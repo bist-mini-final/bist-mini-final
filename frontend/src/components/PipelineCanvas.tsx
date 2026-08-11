@@ -1,0 +1,157 @@
+import { useCallback, useMemo, useState } from 'react';
+import { PanelLeft } from 'lucide-react';
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  type EdgeTypes,
+  type NodeTypes,
+} from '@xyflow/react';
+import { NODE_COLORS, NODE_MODULE_TYPES } from '../config/pipeline';
+import { ModuleSettingsContext } from '../contexts/ModuleSettingsContext';
+import { CustomEdge } from './CustomEdge';
+import { ContextNode } from './CustomNodes/ContextNode';
+import { AnswerCacheWriterNode } from './CustomNodes/AnswerCacheWriterNode';
+import { Bm25RetrieverNode } from './CustomNodes/Bm25RetrieverNode';
+import { BfsLlmStructureDetectorNode } from './CustomNodes/BfsLlmStructureDetectorNode';
+import { CellTextSerializerNode } from './CustomNodes/CellTextSerializerNode';
+import { ExhaustiveCellTextSerializerNode } from './CustomNodes/ExhaustiveCellTextSerializerNode';
+import { CellTextEmbedderNode } from './CustomNodes/CellTextEmbedderNode';
+import { VectorIndexWriterNode } from './CustomNodes/VectorIndexWriterNode';
+import { DecomposerNode } from './CustomNodes/DecomposerNode';
+import { DenseRetrieverNode } from './CustomNodes/DenseRetrieverNode';
+import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
+import { DoclingTableDetectorNode } from './CustomNodes/DoclingTableDetectorNode';
+import { JsonInspectorNode } from './CustomNodes/JsonInspectorNode';
+import { JsonTransformerNode } from './CustomNodes/JsonTransformerNode';
+import { LocalVlmStructureDetectorNode } from './CustomNodes/LocalVlmStructureDetectorNode';
+import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDetectorNode';
+import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
+import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
+import { QueryNode } from './CustomNodes/QueryNode';
+import { ReaderNode } from './CustomNodes/ReaderNode';
+import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
+import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
+import type { usePipelineGraph } from '../hooks/usePipelineGraph';
+import type { ModuleDefinition, WorkflowRun } from '../types';
+
+type PipelineGraph = ReturnType<typeof usePipelineGraph>;
+
+interface PipelineCanvasProps {
+  graph: PipelineGraph;
+  isPaletteOpen: boolean;
+  onOpenPalette: () => void;
+  modules: ModuleDefinition[];
+  runs: WorkflowRun[];
+}
+
+export function PipelineCanvas({
+  graph,
+  isPaletteOpen,
+  onOpenPalette,
+  modules,
+  runs,
+}: PipelineCanvasProps) {
+  const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null);
+  const nodeTypes = useMemo<NodeTypes>(
+    () => ({
+      queryNode: QueryNode,
+      decomposerNode: DecomposerNode,
+      embeddingNode: EmbeddingNode,
+      cell_text_embedder: CellTextEmbedderNode,
+      vector_index_writer: VectorIndexWriterNode,
+      bm25_retriever: Bm25RetrieverNode,
+      dense_retriever: DenseRetrieverNode,
+      rrf_fusion: RrfFusionNode,
+      contextNode: ContextNode,
+      readerNode: ReaderNode,
+      answer_cache_writer: AnswerCacheWriterNode,
+      json_transformer: JsonTransformerNode,
+      json_inspector: JsonInspectorNode,
+      processed_file_selector: ProcessedFileSelectorNode,
+      bfs_llm_structure_detector: BfsLlmStructureDetectorNode,
+      local_vlm_structure_detector: LocalVlmStructureDetectorNode,
+      luna_vlm_structure_detector: LunaVlmStructureDetectorNode,
+      docling_table_detector: DoclingTableDetectorNode,
+      openpyxl_region_detector: OpenpyxlRegionDetectorNode,
+      cell_text_serializer: CellTextSerializerNode,
+      exhaustive_cell_text_serializer: ExhaustiveCellTextSerializerNode,
+    }),
+    []
+  );
+  const edgeTypes = useMemo<EdgeTypes>(() => ({ customEdge: CustomEdge }), []);
+  const openModuleSettings = useCallback((nodeId: string) => setSettingsNodeId(nodeId), []);
+  const settingsNode = settingsNodeId
+    ? graph.nodes.find((node) => node.id === settingsNodeId)
+    : undefined;
+  const settingsModuleType = settingsNode ? NODE_MODULE_TYPES[settingsNode.type ?? ''] : undefined;
+  const settingsModule = settingsModuleType
+    ? modules.find((module) => module.type === settingsModuleType)
+    : undefined;
+  const settingsPreview = undefined;
+
+  return (
+    <ModuleSettingsContext.Provider value={openModuleSettings}>
+      <section className="pipeline-canvas" aria-label="RAG 파이프라인 편집 캔버스">
+      <div className="canvas-hint">
+        {!isPaletteOpen && (
+          <button
+            className="canvas-hint__palette-button"
+            onClick={onOpenPalette}
+            aria-label="모듈 패널 펼치기"
+            title="모듈 패널 펼치기"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </button>
+        )}
+        <span>휠로 확대 · 빈 영역 드래그로 이동</span>
+      </div>
+        <ReactFlow
+        nodes={graph.nodes}
+        edges={graph.edges}
+        onNodesChange={graph.onNodesChange}
+        onEdgesChange={graph.onEdgesChange}
+        onEdgeClick={(_, edge) => {
+          graph.onEdgesChange([{ id: edge.id, type: 'remove' }]);
+        }}
+        onConnect={graph.onConnect}
+        connectOnClick
+        onInit={graph.onInit}
+        onMoveEnd={graph.onMoveEnd}
+        onDrop={graph.onDrop}
+        onDragOver={graph.onDragOver}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.16 }}
+        minZoom={0.2}
+        maxZoom={1.6}
+        defaultEdgeOptions={{ type: 'customEdge' }}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cbd5e1" />
+        <Controls position="bottom-right" showInteractive={false} />
+        <MiniMap
+          position="bottom-left"
+          nodeColor={(node) => NODE_COLORS[node.type ?? ''] ?? '#64748b'}
+          zoomable
+          pannable
+        />
+        </ReactFlow>
+      </section>
+      {settingsNode && settingsModule && (
+        <ModuleSettingsModal
+          nodeId={settingsNode.id}
+          definition={settingsModule}
+          config={(settingsNode.data.config as Record<string, unknown> | undefined) ?? {}}
+          onConfigChange={(patch) => graph.updateNodeConfig(settingsNode.id, patch)}
+          runs={runs}
+          preview={settingsPreview}
+          onClose={() => setSettingsNodeId(null)}
+        />
+      )}
+    </ModuleSettingsContext.Provider>
+  );
+}

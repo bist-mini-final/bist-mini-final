@@ -1,0 +1,301 @@
+import { useCallback, useEffect, useRef } from 'react';
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
+import { Handle, Position, useNodeId, useReactFlow } from '@xyflow/react';
+import { Play, Settings2, Square, Trash2, type LucideIcon } from 'lucide-react';
+import { useOpenModuleSettings } from '../../contexts/ModuleSettingsContext';
+import { useModuleExecution } from '../../contexts/ModuleExecutionContext';
+
+type NodeState = 'idle' | 'active' | 'done' | 'failed' | 'skipped';
+
+interface NodeShellProps {
+  accent: string;
+  icon: LucideIcon;
+  eyebrow: string;
+  title: string;
+  children?: ReactNode;
+  state?: NodeState;
+  selected?: boolean;
+  width?: number;
+  hasInput?: boolean;
+  inputPorts?: string[];
+  hasOutput?: boolean;
+  outputBranches?: string[];
+  headerAccessory?: ReactNode;
+  headerActions?: ReactNode;
+  bodyClassName?: string;
+  onWidthChange?: (width: number) => void;
+  minWidth?: number;
+  maxWidth?: number;
+}
+
+type NodeStyle = CSSProperties & {
+  '--node-accent': string;
+  '--node-width': string;
+};
+
+export function NodeShell({
+  accent,
+  icon: Icon,
+  eyebrow,
+  title,
+  children,
+  state = 'idle',
+  selected = false,
+  width = 320,
+  hasInput = true,
+  inputPorts = [],
+  hasOutput = true,
+  outputBranches = [],
+  headerAccessory,
+  headerActions,
+  bodyClassName = '',
+  onWidthChange,
+  minWidth = 320,
+  maxWidth = 1200,
+}: NodeShellProps) {
+  const nodeId = useNodeId();
+  const { deleteElements, getEdges, getNodes } = useReactFlow();
+  const openModuleSettings = useOpenModuleSettings();
+  const {
+    onExecuteNode,
+    onStopExecution,
+    onClearNodeResult,
+    isExecuting,
+  } = useModuleExecution();
+  const isStopMode = state === 'active' || state === 'done' || state === 'failed';
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+
+  const clampWidth = useCallback(
+    (nextWidth: number) => Math.min(maxWidth, Math.max(minWidth, Math.round(nextWidth))),
+    [maxWidth, minWidth]
+  );
+
+  const stopResize = useCallback(() => {
+    resizeCleanupRef.current?.();
+    resizeCleanupRef.current = null;
+  }, []);
+
+  useEffect(() => stopResize, [stopResize]);
+
+  const startResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!onWidthChange) return;
+    event.preventDefault();
+    event.stopPropagation();
+    stopResize();
+    const startX = event.clientX;
+    const startWidth = width;
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      onWidthChange(clampWidth(startWidth + moveEvent.clientX - startX));
+    };
+    const handlePointerUp = () => stopResize();
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    resizeCleanupRef.current = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [clampWidth, onWidthChange, stopResize, width]);
+
+  const resizeWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!onWidthChange || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onWidthChange(clampWidth(width + (event.key === 'ArrowRight' ? 24 : -24)));
+  }, [clampWidth, onWidthChange, width]);
+
+  const graphEdges = getEdges();
+  const incomingEdges = nodeId
+    ? graphEdges.filter((edge) => edge.target === nodeId)
+    : [];
+  const resolvedInputHandles = inputPorts.length > 0 ? inputPorts : ['in'];
+  const connectedOutputHandles = nodeId
+    ? graphEdges
+        .filter((edge) => edge.source === nodeId && typeof edge.sourceHandle === 'string')
+        .map((edge) => edge.sourceHandle as string)
+    : [];
+  const resolvedOutputHandles = Array.from(
+    new Set([...outputBranches, ...connectedOutputHandles])
+  );
+  const matchesInput = (targetHandle: string | null | undefined, input: string) =>
+    targetHandle === input
+    || (resolvedInputHandles.length === 1 && targetHandle === 'in');
+  const isInputConnected = !hasInput || resolvedInputHandles.every((input) =>
+    incomingEdges.some((edge) => matchesInput(edge.targetHandle, input))
+  );
+  const nodeById = new Map(getNodes().map((node) => [node.id, node]));
+  const isInputReady = !hasInput || resolvedInputHandles.every((input) =>
+    incomingEdges.some((edge) => {
+      if (!matchesInput(edge.targetHandle, input)) return false;
+      const sourceData = nodeById.get(edge.source)?.data;
+      if (sourceData?.executionState !== 'succeeded') return false;
+      const branch = edge.data?.source_branch;
+      return typeof branch !== 'string' || sourceData.executionOutcome === branch;
+    })
+  );
+  const isRunDisabled = !isStopMode && (!isInputReady || isExecuting);
+
+  const style: NodeStyle = {
+    '--node-accent': accent,
+    '--node-width': `${width}px`,
+  };
+
+  return (
+    <section className="flow-node" data-state={state} data-selected={selected ? 'true' : 'false'} style={style}>
+      {hasInput && resolvedInputHandles.map((input, index, handles) => {
+        const top = `${((index + 1) / (handles.length + 1)) * 100}%`;
+        return (
+          <div key={input} className="flow-node__input-port" style={{ top }}>
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={input}
+              className="nodrag nopan flow-node__handle"
+              isConnectable
+              title={`${input} 입력 연결`}
+            />
+            {handles.length > 1 && <span>{input}</span>}
+          </div>
+        );
+      })}
+
+      <header className="flow-node__header">
+        <div className="flow-node__icon" aria-hidden="true">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flow-node__eyebrow">{eyebrow}</div>
+          <div className="flow-node__title">{title}</div>
+        </div>
+        <div className="flow-node__header-actions">
+          {headerAccessory ?? <span className="flow-node__status" aria-hidden="true" />}
+          {headerActions}
+          <button
+            type="button"
+            className={`nodrag nopan flow-node__action ${
+              isStopMode ? 'flow-node__stop' : 'flow-node__execute'
+            } ${
+              isRunDisabled ? 'opacity-30 cursor-not-allowed' : ''
+            }`}
+            disabled={isRunDisabled}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (isStopMode) {
+                if (state === 'active' && isExecuting) {
+                  onStopExecution();
+                  if (nodeId) onClearNodeResult(nodeId);
+                } else if (nodeId) {
+                  onClearNodeResult(nodeId);
+                }
+                return;
+              }
+              if (nodeId && isInputReady && !isExecuting) {
+                onExecuteNode(nodeId);
+              }
+            }}
+            aria-label={
+              isStopMode
+                ? state === 'active'
+                  ? `${title} 실행 정지`
+                  : `${title} 결과 숨기기`
+                : `${title} 단독 실행`
+            }
+            title={
+              isStopMode
+                ? state === 'active'
+                  ? '실행 정지'
+                  : '결과 표시 지우기'
+                : !isInputConnected
+                ? '입력 연결이 필요합니다 (상류 모듈과 선을 연결하세요)'
+                : !isInputReady
+                  ? '상류 모듈의 실행 결과가 필요합니다'
+                : `${title} 단독 실행`
+            }
+          >
+            {isStopMode
+              ? <Square className="h-3.5 w-3.5 fill-current" />
+              : <Play className="h-3.5 w-3.5 fill-current" />}
+          </button>
+          <button
+            type="button"
+            className="nodrag nopan flow-node__action flow-node__settings"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (nodeId) openModuleSettings?.(nodeId);
+            }}
+            aria-label={`${title} 상세 설정`}
+            title="입출력 스키마 및 상세 설정"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="nodrag nopan flow-node__action flow-node__delete"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (nodeId) void deleteElements({ nodes: [{ id: nodeId }] });
+            }}
+            aria-label={`${title} 모듈 삭제`}
+            title="모듈 삭제"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </header>
+
+      {children !== undefined && children !== null && (
+        <div className={`flow-node__body ${bodyClassName}`}>{children}</div>
+      )}
+
+      {hasOutput && (resolvedOutputHandles.length > 0 ? resolvedOutputHandles : ['out']).map((branch, index, handles) => (
+        <Handle
+          key={branch}
+          type="source"
+          position={Position.Right}
+          id={branch}
+          className={`nodrag nopan flow-node__handle${branch === 'out' ? '' : ' flow-node__branch-handle'}`}
+          data-branch={branch === 'out' ? undefined : branch}
+          style={{ top: `${((index + 1) / (handles.length + 1)) * 100}%` }}
+          isConnectable
+          title={branch === 'out' ? '출력 연결' : `${branch} 출력 연결`}
+        />
+      ))}
+
+      {onWidthChange && (
+        <div
+          className="nodrag nopan flow-node__resize-handle"
+          role="separator"
+          aria-label={`${title} 가로 크기 조절`}
+          aria-orientation="vertical"
+          aria-valuemin={minWidth}
+          aria-valuemax={maxWidth}
+          aria-valuenow={width}
+          tabIndex={0}
+          title="드래그하여 모듈 너비 조절"
+          onPointerDown={startResize}
+          onKeyDown={resizeWithKeyboard}
+        />
+      )}
+    </section>
+  );
+}
+
+export function getExecutionNodeState(
+  executionState: string | undefined
+): NodeState {
+  if (executionState === 'idle') return 'idle';
+  if (executionState === 'failed') return 'failed';
+  if (executionState === 'skipped') return 'skipped';
+  if (executionState === 'running') return 'active';
+  if (executionState === 'succeeded') return 'done';
+  return 'idle';
+}

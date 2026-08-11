@@ -1,0 +1,115 @@
+from typing import Any, Dict, List, Optional
+
+from .answer_cache import AnswerCacheRepository
+from .chat_completion import ChatCompletionClient
+from .embedding_artifacts import EmbeddingArtifactStore
+from .vector_index_store import VectorIndexStore
+from .modules.base import ExecutableModule
+from .modules.answer_cache_writer import AnswerCacheWriterModule
+from .modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
+from .modules.context_expander import ContextExpanderModule
+from .modules.bm25_retriever import Bm25RetrieverModule
+from .modules.cell_text_serializer import CellTextSerializerModule
+from .modules.cell_text_embedder import CellTextEmbedderModule
+from .modules.decomposer import DecomposerModule
+from .modules.dense_retriever import DenseRetrieverModule
+from .modules.embedder import EmbedderModule, EmbeddingEncoder
+from .modules.docling_table_detector import DoclingTableDetectorModule
+from .modules.exhaustive_cell_text_serializer import (
+    ExhaustiveCellTextSerializerModule,
+)
+from .modules.json_inspector import JsonInspectorModule
+from .modules.json_transformer import JsonTransformerModule
+from .modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
+from .modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
+from .modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
+from .modules.processed_file_selector import ProcessedFileSelectorModule
+from .modules.query_input import QueryInputModule
+from .modules.reader import ReaderModule
+from .modules.rrf_fusion import RrfFusionModule
+from .modules.vector_index_writer import VectorIndexWriterModule
+
+
+class ModuleRegistry:
+    """Owns module discovery and independent execution by module type."""
+
+    def __init__(
+        self,
+        repository: AnswerCacheRepository,
+        completion_client: Optional[ChatCompletionClient] = None,
+        embedding_encoder: Optional[EmbeddingEncoder] = None,
+        embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
+        vector_index_store: Optional[VectorIndexStore] = None,
+    ) -> None:
+        self.repository = repository
+        self.embedding_artifact_store = (
+            embedding_artifact_store or EmbeddingArtifactStore()
+        )
+        self.vector_index_store = vector_index_store or VectorIndexStore()
+        self.isolated_worker_spec: Optional[Dict[str, str]] = None
+        if (
+            completion_client is None
+            and embedding_encoder is None
+            and repository.path is not None
+        ):
+            self.isolated_worker_spec = {
+                "answer_cache_path": str(repository.path),
+                "embedding_artifact_dir": str(self.embedding_artifact_store.directory),
+                "vector_index_dir": str(self.vector_index_store.directory),
+            }
+        modules: List[ExecutableModule] = [
+            QueryInputModule(repository),
+            DecomposerModule(completion_client),
+            EmbedderModule(embedding_encoder),
+            CellTextEmbedderModule(
+                embedding_encoder,
+                self.embedding_artifact_store,
+            ),
+            VectorIndexWriterModule(
+                self.embedding_artifact_store,
+                self.vector_index_store,
+            ),
+            Bm25RetrieverModule(),
+            DenseRetrieverModule(self.vector_index_store),
+            RrfFusionModule(),
+            ContextExpanderModule(),
+            ReaderModule(completion_client),
+            AnswerCacheWriterModule(repository),
+            JsonTransformerModule(),
+            JsonInspectorModule(),
+            ProcessedFileSelectorModule(),
+            BfsLlmStructureDetectorModule(completion_client),
+            LocalVlmStructureDetectorModule(),
+            LunaVlmStructureDetectorModule(),
+            DoclingTableDetectorModule(),
+            OpenpyxlRegionDetectorModule(),
+            CellTextSerializerModule(),
+            ExhaustiveCellTextSerializerModule(),
+        ]
+        self._modules = {module.definition.type: module for module in modules}
+
+    def definitions(self) -> List[Dict[str, Any]]:
+        return [module.contract() for module in self._modules.values()]
+
+    def definition(self, module_type: str) -> Dict[str, Any]:
+        return self.get(module_type).contract()
+
+    def get(self, module_type: str) -> ExecutableModule:
+        try:
+            return self._modules[module_type]
+        except KeyError as error:
+            raise KeyError(f"지원하지 않는 모듈입니다: {module_type}") from error
+
+    def execute(
+        self, module_type: str, payload: Any
+    ) -> Any:
+        return self.get(module_type).run(payload)
+
+    def clear_caches(self) -> Dict[str, int]:
+        """Clear domain caches owned by registered modules."""
+
+        return {
+            "answers_removed": self.repository.clear_cached_answers(),
+            "embedding_artifacts_removed": self.embedding_artifact_store.clear(),
+            "vector_indexes_removed": self.vector_index_store.clear(),
+        }
