@@ -27,11 +27,20 @@ dist/
 
 # Runtime output
 *.log
-data/runs/
-data/cache/
-data/artifacts/
-data/vector_db/
-data/processed/
+data/runs/*
+!data/runs/.gitkeep
+data/cache/*
+!data/cache/.gitkeep
+data/artifacts/*
+data/artifacts/**
+!data/artifacts/embeddings/
+!data/artifacts/embeddings/.gitkeep
+!data/artifacts/spreadsheets/
+!data/artifacts/spreadsheets/.gitkeep
+data/vector_db/*
+!data/vector_db/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 data/workflows/workflow.json
 tmp/
 
