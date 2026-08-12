@@ -105,11 +105,12 @@ export const pipelineApi = {
   createRun(
     workflowId: string,
     inputs: Record<string, Record<string, unknown>>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    inheritFromRunId?: string
   ) {
     return postJson<WorkflowRun>(
       `/api/workflows/${workflowId}/runs`,
-      { inputs, use_cache: true },
+      { inputs, use_cache: true, ...(inheritFromRunId ? { inherit_from_run_id: inheritFromRunId } : {}) },
       signal
     );
   },

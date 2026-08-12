@@ -4,18 +4,23 @@ from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..bge_encoder import BgeEncoder, DEFAULT_BGE_MODEL
+from ..bge_encoder import DEFAULT_BGE_MODEL
 from ..embedding_artifacts import EmbeddingArtifactStore
+from ..embedding_factory import EmbeddingEncoder, get_embedding_encoder
 from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
-from .embedder import EmbeddingEncoder
+from .embedder import EMBEDDING_MODEL_OPTIONS
 
 
 class CellTextEmbedderInput(CellTextSerializerOutput):
     model: str = Field(
-        default=DEFAULT_BGE_MODEL,
+        default="text-embedding-3-large",
         min_length=1,
-        description="Excel 셀 문서 임베딩에 사용할 Hugging Face 모델 ID",
+        description="Excel 셀 문서 임베딩에 사용할 Hugging Face 또는 OpenAI 모델 ID",
+        json_schema_extra={
+            "enum": EMBEDDING_MODEL_OPTIONS,
+            "options": EMBEDDING_MODEL_OPTIONS,
+        },
     )
     batch_size: int = Field(
         default=64,
@@ -47,14 +52,14 @@ class CellTextEmbeddingsDTO(ModuleDTO):
 class CellTextEmbedderModule(ExecutableModule):
     definition = ModuleDefinition(
         type="cell_text_embedder",
-        label="BGE Cell Text Embedder",
+        label="Cell Text Embedder",
         category="Logic",
         description="직렬화된 Excel 셀 문서를 배치 임베딩하고 원본 메타데이터와 함께 반환합니다.",
         inputs=["input"],
         outputs=["output"],
         config_fields=["model", "batch_size"],
         raw_output=True,
-        version="2",
+        version="3",
     )
     input_model = CellTextEmbedderInput
     output_model = CellTextEmbeddingsDTO
@@ -69,11 +74,11 @@ class CellTextEmbedderModule(ExecutableModule):
         self._encoders: Dict[str, EmbeddingEncoder] = {}
 
     def _encoder_for(self, model_name: str) -> EmbeddingEncoder:
-        if self.encoder is not None:
-            return self.encoder
-        if model_name not in self._encoders:
-            self._encoders[model_name] = BgeEncoder(model_name)
-        return self._encoders[model_name]
+        return get_embedding_encoder(
+            model_name,
+            override_encoder=self.encoder,
+            cache=self._encoders,
+        )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(CellTextEmbedderInput, payload)

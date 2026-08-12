@@ -222,7 +222,19 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       data: { ...node.data, ...sharedNodeData(node.type) },
     }))
   );
-  const [edges, setEdges, onEdgesChange] = useEdgesState(createInitialEdges());
+  const [edges, setEdges, _onEdgesChange] = useEdgesState(createInitialEdges());
+
+  // Block automatic ReactFlow 'remove' events for edges only.
+  // Edge removal is handled exclusively by the × button in CustomEdge.
+  // Node removal via the trash button (deleteElements) still works normally since
+  // it goes through onNodesChange which ReactFlow also uses to clean up connected edges.
+  // The keyboard shortcut (Backspace / Delete) is disabled via deleteKeyCode={null}
+  // in PipelineCanvas, so only explicit UI interactions can delete anything.
+  const onEdgesChange = useCallback<typeof _onEdgesChange>(
+    (changes) => _onEdgesChange(changes.filter((c) => c.type !== 'remove')),
+    [_onEdgesChange]
+  );
+
   const dagSummary = useMemo(() => summarizeDag(nodes, edges), [edges, nodes]);
 
   useEffect(() => {
@@ -426,16 +438,22 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       const branchOutputs = objectConfig(sourceNode?.data.branchOutputs);
       const sourceDefinition = sourceNode?.data.moduleDefinition as ModuleDefinition | undefined;
       const targetDefinition = targetNode?.data.moduleDefinition as ModuleDefinition | undefined;
-      const sourceOutput = sourceBranch && typeof branchOutputs[sourceBranch] === 'string'
-        ? branchOutputs[sourceBranch]
-        : sourceDefinition?.outputs.length === 1
-          ? sourceDefinition.outputs[0]
-          : undefined;
-      const targetInput = connection.targetHandle && connection.targetHandle !== 'in'
+      const sourceOutput = connection.sourceHandle && sourceDefinition?.outputs.includes(connection.sourceHandle)
+        ? connection.sourceHandle
+        : sourceBranch && typeof branchOutputs[sourceBranch] === 'string'
+          ? branchOutputs[sourceBranch]
+          : sourceDefinition?.outputs.length === 1
+            ? sourceDefinition.outputs[0]
+            : connection.sourceHandle && connection.sourceHandle !== 'out'
+              ? connection.sourceHandle
+              : undefined;
+      const targetInput = connection.targetHandle && targetDefinition?.inputs.includes(connection.targetHandle)
         ? connection.targetHandle
-        : targetDefinition?.inputs.length === 1
-          ? targetDefinition.inputs[0]
-          : undefined;
+        : connection.targetHandle && connection.targetHandle !== 'in'
+          ? connection.targetHandle
+          : targetDefinition?.inputs.length === 1
+            ? targetDefinition.inputs[0]
+            : undefined;
       const sourceColor = NODE_COLORS[sourceNode?.type ?? ''] ?? NODE_COLORS.queryNode;
       setEdges((currentEdges) =>
         addEdge(
@@ -491,21 +509,29 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
         },
       }];
     }),
-    edges: edges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      ...(typeof edge.data?.source_output === 'string'
-        ? { source_output: edge.data.source_output }
-        : {}),
-      ...(typeof edge.data?.target_input === 'string'
-        ? { target_input: edge.data.target_input }
-        : {}),
-      ...(typeof edge.data?.source_branch === 'string' &&
-      EXECUTION_BRANCHES.has(edge.data.source_branch)
-        ? { source_branch: edge.data.source_branch as WorkflowGraph['edges'][number]['source_branch'] }
-        : {}),
-    })),
+    edges: edges.map((edge) => {
+      const sourceOutput = typeof edge.data?.source_output === 'string' && edge.data.source_output
+        ? edge.data.source_output
+        : typeof edge.sourceHandle === 'string' && edge.sourceHandle !== 'out'
+          ? edge.sourceHandle
+          : undefined;
+      const targetInput = typeof edge.data?.target_input === 'string' && edge.data.target_input
+        ? edge.data.target_input
+        : typeof edge.targetHandle === 'string' && edge.targetHandle !== 'in'
+          ? edge.targetHandle
+          : undefined;
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        ...(sourceOutput ? { source_output: sourceOutput } : {}),
+        ...(targetInput ? { target_input: targetInput } : {}),
+        ...(typeof edge.data?.source_branch === 'string' &&
+        EXECUTION_BRANCHES.has(edge.data.source_branch)
+          ? { source_branch: edge.data.source_branch as WorkflowGraph['edges'][number]['source_branch'] }
+          : {}),
+      };
+    }),
     viewport: viewportRef.current,
   }), [edges, nodes]);
 
@@ -549,10 +575,9 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
             id: workflowEdge.id,
             source: workflowEdge.source,
             target: workflowEdge.target,
-            sourceHandle: workflowEdge.source_branch ?? 'out',
-            targetHandle: targetDefinition && targetDefinition.inputs.length > 1
-              ? workflowEdge.target_input ?? 'in'
-              : 'in',
+            sourceHandle: workflowEdge.source_branch ?? workflowEdge.source_output ?? 'out',
+            targetHandle: workflowEdge.target_input
+              ?? (targetDefinition && targetDefinition.inputs.length > 1 ? 'in' : 'in'),
             type: 'customEdge',
             data: {
               active: false,
@@ -728,6 +753,21 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     setEdges([]);
   }, [setEdges, setNodes]);
 
+  /** Explicitly remove a node and all edges connected to it. */
+  const deleteNode = useCallback(
+    (nodeId: string) => {
+      setEdges((currentEdges) =>
+        currentEdges.filter(
+          (edge) => edge.source !== nodeId && edge.target !== nodeId
+        )
+      );
+      setNodes((currentNodes) =>
+        currentNodes.filter((node) => node.id !== nodeId)
+      );
+    },
+    [setEdges, setNodes]
+  );
+
   return {
     nodes,
     edges,
@@ -740,6 +780,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     onInit,
     onMoveEnd,
     addNode,
+    deleteNode,
     updateNodeConfig,
     exportGraph,
     replaceGraph,

@@ -379,7 +379,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 21)
+        self.assertEqual(len(definitions), 22)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
@@ -404,6 +404,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "openpyxl_region_detector",
                 "cell_text_serializer",
                 "exhaustive_cell_text_serializer",
+                "prebuilt_index_loader",
             },
         )
 
@@ -551,7 +552,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 21)
+        self.assertEqual(len(modules), 22)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -2279,5 +2280,155 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertEqual(client.get("/api/workflows/api-flow").status_code, 200)
 
 
+class OpenAIEmbeddingEncoderTest(unittest.TestCase):
+    def test_get_embedding_encoder_factory(self):
+        from backend.bge_encoder import BgeEncoder
+        from backend.embedding_factory import get_embedding_encoder
+        from backend.openai_embedding_encoder import OpenAIEmbeddingEncoder
+
+        openai_encoder = get_embedding_encoder("text-embedding-3-small")
+        self.assertIsInstance(openai_encoder, OpenAIEmbeddingEncoder)
+
+        bge_encoder = get_embedding_encoder("BAAI/bge-large-en-v1.5")
+        self.assertIsInstance(bge_encoder, BgeEncoder)
+
+    @patch("backend.openai_embedding_encoder.urlopen")
+    def test_openai_embedding_encode_success(self, mock_urlopen):
+        from backend.openai_embedding_encoder import OpenAIEmbeddingEncoder
+        import io
+
+        mock_response_data = json.dumps({
+            "data": [
+                {"index": 0, "embedding": [3.0, 4.0]},
+                {"index": 1, "embedding": [1.0, 0.0]}
+            ]
+        }).encode("utf-8")
+
+        class MockHTTPResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+            def read(self):
+                return mock_response_data
+
+        mock_urlopen.return_value = MockHTTPResponse()
+
+        encoder = OpenAIEmbeddingEncoder(
+            model_name="text-embedding-3-small",
+            api_key="test-key",
+        )
+        vectors = encoder.encode(["query 1", "query 2"])
+
+        self.assertEqual(len(vectors), 2)
+        # Check L2 normalization: [3, 4] normalized to [0.6, 0.8]
+        self.assertAlmostEqual(vectors[0][0], 0.6)
+        self.assertAlmostEqual(vectors[0][1], 0.8)
+        self.assertAlmostEqual(vectors[1][0], 1.0)
+        self.assertAlmostEqual(vectors[1][1], 0.0)
+
+
+class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.vector_index_dir = Path(self.temp_dir.name) / "vector_db"
+        self.processed_dir = Path(self.temp_dir.name) / "processed"
+        self.vector_index_dir.mkdir(parents=True, exist_ok=True)
+        self.processed_dir.mkdir(parents=True, exist_ok=True)
+
+        self.vector_index_store = VectorIndexStore(self.vector_index_dir)
+        self.prebuilt_json_path = self.processed_dir / "test_prebuilt.json"
+
+        # Write sample prebuilt single JSON index file
+        sample_payload = {
+            "file_name": "Test_Workbook.xlsx",
+            "workbook_hash": "a1b2c3d4e5f67890",
+            "model": "BAAI/bge-large-en-v1.5",
+            "dimension": 2,
+            "items": [
+                {
+                    "sheet_name": "Key Stats",
+                    "cell_address": "E10",
+                    "text": "Sheet: Key Stats | Row Header: Total Revenue | Column Header: 2025-12-31 | Cell Value: 1000",
+                    "embedding": [1.0, 0.0],
+                },
+                {
+                    "sheet_name": "Key Stats",
+                    "cell_address": "E11",
+                    "text": "Sheet: Key Stats | Row Header: Net Income | Column Header: 2025-12-31 | Cell Value: 200",
+                    "embedding": [0.0, 1.0],
+                },
+            ],
+        }
+        self.prebuilt_json_path.write_text(json.dumps(sample_payload), encoding="utf-8")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_prebuilt_index_loader_execution(self):
+        from backend.modules.prebuilt_index_loader import (
+            PrebuiltIndexLoaderInput,
+            PrebuiltIndexLoaderModule,
+        )
+
+        loader = PrebuiltIndexLoaderModule(
+            vector_index_store=self.vector_index_store,
+            search_dirs=[self.processed_dir],
+        )
+
+        result = loader.execute(
+            PrebuiltIndexLoaderInput(file_name="test_prebuilt.json")
+        )
+
+        self.assertIn("document_output", result)
+        self.assertIn("index_output", result)
+
+        doc_out = result["document_output"]
+        idx_out = result["index_output"]
+
+        self.assertEqual(doc_out["file_name"], "Test_Workbook.xlsx")
+        self.assertEqual(len(doc_out["items"]), 2)
+        self.assertEqual(idx_out["document_count"], 2)
+        self.assertEqual(idx_out["dimension"], 2)
+        self.assertEqual(len(idx_out["index_id"]), 64)
+
+        from backend.modules.bm25_retriever import Bm25RetrieverInput, Bm25RetrieverModule
+        from backend.modules.dense_retriever import DenseRetrieverInput, DenseRetrieverModule
+
+        bm25_retriever = Bm25RetrieverModule()
+        dense_retriever = DenseRetrieverModule(index_store=self.vector_index_store)
+
+        index_input = {
+            "index_id": idx_out["index_id"],
+            "workbook_hash": idx_out["workbook_hash"],
+            "model": idx_out["model"],
+            "dimension": idx_out["dimension"],
+            "document_count": idx_out["document_count"],
+        }
+        dense_res = dense_retriever.execute(
+            DenseRetrieverInput.model_validate({
+                "query_input": {
+                    "question_id": "q1",
+                    "items": {"Revenue": [1.0, 0.0]},
+                },
+                "index_input": index_input,
+            })
+        )
+        self.assertTrue(len(dense_res["items"]) > 0)
+
+        bm25_res = bm25_retriever.execute(
+            Bm25RetrieverInput.model_validate({
+                "query_input": {
+                    "question_id": "q1",
+                    "subqueries": ["Total Revenue"],
+                },
+                "document_input": doc_out,
+            })
+        )
+        self.assertTrue(len(bm25_res["items"]) > 0)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+

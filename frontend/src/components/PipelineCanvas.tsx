@@ -30,6 +30,7 @@ import { LocalVlmStructureDetectorNode } from './CustomNodes/LocalVlmStructureDe
 import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDetectorNode';
 import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
 import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
+import { PrebuiltIndexLoaderNode } from './CustomNodes/PrebuiltIndexLoaderNode';
 import { QueryNode } from './CustomNodes/QueryNode';
 import { ReaderNode } from './CustomNodes/ReaderNode';
 import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
@@ -71,6 +72,7 @@ export function PipelineCanvas({
       json_transformer: JsonTransformerNode,
       json_inspector: JsonInspectorNode,
       processed_file_selector: ProcessedFileSelectorNode,
+      prebuilt_index_loader: PrebuiltIndexLoaderNode,
       bfs_llm_structure_detector: BfsLlmStructureDetectorNode,
       local_vlm_structure_detector: LocalVlmStructureDetectorNode,
       luna_vlm_structure_detector: LunaVlmStructureDetectorNode,
@@ -113,9 +115,6 @@ export function PipelineCanvas({
         edges={graph.edges}
         onNodesChange={graph.onNodesChange}
         onEdgesChange={graph.onEdgesChange}
-        onEdgeClick={(_, edge) => {
-          graph.onEdgesChange([{ id: edge.id, type: 'remove' }]);
-        }}
         onConnect={graph.onConnect}
         connectOnClick
         onInit={graph.onInit}
@@ -130,6 +129,7 @@ export function PipelineCanvas({
         maxZoom={1.6}
         defaultEdgeOptions={{ type: 'customEdge' }}
         proOptions={{ hideAttribution: true }}
+        deleteKeyCode={null}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cbd5e1" />
         <Controls position="bottom-right" showInteractive={false} />

@@ -178,6 +178,51 @@ class WorkflowExecutor:
             for batch_index, node_ids in enumerate(batches)
             for node_id in node_ids
         }
+
+        # Collect node states to inherit from a previous run when only new nodes
+        # have been added.  Only nodes that (a) still exist in the new graph with
+        # the same module_type and config, and (b) completed successfully are
+        # copied so that upstream branch checks pass for the new node.
+        inherited_states: Dict[str, RunNodeState] = {}
+        if request.inherit_from_run_id:
+            try:
+                prev_run = self.run_store.load(request.inherit_from_run_id)
+                # Build a lookup of the new graph's nodes
+                new_node_map = {
+                    node.id: node for node in workflow.graph.nodes
+                }
+                new_edge_set = {
+                    (e.source, e.target, e.source_output, e.target_input, e.source_branch)
+                    for e in workflow.graph.edges
+                }
+                prev_edge_set = {
+                    (e.source, e.target, e.source_output, e.target_input, e.source_branch)
+                    for e in prev_run.graph.edges
+                }
+                for prev_node in prev_run.graph.nodes:
+                    new_node = new_node_map.get(prev_node.id)
+                    if new_node is None:
+                        continue  # node was removed — skip
+                    if new_node.module_type != prev_node.module_type:
+                        continue  # module type changed — skip
+                    if new_node.config != prev_node.config:
+                        continue  # config changed — skip
+                    # Check that all edges touching this node are still present
+                    prev_node_edges = {
+                        e for e in prev_edge_set
+                        if e[0] == prev_node.id or e[1] == prev_node.id
+                    }
+                    if not prev_node_edges.issubset(new_edge_set):
+                        continue  # edges changed — skip
+                    prev_state = prev_run.nodes.get(prev_node.id)
+                    if prev_state is None:
+                        continue
+                    if prev_state.status not in ("succeeded", "skipped"):
+                        continue  # only inherit terminal states
+                    inherited_states[prev_node.id] = prev_state
+            except (FileNotFoundError, ValueError):
+                pass  # ignore missing / corrupt previous run
+
         run = WorkflowRun(
             id=f"run-{uuid4().hex}",
             workflow_id=workflow.id,
@@ -190,14 +235,24 @@ class WorkflowExecutor:
                 for index, node_ids in enumerate(batches)
             ],
             nodes={
-                node.id: RunNodeState(
-                    node_id=node.id,
-                    module_type=node.module_type,
-                    batch_index=batch_index_by_node[node.id],
+                node.id: (
+                    inherited_states[node.id].model_copy(
+                        update={"batch_index": batch_index_by_node[node.id]}
+                    )
+                    if node.id in inherited_states
+                    else RunNodeState(
+                        node_id=node.id,
+                        module_type=node.module_type,
+                        batch_index=batch_index_by_node[node.id],
+                    )
                 )
                 for node in workflow.graph.nodes
             },
         )
+        # When inheriting, update the run status to reflect already-completed
+        # nodes so the run is not stuck in 'queued' with completed batches.
+        if inherited_states:
+            self._refresh_run_status(run)
         return self.run_store.save(run)
 
     def execute_next_batch(self, run_id: str) -> WorkflowRun:

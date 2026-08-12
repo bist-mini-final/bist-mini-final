@@ -617,6 +617,43 @@ textarea:focus-visible {
   pointer-events: none;
 }
 
+/* Edge delete button */
+.edge-delete-btn-wrapper {
+  position: absolute;
+  font-size: 0;
+}
+
+.edge-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+  padding: 0;
+}
+
+/* Show button when hovering over the edge path or the button itself */
+.react-flow__edge:hover .edge-delete-btn,
+.edge-delete-btn:hover {
+  opacity: 1;
+}
+
+.edge-delete-btn:hover {
+  color: #ef4444;
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
 .react-flow__node {
   border-radius: var(--radius-lg);
   font-family: inherit;

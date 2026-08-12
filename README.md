@@ -35,22 +35,9 @@ source .venv/bin/activate  # Windows (CMD/PowerShell): .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> [!TIP]
-> **Windows 및 CPU 환경 호환성**: `bge-large-en-v1.5` 모델은 PyTorch CPU 런타임에서도 문제없이 동작합니다. CUDA GPU 가속이 없는 Windows CPU 환경에서도 정상 작동합니다.
-
 ---
 
-### 2. BGE 임베딩 모델 사전 다운로드
-
-본 프로젝트의 BGE 임베딩 모듈(`bge_encoder.py`)은 오프라인 가동을 위해 `local_files_only=True` 옵션이 적용되어 있습니다. 최초 1회 로컬 캐시에 모델을 다운로드해야 합니다.
-
-```bash
-python -c "from transformers import AutoModel, AutoTokenizer; AutoTokenizer.from_pretrained('BAAI/bge-large-en-v1.5'); AutoModel.from_pretrained('BAAI/bge-large-en-v1.5')"
-```
-
----
-
-### 3. 환경변수 설정
+### 2. 환경변수 설정
 
 팀 노션에서 `.env` 관련 설정 정보(`OPENAI_API_KEY` 등)를 확인하여 프로젝트 루트에 `.env` 파일을 생성합니다.
 
@@ -62,8 +49,40 @@ cp .env.example .env
 
 | 변수 | 필수 | 설명 |
 |---|---|---|
-| `OPENAI_API_KEY` | ✅ | Decomposer, Luna Full-Sheet 모듈에 사용 (팀 노션 참고) |
+| `OPENAI_API_KEY` | ✅ | Decomposer, Reader, OpenAI Embeddings (`text-embedding-3-large`) 모듈에 사용 |
 | `OPENAI_BASE_URL` | ⬜ | 기본값 `https://api.openai.com/v1`. 호환 API 사용 시 변경 |
+
+> [!IMPORTANT]
+> 기본 워크플로의 임베딩 모듈(`Embedder`, `Cell Text Embedder`)은 `text-embedding-3-large` (OpenAI API)를 기본값으로 사용합니다. `OPENAI_API_KEY`가 없으면 임베딩 단계를 실행할 수 없습니다.
+
+---
+
+### 3. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
+
+> [!IMPORTANT]
+> 기본 워크플로(`Pre-built Vector Index Loader` 노드)는 사전 임베딩된 인덱스 파일을 로드합니다. 아래 파일을 구글 드라이브에서 받아 `data/processed/`에 배치해야 파이프라인을 바로 실행할 수 있습니다.
+
+**구글 드라이브에서 다운로드할 파일:**
+
+| 파일명 | 설명 |
+|---|---|
+| `SPG_Company_KeyStats_v3_prebuilt.json` | Key Stats 시트 사전 임베딩 인덱스 (약 200~400 MB) |
+
+```
+data/processed/
+└── SPG_Company_KeyStats_v3_prebuilt.json   ← 구글 드라이브에서 다운로드 후 배치
+```
+
+> [!NOTE]
+> prebuilt 인덱스는 `text-embedding-3-large` 모델로 생성되었습니다. 다른 모델로 만든 인덱스를 사용하려면 Dense Retriever의 쿼리 임베딩 모델도 같은 모델로 변경해야 합니다.
+
+**인덱스를 직접 빌드하려면** (선택):
+
+기존 Excel 파일에서 처음부터 인덱스를 생성하려면 `cell_text_embedder` → `vector_index_writer` 파이프라인을 실행한 뒤 아래 명령으로 export합니다.
+
+```bash
+python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output data/processed/SPG_Company_KeyStats_v3_prebuilt.json
+```
 
 ---
 
@@ -75,8 +94,11 @@ cp .env.example .env
 
 ```
 data/processed/
-└── SPG_Company_KeyStats_v3.xlsm   ← 구글 드라이브에서 다운로드 후 배치
+└── SPG_Company_KeyStats_v3.xlsm   ← 구글 드라이브에서 다운로드 후 배치 (Excel 직접 파싱 파이프라인에만 필요)
 ```
+
+> [!NOTE]
+> 사전 구축 인덱스(`prebuilt.json`)를 사용하는 기본 워크플로에서는 Excel 원본 파일 없이도 검색·답변 파이프라인을 실행할 수 있습니다.
 
 ### 5. 프론트엔드 의존성 설치
 
@@ -93,6 +115,19 @@ Local VLM Structure Detector 노드를 사용하려면 Ollama와 모델이 필�
 # Ollama 설치: https://ollama.com
 ollama pull qwen3-vl:4b-instruct
 ```
+
+### 7. (선택) 로컬 BGE 임베딩 모델 설치
+
+`BAAI/bge-large-en-v1.5` 모델을 사용하려면 (OpenAI API 없이 로컬 임베딩을 원할 때) 최초 1회 모델을 다운로드해야 합니다.
+
+> [!NOTE]
+> 기본 워크플로는 `text-embedding-3-large` (OpenAI API)를 사용하므로 **BGE 설치는 선택 사항**입니다. 로컬 임베딩이 필요한 경우에만 아래 명령을 실행하세요.
+
+```bash
+python3 -c "from transformers import AutoModel, AutoTokenizer; AutoTokenizer.from_pretrained('BAAI/bge-large-en-v1.5'); AutoModel.from_pretrained('BAAI/bge-large-en-v1.5')"
+```
+
+`Embedder` 또는 `Cell Text Embedder` 노드의 모델 설정에서 `BAAI/bge-large-en-v1.5`를 선택하면 로컬 모델을 사용합니다.
 
 ---
 

@@ -36,6 +36,7 @@ export const MODULE_NODE_TYPES: Record<ModuleType, string> = {
   openpyxl_region_detector: 'openpyxl_region_detector',
   cell_text_serializer: 'cell_text_serializer',
   exhaustive_cell_text_serializer: 'exhaustive_cell_text_serializer',
+  prebuilt_index_loader: 'prebuilt_index_loader',
 };
 
 export const NODE_MODULE_TYPES: Record<string, ModuleType> = Object.fromEntries(
@@ -48,6 +49,7 @@ export const NODE_COLORS: Record<string, string> = {
   embeddingNode: PIPELINE_STAGES[2].color,
   cell_text_embedder: '#0f766e',
   vector_index_writer: '#0f766e',
+  prebuilt_index_loader: '#059669',
   bm25_retriever: PIPELINE_STAGES[3].color,
   dense_retriever: PIPELINE_STAGES[4].color,
   rrf_fusion: PIPELINE_STAGES[5].color,

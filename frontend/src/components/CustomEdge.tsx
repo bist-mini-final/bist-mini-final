@@ -1,5 +1,5 @@
-import React from 'react';
-import { BaseEdge, EdgeProps, getBezierPath } from '@xyflow/react';
+import React, { useCallback } from 'react';
+import { BaseEdge, EdgeProps, EdgeLabelRenderer, getBezierPath, useReactFlow } from '@xyflow/react';
 
 export const CustomEdge: React.FC<EdgeProps> = ({
   id,
@@ -13,7 +13,8 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   markerEnd,
   data,
 }) => {
-  const [edgePath] = getBezierPath({
+  const { setEdges } = useReactFlow();
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -25,6 +26,14 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   const isActive = data?.active;
   const isDone = data?.done;
   const color = (data?.color as string) || '#6366f1';
+
+  const onDelete = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      setEdges((edges) => edges.filter((edge) => edge.id !== id));
+    },
+    [id, setEdges]
+  );
 
   return (
     <>
@@ -41,6 +50,26 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           transition: 'stroke 0.3s, stroke-width 0.3s',
         }}
       />
+
+      {/* Delete button shown on hover */}
+      <EdgeLabelRenderer>
+        <div
+          className="edge-delete-btn-wrapper"
+          style={{
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+        >
+          <button
+            className="edge-delete-btn"
+            onClick={onDelete}
+            aria-label="연결 삭제"
+            title="연결 삭제"
+          >
+            ×
+          </button>
+        </div>
+      </EdgeLabelRenderer>
 
       {/* Animated Glowing Packet Dot when Active */}
       {isActive && (

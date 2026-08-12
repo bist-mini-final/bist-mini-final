@@ -23,6 +23,7 @@ from .modules.json_transformer import JsonTransformerModule
 from .modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
 from .modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from .modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
+from .modules.prebuilt_index_loader import PrebuiltIndexLoaderModule
 from .modules.processed_file_selector import ProcessedFileSelectorModule
 from .modules.query_input import QueryInputModule
 from .modules.reader import ReaderModule
@@ -58,16 +59,19 @@ class ModuleRegistry:
                 "vector_index_dir": str(self.vector_index_store.directory),
             }
         modules: List[ExecutableModule] = [
-            QueryInputModule(repository),
-            DecomposerModule(completion_client),
-            EmbedderModule(embedding_encoder),
+            QueryInputModule(repository=self.repository),
+            DecomposerModule(completion_client=completion_client),
+            EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
-                embedding_encoder,
-                self.embedding_artifact_store,
+                encoder=embedding_encoder,
+                artifact_store=self.embedding_artifact_store,
             ),
             VectorIndexWriterModule(
-                self.embedding_artifact_store,
-                self.vector_index_store,
+                artifact_store=self.embedding_artifact_store,
+                index_store=self.vector_index_store,
+            ),
+            PrebuiltIndexLoaderModule(
+                vector_index_store=self.vector_index_store,
             ),
             Bm25RetrieverModule(),
             DenseRetrieverModule(self.vector_index_store),

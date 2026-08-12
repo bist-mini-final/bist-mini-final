@@ -25,4 +25,5 @@ export const MODULE_PRESENTATION: Record<ModuleType, ModulePresentation> = {
   openpyxl_region_detector: { icon: 'TableProperties', color: '#d97706' },
   cell_text_serializer: { icon: 'Rows3', color: '#7c3aed' },
   exhaustive_cell_text_serializer: { icon: 'Shuffle', color: '#9333ea' },
+  prebuilt_index_loader: { icon: 'FolderArchive', color: '#059669' },
 };

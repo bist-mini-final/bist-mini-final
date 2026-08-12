@@ -22,7 +22,10 @@ export function App() {
     modules: controller.modules,
   });
   const workflow = useWorkflowPersistence(graph, controller.modules.length > 0);
-  const currentRun = workflow.latestRunMatchesGraph ? workflow.latestRun : null;
+  // Use loose compatibility so that adding new nodes to the canvas does not
+  // wipe out the execution results of already-completed nodes.  New nodes have
+  // no entry in run.nodes and are therefore shown as idle by applyRun().
+  const currentRun = workflow.latestRunCompatibleWithGraph ? workflow.latestRun : null;
   const progressedBatches = currentRun?.batches.filter(
     (batch) => batch.status !== 'pending'
   );

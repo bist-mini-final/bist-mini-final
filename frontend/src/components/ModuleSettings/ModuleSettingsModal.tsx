@@ -659,18 +659,48 @@ export function ModuleSettingsModal({
                     const enumValues = resolved.enum?.filter(
                       (candidate): candidate is string => typeof candidate === 'string'
                     );
+                    const presetOptions = (
+                      (resolved as Record<string, unknown>).options as string[] | undefined
+                    ) ?? enumValues ?? (
+                      fieldName === 'model'
+                        ? [
+                            'BAAI/bge-large-en-v1.5',
+                            'text-embedding-3-small',
+                            'text-embedding-3-large',
+                            'text-embedding-ada-002',
+                          ]
+                        : undefined
+                    );
+                    const selectOptions = presetOptions ?? enumValues;
+
                     return (
                       <label key={fieldName} className={multiline ? 'module-contract-summary__config-textarea' : undefined}>
                         <span><code>{fieldName}</code>{resolved.description}</span>
-                        {enumValues && enumValues.length > 0 ? (
-                          <select
-                            value={stringValue}
-                            onChange={(event) => onConfigChange({ [fieldName]: event.currentTarget.value })}
-                          >
-                            {enumValues.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
-                          </select>
+                        {selectOptions && selectOptions.length > 0 ? (
+                          <div className="flex flex-col gap-1.5">
+                            <select
+                              value={selectOptions.includes(stringValue) ? stringValue : '__custom__'}
+                              onChange={(event) => {
+                                const selected = event.currentTarget.value;
+                                if (selected !== '__custom__') {
+                                  onConfigChange({ [fieldName]: selected });
+                                }
+                              }}
+                            >
+                              {selectOptions.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                              <option value="__custom__">직접 입력 (Custom)...</option>
+                            </select>
+                            {(!selectOptions.includes(stringValue) || stringValue === '') && (
+                              <input
+                                type="text"
+                                value={stringValue}
+                                placeholder="모델 ID 직접 입력 (예: text-embedding-3-small)"
+                                onChange={(event) => onConfigChange({ [fieldName]: event.currentTarget.value })}
+                              />
+                            )}
+                          </div>
                         ) : multiline ? (
                           <AutoResizeTextarea
                             value={stringValue}

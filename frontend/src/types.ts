@@ -19,7 +19,8 @@ export type ModuleType =
   | 'docling_table_detector'
   | 'openpyxl_region_detector'
   | 'cell_text_serializer'
-  | 'exhaustive_cell_text_serializer';
+  | 'exhaustive_cell_text_serializer'
+  | 'prebuilt_index_loader';
 
 export type ExecutionBranch = 'generated' | 'cached' | 'failed';
 export type OutputBranch = Exclude<ExecutionBranch, 'failed'>;

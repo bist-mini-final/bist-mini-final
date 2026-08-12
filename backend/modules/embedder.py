@@ -2,22 +2,29 @@ from typing import Annotated, Any, Dict, List, Optional, Protocol, cast
 
 from pydantic import BaseModel, Field
 
-from ..bge_encoder import BgeEncoder, DEFAULT_BGE_MODEL
+from ..bge_encoder import DEFAULT_BGE_MODEL
+from ..embedding_factory import EmbeddingEncoder, get_embedding_encoder
 from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .decomposer import SubqueriesDTO
+
+EMBEDDING_MODEL_OPTIONS = [
+    "BAAI/bge-large-en-v1.5",
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+    "text-embedding-ada-002",
+]
 
 
 class EmbedderInput(SubqueriesDTO):
     model: str = Field(
-        default=DEFAULT_BGE_MODEL,
+        default="text-embedding-3-large",
         min_length=1,
-        description="서브쿼리 임베딩에 사용할 Hugging Face 모델 ID",
+        description="서브쿼리 임베딩에 사용할 Hugging Face 또는 OpenAI 모델 ID",
+        json_schema_extra={
+            "enum": EMBEDDING_MODEL_OPTIONS,
+            "options": EMBEDDING_MODEL_OPTIONS,
+        },
     )
-
-
-class EmbeddingEncoder(Protocol):
-    def encode(self, queries: List[str]) -> List[List[float]]:
-        """Return one numeric vector per query."""
 
 
 EmbeddingVector = Annotated[List[float], Field(min_length=1)]
@@ -34,14 +41,14 @@ class EmbeddingsDTO(ModuleDTO):
 class EmbedderModule(ExecutableModule):
     definition = ModuleDefinition(
         type="embedder",
-        label="BGE Query Embedder",
+        label="Query Embedder",
         category="Logic",
         description="서브쿼리의 임베딩 실행 메타데이터를 생성합니다.",
         inputs=["input"],
         outputs=["output"],
         config_fields=["model"],
         raw_output=True,
-        version="5",
+        version="6",
     )
     input_model = EmbedderInput
     output_model = EmbeddingsDTO
@@ -51,11 +58,11 @@ class EmbedderModule(ExecutableModule):
         self._encoders: Dict[str, EmbeddingEncoder] = {}
 
     def _encoder_for(self, model_name: str) -> EmbeddingEncoder:
-        if self.encoder is not None:
-            return self.encoder
-        if model_name not in self._encoders:
-            self._encoders[model_name] = BgeEncoder(model_name)
-        return self._encoders[model_name]
+        return get_embedding_encoder(
+            model_name,
+            override_encoder=self.encoder,
+            cache=self._encoders,
+        )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(EmbedderInput, payload)

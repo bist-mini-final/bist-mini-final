@@ -5,6 +5,7 @@ import {
   Eye,
   FileCode,
   FileSpreadsheet,
+  FolderArchive,
   GitBranch,
   GripVertical,
   Layers,
@@ -45,6 +46,7 @@ const ICONS: Record<string, LucideIcon> = {
   ScanText,
   TableProperties,
   Rows3,
+  FolderArchive,
 };
 
 interface ModulePaletteProps {

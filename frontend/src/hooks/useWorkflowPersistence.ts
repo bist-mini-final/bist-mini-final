@@ -48,6 +48,58 @@ function executionFingerprint(graph: WorkflowGraph): string {
   });
 }
 
+/**
+ * Returns true when the current graph is compatible with the given run for
+ * display purposes.  "Compatible" means every node that already exists in the
+ * run still has the same module_type, config, and connected edges — i.e. the
+ * user only *added* new nodes/edges without modifying existing ones.
+ * New nodes simply have no state in the run and will be shown as idle.
+ */
+function executionRunCompatibleWithGraph(
+  run: WorkflowRun,
+  graph: WorkflowGraph
+): boolean {
+  const currentNodeById = new Map(
+    (graph.nodes ?? []).map((n) => [n.id, n])
+  );
+  const currentEdgeSet = new Set(
+    (graph.edges ?? []).map((e) =>
+      JSON.stringify([
+        e.id,
+        e.source,
+        e.target,
+        e.source_output ?? null,
+        e.target_input ?? null,
+        e.source_branch ?? null,
+      ])
+    )
+  );
+
+  // Every node present in the run must still exist in the current graph
+  // with the same module_type and config.
+  for (const runNode of run.graph.nodes) {
+    const currentNode = currentNodeById.get(runNode.id);
+    if (!currentNode) return false;
+    if (currentNode.module_type !== runNode.module_type) return false;
+    if (JSON.stringify(currentNode.config ?? {}) !== JSON.stringify(runNode.config ?? {})) return false;
+  }
+
+  // Every edge present in the run must still exist in the current graph.
+  for (const runEdge of run.graph.edges) {
+    const key = JSON.stringify([
+      runEdge.id,
+      runEdge.source,
+      runEdge.target,
+      runEdge.source_output ?? null,
+      runEdge.target_input ?? null,
+      runEdge.source_branch ?? null,
+    ]);
+    if (!currentEdgeSet.has(key)) return false;
+  }
+
+  return true;
+}
+
 function markNextBatchRunning(run: WorkflowRun): WorkflowRun {
   const retryingFailure = run.status === 'failed';
   const nextBatch = run.batches.find((batch) =>
@@ -210,8 +262,14 @@ export function useWorkflowPersistence(
   const executionController = useRef<AbortController | null>(null);
   const stableRunRef = useRef<WorkflowRun | null>(null);
   const runtimeMutationEpoch = useRef(0);
+  // Strict match: used to decide whether to reuse an existing run for execution.
   const latestRunMatchesGraph = Boolean(
     latestRun && executionFingerprint(latestRun.graph) === executionFingerprint(currentGraph)
+  );
+  // Loose compatibility: used to decide whether to keep showing run results in
+  // the UI when new nodes have been added but existing ones are unchanged.
+  const latestRunCompatibleWithGraph = Boolean(
+    latestRun && executionRunCompatibleWithGraph(latestRun, currentGraph)
   );
 
   const applyRun = useCallback((run: WorkflowRun) => {
@@ -299,12 +357,13 @@ export function useWorkflowPersistence(
   }, [graphFingerprint, ready, saveNow]);
 
   const createRun = useCallback(
-    async (query: string, signal: AbortSignal) => {
+    async (query: string, signal: AbortSignal, inheritFromRunId?: string) => {
       const workflow = await saveNow(signal);
       const run = await pipelineApi.createRun(
         ACTIVE_WORKFLOW_ID,
         runInputs(workflow.graph, query),
-        signal
+        signal,
+        inheritFromRunId
       );
       applyRun(run);
       return run;
@@ -426,11 +485,24 @@ export function useWorkflowPersistence(
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
         const currentRuntimeInputs = runInputs(currentExecutionGraph, query);
-        let run = latestRun
+        const strictMatch = latestRun
           && executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
-          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs)
-          ? latestRun
-          : await createRun(query, controller.signal);
+          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs);
+        const looseMatch = !strictMatch
+          && latestRun
+          && executionRunCompatibleWithGraph(latestRun, currentExecutionGraph)
+          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs);
+        let run: WorkflowRun;
+        if (strictMatch && latestRun) {
+          // Graph unchanged: reuse existing run directly.
+          run = latestRun;
+        } else if (looseMatch && latestRun) {
+          // Only new nodes added: create a new run but inherit completed states
+          // from the previous run so upstream nodes are seen as 'succeeded'.
+          run = await createRun(query, controller.signal, latestRun.id);
+        } else {
+          run = await createRun(query, controller.signal);
+        }
 
         const stableRun = run;
         const runningRun = markNodeRunning(run, nodeId);
@@ -518,6 +590,7 @@ export function useWorkflowPersistence(
     latestRun,
     runs,
     latestRunMatchesGraph,
+    latestRunCompatibleWithGraph,
     isExecuting,
     isClearingCache,
     saveNow,

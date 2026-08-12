@@ -79,6 +79,13 @@ class WorkflowDocument(StrictModel):
 class WorkflowExecutionRequest(StrictModel):
     inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     use_cache: bool = True
+    inherit_from_run_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "기존 실행의 완료된 노드 상태를 새 실행으로 복사합니다. "
+            "새 노드를 추가해도 이전 결과를 유지하기 위해 사용합니다."
+        ),
+    )
 
 
 class RunNodeState(StrictModel):
