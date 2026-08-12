@@ -1898,6 +1898,26 @@ textarea:focus-visible {
   font-size: 0.52rem;
 }
 
+/* Cell reference badge — rendered for [SheetName Cell XNN] patterns */
+.cell-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18em;
+  margin: 0 0.1em;
+  padding: 0.05em 0.38em 0.08em;
+  border-radius: 3px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 0.72em;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  vertical-align: baseline;
+  line-height: 1.55;
+}
+
 .spreadsheet-result-overlay {
   position: fixed;
   z-index: 120;
