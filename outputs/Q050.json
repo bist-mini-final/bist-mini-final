@@ -1,0 +1,15 @@
+{
+  "id": "Q050",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "콜드플레이와 비스텔리젼스의 부채비율을 비교했을 때 어느 쪽이 더 안정적이야?",
+  "chatgpt_answer": "파일 내 두 회사 부채비율 데이터 없음.",
+  "pipeline_answer": "제공된 셀 컨텍스트만으로는 **콜드플레이와 비스텔리젼스 중 어느 쪽이 더 안정적인지 판단할 수 없습니다.**\n\n- 콜드플레이의 부채비율 또는 부채·자본 데이터가 없습니다.\n- 비스텔리젼스의 부채비율 또는 부채·자본 데이터도 없습니다.\n- 제공된 자료는 주로 **International Business Machines Corporation(IBM)** 및 Balance Sheet 지표에 관한 내용입니다.\n\n따라서 두 회사의 **부채비율(총부채 ÷ 자기자본 × 100)** 또는 비교에 필요한 총부채와 자기자본 셀이 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 15883,
+    "completion_tokens": 223,
+    "cached_tokens": 0,
+    "reasoning_tokens": 64,
+    "total_tokens": 16106
+  },
+  "latency_seconds": 23.711
+}

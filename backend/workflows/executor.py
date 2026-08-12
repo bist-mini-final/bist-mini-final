@@ -316,6 +316,7 @@ class WorkflowExecutor:
         self._refresh_run_status(run)
         return self.run_store.save(run)
 
+
     def _execute_next_batch(self, run_id: str) -> WorkflowRun:
         self._raise_if_cancelled(run_id)
         run = self.run_store.load(run_id)
@@ -413,6 +414,9 @@ class WorkflowExecutor:
         state.skip_reason = None
         state.started_at = None
         state.completed_at = None
+        state.elapsed_ms = None
+        state.cost_usd = None
+        state.usage = None
 
     @staticmethod
     def _descendant_node_ids(run: WorkflowRun, node_id: str) -> Set[str]:
@@ -529,6 +533,10 @@ class WorkflowExecutor:
             f"{node.module_type}@{module.definition.version}", cache_payload
         )
 
+        import time
+        from ..openai_cost import calculate_openai_cost
+
+        t_start = time.perf_counter()
         state.status = "running"
         state.input_payload = compact_history_value(payload)
         state.error = None
@@ -578,10 +586,60 @@ class WorkflowExecutor:
                 + ", ".join(missing_outputs)
             )
 
+        t_elapsed = round((time.perf_counter() - t_start) * 1000, 2)
         state.output = output
         state.status = "succeeded"
         state.outcome = module.execution_outcome(output, state.cache_hit)
         state.completed_at = utc_now_iso()
+        state.elapsed_ms = t_elapsed
+
+        # Calculate cost & token usage metrics
+        node_cost: Optional[float] = None
+        node_usage: Optional[Dict[str, int]] = None
+
+        if isinstance(output, Mapping):
+            if "answer_json" in output and isinstance(output["answer_json"], Mapping):
+                aj = output["answer_json"]
+                node_cost = aj.get("estimated_cost_usd")
+                if isinstance(aj.get("api_usage"), Mapping):
+                    node_usage = {k: int(v) for k, v in aj["api_usage"].items() if v is not None}
+            elif "usage" in output or "_usage" in output:
+                raw_u = output.get("usage") or output.get("_usage")
+                model_used = output.get("model") or payload.get("model") or ""
+                if isinstance(raw_u, Mapping):
+                    node_usage = {
+                        "prompt_tokens": int(raw_u.get("prompt_tokens", 0) or 0),
+                        "completion_tokens": int(raw_u.get("completion_tokens", 0) or 0),
+                        "cached_tokens": int(raw_u.get("cached_tokens", 0) or 0),
+                        "total_tokens": int(raw_u.get("total_tokens", 0) or 0),
+                    }
+                    node_cost = calculate_openai_cost(
+                        model_name=str(model_used),
+                        prompt_tokens=node_usage["prompt_tokens"],
+                        completion_tokens=node_usage["completion_tokens"],
+                        cached_tokens=node_usage["cached_tokens"],
+                    )
+
+        if node_usage is None and hasattr(module, "last_usage") and isinstance(getattr(module, "last_usage"), Mapping):
+            raw_u = getattr(module, "last_usage")
+            model_used = getattr(module, "last_model", "") or payload.get("model") or ""
+            node_usage = {
+                "prompt_tokens": int(raw_u.get("prompt_tokens", 0) or 0),
+                "completion_tokens": int(raw_u.get("completion_tokens", 0) or 0),
+                "cached_tokens": int(raw_u.get("cached_tokens", 0) or 0),
+                "total_tokens": int(raw_u.get("total_tokens", 0) or 0),
+            }
+            if node_usage.get("total_tokens", 0) > 0:
+                node_cost = calculate_openai_cost(
+                    model_name=str(model_used),
+                    prompt_tokens=node_usage["prompt_tokens"],
+                    completion_tokens=node_usage["completion_tokens"],
+                    cached_tokens=node_usage["cached_tokens"],
+                )
+
+        state.cost_usd = node_cost
+        state.usage = node_usage
+        self.run_store.save(run)
 
     def _run_cancellable(self, run_id: str, operation) -> WorkflowRun:
         with self._cancellation_lock:
@@ -688,8 +746,13 @@ class WorkflowExecutor:
         self, run: WorkflowRun, node: WorkflowNode
     ) -> Any:
         payload = dict(node.config)
+        payload.update(node.values)
         target_module = self.module_registry.get(node.module_type)
         payload.update(run.runtime_inputs.get(node.id, {}))
+        if "query" not in payload and "question_text" in payload:
+            payload["query"] = payload["question_text"]
+        if "question_text" not in payload and "query" in payload:
+            payload["question_text"] = payload["query"]
         node_by_id = {item.id: item for item in run.graph.nodes}
         incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
         edges_by_input: Dict[str, List[Tuple[WorkflowEdge, str]]] = defaultdict(list)

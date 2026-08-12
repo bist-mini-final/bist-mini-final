@@ -1,0 +1,15 @@
+{
+  "id": "Q039",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "IBM의 최근 3년 EBITDA 추세를 알려줘.",
+  "chatgpt_answer": "최근 3년 EBITDA: 2023 $12,739M → 2024 $12,886M → 2025 $16,778M. 2025년 큰 폭 개선.",
+  "pipeline_answer": "IBM의 최근 3년 EBITDA 추세는 **2023년 정체 후 2025년 크게 증가**한 모습입니다. 단위는 **$M**입니다.\n\n| 연도 | EBITDA | 전년 대비 증감 |\n|---|---:|---:|\n| 2023년 | 12,739 [Income_Statement Cell A2094] | — |\n| 2024년 | 12,886 [Income_Statement Cell A2096] | **+147** = 12,886 − 12,739, **+1.2%** = 147 ÷ 12,739 |\n| 2025년 | 16,778 [Income_Statement Cell A2098] | **+3,892** = 16,778 − 12,886, **+30.2%** = 3,892 ÷ 12,886 |\n\n- 2023~2024년 EBITDA는 **12,739에서 12,886로 소폭 증가**했습니다. [Income_Statement Cell A2094] [Income_Statement Cell A2096]\n- 2024~2025년에는 **16,778로 30.2% 급증**했습니다. [Income_Statement Cell A2096] [Income_Statement Cell A2098]\n- 전체적으로 2023년 대비 2025년 EBITDA는 **4,039 증가**했으며, 계산은 **16,778 − 12,739 = 4,039**입니다. [Income_Statement Cell A2094] [Income_Statement Cell A2098]",
+  "api_usage": {
+    "prompt_tokens": 15896,
+    "completion_tokens": 514,
+    "cached_tokens": 0,
+    "reasoning_tokens": 171,
+    "total_tokens": 16410
+  },
+  "latency_seconds": 508.977
+}

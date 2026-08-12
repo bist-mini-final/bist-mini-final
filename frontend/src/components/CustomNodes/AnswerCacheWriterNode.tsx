@@ -17,6 +17,7 @@ export const AnswerCacheWriterNode = ({ data, selected }: AnswerCacheWriterNodeP
       eyebrow="Output Module"
       title="Answer Cache Writer"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={340}
       inputPorts={['question_text', 'answer_json']}

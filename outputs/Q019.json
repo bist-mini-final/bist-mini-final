@@ -1,0 +1,15 @@
+{
+  "id": "Q019",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM 시가총액은 얼마인가?",
+  "chatgpt_answer": "$270,970.4M.",
+  "pipeline_answer": "IBM의 LTM 시가총액은 **270,970.38886734백만 달러(약 2,709.70억 달러)**입니다 [Key_Stats Cell A248].\n\n계산:\n- 종가 **289.89달러** × 발행주식수 **934,735,206주** ÷ **1,000,000** = **270,970.38886734백만 달러** [Key_Stats Cell A242] [Key_Stats Cell A244] [Key_Stats Cell A246]",
+  "api_usage": {
+    "prompt_tokens": 15463,
+    "completion_tokens": 309,
+    "cached_tokens": 15460,
+    "reasoning_tokens": 184,
+    "total_tokens": 15772
+  },
+  "latency_seconds": 148.915
+}

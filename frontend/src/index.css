@@ -942,22 +942,34 @@ textarea:focus-visible {
 
 .flow-node__input-port span {
   position: absolute;
-  left: 0.65rem;
+  left: 0.75rem;
   top: 0;
-  max-width: 8rem;
+  max-width: 10rem;
   overflow: hidden;
-  padding: 0.1rem 0.35rem;
-  border: 1px solid color-mix(in srgb, var(--node-accent) 15%, #e2e8f0);
+  padding: 0.15rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--node-accent) 30%, #cbd5e1);
   border-radius: 999px;
-  background: rgb(255 255 255 / 92%);
-  color: color-mix(in srgb, var(--node-accent) 78%, #334155);
-  font-size: 0.55rem;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+  color: color-mix(in srgb, var(--node-accent) 85%, #0f172a);
+  font-size: 0.625rem;
   font-weight: 700;
   line-height: 1.2;
   pointer-events: none;
   text-overflow: ellipsis;
-  transform: translateY(-50%);
+  transform: translateY(-50%) scale(0.92);
   white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, transform 150ms ease, visibility 150ms;
+  z-index: 30;
+}
+
+.flow-node__input-port:hover span,
+.flow-node__input-port:focus-within span {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) scale(1);
 }
 
 .flow-node__branch-handle[data-branch="generated"] {

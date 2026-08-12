@@ -1,0 +1,15 @@
+{
+  "id": "Q064",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "IBM의 매출과 TEV를 비교해줘.",
+  "chatgpt_answer": "매출 $67,535M vs TEV $321,253M. TEV는 매출의 4.76배.",
+  "pipeline_answer": "IBM의 **LTM 매출은 67,535**, **LTM TEV는 321,253.3889**입니다. 단위는 제공된 셀 context에 명시되어 있지 않습니다. [Key_Stats Cell A12] [Key_Stats Cell A258]\n\n- **TEV가 매출보다 큰 금액:**  \n  321,253.3889 − 67,535 = **253,718.3889** [Key_Stats Cell A258] [Key_Stats Cell A12]\n\n- **TEV / 매출 배수:**  \n  321,253.3889 ÷ 67,535 = **약 4.76배** [Key_Stats Cell A258] [Key_Stats Cell A12]\n\n- **매출 / TEV 비율:**  \n  67,535 ÷ 321,253.3889 × 100 = **약 21.02%** [Key_Stats Cell A12] [Key_Stats Cell A258]\n\n즉, IBM의 LTM TEV는 LTM 매출의 약 **4.76배**이며, 매출은 TEV의 약 **21.02%** 수준입니다.",
+  "api_usage": {
+    "prompt_tokens": 12512,
+    "completion_tokens": 510,
+    "cached_tokens": 12509,
+    "reasoning_tokens": 234,
+    "total_tokens": 13022
+  },
+  "latency_seconds": 23.222
+}

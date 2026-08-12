@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -6,7 +6,7 @@ import type {
   ReactNode,
 } from 'react';
 import { Handle, Position, useNodeId, useReactFlow } from '@xyflow/react';
-import { Play, Settings2, Square, Trash2, type LucideIcon } from 'lucide-react';
+import { Play, Settings2, Square, Trash2, Clock, Coins, type LucideIcon } from 'lucide-react';
 import { useOpenModuleSettings } from '../../contexts/ModuleSettingsContext';
 import { useModuleExecution } from '../../contexts/ModuleExecutionContext';
 
@@ -31,6 +31,7 @@ interface NodeShellProps {
   onWidthChange?: (width: number) => void;
   minWidth?: number;
   maxWidth?: number;
+  nodeData?: Record<string, unknown>;
 }
 
 type NodeStyle = CSSProperties & {
@@ -57,6 +58,7 @@ export function NodeShell({
   onWidthChange,
   minWidth = 320,
   maxWidth = 1200,
+  nodeData: propNodeData,
 }: NodeShellProps) {
   const nodeId = useNodeId();
   const { deleteElements, getEdges, getNodes } = useReactFlow();
@@ -141,13 +143,73 @@ export function NodeShell({
   );
   const isRunDisabled = !isStopMode && (!isInputReady || isExecuting);
 
+  const currentNode = nodeId ? nodeById.get(nodeId) : null;
+  const mergedData = { ...(currentNode?.data ?? {}), ...(propNodeData ?? {}) } as Record<string, unknown>;
+  const elapsedMs = typeof mergedData.elapsedMs === 'number'
+    ? mergedData.elapsedMs
+    : typeof mergedData.elapsed_ms === 'number'
+      ? mergedData.elapsed_ms
+      : null;
+
+  const costUsd = typeof mergedData.costUsd === 'number'
+    ? mergedData.costUsd
+    : typeof mergedData.cost_usd === 'number'
+      ? mergedData.cost_usd
+      : null;
+
+  const usage = mergedData.usage as { total_tokens?: number } | undefined;
+  const cacheHit = Boolean(mergedData.cacheHit);
+
+  const isRunning = state === 'active';
+
+  // Live elapsed timer: counts up in real-time while node is running
+  const [liveMs, setLiveMs] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!isRunning) {
+      // Stop timer when no longer running
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setLiveMs(null);
+      return;
+    }
+    // Determine start time from node data
+    const startedAtRaw = mergedData.startedAt ?? mergedData.started_at;
+    const startTs = typeof startedAtRaw === 'string'
+      ? new Date(startedAtRaw).getTime()
+      : Date.now();
+
+    const tick = () => setLiveMs(Date.now() - startTs);
+    tick(); // immediate first tick
+    timerRef.current = setInterval(tick, 100);
+    return () => {
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning]);
+
+  // Display: live counter while running, backend value when done
+  const displayMs = isRunning ? liveMs : elapsedMs;
+
+  const formattedTime = displayMs !== null
+    ? displayMs >= 1000
+      ? `${(displayMs / 1000).toFixed(displayMs >= 10000 ? 1 : 2)}s`
+      : `${Math.round(displayMs)}ms`
+    : null;
+
   const style: NodeStyle = {
     '--node-accent': accent,
     '--node-width': `${width}px`,
   };
 
   return (
-    <section className="flow-node" data-state={state} data-selected={selected ? 'true' : 'false'} style={style}>
+    <section className="flow-node relative" data-state={state} data-selected={selected ? 'true' : 'false'} style={style}>
       {hasInput && resolvedInputHandles.map((input, index, handles) => {
         const top = `${((index + 1) / (handles.length + 1)) * 100}%`;
         return (
@@ -160,7 +222,7 @@ export function NodeShell({
               isConnectable
               title={`${input} 입력 연결`}
             />
-            {handles.length > 1 && <span>{input}</span>}
+            <span>{input}</span>
           </div>
         );
       })}
@@ -284,6 +346,25 @@ export function NodeShell({
           onPointerDown={startResize}
           onKeyDown={resizeWithKeyboard}
         />
+      )}
+
+      {(isRunning || formattedTime !== null || costUsd !== null) && (
+        <div className="absolute -bottom-5 left-0 flex items-center gap-1.5 text-[10px] font-mono pointer-events-none select-none z-10">
+          {(isRunning || formattedTime !== null) && (
+            <span className="flex items-center gap-1 font-semibold text-slate-500">
+              <Clock className={`h-3 w-3 text-emerald-500${isRunning ? ' animate-pulse' : ''}`} />
+              {formattedTime ?? '0ms'}
+              {!isRunning && cacheHit && <span className="text-[9px] text-emerald-500 font-normal">(캐시)</span>}
+            </span>
+          )}
+          {!isRunning && costUsd !== null && (
+            <span className={`flex items-center gap-1 font-semibold text-emerald-600 ${formattedTime !== null ? 'pl-1' : ''}`}>
+              <Coins className="h-3 w-3 text-amber-400" />
+              ${costUsd < 0.0001 ? '<0.0001' : costUsd.toFixed(4)}
+              {usage?.total_tokens ? <span className="text-slate-400 font-normal">({usage.total_tokens.toLocaleString()}t)</span> : null}
+            </span>
+          )}
+        </div>
       )}
     </section>
   );

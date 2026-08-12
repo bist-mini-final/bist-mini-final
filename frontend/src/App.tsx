@@ -74,10 +74,6 @@ export function App() {
   };
 
   const handleClearCache = async () => {
-    const confirmed = window.confirm(
-      '진행 중인 모듈 실행을 즉시 중단하고 결과 캐시와 모든 실행 이력을 삭제할까요?\n캔버스의 노드와 연결은 유지됩니다.'
-    );
-    if (!confirmed) return;
     controller.dismissError();
     try {
       await workflow.clearCache();

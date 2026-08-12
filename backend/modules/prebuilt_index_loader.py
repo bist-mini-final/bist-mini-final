@@ -12,9 +12,9 @@ from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecution
 
 class PrebuiltIndexLoaderInput(ModuleDTO):
     file_name: str = Field(
-        default="SPG_Company_KeyStats_v3_prebuilt.json",
+        default="SPG_Company_KeyStats_v3_prebuilt.parquet",
         min_length=1,
-        description="data/processed 또는 data/vector_db에 공유된 사전 구축 인덱스 JSON 파일명",
+        description="data/processed 또는 data/vector_db에 공유된 사전 구축 인덱스 (.parquet / .json) 파일명",
     )
 
 
@@ -42,7 +42,7 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         type="prebuilt_index_loader",
         label="Pre-built Vector Index Loader",
         category="Source",
-        description="구글 드라이브 등에 공유된 사전 인덱싱 단일 JSON 파일을 로드하여 document_output과 index_output을 즉시 생성합니다.",
+        description="공유된 사전 인덱싱 단일 파일(.parquet / .json)을 로드하여 document_output과 index_output을 즉시 생성합니다.",
         inputs=[],
         outputs=["document_output", "index_output"],
         config_fields=["file_name"],
@@ -75,11 +75,76 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
             candidate = directory / target_name
             if candidate.is_file():
                 return candidate
+            if target_name.endswith(".json"):
+                candidate_parquet = directory / (target_name[:-5] + ".parquet")
+                if candidate_parquet.is_file():
+                    return candidate_parquet
+            if target_name.endswith(".parquet"):
+                candidate_json = directory / (target_name[:-8] + ".json")
+                if candidate_json.is_file():
+                    return candidate_json
 
         raise ModuleExecutionError(
             f"사전 구축 인덱스 파일을 찾을 수 없습니다: {target_name}. "
             f"파일을 data/processed/ 디렉터리에 복사해 주세요."
         )
+
+    def _read_data(self, file_path: Path) -> Dict[str, Any]:
+        if file_path.suffix.lower() == ".parquet":
+            try:
+                import pyarrow.parquet as pq
+
+                table = pq.read_table(file_path)
+                schema_meta = table.schema.metadata or {}
+                file_name = (
+                    schema_meta.get(b"file_name", b"").decode("utf-8")
+                    or file_path.name
+                )
+                workbook_hash = (
+                    schema_meta.get(b"workbook_hash", b"").decode("utf-8") or ""
+                )
+                model_name = (
+                    schema_meta.get(b"model", b"").decode("utf-8")
+                    or "text-embedding-3-large"
+                )
+
+                pydict = table.to_pydict()
+                num_rows = table.num_rows
+
+                items: List[Dict[str, Any]] = []
+                for i in range(num_rows):
+                    row_h = pydict["row_header"][i]
+                    col_h = pydict["column_header"][i]
+                    items.append(
+                        {
+                            "cell_id": pydict["cell_id"][i],
+                            "sheet_name": pydict["sheet_name"][i],
+                            "cell_coord": pydict["cell_coord"][i],
+                            "row_header": list(row_h) if isinstance(row_h, (list, tuple)) else [str(row_h)],
+                            "column_header": list(col_h) if isinstance(col_h, (list, tuple)) else [str(col_h)],
+                            "cell_value": pydict["cell_value"][i],
+                            "variant": pydict["variant"][i],
+                            "text": pydict["text"][i],
+                            "embedding": [float(x) for x in pydict["embedding"][i]],
+                        }
+                    )
+                return {
+                    "file_name": file_name,
+                    "workbook_hash": workbook_hash,
+                    "model": model_name,
+                    "items": items,
+                }
+            except Exception as error:
+                raise ModuleExecutionError(
+                    f"사전 구축 Parquet 인덱스 파일 해석 실패: {file_path.name}"
+                ) from error
+
+        try:
+            return json.loads(file_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as error:
+            raise ModuleExecutionError(
+                f"사전 구축 인덱스 파일 해석 실패: {file_path.name}"
+            ) from error
 
     @staticmethod
     def _parse_cell_text(
@@ -115,12 +180,7 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         input_data = cast(PrebuiltIndexLoaderInput, payload)
         file_path = self._find_file(input_data.file_name)
 
-        try:
-            raw_data = json.loads(file_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as error:
-            raise ModuleExecutionError(
-                f"사전 구축 인덱스 파일 해석 실패: {file_path.name}"
-            ) from error
+        raw_data = self._read_data(file_path)
 
         required_keys = {"file_name", "workbook_hash", "model", "items"}
         if not required_keys.issubset(raw_data.keys()):
@@ -141,11 +201,20 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         vectors: List[List[float]] = []
         metadata_list: List[Dict[str, Any]] = []
 
+        def _clean_excel_coord(raw: Any, fallback_index: int) -> str:
+            if raw and isinstance(raw, str):
+                candidate = raw.strip()
+                import re
+                if re.fullmatch(r"[A-Za-z]{1,3}[1-9][0-9]*", candidate):
+                    return candidate.upper()
+            return f"A{fallback_index + 1}"
+
         for index, item in enumerate(items):
             text = item.get("text", "")
             vector = item.get("embedding", [])
             sheet_name = item.get("sheet_name", "Sheet1")
-            cell_coord = item.get("cell_coord") or item.get("cell_address") or f"A{index+1}"
+            raw_coord = item.get("cell_coord") or item.get("cell_address")
+            cell_coord = _clean_excel_coord(raw_coord, index)
 
             if not text or not vector:
                 raise ModuleExecutionError(

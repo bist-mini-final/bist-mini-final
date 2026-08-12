@@ -1,0 +1,15 @@
+{
+  "id": "Q055",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "IBM의 현금성 자산과 장기부채를 알려줘.",
+  "chatgpt_answer": "현금 및 단기투자자산 $14,417M, Long-Term Debt $54,836M.",
+  "pipeline_answer": "IBM의 현금성 자산과 장기부채는 다음과 같습니다.\n\n- **현금 및 단기투자자산:** **14,417백만 달러**(LTM 기준) [Key_Stats Cell A250]\n- **장기부채(비유동부채):** **57,383백만 달러**(2025년 12월 31일 이후 LTM 기준) [Balance_Sheet Cell A6910]\n\n참고로 총부채는 다음과 같이 구성됩니다.\n\n- **총부채:** 64,607백만 달러 [Balance_Sheet Cell A6858]\n- 계산: **유동부채 7,224 + 장기부채 57,383 = 총부채 64,607백만 달러** [Balance_Sheet Cell A6884] [Balance_Sheet Cell A6910] [Balance_Sheet Cell A6858]\n\n※ 현금성 자산 수치는 제공된 **Key_Stats의 LTM ‘Cash & Short-Term Investments’** 값이며, 해당 셀에는 별도의 날짜가 명시되어 있지 않습니다.",
+  "api_usage": {
+    "prompt_tokens": 11531,
+    "completion_tokens": 620,
+    "cached_tokens": 0,
+    "reasoning_tokens": 373,
+    "total_tokens": 12151
+  },
+  "latency_seconds": 26.638
+}

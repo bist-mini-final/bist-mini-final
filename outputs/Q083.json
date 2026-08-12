@@ -1,0 +1,15 @@
+{
+  "id": "Q083",
+  "scenario": "유형 4 재무 계산",
+  "question": "종가와 발행주식수로 시가총액을 계산해줘.",
+  "chatgpt_answer": "289.89 × 934,735,206 ÷ 1,000,000 = $270,970.4M.",
+  "pipeline_answer": "시가총액 계산:\n\n- 종가: **289.89** [KS Cell A242]  \n- 발행주식수: **934,735,206주** [KS Cell A244]  \n- 백만 단위 환산: **1,000,000** [KS Cell A246]\n\n계산식:  \n**289.89 × 934,735,206 ÷ 1,000,000 = 270,970.38886734**\n\n따라서 시가총액은 **270,970.38886734백만**(약 **270.97십억**)입니다. [KS Cell A248]",
+  "api_usage": {
+    "prompt_tokens": 10366,
+    "completion_tokens": 198,
+    "cached_tokens": 0,
+    "reasoning_tokens": 54,
+    "total_tokens": 10564
+  },
+  "latency_seconds": 21.464
+}

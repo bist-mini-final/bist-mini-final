@@ -37,7 +37,7 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
   );
   const schemaDefault = typeof fileSchema?.default === 'string'
     ? fileSchema.default
-    : 'SPG_Company_KeyStats_v3_prebuilt.json';
+    : 'SPG_Company_KeyStats_v3_prebuilt.parquet';
 
   const selectedFile = data.config?.file_name || schemaDefault;
   const { docCount, indexId } = getOutputSummary(data.executionOutput);
@@ -55,6 +55,7 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
       eyebrow="Source Module"
       title="Pre-built Vector Index Loader"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={data.nodeWidth ?? 360}
       onWidthChange={data.onNodeWidthChange}
@@ -65,7 +66,7 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
     >
       <label className="block space-y-1.5">
         <span className="node-field-label">
-          <FolderOpen className="h-3 w-3 text-emerald-700" /> 사전 구축 인덱스 JSON 파일
+          <FolderOpen className="h-3 w-3 text-emerald-700" /> 사전 구축 인덱스 파일 (.parquet / .json)
         </span>
         {fileOptions.length > 0 ? (
           <select
@@ -84,7 +85,7 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
             type="text"
             className="nodrag nopan w-full rounded-lg border border-emerald-200 bg-emerald-50/70 px-2.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
             value={selectedFile}
-            placeholder="SPG_Company_KeyStats_v3_prebuilt.json"
+            placeholder="SPG_Company_KeyStats_v3_prebuilt.parquet"
             onPointerDown={(event) => event.stopPropagation()}
             onChange={(event) => data.onConfigChange?.({ file_name: event.currentTarget.value })}
           />

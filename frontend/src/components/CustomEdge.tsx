@@ -13,7 +13,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   markerEnd,
   data,
 }) => {
-  const { setEdges } = useReactFlow();
+  const { deleteElements } = useReactFlow();
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -30,9 +30,9 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   const onDelete = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
-      setEdges((edges) => edges.filter((edge) => edge.id !== id));
+      void deleteElements({ edges: [{ id }] });
     },
-    [id, setEdges]
+    [id, deleteElements]
   );
 
   return (

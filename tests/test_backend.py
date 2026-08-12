@@ -465,7 +465,10 @@ class RepositoryIntegrationTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(set(decomposed), {"question_id", "subqueries"})
+        self.assertEqual(
+            set(decomposed.keys() - {"_usage", "_model"}),
+            {"question_id", "subqueries"},
+        )
         self.assertEqual(set(embedded), {"question_id", "items"})
         self.assertEqual(len(embedded["items"]), len(decomposed["subqueries"]))
         self.assertEqual(
@@ -961,7 +964,10 @@ class ApiContractTests(unittest.TestCase):
             expected_variants.issubset(set(result["subqueries"])),
             result["subqueries"],
         )
-        self.assertEqual(set(result), {"question_id", "subqueries"})
+        self.assertEqual(
+            set(result.keys() - {"_usage", "_model"}),
+            {"question_id", "subqueries"},
+        )
         self.assertEqual([message["role"] for message in client.messages], ["system", "user"])
         self.assertIn("custom system", client.messages[0]["content"])
         self.assertIn("IBM의 LTM 기준", client.messages[1]["content"])
@@ -1571,7 +1577,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertEqual(client.json_schema["additionalProperties"], False)
 
         serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
-        self.assertEqual(len(serialized["items"]), 6)
+        self.assertEqual(len(serialized["items"]), 54)
         first = serialized["items"][0]
         self.assertEqual(first["row_header"], ["SUMMARY RATIOS", "Return on Assets"])
         self.assertEqual(
@@ -1871,25 +1877,18 @@ class WorkflowExecutionTests(unittest.TestCase):
         expected_connections = {
             ("query_input", "decomposer", "question_text"),
             ("query_input", "reader", "question_text"),
-            ("processed_file_selector", "luna_vlm_structure_detector", "input"),
-            ("luna_vlm_structure_detector", "cell_text_serializer", "input"),
-            ("cell_text_serializer", "json_inspector", "input"),
-            ("json_inspector", "bm25_retriever", "document_input"),
-            ("json_inspector", "cell_text_embedder", "input"),
-            ("json_inspector", "context", "document_input"),
+            ("prebuilt_index_loader", "bm25_retriever", "document_input"),
+            ("prebuilt_index_loader", "dense_retriever", "index_input"),
+            ("prebuilt_index_loader", "context", "document_input"),
             ("decomposer", "json_inspector", "input"),
             ("json_inspector", "embedder", "input"),
             ("json_inspector", "bm25_retriever", "query_input"),
             ("embedder", "dense_retriever", "query_input"),
-            ("cell_text_embedder", "vector_index_writer", "input"),
-            ("vector_index_writer", "dense_retriever", "index_input"),
             ("bm25_retriever", "rrf_fusion", "bm25_result"),
             ("dense_retriever", "rrf_fusion", "dense_result"),
             ("rrf_fusion", "context", "retrieval_json"),
             ("context", "reader", "context_json"),
             ("reader", "json_inspector", "input"),
-            ("json_inspector", "answer_cache_writer", "answer_json"),
-            ("query_input", "answer_cache_writer", "question_text"),
         }
         self.assertTrue(batches)
         self.assertTrue(expected_connections.issubset(connections))

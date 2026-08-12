@@ -69,6 +69,7 @@ export const JsonTransformerNode = ({ data, selected }: JsonTransformerNodeProps
       eyebrow="Transform Module"
       title="JSON Format Mapper / Converter"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={340}
       bodyClassName="space-y-3"

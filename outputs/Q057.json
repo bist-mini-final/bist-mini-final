@@ -1,0 +1,15 @@
+{
+  "id": "Q057",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "IBM의 영업·투자·재무 현금흐름을 알려줘.",
+  "chatgpt_answer": "영업 CF $13,193M, 투자 CF -$10,302M, 재무 CF -$3,829M.",
+  "pipeline_answer": "제공된 컨텍스트 기준으로 IBM의 현금흐름은 다음과 같습니다. 단위는 **$M**입니다.\n\n> **주의:** ‘영업현금흐름(Cash from Operating)’ 총액 셀은 제공되지 않았습니다. 따라서 아래 영업 항목은 총 영업현금흐름이 아니라 **Other Operating Activities(기타 영업활동)** 값입니다.\n\n| 연도 | 영업활동* | 투자활동 | 재무활동 |\n|---|---:|---:|---:|\n| 2014 | -238 [Cash_Flow Cell A9200] | -3,001 [Cash_Flow Cell A9694] | -15,452 [Cash_Flow Cell A10136] |\n| 2015 | 1,386 [Cash_Flow Cell A9202] | -8,159 [Cash_Flow Cell A9696] | -9,413 [Cash_Flow Cell A10138] |\n| 2016 | -1,132 [Cash_Flow Cell A9204] | -10,928 [Cash_Flow Cell A9698] | -5,917 [Cash_Flow Cell A10140] |\n| 2017 | -931 [Cash_Flow Cell A9206] | -7,081 [Cash_Flow Cell A9700] | -6,418 [Cash_Flow Cell A10142] |\n| 2018 | 852 [Cash_Flow Cell A9208] | -4,913 [Cash_Flow Cell A9702] | -10,469 [Cash_Flow Cell A10144] |\n| 2019 | -1,528 [Cash_Flow Cell A9210] | -26,936 [Cash_Flow Cell A9704] | 9,042 [Cash_Flow Cell A10146] |\n| 2020 | -3,204 [Cash_Flow Cell A9212] | -3,028 [Cash_Flow Cell A9706] | -9,721 [Cash_Flow Cell A10148] |\n| 2021 | -2,001 [Cash_Flow Cell A9214] | -5,975 [Cash_Flow Cell A9708] | -13,354 [Cash_Flow Cell A10150] |\n| 2022 | 3,168 [Cash_Flow Cell A9216] | -4,202 [Cash_Flow Cell A9710] | -4,958 [Cash_Flow Cell A10152] |\n| 2023 | -1,114 [Cash_Flow Cell A9218] | -7,070 [Cash_Flow Cell A9712] | -1,769 [Cash_Flow Cell A10154] |\n| 2024 | 783 [Cash_Flow Cell A9220] | -4,937 [Cash_Flow Cell A9714] | -7,079 [Cash_Flow Cell A10156] |\n| 2025 | 1 [Cash_Flow Cell A9222] | -10,302 [Cash_Flow Cell A9716] | -3,829 [Cash_Flow Cell A10158] |\n\n\\* 영업활동 열은 **총 영업현금흐름이 아닌 기타 영업활동**입니다. 총 영업현금흐름을 산출하려면 해당 항목의 **Cash from Operating 총액 셀**이 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 14963,
+    "completion_tokens": 1633,
+    "cached_tokens": 0,
+    "reasoning_tokens": 886,
+    "total_tokens": 16596
+  },
+  "latency_seconds": 36.495
+}

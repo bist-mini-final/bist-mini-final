@@ -2,7 +2,7 @@ import hashlib
 import json
 from typing import Any, Dict, List, Literal, Optional, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..chat_completion import ChatCompletionClient, ChatCompletionError
 from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
@@ -43,6 +43,8 @@ class DecomposerInput(ModuleDTO):
 
 
 class SubqueriesDTO(ModuleDTO):
+    model_config = ConfigDict(extra="allow")
+
     question_id: str = Field(description="원본 질문 ID")
     subqueries: List[str] = Field(
         min_length=1,
@@ -93,30 +95,49 @@ class DecomposerModule(ExecutableModule):
     ) -> None:
         self.completion_client = completion_client or ChatCompletionClient()
 
-    def _generate_subqueries(self, input_data: DecomposerInput) -> List[str]:
+    def _generate_subqueries(self, input_data: DecomposerInput) -> tuple[List[str], Dict[str, int]]:
         preset = DECOMPOSER_PRESETS[input_data.preset]
         system_prompt = input_data.system_prompt or preset["system_prompt"]
         user_template = input_data.user_prompt_template or preset["user_prompt_template"]
         user_prompt = user_template.replace("{question}", input_data.question_text)
         try:
-            response = self.completion_client.complete(
-                input_data.model,
-                [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
+            complete_with_meta = getattr(self.completion_client, "complete_with_metadata", None)
+            if callable(complete_with_meta):
+                result = complete_with_meta(
+                    input_data.model,
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+                raw_response = result.content
+                usage = result.usage
+            else:
+                raw_response = self.completion_client.complete(
+                    input_data.model,
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+                usage = {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "cached_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 0,
+                }
         except ChatCompletionError as error:
             raise ModuleExecutionError(str(error)) from error
         try:
-            generated = _parse_subquery_response(response)
+            generated = _parse_subquery_response(raw_response)
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             raise ModuleExecutionError(
                 "LLM 서브쿼리 응답이 유효한 JSON 문자열 배열이 아닙니다"
             ) from error
         if not generated:
             raise ModuleExecutionError("LLM이 서브쿼리를 생성하지 않았습니다")
-        return generated
+        return generated, usage
 
     @staticmethod
     def _question_id(question_text: str) -> str:
@@ -126,7 +147,7 @@ class DecomposerModule(ExecutableModule):
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(DecomposerInput, payload)
-        generated_subqueries = self._generate_subqueries(input_data)
+        generated_subqueries, usage = self._generate_subqueries(input_data)
         subqueries = augment_subqueries(generated_subqueries)
         if not subqueries:
             raise ModuleExecutionError("검색용 서브쿼리 확장 결과가 비어 있습니다")
@@ -134,4 +155,6 @@ class DecomposerModule(ExecutableModule):
         return {
             "question_id": self._question_id(input_data.question_text),
             "subqueries": subqueries,
+            "_usage": usage,
+            "_model": input_data.model,
         }

@@ -1,0 +1,15 @@
+{
+  "id": "Q065",
+  "scenario": "유형 4 재무 계산",
+  "question": "IBM의 2025년 ROE와 ROA는 얼마인가?",
+  "chatgpt_answer": "2025 ROE 약 35.34%, ROA 약 7.33% (각각 2024\\~2025 평균 보통주자본/평균 총자산 사용).",
+  "pipeline_answer": "IBM의 **2025년 ROE와 ROA는 제공된 셀만으로 산출할 수 없습니다.** 2025년 **순이익**이 누락되어 있기 때문입니다.\n\n- 2025년 총자본: **$32,741M** [Balance_Sheet Cell A6024]  \n- 2025년 총자산: **$151,880M** [Balance_Sheet Cell A5140]  \n- 2024년 총자본: **$27,393M** [Balance_Sheet Cell A6022]  \n- 2024년 총자산: **$137,175M** [Balance_Sheet Cell A5138]  \n\n일반적인 평균 잔액 기준으로는:\n\n- 평균 총자본 = (27,393 + 32,741) ÷ 2 = **$30,067M** [Balance_Sheet Cell A6022] [Balance_Sheet Cell A6024]  \n- 평균 총자산 = (137,175 + 151,880) ÷ 2 = **$144,527.5M** [Balance_Sheet Cell A5138] [Balance_Sheet Cell A5140]  \n\n따라서 계산식은 다음과 같습니다.\n\n- **ROE = 2025년 순이익 ÷ 30,067M × 100**\n- **ROA = 2025년 순이익 ÷ 144,527.5M × 100**\n\n그러나 **2025년 순이익 셀 값이 제공되지 않아 정확한 ROE와 ROA 백분율은 확인할 수 없습니다.**",
+  "api_usage": {
+    "prompt_tokens": 21937,
+    "completion_tokens": 617,
+    "cached_tokens": 0,
+    "reasoning_tokens": 264,
+    "total_tokens": 22554
+  },
+  "latency_seconds": 31.529
+}

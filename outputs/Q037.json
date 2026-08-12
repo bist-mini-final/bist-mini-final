@@ -1,0 +1,15 @@
+{
+  "id": "Q037",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "IBM의 FY0 매출과 LTM 매출을 알려줘.",
+  "chatgpt_answer": "FY0 매출과 LTM 매출 모두 $67,535M.",
+  "pipeline_answer": "IBM의 매출은 다음과 같습니다.\n\n- **FY0 매출(2025년 12월 31일 기준): 67,535** [Key_Stats Cell A10]\n- **LTM 매출(2025년 12월 31일 기준): 67,535** [Key_Stats Cell A12]\n\n따라서 **FY0와 LTM 매출은 동일하며, 차이는 0**입니다.  \n계산: 67,535 − 67,535 = **0** [Key_Stats Cell A10][Key_Stats Cell A12]\n\n※ 제공된 셀 문맥에는 매출의 통화 단위가 명시되어 있지 않습니다.",
+  "api_usage": {
+    "prompt_tokens": 18952,
+    "completion_tokens": 240,
+    "cached_tokens": 0,
+    "reasoning_tokens": 83,
+    "total_tokens": 19192
+  },
+  "latency_seconds": 299.975
+}

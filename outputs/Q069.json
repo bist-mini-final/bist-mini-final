@@ -1,0 +1,15 @@
+{
+  "id": "Q069",
+  "scenario": "유형 4 재무 계산",
+  "question": "FCF 대비 배당 및 자사주 매입 집행 비중은?",
+  "chatgpt_answer": "단순 FCF 11,576M 대비 배당 6,255M은 54.0%. 2025 자사주 매입은 파일에 NA여서 배당+자사주 합계 비중은 엄밀히 산출 불가(NA를 0으로 보면 54.0%).",
+  "pipeline_answer": "FCF 대비 **배당 및 자사주 매입 집행 비중**은 다음과 같습니다. 계산식은 다음과 같습니다.\n\n> **집행 비중 = (배당금 지급액 + 자사주 매입액) ÷ 레버드 FCF × 100**  \n> 현금 유출 항목이 음수로 표시되어 있으므로 절댓값으로 계산했습니다.\n\n| 연도 | 레버드 FCF ($M) | 배당 ($M) | 자사주 매입 ($M) | 계산 | FCF 대비 비중 |\n|---|---:|---:|---:|---:|---:|\n| 2014 | 15,045.125 | 4,265 | 13,679 | (4,265+13,679) ÷ 15,045.125 | **119.27%** [Cash_Flow Cell A10346][Cash_Flow Cell A10058][Cash_Flow Cell A9902] |\n| 2015 | 8,746.625 | 4,897 | 4,857 | (4,897+4,857) ÷ 8,746.625 | **111.52%** [Cash_Flow Cell A10348][Cash_Flow Cell A10060][Cash_Flow Cell A9904] |\n| 2016 | 9,139.500 | 5,256 | 3,628 | (5,256+3,628) ÷ 9,139.5 | **97.20%** [Cash_Flow Cell A10350][Cash_Flow Cell A10062][Cash_Flow Cell A9906] |\n| 2017 | 8,041.875 | 5,506 | 4,533 | (5,506+4,533) ÷ 8,041.875 | **124.84%** [Cash_Flow Cell A10352][Cash_Flow Cell A10064][Cash_Flow Cell A9908] |\n| 2018 | 6,483.375 | 5,666 | 4,614 | (5,666+4,614) ÷ 6,483.375 | **158.51%** [Cash_Flow Cell A10354][Cash_Flow Cell A10066][Cash_Flow Cell A9910] |\n| 2019 | 14,803.875 | 5,707 | 1,633 | (5,707+1,633) ÷ 14,803.875 | **49.58%** [Cash_Flow Cell A10356][Cash_Flow Cell A10068][Cash_Flow Cell A9912] |\n| 2020 | 14,879.750 | 5,797 | 302 | (5,797+302) ÷ 14,879.75 | **40.99%** [Cash_Flow Cell A10358][Cash_Flow Cell A10070][Cash_Flow Cell A9914] |\n| 2021 | 4,626.500 | 5,869 | 319 | (5,869+319) ÷ 4,626.5 | **133.79%** [Cash_Flow Cell A10360][Cash_Flow Cell A10072][Cash_Flow Cell A9916] |\n| 2022 | 9,680.625 | 5,948 | 407 | (5,948+407) ÷ 9,680.625 | **65.64%** [Cash_Flow Cell A10362][Cash_Flow Cell A10074][Cash_Flow Cell A9918] |\n| 2023 | 10,823.000 | 6,040 | 402 | (6,040+402) ÷ 10,823 | **59.50%** [Cash_Flow Cell A10364][Cash_Flow Cell A10076][Cash_Flow Cell A9920] |\n\n**요약:**  \n- 2014~2018년에는 배당과 자사주 매입 합계가 FCF를 초과했으며, 특히 **2018년 158.51%**로 가장 높았습니다. [Cash_Flow Cell A10354][Cash_Flow Cell A10066][Cash_Flow Cell A9910]  \n- 2019~2020년에는 각각 **49.58%, 40.99%**로 낮아졌습니다. [Cash_Flow Cell A10356][Cash_Flow Cell A10068][Cash_Flow Cell A9912][Cash_Flow Cell A10358][Cash_Flow Cell A10070][Cash_Flow Cell A9914]  \n- 2021년에는 **133.79%**로 다시 FCF를 초과했습니다. [Cash_Flow Cell A10360][Cash_Flow Cell A10072][Cash_Flow Cell A9916]\n\n2024년은 레버드 FCF **9,325.5백만 달러**, 자사주 매입 **651백만 달러**, 보통주 배당 **6,147백만 달러**가 확인되지만, **총 배당금 지급액 데이터가 제공되지 않았습니다**. 따라서 총 배당 기준의 2024년 비중은 산출할 수 없습니다. [Cash_Flow Cell A10366][Cash_Flow Cell A9922][Cash_Flow Cell A10000] 보통주 배당만 사용하면 계산은 **(6,147+651) ÷ 9,325.5 = 72.86%**입니다. [Cash_Flow Cell A10366][Cash_Flow Cell A10000][Cash_Flow Cell A9922]",
+  "api_usage": {
+    "prompt_tokens": 17450,
+    "completion_tokens": 2247,
+    "cached_tokens": 17447,
+    "reasoning_tokens": 1024,
+    "total_tokens": 19697
+  },
+  "latency_seconds": 33.391
+}

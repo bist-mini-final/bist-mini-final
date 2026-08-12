@@ -1,0 +1,15 @@
+{
+  "id": "Q012",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 최근 분기 시가총액은?",
+  "chatgpt_answer": "파일에는 분기 시가총액 시계열이 없어 산출 불가. 현재 valuation date 시가총액은 $270,970.4M.",
+  "pipeline_answer": "제공된 컨텍스트에서 확인되는 IBM의 **LTM 기준 시가총액은 270,970.38886734**입니다 [Key_Stats Cell A248].\n\n계산은 다음과 같습니다.\n\n- 주가: 289.89 [Key_Stats Cell A242]  \n- 발행주식수: 934,735,206주 [Key_Stats Cell A244]  \n- 계산: 289.89 × 934,735,206 ÷ 1,000,000 = **270,970.38886734** [Key_Stats Cell A246]\n\n다만 제공된 셀에는 **최근 분기의 구체적인 기준일자와 시가총액 단위가 명시되어 있지 않으며**, 값은 LTM 기준입니다.",
+  "api_usage": {
+    "prompt_tokens": 12630,
+    "completion_tokens": 524,
+    "cached_tokens": 0,
+    "reasoning_tokens": 350,
+    "total_tokens": 13154
+  },
+  "latency_seconds": 134.701
+}

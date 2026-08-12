@@ -216,7 +216,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     [activeStep, modules, queryText, setQueryText]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
+  const [nodes, setNodes, _onNodesChange] = useNodesState<Node>(
     createInitialNodes().map((node) => ({
       ...node,
       data: { ...node.data, ...sharedNodeData(node.type) },
@@ -224,14 +224,31 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
   const [edges, setEdges, _onEdgesChange] = useEdgesState(createInitialEdges());
 
+  // When nodes are removed, also remove all edges connected to those nodes.
+  // This prevents orphan/dangling edges that would fail backend validation.
+  const onNodesChange = useCallback<typeof _onNodesChange>(
+    (changes) => {
+      const removedNodeIds = new Set(
+        changes.filter((c) => c.type === 'remove').map((c) => c.id)
+      );
+      if (removedNodeIds.size > 0) {
+        setEdges((currentEdges) =>
+          currentEdges.filter(
+            (e) => !removedNodeIds.has(e.source) && !removedNodeIds.has(e.target)
+          )
+        );
+      }
+      _onNodesChange(changes);
+    },
+    [_onNodesChange, setEdges]
+  );
+
   // Block automatic ReactFlow 'remove' events for edges only.
-  // Edge removal is handled exclusively by the × button in CustomEdge.
-  // Node removal via the trash button (deleteElements) still works normally since
-  // it goes through onNodesChange which ReactFlow also uses to clean up connected edges.
+  // Edge removal is handled exclusively by the × button in CustomEdge (via deleteElements).
   // The keyboard shortcut (Backspace / Delete) is disabled via deleteKeyCode={null}
   // in PipelineCanvas, so only explicit UI interactions can delete anything.
   const onEdgesChange = useCallback<typeof _onEdgesChange>(
-    (changes) => _onEdgesChange(changes.filter((c) => c.type !== 'remove')),
+    (changes) => _onEdgesChange(changes),
     [_onEdgesChange]
   );
 
@@ -571,13 +588,24 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
           const targetDefinition = modules.find(
             (module) => module.type === targetNode?.module_type
           );
+          const sourceNode = migratedGraph.nodes.find((node) => node.id === workflowEdge.source);
+          const sourceDefinition = modules.find(
+            (module) => module.type === sourceNode?.module_type
+          );
+          const hasMultipleInputs = (targetDefinition?.inputs.length ?? 0) > 1;
+          const targetHandle = hasMultipleInputs && workflowEdge.target_input
+            ? workflowEdge.target_input
+            : 'in';
+          const hasMultipleOutputs = (sourceDefinition?.outputs.length ?? 0) > 1
+            || Object.keys(sourceDefinition?.branch_outputs ?? {}).length > 0;
+          const sourceHandle = workflowEdge.source_branch
+            ?? (hasMultipleOutputs && workflowEdge.source_output ? workflowEdge.source_output : 'out');
           return {
             id: workflowEdge.id,
             source: workflowEdge.source,
             target: workflowEdge.target,
-            sourceHandle: workflowEdge.source_branch ?? workflowEdge.source_output ?? 'out',
-            targetHandle: workflowEdge.target_input
-              ?? (targetDefinition && targetDefinition.inputs.length > 1 ? 'in' : 'in'),
+            sourceHandle,
+            targetHandle,
             type: 'customEdge',
             data: {
               active: false,
@@ -637,6 +665,9 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
               executionOutcome: state.outcome,
               cacheHit: state.cache_hit,
               batchIndex: state.batch_index,
+              elapsedMs: state.elapsed_ms,
+              costUsd: state.cost_usd,
+              usage: state.usage,
             },
           };
         })

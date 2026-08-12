@@ -1,0 +1,15 @@
+{
+  "id": "Q072",
+  "scenario": "유형 4 재무 계산",
+  "question": "2025년 매출총이익률과 영업이익률은?",
+  "chatgpt_answer": "2025 매출총이익률 58.19%, 영업이익률 17.41%.",
+  "pipeline_answer": "2025년:\n\n- **매출총이익률:** **58.1876064263%** [Key_Stats Cell A64]\n- **영업이익률:** **17.4087510180%** [Key_Stats Cell A136]",
+  "api_usage": {
+    "prompt_tokens": 14599,
+    "completion_tokens": 234,
+    "cached_tokens": 14596,
+    "reasoning_tokens": 170,
+    "total_tokens": 14833
+  },
+  "latency_seconds": 46.403
+}

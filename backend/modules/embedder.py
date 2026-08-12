@@ -17,7 +17,7 @@ EMBEDDING_MODEL_OPTIONS = [
 
 class EmbedderInput(SubqueriesDTO):
     model: str = Field(
-        default="text-embedding-3-large",
+        default=DEFAULT_BGE_MODEL,
         min_length=1,
         description="서브쿼리 임베딩에 사용할 Hugging Face 또는 OpenAI 모델 ID",
         json_schema_extra={

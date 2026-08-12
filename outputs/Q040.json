@@ -1,0 +1,15 @@
+{
+  "id": "Q040",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "IBM의 최근 3년 순이익 추세를 알려줘.",
+  "chatgpt_answer": "최근 3년 순이익: 2023 $7,502M → 2024 $6,023M → 2025 $10,593M. 2024 감소 후 2025 급반등.",
+  "pipeline_answer": "IBM의 최근 3년 순이익 추세는 **2024년에 감소한 뒤 2025년에 크게 반등**한 모습입니다. 단위는 **백만 달러($M)**입니다.\n\n- **2023년:** 7,502 [Income_Statement Cell A1572]\n- **2024년:** 6,023 [Income_Statement Cell A1574]  \n  - 전년 대비: 6,023 - 7,502 = **-1,479**\n  - 증감률: -1,479 ÷ 7,502 × 100 = **-19.7%**\n- **2025년:** 10,593 [Income_Statement Cell A1576]  \n  - 전년 대비: 10,593 - 6,023 = **+4,570**\n  - 증감률: 4,570 ÷ 6,023 × 100 = **+75.9%**\n\n종합하면, **2023년 7,502에서 2025년 10,593으로 3,091 증가**했으며, 2023년 대비 **41.2% 증가**했습니다. [Income_Statement Cell A1572] [Income_Statement Cell A1576]",
+  "api_usage": {
+    "prompt_tokens": 13001,
+    "completion_tokens": 459,
+    "cached_tokens": 0,
+    "reasoning_tokens": 186,
+    "total_tokens": 13460
+  },
+  "latency_seconds": 757.2
+}

@@ -102,6 +102,9 @@ class RunNodeState(StrictModel):
     skip_reason: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+    elapsed_ms: Optional[float] = None
+    cost_usd: Optional[float] = None
+    usage: Optional[Dict[str, int]] = None
 
 
 class RunBatchState(StrictModel):

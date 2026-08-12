@@ -1,0 +1,15 @@
+{
+  "id": "Q052",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "비스텔리젼스의 EBITDA 마진을 IBM과 비교하면 어떤 수준이야?",
+  "chatgpt_answer": "비스텔리젼스 데이터가 없어 IBM과 비교 불가. IBM LTM EBITDA 마진은 24.84%.",
+  "pipeline_answer": "제공된 셀 context에는 **비스텔리젼스의 EBITDA 또는 EBITDA 마진 데이터가 없어**, IBM과의 직접 비교 수준을 산출할 수 없습니다.\n\n참고로 IBM의 EBITDA 마진은 다음과 같습니다.\n\n- 2024년: **20.5345%** [Key_Stats Cell A98]\n- 2025년: **24.8434%** [Key_Stats Cell A100]\n- 2025년 증가폭: **24.8434% - 20.5345% = 4.3089%p** [Key_Stats Cell A98] [Key_Stats Cell A100]\n- 2026년 추정치: **28.1271%** [Key_Stats Cell A104]\n\n따라서 비스텔리젼스의 **2024년 또는 2025년 EBITDA 마진**이 제공되어야 IBM 대비 높음·낮음 및 격차를 판단할 수 있습니다.",
+  "api_usage": {
+    "cached_tokens": 0,
+    "completion_tokens": 440,
+    "prompt_tokens": 12950,
+    "reasoning_tokens": 223,
+    "total_tokens": 13390
+  },
+  "latency_seconds": 14.095
+}

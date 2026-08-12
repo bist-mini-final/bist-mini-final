@@ -1,0 +1,15 @@
+{
+  "id": "Q027",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM CAPEX는 얼마인가?",
+  "chatgpt_answer": "$1,617M 지출(표시값 -$1,617M).",
+  "pipeline_answer": "IBM의 LTM CAPEX는 **-1,617백만 달러(-$1.617B)**입니다. [Cash_Flow Cell A9484]",
+  "api_usage": {
+    "prompt_tokens": 15843,
+    "completion_tokens": 115,
+    "cached_tokens": 0,
+    "reasoning_tokens": 72,
+    "total_tokens": 15958
+  },
+  "latency_seconds": 132.112
+}

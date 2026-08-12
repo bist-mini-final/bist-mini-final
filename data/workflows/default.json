@@ -84,7 +84,7 @@
           "y": 260.3659918372633
         },
         "config": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
+          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
         },
         "values": {},
         "ui": {

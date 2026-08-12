@@ -18,6 +18,7 @@ export const ContextNode = ({ data, selected }: ContextNodeProps) => {
       eyebrow="Transform Module"
       title="Context Expander"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={350}
       inputPorts={['retrieval_json', 'document_input']}

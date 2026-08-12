@@ -1,0 +1,15 @@
+{
+  "id": "Q024",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM 총자산은 얼마인가?",
+  "chatgpt_answer": "$151,880M.",
+  "pipeline_answer": "제공된 셀 컨텍스트에는 IBM의 **LTM 총자산(Total Assets)** 금액이 없습니다. 따라서 LTM 총자산은 산출할 수 없습니다. LTM 기준일은 **2025-12-31**로 확인됩니다 [Balance_Sheet Cell A8678].",
+  "api_usage": {
+    "prompt_tokens": 14563,
+    "completion_tokens": 145,
+    "cached_tokens": 0,
+    "reasoning_tokens": 72,
+    "total_tokens": 14708
+  },
+  "latency_seconds": 176.021
+}

@@ -1,0 +1,15 @@
+{
+  "id": "Q031",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "비스텔리젼스의 2023년 상반기와 하반기 매출을 비교해줘.",
+  "chatgpt_answer": "파일 내 비스텔리젼스 반기 데이터 없음.",
+  "pipeline_answer": "제공된 셀 context에는 비스텔리젼스의 **2023년 상반기 및 하반기 매출 데이터가 없습니다**. 따라서 두 기간의 매출 비교나 증감률 계산은 할 수 없습니다.\n\n참고로 확인 가능한 값은 **2023년 연간 매출 61,860**뿐입니다 [Key_Stats Cell A6]. 상·하반기 매출 비교를 위해서는 2023년 **H1 매출과 H2 매출** 셀이 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 17660,
+    "completion_tokens": 165,
+    "cached_tokens": 0,
+    "reasoning_tokens": 43,
+    "total_tokens": 17825
+  },
+  "latency_seconds": 399.916
+}

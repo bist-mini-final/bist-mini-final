@@ -1,0 +1,15 @@
+{
+  "id": "Q105",
+  "scenario": "유형 6 지표 전망 및 예측",
+  "question": "영업현금흐름이 5% 증가하고 CapEx가 동일하면 2026년 FCF는?",
+  "chatgpt_answer": "CFO가 5% 증가하면 13,852.7M. CapEx 1,617M 유지 시 2026 FCF ≈ $12,235.7M.",
+  "pipeline_answer": "2026년 FCF는 **약 12,235.65백만 달러(약 122억 3,565만 달러)**로 계산됩니다.\n\n계산:\n1. 2025년 영업현금흐름: **13,193백만 달러** [Cash_Flow Cell A9458]  \n2. 5% 증가 후 영업현금흐름:  \n   **13,193 × 1.05 = 13,852.65백만 달러**\n3. CapEx: **-1,617백만 달러** [Cash_Flow Cell A9484]  \n4. FCF = 영업현금흐름 + CapEx:  \n   **13,852.65 + (-1,617) = 12,235.65백만 달러**\n\n따라서 **2026년 FCF 추정치는 12,235.65백만 달러**입니다. 단, 2026년 실제 영업현금흐름과 CapEx는 컨텍스트에 없으므로, 2025년 수치를 기준으로 영업현금흐름만 5% 증가하고 CapEx는 동일하다고 가정한 계산입니다.",
+  "api_usage": {
+    "prompt_tokens": 20572,
+    "completion_tokens": 490,
+    "cached_tokens": 0,
+    "reasoning_tokens": 221,
+    "total_tokens": 21062
+  },
+  "latency_seconds": 55.613
+}

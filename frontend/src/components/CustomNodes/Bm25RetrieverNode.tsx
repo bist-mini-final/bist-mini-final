@@ -26,6 +26,7 @@ export const Bm25RetrieverNode = ({ data, selected }: Bm25RetrieverNodeProps) =>
       eyebrow="Logic Module"
       title="BM25 Keyword Retriever"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={330}
       inputPorts={['query_input', 'document_input']}

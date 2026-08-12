@@ -1,0 +1,15 @@
+{
+  "id": "Q084",
+  "scenario": "유형 4 재무 계산",
+  "question": "IBM의 TEV는 LTM 매출의 몇 배야?",
+  "chatgpt_answer": "직접 계산 기준 TEV/LTM Revenue = 4.76x.",
+  "pipeline_answer": "IBM의 TEV는 LTM 매출의 약 **4.76배**입니다.\n\n계산: **321,253.3889 ÷ 67,535 = 4.7569배**  \n- LTM TEV: 321,253.38886734 [Key_Stats Cell A258]  \n- LTM 매출: 67,535 [Key_Stats Cell A12]",
+  "api_usage": {
+    "prompt_tokens": 17774,
+    "completion_tokens": 274,
+    "cached_tokens": 0,
+    "reasoning_tokens": 180,
+    "total_tokens": 18048
+  },
+  "latency_seconds": 31.014
+}

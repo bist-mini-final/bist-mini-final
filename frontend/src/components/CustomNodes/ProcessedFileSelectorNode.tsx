@@ -45,6 +45,7 @@ export const ProcessedFileSelectorNode = ({ data, selected }: ProcessedFileSelec
       eyebrow="Source Module"
       title="Processed Excel File Selector"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={data.nodeWidth ?? 340}
       onWidthChange={data.onNodeWidthChange}

@@ -139,6 +139,9 @@ export interface RunNodeState {
   skip_reason: string | null;
   started_at: string | null;
   completed_at: string | null;
+  elapsed_ms?: number | null;
+  cost_usd?: number | null;
+  usage?: Record<string, number> | null;
 }
 
 export interface RunBatchState {
