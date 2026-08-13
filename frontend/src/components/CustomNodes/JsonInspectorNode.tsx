@@ -153,6 +153,7 @@ export const JsonInspectorNode = ({ data, selected }: JsonInspectorNodeProps) =>
       title="JSON Data Inspector"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['input']}
       selected={selected}
       width={data.nodeWidth ?? 390}
       onWidthChange={data.onNodeWidthChange}

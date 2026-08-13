@@ -36,6 +36,7 @@ export const DecomposerNode = ({ id, data, selected }: DecomposerNodeProps) => {
       selected={selected}
       width={360}
       nodeData={data}
+      inputPorts={['query_context']}
       bodyClassName="space-y-3"
     >
       <div className="space-y-1.5">

@@ -28,6 +28,7 @@ export const CellTextEmbedderNode = ({ data, selected }: CellTextEmbedderNodePro
       title="BGE Cell Text Embedder"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['input']}
       selected={selected}
       width={340}
       bodyClassName="space-y-2.5"

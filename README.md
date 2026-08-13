@@ -36,6 +36,8 @@ source .venv/bin/activate  # Windows (CMD/PowerShell): .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+`requirements.txt`에는 사전 구축 `.parquet` 인덱스를 읽기 위한 `pyarrow`가 포함되어 있습니다. 기존 가상환경을 사용 중이라면 의존성 변경 후 위 명령을 다시 실행하세요.
+
 ---
 
 ### 2. 환경변수 설정

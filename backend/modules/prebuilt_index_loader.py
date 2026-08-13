@@ -103,7 +103,13 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         if file_path.suffix.lower() == ".parquet":
             try:
                 import pyarrow.parquet as pq
+            except ImportError as error:
+                raise ModuleExecutionError(
+                    "Parquet 인덱스를 읽으려면 pyarrow가 필요합니다. "
+                    "pip install -r requirements.txt를 실행해 주세요"
+                ) from error
 
+            try:
                 table = pq.read_table(file_path)
                 schema_meta = table.schema.metadata or {}
                 file_name = (
@@ -146,7 +152,8 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
                 }
             except Exception as error:
                 raise ModuleExecutionError(
-                    f"사전 구축 Parquet 인덱스 파일 해석 실패: {file_path.name}"
+                    f"사전 구축 Parquet 인덱스 파일 해석 실패: {file_path.name} "
+                    f"({type(error).__name__}: {error})"
                 ) from error
 
         try:

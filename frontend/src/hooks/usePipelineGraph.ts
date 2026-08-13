@@ -155,6 +155,19 @@ function moduleInputDefaults(definition: ModuleDefinition | undefined): Record<s
   );
 }
 
+function resolveTargetInput(
+  definition: ModuleDefinition | undefined,
+  declaredInput: unknown,
+): string | undefined {
+  if (
+    typeof declaredInput === 'string'
+    && definition?.inputs.includes(declaredInput)
+  ) {
+    return declaredInput;
+  }
+  return definition?.inputs.length === 1 ? definition.inputs[0] : undefined;
+}
+
 const LEGACY_DECOMPOSER_SYSTEM_PROMPT_PREFIX = 'You are an expert financial DB query planner.';
 const LEGACY_DECOMPOSER_USER_PROMPT = 'Decompose the following financial question into atomic subqueries:\nQuestion: {question}';
 
@@ -461,6 +474,41 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
 
   useEffect(() => {
     if (modules.length === 0) return;
+    const moduleTypeByNodeId = new Map(
+      nodes.flatMap((node) => {
+        const moduleType = nodeModuleType(node);
+        return moduleType ? [[node.id, moduleType] as const] : [];
+      })
+    );
+    const definitionByType = new Map(modules.map((module) => [module.type, module]));
+
+    setEdges((currentEdges) => {
+      let changed = false;
+      const nextEdges = currentEdges.map((edge) => {
+        const targetDefinition = definitionByType.get(moduleTypeByNodeId.get(edge.target) ?? '');
+        const targetInput = resolveTargetInput(
+          targetDefinition,
+          edge.data?.target_input ?? edge.targetHandle,
+        );
+        if (!targetInput || (
+          edge.targetHandle === targetInput
+          && edge.data?.target_input === targetInput
+        )) {
+          return edge;
+        }
+        changed = true;
+        return {
+          ...edge,
+          targetHandle: targetInput,
+          data: { ...edge.data, target_input: targetInput },
+        };
+      });
+      return changed ? nextEdges : currentEdges;
+    });
+  }, [modules, nodes, setEdges]);
+
+  useEffect(() => {
+    if (modules.length === 0) return;
     const frame = window.requestAnimationFrame(() => {
       nodes.forEach((node) => updateNodeInternals(node.id));
     });
@@ -677,10 +725,10 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
           const sourceDefinition = modules.find(
             (module) => module.type === sourceNode?.module_type
           );
-          const hasMultipleInputs = (targetDefinition?.inputs.length ?? 0) > 1;
-          const targetHandle = hasMultipleInputs && workflowEdge.target_input
-            ? workflowEdge.target_input
-            : 'in';
+          const targetHandle = resolveTargetInput(
+            targetDefinition,
+            workflowEdge.target_input,
+          ) ?? 'in';
           const hasMultipleOutputs = (sourceDefinition?.outputs.length ?? 0) > 1
             || Object.keys(sourceDefinition?.branch_outputs ?? {}).length > 0;
           const sourceHandle = workflowEdge.source_branch
