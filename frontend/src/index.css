@@ -22,6 +22,9 @@
   --radius-lg: 1rem;
   --shadow-card: 0 10px 30px -18px rgb(15 76 43 / 28%);
   --shadow-float: 0 20px 45px -24px rgb(15 54 34 / 38%);
+  /* Header height — used to offset absolute-positioned overlays below the header.
+     Overridden in each breakpoint where the header wraps or compacts. */
+  --header-h: 4.75rem;
 }
 
 * {
@@ -446,7 +449,7 @@ textarea:focus-visible {
 
 .error-banner {
   position: absolute;
-  top: 4.75rem;
+  top: var(--header-h, 4.75rem);
   left: 50%;
   transform: translateX(-50%);
   z-index: 35;
@@ -485,7 +488,7 @@ textarea:focus-visible {
 
 .module-palette {
   position: absolute;
-  top: 4.75rem;
+  top: var(--header-h, 4.75rem);
   left: 1rem;
   bottom: 1rem;
   z-index: 25;
@@ -757,7 +760,7 @@ textarea:focus-visible {
 
 .canvas-hint {
   position: absolute;
-  top: 4.75rem;
+  top: var(--header-h, 4.75rem);
   left: 1.25rem;
   z-index: 5;
   border: 1px solid rgb(220 231 225 / 85%);
@@ -3085,7 +3088,10 @@ body.spreadsheet-result-is-resizing * {
 
   .module-palette {
     position: absolute;
-    inset: 0 auto 0 0;
+    top: var(--header-h, 4.75rem);
+    left: 0;
+    right: auto;
+    bottom: 0;
     width: min(20rem, calc(100vw - 3rem));
     max-width: 90vw;
     box-shadow: 20px 0 50px -28px rgb(15 54 34 / 60%);
@@ -3116,7 +3122,10 @@ body.spreadsheet-result-is-resizing * {
 
   .palette-backdrop {
     position: absolute;
-    inset: 0;
+    top: var(--header-h, 4.75rem);
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 15;
     display: block;
     border: 0;
@@ -3237,6 +3246,7 @@ body.spreadsheet-result-is-resizing * {
   }
 
   .app-header {
+    --header-h: 3.8rem;
     min-height: auto;
     align-items: center;
     gap: 0.6rem;
@@ -3257,6 +3267,12 @@ body.spreadsheet-result-is-resizing * {
 
   .app-header__actions {
     gap: 0.35rem;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .execution-stats-panel {
+    display: none;
   }
 
   .step-progress {
@@ -3280,7 +3296,7 @@ body.spreadsheet-result-is-resizing * {
   }
 
   .canvas-hint {
-    top: 0.65rem;
+    top: calc(var(--header-h, 3.8rem) + 0.5rem);
     left: 0.65rem;
   }
 
@@ -3295,6 +3311,8 @@ body.spreadsheet-result-is-resizing * {
 
 @media (max-width: 479px) {
   .app-header {
+    /* 2-row header: brand row (~2.4rem) + actions row (~2rem) + padding (~1rem gap) ≈ 7rem */
+    --header-h: 7rem;
     flex-wrap: wrap;
   }
 
@@ -3313,6 +3331,14 @@ body.spreadsheet-result-is-resizing * {
 
   .canvas-hint {
     display: none;
+  }
+
+  .module-palette {
+    top: var(--header-h, 7rem);
+  }
+
+  .error-banner {
+    top: var(--header-h, 7rem);
   }
 }
 
