@@ -1,6 +1,8 @@
 import type {
   ModuleDefinition,
   ModuleType,
+  BenchmarkCase,
+  BenchmarkComparison,
   WorkflowDocument,
   WorkflowGraph,
   WorkflowRun,
@@ -148,5 +150,21 @@ export const pipelineApi = {
       undefined,
       signal
     );
+  },
+
+  deleteWorkflow(workflowId: string, signal?: AbortSignal) {
+    return writeJson<{ deleted: string }>('DELETE', `/api/workflows/${workflowId}`, undefined, signal);
+  },
+
+  getWorkflows(signal?: AbortSignal) {
+    return requestJson<{ workflows: WorkflowDocument[] }>('/api/workflows', signal);
+  },
+
+  compareBenchmarks(workflowIds: string[], cases: BenchmarkCase[], useCache = false) {
+    return postJson<BenchmarkComparison>('/api/benchmarks/compare', {
+      workflow_ids: workflowIds,
+      cases,
+      use_cache: useCache,
+    });
   },
 };

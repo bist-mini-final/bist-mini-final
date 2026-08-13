@@ -55,6 +55,9 @@ function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
   for (const edge of graph.edges) {
     const sourceType = moduleTypeByNodeId.get(edge.source);
     const targetType = moduleTypeByNodeId.get(edge.target);
+    // A node can be deleted before ReactFlow emits its connected-edge removal.
+    // Never keep that stale edge in a saved graph or send it to DAG validation.
+    if (!sourceType || !targetType) continue;
     let targetInput = edge.target_input;
 
     if (targetInput === 'input' && targetType === 'bm25_retriever') {
@@ -216,7 +219,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     [activeStep, modules, queryText, setQueryText]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
+  const [nodes, setNodes, _onNodesChange] = useNodesState<Node>(
     createInitialNodes().map((node) => ({
       ...node,
       data: { ...node.data, ...sharedNodeData(node.type) },
@@ -224,16 +227,28 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
   const [edges, setEdges, _onEdgesChange] = useEdgesState(createInitialEdges());
 
+  const onNodesChange = useCallback<typeof _onNodesChange>(
+    (changes) => {
+      const removedNodeIds = new Set(
+        changes.filter((change) => change.type === 'remove').map((change) => change.id)
+      );
+      if (removedNodeIds.size > 0) {
+        setEdges((currentEdges) => currentEdges.filter(
+          (edge) => !removedNodeIds.has(edge.source) && !removedNodeIds.has(edge.target)
+        ));
+      }
+      _onNodesChange(changes);
+    },
+    [_onNodesChange, setEdges]
+  );
+
   // Block automatic ReactFlow 'remove' events for edges only.
   // Edge removal is handled exclusively by the × button in CustomEdge.
   // Node removal via the trash button (deleteElements) still works normally since
   // it goes through onNodesChange which ReactFlow also uses to clean up connected edges.
   // The keyboard shortcut (Backspace / Delete) is disabled via deleteKeyCode={null}
   // in PipelineCanvas, so only explicit UI interactions can delete anything.
-  const onEdgesChange = useCallback<typeof _onEdgesChange>(
-    (changes) => _onEdgesChange(changes.filter((c) => c.type !== 'remove')),
-    [_onEdgesChange]
-  );
+  const onEdgesChange = _onEdgesChange;
 
   const dagSummary = useMemo(() => summarizeDag(nodes, edges), [edges, nodes]);
 
@@ -541,7 +556,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       const savedQuery = migratedGraph.nodes.find(
         (workflowNode) => workflowNode.module_type === 'query_input'
       )?.values?.query;
-      if (typeof savedQuery === 'string') setQueryText(savedQuery);
+      setQueryText(typeof savedQuery === 'string' ? savedQuery : '');
 
       stoppedNodeIdsRef.current = new Set(
         migratedGraph.nodes
@@ -753,6 +768,28 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     setEdges([]);
   }, [setEdges, setNodes]);
 
+  const selectNode = useCallback((nodeId: string) => {
+    setNodes((currentNodes) => currentNodes.map((node) => ({
+      ...node,
+      selected: node.id === nodeId,
+    })));
+  }, [setNodes]);
+
+  const duplicateNode = useCallback((nodeId: string) => {
+    setNodes((currentNodes) => {
+      const original = currentNodes.find((node) => node.id === nodeId);
+      if (!original) return currentNodes;
+      const clone: Node = {
+        ...original,
+        id: `node-${Date.now()}`,
+        position: { x: original.position.x + 36, y: original.position.y + 36 },
+        data: { ...original.data, executionState: undefined, executionOutput: null, executionError: null },
+        selected: true,
+      };
+      return currentNodes.map((node): Node => ({ ...node, selected: false })).concat(clone);
+    });
+  }, [setNodes]);
+
   /** Explicitly remove a node and all edges connected to it. */
   const deleteNode = useCallback(
     (nodeId: string) => {
@@ -789,6 +826,8 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     clearNodeExecutionState,
     resumeNodeExecution,
     clearGraph,
+    selectNode,
+    duplicateNode,
     batchCount: dagSummary.batchCount,
     hasCycle: dagSummary.hasCycle,
   };

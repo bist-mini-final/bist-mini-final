@@ -14,6 +14,7 @@ from ..workflows import (
     WorkflowSaveRequest,
     WorkflowStore,
 )
+from .benchmark_routes import create_benchmark_router
 
 
 def create_workflow_router(
@@ -31,6 +32,7 @@ def create_workflow_router(
         run_store,
         result_cache,
     )
+    router.include_router(create_benchmark_router(workflow_store, workflow_executor))
 
     @router.delete("/cache")
     def clear_runtime_cache():
@@ -38,7 +40,18 @@ def create_workflow_router(
 
     @router.get("/workflows")
     def list_workflows():
-        return {"workflows": workflow_store.list()}
+        # Older default.json files carry id="workflow".  Filter by the
+        # persisted document identity *and* collapse duplicate logical IDs so
+        # the bootstrap template can never appear as a second canvas frame.
+        workflows_by_id = {
+            item.id: item
+            for item in workflow_store.list()
+            if item.id != WorkflowStore.DEFAULT_TEMPLATE_ID
+        }
+        workflows = list(workflows_by_id.values())
+        if not any(item.id == WorkflowStore.ACTIVE_WORKFLOW_ID for item in workflows):
+            workflows.insert(0, workflow_store.load(WorkflowStore.ACTIVE_WORKFLOW_ID))
+        return {"workflows": workflows}
 
     @router.get("/workflows/{workflow_id}")
     def get_workflow(workflow_id: str):
@@ -55,6 +68,16 @@ def create_workflow_router(
     def save_workflow(workflow_id: str, request: WorkflowSaveRequest):
         try:
             return workflow_store.save(workflow_id, request)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.delete("/workflows/{workflow_id}")
+    def delete_workflow(workflow_id: str):
+        try:
+            workflow_store.delete(workflow_id)
+            return {"deleted": workflow_id}
+        except FileNotFoundError as error:
+            raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}") from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 

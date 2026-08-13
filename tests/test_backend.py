@@ -41,6 +41,10 @@ from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModul
 from backend.modules.processed_file_selector import ProcessedFileSelectorModule
 from backend.modules.reader import ReaderModule
 from backend.modules.rrf_fusion import RrfFusionModule
+from backend.modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from backend.modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from backend.semantic_matching.catalog import QueryExample
+from backend.semantic_matching.matcher import SemanticQueryMatcher
 from backend.modules.vector_index_writer import VectorIndexWriterModule
 from backend.routes import create_api_router
 from backend.similarity import combined_similarity, rank_candidates
@@ -215,6 +219,73 @@ class SimilarityTests(unittest.TestCase):
         self.assertEqual(matches[0].question_id, "Q2")
 
 
+class SemanticQueryMatcherTests(unittest.TestCase):
+    class KeywordEncoder:
+        def encode(self, queries):
+            return [
+                [1.0, 0.0] if "revenue" in query.lower() else [0.0, 1.0]
+                for query in queries
+            ]
+
+    def test_route_votes_for_nearby_examples_and_returns_sheet_scope(self) -> None:
+        matcher = SemanticQueryMatcher(self.KeywordEncoder(), examples=(
+            QueryExample("q1", "revenue trend", "financials", ("Key_Stats",)),
+            QueryExample("q2", "revenue growth", "financials", ("Key_Stats",)),
+            QueryExample("q3", "employee count", "headcount", ("Employees",)),
+        ))
+
+        decision = matcher.route("revenue this year", "test", 0.74, 3, 0.05)
+
+        self.assertEqual(decision.target, "financials")
+        self.assertEqual(decision.sheets, ("Key_Stats",))
+        self.assertEqual(len(decision.matches), 3)
+
+    def test_route_falls_back_below_confidence_threshold(self) -> None:
+        matcher = SemanticQueryMatcher(self.KeywordEncoder(), examples=(
+            QueryExample("q1", "employee count", "headcount", ("Employees",)),
+        ))
+
+        decision = matcher.route("revenue this year", "test", 0.74, 1, 0.05)
+
+        self.assertIsNone(decision.target)
+        self.assertEqual(decision.sheets, ())
+
+    def test_scoped_dense_retriever_falls_back_when_no_matching_sheet_exists(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = VectorIndexStore(Path(directory))
+            index_id = "a" * 64
+            metadata = {
+                "workbook_hash": "hash", "model": "test", "dimension": 2,
+                "document_count": 1, "items": [{
+                    "cell_id": "Other Cell A1", "sheet_name": "Other", "cell_coord": "A1",
+                    "row_header": ["Revenue"], "column_header": ["LTM"],
+                    "cell_value": "100", "variant": "header_with_value", "text": "Revenue",
+                    "embedding_index": 0,
+                }],
+            }
+            store.put(index_id, [[1.0, 0.0]], metadata)
+            result = SemanticScopedDenseRetrieverModule(store).run({
+                "query_input": {"question_id": "q", "items": {"Revenue": [1.0, 0.0]}},
+                "index_input": {"index_id": index_id, "workbook_hash": "hash", "model": "test", "dimension": 2, "document_count": 1},
+                "semantic_match": {"matched": True, "target": "financials", "confidence": 0.9, "sheets": ["Key_Stats"], "reason": "test", "matches": []},
+            })
+        self.assertEqual(result["items"][0]["cell_id"], "Other Cell A1")
+
+    def test_adaptive_decomposer_skips_llm_when_semantic_match_succeeds(self) -> None:
+        class FailingCompletionClient:
+            def complete(self, model, messages):
+                raise AssertionError("LLM must not be called for a confident match")
+
+        result = AdaptiveQueryDecomposerModule(FailingCompletionClient()).run({
+            "question_text": "IBM revenue trend",
+            "semantic_match": {
+                "matched": True, "target": "financials", "confidence": 0.9,
+                "sheets": ["Key_Stats"], "reason": "test", "matches": [],
+            },
+        })
+        self.assertEqual(result["subqueries"], ["IBM revenue trend"])
+
+
 class ModularRagArchitectureTests(unittest.TestCase):
     def test_rrf_fuses_ranks_within_the_same_subquery(self) -> None:
         def candidate(rank, cell_id, subquery):
@@ -379,18 +450,21 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 22)
+        self.assertEqual(len(definitions), 25)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
                 "query_input",
                 "decomposer",
+                "adaptive_query_decomposer",
                 "embedder",
                 "cell_text_embedder",
                 "vector_index_writer",
                 "bm25_retriever",
                 "dense_retriever",
                 "rrf_fusion",
+                "semantic_query_matcher",
+                "semantic_scoped_dense_retriever",
                 "context",
                 "reader",
                 "answer_cache_writer",

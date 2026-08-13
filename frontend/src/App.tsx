@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Header } from './components/Header';
 import { PipelineCanvas } from './components/PipelineCanvas';
+import { BenchmarkPanel } from './components/BenchmarkPanel';
 import { ModulePalette } from './components/Sidebar/ModulePalette';
 import { usePipelineController } from './hooks/usePipelineController';
 import { usePipelineGraph } from './hooks/usePipelineGraph';
@@ -155,8 +156,12 @@ export function App() {
             runs={workflow.runs}
             isPaletteOpen={isPaletteOpen}
             onOpenPalette={() => setIsPaletteOpen(true)}
+            workflowId={workflow.workflowId}
+            workflowName={workflow.workflowName}
+            onSwitchWorkflow={workflow.switchWorkflow}
           />
         </main>
+        <BenchmarkPanel />
       </div>
     </ModuleExecutionContext.Provider>
   );

@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-ExecutionBranch = Literal["generated", "cached", "failed"]
-OutputBranch = Literal["generated", "cached"]
+ExecutionBranch = str
+OutputBranch = str
 NodeStatus = Literal["pending", "running", "succeeded", "failed", "skipped"]
 RunStatus = Literal["queued", "running", "completed", "failed"]
 BatchStatus = Literal["pending", "running", "completed", "failed"]

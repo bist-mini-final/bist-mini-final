@@ -648,6 +648,67 @@ textarea:focus-visible {
   opacity: 1;
 }
 
+.workflow-layers { position: absolute; z-index: 7; right: 0.85rem; top: 0.85rem; width: min(19rem, 32vw); border: 1px solid #d7e1ee; border-radius: 12px; background: rgb(255 255 255 / 96%); box-shadow: 0 12px 30px rgb(15 23 42 / 12%); backdrop-filter: blur(10px); overflow: hidden; }
+.workflow-layers__toolbar { display: flex; align-items: stretch; border-bottom: 1px solid #e4ebf3; background: #fff; }
+.workflow-layers__header { flex: 1; display: flex; align-items: center; gap: 7px; padding: 11px 12px; border: 0; background: transparent; color: #172033; font-weight: 700; cursor: pointer; text-align: left; }
+.workflow-layers__header small { margin-left: auto; padding: 1px 6px; border-radius: 99px; background: #e2e8f0; color: #475569; }
+.workflow-layers__create { width: 39px; border: 0; border-left: 1px solid #e4ebf3; background: transparent; color: #2563eb; cursor: pointer; display: grid; place-items: center; }
+.workflow-layers__create:hover { background: #eff6ff; color: #1d4ed8; }
+.workflow-layers__body { max-height: min(60vh, 34rem); overflow: auto; padding: 6px; }
+.workflow-layers__frame { margin: 2px 0; border: 1px solid transparent; border-radius: 8px; color: #334155; font-size: 12px; font-weight: 700; overflow: hidden; }
+.workflow-layers__frame[open] { border-color: #dbeafe; background: #f8fbff; }
+.workflow-layers__frame > summary { display: flex; align-items: center; justify-content: space-between; padding: 9px; cursor: pointer; list-style: none; }
+.workflow-layers__frame > summary::-webkit-details-marker { display: none; }
+.workflow-layers__frame > summary::before { content: '▸'; color: #94a3b8; margin-right: 6px; transition: transform 120ms; }
+.workflow-layers__frame[open] > summary::before { transform: rotate(90deg); }
+.workflow-layers__frame > summary span { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-layers__frame > summary small { margin-left: 8px; color: #94a3b8; font-size: 10px; font-weight: 500; }
+.workflow-layers__copy { display: grid; place-items: center; width: 25px; height: 25px; margin-left: 5px; border: 0; border-radius: 5px; background: transparent; color: #94a3b8; cursor: pointer; }
+.workflow-layers__copy:hover { background: #e8f1ff; color: #2563eb; }
+.workflow-layers__actions { display: inline-flex; gap: 1px; margin-left: 5px; }
+.workflow-layers__actions button { display: grid; place-items: center; width: 23px; height: 23px; border: 0; border-radius: 5px; background: transparent; color: #94a3b8; cursor: pointer; }
+.workflow-layers__actions button:hover:not(:disabled) { background: #e8f1ff; color: #2563eb; }
+.workflow-layers__actions button:last-child:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
+.workflow-layers__actions button:disabled { opacity: .35; cursor: not-allowed; }
+.workflow-layer { display: flex; min-width: 0; align-items: center; border-radius: 6px; color: #334155; }
+.workflow-layer__select { min-width: 0; flex: 1; display: flex; align-items: center; gap: 6px; padding-top: 7px; padding-bottom: 7px; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.workflow-layer:hover, .workflow-layer--selected { background: #e8f1ff; color: #164e92; }
+.workflow-layer__copy { display: grid; place-items: center; width: 25px; height: 25px; margin-right: 4px; border: 0; border-radius: 5px; background: transparent; color: #94a3b8; cursor: pointer; opacity: 0; }
+.workflow-layer:hover .workflow-layer__copy, .workflow-layer--selected .workflow-layer__copy { opacity: 1; }
+.workflow-layer__copy:hover { background: #dbeafe; color: #2563eb; }
+.workflow-layer__index { flex: none; width: 16px; color: #94a3b8; font-size: 10px; text-align: right; }
+.workflow-layer__name { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; }
+.workflow-layer__links { display: inline-flex; align-items: center; gap: 2px; color: #94a3b8; font-size: 10px; }
+.workflow-layer--running .workflow-layer__name { color: #2563eb; }
+.workflow-layer--failed .workflow-layer__name { color: #dc2626; }
+
+.edge-delete-btn--visible {
+  opacity: 1;
+}
+
+.edge-selection-path {
+  cursor: pointer;
+}
+
+.benchmark-panel { margin: 0 20px 20px; padding: 12px 16px; background: #fff; border: 1px solid #dbe4ef; border-radius: 10px; color: #172033; }
+.benchmark-panel summary { cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.benchmark-panel p { color: #526176; font-size: 13px; }
+.benchmark-panel label { display: block; margin: 10px 0; font-size: 13px; font-weight: 600; }
+.benchmark-panel input, .benchmark-panel textarea { display: block; width: min(760px, 100%); margin-top: 4px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+.benchmark-panel button { display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+.workflow-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 12px 0; }
+.workflow-frame { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: #f8fafc; }
+.workflow-frame__title { display: flex !important; align-items: center; gap: 6px; font-size: 14px !important; }
+.workflow-frame small { display: block; margin: 6px 0; color: #64748b; }
+.workflow-frame details summary { display: flex; align-items: center; gap: 3px; cursor: pointer; color: #475569; font-size: 12px; }
+.workflow-frame ol { margin: 7px 0 0; padding-left: 20px; max-height: 150px; overflow: auto; font-size: 12px; }
+.benchmark-error { margin-top: 8px; color: #b91c1c; }
+.benchmark-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 14px; }
+.benchmark-results article { padding: 10px; border: 1px solid #dbe4ef; border-radius: 8px; font-size: 13px; }
+.benchmark-results h4 { margin: 0 0 8px; }
+.benchmark-bar { height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
+.benchmark-bar span { display: block; height: 100%; background: #16a34a; }
+
 .edge-delete-btn:hover {
   color: #ef4444;
   border-color: #fca5a5;

@@ -1,12 +1,16 @@
 export type ModuleType =
   | 'query_input'
   | 'decomposer'
+  | 'adaptive_query_decomposer'
   | 'embedder'
   | 'cell_text_embedder'
   | 'vector_index_writer'
   | 'bm25_retriever'
   | 'dense_retriever'
   | 'rrf_fusion'
+  | 'semantic_query_matcher'
+  | 'llm_query_router'
+  | 'semantic_scoped_dense_retriever'
   | 'context'
   | 'reader'
   | 'answer_cache_writer'
@@ -162,6 +166,40 @@ export interface WorkflowRun {
   use_cache: boolean;
   batches: RunBatchState[];
   nodes: Record<string, RunNodeState>;
+}
+
+export interface BenchmarkCase {
+  id: string;
+  question: string;
+  expected_numbers?: number[];
+  expected_terms?: string[];
+}
+
+export interface BenchmarkSummary {
+  workflow_id: string;
+  cases: number;
+  accuracy: number;
+  average_latency_seconds: number;
+  average_tokens: number;
+  average_cost_usd: number;
+  errors: number;
+}
+
+export interface BenchmarkComparison {
+  execution_mode: 'sequential_isolated';
+  use_cache: boolean;
+  summary: BenchmarkSummary[];
+  results: Array<{
+    workflow_id: string;
+    case_id: string;
+    question: string;
+    latency_seconds: number;
+    total_tokens: number;
+    estimated_cost_usd: number;
+    score: { correct: boolean };
+    error: string | null;
+    timeline: Array<{ module_type: string; latency_seconds: number | null }>;
+  }>;
 }
 
 export type SaveStatus = 'loading' | 'saving' | 'saved' | 'error';

@@ -16,7 +16,9 @@ import {
   Plus,
   PanelLeftClose,
   Rows3,
+  Route,
   Search,
+  SearchCheck,
   ScanSearch,
   ScanText,
   Shuffle,
@@ -36,6 +38,7 @@ const ICONS: Record<string, LucideIcon> = {
   CloudCog,
   ListFilter,
   Search,
+  SearchCheck,
   Merge,
   Maximize2,
   Sparkles,
@@ -46,6 +49,7 @@ const ICONS: Record<string, LucideIcon> = {
   ScanText,
   TableProperties,
   Rows3,
+  Route,
   FolderArchive,
 };
 

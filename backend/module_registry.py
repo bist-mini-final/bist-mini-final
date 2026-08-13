@@ -6,6 +6,7 @@ from .embedding_artifacts import EmbeddingArtifactStore
 from .vector_index_store import VectorIndexStore
 from .modules.base import ExecutableModule
 from .modules.answer_cache_writer import AnswerCacheWriterModule
+from .modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
 from .modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from .modules.context_expander import ContextExpanderModule
 from .modules.bm25_retriever import Bm25RetrieverModule
@@ -28,6 +29,9 @@ from .modules.processed_file_selector import ProcessedFileSelectorModule
 from .modules.query_input import QueryInputModule
 from .modules.reader import ReaderModule
 from .modules.rrf_fusion import RrfFusionModule
+from .modules.semantic_query_matcher import SemanticQueryMatcherModule
+from .modules.llm_query_router import LlmQueryRouterModule
+from .modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
 from .modules.vector_index_writer import VectorIndexWriterModule
 
 
@@ -61,6 +65,7 @@ class ModuleRegistry:
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
             DecomposerModule(completion_client=completion_client),
+            AdaptiveQueryDecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
                 encoder=embedding_encoder,
@@ -76,6 +81,9 @@ class ModuleRegistry:
             Bm25RetrieverModule(),
             DenseRetrieverModule(self.vector_index_store),
             RrfFusionModule(),
+            SemanticQueryMatcherModule(encoder=embedding_encoder),
+            LlmQueryRouterModule(completion_client=completion_client),
+            SemanticScopedDenseRetrieverModule(self.vector_index_store),
             ContextExpanderModule(),
             ReaderModule(completion_client),
             AnswerCacheWriterModule(repository),

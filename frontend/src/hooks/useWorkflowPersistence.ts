@@ -6,8 +6,8 @@ import type {
   WorkflowRun,
 } from '../types';
 
-const ACTIVE_WORKFLOW_ID = 'workflow';
-const ACTIVE_WORKFLOW_NAME = 'Excel RAG Flow';
+const DEFAULT_WORKFLOW_ID = 'workflow';
+const DEFAULT_WORKFLOW_NAME = 'Excel RAG Flow';
 
 interface WorkflowGraphBridge {
   exportGraph: () => WorkflowGraph;
@@ -253,6 +253,8 @@ export function useWorkflowPersistence(
   const currentGraph = graph.exportGraph();
   const graphFingerprint = JSON.stringify(currentGraph);
   const [ready, setReady] = useState(false);
+  const [workflowId, setWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
+  const [workflowName, setWorkflowName] = useState(DEFAULT_WORKFLOW_NAME);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [latestRun, setLatestRun] = useState<WorkflowRun | null>(null);
@@ -292,19 +294,19 @@ export function useWorkflowPersistence(
       try {
         let workflow;
         try {
-          workflow = await pipelineApi.getWorkflow(ACTIVE_WORKFLOW_ID, controller.signal);
+          workflow = await pipelineApi.getWorkflow(workflowId, controller.signal);
           graphRef.current.replaceGraph(workflow.graph);
         } catch (error: unknown) {
-          if (!(error instanceof ApiError && error.status === 404)) throw error;
+          if (!(error instanceof ApiError && error.status === 404 && workflowId === DEFAULT_WORKFLOW_ID)) throw error;
           workflow = await pipelineApi.saveWorkflow(
-            ACTIVE_WORKFLOW_ID,
-            ACTIVE_WORKFLOW_NAME,
+            workflowId,
+            DEFAULT_WORKFLOW_NAME,
             graphRef.current.exportGraph(),
             controller.signal
           );
         }
 
-        const response = await pipelineApi.getRuns(ACTIVE_WORKFLOW_ID, controller.signal);
+        const response = await pipelineApi.getRuns(workflowId, controller.signal);
         const sortedRuns = response.runs
           .slice()
           .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
@@ -312,6 +314,7 @@ export function useWorkflowPersistence(
         const mostRecentRun = sortedRuns[0];
         if (mostRecentRun) applyRun(mostRecentRun);
         setLastSavedAt(workflow.updated_at);
+        setWorkflowName(workflow.name);
         setSaveStatus('saved');
         setReady(true);
       } catch (error: unknown) {
@@ -322,14 +325,14 @@ export function useWorkflowPersistence(
     };
     void load();
     return () => controller.abort();
-  }, [applyRun, moduleCatalogReady]);
+  }, [applyRun, moduleCatalogReady, workflowId]);
 
   const saveNow = useCallback(async (signal?: AbortSignal) => {
     setSaveStatus('saving');
     try {
       const workflow = await pipelineApi.saveWorkflow(
-        ACTIVE_WORKFLOW_ID,
-        ACTIVE_WORKFLOW_NAME,
+        workflowId,
+        workflowName,
         graphRef.current.exportGraph(),
         signal
       );
@@ -342,7 +345,7 @@ export function useWorkflowPersistence(
       }
       throw error;
     }
-  }, []);
+  }, [workflowId, workflowName]);
 
   useEffect(() => {
     if (!ready) return;
@@ -360,7 +363,7 @@ export function useWorkflowPersistence(
     async (query: string, signal: AbortSignal, inheritFromRunId?: string) => {
       const workflow = await saveNow(signal);
       const run = await pipelineApi.createRun(
-        ACTIVE_WORKFLOW_ID,
+        workflowId,
         runInputs(workflow.graph, query),
         signal,
         inheritFromRunId
@@ -368,7 +371,7 @@ export function useWorkflowPersistence(
       applyRun(run);
       return run;
     },
-    [applyRun, saveNow]
+    [applyRun, saveNow, workflowId]
   );
 
   const executeAll = useCallback(
@@ -382,11 +385,13 @@ export function useWorkflowPersistence(
       setIsExecuting(true);
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
+        const currentRuntimeInputs = runInputs(currentExecutionGraph, query);
         let run = latestRun &&
           (latestRun.status === 'queued' ||
             latestRun.status === 'running' ||
             latestRun.status === 'failed') &&
           executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
+          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs)
           ? latestRun
           : await createRun(query, controller.signal);
         applyRun(run);
@@ -582,8 +587,26 @@ export function useWorkflowPersistence(
     }
   }, [latestRun]);
 
+  const switchWorkflow = useCallback(async (nextWorkflowId: string, nextWorkflowName?: string) => {
+    if (isExecuting) return;
+    if (nextWorkflowId === workflowId) {
+      if (nextWorkflowName) setWorkflowName(nextWorkflowName);
+      return;
+    }
+    // A frame switch must not race the debounced autosave and drop edits.
+    await saveNow();
+    executionController.current?.abort();
+    setReady(false);
+    setLatestRun(null);
+    setRuns([]);
+    graphRef.current.clearExecutionState();
+    if (nextWorkflowName) setWorkflowName(nextWorkflowName);
+    setWorkflowId(nextWorkflowId);
+  }, [isExecuting, saveNow, workflowId]);
+
   return {
-    workflowId: ACTIVE_WORKFLOW_ID,
+    workflowId,
+    workflowName,
     ready,
     saveStatus,
     lastSavedAt,
@@ -599,5 +622,6 @@ export function useWorkflowPersistence(
     executeNode,
     cancelExecution,
     clearCache,
+    switchWorkflow,
   };
 }

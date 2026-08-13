@@ -14,6 +14,7 @@ import { ModuleSettingsContext } from '../contexts/ModuleSettingsContext';
 import { CustomEdge } from './CustomEdge';
 import { ContextNode } from './CustomNodes/ContextNode';
 import { AnswerCacheWriterNode } from './CustomNodes/AnswerCacheWriterNode';
+import { AdaptiveQueryDecomposerNode } from './CustomNodes/AdaptiveQueryDecomposerNode';
 import { Bm25RetrieverNode } from './CustomNodes/Bm25RetrieverNode';
 import { BfsLlmStructureDetectorNode } from './CustomNodes/BfsLlmStructureDetectorNode';
 import { CellTextSerializerNode } from './CustomNodes/CellTextSerializerNode';
@@ -34,7 +35,11 @@ import { PrebuiltIndexLoaderNode } from './CustomNodes/PrebuiltIndexLoaderNode';
 import { QueryNode } from './CustomNodes/QueryNode';
 import { ReaderNode } from './CustomNodes/ReaderNode';
 import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
+import { SemanticQueryMatcherNode } from './CustomNodes/SemanticQueryMatcherNode';
+import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
+import { SemanticScopedDenseRetrieverNode } from './CustomNodes/SemanticScopedDenseRetrieverNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
+import { WorkflowLayersPanel } from './WorkflowLayersPanel';
 import type { usePipelineGraph } from '../hooks/usePipelineGraph';
 import type { ModuleDefinition, WorkflowRun } from '../types';
 
@@ -46,6 +51,9 @@ interface PipelineCanvasProps {
   onOpenPalette: () => void;
   modules: ModuleDefinition[];
   runs: WorkflowRun[];
+  workflowId: string;
+  workflowName: string;
+  onSwitchWorkflow: (workflowId: string, workflowName?: string) => Promise<void>;
 }
 
 export function PipelineCanvas({
@@ -54,18 +62,25 @@ export function PipelineCanvas({
   onOpenPalette,
   modules,
   runs,
+  workflowId,
+  workflowName,
+  onSwitchWorkflow,
 }: PipelineCanvasProps) {
   const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null);
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       queryNode: QueryNode,
       decomposerNode: DecomposerNode,
+      adaptive_query_decomposer: AdaptiveQueryDecomposerNode,
       embeddingNode: EmbeddingNode,
       cell_text_embedder: CellTextEmbedderNode,
       vector_index_writer: VectorIndexWriterNode,
       bm25_retriever: Bm25RetrieverNode,
       dense_retriever: DenseRetrieverNode,
       rrf_fusion: RrfFusionNode,
+      semantic_query_matcher: SemanticQueryMatcherNode,
+      llm_query_router: LlmQueryRouterNode,
+      semantic_scoped_dense_retriever: SemanticScopedDenseRetrieverNode,
       contextNode: ContextNode,
       readerNode: ReaderNode,
       answer_cache_writer: AnswerCacheWriterNode,
@@ -111,6 +126,7 @@ export function PipelineCanvas({
         <span>휠로 확대 · 빈 영역 드래그로 이동</span>
       </div>
         <ReactFlow
+        key={workflowId}
         nodes={graph.nodes}
         edges={graph.edges}
         onNodesChange={graph.onNodesChange}
@@ -121,6 +137,10 @@ export function PipelineCanvas({
         onMoveEnd={graph.onMoveEnd}
         onDrop={graph.onDrop}
         onDragOver={graph.onDragOver}
+        onNodeClick={(_, node) => graph.selectNode(node.id)}
+        selectionOnDrag
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode="Shift"
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -129,7 +149,7 @@ export function PipelineCanvas({
         maxZoom={1.6}
         defaultEdgeOptions={{ type: 'customEdge' }}
         proOptions={{ hideAttribution: true }}
-        deleteKeyCode={null}
+        deleteKeyCode={['Backspace', 'Delete']}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cbd5e1" />
         <Controls position="bottom-right" showInteractive={false} />
@@ -140,6 +160,7 @@ export function PipelineCanvas({
           pannable
         />
         </ReactFlow>
+        <WorkflowLayersPanel nodes={graph.nodes} edges={graph.edges} modules={modules} onSelect={graph.selectNode} onDuplicateNode={graph.duplicateNode} workflowId={workflowId} workflowName={workflowName} onSwitchWorkflow={onSwitchWorkflow} />
       </section>
       {settingsNode && settingsModule && (
         <ModuleSettingsModal

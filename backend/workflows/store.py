@@ -70,6 +70,13 @@ class JsonModelStore:
                 removed += 1
         return removed
 
+    def delete(self, document_id: str) -> None:
+        path = self._path(document_id)
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        with self._lock:
+            path.unlink()
+
 
 class WorkflowStore:
     ACTIVE_WORKFLOW_ID = "workflow"
@@ -81,11 +88,23 @@ class WorkflowStore:
     def save(
         self, workflow_id: str, request: WorkflowSaveRequest
     ) -> WorkflowDocument:
+        node_ids = {node.id for node in request.graph.nodes}
+        # Keep a stale client-side edge from making the whole workflow invalid.
+        # This also repairs documents produced by older canvas versions.
+        graph = request.graph.model_copy(
+            update={
+                "edges": [
+                    edge
+                    for edge in request.graph.edges
+                    if edge.source in node_ids and edge.target in node_ids
+                ]
+            }
+        )
         document = WorkflowDocument(
             id=_validate_identifier(workflow_id),
             name=request.name,
             updated_at=utc_now_iso(),
-            graph=request.graph,
+            graph=graph,
         )
         return self._store.write(workflow_id, document)
 
@@ -100,6 +119,11 @@ class WorkflowStore:
 
     def list(self) -> List[WorkflowDocument]:
         return self._store.list_documents()
+
+    def delete(self, workflow_id: str) -> None:
+        if workflow_id in (self.ACTIVE_WORKFLOW_ID, self.DEFAULT_TEMPLATE_ID):
+            raise ValueError("The current/default workflow cannot be deleted")
+        self._store.delete(workflow_id)
 
 
 class RunStore:
