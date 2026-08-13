@@ -7,7 +7,6 @@ import type {
 } from '../types';
 
 const DEFAULT_WORKFLOW_ID = 'workflow';
-const DEFAULT_WORKFLOW_NAME = 'Excel RAG Flow';
 
 interface WorkflowGraphBridge {
   exportGraph: () => WorkflowGraph;
@@ -243,8 +242,6 @@ export function useWorkflowPersistence(
   const currentGraph = graph.exportGraph();
   const graphFingerprint = JSON.stringify(currentGraph);
   const [ready, setReady] = useState(false);
-  const [workflowId, setWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
-  const [workflowName, setWorkflowName] = useState(DEFAULT_WORKFLOW_NAME);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [latestRun, setLatestRun] = useState<WorkflowRun | null>(null);
@@ -295,7 +292,7 @@ export function useWorkflowPersistence(
           workflow = await pipelineApi.getWorkflow(activeWorkflowId, controller.signal);
           graphRef.current.replaceGraph(workflow.graph);
         } catch (error: unknown) {
-          if (!(error instanceof ApiError && error.status === 404 && workflowId === DEFAULT_WORKFLOW_ID)) throw error;
+          if (!(error instanceof ApiError && error.status === 404 && activeWorkflowId === DEFAULT_WORKFLOW_ID)) throw error;
           workflow = await pipelineApi.saveWorkflow(
             activeWorkflowId,
             activeWorkflowName,
@@ -312,7 +309,6 @@ export function useWorkflowPersistence(
         const mostRecentRun = sortedRuns[0];
         if (mostRecentRun) applyRun(mostRecentRun);
         setLastSavedAt(workflow.updated_at);
-        setWorkflowName(workflow.name);
         setSaveStatus('saved');
         setReady(true);
       } catch (error: unknown) {
@@ -582,25 +578,9 @@ export function useWorkflowPersistence(
     }
   }, [latestRun]);
 
-  const switchWorkflow = useCallback(async (nextWorkflowId: string, nextWorkflowName?: string) => {
-    if (isExecuting) return;
-    if (nextWorkflowId === workflowId) {
-      if (nextWorkflowName) setWorkflowName(nextWorkflowName);
-      return;
-    }
-    // A frame switch must not race the debounced autosave and drop edits.
-    await saveNow();
-    executionController.current?.abort();
-    setReady(false);
-    setLatestRun(null);
-    setRuns([]);
-    graphRef.current.clearExecutionState();
-    if (nextWorkflowName) setWorkflowName(nextWorkflowName);
-    setWorkflowId(nextWorkflowId);
-  }, [isExecuting, saveNow, workflowId]);
-
   return {
     workflowId: activeWorkflowId,
+    workflowName: activeWorkflowName,
     ready,
     saveStatus,
     lastSavedAt,
@@ -616,6 +596,5 @@ export function useWorkflowPersistence(
     executeNode,
     cancelExecution,
     clearCache,
-    switchWorkflow,
   };
 }

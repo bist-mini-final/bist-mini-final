@@ -128,6 +128,15 @@ export function App() {
     setActiveWorkflowId(id);
   };
 
+  const handleSwitchWorkflow = async (id: string, name?: string) => {
+    if (name) {
+      setWorkflows((current) => current.some((item) => item.id === id)
+        ? current.map((item) => item.id === id ? { ...item, name } : item)
+        : [...current, { id, name }]);
+    }
+    handleSelectWorkflow(id);
+  };
+
   const runMetrics = useMemo(() => {
     let totalElapsedMs = 0;
     let totalCostUsd = 0;
@@ -247,9 +256,9 @@ export function App() {
             runs={workflow.runs}
             isPaletteOpen={isPaletteOpen}
             onOpenPalette={() => setIsPaletteOpen(true)}
-            workflowId={workflow.workflowId}
-            workflowName={workflow.workflowName}
-            onSwitchWorkflow={workflow.switchWorkflow}
+            workflowId={activeWorkflowId}
+            workflowName={activeWorkflowName}
+            onSwitchWorkflow={handleSwitchWorkflow}
           />
         </main>
         <BenchmarkPanel />

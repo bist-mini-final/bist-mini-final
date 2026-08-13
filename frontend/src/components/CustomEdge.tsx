@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BaseEdge, EdgeProps, getBezierPath, useReactFlow } from '@xyflow/react';
 
 export const CustomEdge: React.FC<EdgeProps> = ({
@@ -9,14 +9,12 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   targetY,
   sourcePosition,
   targetPosition,
-  selected,
   style = {},
   markerEnd,
   data,
   selected,
 }) => {
   const { setEdges, screenToFlowPosition } = useReactFlow();
-  const [contextDeleteOpen, setContextDeleteOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const pathRef = useRef<SVGPathElement | null>(null);
   const [handlePos, setHandlePos] = useState<{ x: number; y: number } | null>(null);
@@ -125,7 +123,6 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     (event: React.MouseEvent<SVGPathElement>) => {
       event.preventDefault();
       selectEdge(event);
-      setContextDeleteOpen(true);
     },
     [selectEdge]
   );
@@ -181,15 +178,6 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           strokeDasharray: isActive ? '6,6' : 'none',
           transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
-      />
-      <path
-        d={edgePath}
-        fill="none"
-        stroke="transparent"
-        strokeWidth={18}
-        className="edge-selection-path"
-        onClick={selectEdge}
-        onContextMenu={openContextDelete}
       />
       <path
         d={edgePath}

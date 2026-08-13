@@ -227,25 +227,6 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
   const [edges, setEdges, _onEdgesChange] = useEdgesState(createInitialEdges());
 
-  // When nodes are removed, also remove all edges connected to those nodes.
-  // This prevents orphan/dangling edges that would fail backend validation.
-  const onNodesChange = useCallback<typeof _onNodesChange>(
-    (changes) => {
-      const removedNodeIds = new Set(
-        changes.filter((c) => c.type === 'remove').map((c) => c.id)
-      );
-      if (removedNodeIds.size > 0) {
-        setEdges((currentEdges) =>
-          currentEdges.filter(
-            (e) => !removedNodeIds.has(e.source) && !removedNodeIds.has(e.target)
-          )
-        );
-      }
-      _onNodesChange(changes);
-    },
-    [_onNodesChange, setEdges]
-  );
-
   const onNodesChange = useCallback<typeof _onNodesChange>(
     (changes) => {
       const removedNodeIds = new Set(
