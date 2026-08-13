@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Header } from './components/Header';
+import type { WorkflowOption } from './components/Header';
 import { PipelineCanvas } from './components/PipelineCanvas';
 import { ModulePalette } from './components/Sidebar/ModulePalette';
 import { usePipelineController } from './hooks/usePipelineController';
@@ -8,6 +9,9 @@ import { usePipelineGraph } from './hooks/usePipelineGraph';
 import { useWorkflowPersistence } from './hooks/useWorkflowPersistence';
 import { useResizablePanel } from './hooks/useResizablePanel';
 import { ModuleExecutionContext } from './contexts/ModuleExecutionContext';
+import { pipelineApi } from './services/api';
+
+const DEFAULT_WORKFLOW_ID = 'default';
 
 export function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(
@@ -15,13 +19,43 @@ export function App() {
   );
   const modulePanel = useResizablePanel();
   const controller = usePipelineController();
+
+  // Workflow list + active selection (default = "default" json)
+  const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
+  const [activeWorkflowId, setActiveWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
+  const activeWorkflowName = useMemo(
+    () => workflows.find((w) => w.id === activeWorkflowId)?.name ?? activeWorkflowId,
+    [workflows, activeWorkflowId]
+  );
+
+  // Load workflow list on mount
+  useEffect(() => {
+    const controller = new AbortController();
+    pipelineApi.listWorkflows(controller.signal).then(({ workflows: list }) => {
+      const options: WorkflowOption[] = list.map((wf) => ({ id: wf.id, name: wf.id }));
+      // Ensure "default" is always first in the list
+      options.sort((a, b) => {
+        if (a.id === DEFAULT_WORKFLOW_ID) return -1;
+        if (b.id === DEFAULT_WORKFLOW_ID) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      setWorkflows(options);
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
   const graph = usePipelineGraph({
     queryText: controller.queryText,
     setQueryText: controller.setQueryText,
     activeStep: controller.activeStep,
     modules: controller.modules,
   });
-  const workflow = useWorkflowPersistence(graph, controller.modules.length > 0);
+  const workflow = useWorkflowPersistence(
+    graph,
+    controller.modules.length > 0,
+    activeWorkflowId,
+    activeWorkflowName,
+  );
   // Use loose compatibility so that adding new nodes to the canvas does not
   // wipe out the execution results of already-completed nodes.  New nodes have
   // no entry in run.nodes and are therefore shown as idle by applyRun().
@@ -85,6 +119,60 @@ export function App() {
     }
   };
 
+  const handleSelectWorkflow = (id: string) => {
+    if (id === activeWorkflowId) return;
+    // Reset local controller state when switching workflows
+    controller.reset();
+    graph.clearGraph();
+    setActiveWorkflowId(id);
+  };
+
+  const runMetrics = useMemo(() => {
+    let totalElapsedMs = 0;
+    let totalCostUsd = 0;
+    let totalTokens = 0;
+    let hasExecution = false;
+
+    if (currentRun?.nodes) {
+      Object.values(currentRun.nodes).forEach((nodeState) => {
+        if (nodeState.elapsed_ms) {
+          totalElapsedMs += nodeState.elapsed_ms;
+          hasExecution = true;
+        }
+        if (nodeState.cost_usd) {
+          totalCostUsd += nodeState.cost_usd;
+        }
+        if (nodeState.usage) {
+          const tokens = nodeState.usage.total_tokens ?? nodeState.usage.tokens ?? 0;
+          totalTokens += tokens;
+        }
+      });
+    }
+
+    graph.nodes.forEach((node) => {
+      const data = node.data as Record<string, unknown> | undefined;
+      if (data) {
+        const ms = typeof data.elapsedMs === 'number' ? data.elapsedMs : typeof data.elapsed_ms === 'number' ? data.elapsed_ms : 0;
+        const cost = typeof data.costUsd === 'number' ? data.costUsd : typeof data.cost_usd === 'number' ? data.cost_usd : 0;
+        const usageObj = (data.usage as Record<string, number> | undefined) ?? (data.usage_metadata as Record<string, number> | undefined);
+        const tokens = usageObj?.total_tokens ?? usageObj?.tokens ?? 0;
+
+        if (!currentRun?.nodes?.[node.id]) {
+          if (ms > 0) { totalElapsedMs += ms; hasExecution = true; }
+          if (cost > 0) totalCostUsd += cost;
+          if (tokens > 0) totalTokens += tokens;
+        }
+      }
+    });
+
+    return {
+      totalElapsedMs,
+      totalCostUsd,
+      totalTokens,
+      hasExecution: hasExecution || totalCostUsd > 0 || totalTokens > 0,
+    };
+  }, [currentRun, graph.nodes]);
+
   return (
     <ModuleExecutionContext.Provider
       value={{
@@ -112,6 +200,10 @@ export function App() {
           onSave={() => void workflow.saveNow().catch(() => undefined)}
           isClearingCache={workflow.isClearingCache}
           onClearCache={() => void handleClearCache()}
+          metrics={runMetrics}
+          workflows={workflows}
+          activeWorkflowId={activeWorkflowId}
+          onSelectWorkflow={handleSelectWorkflow}
         />
 
         {controller.errorMessage && (
@@ -123,7 +215,10 @@ export function App() {
           </div>
         )}
 
-        <main className="app-workspace">
+        <main
+          className="app-workspace"
+          style={{ '--module-palette-width': `${modulePanel.width}px` } as React.CSSProperties}
+        >
           <ModulePalette
             modules={controller.modules}
             isOpen={isPaletteOpen}

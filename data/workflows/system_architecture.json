@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "id": "default",
-  "name": "default",
-  "updated_at": "2026-08-13T02:39:04.112975+00:00",
+  "id": "system_architecture",
+  "name": "system_architecture",
+  "updated_at": "2026-08-13T02:07:48.066563+00:00",
   "graph": {
     "nodes": [
       {
@@ -68,23 +68,6 @@
         },
         "config": {
           "model": "text-embedding-3-large"
-        },
-        "values": {},
-        "ui": {
-          "width": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "custom-node-1786497475934-2",
-        "module_type": "prebuilt_index_loader",
-        "position": {
-          "x": 2168.070268203153,
-          "y": 266.7211502837916
-        },
-        "config": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
         },
         "values": {},
         "ui": {
@@ -201,6 +184,67 @@
           "execution_stopped": false,
           "column_widths": {}
         }
+      },
+      {
+        "id": "custom-node-1786586768596-1",
+        "module_type": "processed_file_selector",
+        "position": {
+          "x": 1134.7401962982779,
+          "y": 454.89797405353835
+        },
+        "config": {
+          "file_name": "SPG_Company_KeyStats_v3.xlsm"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "custom-node-1786586774952-2",
+        "module_type": "luna_vlm_structure_detector",
+        "position": {
+          "x": 1580.1566203997525,
+          "y": 443.2700039327127
+        },
+        "config": {
+          "model": "gpt-5.6-luna",
+          "max_rows": 400,
+          "max_columns": 60,
+          "max_context_cells": 50000,
+          "reasoning_effort": "low",
+          "max_output_tokens": 6000,
+          "timeout_seconds": 240,
+          "validation_retries": 1,
+          "system_prompt": "You identify every table and its internal regions in an Excel worksheet.\nHidden sheets, hidden rows, and hidden columns are intentionally absent and must never be inferred.\n\nYou receive exactly one high-detail image containing the complete visible worksheet. It is never a crop, tile, or preselected candidate region. Inspect the entire image globally before deciding table boundaries, including sparse areas and tables separated by blank rows or columns.\n\nThe image preserves the original worksheet style while populated cells are tinted and labeled by exact Excel coordinate. Colors are: text amber, number green, date blue, boolean purple, error red, unresolved formula gray. A magenta inner border marks a formula. Exact coordinate, type, value, formula, and merged-range facts for the complete sheet are supplied as text and are authoritative.\n\nCell-role guidance:\n- Ordinary descriptive text is strong structural evidence. Text-dominant rows above a numeric/date/formula matrix are usually titles or column headers, and text-dominant columns to its left are usually row headers. Prefer those header roles unless position, repetition, or surrounding layout clearly shows that the text belongs to the data matrix.\n- A text-typed cell is not automatically a header. Missing-value and status literals such as `NA`, `N/A`, `NM`, `N.M.`, `N/M`, `-`, `--`, `—`, `not available`, and `not meaningful` are data values when they occupy a data-matrix position. Keep them inside data_range and never widen a header range merely because these values are represented as text.\n- Free-form text may also be legitimate table data. Resolve ambiguous cells from spatial continuity, neighboring value roles, merged cells, repetition, and formatting; use the value type only as a strong hint.\n\nReturn every independent rectangular table in the worksheet. A table must contain data cells; do not emit decorations, isolated notes, or empty rectangles. Every returned coordinate must be inside sheet_range. Use:\n- excel_range: the complete visible table.\n- title_range: title rows above this table's data, or null.\n- column_header_range: every visible column-header level above the data, or null.\n- row_header_range: label columns left of the data, or null.\n- data_range: the complete value matrix.\n\nAll ranges use inclusive Excel coordinates and semantic regions must not overlap. For example, when row_header_range ends at D, data_range must start at E or later. Never repeat a row-header column inside data_range.\n\nUse the full-sheet context to keep one logical table whole instead of splitting it at image boundaries. Do not propose search candidates and do not omit a table because its location is uncertain. Return only JSON matching the supplied schema.",
+          "user_prompt_template": "Analyze the complete visible worksheet {sheet_name}.\nComplete visible sheet range: {sheet_range}\nThe compact tuple format is [excel_coord, value_type, value, optional_flags].\nExact full-sheet context:\n{sheet_context}"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "custom-node-1786586786551-3",
+        "module_type": "cell_text_embedder",
+        "position": {
+          "x": 2189.3335823574776,
+          "y": 521.7365731172482
+        },
+        "config": {
+          "model": "text-embedding-3-large",
+          "batch_size": 64
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
       }
     ],
     "edges": [
@@ -237,22 +281,6 @@
         "source_branch": null
       },
       {
-        "id": "edge-1786497535281-6",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497522370-4",
-        "source_output": "document_output",
-        "target_input": "document_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-1786497559034-7",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497551832-5",
-        "source_output": "index_output",
-        "target_input": "index_input",
-        "source_branch": null
-      },
-      {
         "id": "edge-1786497569933-9",
         "source": "custom-node-1786497522370-4",
         "target": "custom-node-1786497565202-6",
@@ -285,14 +313,6 @@
         "source_branch": null
       },
       {
-        "id": "edge-1786497776786-1",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497623603-7",
-        "source_output": "document_output",
-        "target_input": "document_input",
-        "source_branch": null
-      },
-      {
         "id": "edge-1786497806961-2",
         "source": "custom-node-1786497623603-7",
         "target": "custom-node-1786497793017-1",
@@ -315,12 +335,52 @@
         "source_output": "answer_json",
         "target_input": "input",
         "source_branch": null
+      },
+      {
+        "id": "edge-1786586777807-1",
+        "source": "custom-node-1786586768596-1",
+        "target": "custom-node-1786586774952-2",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-1786586840506-2",
+        "source": "custom-node-1786586774952-2",
+        "target": "custom-node-1786586786551-3",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-1786586844185-3",
+        "source": "custom-node-1786586786551-3",
+        "target": "custom-node-1786497551832-5",
+        "source_output": "output",
+        "target_input": "index_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-1786586851112-4",
+        "source": "custom-node-1786586774952-2",
+        "target": "custom-node-1786497522370-4",
+        "source_output": "output",
+        "target_input": "document_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-1786586857553-5",
+        "source": "custom-node-1786586774952-2",
+        "target": "custom-node-1786497623603-7",
+        "source_output": "output",
+        "target_input": "document_input",
+        "source_branch": null
       }
     ],
     "viewport": {
-      "x": -750.9746608845232,
-      "y": 509.55261331232794,
-      "zoom": 0.7547506007162889
+      "x": -404.67442863166934,
+      "y": 331.1606732383075,
+      "zoom": 0.6811629661991573
     }
   }
 }

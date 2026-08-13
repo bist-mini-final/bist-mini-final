@@ -27,6 +27,8 @@ dist/
 
 # Runtime output
 *.log
+outputs/
+output/
 data/runs/*
 !data/runs/.gitkeep
 data/cache/*

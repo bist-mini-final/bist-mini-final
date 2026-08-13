@@ -14,7 +14,6 @@ import {
   Merge,
   MessageSquare,
   Plus,
-  PanelLeftClose,
   Rows3,
   Search,
   ScanSearch,
@@ -22,6 +21,7 @@ import {
   Shuffle,
   Sparkles,
   TableProperties,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { MODULE_CATEGORIES, MODULE_PRESENTATION } from '../../config/modules';
@@ -52,7 +52,7 @@ const ICONS: Record<string, LucideIcon> = {
 interface ModulePaletteProps {
   modules: ModuleDefinition[];
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   onAddNode: (type: ModuleType) => void;
   width: number;
   onResizeStart: (event: PointerEvent<HTMLDivElement>) => void;
@@ -98,8 +98,13 @@ export function ModulePalette({
           <p>클릭하거나 캔버스로 드래그하세요</p>
         </div>
         <span className="module-count">{modules.length}</span>
-        <button className="icon-button module-palette__close" onClick={onClose} aria-label="모듈 패널 접기" title="패널 접기">
-          <PanelLeftClose className="h-4 w-4" />
+        <button
+          className="module-palette__close"
+          onClick={onClose}
+          aria-label="모듈 패널 닫기"
+          title="패널 닫기"
+        >
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
 

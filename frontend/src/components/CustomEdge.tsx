@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { BaseEdge, EdgeProps, EdgeLabelRenderer, getBezierPath, useReactFlow } from '@xyflow/react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BaseEdge, EdgeProps, getBezierPath, useReactFlow } from '@xyflow/react';
 
 export const CustomEdge: React.FC<EdgeProps> = ({
   id,
@@ -9,12 +9,21 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   targetY,
   sourcePosition,
   targetPosition,
+  selected,
   style = {},
   markerEnd,
   data,
 }) => {
-  const { deleteElements } = useReactFlow();
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const { setEdges, screenToFlowPosition } = useReactFlow();
+  const [isHovered, setIsHovered] = useState(false);
+  const pathRef = useRef<SVGPathElement | null>(null);
+  const [handlePos, setHandlePos] = useState<{ x: number; y: number } | null>(null);
+
+  const customControlX = typeof data?.controlX === 'number' ? data.controlX : null;
+  const customControlY = typeof data?.controlY === 'number' ? data.controlY : null;
+  const hasCustomControl = customControlX !== null && customControlY !== null;
+
+  const [defaultPath] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -23,60 +32,170 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     targetPosition,
   });
 
-  const isActive = data?.active;
-  const isDone = data?.done;
-  const color = (data?.color as string) || '#6366f1';
+  const cx = hasCustomControl ? customControlX : 0;
+  const cy = hasCustomControl ? customControlY : 0;
 
-  const onDelete = useCallback(
-    (event: React.MouseEvent) => {
+  const edgePath = hasCustomControl
+    ? `M ${sourceX} ${sourceY} Q ${cx} ${cy} ${targetX} ${targetY}`
+    : defaultPath;
+
+  // Use SVG getPointAtLength to find exact midpoint on the rendered path
+  useEffect(() => {
+    const el = pathRef.current;
+    if (!el) { setHandlePos(null); return; }
+    try {
+      const len = el.getTotalLength();
+      if (len === 0) { setHandlePos(null); return; }
+      const pt = el.getPointAtLength(len / 2);
+      setHandlePos({ x: pt.x, y: pt.y });
+    } catch {
+      setHandlePos(null);
+    }
+  }, [edgePath]);
+
+  const isActive = Boolean(data?.active);
+  const isDone = Boolean(data?.done);
+  const color = (data?.color as string) || '#10b981';
+
+  const onControlPointerDown = useCallback(
+    (event: React.PointerEvent) => {
       event.stopPropagation();
-      void deleteElements({ edges: [{ id }] });
+      const el = event.currentTarget as HTMLElement;
+      try { el.setPointerCapture(event.pointerId); } catch {}
+
+      const onMove = (e: PointerEvent) => {
+        const fp = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const newCx = Math.round(2 * fp.x - 0.5 * sourceX - 0.5 * targetX);
+        const newCy = Math.round(2 * fp.y - 0.5 * sourceY - 0.5 * targetY);
+        setEdges((edges) =>
+          edges.map((edge) =>
+            edge.id === id
+              ? { ...edge, data: { ...edge.data, controlX: newCx, controlY: newCy } }
+              : edge
+          )
+        );
+      };
+
+      const onUp = (e: PointerEvent) => {
+        try { el.releasePointerCapture(e.pointerId); } catch {}
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
     },
-    [id, deleteElements]
+    [id, sourceX, sourceY, targetX, targetY, setEdges, screenToFlowPosition]
   );
 
+  const onControlDoubleClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      setEdges((edges) =>
+        edges.map((e) => {
+          if (e.id !== id) return e;
+          const d = { ...e.data };
+          delete d.controlX;
+          delete d.controlY;
+          return { ...e, data: d };
+        })
+      );
+    },
+    [id, setEdges]
+  );
+
+  const isSelectedOrHovered = Boolean(selected || isHovered);
+
   return (
-    <>
-      {/* Background / Base Edge */}
+    <g
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/*
+        Hidden measurement path with the same 'd' as the rendered edge.
+        getPointAtLength reads its DOM geometry to get the exact midpoint.
+      */}
+      <path
+        ref={pathRef}
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={1}
+        style={{ pointerEvents: 'none', visibility: 'hidden' }}
+      />
+
+      {/* Wide invisible hit area */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={24}
+        style={{ cursor: 'pointer' }}
+      />
+
+      {/* Selection halo */}
+      {selected && (
+        <path
+          d={edgePath}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth={isDone || isActive ? 5 : 4}
+          strokeOpacity={0.4}
+          strokeLinecap="round"
+        />
+      )}
+
+      {/* Visible edge */}
       <BaseEdge
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
         style={{
           ...style,
-          stroke: isDone ? color : isActive ? color : '#cbd5e1',
-          strokeWidth: isDone || isActive ? 2.5 : 1.5,
+          stroke: selected ? '#2563eb' : isDone ? color : isActive ? color : '#94a3b8',
+          strokeWidth: selected ? 2.5 : isDone || isActive ? 2.5 : 1.75,
           strokeDasharray: isActive ? '6,6' : 'none',
-          transition: 'stroke 0.3s, stroke-width 0.3s',
+          transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
       />
 
-      {/* Delete button shown on hover */}
-      <EdgeLabelRenderer>
-        <div
-          className="edge-delete-btn-wrapper"
-          style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: 'all',
-          }}
+      {/* Curve drag handle — always on the path via getPointAtLength */}
+      {isSelectedOrHovered && handlePos && (
+        <g
+          style={{ pointerEvents: 'all', cursor: 'grab' }}
+          onPointerDown={onControlPointerDown}
+          onDoubleClick={onControlDoubleClick}
         >
-          <button
-            className="edge-delete-btn"
-            onClick={onDelete}
-            aria-label="연결 삭제"
-            title="연결 삭제"
-          >
-            ×
-          </button>
-        </div>
-      </EdgeLabelRenderer>
+          {/* Transparent hit area */}
+          <circle cx={handlePos.x} cy={handlePos.y} r={14} fill="transparent" />
+          {/* White ring */}
+          <circle
+            cx={handlePos.x}
+            cy={handlePos.y}
+            r={6}
+            fill="#ffffff"
+            stroke="#2563eb"
+            strokeWidth={2.5}
+          />
+          {/* Blue center dot */}
+          <circle
+            cx={handlePos.x}
+            cy={handlePos.y}
+            r={2.5}
+            fill="#2563eb"
+            style={{ pointerEvents: 'none' }}
+          />
+        </g>
+      )}
 
-      {/* Animated Glowing Packet Dot when Active */}
+      {/* Animated packet when active */}
       {isActive && (
-        <circle r="4" fill={color} className="shadow-lg">
+        <circle r="4" fill={color}>
           <animateMotion dur="1.2s" repeatCount="indefinite" path={edgePath} />
         </circle>
       )}
-    </>
+    </g>
   );
 };

@@ -99,7 +99,14 @@ class WorkflowStore:
             return template.model_copy(update={"id": self.ACTIVE_WORKFLOW_ID})
 
     def list(self) -> List[WorkflowDocument]:
-        return self._store.list_documents()
+        documents: List[WorkflowDocument] = []
+        for path in sorted(self._store.directory.glob("*.json")):
+            doc = WorkflowDocument.model_validate_json(path.read_text(encoding="utf-8"))
+            # Always use the filename stem as the id so the UI shows actual filenames
+            if doc.id != path.stem:
+                doc = doc.model_copy(update={"id": path.stem})
+            documents.append(doc)
+        return documents
 
 
 class RunStore:

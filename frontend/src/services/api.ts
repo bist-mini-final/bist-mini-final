@@ -73,6 +73,10 @@ export const pipelineApi = {
     return requestJson<ModuleResponse>('/api/modules', signal);
   },
 
+  listWorkflows(signal?: AbortSignal) {
+    return requestJson<{ workflows: WorkflowDocument[] }>('/api/workflows', signal);
+  },
+
   getWorkflow(workflowId: string, signal?: AbortSignal) {
     return requestJson<WorkflowDocument>(`/api/workflows/${workflowId}`, signal);
   },

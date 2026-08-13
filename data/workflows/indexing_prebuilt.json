@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "id": "indexing_prebuilt",
+  "name": "indexing_prebuilt",
+  "updated_at": "2026-08-13T02:30:05.569597+00:00",
+  "graph": {
+    "nodes": [
+      {
+        "id": "idx-n1-selector",
+        "module_type": "processed_file_selector",
+        "position": {
+          "x": 100,
+          "y": 0
+        },
+        "config": {
+          "file_name": "SPG_Company_KeyStats_v3.xlsm"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-n2-vlm",
+        "module_type": "luna_vlm_structure_detector",
+        "position": {
+          "x": 650,
+          "y": 0
+        },
+        "config": {
+          "model": "gpt-5.6-luna",
+          "max_rows": 400,
+          "max_columns": 60,
+          "max_context_cells": 50000,
+          "reasoning_effort": "low",
+          "max_output_tokens": 6000,
+          "timeout_seconds": 240,
+          "validation_retries": 1,
+          "system_prompt": "You identify every table and its internal regions in an Excel worksheet. Return only JSON matching the supplied schema.",
+          "user_prompt_template": "Analyze the complete visible worksheet {sheet_name}.\nComplete visible sheet range: {sheet_range}\nExact full-sheet context:\n{sheet_context}"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-n3-serializer",
+        "module_type": "cell_text_serializer",
+        "position": {
+          "x": 1200,
+          "y": 0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-n4-embedder",
+        "module_type": "cell_text_embedder",
+        "position": {
+          "x": 1750,
+          "y": 0
+        },
+        "config": {
+          "model": "text-embedding-3-large",
+          "batch_size": 256
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-n5-writer",
+        "module_type": "vector_index_writer",
+        "position": {
+          "x": 2300,
+          "y": 0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-n6-inspector",
+        "module_type": "json_inspector",
+        "position": {
+          "x": 2800,
+          "y": 0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": 520,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "idx-e1",
+        "source": "idx-n1-selector",
+        "target": "idx-n2-vlm",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "idx-e2",
+        "source": "idx-n2-vlm",
+        "target": "idx-n3-serializer",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "idx-e3",
+        "source": "idx-n3-serializer",
+        "target": "idx-n4-embedder",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "idx-e4",
+        "source": "idx-n4-embedder",
+        "target": "idx-n5-writer",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "idx-e5",
+        "source": "idx-n5-writer",
+        "target": "idx-n6-inspector",
+        "source_output": "index_output",
+        "target_input": "input",
+        "source_branch": null
+      }
+    ],
+    "viewport": {
+      "x": -50,
+      "y": 300,
+      "zoom": 0.75
+    }
+  }
+}
