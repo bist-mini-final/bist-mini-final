@@ -70,6 +70,7 @@ export const JsonTransformerNode = ({ data, selected }: JsonTransformerNodeProps
       title="JSON Format Mapper / Converter"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['any_json']}
       selected={selected}
       width={340}
       bodyClassName="space-y-3"

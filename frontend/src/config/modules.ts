@@ -3,7 +3,7 @@ import type { ModulePresentation, ModuleType } from '../types';
 export const MODULE_CATEGORIES = ['Source', 'Logic', 'Transform', 'Output'] as const;
 
 /** UI-only metadata. Labels, descriptions, and I/O contracts come from the backend. */
-export const MODULE_PRESENTATION: Record<ModuleType, ModulePresentation> = {
+export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>> = {
   query_input: { icon: 'MessageSquare', color: '#107c41' },
   direct_query_decomposer: { icon: 'ArrowRight', color: '#475569' },
   decomposer: { icon: 'GitBranch', color: '#7c3aed' },
@@ -31,4 +31,7 @@ export const MODULE_PRESENTATION: Record<ModuleType, ModulePresentation> = {
   cell_text_serializer: { icon: 'Rows3', color: '#7c3aed' },
   exhaustive_cell_text_serializer: { icon: 'Shuffle', color: '#9333ea' },
   prebuilt_index_loader: { icon: 'FolderArchive', color: '#059669' },
+  dataframe_source: { icon: 'TableProperties', color: '#2563eb' },
+  image_tile_source: { icon: 'Layers', color: '#7c3aed' },
+  qa_example_loader: { icon: 'MessageSquare', color: '#d97706' },
 };

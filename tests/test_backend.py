@@ -20,6 +20,7 @@ from backend.chat_completion import ChatCompletionError
 from backend.embedding_artifacts import EmbeddingArtifactStore
 from backend.vector_index_store import VectorIndexStore
 from backend.module_registry import ModuleRegistry
+from backend.module_documentation import MODULE_DOCS_DIR, render_module_markdown
 from backend.module_worker import ModuleWorkerCancelled
 from backend.openai_responses_vision import OpenAIResponsesVisionClient
 from backend.modules.decomposer import DecomposerModule
@@ -89,7 +90,7 @@ class BlockingModuleWorker:
         self.terminated = Event()
         self.execution_id = None
 
-    def execute(self, module_type, payload, execution_id):
+    def execute(self, module_type, input_payload, config, execution_id):
         self.execution_id = execution_id
         self.started.set()
         self.terminated.wait(timeout=5)
@@ -204,6 +205,23 @@ def sample_cell_documents():
     }
 
 
+def sample_query_context(
+    question_id: str = "QUERY-TEST",
+    question_text: str = "테스트 지표는 얼마인가?",
+):
+    return {
+        "question_id": question_id,
+        "question_text": question_text,
+    }
+
+
+def sample_document_context():
+    return {
+        "file_name": "sample.xlsx",
+        "workbook_hash": "test-workbook-hash",
+    }
+
+
 class SimilarityTests(unittest.TestCase):
     def test_identical_questions_have_maximum_similarity(self) -> None:
         combined, sequence, jaccard = combined_similarity("IBM 시가총액", "IBM 시가총액")
@@ -300,11 +318,13 @@ class ModularRagArchitectureTests(unittest.TestCase):
         result = RrfFusionModule().run(
             {
                 "bm25_result": {
-                    "question_id": "QUERY-RRF",
+                    "query_context": sample_query_context("QUERY-RRF"),
+                    "document_context": sample_document_context(),
                     "items": [candidate(1, "KS Cell A1", "query-a")],
                 },
                 "dense_result": {
-                    "question_id": "QUERY-RRF",
+                    "query_context": sample_query_context("QUERY-RRF"),
+                    "document_context": sample_document_context(),
                     "items": [candidate(1, "KS Cell A1", "query-b")],
                 },
             }
@@ -312,11 +332,31 @@ class ModularRagArchitectureTests(unittest.TestCase):
 
         self.assertAlmostEqual(result["items"][0]["rrf_score"], 1 / 61, places=9)
 
+    def test_rrf_rejects_results_from_different_documents(self) -> None:
+        branch = {
+            "query_context": sample_query_context("QUERY-LINEAGE"),
+            "document_context": sample_document_context(),
+            "items": [],
+        }
+        mismatched = {
+            **branch,
+            "document_context": {
+                "file_name": "other.xlsx",
+                "workbook_hash": "other-hash",
+            },
+        }
+
+        with self.assertRaisesRegex(ModuleExecutionError, "document_context"):
+            RrfFusionModule().run(
+                {"bm25_result": branch, "dense_result": mismatched}
+            )
+
     def test_context_expander_uses_rrf_cells_and_adjacent_document_rows(self) -> None:
         context = ContextExpanderModule().run(
             {
                 "retrieval_json": {
-                    "question_id": "QUERY-TEST",
+                    "query_context": sample_query_context(),
+                    "document_context": sample_document_context(),
                     "items": [
                         {
                             "rank": 1,
@@ -335,7 +375,8 @@ class ModularRagArchitectureTests(unittest.TestCase):
         )["context_json"]
 
         rendered = "\n\n".join(context["context_blocks"])
-        self.assertEqual(context["question_id"], "QUERY-TEST")
+        self.assertEqual(context["query_context"]["question_id"], "QUERY-TEST")
+        self.assertEqual(context["document_context"], sample_document_context())
         self.assertEqual(context["block_count"], 2)
         self.assertIn("KS Cell A1", rendered)
         self.assertIn("KS Cell B2", rendered)
@@ -354,9 +395,9 @@ class ModularRagArchitectureTests(unittest.TestCase):
         client = CapturingCompletionClient()
         answer = ReaderModule(client).run(
             {
-                "question_text": "테스트 지표는 얼마인가?",
                 "context_json": {
-                    "question_id": "QUERY-TEST",
+                    "query_context": sample_query_context(),
+                    "document_context": sample_document_context(),
                     "top_k_used": 1,
                     "adjacent_radius": 3,
                     "context_characters": 40,
@@ -403,7 +444,7 @@ class ModularRagArchitectureTests(unittest.TestCase):
 
             self.assertEqual(
                 set(index_reference),
-                {"index_id", "workbook_hash", "model", "dimension", "document_count"},
+                {"index_id", "file_name", "workbook_hash", "model", "dimension", "document_count"},
             )
             self.assertTrue(
                 (root / "vector-db" / f"{index_reference['index_id']}.npy").is_file()
@@ -413,14 +454,17 @@ class ModularRagArchitectureTests(unittest.TestCase):
             ).run(
                 {
                     "query_input": {
-                        "question_id": "QUERY-PERSISTED",
+                        "query_context": sample_query_context("QUERY-PERSISTED"),
                         "items": {"Test Metric": [1.0, 11.0]},
                     },
                     "index_input": index_reference,
                 }
             )
             self.assertTrue(restarted_dense["items"])
-            self.assertEqual(restarted_dense["question_id"], "QUERY-PERSISTED")
+            self.assertEqual(
+                restarted_dense["query_context"]["question_id"],
+                "QUERY-PERSISTED",
+            )
 
 
 class RepositoryIntegrationTests(unittest.TestCase):
@@ -479,13 +523,58 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "cell_text_serializer",
                 "exhaustive_cell_text_serializer",
                 "prebuilt_index_loader",
+                "dataframe_source",
+                "image_tile_source",
+                "qa_example_loader",
             },
         )
 
+    def test_registered_modules_declare_dto_layers_explicitly(self) -> None:
+        for definition in self.module_registry.definitions():
+            module = self.module_registry.get(definition["type"])
+            module_class = type(module)
+            with self.subTest(module_type=definition["type"]):
+                self.assertIn("input_model", module_class.__dict__)
+                self.assertIn("config_model", module_class.__dict__)
+                self.assertIn("execution_model", module_class.__dict__)
+                self.assertTrue(module_class.__doc__)
+                self.assertTrue(module.input_model.__name__.endswith("InputDTO"))
+                self.assertTrue(module.config_model.__name__.endswith("ConfigDTO"))
+                self.assertIsNot(module.input_model, module.output_model)
+                self.assertTrue(
+                    set(module.input_model.model_fields).isdisjoint(
+                        module.config_model.model_fields
+                    )
+                )
+
+    def test_checked_in_module_guides_match_live_contracts(self) -> None:
+        expected_files = {
+            f"{definition['type']}.md"
+            for definition in self.module_registry.definitions()
+        }
+        actual_files = {path.name for path in MODULE_DOCS_DIR.glob("*.md")} - {
+            "README.md"
+        }
+        self.assertEqual(actual_files, expected_files)
+
+        for definition in self.module_registry.definitions():
+            with self.subTest(module_type=definition["type"]):
+                module = self.module_registry.get(definition["type"])
+                self.assertEqual(
+                    (MODULE_DOCS_DIR / f"{definition['type']}.md").read_text(
+                        encoding="utf-8"
+                    ),
+                    render_module_markdown(module),
+                )
+
     def test_pipeline_modules_execute_with_named_io(self) -> None:
+        query_context = sample_query_context(
+            "QUERY-INTEGRATION",
+            self.question_text,
+        )
         decomposed = self.module_registry.execute(
             "decomposer",
-            {"question_text": self.question_text},
+            {"query_context": query_context},
         )
         embedded = self.module_registry.execute(
             "embedder", decomposed
@@ -526,30 +615,27 @@ class RepositoryIntegrationTests(unittest.TestCase):
         )
         answer = self.module_registry.execute(
             "reader",
-            {
-                "question_text": self.question_text,
-                "context_json": context["context_json"],
-            },
+            {"context_json": context["context_json"]},
         )
         cached_answer = self.module_registry.execute(
             "answer_cache_writer",
-            {
-                "question_text": self.question_text,
-                "answer_json": answer["answer_json"],
-            },
+            {"answer_json": answer["answer_json"]},
         )
 
         self.assertEqual(
-            set(decomposed.keys() - {"_usage", "_model"}),
-            {"question_id", "subqueries"},
+            set(decomposed),
+            {"query_context", "subqueries"},
         )
-        self.assertEqual(set(embedded), {"question_id", "items"})
+        self.assertEqual(set(embedded), {"query_context", "items"})
         self.assertEqual(len(embedded["items"]), len(decomposed["subqueries"]))
         self.assertEqual(
             set(embedded["items"]),
             set(decomposed["subqueries"]),
         )
-        self.assertEqual(set(bm25_result), {"question_id", "items"})
+        self.assertEqual(
+            set(bm25_result),
+            {"query_context", "document_context", "items"},
+        )
         self.assertEqual(
             set(document_embeddings),
             {
@@ -569,11 +655,17 @@ class RepositoryIntegrationTests(unittest.TestCase):
         self.assertEqual(document_embeddings["dimension"], 2)
         self.assertEqual(
             set(vector_index),
-            {"index_id", "workbook_hash", "model", "dimension", "document_count"},
+            {"index_id", "file_name", "workbook_hash", "model", "dimension", "document_count"},
         )
         self.assertEqual(vector_index["document_count"], len(document_input["items"]))
-        self.assertEqual(set(dense_result), {"question_id", "items"})
-        self.assertEqual(set(retrieved), {"question_id", "items"})
+        self.assertEqual(
+            set(dense_result),
+            {"query_context", "document_context", "items"},
+        )
+        self.assertEqual(
+            set(retrieved),
+            {"query_context", "document_context", "items"},
+        )
         self.assertEqual(bm25_result["items"][0]["cell_id"], "KS Cell A1")
         self.assertTrue(dense_result["items"])
         self.assertTrue(retrieved["items"])
@@ -581,7 +673,9 @@ class RepositoryIntegrationTests(unittest.TestCase):
         self.assertIn("answer_json", answer)
         self.assertEqual(cached_answer, answer)
         self.assertEqual(
-            self.repository.get_cached_answer(answer["answer_json"]["question_id"]),
+            self.repository.get_cached_answer(
+                answer["answer_json"]["query_context"]["question_id"]
+            ),
             answer["answer_json"]["answer"],
         )
 
@@ -590,7 +684,18 @@ class RepositoryIntegrationTests(unittest.TestCase):
             "query_input", {"query": self.question_text}
         )
 
-        self.assertEqual(query_result, {"cached_answer": "Test LLM Answer"})
+        self.assertEqual(
+            query_result,
+            {
+                "cached_answer": {
+                    "query_context": {
+                        "question_id": "Q001",
+                        "question_text": self.question_text,
+                    },
+                    "answer": "Test LLM Answer",
+                }
+            },
+        )
 
     def test_json_transformer_and_inspector_execute_independently(self) -> None:
         transformed = self.module_registry.execute(
@@ -629,11 +734,12 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 22)
+        self.assertEqual(len(modules), 25)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
             self.assertIn("output_schema", module)
+            self.assertIn("execution_schema", module)
             self.assertIn("branch_schemas", module)
             self.assertIn("properties", module["config_schema"])
             if module["raw_input"]:
@@ -659,8 +765,12 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(set(contract["input_schema"]["properties"]), {"query"})
         self.assertEqual(set(contract["config_schema"]["properties"]), {"threshold"})
         self.assertEqual(
+            contract["documentation_url"],
+            "/api/modules/query_input/docs",
+        )
+        self.assertEqual(
             contract["branch_outputs"],
-            {"cached": "cached_answer", "generated": "question_text"},
+            {"cached": "cached_answer", "generated": "query_context"},
         )
         self.assertEqual(
             set(contract["branch_schemas"]["cached"]["properties"]),
@@ -668,15 +778,19 @@ class ApiContractTests(unittest.TestCase):
         )
         self.assertEqual(
             set(contract["branch_schemas"]["generated"]["properties"]),
-            {"question_text"},
+            {"query_context"},
         )
         self.assertNotIn("failed", contract["branch_schemas"])
         self.assertEqual(contract["config_fields"], ["threshold"])
+        self.assertEqual(
+            set(contract["execution_schema"]["properties"]),
+            {"input", "config"},
+        )
 
         decomposer = self.client.get("/api/modules/decomposer").json()
         self.assertEqual(
             set(decomposer["input_schema"]["properties"]),
-            {"question_text"},
+            {"query_context"},
         )
         self.assertEqual(
             set(decomposer["config_schema"]["properties"]),
@@ -684,7 +798,7 @@ class ApiContractTests(unittest.TestCase):
         )
         self.assertEqual(
             set(decomposer["output_schema"]["properties"]),
-            {"question_id", "subqueries"},
+            {"query_context", "subqueries"},
         )
         self.assertEqual(decomposer["outputs"], ["output"])
         self.assertTrue(decomposer["raw_output"])
@@ -692,7 +806,7 @@ class ApiContractTests(unittest.TestCase):
         embedder = self.client.get("/api/modules/embedder").json()
         self.assertEqual(
             set(embedder["input_schema"]["properties"]),
-            {"question_id", "subqueries"},
+            {"query_context", "subqueries"},
         )
         self.assertEqual(
             set(embedder["config_schema"]["properties"]),
@@ -704,7 +818,7 @@ class ApiContractTests(unittest.TestCase):
         )
         self.assertEqual(
             set(embedder["output_schema"]["properties"]),
-            {"question_id", "items"},
+            {"query_context", "items"},
         )
         items_schema = embedder["output_schema"]["properties"]["items"]
         self.assertEqual(items_schema["type"], "object")
@@ -783,7 +897,7 @@ class ApiContractTests(unittest.TestCase):
         )
         self.assertEqual(
             set(rrf["output_schema"]["properties"]),
-            {"question_id", "items"},
+            {"query_context", "document_context", "items"},
         )
         self.assertTrue(rrf["raw_output"])
 
@@ -822,15 +936,39 @@ class ApiContractTests(unittest.TestCase):
             },
         )
 
+    def test_swagger_exposes_exact_per_module_execution_models(self) -> None:
+        openapi = self.client.get("/openapi.json").json()
+        execute_path = openapi["paths"]["/api/modules/decomposer/execute"]["post"]
+        request_schema = execute_path["requestBody"]["content"][
+            "application/json"
+        ]["schema"]
+        response_schema = execute_path["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+
+        self.assertTrue(
+            request_schema["$ref"].endswith("/DecomposerExecutionRequestDTO")
+        )
+        self.assertTrue(response_schema["$ref"].endswith("/SubqueriesDTO"))
+        self.assertEqual(self.client.get("/docs").status_code, 200)
+
+    def test_generated_module_markdown_is_available_through_api(self) -> None:
+        response = self.client.get("/api/modules/context/docs")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("# Context Expander", response.text)
+        self.assertIn("## Input DTO", response.text)
+        self.assertIn("document_context", response.text)
+
     def test_every_module_separates_connection_inputs_from_node_config(self) -> None:
         expected = {
             "query_input": ({"query"}, {"threshold"}),
             "decomposer": (
-                {"question_text"},
+                {"query_context"},
                 {"model", "preset", "system_prompt", "user_prompt_template"},
             ),
             "embedder": (
-                {"question_id", "subqueries"},
+                {"query_context", "subqueries"},
                 {"model"},
             ),
             "cell_text_embedder": (
@@ -841,6 +979,7 @@ class ApiContractTests(unittest.TestCase):
                 {"file_name", "workbook_hash", "model", "artifact_id", "dimension", "items"},
                 set(),
             ),
+            "prebuilt_index_loader": ({"file_name"}, set()),
             "bm25_retriever": (
                 {"query_input", "document_input"},
                 {"k1", "b", "top_k"},
@@ -858,16 +997,16 @@ class ApiContractTests(unittest.TestCase):
                 {"top_k", "adjacent_radius", "max_blocks"},
             ),
             "reader": (
-                {"question_text", "context_json"},
+                {"context_json"},
                 {"model", "preset", "system_prompt", "user_prompt_template"},
             ),
             "answer_cache_writer": (
-                {"question_text", "answer_json"},
+                {"answer_json"},
                 set(),
             ),
             "json_transformer": ({"any_json"}, {"mappings"}),
             "json_inspector": (set(), set()),
-            "processed_file_selector": (set(), {"file_name"}),
+            "processed_file_selector": ({"file_name"}, set()),
             "bfs_llm_structure_detector": (
                 {"file_name", "workbook_hash", "sheet_names"},
                 {
@@ -936,7 +1075,24 @@ class ApiContractTests(unittest.TestCase):
                     "max_documents",
                 },
             ),
+            "dataframe_source": (
+                {"file_name"},
+                {"sample_rows", "max_sheets"},
+            ),
+            "image_tile_source": (
+                {"file_name", "sheet_name"},
+                {"tile_height_px", "max_tiles"},
+            ),
+            "qa_example_loader": (
+                {"file_name"},
+                {"include_builtin"},
+            ),
         }
+
+        registered_types = {
+            module["type"] for module in self.client.get("/api/modules").json()["modules"]
+        }
+        self.assertEqual(set(expected), registered_types)
 
         for module_type, (input_fields, config_fields) in expected.items():
             with self.subTest(module_type=module_type):
@@ -947,6 +1103,16 @@ class ApiContractTests(unittest.TestCase):
                 self.assertEqual(actual_config, config_fields)
                 self.assertTrue(actual_inputs.isdisjoint(actual_config))
                 self.assertEqual(set(contract["config_fields"]), config_fields)
+                self.assertFalse(
+                    set(contract["config_schema"].get("required", [])),
+                    "Config DTO는 독립 실행 가능한 기본값을 가져야 합니다",
+                )
+                self.assertTrue(
+                    {"file_name", "workbook_hash", "sheet_name", "sheet_names"}.isdisjoint(
+                        actual_config
+                    ),
+                    "데이터 식별자는 Config가 아니라 Input DTO여야 합니다",
+                )
 
         inspector = self.client.get("/api/modules/json_inspector").json()
         self.assertTrue(inspector["raw_input"])
@@ -963,15 +1129,49 @@ class ApiContractTests(unittest.TestCase):
     def test_module_can_be_executed_independently(self) -> None:
         response = self.client.post(
             "/api/modules/json_transformer/execute",
-            json={"any_json": {"source": 7}, "mappings": {"source": "target"}},
+            json={
+                "input": {"any_json": {"source": 7}},
+                "config": {"mappings": {"source": "target"}},
+            },
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["transformed_json"], {"target": 7})
 
+    def test_independent_execution_rejects_mixed_input_and_config_layers(self) -> None:
+        config_in_input = self.client.post(
+            "/api/modules/json_transformer/execute",
+            json={
+                "input": {
+                    "any_json": {"source": 7},
+                    "mappings": {"source": "target"},
+                },
+                "config": {},
+            },
+        )
+        input_in_config = self.client.post(
+            "/api/modules/json_transformer/execute",
+            json={
+                "input": {"any_json": {"source": 7}},
+                "config": {"any_json": {}},
+            },
+        )
+
+        self.assertEqual(config_in_input.status_code, 422)
+        self.assertEqual(input_in_config.status_code, 422)
+
+    def test_generic_source_module_is_registered_and_independently_executable(self) -> None:
+        response = self.client.post(
+            "/api/modules/qa_example_loader/execute",
+            json={"input": {}, "config": {"include_builtin": True}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(response.json()["total_count"], 0)
+
     def test_json_transformer_starts_with_an_empty_mapping(self) -> None:
         response = self.client.post(
             "/api/modules/json_transformer/execute",
-            json={"any_json": {"source": 7}},
+            json={"input": {"any_json": {"source": 7}}},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -981,7 +1181,7 @@ class ApiContractTests(unittest.TestCase):
         source = [{"row": 1}, {"row": 2}]
         response = self.client.post(
             "/api/modules/json_inspector/execute",
-            json=source,
+            json={"input": source},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -990,14 +1190,14 @@ class ApiContractTests(unittest.TestCase):
     def test_embedder_accepts_and_returns_an_unwrapped_dto(self) -> None:
         result = EmbedderModule(StubEmbeddingEncoder()).run(
             {
-                "question_id": "QUERY-TEST",
+                "query_context": sample_query_context(),
                 "subqueries": [
                     "Sheet: ? | Row Header: Revenue | Column Header: LTM | Cell Value: ?"
                 ],
             }
         )
 
-        self.assertEqual(set(result), {"question_id", "items"})
+        self.assertEqual(set(result), {"query_context", "items"})
         self.assertEqual(
             result["items"][
                 "Sheet: ? | Row Header: Revenue | Column Header: LTM | Cell Value: ?"
@@ -1020,7 +1220,10 @@ class ApiContractTests(unittest.TestCase):
         module = DecomposerModule(client)
         result = module.run(
             {
-                "question_text": "IBM의 LTM 기준 시가총액과 TEV는?",
+                "query_context": sample_query_context(
+                    "QUERY-DECOMPOSER",
+                    "IBM의 LTM 기준 시가총액과 TEV는?",
+                ),
                 "system_prompt": "custom system",
                 "user_prompt_template": "Question: {question}",
             }
@@ -1039,8 +1242,8 @@ class ApiContractTests(unittest.TestCase):
             result["subqueries"],
         )
         self.assertEqual(
-            set(result.keys() - {"_usage", "_model"}),
-            {"question_id", "subqueries"},
+            set(result),
+            {"query_context", "subqueries"},
         )
         self.assertEqual([message["role"] for message in client.messages], ["system", "user"])
         self.assertIn("custom system", client.messages[0]["content"])
@@ -1056,7 +1259,9 @@ class ApiContractTests(unittest.TestCase):
                 return '["Row Header: Total Enterprise Value | Column Header: LTM"]'
 
         client = FakeCompletionClient()
-        DecomposerModule(client).run({"question_text": "LTM TEV는?"})
+        DecomposerModule(client).run(
+            {"query_context": sample_query_context("QUERY-PROMPT", "LTM TEV는?")}
+        )
         prompt = "\n".join(message["content"] for message in client.messages)
 
         self.assertNotIn("2-4", prompt)
@@ -1066,21 +1271,22 @@ class ApiContractTests(unittest.TestCase):
 
     def test_decomposer_cache_identity_uses_effective_model_defaults(self) -> None:
         module = DecomposerModule(StubCompletionClient())
-        implicit_luna = module.cache_payload({"question_text": "동일 질문"})
+        query_input = {"query_context": sample_query_context("QUERY-CACHE", "동일 질문")}
+        implicit_luna = module.cache_payload(query_input)
         explicit_luna = module.cache_payload(
-            {"question_text": "동일 질문", "model": "gpt-5.6-luna"}
+            {**query_input, "model": "gpt-5.6-luna"}
         )
         terra = module.cache_payload(
-            {"question_text": "동일 질문", "model": "gpt-5.6-terra"}
+            {**query_input, "model": "gpt-5.6-terra"}
         )
 
         self.assertEqual(
-            ResultCache.key("decomposer@5", implicit_luna),
-            ResultCache.key("decomposer@5", explicit_luna),
+            ResultCache.key("decomposer@6", implicit_luna),
+            ResultCache.key("decomposer@6", explicit_luna),
         )
         self.assertNotEqual(
-            ResultCache.key("decomposer@5", implicit_luna),
-            ResultCache.key("decomposer@5", terra),
+            ResultCache.key("decomposer@6", implicit_luna),
+            ResultCache.key("decomposer@6", terra),
         )
 
     def test_decomposer_propagates_llm_failure_without_fallback_output(self) -> None:
@@ -1090,20 +1296,28 @@ class ApiContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ModuleExecutionError, "provider unavailable"):
             DecomposerModule(FailedCompletionClient()).run(
-                {"question_text": "폴백을 만들면 안 되는 질문"}
+                {
+                    "query_context": sample_query_context(
+                        "QUERY-FAILURE",
+                        "폴백을 만들면 안 되는 질문",
+                    )
+                }
             )
 
     def test_invalid_module_input_returns_validation_error(self) -> None:
         response = self.client.post(
             "/api/modules/embedder/execute",
-            json={},
+            json={"input": {}},
         )
         self.assertEqual(response.status_code, 422)
 
     def test_unknown_dto_field_is_rejected(self) -> None:
         response = self.client.post(
             "/api/modules/json_transformer/execute",
-            json={"any_json": {"source": 7}, "mapping_typo": {}},
+            json={
+                "input": {"any_json": {"source": 7}},
+                "config": {"mapping_typo": {}},
+            },
         )
 
         self.assertEqual(response.status_code, 422)
@@ -1178,7 +1392,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
         selector = ProcessedFileSelectorModule(catalog=self.catalog)
         selector_contract = selector.contract()
         self.assertEqual(
-            selector_contract["config_schema"]["properties"]["file_name"]["enum"],
+            selector_contract["input_schema"]["properties"]["file_name"]["enum"],
             ["sample.xlsx"],
         )
         selection = selector.run({"file_name": "sample.xlsx"})
@@ -1352,7 +1566,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
                     '{"sheet_name":"Visible","tables":[{'
                     '"excel_range":"A1:D4","title_range":null,'
                     '"column_header_range":"A1:D1","row_header_range":"A2:A4",'
-                    '"data_range":"B2:D4","confidence":0.9}]}'
+                    '"data_range":"B2:D4"}]}'
                 )
 
         vision_client = CapturingVisionClient()
@@ -1463,7 +1677,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
                     '{"sheet_name":"Key Stats","tables":[{'
                     '"excel_range":"A1:C4","title_range":null,'
                     '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
-                    '"data_range":"B2:C4","confidence":0.92}]}'
+                    '"data_range":"B2:C4"}]}'
                 )
 
         client = VisionClient()
@@ -1542,7 +1756,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
                     '{"tables":[{'
                     '"excel_range":"A1:C4","title_range":null,'
                     '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
-                    '"data_range":"A2:C4","confidence":0.94}]}'
+                    '"data_range":"A2:C4"}]}'
                 )
 
         client = VisionClient()
@@ -1748,7 +1962,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                     source="query",
                     target="decompose",
                     source_branch="generated",
-                    target_input="question_text",
+                    target_input="query_context",
                 ),
                 WorkflowEdge(id="e2", source="decompose", target="embed"),
                 WorkflowEdge(
@@ -1814,13 +2028,6 @@ class WorkflowExecutionTests(unittest.TestCase):
                     source="context",
                     target="reader",
                     target_input="context_json",
-                ),
-                WorkflowEdge(
-                    id="e15",
-                    source="query",
-                    target="reader",
-                    source_branch="generated",
-                    target_input="question_text",
                 ),
                 WorkflowEdge(id="e9", source="decompose", target="transform"),
                 WorkflowEdge(id="e10", source="transform", target="inspect"),
@@ -1939,6 +2146,13 @@ class WorkflowExecutionTests(unittest.TestCase):
         module_type_by_id = {
             node.id: node.module_type for node in workflow.graph.nodes
         }
+        prebuilt_node = next(
+            node
+            for node in workflow.graph.nodes
+            if node.module_type == "prebuilt_index_loader"
+        )
+        self.assertNotIn("file_name", prebuilt_node.config)
+        self.assertIn("file_name", prebuilt_node.values)
         connections = {
             (
                 module_type_by_id[edge.source],
@@ -1949,8 +2163,7 @@ class WorkflowExecutionTests(unittest.TestCase):
         }
 
         expected_connections = {
-            ("query_input", "decomposer", "question_text"),
-            ("query_input", "reader", "question_text"),
+            ("query_input", "decomposer", "query_context"),
             ("prebuilt_index_loader", "bm25_retriever", "document_input"),
             ("prebuilt_index_loader", "dense_retriever", "index_input"),
             ("prebuilt_index_loader", "context", "document_input"),
@@ -1966,6 +2179,26 @@ class WorkflowExecutionTests(unittest.TestCase):
         }
         self.assertTrue(batches)
         self.assertTrue(expected_connections.issubset(connections))
+        self.assertFalse(
+            any(
+                source == "query_input" and target == "reader"
+                for source, target, _ in connections
+            )
+        )
+
+    def test_all_saved_workflows_use_valid_input_and_config_layers(self) -> None:
+        project_root = Path(__file__).resolve().parent.parent
+        workflow_dir = project_root / "data" / "workflows"
+        workflow_store = WorkflowStore(workflow_dir)
+
+        for path in sorted(workflow_dir.glob("*.json")):
+            with self.subTest(workflow=path.name):
+                workflow = workflow_store.load(path.stem)
+                batches = self.executor.validate_graph(workflow.graph)
+                self.assertEqual(
+                    sum(len(batch) for batch in batches),
+                    len(workflow.graph.nodes),
+                )
 
     def test_runtime_input_cannot_override_node_config(self) -> None:
         workflow = self.save_workflow()
@@ -2010,11 +2243,19 @@ class WorkflowExecutionTests(unittest.TestCase):
         query_output = after_query.nodes["query"].output
         self.assertEqual(after_query.nodes["query"].status, "succeeded")
         self.assertIsNotNone(query_output)
+        self.assertEqual(
+            after_query.nodes["query"].input_payload,
+            {"query": "질문 Q001"},
+        )
+        self.assertEqual(
+            after_query.nodes["query"].config_payload,
+            {"threshold": 0.99},
+        )
 
         after_decompose = self.executor.execute_next_batch(run.id)
         self.assertEqual(
-            after_decompose.nodes["decompose"].input_payload["question_text"],
-            query_output["question_text"],
+            after_decompose.nodes["decompose"].input_payload["query_context"],
+            query_output["query_context"],
         )
         persisted = self.run_store.load(run.id)
         self.assertEqual(
@@ -2241,7 +2482,13 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertEqual(second.nodes["cached-inspector"].status, "succeeded")
         self.assertEqual(
             second.nodes["cached-inspector"].output,
-            "LLM 답변 Q001",
+            {
+                "query_context": {
+                    "question_id": "Q001",
+                    "question_text": "질문 Q001",
+                },
+                "answer": "LLM 답변 Q001",
+            },
         )
 
     def test_failed_output_branch_is_not_part_of_the_edge_contract(self) -> None:
@@ -2438,9 +2685,65 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
+    def test_prebuilt_parquet_loader_execution(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from backend.modules.prebuilt_index_loader import (
+            PrebuiltIndexLoaderInputDTO,
+            PrebuiltIndexLoaderModule,
+        )
+
+        parquet_path = self.processed_dir / "test_prebuilt.parquet"
+        table = pa.table(
+            {
+                "cell_id": ["Key Stats Cell E10", "Key Stats Cell E11"],
+                "sheet_name": ["Key Stats", "Key Stats"],
+                "cell_coord": ["E10", "E11"],
+                "row_header": [["Total Revenue"], ["Net Income"]],
+                "column_header": [["2025-12-31"], ["2025-12-31"]],
+                "cell_value": ["1000", "200"],
+                "variant": ["header_with_value", "header_with_value"],
+                "text": [
+                    "Sheet: Key Stats | Row Header: Total Revenue | Column Header: 2025-12-31 | Cell Value: 1000",
+                    "Sheet: Key Stats | Row Header: Net Income | Column Header: 2025-12-31 | Cell Value: 200",
+                ],
+                "embedding": pa.array(
+                    [[1.0, 0.0], [0.0, 1.0]],
+                    type=pa.list_(pa.float32()),
+                ),
+            }
+        ).replace_schema_metadata(
+            {
+                b"file_name": b"Test_Workbook.xlsx",
+                b"workbook_hash": b"a1b2c3d4e5f67890",
+                b"model": b"BAAI/bge-large-en-v1.5",
+            }
+        )
+        pq.write_table(table, parquet_path)
+
+        loader = PrebuiltIndexLoaderModule(
+            vector_index_store=self.vector_index_store,
+            search_dirs=[self.processed_dir],
+        )
+        result = loader.execute(
+            PrebuiltIndexLoaderInputDTO(file_name=parquet_path.name)
+        )
+
+        self.assertEqual(
+            result["document_output"]["file_name"],
+            "Test_Workbook.xlsx",
+        )
+        self.assertEqual(result["index_output"]["document_count"], 2)
+        self.assertEqual(result["index_output"]["dimension"], 2)
+        self.assertEqual(
+            result["index_output"]["model"],
+            "BAAI/bge-large-en-v1.5",
+        )
+
     def test_prebuilt_index_loader_execution(self):
         from backend.modules.prebuilt_index_loader import (
-            PrebuiltIndexLoaderInput,
+            PrebuiltIndexLoaderInputDTO,
             PrebuiltIndexLoaderModule,
         )
 
@@ -2450,7 +2753,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         )
 
         result = loader.execute(
-            PrebuiltIndexLoaderInput(file_name="test_prebuilt.json")
+            PrebuiltIndexLoaderInputDTO(file_name="test_prebuilt.json")
         )
 
         self.assertIn("document_output", result)
@@ -2465,23 +2768,30 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(idx_out["dimension"], 2)
         self.assertEqual(len(idx_out["index_id"]), 64)
 
-        from backend.modules.bm25_retriever import Bm25RetrieverInput, Bm25RetrieverModule
-        from backend.modules.dense_retriever import DenseRetrieverInput, DenseRetrieverModule
+        from backend.modules.bm25_retriever import (
+            Bm25RetrieverExecutionDTO,
+            Bm25RetrieverModule,
+        )
+        from backend.modules.dense_retriever import (
+            DenseRetrieverExecutionDTO,
+            DenseRetrieverModule,
+        )
 
         bm25_retriever = Bm25RetrieverModule()
         dense_retriever = DenseRetrieverModule(index_store=self.vector_index_store)
 
         index_input = {
             "index_id": idx_out["index_id"],
+            "file_name": idx_out["file_name"],
             "workbook_hash": idx_out["workbook_hash"],
             "model": idx_out["model"],
             "dimension": idx_out["dimension"],
             "document_count": idx_out["document_count"],
         }
         dense_res = dense_retriever.execute(
-            DenseRetrieverInput.model_validate({
+            DenseRetrieverExecutionDTO.model_validate({
                 "query_input": {
-                    "question_id": "q1",
+                    "query_context": sample_query_context("q1", "Revenue"),
                     "items": {"Revenue": [1.0, 0.0]},
                 },
                 "index_input": index_input,
@@ -2490,9 +2800,9 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertTrue(len(dense_res["items"]) > 0)
 
         bm25_res = bm25_retriever.execute(
-            Bm25RetrieverInput.model_validate({
+            Bm25RetrieverExecutionDTO.model_validate({
                 "query_input": {
-                    "question_id": "q1",
+                    "query_context": sample_query_context("q1", "Revenue"),
                     "subqueries": ["Total Revenue"],
                 },
                 "document_input": doc_out,
@@ -2503,5 +2813,3 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

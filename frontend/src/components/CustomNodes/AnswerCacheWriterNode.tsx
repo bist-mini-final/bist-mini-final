@@ -20,11 +20,11 @@ export const AnswerCacheWriterNode = ({ data, selected }: AnswerCacheWriterNodeP
       nodeData={data}
       selected={selected}
       width={340}
-      inputPorts={['question_text', 'answer_json']}
+      inputPorts={['answer_json']}
       bodyClassName="space-y-2"
     >
       <p className="m-0 text-[10px] leading-relaxed text-slate-600">
-        원문 질문과 Reader 답변을 다음 실행의 Query Input 캐시에 저장합니다.
+        Reader 답변에 포함된 원문 질문 계보를 다음 실행의 Query Input 캐시에 저장합니다.
       </p>
       {running && (
         <div className="flex items-center gap-2 text-[10px] font-semibold text-rose-700">

@@ -12,7 +12,32 @@ from backend.routes import create_api_router
 def create_app() -> FastAPI:
     repository = AnswerCacheRepository(CACHE_DIR / "answers.json")
 
-    application = FastAPI(title="RAG Pipeline Visualizer", version="1.1.0")
+    application = FastAPI(
+        title="RAG Pipeline Visualizer API",
+        version="2.0.0",
+        description=(
+            "독립 실행 가능한 RAG·스프레드시트 모듈과 DTO 기반 워크플로 API입니다. "
+            "각 모듈 실행 엔드포인트는 Input/Config/Output Pydantic 스키마를 "
+            "Swagger에 직접 노출합니다."
+        ),
+        openapi_tags=[
+            {
+                "name": "Modules",
+                "description": "모듈 계약 조회와 모듈별 독립 JSON 실행",
+            },
+            {
+                "name": "Workflows",
+                "description": "DTO 포트를 조합한 DAG 저장과 실행",
+            },
+            {
+                "name": "Spreadsheet Artifacts",
+                "description": "스프레드시트 분석 결과 이미지 조회",
+            },
+        ],
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=list(DEV_CORS_ORIGINS),

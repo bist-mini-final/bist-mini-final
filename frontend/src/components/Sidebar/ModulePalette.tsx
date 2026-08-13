@@ -120,7 +120,8 @@ export function ModulePalette({
               <h3>{category} Modules</h3>
               <div className="module-group__items">
                 {categoryModules.map((module) => {
-                  const presentation = MODULE_PRESENTATION[module.type];
+                  const presentation = MODULE_PRESENTATION[module.type]
+                    ?? { icon: 'Layers', color: '#64748b' };
                   const Icon = ICONS[presentation.icon] ?? Layers;
                   const style: AccentStyle = { '--module-accent': presentation.color };
                   return (

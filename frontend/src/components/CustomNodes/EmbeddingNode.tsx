@@ -25,6 +25,7 @@ export const EmbeddingNode = ({ data, selected }: EmbeddingNodeProps) => {
       title="Query Embedder"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['input']}
       selected={selected}
       width={320}
       bodyClassName="space-y-2"

@@ -65,7 +65,7 @@ class VectorIndexStore:
             stored = self._validate_metadata(index_id, metadata_path)
             self._assert_same_index(metadata, stored)
             return
-        if not vectors:
+        if len(vectors) == 0:
             raise ModuleExecutionError("벡터 인덱스에 저장할 문서가 없습니다")
 
         numpy = self._dependencies()

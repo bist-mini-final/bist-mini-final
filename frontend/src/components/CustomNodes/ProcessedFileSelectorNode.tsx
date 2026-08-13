@@ -9,9 +9,9 @@ interface ProcessedFileSelectorNodeData extends Record<string, unknown> {
   executionState?: string;
   executionOutput?: unknown;
   nodeWidth?: number;
-  config?: { file_name?: string };
+  values?: { file_name?: string };
   moduleDefinition?: ModuleDefinition;
-  onConfigChange?: (patch: Record<string, unknown>) => void;
+  onValuesChange?: (patch: Record<string, unknown>) => void;
   onNodeWidthChange?: (width: number) => void;
 }
 
@@ -24,19 +24,19 @@ function selectedSheetCount(output: unknown): number | null {
 }
 
 export const ProcessedFileSelectorNode = ({ data, selected }: ProcessedFileSelectorNodeProps) => {
-  const fileSchema = data.moduleDefinition?.config_schema.properties?.file_name;
+  const fileSchema = data.moduleDefinition?.input_schema.properties?.file_name;
   const fileOptions = (fileSchema?.enum ?? []).filter(
     (candidate): candidate is string => typeof candidate === 'string'
   );
   const schemaDefault = typeof fileSchema?.default === 'string' ? fileSchema.default : '';
-  const selectedFile = data.config?.file_name || schemaDefault || fileOptions[0] || '';
+  const selectedFile = data.values?.file_name || schemaDefault || fileOptions[0] || '';
   const sheetCount = selectedSheetCount(data.executionOutput);
 
   useEffect(() => {
-    if (!data.config?.file_name && selectedFile) {
-      data.onConfigChange?.({ file_name: selectedFile });
+    if (!data.values?.file_name && selectedFile) {
+      data.onValuesChange?.({ file_name: selectedFile });
     }
-  }, [data.config?.file_name, data.onConfigChange, selectedFile]);
+  }, [data.onValuesChange, data.values?.file_name, selectedFile]);
 
   return (
     <NodeShell
@@ -61,7 +61,7 @@ export const ProcessedFileSelectorNode = ({ data, selected }: ProcessedFileSelec
           value={selectedFile}
           disabled={fileOptions.length === 0}
           onPointerDown={(event) => event.stopPropagation()}
-          onChange={(event) => data.onConfigChange?.({ file_name: event.currentTarget.value })}
+          onChange={(event) => data.onValuesChange?.({ file_name: event.currentTarget.value })}
           aria-label="processed Excel 파일 선택"
         >
           {fileOptions.length === 0 && <option value="">선택 가능한 Excel 파일 없음</option>}
@@ -78,4 +78,3 @@ export const ProcessedFileSelectorNode = ({ data, selected }: ProcessedFileSelec
     </NodeShell>
   );
 };
-

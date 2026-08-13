@@ -4,18 +4,29 @@ from typing import Any, DefaultDict, Dict, List, Set, Tuple, Union, cast
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import BaseModel, Field
 
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
+from .data_lineage import DocumentContextDTO, QueryContextDTO
 from .retrieval_models import RankedSearchResultDTO, RetrievalDTO
 
 
-class ContextExpanderInput(ModuleDTO):
+class ContextExpanderInputDTO(ModuleInputDTO):
     retrieval_json: Union[RetrievalDTO, RankedSearchResultDTO] = Field(
         description="RRF Fusion에서 전달되는 셀 단위 결합 검색 결과"
     )
     document_input: CellTextSerializerOutput = Field(
         description="인접 행과 실제 값을 복원할 Structured Cell Text 문서"
     )
+
+
+class ContextExpanderConfigDTO(ModuleConfigDTO):
     top_k: int = Field(
         default=100,
         gt=0,
@@ -36,8 +47,17 @@ class ContextExpanderInput(ModuleDTO):
     )
 
 
+class ContextExpanderExecutionDTO(ContextExpanderInputDTO, ContextExpanderConfigDTO):
+    """Internal union of retrieval data and expansion policy."""
+
+
 class ContextDTO(ModuleDTO):
-    question_id: str = Field(description="원본 질문 ID")
+    query_context: QueryContextDTO = Field(
+        description="Reader까지 보존되는 원본 질문 컨텍스트"
+    )
+    document_context: DocumentContextDTO = Field(
+        description="컨텍스트 블록이 추출된 원본 문서 컨텍스트"
+    )
     top_k_used: int = Field(gt=0, description="확장에 실제 사용한 RRF 후보 수")
     adjacent_radius: int = Field(ge=0, description="검색 셀 기준 인접 행 확장 반경")
     context_characters: int = Field(ge=0, description="전체 컨텍스트 문자 수")
@@ -63,9 +83,11 @@ class ContextExpanderModule(ExecutableModule):
         inputs=["retrieval_json", "document_input"],
         outputs=["context_json"],
         config_fields=["top_k", "adjacent_radius", "max_blocks"],
-        version="2",
+        version="3",
     )
-    input_model = ContextExpanderInput
+    input_model = ContextExpanderInputDTO
+    config_model = ContextExpanderConfigDTO
+    execution_model = ContextExpanderExecutionDTO
     output_model = ContextExpanderOutput
 
     @staticmethod
@@ -117,7 +139,15 @@ class ContextExpanderModule(ExecutableModule):
         )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ContextExpanderInput, payload)
+        input_data = cast(ContextExpanderExecutionDTO, payload)
+        expected_document = {
+            "file_name": input_data.document_input.file_name,
+            "workbook_hash": input_data.document_input.workbook_hash,
+        }
+        if input_data.retrieval_json.document_context.model_dump(mode="json") != expected_document:
+            raise ModuleExecutionError(
+                "검색 결과와 Structured Cell Text의 document_context가 일치하지 않습니다"
+            )
         candidates = input_data.retrieval_json.items[: input_data.top_k]
         if not candidates:
             raise ModuleExecutionError("컨텍스트를 확장할 RRF 후보가 없습니다")
@@ -164,7 +194,10 @@ class ContextExpanderModule(ExecutableModule):
         context_text = "\n\n".join(context_blocks)
         return {
             "context_json": {
-                "question_id": input_data.retrieval_json.question_id.upper(),
+                "query_context": input_data.retrieval_json.query_context.model_dump(
+                    mode="json"
+                ),
+                "document_context": expected_document,
                 "top_k_used": matched_candidates,
                 "adjacent_radius": input_data.adjacent_radius,
                 "context_characters": len(context_text),

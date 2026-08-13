@@ -14,7 +14,8 @@ export const PIPELINE_STAGES = [
   { id: 'reader', nodeType: 'readerNode', color: '#e11d48', width: 360 },
 ] as const;
 
-export const MODULE_NODE_TYPES: Record<ModuleType, string> = {
+/** Optional specialized renderers; all other backend modules use generic_module. */
+export const MODULE_NODE_TYPES: Partial<Record<ModuleType, string>> = {
   query_input: 'queryNode',
   direct_query_decomposer: 'direct_query_decomposer',
   decomposer: 'decomposerNode',
@@ -45,7 +46,9 @@ export const MODULE_NODE_TYPES: Record<ModuleType, string> = {
 };
 
 export const NODE_MODULE_TYPES: Record<string, ModuleType> = Object.fromEntries(
-  Object.entries(MODULE_NODE_TYPES).map(([moduleType, nodeType]) => [nodeType, moduleType])
+  Object.entries(MODULE_NODE_TYPES)
+    .filter(([, nodeType]) => nodeType !== 'generic_module')
+    .map(([moduleType, nodeType]) => [nodeType, moduleType])
 ) as Record<string, ModuleType>;
 
 export const NODE_COLORS: Record<string, string> = {
@@ -76,6 +79,7 @@ export const NODE_COLORS: Record<string, string> = {
   openpyxl_region_detector: '#d97706',
   cell_text_serializer: '#7c3aed',
   exhaustive_cell_text_serializer: '#9333ea',
+  generic_module: '#64748b',
 };
 
 export function createInitialNodes(): Node[] {
@@ -107,28 +111,26 @@ export function createInitialEdges(): Edge[] {
       source: 'stage-0',
       target: 'stage-1',
       sourceHandle: 'generated',
-      targetHandle: 'in',
+      targetHandle: 'query_context',
       type: 'customEdge',
-      data: { active: false, done: false, color: '#107c41', source_branch: 'generated', source_output: 'question_text', target_input: 'question_text' },
+      data: { active: false, done: false, color: '#107c41', source_branch: 'generated', source_output: 'query_context', target_input: 'query_context' },
     },
-    { id: 'stage-edge-decompose-embed', source: 'stage-1', target: 'stage-2', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed' } },
+    { id: 'stage-edge-decompose-embed', source: 'stage-1', target: 'stage-2', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed', source_output: 'output', target_input: 'input' } },
     { id: 'stage-edge-decompose-bm25', source: 'stage-1', target: 'stage-3', sourceHandle: 'out', targetHandle: 'query_input', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed', source_output: 'output', target_input: 'query_input' } },
     { id: 'stage-edge-embed-dense', source: 'stage-2', target: 'stage-4', sourceHandle: 'out', targetHandle: 'query_input', type: 'customEdge', data: { active: false, done: false, color: '#0891b2', source_output: 'output', target_input: 'query_input' } },
-    { id: 'stage-edge-file-structure', source: 'excel-0', target: 'excel-structure', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#107c41' } },
-    { id: 'stage-edge-structure-serializer', source: 'excel-structure', target: 'excel-3', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#0f766e' } },
-    { id: 'stage-edge-file-docling', source: 'excel-0', target: 'excel-1', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#107c41' } },
-    { id: 'stage-edge-docling-openpyxl', source: 'excel-1', target: 'excel-2', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#0891b2' } },
+    { id: 'stage-edge-file-structure', source: 'excel-0', target: 'excel-structure', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#107c41', source_output: 'output', target_input: 'input' } },
+    { id: 'stage-edge-structure-serializer', source: 'excel-structure', target: 'excel-3', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#0f766e', source_output: 'output', target_input: 'input' } },
+    { id: 'stage-edge-file-docling', source: 'excel-0', target: 'excel-1', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#107c41', source_output: 'output', target_input: 'input' } },
+    { id: 'stage-edge-docling-openpyxl', source: 'excel-1', target: 'excel-2', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#0891b2', source_output: 'output', target_input: 'input' } },
     { id: 'stage-edge-documents-bm25', source: 'excel-3', target: 'stage-3', sourceHandle: 'out', targetHandle: 'document_input', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed', source_output: 'output', target_input: 'document_input' } },
-    { id: 'stage-edge-documents-embed', source: 'excel-3', target: 'excel-4', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed' } },
-    { id: 'stage-edge-document-embeddings-index', source: 'excel-4', target: 'excel-5', sourceHandle: 'out', targetHandle: 'in', type: 'customEdge', data: { active: false, done: false, color: '#0f766e', source_output: 'output', target_input: 'input' } },
+    { id: 'stage-edge-documents-embed', source: 'excel-3', target: 'excel-4', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed', source_output: 'output', target_input: 'input' } },
+    { id: 'stage-edge-document-embeddings-index', source: 'excel-4', target: 'excel-5', sourceHandle: 'out', targetHandle: 'input', type: 'customEdge', data: { active: false, done: false, color: '#0f766e', source_output: 'output', target_input: 'input' } },
     { id: 'stage-edge-index-dense', source: 'excel-5', target: 'stage-4', sourceHandle: 'out', targetHandle: 'index_input', type: 'customEdge', data: { active: false, done: false, color: '#0f766e', source_output: 'index_output', target_input: 'index_input' } },
     { id: 'stage-edge-bm25-rrf', source: 'stage-3', target: 'stage-5', sourceHandle: 'out', targetHandle: 'bm25_result', type: 'customEdge', data: { active: false, done: false, color: '#2563eb', source_output: 'bm25_result', target_input: 'bm25_result' } },
     { id: 'stage-edge-dense-rrf', source: 'stage-4', target: 'stage-5', sourceHandle: 'out', targetHandle: 'dense_result', type: 'customEdge', data: { active: false, done: false, color: '#0891b2', source_output: 'dense_result', target_input: 'dense_result' } },
     { id: 'stage-edge-rrf-context', source: 'stage-5', target: 'stage-6', sourceHandle: 'out', targetHandle: 'retrieval_json', type: 'customEdge', data: { active: false, done: false, color: '#059669', source_output: 'retrieval_json', target_input: 'retrieval_json' } },
     { id: 'stage-edge-documents-context', source: 'excel-3', target: 'stage-6', sourceHandle: 'out', targetHandle: 'document_input', type: 'customEdge', data: { active: false, done: false, color: '#7c3aed', source_output: 'output', target_input: 'document_input' } },
     { id: 'stage-edge-context-reader', source: 'stage-6', target: 'stage-7', sourceHandle: 'out', targetHandle: 'context_json', type: 'customEdge', data: { active: false, done: false, color: '#d97706', source_output: 'context_json', target_input: 'context_json' } },
-    { id: 'stage-edge-query-reader', source: 'stage-0', target: 'stage-7', sourceHandle: 'generated', targetHandle: 'question_text', type: 'customEdge', data: { active: false, done: false, color: '#107c41', source_branch: 'generated', source_output: 'question_text', target_input: 'question_text' } },
     { id: 'stage-edge-reader-cache', source: 'stage-7', target: 'stage-8', sourceHandle: 'out', targetHandle: 'answer_json', type: 'customEdge', data: { active: false, done: false, color: '#e11d48', source_output: 'answer_json', target_input: 'answer_json' } },
-    { id: 'stage-edge-query-cache', source: 'stage-0', target: 'stage-8', sourceHandle: 'generated', targetHandle: 'question_text', type: 'customEdge', data: { active: false, done: false, color: '#107c41', source_branch: 'generated', source_output: 'question_text', target_input: 'question_text' } },
   ];
 }

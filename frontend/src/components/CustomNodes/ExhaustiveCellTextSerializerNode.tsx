@@ -41,6 +41,7 @@ export const ExhaustiveCellTextSerializerNode = ({
       title="Exhaustive Cell Header Serializer"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['input']}
       selected={selected}
       width={data.nodeWidth ?? 370}
       onWidthChange={data.onNodeWidthChange}

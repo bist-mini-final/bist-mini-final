@@ -26,6 +26,7 @@ export const VectorIndexWriterNode = ({ data, selected }: VectorIndexWriterNodeP
       title="Vector Index Writer"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['input']}
       selected={selected}
       width={350}
       bodyClassName="space-y-2"

@@ -18,7 +18,7 @@ from ..spreadsheets.structured_cell_text import (
     sheet_code,
 )
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError
 from .cell_text_serializer import CellTextSerializerOutput
 from .processed_file_selector import WorkbookSelectionDTO
 
@@ -26,7 +26,11 @@ from .processed_file_selector import WorkbookSelectionDTO
 EXHAUSTIVE_SERIALIZATION_VERSION = "exhaustive-cell-v1-visible-only"
 
 
-class ExhaustiveCellTextSerializerInput(WorkbookSelectionDTO):
+class ExhaustiveCellTextSerializerInputDTO(WorkbookSelectionDTO):
+    """Workbook identity and visible sheet selection."""
+
+
+class ExhaustiveCellTextSerializerConfigDTO(ModuleConfigDTO):
     variant_mode: Literal["header_only", "header_with_value", "both"] = Field(
         default="header_only",
         description=(
@@ -50,6 +54,13 @@ class ExhaustiveCellTextSerializerInput(WorkbookSelectionDTO):
             "저장하지 않고 실행 전체를 실패시킵니다"
         ),
     )
+
+
+class ExhaustiveCellTextSerializerExecutionDTO(
+    ExhaustiveCellTextSerializerInputDTO,
+    ExhaustiveCellTextSerializerConfigDTO,
+):
+    """Internal union of workbook data and serialization policy."""
 
 
 @dataclass(frozen=True)
@@ -89,7 +100,9 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
         raw_output=True,
         version=EXHAUSTIVE_SERIALIZATION_VERSION,
     )
-    input_model = ExhaustiveCellTextSerializerInput
+    input_model = ExhaustiveCellTextSerializerInputDTO
+    config_model = ExhaustiveCellTextSerializerConfigDTO
+    execution_model = ExhaustiveCellTextSerializerExecutionDTO
     output_model = CellTextSerializerOutput
 
     def __init__(
@@ -200,7 +213,7 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
     def _document_count(
         cls,
         sheets: Sequence[SheetCells],
-        input_data: ExhaustiveCellTextSerializerInput,
+        input_data: ExhaustiveCellTextSerializerExecutionDTO,
     ) -> int:
         variants = 2 if input_data.variant_mode == "both" else 1
         return sum(
@@ -220,7 +233,7 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
     def _documents(
         cls,
         sheets: Sequence[SheetCells],
-        input_data: ExhaustiveCellTextSerializerInput,
+        input_data: ExhaustiveCellTextSerializerExecutionDTO,
     ) -> List[Dict[str, Any]]:
         documents: List[Dict[str, Any]] = []
         for sheet in sheets:
@@ -260,7 +273,7 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
         return documents
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ExhaustiveCellTextSerializerInput, payload)
+        input_data = cast(ExhaustiveCellTextSerializerExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

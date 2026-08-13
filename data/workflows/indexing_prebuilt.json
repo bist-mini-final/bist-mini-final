@@ -12,10 +12,10 @@
           "x": 100.0,
           "y": 0.0
         },
-        "config": {
+        "config": {},
+        "values": {
           "file_name": "SPG_Company_KeyStats_v3.xlsm"
         },
-        "values": {},
         "ui": {
           "width": null,
           "execution_stopped": false,

@@ -25,7 +25,6 @@ class ClassifiedRegionDTO(ModuleDTO):
     bbox_px: Tuple[float, float, float, float]
     rows: Tuple[int, int]
     columns: Tuple[int, int]
-    confidence: float
     parent_ids: List[str]
 
 

@@ -31,10 +31,11 @@ function runInputs(
 
 function executionFingerprint(graph: WorkflowGraph): string {
   return JSON.stringify({
-    nodes: (graph.nodes ?? []).map(({ id, module_type, config }) => ({
+    nodes: (graph.nodes ?? []).map(({ id, module_type, config, values }) => ({
       id,
       module_type,
       config: config ?? {},
+      values: values ?? {},
     })),
     edges: (graph.edges ?? []).map((edge) => ({
       id: edge.id,
@@ -72,6 +73,7 @@ function executionRunCompatibleWithGraph(
     if (!currentNode) return false;
     if (currentNode.module_type !== runNode.module_type) return false;
     if (JSON.stringify(currentNode.config ?? {}) !== JSON.stringify(runNode.config ?? {})) return false;
+    if (JSON.stringify(currentNode.values ?? {}) !== JSON.stringify(runNode.values ?? {})) return false;
   }
 
   for (const runEdge of run.graph.edges) {

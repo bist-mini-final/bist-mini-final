@@ -18,7 +18,7 @@ from ..spreadsheets.prompt_guidance import TEXT_CELL_ROLE_GUIDANCE
 from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
 from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .docling_table_detector import _safe_name
 from .processed_file_selector import WorkbookSelectionDTO
 from .spreadsheet_structure import SpreadsheetStructureOutput
@@ -61,7 +61,11 @@ class LocalVisionClient(Protocol):
     ) -> str: ...
 
 
-class LocalVlmStructureDetectorInput(WorkbookSelectionDTO):
+class LocalVlmStructureDetectorInputDTO(WorkbookSelectionDTO):
+    """Workbook identity and visible sheet selection."""
+
+
+class LocalVlmStructureDetectorConfigDTO(ModuleConfigDTO):
     model: str = Field(
         default="qwen3-vl:4b-instruct",
         min_length=1,
@@ -101,13 +105,19 @@ class LocalVlmStructureDetectorInput(WorkbookSelectionDTO):
     )
 
 
+class LocalVlmStructureDetectorExecutionDTO(
+    LocalVlmStructureDetectorInputDTO,
+    LocalVlmStructureDetectorConfigDTO,
+):
+    """Internal union of workbook data and VLM settings."""
+
+
 class LocalVlmTableDecisionDTO(ModuleDTO):
     excel_range: str = Field(description="전체 테이블 Excel 범위")
     title_range: Optional[str] = Field(default=None, description="테이블 제목 범위")
     column_header_range: Optional[str] = Field(default=None, description="열 헤더 범위")
     row_header_range: Optional[str] = Field(default=None, description="행 헤더 범위")
     data_range: str = Field(description="데이터 값 행렬 범위")
-    confidence: float = Field(default=0.8, ge=0, le=1)
 
 
 class LocalVlmSheetDecisionDTO(ModuleDTO):
@@ -180,7 +190,9 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
         raw_output=True,
         version="4",
     )
-    input_model = LocalVlmStructureDetectorInput
+    input_model = LocalVlmStructureDetectorInputDTO
+    config_model = LocalVlmStructureDetectorConfigDTO
+    execution_model = LocalVlmStructureDetectorExecutionDTO
     output_model = LocalVlmStructureDetectorOutput
 
     def __init__(
@@ -202,7 +214,6 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
         region_type: str,
         bounds: CellBounds,
         layout,
-        confidence: float,
         parent_ids: List[str],
     ) -> Dict[str, Any]:
         return {
@@ -212,7 +223,6 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
             "bbox_px": cell_bounds_bbox(bounds, layout),
             "rows": (bounds.min_row, bounds.max_row),
             "columns": (bounds.min_column, bounds.max_column),
-            "confidence": confidence,
             "parent_ids": parent_ids,
         }
 
@@ -315,7 +325,6 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
         named = self._validate_table(table, layout, visibility)
         whole = cast(CellBounds, named["excel_range"])
         data = cast(CellBounds, named["data_range"])
-        confidence = table.confidence
         prefix = f"table_{table_index}"
         regions: List[Dict[str, Any]] = []
         parents: List[str] = []
@@ -328,15 +337,15 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
             if bounds is None:
                 continue
             region_id = f"{prefix}_{region_type}"
-            regions.append(self._region(region_id, region_type, bounds, layout, confidence, list(parents)))
+            regions.append(self._region(region_id, region_type, bounds, layout, list(parents)))
             parents.append(region_id)
 
         row_header = cast(Optional[CellBounds], named["row_header_range"])
         if row_header is not None:
             row_header_id = f"{prefix}_row_header"
-            regions.append(self._region(row_header_id, "row_header", row_header, layout, confidence, list(parents)))
+            regions.append(self._region(row_header_id, "row_header", row_header, layout, list(parents)))
             parents.append(row_header_id)
-        regions.append(self._region(f"{prefix}_data", "data", data, layout, confidence, list(parents)))
+        regions.append(self._region(f"{prefix}_data", "data", data, layout, list(parents)))
 
         column_header = cast(Optional[CellBounds], named["column_header_range"])
         return {
@@ -354,7 +363,7 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
         }
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        settings = cast(LocalVlmStructureDetectorInput, payload)
+        settings = cast(LocalVlmStructureDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(settings.file_name)
             current_hash = self.catalog.sha256(workbook_path)

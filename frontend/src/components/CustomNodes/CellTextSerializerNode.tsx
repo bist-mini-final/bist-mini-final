@@ -36,6 +36,7 @@ export const CellTextSerializerNode = ({ data, selected }: CellTextSerializerNod
       title="Structured Cell Text Serializer"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
+      inputPorts={['input']}
       selected={selected}
       width={data.nodeWidth ?? 370}
       onWidthChange={data.onNodeWidthChange}

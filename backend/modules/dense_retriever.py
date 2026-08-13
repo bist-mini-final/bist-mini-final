@@ -3,24 +3,37 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from pydantic import BaseModel, Field
 
 from ..vector_index_store import VectorIndexStore
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 from .cell_text_embedder import EmbeddedCellTextDocumentDTO
 from .embedder import EmbeddingsDTO
 from .retrieval_models import RankedSearchResultDTO
 from .vector_index_writer import VectorIndexDTO
 
 
-class DenseRetrieverInput(ModuleDTO):
+class DenseRetrieverInputDTO(ModuleInputDTO):
     query_input: EmbeddingsDTO = Field(description="질문 측 서브쿼리 임베딩 입력 포트")
     index_input: VectorIndexDTO = Field(
         description="Vector Index Writer가 생성한 영속 문서 인덱스 입력 포트"
     )
+
+
+class DenseRetrieverConfigDTO(ModuleConfigDTO):
     top_k: int = Field(
         default=1000,
         gt=0,
         le=10000,
         description="각 서브쿼리별 Dense 후보 최대 개수",
     )
+
+
+class DenseRetrieverExecutionDTO(DenseRetrieverInputDTO, DenseRetrieverConfigDTO):
+    """Internal union of search inputs and retrieval policy."""
 
 
 class DenseRetrieverModule(ExecutableModule):
@@ -33,9 +46,11 @@ class DenseRetrieverModule(ExecutableModule):
         outputs=["dense_result"],
         config_fields=["top_k"],
         raw_output=True,
-        version="6",
+        version="7",
     )
-    input_model = DenseRetrieverInput
+    input_model = DenseRetrieverInputDTO
+    config_model = DenseRetrieverConfigDTO
+    execution_model = DenseRetrieverExecutionDTO
     output_model = RankedSearchResultDTO
 
     def __init__(self, index_store: Optional[VectorIndexStore] = None) -> None:
@@ -69,10 +84,10 @@ class DenseRetrieverModule(ExecutableModule):
         ]
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(DenseRetrieverInput, payload)
-        question_id = input_data.query_input.question_id.upper()
+        input_data = cast(DenseRetrieverExecutionDTO, payload)
         metadata = self.index_store.metadata(input_data.index_input.index_id)
         expected_metadata = {
+            "file_name": input_data.index_input.file_name,
             "workbook_hash": input_data.index_input.workbook_hash,
             "model": input_data.index_input.model,
             "dimension": input_data.index_input.dimension,
@@ -102,6 +117,12 @@ class DenseRetrieverModule(ExecutableModule):
             )
 
         return {
-            "question_id": question_id,
+            "query_context": input_data.query_input.query_context.model_dump(
+                mode="json"
+            ),
+            "document_context": {
+                "file_name": input_data.index_input.file_name,
+                "workbook_hash": input_data.index_input.workbook_hash,
+            },
             "items": ranked_items,
         }

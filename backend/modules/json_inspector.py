@@ -2,10 +2,10 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field, RootModel
 
-from .base import ExecutableModule, ModuleDefinition
+from .base import EmptyModuleConfigDTO, ExecutableModule, ModuleDefinition
 
 
-class JsonInspectorInput(RootModel[Any]):
+class JsonInspectorInputDTO(RootModel[Any]):
     root: Any = Field(description="상류 모듈에서 전달된 원본 JSON 값")
 
 
@@ -29,8 +29,10 @@ class JsonInspectorModule(ExecutableModule):
         cacheable=False,
         version="2",
     )
-    input_model = JsonInspectorInput
+    input_model = JsonInspectorInputDTO
+    config_model = EmptyModuleConfigDTO
+    execution_model = JsonInspectorInputDTO
     output_model = JsonInspectorOutput
 
     def execute(self, payload: BaseModel) -> Any:
-        return cast(JsonInspectorInput, payload).root
+        return cast(JsonInspectorInputDTO, payload).root
