@@ -16,6 +16,7 @@ export const PIPELINE_STAGES = [
 
 export const MODULE_NODE_TYPES: Record<ModuleType, string> = {
   query_input: 'queryNode',
+  direct_query_decomposer: 'direct_query_decomposer',
   decomposer: 'decomposerNode',
   adaptive_query_decomposer: 'adaptive_query_decomposer',
   embedder: 'embeddingNode',
@@ -49,6 +50,7 @@ export const NODE_MODULE_TYPES: Record<string, ModuleType> = Object.fromEntries(
 
 export const NODE_COLORS: Record<string, string> = {
   queryNode: PIPELINE_STAGES[0].color,
+  direct_query_decomposer: '#475569',
   decomposerNode: PIPELINE_STAGES[1].color,
   adaptive_query_decomposer: '#6d28d9',
   embeddingNode: PIPELINE_STAGES[2].color,

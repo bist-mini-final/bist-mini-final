@@ -11,6 +11,7 @@ import { useWorkflowPersistence } from './hooks/useWorkflowPersistence';
 import { useResizablePanel } from './hooks/useResizablePanel';
 import { ModuleExecutionContext } from './contexts/ModuleExecutionContext';
 import { pipelineApi } from './services/api';
+import type { WorkflowGraph } from './types';
 
 const DEFAULT_WORKFLOW_ID = 'default';
 
@@ -18,6 +19,7 @@ export function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(
     () => window.matchMedia('(min-width: 1024px)').matches
   );
+  const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
   const modulePanel = useResizablePanel();
   const controller = usePipelineController();
 
@@ -128,13 +130,39 @@ export function App() {
     setActiveWorkflowId(id);
   };
 
-  const handleSwitchWorkflow = async (id: string, name?: string) => {
-    if (name) {
-      setWorkflows((current) => current.some((item) => item.id === id)
-        ? current.map((item) => item.id === id ? { ...item, name } : item)
-        : [...current, { id, name }]);
-    }
+  const createWorkflow = async () => {
+    const name = window.prompt('새 워크플로 이름', '새 RAG 워크플로');
+    if (!name?.trim()) return;
+    const id = `workflow-${Date.now()}`;
+    const graph: WorkflowGraph = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
+    await pipelineApi.saveWorkflow(id, name.trim(), graph);
+    setWorkflows((current) => [...current, { id, name: name.trim() }]);
     handleSelectWorkflow(id);
+  };
+
+  const duplicateWorkflow = async () => {
+    const name = window.prompt('복제할 워크플로 이름', `${activeWorkflowName} 복사본`);
+    if (!name?.trim()) return;
+    const id = `workflow-${Date.now()}`;
+    // The graph in memory is the active workflow, including all edge ports.
+    await pipelineApi.saveWorkflow(id, name.trim(), graph.exportGraph());
+    setWorkflows((current) => [...current, { id, name: name.trim() }]);
+    handleSelectWorkflow(id);
+  };
+
+  const renameWorkflow = async () => {
+    const name = window.prompt('워크플로 이름 변경', activeWorkflowName);
+    if (!name?.trim() || name.trim() === activeWorkflowName) return;
+    await pipelineApi.saveWorkflow(activeWorkflowId, name.trim(), graph.exportGraph());
+    setWorkflows((current) => current.map((item) => item.id === activeWorkflowId ? { ...item, name: name.trim() } : item));
+  };
+
+  const deleteWorkflow = async () => {
+    if (activeWorkflowId === DEFAULT_WORKFLOW_ID) return;
+    if (!window.confirm(`'${activeWorkflowName}' 워크플로를 삭제할까요?`)) return;
+    await pipelineApi.deleteWorkflow(activeWorkflowId);
+    setWorkflows((current) => current.filter((item) => item.id !== activeWorkflowId));
+    handleSelectWorkflow(DEFAULT_WORKFLOW_ID);
   };
 
   const runMetrics = useMemo(() => {
@@ -214,6 +242,7 @@ export function App() {
           workflows={workflows}
           activeWorkflowId={activeWorkflowId}
           onSelectWorkflow={handleSelectWorkflow}
+          onOpenBenchmark={() => setIsBenchmarkOpen(true)}
         />
 
         {controller.errorMessage && (
@@ -256,12 +285,16 @@ export function App() {
             runs={workflow.runs}
             isPaletteOpen={isPaletteOpen}
             onOpenPalette={() => setIsPaletteOpen(true)}
-            workflowId={activeWorkflowId}
-            workflowName={activeWorkflowName}
-            onSwitchWorkflow={handleSwitchWorkflow}
+            workflows={workflows}
+            activeWorkflowId={activeWorkflowId}
+            onSelectWorkflow={handleSelectWorkflow}
+            onCreateWorkflow={() => void createWorkflow()}
+            onDuplicateWorkflow={() => void duplicateWorkflow()}
+            onRenameWorkflow={() => void renameWorkflow()}
+            onDeleteWorkflow={() => void deleteWorkflow()}
           />
         </main>
-        <BenchmarkPanel />
+        <BenchmarkPanel isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
       </div>
     </ModuleExecutionContext.Provider>
   );

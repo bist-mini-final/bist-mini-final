@@ -21,6 +21,7 @@ import { ExhaustiveCellTextSerializerNode } from './CustomNodes/ExhaustiveCellTe
 import { CellTextEmbedderNode } from './CustomNodes/CellTextEmbedderNode';
 import { VectorIndexWriterNode } from './CustomNodes/VectorIndexWriterNode';
 import { DecomposerNode } from './CustomNodes/DecomposerNode';
+import { DirectQueryDecomposerNode } from './CustomNodes/DirectQueryDecomposerNode';
 import { DenseRetrieverNode } from './CustomNodes/DenseRetrieverNode';
 import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
 import { DoclingTableDetectorNode } from './CustomNodes/DoclingTableDetectorNode';
@@ -39,6 +40,7 @@ import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
 import { SemanticScopedDenseRetrieverNode } from './CustomNodes/SemanticScopedDenseRetrieverNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
 import { WorkflowLayersPanel } from './WorkflowLayersPanel';
+import type { WorkflowOption } from './Header';
 import type { usePipelineGraph } from '../hooks/usePipelineGraph';
 import type { ModuleDefinition, WorkflowRun } from '../types';
 
@@ -50,9 +52,13 @@ interface PipelineCanvasProps {
   onOpenPalette?: () => void;
   modules: ModuleDefinition[];
   runs: WorkflowRun[];
-  workflowId: string;
-  workflowName: string;
-  onSwitchWorkflow: (workflowId: string, workflowName?: string) => Promise<void>;
+  workflows: WorkflowOption[];
+  activeWorkflowId: string;
+  onSelectWorkflow: (id: string) => void;
+  onCreateWorkflow: () => void;
+  onDuplicateWorkflow: () => void;
+  onRenameWorkflow: () => void;
+  onDeleteWorkflow: () => void;
 }
 
 export function PipelineCanvas({
@@ -60,14 +66,13 @@ export function PipelineCanvas({
   isPaletteOpen,
   modules,
   runs,
-  workflowId,
-  workflowName,
-  onSwitchWorkflow,
+  workflows, activeWorkflowId, onSelectWorkflow, onCreateWorkflow, onDuplicateWorkflow, onRenameWorkflow, onDeleteWorkflow,
 }: PipelineCanvasProps) {
   const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null);
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       queryNode: QueryNode,
+      direct_query_decomposer: DirectQueryDecomposerNode,
       decomposerNode: DecomposerNode,
       adaptive_query_decomposer: AdaptiveQueryDecomposerNode,
       embeddingNode: EmbeddingNode,
@@ -114,7 +119,7 @@ export function PipelineCanvas({
           <span>휠로 확대 · 빈 영역 드래그로 이동</span>
         </div>
         <ReactFlow
-        key={workflowId}
+        key={activeWorkflowId}
         nodes={graph.nodes}
         edges={graph.edges}
         onNodesChange={graph.onNodesChange}
@@ -149,7 +154,7 @@ export function PipelineCanvas({
           pannable
         />
         </ReactFlow>
-        <WorkflowLayersPanel nodes={graph.nodes} edges={graph.edges} modules={modules} onSelect={graph.selectNode} onDuplicateNode={graph.duplicateNode} workflowId={workflowId} workflowName={workflowName} onSwitchWorkflow={onSwitchWorkflow} />
+        <WorkflowLayersPanel nodes={graph.nodes} edges={graph.edges} modules={modules} workflows={workflows} activeWorkflowId={activeWorkflowId} onSelectWorkflow={onSelectWorkflow} onCreateWorkflow={onCreateWorkflow} onDuplicateWorkflow={onDuplicateWorkflow} onRenameWorkflow={onRenameWorkflow} onDeleteWorkflow={onDeleteWorkflow} onSelectNode={graph.selectNode} onDuplicateNode={graph.duplicateNode} />
       </section>
       {settingsNode && settingsModule && (
         <ModuleSettingsModal

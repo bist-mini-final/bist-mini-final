@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional, Type, TypeVar
@@ -51,8 +52,23 @@ class JsonModelStore:
         serialized = document.model_dump_json(indent=2)
         with self._lock:
             temporary_path.write_text(serialized + "\n", encoding="utf-8")
-            temporary_path.replace(path)
+            self._replace_with_retry(temporary_path, path)
         return document
+
+    @staticmethod
+    def _replace_with_retry(temporary_path: Path, path: Path) -> None:
+        """Retry a short-lived Windows file lock held by a run-list reader."""
+
+        last_error: PermissionError | None = None
+        for _ in range(8):
+            try:
+                temporary_path.replace(path)
+                return
+            except PermissionError as error:
+                last_error = error
+                time.sleep(0.05)
+        if last_error is not None:
+            raise last_error
 
     def list_documents(self) -> List[ModelType]:
         documents: List[ModelType] = []
@@ -153,7 +169,7 @@ class RunStore:
                 summary.model_dump_json(indent=2) + "\n",
                 encoding="utf-8",
             )
-            temporary_path.replace(summary_path)
+            JsonModelStore._replace_with_retry(temporary_path, summary_path)
         return saved
 
     def load(self, run_id: str) -> WorkflowRun:

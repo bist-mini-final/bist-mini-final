@@ -2,15 +2,15 @@
   "schema_version": 1,
   "id": "indexing_prebuilt",
   "name": "indexing_prebuilt",
-  "updated_at": "2026-08-13T02:30:05.569597+00:00",
+  "updated_at": "2026-08-13T06:52:53.027507+00:00",
   "graph": {
     "nodes": [
       {
         "id": "idx-n1-selector",
         "module_type": "processed_file_selector",
         "position": {
-          "x": 100,
-          "y": 0
+          "x": 100.0,
+          "y": 0.0
         },
         "config": {
           "file_name": "SPG_Company_KeyStats_v3.xlsm"
@@ -26,8 +26,8 @@
         "id": "idx-n2-vlm",
         "module_type": "luna_vlm_structure_detector",
         "position": {
-          "x": 650,
-          "y": 0
+          "x": 650.0,
+          "y": 0.0
         },
         "config": {
           "model": "gpt-5.6-luna",
@@ -52,8 +52,8 @@
         "id": "idx-n3-serializer",
         "module_type": "cell_text_serializer",
         "position": {
-          "x": 1200,
-          "y": 0
+          "x": 1200.0,
+          "y": 0.0
         },
         "config": {},
         "values": {},
@@ -67,8 +67,8 @@
         "id": "idx-n4-embedder",
         "module_type": "cell_text_embedder",
         "position": {
-          "x": 1750,
-          "y": 0
+          "x": 1750.0,
+          "y": 0.0
         },
         "config": {
           "model": "text-embedding-3-large",
@@ -85,8 +85,8 @@
         "id": "idx-n5-writer",
         "module_type": "vector_index_writer",
         "position": {
-          "x": 2300,
-          "y": 0
+          "x": 2300.0,
+          "y": 0.0
         },
         "config": {},
         "values": {},
@@ -100,13 +100,13 @@
         "id": "idx-n6-inspector",
         "module_type": "json_inspector",
         "position": {
-          "x": 2800,
-          "y": 0
+          "x": 2800.0,
+          "y": 0.0
         },
         "config": {},
         "values": {},
         "ui": {
-          "width": 520,
+          "width": 520.0,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -155,9 +155,9 @@
       }
     ],
     "viewport": {
-      "x": -50,
-      "y": 300,
-      "zoom": 0.75
+      "x": 436.91457745090224,
+      "y": 268.44761444239634,
+      "zoom": 0.2639015821545788
     }
   }
 }

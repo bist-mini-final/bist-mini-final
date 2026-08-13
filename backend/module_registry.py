@@ -13,6 +13,7 @@ from .modules.bm25_retriever import Bm25RetrieverModule
 from .modules.cell_text_serializer import CellTextSerializerModule
 from .modules.cell_text_embedder import CellTextEmbedderModule
 from .modules.decomposer import DecomposerModule
+from .modules.direct_query_decomposer import DirectQueryDecomposerModule
 from .modules.dense_retriever import DenseRetrieverModule
 from .modules.embedder import EmbedderModule, EmbeddingEncoder
 from .modules.docling_table_detector import DoclingTableDetectorModule
@@ -64,6 +65,7 @@ class ModuleRegistry:
             }
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
+            DirectQueryDecomposerModule(),
             DecomposerModule(completion_client=completion_client),
             AdaptiveQueryDecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),

@@ -1,5 +1,6 @@
 export type ModuleType =
   | 'query_input'
+  | 'direct_query_decomposer'
   | 'decomposer'
   | 'adaptive_query_decomposer'
   | 'embedder'
@@ -176,6 +177,8 @@ export interface BenchmarkCase {
   question: string;
   expected_numbers?: number[];
   expected_terms?: string[];
+  expected_target?: string;
+  expected_sheets?: string[];
 }
 
 export interface BenchmarkSummary {
@@ -186,9 +189,17 @@ export interface BenchmarkSummary {
   average_tokens: number;
   average_cost_usd: number;
   errors: number;
+  route_cases: number;
+  route_accuracy: number | null;
+  router_kind: string | null;
+  average_router_latency_seconds: number | null;
+  average_router_tokens: number | null;
+  average_router_cost_usd: number | null;
 }
 
 export interface BenchmarkComparison {
+  id?: string;
+  saved_at?: string;
   execution_mode: 'sequential_isolated';
   use_cache: boolean;
   summary: BenchmarkSummary[];
@@ -200,6 +211,16 @@ export interface BenchmarkComparison {
     total_tokens: number;
     estimated_cost_usd: number;
     score: { correct: boolean };
+    route_score: { correct: boolean; target_correct: boolean; sheets_correct: boolean } | null;
+    router: {
+      kind: string;
+      target: string | null;
+      sheets: string[];
+      matched: boolean;
+      latency_seconds: number;
+      total_tokens: number;
+      estimated_cost_usd: number;
+    } | null;
     error: string | null;
     timeline: Array<{ module_type: string; latency_seconds: number | null }>;
   }>;

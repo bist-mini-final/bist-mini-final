@@ -9,6 +9,7 @@ DIST_DIR = PROJECT_DIR / "dist"
 WORKFLOW_DIR = PROJECT_DIR / "data" / "workflows"
 RUN_DIR = PROJECT_DIR / "data" / "runs"
 CACHE_DIR = PROJECT_DIR / "data" / "cache"
+BENCHMARK_DIR = PROJECT_DIR / "data" / "benchmarks"
 
 SIMILARITY_THRESHOLD = 0.65
 DEV_CORS_ORIGINS = (

@@ -5,6 +5,7 @@ export const MODULE_CATEGORIES = ['Source', 'Logic', 'Transform', 'Output'] as c
 /** UI-only metadata. Labels, descriptions, and I/O contracts come from the backend. */
 export const MODULE_PRESENTATION: Record<ModuleType, ModulePresentation> = {
   query_input: { icon: 'MessageSquare', color: '#107c41' },
+  direct_query_decomposer: { icon: 'ArrowRight', color: '#475569' },
   decomposer: { icon: 'GitBranch', color: '#7c3aed' },
   adaptive_query_decomposer: { icon: 'GitBranch', color: '#6d28d9' },
   embedder: { icon: 'Cpu', color: '#0891b2' },

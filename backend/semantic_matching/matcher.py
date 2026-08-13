@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from threading import Lock
 from typing import Dict, Sequence
 
 from .catalog import QueryExample, load_examples
 from ..embedding_factory import EmbeddingEncoder
+from ..embedding_artifacts import EmbeddingArtifactStore
 from ..modules.base import ModuleExecutionError
 
 
@@ -48,10 +52,12 @@ class SemanticQueryMatcher:
         encoder: EmbeddingEncoder,
         catalog_path: str | None = None,
         examples: tuple[QueryExample, ...] | None = None,
+        artifact_store: EmbeddingArtifactStore | None = None,
     ) -> None:
         self.encoder = encoder
         self.catalog_path = catalog_path
         self.examples = examples
+        self.artifact_store = artifact_store or EmbeddingArtifactStore()
         self._cache: Dict[str, tuple[tuple[QueryExample, ...], list[list[float]]]] = {}
         self._lock = Lock()
 
@@ -63,11 +69,39 @@ class SemanticQueryMatcher:
             examples = self.examples or (
                 load_examples(self.catalog_path) if self.catalog_path else load_examples()
             )
-            vectors = self.encoder.encode([example.question for example in examples])
+            identity = json.dumps(
+                {"kind": "semantic-routing-catalog", "model": model,
+                 "examples": [{"id": item.example_id, "question": item.question,
+                               "target": item.target, "sheets": item.sheets} for item in examples]},
+                ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            )
+            artifact_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+            metadata_path = self.artifact_store.directory / f"{artifact_id}.semantic.json"
+            vectors = self._load_artifact(artifact_id, metadata_path, len(examples))
+            if vectors is None:
+                vectors = self.encoder.encode([example.question for example in examples])
+                if not vectors or any(len(vector) != len(vectors[0]) for vector in vectors):
+                    raise ModuleExecutionError("Semantic query catalog embeddings have inconsistent dimensions")
+                self.artifact_store.put(artifact_id, vectors)
+                metadata_path.write_text(json.dumps({
+                    "artifact_id": artifact_id, "model": model, "count": len(vectors),
+                    "dimension": len(vectors[0]),
+                }, sort_keys=True), encoding="utf-8")
             if len(vectors) != len(examples):
                 raise ModuleExecutionError("Semantic query catalog embedding count does not match examples")
             self._cache[model] = (examples, vectors)
             return self._cache[model]
+
+    def _load_artifact(self, artifact_id: str, metadata_path: Path, count: int) -> list[list[float]] | None:
+        """Return a validated persisted catalog, or signal a one-time rebuild."""
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if metadata.get("artifact_id") != artifact_id or metadata.get("count") != count:
+                return None
+            dimension = int(metadata["dimension"])
+            return self.artifact_store.get(artifact_id, count, dimension)
+        except (OSError, ValueError, KeyError, json.JSONDecodeError, ModuleExecutionError):
+            return None
 
     def route(
         self,

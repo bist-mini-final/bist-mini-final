@@ -40,17 +40,17 @@ def create_workflow_router(
 
     @router.get("/workflows")
     def list_workflows():
-        # Older default.json files carry id="workflow".  Filter by the
-        # persisted document identity *and* collapse duplicate logical IDs so
-        # the bootstrap template can never appear as a second canvas frame.
-        workflows_by_id = {
-            item.id: item
-            for item in workflow_store.list()
-            if item.id != WorkflowStore.DEFAULT_TEMPLATE_ID
-        }
-        workflows = list(workflows_by_id.values())
-        if not any(item.id == WorkflowStore.ACTIVE_WORKFLOW_ID for item in workflows):
-            workflows.insert(0, workflow_store.load(WorkflowStore.ACTIVE_WORKFLOW_ID))
+        # ``default.json`` is the canonical starter workflow.  Its legacy
+        # document payload may say id="workflow", so normalize the public id
+        # to the filename-backed route id and never expose it twice.
+        default = workflow_store.load(WorkflowStore.DEFAULT_TEMPLATE_ID).model_copy(
+            update={"id": WorkflowStore.DEFAULT_TEMPLATE_ID}
+        )
+        workflows = [default]
+        workflows.extend(
+            item for item in workflow_store.list()
+            if item.id not in (WorkflowStore.DEFAULT_TEMPLATE_ID, WorkflowStore.ACTIVE_WORKFLOW_ID)
+        )
         return {"workflows": workflows}
 
     @router.get("/workflows/{workflow_id}")

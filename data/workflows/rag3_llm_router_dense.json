@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "id": "rag3_llm_router_dense",
+  "name": "rag3_llm_router_dense",
+  "updated_at": "2026-08-13T07:45:39.014652+00:00",
+  "graph": {
+    "nodes": [
+      {
+        "id": "query",
+        "module_type": "query_input",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "config": {
+          "threshold": 1
+        },
+        "values": {
+          "query": "IBM의 LTM 매출은 얼마야?"
+        },
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "router",
+        "module_type": "llm_query_router",
+        "position": {
+          "x": 340.0,
+          "y": -140.0
+        },
+        "config": {
+          "model": "gpt-5.6-luna"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "direct",
+        "module_type": "direct_query_decomposer",
+        "position": {
+          "x": 340.0,
+          "y": 100.0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "embed",
+        "module_type": "embedder",
+        "position": {
+          "x": 680.0,
+          "y": 100.0
+        },
+        "config": {
+          "model": "text-embedding-3-large"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "index",
+        "module_type": "prebuilt_index_loader",
+        "position": {
+          "x": 680.0,
+          "y": 360.0
+        },
+        "config": {
+          "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "dense",
+        "module_type": "semantic_scoped_dense_retriever",
+        "position": {
+          "x": 1040.0,
+          "y": 100.0
+        },
+        "config": {
+          "top_k": 1000
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "context",
+        "module_type": "context",
+        "position": {
+          "x": 1380.0,
+          "y": 100.0
+        },
+        "config": {
+          "top_k": 100,
+          "adjacent_radius": 3,
+          "max_blocks": 500
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "reader",
+        "module_type": "reader",
+        "position": {
+          "x": 1720.0,
+          "y": 100.0
+        },
+        "config": {
+          "model": "gpt-5.6-luna",
+          "preset": "luna_reader"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "custom-node-1786607099829-1",
+        "module_type": "json_inspector",
+        "position": {
+          "x": 2238.391840566281,
+          "y": 150.28247861399547
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "q-router",
+        "source": "query",
+        "target": "router",
+        "source_output": "question_text",
+        "target_input": "question_text",
+        "source_branch": "generated"
+      },
+      {
+        "id": "q-direct",
+        "source": "query",
+        "target": "direct",
+        "source_output": "question_text",
+        "target_input": "question_text",
+        "source_branch": "generated"
+      },
+      {
+        "id": "direct-embed",
+        "source": "direct",
+        "target": "embed",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "embed-dense",
+        "source": "embed",
+        "target": "dense",
+        "source_output": "output",
+        "target_input": "query_input",
+        "source_branch": null
+      },
+      {
+        "id": "router-dense",
+        "source": "router",
+        "target": "dense",
+        "source_output": "semantic_match",
+        "target_input": "semantic_match",
+        "source_branch": null
+      },
+      {
+        "id": "index-dense",
+        "source": "index",
+        "target": "dense",
+        "source_output": "index_output",
+        "target_input": "index_input",
+        "source_branch": null
+      },
+      {
+        "id": "dense-context",
+        "source": "dense",
+        "target": "context",
+        "source_output": "dense_result",
+        "target_input": "retrieval_json",
+        "source_branch": null
+      },
+      {
+        "id": "index-context",
+        "source": "index",
+        "target": "context",
+        "source_output": "document_output",
+        "target_input": "document_input",
+        "source_branch": null
+      },
+      {
+        "id": "context-reader",
+        "source": "context",
+        "target": "reader",
+        "source_output": "context_json",
+        "target_input": "context_json",
+        "source_branch": null
+      },
+      {
+        "id": "q-reader",
+        "source": "query",
+        "target": "reader",
+        "source_output": "question_text",
+        "target_input": "question_text",
+        "source_branch": "generated"
+      },
+      {
+        "id": "edge-1786607101902-1",
+        "source": "reader",
+        "target": "custom-node-1786607099829-1",
+        "source_output": "answer_json",
+        "target_input": "input",
+        "source_branch": null
+      }
+    ],
+    "viewport": {
+      "x": 410.78016056718985,
+      "y": 396.4958894308701,
+      "zoom": 0.4594793419988144
+    }
+  }
+}
