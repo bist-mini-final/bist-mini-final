@@ -8,9 +8,9 @@ interface PrebuiltIndexLoaderNodeData extends Record<string, unknown> {
   executionState?: string;
   executionOutput?: unknown;
   nodeWidth?: number;
-  config?: { file_name?: string };
+  values?: { file_name?: string };
   moduleDefinition?: ModuleDefinition;
-  onConfigChange?: (patch: Record<string, unknown>) => void;
+  onValuesChange?: (patch: Record<string, unknown>) => void;
   onNodeWidthChange?: (width: number) => void;
 }
 
@@ -31,7 +31,7 @@ function getOutputSummary(output: unknown): { docCount: number | null; indexId: 
 }
 
 export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderNodeProps) => {
-  const fileSchema = data.moduleDefinition?.config_schema.properties?.file_name;
+  const fileSchema = data.moduleDefinition?.input_schema.properties?.file_name;
   const fileOptions = (fileSchema?.enum ?? []).filter(
     (candidate): candidate is string => typeof candidate === 'string'
   );
@@ -39,14 +39,14 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
     ? fileSchema.default
     : 'SPG_Company_KeyStats_v3_prebuilt.parquet';
 
-  const selectedFile = data.config?.file_name || schemaDefault;
+  const selectedFile = data.values?.file_name || schemaDefault;
   const { docCount, indexId } = getOutputSummary(data.executionOutput);
 
   useEffect(() => {
-    if (!data.config?.file_name && selectedFile) {
-      data.onConfigChange?.({ file_name: selectedFile });
+    if (!data.values?.file_name && selectedFile) {
+      data.onValuesChange?.({ file_name: selectedFile });
     }
-  }, [data.config?.file_name, data.onConfigChange, selectedFile]);
+  }, [data.onValuesChange, data.values?.file_name, selectedFile]);
 
   return (
     <NodeShell
@@ -73,7 +73,7 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
             className="nodrag nopan w-full cursor-pointer rounded-lg border border-emerald-200 bg-emerald-50/70 px-2.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
             value={selectedFile}
             onPointerDown={(event) => event.stopPropagation()}
-            onChange={(event) => data.onConfigChange?.({ file_name: event.currentTarget.value })}
+            onChange={(event) => data.onValuesChange?.({ file_name: event.currentTarget.value })}
             aria-label="사전 구축 인덱스 파일 선택"
           >
             {fileOptions.map((fileName) => (
@@ -87,7 +87,7 @@ export const PrebuiltIndexLoaderNode = ({ data, selected }: PrebuiltIndexLoaderN
             value={selectedFile}
             placeholder="SPG_Company_KeyStats_v3_prebuilt.parquet"
             onPointerDown={(event) => event.stopPropagation()}
-            onChange={(event) => data.onConfigChange?.({ file_name: event.currentTarget.value })}
+            onChange={(event) => data.onValuesChange?.({ file_name: event.currentTarget.value })}
           />
         )}
       </label>

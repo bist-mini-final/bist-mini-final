@@ -18,18 +18,28 @@ from pydantic import BaseModel, Field
 
 from ..config import SPREADSHEET_ARTIFACT_DIR, PROCESSED_DATA_DIR
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 
 
-class ImageTileSourceInput(ModuleDTO):
+class ImageTileSourceInputDTO(ModuleInputDTO):
     file_name: str = Field(
-        default="",
+        min_length=1,
         description="data/processed에서 선택할 Excel 파일명 (이미지 타일 소스로 사용)",
     )
     sheet_name: Optional[str] = Field(
         default=None,
         description="특정 시트만 선택. 비워두면 모든 시트 포함",
     )
+
+
+class ImageTileSourceConfigDTO(ModuleConfigDTO):
     tile_height_px: int = Field(
         default=64,
         ge=16,
@@ -42,6 +52,10 @@ class ImageTileSourceInput(ModuleDTO):
         le=5000,
         description="출력할 최대 타일 수",
     )
+
+
+class ImageTileSourceExecutionDTO(ImageTileSourceInputDTO, ImageTileSourceConfigDTO):
+    """Internal union of source selection and tiling policy."""
 
 
 class ImageTileDTO(ModuleDTO):
@@ -79,11 +93,13 @@ class ImageTileSourceModule(ExecutableModule):
         ),
         inputs=[],
         outputs=["output"],
-        config_fields=["file_name", "sheet_name", "tile_height_px", "max_tiles"],
+        config_fields=["tile_height_px", "max_tiles"],
         raw_output=True,
         version="1",
     )
-    input_model = ImageTileSourceInput
+    input_model = ImageTileSourceInputDTO
+    config_model = ImageTileSourceConfigDTO
+    execution_model = ImageTileSourceExecutionDTO
     output_model = ImageTileSourceOutput
 
     def __init__(self, processed_dir: Path = PROCESSED_DATA_DIR) -> None:
@@ -93,14 +109,14 @@ class ImageTileSourceModule(ExecutableModule):
     def contract(self) -> Dict[str, Any]:
         contract = super().contract()
         available = self.catalog.file_names()
-        file_schema = contract["config_schema"]["properties"]["file_name"]
+        file_schema = contract["input_schema"]["properties"]["file_name"]
         file_schema["enum"] = available
         if available:
             file_schema["default"] = available[0]
         return contract
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ImageTileSourceInput, payload)
+        input_data = cast(ImageTileSourceExecutionDTO, payload)
 
         try:
             path = self.catalog.resolve(input_data.file_name)

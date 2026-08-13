@@ -16,7 +16,14 @@ from typing import Any, Dict, List, Optional, cast
 from pydantic import BaseModel, Field
 
 from ..config import PROJECT_DIR
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 
 QA_EXAMPLES_DIR = PROJECT_DIR / "data" / "qa_examples"
 
@@ -60,7 +67,7 @@ BUILTIN_EXAMPLES = [
 ]
 
 
-class QaExampleLoaderInput(ModuleDTO):
+class QaExampleLoaderInputDTO(ModuleInputDTO):
     file_name: Optional[str] = Field(
         default=None,
         description=(
@@ -68,10 +75,17 @@ class QaExampleLoaderInput(ModuleDTO):
             "비워두면 내장 예시 세트를 사용합니다."
         ),
     )
+
+
+class QaExampleLoaderConfigDTO(ModuleConfigDTO):
     include_builtin: bool = Field(
         default=True,
         description="내장 예시 세트를 함께 포함할지 여부",
     )
+
+
+class QaExampleLoaderExecutionDTO(QaExampleLoaderInputDTO, QaExampleLoaderConfigDTO):
+    """Internal union of example source and inclusion policy."""
 
 
 class QaExampleItem(ModuleDTO):
@@ -98,18 +112,20 @@ class QaExampleLoaderModule(ExecutableModule):
         ),
         inputs=[],
         outputs=["output"],
-        config_fields=["file_name", "include_builtin"],
+        config_fields=["include_builtin"],
         raw_output=True,
         version="1",
     )
-    input_model = QaExampleLoaderInput
+    input_model = QaExampleLoaderInputDTO
+    config_model = QaExampleLoaderConfigDTO
+    execution_model = QaExampleLoaderExecutionDTO
     output_model = QaExampleLoaderOutput
 
     def contract(self) -> Dict[str, Any]:
         contract = super().contract()
         # Populate enum with available JSON files
         available = self._available_files()
-        file_schema = contract["config_schema"]["properties"]["file_name"]
+        file_schema = contract["input_schema"]["properties"]["file_name"]
         file_schema["enum"] = [None] + available
         return contract
 
@@ -119,7 +135,7 @@ class QaExampleLoaderModule(ExecutableModule):
         return sorted(p.name for p in QA_EXAMPLES_DIR.glob("*.json"))
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(QaExampleLoaderInput, payload)
+        input_data = cast(QaExampleLoaderExecutionDTO, payload)
         examples: List[Dict[str, Any]] = []
         source = "builtin"
 

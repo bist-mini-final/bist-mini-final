@@ -7,12 +7,22 @@ from pydantic import BaseModel, Field
 from ..bge_encoder import DEFAULT_BGE_MODEL
 from ..embedding_artifacts import EmbeddingArtifactStore
 from ..embedding_factory import EmbeddingEncoder, get_embedding_encoder
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+)
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
 from .embedder import EMBEDDING_MODEL_OPTIONS
 
 
-class CellTextEmbedderInput(CellTextSerializerOutput):
+class CellTextEmbedderInputDTO(CellTextSerializerOutput):
+    """Structured cell documents produced by a serializer."""
+
+
+class CellTextEmbedderConfigDTO(ModuleConfigDTO):
     model: str = Field(
         default=DEFAULT_BGE_MODEL,
         min_length=1,
@@ -28,6 +38,13 @@ class CellTextEmbedderInput(CellTextSerializerOutput):
         le=512,
         description="Excel 셀 문서를 한 번에 임베딩할 배치 크기",
     )
+
+
+class CellTextEmbedderExecutionDTO(
+    CellTextEmbedderInputDTO,
+    CellTextEmbedderConfigDTO,
+):
+    """Internal union of document data and embedding settings."""
 
 
 class EmbeddedCellTextDocumentDTO(CellTextDocumentDTO):
@@ -61,7 +78,9 @@ class CellTextEmbedderModule(ExecutableModule):
         raw_output=True,
         version="3",
     )
-    input_model = CellTextEmbedderInput
+    input_model = CellTextEmbedderInputDTO
+    config_model = CellTextEmbedderConfigDTO
+    execution_model = CellTextEmbedderExecutionDTO
     output_model = CellTextEmbeddingsDTO
 
     def __init__(
@@ -81,7 +100,7 @@ class CellTextEmbedderModule(ExecutableModule):
         )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(CellTextEmbedderInput, payload)
+        input_data = cast(CellTextEmbedderExecutionDTO, payload)
         encoder = self._encoder_for(input_data.model)
         vectors: List[List[float]] = []
         if not input_data.items:

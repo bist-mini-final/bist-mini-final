@@ -65,8 +65,17 @@ export const pipelineApi = {
     return `/api/spreadsheet-artifacts/${encodeURIComponent(workbookHash)}/sheets/${encodeURIComponent(sheetName)}?layer=${layer}`;
   },
 
-  executeModule<T>(moduleType: ModuleType, payload: unknown, signal?: AbortSignal) {
-    return postJson<T>(`/api/modules/${moduleType}/execute`, payload, signal);
+  executeModule<T>(
+    moduleType: ModuleType,
+    input: unknown,
+    config: Record<string, unknown> = {},
+    signal?: AbortSignal
+  ) {
+    return postJson<T>(
+      `/api/modules/${moduleType}/execute`,
+      { input, config },
+      signal
+    );
   },
 
   getModules(signal?: AbortSignal) {

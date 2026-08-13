@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Tuple, cast
 
 from pydantic import BaseModel, Field
 
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleInputDTO
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
 from .decomposer import SubqueriesDTO
 from .retrieval_models import RankedSearchResultDTO
@@ -18,11 +18,14 @@ def tokenize(text: str) -> List[str]:
     return TOKEN_PATTERN.findall(text.lower())
 
 
-class Bm25RetrieverInput(ModuleDTO):
+class Bm25RetrieverInputDTO(ModuleInputDTO):
     query_input: SubqueriesDTO = Field(description="질문 측 서브쿼리 입력 포트")
     document_input: CellTextSerializerOutput = Field(
         description="Excel 측 구조화 셀 문서 입력 포트"
     )
+
+
+class Bm25RetrieverConfigDTO(ModuleConfigDTO):
     k1: float = Field(
         default=1.5,
         gt=0,
@@ -43,6 +46,10 @@ class Bm25RetrieverInput(ModuleDTO):
     )
 
 
+class Bm25RetrieverExecutionDTO(Bm25RetrieverInputDTO, Bm25RetrieverConfigDTO):
+    """Internal union of retrieval data and BM25 policy."""
+
+
 class Bm25RetrieverModule(ExecutableModule):
     definition = ModuleDefinition(
         type="bm25_retriever",
@@ -53,9 +60,11 @@ class Bm25RetrieverModule(ExecutableModule):
         outputs=["bm25_result"],
         config_fields=["k1", "b", "top_k"],
         raw_output=True,
-        version="3",
+        version="4",
     )
-    input_model = Bm25RetrieverInput
+    input_model = Bm25RetrieverInputDTO
+    config_model = Bm25RetrieverConfigDTO
+    execution_model = Bm25RetrieverExecutionDTO
     output_model = RankedSearchResultDTO
 
     @staticmethod
@@ -116,11 +125,17 @@ class Bm25RetrieverModule(ExecutableModule):
         ]
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(Bm25RetrieverInput, payload)
+        input_data = cast(Bm25RetrieverExecutionDTO, payload)
         documents = input_data.document_input.items
+        query_context = input_data.query_input.query_context.model_dump(mode="json")
+        document_context = {
+            "file_name": input_data.document_input.file_name,
+            "workbook_hash": input_data.document_input.workbook_hash,
+        }
         if not documents:
             return {
-                "question_id": input_data.query_input.question_id.upper(),
+                "query_context": query_context,
+                "document_context": document_context,
                 "items": [],
             }
 
@@ -161,6 +176,7 @@ class Bm25RetrieverModule(ExecutableModule):
             )
 
         return {
-            "question_id": input_data.query_input.question_id.upper(),
+            "query_context": query_context,
+            "document_context": document_context,
             "items": ranked_items,
         }

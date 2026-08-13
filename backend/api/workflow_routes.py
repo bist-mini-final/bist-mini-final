@@ -22,7 +22,7 @@ def create_workflow_router(
     run_dir: Path,
     cache_dir: Path,
 ) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(tags=["Workflows"])
     workflow_store = WorkflowStore(workflow_dir)
     run_store = RunStore(run_dir)
     result_cache = ResultCache(cache_dir)

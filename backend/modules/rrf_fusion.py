@@ -2,7 +2,13 @@ from typing import Any, Dict, Tuple, cast
 
 from pydantic import BaseModel, Field
 
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 from .retrieval_models import RankedSearchCandidateDTO, RankedSearchResultDTO, RetrievalDTO
 
 
@@ -25,9 +31,12 @@ def _has_ratio_intent(subquery: str) -> bool:
     )
 
 
-class RrfFusionInput(ModuleDTO):
+class RrfFusionInputDTO(ModuleInputDTO):
     bm25_result: RankedSearchResultDTO = Field(description="BM25 서브쿼리별 후보 순위")
     dense_result: RankedSearchResultDTO = Field(description="Dense 서브쿼리별 후보 순위")
+
+
+class RrfFusionConfigDTO(ModuleConfigDTO):
     rrf_k: int = Field(
         default=60,
         ge=1,
@@ -48,6 +57,10 @@ class RrfFusionInput(ModuleDTO):
     )
 
 
+class RrfFusionExecutionDTO(RrfFusionInputDTO, RrfFusionConfigDTO):
+    """Internal union of ranked results and fusion policy."""
+
+
 class RrfFusionModule(ExecutableModule):
     definition = ModuleDefinition(
         type="rrf_fusion",
@@ -58,18 +71,26 @@ class RrfFusionModule(ExecutableModule):
         outputs=["retrieval_json"],
         config_fields=["rrf_k", "top_k", "ratio_penalty"],
         raw_output=True,
-        version="2",
+        version="3",
     )
-    input_model = RrfFusionInput
+    input_model = RrfFusionInputDTO
+    config_model = RrfFusionConfigDTO
+    execution_model = RrfFusionExecutionDTO
     output_model = RetrievalDTO
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(RrfFusionInput, payload)
-        bm25_id = input_data.bm25_result.question_id.upper()
-        dense_id = input_data.dense_result.question_id.upper()
-        if bm25_id != dense_id:
+        input_data = cast(RrfFusionExecutionDTO, payload)
+        bm25_query = input_data.bm25_result.query_context
+        dense_query = input_data.dense_result.query_context
+        if bm25_query != dense_query:
             raise ModuleExecutionError(
-                "BM25와 Dense 결과의 question_id가 일치하지 않습니다"
+                "BM25와 Dense 결과의 query_context가 일치하지 않습니다"
+            )
+        bm25_document = input_data.bm25_result.document_context
+        dense_document = input_data.dense_result.document_context
+        if bm25_document != dense_document:
+            raise ModuleExecutionError(
+                "BM25와 Dense 결과의 document_context가 일치하지 않습니다"
             )
 
         scores_by_query_cell: Dict[CandidateKey, float] = {}
@@ -112,7 +133,8 @@ class RrfFusionModule(ExecutableModule):
             key=lambda item: (-item[0], item[1].cell_id),
         )[: input_data.top_k]
         return {
-            "question_id": bm25_id,
+            "query_context": bm25_query.model_dump(mode="json"),
+            "document_context": bm25_document.model_dump(mode="json"),
             "items": [
                 {
                     "rank": rank,

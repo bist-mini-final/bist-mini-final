@@ -40,14 +40,34 @@ const BRANCH_COLORS: Record<string, string> = {
 };
 const FALLBACK_BRANCH_OUTPUTS: Partial<Record<ModuleType, Record<string, string>>> = {
   query_input: {
-    generated: 'question_text',
+    generated: 'query_context',
     cached: 'cached_answer',
   },
 };
 
+const LEGACY_CONFIG_INPUT_FIELDS: Partial<Record<ModuleType, string[]>> = {
+  processed_file_selector: ['file_name'],
+  prebuilt_index_loader: ['file_name'],
+  dataframe_source: ['file_name'],
+  image_tile_source: ['file_name', 'sheet_name'],
+  qa_example_loader: ['file_name'],
+};
+
 function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
+  const nodes = graph.nodes.map((node) => {
+    const migratedFields = LEGACY_CONFIG_INPUT_FIELDS[node.module_type] ?? [];
+    const config = { ...node.config };
+    const values = { ...node.values };
+    migratedFields.forEach((field) => {
+      if (values[field] === undefined && config[field] !== undefined) {
+        values[field] = config[field];
+      }
+      delete config[field];
+    });
+    return { ...node, config, values };
+  });
   const moduleTypeByNodeId = new Map(
-    graph.nodes.map((node) => [node.id, node.module_type])
+    nodes.map((node) => [node.id, node.module_type])
   );
   const seenConnections = new Set<string>();
   const edges: WorkflowGraph['edges'] = [];
@@ -55,7 +75,19 @@ function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
   for (const edge of graph.edges) {
     const sourceType = moduleTypeByNodeId.get(edge.source);
     const targetType = moduleTypeByNodeId.get(edge.target);
+    if (
+      sourceType === 'query_input'
+      && (targetType === 'reader' || targetType === 'answer_cache_writer')
+    ) {
+      continue;
+    }
+    let sourceOutput = edge.source_output;
     let targetInput = edge.target_input;
+
+    if (sourceType === 'query_input' && targetType === 'decomposer') {
+      if (!sourceOutput || sourceOutput === 'question_text') sourceOutput = 'query_context';
+      if (!targetInput || targetInput === 'question_text') targetInput = 'query_context';
+    }
 
     if (targetInput === 'input' && targetType === 'bm25_retriever') {
       if (sourceType === 'decomposer') targetInput = 'query_input';
@@ -66,7 +98,11 @@ function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
       if (sourceType === 'vector_index_writer') targetInput = 'index_input';
     }
 
-    const migratedEdge = { ...edge, target_input: targetInput };
+    const migratedEdge = {
+      ...edge,
+      source_output: sourceOutput,
+      target_input: targetInput,
+    };
     const connectionKey = JSON.stringify([
       migratedEdge.source,
       migratedEdge.target,
@@ -79,13 +115,20 @@ function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
     edges.push(migratedEdge);
   }
 
-  return { ...graph, edges };
+  return { ...graph, nodes, edges };
 }
 
 function objectConfig(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function nodeModuleType(node: Pick<Node, 'type' | 'data'> | undefined): ModuleType | undefined {
+  const explicitType = node?.data.moduleType;
+  return typeof explicitType === 'string'
+    ? explicitType as ModuleType
+    : NODE_MODULE_TYPES[node?.type ?? ''];
 }
 
 function numericRecord(value: unknown): Record<string, number> {
@@ -99,6 +142,14 @@ function numericRecord(value: unknown): Record<string, number> {
 function moduleConfigDefaults(definition: ModuleDefinition | undefined): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(definition?.config_schema.properties ?? {}).flatMap(([field, schema]) =>
+      schema.default === undefined ? [] : [[field, schema.default]]
+    )
+  );
+}
+
+function moduleInputDefaults(definition: ModuleDefinition | undefined): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(definition?.input_schema.properties ?? {}).flatMap(([field, schema]) =>
       schema.default === undefined ? [] : [[field, schema.default]]
     )
   );
@@ -197,8 +248,8 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   const edgeSequence = useRef(0);
 
   const sharedNodeData = useCallback(
-    (nodeType?: string) => {
-      const moduleType = NODE_MODULE_TYPES[nodeType ?? ''];
+    (nodeType?: string, explicitModuleType?: ModuleType) => {
+      const moduleType = explicitModuleType ?? NODE_MODULE_TYPES[nodeType ?? ''];
       const definition = modules.find((module) => module.type === moduleType);
       const branchOutputs = definition?.branch_outputs
         ?? FALLBACK_BRANCH_OUTPUTS[moduleType]
@@ -210,6 +261,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
         branchOutputs,
         outputBranches: Object.keys(branchOutputs),
         moduleDefinition: definition,
+        moduleType,
       };
       return shared;
     },
@@ -268,7 +320,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
         visited.add(nodeId);
         const incomingEdge = incomingEdgeByTarget.get(nodeId);
         const sourceNode = incomingEdge ? nodeById.get(incomingEdge.source) : undefined;
-        const sourceModuleType = NODE_MODULE_TYPES[sourceNode?.type ?? ''];
+        const sourceModuleType = nodeModuleType(sourceNode);
         if (sourceModuleType === 'json_inspector' && sourceNode) {
           return inspectedModuleType(sourceNode.id, visited);
         }
@@ -276,7 +328,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       };
       let changed = false;
       const nextNodes = currentNodes.map((node) => {
-        if (NODE_MODULE_TYPES[node.type ?? ''] !== 'json_inspector') return node;
+        if (nodeModuleType(node) !== 'json_inspector') return node;
         const nextModuleType = inspectedModuleType(node.id);
         if (node.data.upstreamModuleType === nextModuleType) return node;
         changed = true;
@@ -299,6 +351,25 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
                 data: {
                   ...node.data,
                   config: { ...objectConfig(node.data.config), ...patch },
+                },
+              }
+            : node
+        )
+      );
+    },
+    [setNodes]
+  );
+
+  const updateNodeValues = useCallback(
+    (nodeId: string, patch: Record<string, unknown>) => {
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  values: { ...objectConfig(node.data.values), ...patch },
                 },
               }
             : node
@@ -345,16 +416,23 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
 
   const decorateNodeData = useCallback(
-    (nodeId: string, nodeType: string | undefined, existing: Record<string, unknown>) => ({
-      ...existing,
-      ...sharedNodeData(nodeType),
-      config: moduleConfig(nodeType, existing.config),
-      onConfigChange: (patch: Record<string, unknown>) => updateNodeConfig(nodeId, patch),
-      onNodeWidthChange: (width: number) => updateNodeWidth(nodeId, width),
-      onColumnWidthChange: (column: string, width: number) =>
-        updateNodeColumnWidth(nodeId, column, width),
-    }),
-    [sharedNodeData, updateNodeColumnWidth, updateNodeConfig, updateNodeWidth]
+    (nodeId: string, nodeType: string | undefined, existing: Record<string, unknown>) => {
+      const explicitModuleType = typeof existing.moduleType === 'string'
+        ? existing.moduleType as ModuleType
+        : undefined;
+      return {
+        ...existing,
+        ...sharedNodeData(nodeType, explicitModuleType),
+        config: moduleConfig(nodeType, existing.config),
+        values: objectConfig(existing.values),
+        onConfigChange: (patch: Record<string, unknown>) => updateNodeConfig(nodeId, patch),
+        onValuesChange: (patch: Record<string, unknown>) => updateNodeValues(nodeId, patch),
+        onNodeWidthChange: (width: number) => updateNodeWidth(nodeId, width),
+        onColumnWidthChange: (column: string, width: number) =>
+          updateNodeColumnWidth(nodeId, column, width),
+      };
+    },
+    [sharedNodeData, updateNodeColumnWidth, updateNodeConfig, updateNodeValues, updateNodeWidth]
   );
 
   useEffect(() => {
@@ -396,14 +474,16 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   const createCustomNode = useCallback(
     (moduleType: ModuleType, position: { x: number; y: number }): Node => {
       const nodeId = `custom-node-${Date.now()}-${++nodeSequence.current}`;
-      const nodeType = MODULE_NODE_TYPES[moduleType];
+      const nodeType = MODULE_NODE_TYPES[moduleType] ?? 'generic_module';
       const definition = modules.find((module) => module.type === moduleType);
       return {
         id: nodeId,
         type: nodeType,
         position,
         data: decorateNodeData(nodeId, nodeType, {
+          moduleType,
           config: moduleConfigDefaults(definition),
+          values: moduleInputDefaults(definition),
         }),
       };
     },
@@ -507,16 +587,19 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
 
   const exportGraph = useCallback((): WorkflowGraph => migrateLegacyConnections({
     nodes: nodes.flatMap((node) => {
-      const moduleType = NODE_MODULE_TYPES[node.type ?? ''];
+      const moduleType = nodeModuleType(node);
       if (!moduleType) return [];
       return [{
         id: node.id,
         module_type: moduleType,
         position: { x: node.position.x, y: node.position.y },
         config: objectConfig(node.data.config),
-        values: moduleType === 'query_input' && typeof node.data.queryText === 'string'
-          ? { query: node.data.queryText }
-          : {},
+        values: {
+          ...objectConfig(node.data.values),
+          ...(moduleType === 'query_input' && typeof node.data.queryText === 'string'
+            ? { query: node.data.queryText }
+            : {}),
+        },
         ui: {
           ...(typeof node.data.nodeWidth === 'number'
             ? { width: node.data.nodeWidth }
@@ -568,13 +651,15 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
 
       setNodes(
         migratedGraph.nodes.map((workflowNode) => {
-          const nodeType = MODULE_NODE_TYPES[workflowNode.module_type];
+          const nodeType = MODULE_NODE_TYPES[workflowNode.module_type] ?? 'generic_module';
           return {
             id: workflowNode.id,
             type: nodeType,
             position: workflowNode.position,
             data: decorateNodeData(workflowNode.id, nodeType, {
+              moduleType: workflowNode.module_type,
               config: workflowNode.config,
+              values: workflowNode.values,
               nodeWidth: workflowNode.ui?.width ?? undefined,
               columnWidths: workflowNode.ui?.column_widths ?? {},
               executionStopped: workflowNode.ui?.execution_stopped === true,
@@ -661,6 +746,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
               executionState: state.status,
               executionOutput: state.output,
               executionInput: state.input_payload,
+              executionConfig: state.config_payload,
               executionError: state.error,
               executionOutcome: state.outcome,
               cacheHit: state.cache_hit,

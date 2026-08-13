@@ -3,6 +3,7 @@ from typing import List
 from pydantic import Field
 
 from .base import ModuleDTO
+from .data_lineage import DocumentContextDTO, QueryContextDTO
 
 
 class RankedSearchCandidateDTO(ModuleDTO):
@@ -14,7 +15,12 @@ class RankedSearchCandidateDTO(ModuleDTO):
 
 
 class RankedSearchResultDTO(ModuleDTO):
-    question_id: str = Field(min_length=1, description="원본 질문 ID")
+    query_context: QueryContextDTO = Field(
+        description="검색 후보가 대응하는 원본 질문 컨텍스트"
+    )
+    document_context: DocumentContextDTO = Field(
+        description="검색 후보가 추출된 원본 문서 컨텍스트"
+    )
     items: List[RankedSearchCandidateDTO] = Field(
         description="각 matched_subquery 내부 검색 점수 내림차순 후보 목록"
     )
@@ -29,5 +35,10 @@ class RrfCandidateDTO(ModuleDTO):
 
 
 class RetrievalDTO(ModuleDTO):
-    question_id: str = Field(min_length=1, description="원본 질문 ID")
+    query_context: QueryContextDTO = Field(
+        description="결합 검색 결과가 대응하는 원본 질문 컨텍스트"
+    )
+    document_context: DocumentContextDTO = Field(
+        description="결합 검색 결과가 참조하는 원본 문서 컨텍스트"
+    )
     items: List[RrfCandidateDTO] = Field(description="RRF 점수 내림차순 결합 후보")

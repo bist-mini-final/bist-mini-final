@@ -33,7 +33,7 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
       selected={selected}
       width={380}
       nodeData={data}
-      inputPorts={['question_text', 'context_json']}
+      inputPorts={['context_json']}
       bodyClassName="space-y-3"
     >
       <div className="space-y-1.5">

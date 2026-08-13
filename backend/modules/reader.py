@@ -1,15 +1,23 @@
 import time
 from typing import Any, Dict, Literal, Optional, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from ..chat_completion import (
     ChatCompletionClient,
     ChatCompletionError,
     ChatCompletionResult,
 )
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 from .context_expander import ContextDTO
+from .data_lineage import DocumentContextDTO, QueryContextDTO
 from .reader_presets import (
     READER_PRESETS,
     READER_SYSTEM_PROMPT,
@@ -18,14 +26,16 @@ from .reader_presets import (
 )
 
 
-class ReaderInput(ModuleDTO):
-    question_text: str = Field(
-        min_length=1,
-        description="Query Input의 원문 질문",
-    )
+class ReaderInputDTO(ModuleInputDTO):
     context_json: ContextDTO = Field(
-        description="Context Expander에서 생성한 실제 Excel 셀 컨텍스트"
+        description=(
+            "원 질문과 원본 문서 식별자를 포함하는 Context Expander의 "
+            "grounded context"
+        )
     )
+
+
+class ReaderConfigDTO(ModuleConfigDTO):
     model: str = Field(default="gpt-5.6-luna", description="답변 생성에 사용할 LLM ID")
     preset: Literal["luna_reader", "strict_citation"] = Field(
         default="luna_reader",
@@ -41,9 +51,11 @@ class ReaderInput(ModuleDTO):
     )
 
 
-class ApiUsageDTO(ModuleDTO):
-    model_config = ConfigDict(extra="allow")
+class ReaderExecutionDTO(ReaderInputDTO, ReaderConfigDTO):
+    """Internal union of grounded input and generation settings."""
 
+
+class ApiUsageDTO(ModuleDTO):
     prompt_tokens: Optional[int] = Field(default=None, ge=0, description="입력 토큰 수")
     completion_tokens: Optional[int] = Field(default=None, ge=0, description="출력 토큰 수")
     cached_tokens: Optional[int] = Field(default=None, ge=0, description="캐시 적중 토큰 수")
@@ -52,7 +64,12 @@ class ApiUsageDTO(ModuleDTO):
 
 
 class AnswerDTO(ModuleDTO):
-    question_id: str = Field(description="원본 질문 ID")
+    query_context: QueryContextDTO = Field(
+        description="답변이 대응하는 원본 질문 컨텍스트"
+    )
+    document_context: DocumentContextDTO = Field(
+        description="답변 근거가 추출된 원본 문서 컨텍스트"
+    )
     model: str = Field(description="답변 생성에 사용된 모델 ID")
     answer: str = Field(min_length=1, description="근거 컨텍스트 기반 최종 답변")
     api_usage: ApiUsageDTO = Field(description="LLM 토큰 사용량")
@@ -69,14 +86,16 @@ class ReaderModule(ExecutableModule):
         type="reader",
         label="LLM Reader Answer",
         category="Output",
-        description="원문 질문과 확장된 Excel 셀 컨텍스트로 실제 LLM 답변을 생성합니다.",
-        inputs=["question_text", "context_json"],
+        description="질문·문서 계보가 포함된 확장 Excel 컨텍스트로 실제 LLM 답변을 생성합니다.",
+        inputs=["context_json"],
         outputs=["answer_json"],
         config_fields=["model", "preset", "system_prompt", "user_prompt_template"],
         config_presets=reader_config_presets(),
-        version="2",
+        version="3",
     )
-    input_model = ReaderInput
+    input_model = ReaderInputDTO
+    config_model = ReaderConfigDTO
+    execution_model = ReaderExecutionDTO
     output_model = ReaderOutput
 
     def __init__(
@@ -126,14 +145,14 @@ class ReaderModule(ExecutableModule):
         )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ReaderInput, payload)
+        input_data = cast(ReaderExecutionDTO, payload)
         preset = READER_PRESETS[input_data.preset]
         system_prompt = input_data.system_prompt or preset["system_prompt"]
         user_template = input_data.user_prompt_template or preset["user_prompt_template"]
         context_text = "\n\n".join(input_data.context_json.context_blocks)
         user_prompt = user_template.replace("{context_text}", context_text).replace(
             "{question}",
-            input_data.question_text,
+            input_data.context_json.query_context.question_text,
         )
         try:
             result = self._complete(
@@ -148,7 +167,12 @@ class ReaderModule(ExecutableModule):
 
         return {
             "answer_json": {
-                "question_id": input_data.context_json.question_id.upper(),
+                "query_context": input_data.context_json.query_context.model_dump(
+                    mode="json"
+                ),
+                "document_context": input_data.context_json.document_context.model_dump(
+                    mode="json"
+                ),
                 "model": input_data.model,
                 "answer": result.content,
                 "api_usage": result.usage,

@@ -17,14 +17,24 @@ from pydantic import BaseModel, Field
 
 from ..config import PROCESSED_DATA_DIR
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleInputDTO,
+)
 
 
-class DataframeSourceInput(ModuleDTO):
+class DataframeSourceInputDTO(ModuleInputDTO):
     file_name: str = Field(
-        default="",
+        min_length=1,
         description="data/processed에서 선택할 Excel 파일명",
     )
+
+
+class DataframeSourceConfigDTO(ModuleConfigDTO):
     sample_rows: int = Field(
         default=3,
         ge=0,
@@ -37,6 +47,10 @@ class DataframeSourceInput(ModuleDTO):
         le=20,
         description="출력에 포함할 최대 시트 수",
     )
+
+
+class DataframeSourceExecutionDTO(DataframeSourceInputDTO, DataframeSourceConfigDTO):
+    """Internal union of source identity and preview policy."""
 
 
 class SheetSchemaDTO(ModuleDTO):
@@ -70,11 +84,13 @@ class DataframeSourceModule(ExecutableModule):
         ),
         inputs=[],
         outputs=["output"],
-        config_fields=["file_name", "sample_rows", "max_sheets"],
+        config_fields=["sample_rows", "max_sheets"],
         raw_output=True,
         version="1",
     )
-    input_model = DataframeSourceInput
+    input_model = DataframeSourceInputDTO
+    config_model = DataframeSourceConfigDTO
+    execution_model = DataframeSourceExecutionDTO
     output_model = DataframeSourceOutput
 
     def __init__(self, processed_dir: Path = PROCESSED_DATA_DIR) -> None:
@@ -84,7 +100,7 @@ class DataframeSourceModule(ExecutableModule):
     def contract(self) -> Dict[str, Any]:
         contract = super().contract()
         available = self.catalog.file_names()
-        file_schema = contract["config_schema"]["properties"]["file_name"]
+        file_schema = contract["input_schema"]["properties"]["file_name"]
         file_schema["enum"] = available
         if available:
             file_schema["default"] = available[0]
@@ -98,7 +114,7 @@ class DataframeSourceModule(ExecutableModule):
                 "pandas가 설치되어 있지 않습니다: pip install pandas openpyxl"
             ) from err
 
-        input_data = cast(DataframeSourceInput, payload)
+        input_data = cast(DataframeSourceExecutionDTO, payload)
 
         try:
             path = self.catalog.resolve(input_data.file_name)

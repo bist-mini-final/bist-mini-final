@@ -25,6 +25,7 @@ import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
 import { DoclingTableDetectorNode } from './CustomNodes/DoclingTableDetectorNode';
 import { JsonInspectorNode } from './CustomNodes/JsonInspectorNode';
 import { JsonTransformerNode } from './CustomNodes/JsonTransformerNode';
+import { GenericModuleNode } from './CustomNodes/GenericModuleNode';
 import { LocalVlmStructureDetectorNode } from './CustomNodes/LocalVlmStructureDetectorNode';
 import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDetectorNode';
 import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
@@ -78,6 +79,7 @@ export function PipelineCanvas({
       openpyxl_region_detector: OpenpyxlRegionDetectorNode,
       cell_text_serializer: CellTextSerializerNode,
       exhaustive_cell_text_serializer: ExhaustiveCellTextSerializerNode,
+      generic_module: GenericModuleNode,
     }),
     []
   );
@@ -86,7 +88,10 @@ export function PipelineCanvas({
   const settingsNode = settingsNodeId
     ? graph.nodes.find((node) => node.id === settingsNodeId)
     : undefined;
-  const settingsModuleType = settingsNode ? NODE_MODULE_TYPES[settingsNode.type ?? ''] : undefined;
+  const settingsModuleType = settingsNode
+    ? (settingsNode.data.moduleType as string | undefined)
+      ?? NODE_MODULE_TYPES[settingsNode.type ?? '']
+    : undefined;
   const settingsModule = settingsModuleType
     ? modules.find((module) => module.type === settingsModuleType)
     : undefined;

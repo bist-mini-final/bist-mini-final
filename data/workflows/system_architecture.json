@@ -192,10 +192,10 @@
           "x": 1134.7401962982779,
           "y": 454.89797405353835
         },
-        "config": {
+        "config": {},
+        "values": {
           "file_name": "SPG_Company_KeyStats_v3.xlsm"
         },
-        "values": {},
         "ui": {
           "width": null,
           "execution_stopped": false,
@@ -252,8 +252,8 @@
         "id": "edge-1786497098970-3",
         "source": "custom-node-1786497067905-2",
         "target": "custom-node-1786497092339-3",
-        "source_output": "question_text",
-        "target_input": "question_text",
+        "source_output": "query_context",
+        "target_input": "query_context",
         "source_branch": "generated"
       },
       {
@@ -319,14 +319,6 @@
         "source_output": "context_json",
         "target_input": "context_json",
         "source_branch": null
-      },
-      {
-        "id": "edge-1786497825968-5",
-        "source": "custom-node-1786497067905-2",
-        "target": "custom-node-1786497793017-1",
-        "source_output": "question_text",
-        "target_input": "question_text",
-        "source_branch": "generated"
       },
       {
         "id": "edge-1786497857633-6",

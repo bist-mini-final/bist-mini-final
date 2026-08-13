@@ -7,10 +7,17 @@ from pydantic import BaseModel, Field
 
 from ..config import PROCESSED_DATA_DIR, VECTOR_INDEX_DIR
 from ..vector_index_store import VectorIndexStore
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    EmptyModuleConfigDTO,
+    ExecutableModule,
+    ModuleDefinition,
+    ModuleExecutionError,
+    ModuleInputDTO,
+    ModuleDTO,
+)
 
 
-class PrebuiltIndexLoaderInput(ModuleDTO):
+class PrebuiltIndexLoaderInputDTO(ModuleInputDTO):
     file_name: str = Field(
         default="SPG_Company_KeyStats_v3_prebuilt.parquet",
         min_length=1,
@@ -26,6 +33,7 @@ class DocumentOutputDTO(ModuleDTO):
 
 class IndexOutputDTO(ModuleDTO):
     index_id: str
+    file_name: str
     workbook_hash: str
     model: str
     dimension: int
@@ -45,11 +53,13 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         description="공유된 사전 인덱싱 단일 파일(.parquet / .json)을 로드하여 document_output과 index_output을 즉시 생성합니다.",
         inputs=[],
         outputs=["document_output", "index_output"],
-        config_fields=["file_name"],
+        config_fields=[],
         raw_output=False,
-        version="1",
+        version="2",
     )
-    input_model = PrebuiltIndexLoaderInput
+    input_model = PrebuiltIndexLoaderInputDTO
+    config_model = EmptyModuleConfigDTO
+    execution_model = PrebuiltIndexLoaderInputDTO
     output_model = PrebuiltIndexLoaderOutput
 
     def __init__(
@@ -177,7 +187,7 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         return row_header, col_header, cell_value
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(PrebuiltIndexLoaderInput, payload)
+        input_data = cast(PrebuiltIndexLoaderInputDTO, payload)
         file_path = self._find_file(input_data.file_name)
 
         raw_data = self._read_data(file_path)
@@ -306,6 +316,7 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
             },
             "index_output": {
                 "index_id": index_id,
+                "file_name": file_name,
                 "workbook_hash": workbook_hash,
                 "model": model_name,
                 "dimension": dimension,

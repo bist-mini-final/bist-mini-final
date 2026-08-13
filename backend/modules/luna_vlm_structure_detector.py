@@ -23,7 +23,7 @@ from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
 from ..spreadsheets.table_fragment_merge import parse_excel_range
 from ..spreadsheets.table_geometry import CellBounds, SheetLayout
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .docling_table_detector import _safe_name
 from .local_vlm_structure_detector import (
     LocalVlmStructureDetectorModule,
@@ -75,7 +75,6 @@ LUNA_SHEET_RESPONSE_SCHEMA: Dict[str, Any] = {
                     "column_header_range": {"type": ["string", "null"]},
                     "row_header_range": {"type": ["string", "null"]},
                     "data_range": {"type": "string"},
-                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                 },
                 "required": [
                     "excel_range",
@@ -83,7 +82,6 @@ LUNA_SHEET_RESPONSE_SCHEMA: Dict[str, Any] = {
                     "column_header_range",
                     "row_header_range",
                     "data_range",
-                    "confidence",
                 ],
                 "additionalProperties": False,
             },
@@ -110,7 +108,11 @@ class LunaVisionClient(Protocol):
     ) -> OpenAIResponsesVisionResult | str: ...
 
 
-class LunaVlmStructureDetectorInput(WorkbookSelectionDTO):
+class LunaVlmStructureDetectorInputDTO(WorkbookSelectionDTO):
+    """Workbook identity and visible sheet selection."""
+
+
+class LunaVlmStructureDetectorConfigDTO(ModuleConfigDTO):
     model: str = Field(
         default="gpt-5.6-luna",
         min_length=1,
@@ -137,6 +139,13 @@ class LunaVlmStructureDetectorInput(WorkbookSelectionDTO):
         min_length=1,
         description="sheet_name, sheet_range, sheet_context 변수를 지원하는 전체 시트 프롬프트",
     )
+
+
+class LunaVlmStructureDetectorExecutionDTO(
+    LunaVlmStructureDetectorInputDTO,
+    LunaVlmStructureDetectorConfigDTO,
+):
+    """Internal union with legacy workflow migration support."""
 
     @model_validator(mode="before")
     @classmethod
@@ -233,7 +242,9 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
         raw_output=True,
         version="4",
     )
-    input_model = LunaVlmStructureDetectorInput
+    input_model = LunaVlmStructureDetectorInputDTO
+    config_model = LunaVlmStructureDetectorConfigDTO
+    execution_model = LunaVlmStructureDetectorExecutionDTO
     output_model = LunaVlmStructureDetectorOutput
 
     def __init__(
@@ -259,7 +270,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
 
     def _analyze_sheet(
         self,
-        settings: LunaVlmStructureDetectorInput,
+        settings: LunaVlmStructureDetectorExecutionDTO,
         sheet_name: str,
         sheet_bounds: CellBounds,
         image_path: Path,
@@ -327,7 +338,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
         return []
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        settings = cast(LunaVlmStructureDetectorInput, payload)
+        settings = cast(LunaVlmStructureDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(settings.file_name)
             current_hash = self.catalog.sha256(workbook_path)

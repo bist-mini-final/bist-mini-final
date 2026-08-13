@@ -17,7 +17,6 @@ class TableFragment:
     column_header_range: Optional[str]
     row_header_range: Optional[str]
     data_range: str
-    confidence: float
 
 
 def parse_excel_range(value: str) -> CellBounds:
@@ -81,7 +80,6 @@ def _merge_group(group: Sequence[TableFragment]) -> TableFragment:
         column_header_range=column_header.excel_range if column_header else None,
         row_header_range=row_header.excel_range if row_header else None,
         data_range=data.excel_range,
-        confidence=sum(item.confidence for item in group) / len(group),
     )
 
 

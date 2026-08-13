@@ -72,11 +72,29 @@ class WorkflowExecutor:
                 module = self.module_registry.get(node.module_type)
             except KeyError as error:
                 raise DagExecutionError(str(error)) from error
-            unknown_config = set(node.config) - set(module.definition.config_fields)
+            unknown_config = set(node.config) - set(module.config_fields)
             if unknown_config:
                 raise DagExecutionError(
                     f"노드 {node.id}의 config에 설정 필드가 아닌 값이 있습니다: "
                     + ", ".join(sorted(unknown_config))
+                )
+            try:
+                module.validate_config(node.config)
+            except ValidationError as error:
+                raise DagExecutionError(
+                    f"노드 {node.id}의 config가 유효하지 않습니다: "
+                    + self._format_error(error)
+                ) from error
+            allowed_value_fields = (
+                set(module.definition.inputs)
+                if module.definition.raw_input
+                else set(module.input_fields)
+            )
+            unknown_values = set(node.values) - allowed_value_fields
+            if unknown_values:
+                raise DagExecutionError(
+                    f"노드 {node.id}의 values에 Input DTO 필드가 아닌 값이 있습니다: "
+                    + ", ".join(sorted(unknown_values))
                 )
             node_by_id[node.id] = node
 
@@ -163,8 +181,7 @@ class WorkflowExecutor:
             if module.definition.raw_input:
                 allowed_fields = set(module.definition.inputs)
             else:
-                input_schema = module.contract()["input_schema"]
-                allowed_fields = set(input_schema.get("properties", {}))
+                allowed_fields = set(module.input_fields)
             unknown_fields = set(runtime_input) - allowed_fields
             if unknown_fields:
                 raise DagExecutionError(
@@ -207,6 +224,8 @@ class WorkflowExecutor:
                         continue  # module type changed — skip
                     if new_node.config != prev_node.config:
                         continue  # config changed — skip
+                    if new_node.values != prev_node.values:
+                        continue  # source/runtime values changed — skip
                     # Check that all edges touching this node are still present
                     prev_node_edges = {
                         e for e in prev_edge_set
@@ -406,6 +425,7 @@ class WorkflowExecutor:
     def _reset_node_state(state: RunNodeState) -> None:
         state.status = "pending"
         state.input_payload = None
+        state.config_payload = {}
         state.output = None
         state.error = None
         state.cache_key = None
@@ -526,9 +546,10 @@ class WorkflowExecutor:
         node: WorkflowNode,
         state: RunNodeState,
     ) -> None:
-        payload = self._assemble_input(run, node)
+        input_payload = self._assemble_input(run, node)
         module = self.module_registry.get(node.module_type)
-        cache_payload = module.cache_payload(payload)
+        validated_config = module.validate_config(node.config).model_dump(mode="json")
+        cache_payload = module.cache_payload(input_payload, validated_config)
         cache_key = self.result_cache.key(
             f"{node.module_type}@{module.definition.version}", cache_payload
         )
@@ -538,7 +559,8 @@ class WorkflowExecutor:
 
         t_start = time.perf_counter()
         state.status = "running"
-        state.input_payload = compact_history_value(payload)
+        state.input_payload = compact_history_value(input_payload)
+        state.config_payload = compact_history_value(validated_config)
         state.error = None
         state.skip_reason = None
         state.outcome = None
@@ -554,11 +576,16 @@ class WorkflowExecutor:
         if output is None:
             self._raise_if_cancelled(run.id)
             if self._module_worker is None:
-                output = self.module_registry.execute(node.module_type, payload)
+                output = self.module_registry.execute(
+                    node.module_type,
+                    input_payload,
+                    validated_config,
+                )
             else:
                 output = self._module_worker.execute(
                     node.module_type,
-                    payload,
+                    input_payload,
+                    validated_config,
                     run.id,
                 )
             self._raise_if_cancelled(run.id)
@@ -605,7 +632,7 @@ class WorkflowExecutor:
                     node_usage = {k: int(v) for k, v in aj["api_usage"].items() if v is not None}
             elif "usage" in output or "_usage" in output:
                 raw_u = output.get("usage") or output.get("_usage")
-                model_used = output.get("model") or payload.get("model") or ""
+                model_used = output.get("model") or validated_config.get("model") or ""
                 if isinstance(raw_u, Mapping):
                     node_usage = {
                         "prompt_tokens": int(raw_u.get("prompt_tokens", 0) or 0),
@@ -620,9 +647,32 @@ class WorkflowExecutor:
                         cached_tokens=node_usage["cached_tokens"],
                     )
 
-        if node_usage is None and hasattr(module, "last_usage") and isinstance(getattr(module, "last_usage"), Mapping):
-            raw_u = getattr(module, "last_usage")
-            model_used = getattr(module, "last_model", "") or payload.get("model") or ""
+        worker_metadata = (
+            getattr(self._module_worker, "last_metadata", {})
+            if self._module_worker is not None and not state.cache_hit
+            else {}
+        )
+        module_usage = (
+            getattr(module, "last_usage", None) if not state.cache_hit else None
+        )
+        raw_u = (
+            module_usage
+            if isinstance(module_usage, Mapping)
+            else worker_metadata.get("usage")
+            if isinstance(worker_metadata, Mapping)
+            else None
+        )
+        if node_usage is None and isinstance(raw_u, Mapping):
+            model_used = (
+                getattr(module, "last_model", "")
+                or (
+                    worker_metadata.get("model", "")
+                    if isinstance(worker_metadata, Mapping)
+                    else ""
+                )
+                or validated_config.get("model")
+                or ""
+            )
             node_usage = {
                 "prompt_tokens": int(raw_u.get("prompt_tokens", 0) or 0),
                 "completion_tokens": int(raw_u.get("completion_tokens", 0) or 0),
@@ -693,9 +743,16 @@ class WorkflowExecutor:
         incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
         if not incoming_edges:
             module = self.module_registry.get(node.module_type)
-            supplied_fields = set(node.config) | set(run.runtime_inputs.get(node.id, {}))
+            supplied_fields = set(node.values) | set(
+                run.runtime_inputs.get(node.id, {})
+            )
+            required_inputs = (
+                list(module.definition.inputs)
+                if module.definition.raw_input
+                else module.required_input_fields
+            )
             missing_inputs = [
-                port for port in module.definition.inputs if port not in supplied_fields
+                field for field in required_inputs if field not in supplied_fields
             ]
             if missing_inputs:
                 return (
@@ -713,7 +770,7 @@ class WorkflowExecutor:
 
         module = self.module_registry.get(node.module_type)
         supplied_inputs = (
-            set(node.config)
+            set(node.values)
             | set(run.runtime_inputs.get(node.id, {}))
             | set(edges_by_input)
         )
@@ -745,14 +802,9 @@ class WorkflowExecutor:
     def _assemble_input(
         self, run: WorkflowRun, node: WorkflowNode
     ) -> Any:
-        payload = dict(node.config)
-        payload.update(node.values)
+        payload = dict(node.values)
         target_module = self.module_registry.get(node.module_type)
         payload.update(run.runtime_inputs.get(node.id, {}))
-        if "query" not in payload and "question_text" in payload:
-            payload["query"] = payload["question_text"]
-        if "question_text" not in payload and "query" in payload:
-            payload["question_text"] = payload["query"]
         node_by_id = {item.id: item for item in run.graph.nodes}
         incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
         edges_by_input: Dict[str, List[Tuple[WorkflowEdge, str]]] = defaultdict(list)

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Annotated, Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Mapping, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
@@ -62,6 +62,55 @@ class WorkflowGraph(StrictModel):
     edges: List[WorkflowEdge] = Field(default_factory=list)
     viewport: CanvasViewport = Field(default_factory=CanvasViewport)
 
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_query_lineage_edges(cls, value: Any) -> Any:
+        """Upgrade legacy Query→Reader/Cache fan-out to carried query context."""
+
+        if not isinstance(value, Mapping):
+            return value
+        raw_nodes = value.get("nodes", [])
+        if not isinstance(raw_nodes, list):
+            return value
+        module_by_id = {
+            (
+                node.get("id")
+                if isinstance(node, Mapping)
+                else getattr(node, "id", None)
+            ): (
+                node.get("module_type")
+                if isinstance(node, Mapping)
+                else getattr(node, "module_type", None)
+            )
+            for node in raw_nodes
+        }
+        migrated_edges = []
+        for raw_edge in value.get("edges", []):
+            edge = (
+                dict(raw_edge)
+                if isinstance(raw_edge, Mapping)
+                else raw_edge.model_dump()
+                if isinstance(raw_edge, BaseModel)
+                else None
+            )
+            if edge is None:
+                migrated_edges.append(raw_edge)
+                continue
+            source_type = module_by_id.get(edge.get("source"))
+            target_type = module_by_id.get(edge.get("target"))
+            if source_type == "query_input" and target_type in {
+                "reader",
+                "answer_cache_writer",
+            }:
+                continue
+            if source_type == "query_input" and target_type == "decomposer":
+                if edge.get("source_output") in {None, "question_text"}:
+                    edge["source_output"] = "query_context"
+                if edge.get("target_input") in {None, "question_text"}:
+                    edge["target_input"] = "query_context"
+            migrated_edges.append(edge)
+        return {**value, "edges": migrated_edges}
+
 
 class WorkflowSaveRequest(StrictModel):
     name: str = Field(default="Untitled workflow", min_length=1, max_length=160)
@@ -94,6 +143,7 @@ class RunNodeState(StrictModel):
     batch_index: int = Field(ge=0)
     status: NodeStatus = "pending"
     input_payload: Any = None
+    config_payload: Dict[str, Any] = Field(default_factory=dict)
     output: Any = None
     error: Optional[str] = None
     cache_key: Optional[str] = None

@@ -5,6 +5,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Braces,
+  BookOpen,
   CheckCircle2,
   Clock3,
   Database,
@@ -518,6 +519,13 @@ export function ModuleSettingsModal({
           <div className="module-settings-modal__meta">
             <span>v{definition.version}</span>
             <span><Database className="h-3 w-3" /> {definition.cacheable ? '캐시 사용' : '캐시 안 함'}</span>
+            <a
+              href={definition.documentation_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <BookOpen className="h-3 w-3" /> Markdown 문서
+            </a>
           </div>
           <button
             ref={closeButtonRef}
@@ -549,6 +557,7 @@ export function ModuleSettingsModal({
               <li><CheckCircle2 className="h-3.5 w-3.5" /> 연결선은 출력 포트명을 대상 입력 포트명으로 전달합니다.</li>
               <li><CheckCircle2 className="h-3.5 w-3.5" /> 필수 입력이 없거나 타입이 다르면 실행 전에 422 오류로 중단됩니다.</li>
               <li><CheckCircle2 className="h-3.5 w-3.5" /> 출력도 DTO 검증을 통과해야 캐시와 다음 모듈에 저장됩니다.</li>
+              <li><CheckCircle2 className="h-3.5 w-3.5" /> 소스 데이터 선택값은 워크플로 JSON의 <code>values</code> 필드에 유지됩니다.</li>
               <li><CheckCircle2 className="h-3.5 w-3.5" /> 노드 설정은 워크플로 JSON의 <code>config</code> 필드에 유지됩니다.</li>
             </ul>
 

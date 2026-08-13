@@ -19,7 +19,7 @@ def _safe_sheet_name(value: str) -> str:
 def create_spreadsheet_artifact_router(artifact_dir: Path) -> APIRouter:
     """Serve read-only spreadsheet render artifacts for result inspection."""
 
-    router = APIRouter()
+    router = APIRouter(tags=["Spreadsheet Artifacts"])
 
     @router.get("/spreadsheet-artifacts/{workbook_hash}/sheets/{sheet_name}")
     def get_sheet_artifact(

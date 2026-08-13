@@ -20,12 +20,22 @@ from ..spreadsheets.structured_cell_text import (
     sheet_code,
 )
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    EmptyModuleConfigDTO,
+    ExecutableModule,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+)
 from .spreadsheet_structure import (
     ClassifiedRegionDTO,
     ClassifiedTableDTO,
     SpreadsheetStructureOutput,
 )
+
+
+class CellTextSerializerInputDTO(SpreadsheetStructureOutput):
+    """Classified workbook data received from a structure detector."""
 
 
 class CellTextDocumentDTO(ModuleDTO):
@@ -57,7 +67,9 @@ class CellTextSerializerModule(ExecutableModule):
         raw_output=True,
         version=SERIALIZATION_VERSION,
     )
-    input_model = SpreadsheetStructureOutput
+    input_model = CellTextSerializerInputDTO
+    config_model = EmptyModuleConfigDTO
+    execution_model = CellTextSerializerInputDTO
     output_model = CellTextSerializerOutput
 
     def __init__(
@@ -201,7 +213,7 @@ class CellTextSerializerModule(ExecutableModule):
         return documents
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(SpreadsheetStructureOutput, payload)
+        input_data = cast(CellTextSerializerInputDTO, payload)
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

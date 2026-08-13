@@ -42,9 +42,21 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
             return
         task_id = task["task_id"]
         try:
-            output = registry.get(task["module_type"]).run(task["payload"])
+            module = registry.get(task["module_type"])
+            output = module.run(
+                task["input"],
+                task["config"],
+            )
             response_queue.put(
-                {"task_id": task_id, "ok": True, "output": output}
+                {
+                    "task_id": task_id,
+                    "ok": True,
+                    "output": output,
+                    "metadata": {
+                        "usage": getattr(module, "last_usage", None),
+                        "model": getattr(module, "last_model", None),
+                    },
+                }
             )
         except BaseException as error:  # child failures must not kill the API server
             response_queue.put(
@@ -69,12 +81,14 @@ class CancellableModuleWorker:
         self._response_queue = None
         self._active_task_id: Optional[str] = None
         self._active_execution_id: Optional[str] = None
+        self.last_metadata: Dict[str, Any] = {}
         atexit.register(self.shutdown)
 
     def execute(
         self,
         module_type: str,
-        payload: Any,
+        input_payload: Any,
+        config: Any,
         execution_id: str,
     ) -> Any:
         task_id = uuid4().hex
@@ -87,11 +101,13 @@ class CancellableModuleWorker:
             response_queue = self._response_queue
             self._active_task_id = task_id
             self._active_execution_id = execution_id
+            self.last_metadata = {}
             request_queue.put(
                 {
                     "task_id": task_id,
                     "module_type": module_type,
-                    "payload": payload,
+                    "input": input_payload,
+                    "config": config,
                 }
             )
 
@@ -114,6 +130,10 @@ class CancellableModuleWorker:
                 if result.get("task_id") != task_id:
                     continue
                 if result.get("ok") is True:
+                    metadata = result.get("metadata")
+                    self.last_metadata = (
+                        dict(metadata) if isinstance(metadata, dict) else {}
+                    )
                     return result.get("output")
                 error_type = result.get("error_type") or "ModuleExecutionError"
                 message = result.get("error") or "격리 모듈 실행에 실패했습니다"
@@ -169,6 +189,7 @@ class CancellableModuleWorker:
         self._response_queue = None
         self._active_task_id = None
         self._active_execution_id = None
+        self.last_metadata = {}
         return process
 
     @staticmethod
@@ -181,4 +202,3 @@ class CancellableModuleWorker:
         if process.is_alive():
             process.kill()
             process.join(timeout=1.0)
-

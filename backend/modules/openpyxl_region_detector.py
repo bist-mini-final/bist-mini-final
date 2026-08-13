@@ -12,7 +12,7 @@ from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visibl
 from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox, compute_sheet_layout
 from ..spreadsheets.grid_structure import build_column_header_tree
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError, ModuleInputDTO
 from .docling_table_detector import DoclingTableRegionDTO
 from .spreadsheet_structure import (
     ClassifiedRegionDTO,
@@ -21,10 +21,13 @@ from .spreadsheet_structure import (
 )
 
 
-class OpenpyxlRegionDetectorInput(ModuleDTO):
+class OpenpyxlRegionDetectorInputDTO(ModuleInputDTO):
     file_name: str
     workbook_hash: str
     tables: List[DoclingTableRegionDTO]
+
+
+class OpenpyxlRegionDetectorConfigDTO(ModuleConfigDTO):
     header_scan_rows: int = Field(
         default=10,
         ge=1,
@@ -43,6 +46,13 @@ class OpenpyxlRegionDetectorInput(ModuleDTO):
         le=1,
         description="column_header로 판정할 최소 배경색 셀 비율",
     )
+
+
+class OpenpyxlRegionDetectorExecutionDTO(
+    OpenpyxlRegionDetectorInputDTO,
+    OpenpyxlRegionDetectorConfigDTO,
+):
+    """Internal union of detected tables and classification policy."""
 
 
 class OpenpyxlRegionDetectorOutput(SpreadsheetStructureOutput):
@@ -65,7 +75,9 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
         raw_output=True,
         version="3",
     )
-    input_model = OpenpyxlRegionDetectorInput
+    input_model = OpenpyxlRegionDetectorInputDTO
+    config_model = OpenpyxlRegionDetectorConfigDTO
+    execution_model = OpenpyxlRegionDetectorExecutionDTO
     output_model = OpenpyxlRegionDetectorOutput
 
     def __init__(
@@ -81,7 +93,6 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
         region_type: Literal["title", "column_header", "row_header", "data"],
         bounds: CellBounds,
         layout,
-        confidence: float,
         parent_ids: List[str],
     ) -> Dict[str, Any]:
         return {
@@ -91,7 +102,6 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
             "bbox_px": cell_bounds_bbox(bounds, layout),
             "rows": (bounds.min_row, bounds.max_row),
             "columns": (bounds.min_column, bounds.max_column),
-            "confidence": confidence,
             "parent_ids": parent_ids,
         }
 
@@ -101,7 +111,7 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
         table_index: int,
         bounds: CellBounds,
         layout,
-        settings: OpenpyxlRegionDetectorInput,
+        settings: OpenpyxlRegionDetectorExecutionDTO,
     ) -> Dict[str, Any]:
         visibility = WorksheetVisibility.from_worksheet(worksheet)
         visible_rows = [
@@ -227,7 +237,6 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
                         visible_columns[-1],
                     ),
                     layout,
-                    0.75,
                     [],
                 )
             )
@@ -244,7 +253,6 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
                         visible_columns[-1],
                     ),
                     layout,
-                    0.85,
                     list(parent_ids),
                 )
             )
@@ -294,7 +302,6 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
                         visible_columns[index_column_count - 1],
                     ),
                     layout,
-                    0.75,
                     list(parent_ids),
                 )
             )
@@ -319,7 +326,6 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
                         visible_columns[-1],
                     ),
                     layout,
-                    0.90,
                     parents,
                 )
             )
@@ -338,7 +344,7 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
         }
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(OpenpyxlRegionDetectorInput, payload)
+        input_data = cast(OpenpyxlRegionDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

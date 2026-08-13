@@ -16,11 +16,15 @@ from ..spreadsheets.table_geometry import (
     cell_bounds_bbox,
 )
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .processed_file_selector import WorkbookSelectionDTO
 
 
-class DoclingTableDetectorInput(WorkbookSelectionDTO):
+class DoclingTableDetectorInputDTO(WorkbookSelectionDTO):
+    """Workbook identity and visible sheet selection."""
+
+
+class DoclingTableDetectorConfigDTO(ModuleConfigDTO):
     max_rows: int = Field(
         default=400,
         ge=1,
@@ -33,6 +37,13 @@ class DoclingTableDetectorInput(WorkbookSelectionDTO):
         le=200,
         description="시트 이미지화 및 탐지에 포함할 최대 열 수",
     )
+
+
+class DoclingTableDetectorExecutionDTO(
+    DoclingTableDetectorInputDTO,
+    DoclingTableDetectorConfigDTO,
+):
+    """Internal union of workbook data and render limits."""
 
 
 class TableCellBoundsDTO(ModuleDTO):
@@ -93,7 +104,9 @@ class DoclingTableDetectorModule(ExecutableModule):
         raw_output=True,
         version="3",
     )
-    input_model = DoclingTableDetectorInput
+    input_model = DoclingTableDetectorInputDTO
+    config_model = DoclingTableDetectorConfigDTO
+    execution_model = DoclingTableDetectorExecutionDTO
     output_model = DoclingTableDetectorOutput
 
     def __init__(
@@ -127,7 +140,7 @@ class DoclingTableDetectorModule(ExecutableModule):
         return normalized if normalized[2] > normalized[0] and normalized[3] > normalized[1] else None
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(DoclingTableDetectorInput, payload)
+        input_data = cast(DoclingTableDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

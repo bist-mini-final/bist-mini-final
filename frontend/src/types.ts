@@ -1,26 +1,5 @@
-export type ModuleType =
-  | 'query_input'
-  | 'decomposer'
-  | 'embedder'
-  | 'cell_text_embedder'
-  | 'vector_index_writer'
-  | 'bm25_retriever'
-  | 'dense_retriever'
-  | 'rrf_fusion'
-  | 'context'
-  | 'reader'
-  | 'answer_cache_writer'
-  | 'json_transformer'
-  | 'json_inspector'
-  | 'processed_file_selector'
-  | 'bfs_llm_structure_detector'
-  | 'local_vlm_structure_detector'
-  | 'luna_vlm_structure_detector'
-  | 'docling_table_detector'
-  | 'openpyxl_region_detector'
-  | 'cell_text_serializer'
-  | 'exhaustive_cell_text_serializer'
-  | 'prebuilt_index_loader';
+/** Backend-owned module identifier. Unknown types render with GenericModuleNode. */
+export type ModuleType = string;
 
 export type ExecutionBranch = 'generated' | 'cached' | 'failed';
 export type OutputBranch = Exclude<ExecutionBranch, 'failed'>;
@@ -69,6 +48,8 @@ export interface ModuleDefinition {
   input_schema: JsonSchema;
   config_schema: JsonSchema;
   output_schema: JsonSchema;
+  execution_schema: JsonSchema;
+  documentation_url: string;
   branch_schemas: Partial<Record<OutputBranch, JsonSchema>>;
 }
 
@@ -131,6 +112,7 @@ export interface RunNodeState {
   batch_index: number;
   status: RunNodeStatus;
   input_payload: unknown;
+  config_payload: Record<string, unknown>;
   output: unknown;
   error: string | null;
   cache_key: string | null;

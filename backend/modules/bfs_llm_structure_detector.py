@@ -20,7 +20,7 @@ from ..spreadsheets.prompt_guidance import TEXT_CELL_ROLE_GUIDANCE
 from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
 from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox, compute_sheet_layout
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .docling_table_detector import _safe_name
 from .processed_file_selector import WorkbookSelectionDTO
 from .spreadsheet_structure import SpreadsheetStructureOutput
@@ -43,7 +43,11 @@ BOUNDARY_USER_TEMPLATE = """Analyze the following BFS-detected Excel table regio
 {regions_json}"""
 
 
-class BfsLlmStructureDetectorInput(WorkbookSelectionDTO):
+class BfsLlmStructureDetectorInputDTO(WorkbookSelectionDTO):
+    """Workbook identity and visible sheet selection."""
+
+
+class BfsLlmStructureDetectorConfigDTO(ModuleConfigDTO):
     model: str = Field(default="gpt-5.6-luna", description="표 경계 판단에 사용할 LLM ID")
     max_rows: int = Field(default=400, ge=1, le=2000, description="시트에서 분석할 최대 행 수")
     max_columns: int = Field(default=60, ge=1, le=200, description="시트에서 분석할 최대 열 수")
@@ -54,6 +58,13 @@ class BfsLlmStructureDetectorInput(WorkbookSelectionDTO):
     llm_batch_size: int = Field(default=8, ge=1, le=20, description="한 LLM 요청에서 함께 판정할 표 후보 수")
     system_prompt: str = Field(default=BOUNDARY_SYSTEM_PROMPT, description="제목·헤더·데이터 경계 판단 지시")
     user_prompt_template: str = Field(default=BOUNDARY_USER_TEMPLATE, description="{regions_json} 변수를 지원하는 사용자 프롬프트")
+
+
+class BfsLlmStructureDetectorExecutionDTO(
+    BfsLlmStructureDetectorInputDTO,
+    BfsLlmStructureDetectorConfigDTO,
+):
+    """Internal union of workbook data and detection policy."""
 
 
 class BoundaryDecisionDTO(ModuleDTO):
@@ -104,7 +115,9 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
         raw_output=True,
         version="3",
     )
-    input_model = BfsLlmStructureDetectorInput
+    input_model = BfsLlmStructureDetectorInputDTO
+    config_model = BfsLlmStructureDetectorConfigDTO
+    execution_model = BfsLlmStructureDetectorExecutionDTO
     output_model = BfsLlmStructureDetectorOutput
 
     def __init__(
@@ -123,7 +136,7 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
     def _decide_boundaries(
         self,
         regions: List[Dict[str, Any]],
-        settings: BfsLlmStructureDetectorInput,
+        settings: BfsLlmStructureDetectorExecutionDTO,
     ) -> Dict[str, BoundaryDecisionDTO]:
         decisions: Dict[str, BoundaryDecisionDTO] = {}
         for offset in range(0, len(regions), settings.llm_batch_size):
@@ -202,7 +215,6 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
         region_type: str,
         bounds: CellBounds,
         layout,
-        confidence: float,
         parent_ids: List[str],
     ) -> Dict[str, Any]:
         return {
@@ -212,12 +224,11 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
             "bbox_px": cell_bounds_bbox(bounds, layout),
             "rows": (bounds.min_row, bounds.max_row),
             "columns": (bounds.min_column, bounds.max_column),
-            "confidence": confidence,
             "parent_ids": parent_ids,
         }
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        settings = cast(BfsLlmStructureDetectorInput, payload)
+        settings = cast(BfsLlmStructureDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(settings.file_name)
             current_hash = self.catalog.sha256(workbook_path)
@@ -362,7 +373,6 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
                                 visible_columns[-1],
                             ),
                             layout,
-                            0.85,
                             [],
                         )
                     )
@@ -381,7 +391,6 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
                                 visible_columns[-1],
                             ),
                             layout,
-                            0.85,
                             list(parent_ids),
                         )
                     )
@@ -401,7 +410,6 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
                                 visible_columns[decision.index_column_count - 1],
                             ),
                             layout,
-                            0.85,
                             list(parent_ids),
                         )
                     )
@@ -420,7 +428,6 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
                             visible_columns[-1],
                         ),
                         layout,
-                        0.90,
                         data_parents,
                     )
                 )
