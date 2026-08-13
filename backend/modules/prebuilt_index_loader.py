@@ -46,6 +46,17 @@ class PrebuiltIndexLoaderOutput(ModuleDTO):
 
 
 class PrebuiltIndexLoaderModule(ExecutableModule):
+    _PARQUET_ITEM_COLUMNS = (
+        "cell_id",
+        "sheet_name",
+        "cell_coord",
+        "row_header",
+        "column_header",
+        "cell_value",
+        "variant",
+        "text",
+    )
+
     definition = ModuleDefinition(
         type="prebuilt_index_loader",
         label="Pre-built Vector Index Loader",
@@ -102,6 +113,8 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
     def _read_data(self, file_path: Path) -> Dict[str, Any]:
         if file_path.suffix.lower() == ".parquet":
             try:
+                import numpy
+                import pyarrow as pa
                 import pyarrow.parquet as pq
             except ImportError as error:
                 raise ModuleExecutionError(
@@ -110,8 +123,16 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
                 ) from error
 
             try:
-                table = pq.read_table(file_path)
-                schema_meta = table.schema.metadata or {}
+                parquet_file = pq.ParquetFile(file_path)
+                available_columns = set(parquet_file.schema_arrow.names)
+                required_columns = {*self._PARQUET_ITEM_COLUMNS, "embedding"}
+                missing_columns = sorted(required_columns - available_columns)
+                if missing_columns:
+                    raise ValueError(
+                        "필수 컬럼 누락: " + ", ".join(missing_columns)
+                    )
+
+                schema_meta = parquet_file.schema_arrow.metadata or {}
                 file_name = (
                     schema_meta.get(b"file_name", b"").decode("utf-8")
                     or file_path.name
@@ -124,8 +145,12 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
                     or "text-embedding-3-large"
                 )
 
-                pydict = table.to_pydict()
-                num_rows = table.num_rows
+                item_table = parquet_file.read(
+                    columns=list(self._PARQUET_ITEM_COLUMNS),
+                    use_threads=True,
+                )
+                pydict = item_table.to_pydict()
+                num_rows = parquet_file.metadata.num_rows
 
                 items: List[Dict[str, Any]] = []
                 for i in range(num_rows):
@@ -141,14 +166,85 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
                             "cell_value": pydict["cell_value"][i],
                             "variant": pydict["variant"][i],
                             "text": pydict["text"][i],
-                            "embedding": [float(x) for x in pydict["embedding"][i]],
                         }
+                    )
+
+                vectors = None
+                vector_dimension: Optional[int] = None
+                vector_offset = 0
+                for batch in parquet_file.iter_batches(
+                    batch_size=256,
+                    columns=["embedding"],
+                    use_threads=True,
+                ):
+                    embedding_array = batch.column(0)
+                    if embedding_array.null_count:
+                        raise ValueError("embedding 컬럼에 null 벡터가 있습니다")
+
+                    if pa.types.is_fixed_size_list(embedding_array.type):
+                        batch_dimension = embedding_array.type.list_size
+                        flat_values = embedding_array.values.to_numpy(
+                            zero_copy_only=False
+                        )
+                    elif (
+                        pa.types.is_list(embedding_array.type)
+                        or pa.types.is_large_list(embedding_array.type)
+                    ):
+                        offsets = embedding_array.offsets.to_numpy(
+                            zero_copy_only=False
+                        )
+                        lengths = numpy.diff(offsets)
+                        if len(lengths) == 0:
+                            continue
+                        batch_dimension = int(lengths[0])
+                        if batch_dimension <= 0 or not numpy.all(
+                            lengths == batch_dimension
+                        ):
+                            raise ValueError(
+                                "embedding 벡터의 차원이 일정하지 않습니다"
+                            )
+                        value_start = int(offsets[0])
+                        value_end = int(offsets[-1])
+                        flat_values = embedding_array.values.slice(
+                            value_start,
+                            value_end - value_start,
+                        ).to_numpy(zero_copy_only=False)
+                    else:
+                        raise ValueError(
+                            "embedding 컬럼은 list<float> 형식이어야 합니다"
+                        )
+
+                    if vector_dimension is None:
+                        vector_dimension = batch_dimension
+                        vectors = numpy.empty(
+                            (num_rows, vector_dimension),
+                            dtype="float32",
+                        )
+                    elif vector_dimension != batch_dimension:
+                        raise ValueError(
+                            "embedding 벡터의 차원이 일정하지 않습니다"
+                        )
+
+                    batch_rows = batch.num_rows
+                    batch_matrix = numpy.asarray(
+                        flat_values,
+                        dtype="float32",
+                    ).reshape(batch_rows, vector_dimension)
+                    vectors[
+                        vector_offset : vector_offset + batch_rows
+                    ] = batch_matrix
+                    vector_offset += batch_rows
+
+                if vectors is None or vector_offset != num_rows:
+                    raise ValueError(
+                        "embedding 벡터 개수가 Parquet 행 개수와 일치하지 않습니다"
                     )
                 return {
                     "file_name": file_name,
                     "workbook_hash": workbook_hash,
                     "model": model_name,
                     "items": items,
+                    "_vectors": vectors,
                 }
             except Exception as error:
                 raise ModuleExecutionError(
@@ -209,13 +305,18 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
         workbook_hash = raw_data["workbook_hash"]
         model_name = raw_data["model"]
         items = raw_data["items"]
+        vector_matrix = raw_data.get("_vectors")
 
         if not items or not isinstance(items, list):
             raise ModuleExecutionError("인덱스 파일에 셀 문서 항목(items)이 없습니다")
+        if vector_matrix is not None and len(vector_matrix) != len(items):
+            raise ModuleExecutionError(
+                "Parquet embedding 벡터 개수와 셀 문서 개수가 일치하지 않습니다"
+            )
 
         # Extract texts, embeddings, and cell metadata
         doc_items: List[Dict[str, Any]] = []
-        vectors: List[List[float]] = []
+        vectors: Any = vector_matrix if vector_matrix is not None else []
         metadata_list: List[Dict[str, Any]] = []
 
         def _clean_excel_coord(raw: Any, fallback_index: int) -> str:
@@ -228,12 +329,16 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
 
         for index, item in enumerate(items):
             text = item.get("text", "")
-            vector = item.get("embedding", [])
+            vector = (
+                vector_matrix[index]
+                if vector_matrix is not None
+                else item.get("embedding", [])
+            )
             sheet_name = item.get("sheet_name", "Sheet1")
             raw_coord = item.get("cell_coord") or item.get("cell_address")
             cell_coord = _clean_excel_coord(raw_coord, index)
 
-            if not text or not vector:
+            if not text or len(vector) == 0:
                 raise ModuleExecutionError(
                     f"항목 {index}에 text 또는 embedding 벡터가 누락되었습니다"
                 )
@@ -276,13 +381,19 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
                 "embedding_index": index,
             }
             doc_items.append(doc_item)
-            vectors.append(vector)
+            if vector_matrix is None:
+                vectors.append(vector)
             metadata_list.append(doc_item)
 
-        dimensions = {len(v) for v in vectors}
-        if len(dimensions) != 1 or 0 in dimensions:
-            raise ModuleExecutionError("임베딩 벡터의 차원이 일정하지 않습니다")
-        dimension = dimensions.pop()
+        if vector_matrix is not None:
+            if vector_matrix.ndim != 2 or vector_matrix.shape[1] <= 0:
+                raise ModuleExecutionError("임베딩 벡터의 차원이 올바르지 않습니다")
+            dimension = int(vector_matrix.shape[1])
+        else:
+            dimensions = {len(v) for v in vectors}
+            if len(dimensions) != 1 or 0 in dimensions:
+                raise ModuleExecutionError("임베딩 벡터의 차원이 일정하지 않습니다")
+            dimension = dimensions.pop()
 
         # Compute deterministic 64-char sha256 index_id based on payload
         artifact_payload = json.dumps(

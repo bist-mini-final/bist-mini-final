@@ -2611,6 +2611,62 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
+    def test_prebuilt_parquet_loader_execution(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from backend.modules.prebuilt_index_loader import (
+            PrebuiltIndexLoaderInputDTO,
+            PrebuiltIndexLoaderModule,
+        )
+
+        parquet_path = self.processed_dir / "test_prebuilt.parquet"
+        table = pa.table(
+            {
+                "cell_id": ["Key Stats Cell E10", "Key Stats Cell E11"],
+                "sheet_name": ["Key Stats", "Key Stats"],
+                "cell_coord": ["E10", "E11"],
+                "row_header": [["Total Revenue"], ["Net Income"]],
+                "column_header": [["2025-12-31"], ["2025-12-31"]],
+                "cell_value": ["1000", "200"],
+                "variant": ["header_with_value", "header_with_value"],
+                "text": [
+                    "Sheet: Key Stats | Row Header: Total Revenue | Column Header: 2025-12-31 | Cell Value: 1000",
+                    "Sheet: Key Stats | Row Header: Net Income | Column Header: 2025-12-31 | Cell Value: 200",
+                ],
+                "embedding": pa.array(
+                    [[1.0, 0.0], [0.0, 1.0]],
+                    type=pa.list_(pa.float32()),
+                ),
+            }
+        ).replace_schema_metadata(
+            {
+                b"file_name": b"Test_Workbook.xlsx",
+                b"workbook_hash": b"a1b2c3d4e5f67890",
+                b"model": b"BAAI/bge-large-en-v1.5",
+            }
+        )
+        pq.write_table(table, parquet_path)
+
+        loader = PrebuiltIndexLoaderModule(
+            vector_index_store=self.vector_index_store,
+            search_dirs=[self.processed_dir],
+        )
+        result = loader.execute(
+            PrebuiltIndexLoaderInputDTO(file_name=parquet_path.name)
+        )
+
+        self.assertEqual(
+            result["document_output"]["file_name"],
+            "Test_Workbook.xlsx",
+        )
+        self.assertEqual(result["index_output"]["document_count"], 2)
+        self.assertEqual(result["index_output"]["dimension"], 2)
+        self.assertEqual(
+            result["index_output"]["model"],
+            "BAAI/bge-large-en-v1.5",
+        )
+
     def test_prebuilt_index_loader_execution(self):
         from backend.modules.prebuilt_index_loader import (
             PrebuiltIndexLoaderInputDTO,
