@@ -1,0 +1,15 @@
+{
+  "id": "Q080",
+  "scenario": "유형 4 재무 계산",
+  "question": "IBM의 LTM 순이익률을 계산해줘.",
+  "chatgpt_answer": "LTM 순이익률 15.69% (=10,593/67,535).",
+  "pipeline_answer": "IBM의 **LTM 순이익률**은 다음과 같이 계산됩니다.\n\n\\[\n\\text{LTM 순이익률}\n= \\frac{\\text{LTM 순이익}}{\\text{LTM 총매출}}\n\\times 100\n= \\frac{10{,}593}{67{,}535}\\times 100\n= 15.6852\\%\n\\]\n\n- LTM 순이익: **10,593** [Key_Stats Cell A180]  \n- LTM 총매출: **67,535** [Key_Stats Cell A12]  \n- **LTM 순이익률: 15.6852%** [Key_Stats Cell A198]",
+  "api_usage": {
+    "prompt_tokens": 15171,
+    "completion_tokens": 489,
+    "cached_tokens": 0,
+    "reasoning_tokens": 318,
+    "total_tokens": 15660
+  },
+  "latency_seconds": 40.48
+}

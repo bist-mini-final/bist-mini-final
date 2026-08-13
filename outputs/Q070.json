@@ -1,0 +1,15 @@
+{
+  "id": "Q070",
+  "scenario": "유형 4 재무 계산",
+  "question": "DSO 및 DIO의 추이는?",
+  "chatgpt_answer": "평균잔액 방식 DSO: 2021 48.2일, 2022 48.0일, 2023 47.3일, 2024 48.0일, 2025 46.8일. DIO: 24.9→21.3→18.2→16.7→16.2일. 재고회전은 뚜렷하게 개선.",
+  "pipeline_answer": "현재 제공된 셀 context만으로는 **DSO 및 DIO의 추이 산출이 불가능합니다.**\n\n- **DSO** 산식: `평균 매출채권 ÷ 매출액 × 일수`\n  - 제공된 것은 일부 항목인 **Accounts Receivables Unbilled**뿐이며, 예를 들어 2015년 **1,630**, 2016년 **1,611**입니다 [Balance_Sheet Cell A7096] [Balance_Sheet Cell A7098].\n  - 총매출채권, 매출액 및 적용 일수가 없어 DSO를 계산할 수 없습니다.\n\n- **DIO** 산식: `평균 재고자산 ÷ 매출원가 × 일수`\n  - 재고 구성 항목 일부는 확인되지만, 예를 들어 완제품 재고는 2015년 **352**, 재공품 재고는 **1,199**입니다 [Balance_Sheet Cell A7200] [Balance_Sheet Cell A7174].\n  - 원재료 재고는 해당 기간에 **NA**로 표시되어 있으며 [Balance_Sheet Cell A7146], 총재고자산과 매출원가가 제공되지 않아 DIO를 계산할 수 없습니다.\n\n따라서 **DSO와 DIO의 연도별 수준 및 증감 추이는 판단할 수 없습니다.** 계산을 위해서는 각 기간의 **매출액, 매출원가, 총매출채권 및 총재고자산** 셀이 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 11388,
+    "completion_tokens": 657,
+    "cached_tokens": 11385,
+    "reasoning_tokens": 320,
+    "total_tokens": 12045
+  },
+  "latency_seconds": 16.78
+}

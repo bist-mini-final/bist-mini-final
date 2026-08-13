@@ -1,0 +1,15 @@
+{
+  "id": "Q011",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 부채비율(Debt/Equity)은 얼마인가?",
+  "chatgpt_answer": "Debt/Equity 1.98x, 즉 약 197.9% (=총부채성 Debt 64,607 / 보통주자본 32,648).",
+  "pipeline_answer": "IBM의 **LTM Debt/Equity 비율은 약 197.4% (1.97배)**입니다.\n\n- 총부채: **64,607** [Key_Stats Cell A252]\n- 총자본: **97,348** [Key_Stats Cell A268]\n- 총자본에서 총부채를 차감한 자기자본:  \n  **97,348 − 64,607 = 32,741** [Key_Stats Cell A268][Key_Stats Cell A252]\n- Debt/Equity:  \n  **64,607 ÷ 32,741 = 1.9736배 = 197.4%** [Key_Stats Cell A252][Key_Stats Cell A268]\n\n참고로 자기자본은 보통주자본 **32,648**과 소수주주지분 **93**의 합계인 **32,741**로도 확인됩니다 [Key_Stats Cell A260][Key_Stats Cell A264].",
+  "api_usage": {
+    "prompt_tokens": 15617,
+    "completion_tokens": 564,
+    "cached_tokens": 0,
+    "reasoning_tokens": 343,
+    "total_tokens": 16181
+  },
+  "latency_seconds": 272.522
+}

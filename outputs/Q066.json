@@ -1,0 +1,15 @@
+{
+  "id": "Q066",
+  "scenario": "유형 4 재무 계산",
+  "question": "2025년 Cash Conversion Ratio는?",
+  "chatgpt_answer": "Cash Conversion Ratio(CFO/Net Income) 1.25x, 즉 약 124.5%.",
+  "pipeline_answer": "2025년 **Cash Conversion Ratio는 제공된 Excel 셀 컨텍스트에 값이 없어 확인할 수 없습니다.**  \n\n2025년 현금흐름 관련 값으로는 Levered Free Cash Flow **12,770.75** [Cash_Flow Cell A10368], Unlevered Free Cash Flow **13,980.125** [Cash_Flow Cell A10394]가 있으나, Cash Conversion Ratio 계산에 필요한 기준 이익(예: EBITDA 또는 영업이익) 값이 제공되지 않았습니다.",
+  "api_usage": {
+    "prompt_tokens": 16335,
+    "completion_tokens": 259,
+    "cached_tokens": 0,
+    "reasoning_tokens": 138,
+    "total_tokens": 16594
+  },
+  "latency_seconds": 25.259
+}

@@ -1,0 +1,15 @@
+{
+  "id": "Q082",
+  "scenario": "유형 4 재무 계산",
+  "question": "영업현금흐름과 CAPEX로 FCF를 계산해줘.",
+  "chatgpt_answer": "FCF = 13,193 + (-1,617) = $11,576M.",
+  "pipeline_answer": "FCF는 **영업현금흐름(CFO) + CAPEX**로 계산했습니다. CAPEX가 음수로 표시되어 있으므로, 예를 들어 **FCF = CFO - CAPEX 절대값**입니다. 단위는 **$M**입니다.\n\n| 연도 | 계산 | FCF ($M) |\n|---|---:|---:|\n| 2015 | 17,255 + (-3,579) | **13,676** [Cash_Flow Cell A9436] [Cash_Flow Cell A9462] |\n| 2016 | 17,084 + (-3,567) | **13,517** [Cash_Flow Cell A9438] [Cash_Flow Cell A9464] |\n| 2017 | 16,724 + (-3,229) | **13,495** [Cash_Flow Cell A9440] [Cash_Flow Cell A9466] |\n| 2018 | 15,247 + (-3,395) | **11,852** [Cash_Flow Cell A9442] [Cash_Flow Cell A9468] |\n| 2019 | 14,770 + (-2,286) | **12,484** [Cash_Flow Cell A9444] [Cash_Flow Cell A9470] |\n| 2020 | 18,197 + (-2,618) | **15,579** [Cash_Flow Cell A9446] [Cash_Flow Cell A9472] |\n| 2021 | 12,796 + (-2,062) | **10,734** [Cash_Flow Cell A9448] [Cash_Flow Cell A9474] |\n| 2022 | 10,435 + (-1,346) | **9,089** [Cash_Flow Cell A9450] [Cash_Flow Cell A9476] |\n| 2025 | 13,193 + (-1,617) | **11,576** [Cash_Flow Cell A9458] [Cash_Flow Cell A9482] |\n\n**계산 불가 연도:**  \n- **2014년:** 영업현금흐름 값이 제공되지 않았습니다. CAPEX는 **-3,740**입니다. [Cash_Flow Cell A9460]  \n- **2023년 및 2024년:** CAPEX는 각각 **-1,245**, **-1,048**이나, 해당 연도의 영업현금흐름 값이 제공되지 않았습니다. [Cash_Flow Cell A9478] [Cash_Flow Cell A9480]",
+  "api_usage": {
+    "prompt_tokens": 16388,
+    "completion_tokens": 1049,
+    "cached_tokens": 0,
+    "reasoning_tokens": 486,
+    "total_tokens": 17437
+  },
+  "latency_seconds": 23.893
+}

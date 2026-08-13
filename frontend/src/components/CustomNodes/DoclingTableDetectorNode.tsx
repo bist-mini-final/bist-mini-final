@@ -49,6 +49,7 @@ export const DoclingTableDetectorNode = ({ data, selected }: DoclingTableDetecto
         eyebrow="Logic Module"
         title="Docling Table Region Detector"
         state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
         selected={selected}
         width={data.nodeWidth ?? 340}
         onWidthChange={data.onNodeWidthChange}

@@ -34,6 +34,7 @@ export const QueryNode = ({ data, selected }: QueryNodeProps) => {
       eyebrow="Source Module"
       title="사용자 질의 (Query Input)"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       hasInput={false}
       outputBranches={data.outputBranches}

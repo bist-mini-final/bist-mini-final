@@ -47,6 +47,7 @@ export const LocalVlmStructureDetectorNode = ({
         eyebrow="Logic Module"
         title="Local VLM Table Structure Detector"
         state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
         selected={selected}
         width={data.nodeWidth ?? 380}
         onWidthChange={data.onNodeWidthChange}

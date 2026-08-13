@@ -26,6 +26,7 @@ export const RrfFusionNode = ({ data, selected }: RrfFusionNodeProps) => {
       eyebrow="Logic Module"
       title="RRF Fusion"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={350}
       inputPorts={['bm25_result', 'dense_result']}

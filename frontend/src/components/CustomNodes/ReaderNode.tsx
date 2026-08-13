@@ -32,6 +32,7 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
       state={getExecutionNodeState(data.executionState)}
       selected={selected}
       width={380}
+      nodeData={data}
       inputPorts={['question_text', 'context_json']}
       bodyClassName="space-y-3"
     >

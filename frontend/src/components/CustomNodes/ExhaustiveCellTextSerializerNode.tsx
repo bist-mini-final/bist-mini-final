@@ -40,6 +40,7 @@ export const ExhaustiveCellTextSerializerNode = ({
       eyebrow="Transform Module"
       title="Exhaustive Cell Header Serializer"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={data.nodeWidth ?? 370}
       onWidthChange={data.onNodeWidthChange}

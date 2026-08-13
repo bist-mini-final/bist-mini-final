@@ -48,13 +48,6 @@ function executionFingerprint(graph: WorkflowGraph): string {
   });
 }
 
-/**
- * Returns true when the current graph is compatible with the given run for
- * display purposes.  "Compatible" means every node that already exists in the
- * run still has the same module_type, config, and connected edges — i.e. the
- * user only *added* new nodes/edges without modifying existing ones.
- * New nodes simply have no state in the run and will be shown as idle.
- */
 function executionRunCompatibleWithGraph(
   run: WorkflowRun,
   graph: WorkflowGraph
@@ -75,8 +68,6 @@ function executionRunCompatibleWithGraph(
     )
   );
 
-  // Every node present in the run must still exist in the current graph
-  // with the same module_type and config.
   for (const runNode of run.graph.nodes) {
     const currentNode = currentNodeById.get(runNode.id);
     if (!currentNode) return false;
@@ -84,7 +75,6 @@ function executionRunCompatibleWithGraph(
     if (JSON.stringify(currentNode.config ?? {}) !== JSON.stringify(runNode.config ?? {})) return false;
   }
 
-  // Every edge present in the run must still exist in the current graph.
   for (const runEdge of run.graph.edges) {
     const key = JSON.stringify([
       runEdge.id,
@@ -232,8 +222,6 @@ async function executeNextOrResume(
   try {
     return await pipelineApi.executeNextBatch(run.id, signal);
   } catch (error) {
-    // A stopped browser request does not cancel the synchronous backend worker.
-    // Reconcile the persisted run before deciding whether execute-next is valid.
     if (error instanceof ApiError && error.status === 422) {
       const persistedRun = await pipelineApi.getRun(run.id, signal);
       if (persistedRun.status === 'failed') {
@@ -246,7 +234,9 @@ async function executeNextOrResume(
 
 export function useWorkflowPersistence(
   graph: WorkflowGraphBridge,
-  moduleCatalogReady: boolean
+  moduleCatalogReady: boolean,
+  activeWorkflowId: string,
+  activeWorkflowName: string,
 ) {
   const graphRef = useRef(graph);
   graphRef.current = graph;
@@ -264,12 +254,9 @@ export function useWorkflowPersistence(
   const executionController = useRef<AbortController | null>(null);
   const stableRunRef = useRef<WorkflowRun | null>(null);
   const runtimeMutationEpoch = useRef(0);
-  // Strict match: used to decide whether to reuse an existing run for execution.
   const latestRunMatchesGraph = Boolean(
     latestRun && executionFingerprint(latestRun.graph) === executionFingerprint(currentGraph)
   );
-  // Loose compatibility: used to decide whether to keep showing run results in
-  // the UI when new nodes have been added but existing ones are unchanged.
   const latestRunCompatibleWithGraph = Boolean(
     latestRun && executionRunCompatibleWithGraph(latestRun, currentGraph)
   );
@@ -283,30 +270,41 @@ export function useWorkflowPersistence(
     graphRef.current.applyRun(run);
   }, []);
 
+  // Load workflow whenever activeWorkflowId changes
   useEffect(() => {
     if (!moduleCatalogReady) {
       setSaveStatus('loading');
       return;
     }
     const controller = new AbortController();
+
+    // Cancel any running execution when switching workflows
+    executionController.current?.abort();
+    executionController.current = null;
+    stableRunRef.current = null;
+    setIsExecuting(false);
+    setReady(false);
+    setLatestRun(null);
+    setRuns([]);
+
     const load = async () => {
       setSaveStatus('loading');
       try {
         let workflow;
         try {
-          workflow = await pipelineApi.getWorkflow(workflowId, controller.signal);
+          workflow = await pipelineApi.getWorkflow(activeWorkflowId, controller.signal);
           graphRef.current.replaceGraph(workflow.graph);
         } catch (error: unknown) {
           if (!(error instanceof ApiError && error.status === 404 && workflowId === DEFAULT_WORKFLOW_ID)) throw error;
           workflow = await pipelineApi.saveWorkflow(
-            workflowId,
-            DEFAULT_WORKFLOW_NAME,
+            activeWorkflowId,
+            activeWorkflowName,
             graphRef.current.exportGraph(),
             controller.signal
           );
         }
 
-        const response = await pipelineApi.getRuns(workflowId, controller.signal);
+        const response = await pipelineApi.getRuns(activeWorkflowId, controller.signal);
         const sortedRuns = response.runs
           .slice()
           .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
@@ -325,14 +323,14 @@ export function useWorkflowPersistence(
     };
     void load();
     return () => controller.abort();
-  }, [applyRun, moduleCatalogReady, workflowId]);
+  }, [applyRun, moduleCatalogReady, activeWorkflowId, activeWorkflowName]);
 
   const saveNow = useCallback(async (signal?: AbortSignal) => {
     setSaveStatus('saving');
     try {
       const workflow = await pipelineApi.saveWorkflow(
-        workflowId,
-        workflowName,
+        activeWorkflowId,
+        activeWorkflowName,
         graphRef.current.exportGraph(),
         signal
       );
@@ -345,7 +343,7 @@ export function useWorkflowPersistence(
       }
       throw error;
     }
-  }, [workflowId, workflowName]);
+  }, [activeWorkflowId, activeWorkflowName]);
 
   useEffect(() => {
     if (!ready) return;
@@ -363,7 +361,7 @@ export function useWorkflowPersistence(
     async (query: string, signal: AbortSignal, inheritFromRunId?: string) => {
       const workflow = await saveNow(signal);
       const run = await pipelineApi.createRun(
-        workflowId,
+        activeWorkflowId,
         runInputs(workflow.graph, query),
         signal,
         inheritFromRunId
@@ -371,7 +369,7 @@ export function useWorkflowPersistence(
       applyRun(run);
       return run;
     },
-    [applyRun, saveNow, workflowId]
+    [applyRun, saveNow, activeWorkflowId]
   );
 
   const executeAll = useCallback(
@@ -499,11 +497,8 @@ export function useWorkflowPersistence(
           && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs);
         let run: WorkflowRun;
         if (strictMatch && latestRun) {
-          // Graph unchanged: reuse existing run directly.
           run = latestRun;
         } else if (looseMatch && latestRun) {
-          // Only new nodes added: create a new run but inherit completed states
-          // from the previous run so upstream nodes are seen as 'succeeded'.
           run = await createRun(query, controller.signal, latestRun.id);
         } else {
           run = await createRun(query, controller.signal);
@@ -605,8 +600,7 @@ export function useWorkflowPersistence(
   }, [isExecuting, saveNow, workflowId]);
 
   return {
-    workflowId,
-    workflowName,
+    workflowId: activeWorkflowId,
     ready,
     saveStatus,
     lastSavedAt,

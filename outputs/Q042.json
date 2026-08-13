@@ -1,0 +1,15 @@
+{
+  "id": "Q042",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "IBM의 최근 3년 장기부채가 증가했는지 알려줘.",
+  "chatgpt_answer": "최근 3년 Long-Term Debt: 49,742→49,081→54,836M. 2024 소폭 감소 후 2025 증가; 3년 기준 순증.",
+  "pipeline_answer": "네. IBM의 최근 3년 장기부채는 **증가했습니다**.\n\n- **2023년:** 11,879 [Balance_Sheet Cell A7918]\n- **2024년:** 12,116 [Balance_Sheet Cell A7920]\n- **2025년:** 15,100 [Balance_Sheet Cell A7922]\n\n계산:\n\n- 2023년 → 2024년: `12,116 - 11,879 = 237` 증가, 약 **2.0%** 증가\n- 2024년 → 2025년: `15,100 - 12,116 = 2,984` 증가, 약 **24.6%** 증가\n- 2023년 → 2025년: `15,100 - 11,879 = 3,221` 증가, 약 **27.1%** 증가\n\n따라서 **2023년부터 2025년까지 장기부채는 3,221 증가했으며, 약 27.1% 늘어났습니다.** [Balance_Sheet Cell A7918] [Balance_Sheet Cell A7922]\n\n단, 제공된 셀 컨텍스트에는 금액 단위가 명시되어 있지 않습니다.",
+  "api_usage": {
+    "prompt_tokens": 12935,
+    "completion_tokens": 502,
+    "cached_tokens": 0,
+    "reasoning_tokens": 227,
+    "total_tokens": 13437
+  },
+  "latency_seconds": 590.63
+}

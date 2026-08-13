@@ -1,0 +1,15 @@
+{
+  "id": "Q043",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "IBM의 최근 3년 영업현금흐름 추세를 알려줘.",
+  "chatgpt_answer": "최근 3년 CFO: 13,931→13,445→13,193M. 완만한 감소 추세.",
+  "pipeline_answer": "IBM의 최근 3년 영업현금흐름(Cash from Ops.) 추세는 **감소세**입니다. 단위는 **$M**입니다.\n\n| 회계연도 | 영업현금흐름 |\n|---|---:|\n| 2023-12-31 | 13,931 [Cash_Flow Cell A9452] |\n| 2024-12-31 | 13,445 [Cash_Flow Cell A9454] |\n| 2025-12-31 | 13,193 [Cash_Flow Cell A9456] |\n\n- **2023년 → 2024년:** 13,445 - 13,931 = **-486 $M**, 즉 **-3.5%** 감소  \n  (486 ÷ 13,931 × 100) [Cash_Flow Cell A9452] [Cash_Flow Cell A9454]\n- **2024년 → 2025년:** 13,193 - 13,445 = **-252 $M**, 즉 **-1.9%** 감소  \n  (252 ÷ 13,445 × 100) [Cash_Flow Cell A9454] [Cash_Flow Cell A9456]\n- **2023년 → 2025년 전체:** 13,193 - 13,931 = **-738 $M**, 즉 **-5.3%** 감소  \n  (738 ÷ 13,931 × 100) [Cash_Flow Cell A9452] [Cash_Flow Cell A9456]\n\n따라서 IBM의 영업현금흐름은 **2023년 13,931 $M에서 2025년 13,193 $M으로 2년간 완만하게 감소**했습니다.",
+  "api_usage": {
+    "prompt_tokens": 15674,
+    "completion_tokens": 502,
+    "cached_tokens": 0,
+    "reasoning_tokens": 116,
+    "total_tokens": 16176
+  },
+  "latency_seconds": 71.747
+}

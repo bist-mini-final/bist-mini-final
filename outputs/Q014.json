@@ -1,0 +1,15 @@
+{
+  "id": "Q014",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "BAC의 기관투자자 지분율은?",
+  "chatgpt_answer": "파일 내 BAC 기관투자자 지분율 데이터 없음.",
+  "pipeline_answer": "제공된 Excel 셀 컨텍스트에는 **BAC의 기관투자자 지분율** 데이터가 없습니다. 따라서 기관투자자 지분율은 확인할 수 없습니다. 해당 비율 또는 기관투자자 보유주식 수와 총 발행주식 수에 대한 셀 정보가 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 12829,
+    "completion_tokens": 151,
+    "cached_tokens": 0,
+    "reasoning_tokens": 72,
+    "total_tokens": 12980
+  },
+  "latency_seconds": 140.057
+}

@@ -1,0 +1,15 @@
+{
+  "id": "Q056",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "IBM의 영업현금흐름과 CAPEX를 알려줘.",
+  "chatgpt_answer": "CFO $13,193M, CapEx $1,617M 지출.",
+  "pipeline_answer": "IBM의 영업현금흐름과 CAPEX는 다음과 같습니다. 단위는 **$M(백만 달러)**이며, CAPEX는 원자료에 음수로 표시되어 있습니다.\n\n| 회계연도 | 영업현금흐름 | CAPEX |\n|---|---:|---:|\n| 2015-12-31 | 17,255 [Cash_Flow Cell A9436] | -3,579 [Cash_Flow Cell A9462] |\n| 2016-12-31 | 17,084 [Cash_Flow Cell A9438] | -3,567 [Cash_Flow Cell A9464] |\n| 2017-12-31 | 16,724 [Cash_Flow Cell A9440] | -3,229 [Cash_Flow Cell A9466] |\n| 2018-12-31 | 15,247 [Cash_Flow Cell A9442] | -3,395 [Cash_Flow Cell A9468] |\n| 2019-12-31 | 14,770 [Cash_Flow Cell A9444] | -2,286 [Cash_Flow Cell A9470] |\n| 2020-12-31 | 18,197 [Cash_Flow Cell A9446] | -2,618 [Cash_Flow Cell A9472] |\n| 2021-12-31 | 12,796 [Cash_Flow Cell A9448] | -2,062 [Cash_Flow Cell A9474] |\n| 2022-12-31 | 10,435 [Cash_Flow Cell A9450] | -1,346 [Cash_Flow Cell A9476] |\n| 2023-12-31 | 13,931 [Cash_Flow Cell A9452] | -1,245 [Cash_Flow Cell A9478] |\n| 2024-12-31 | **값 미제공** | -1,048 [Cash_Flow Cell A9480] |\n| 2025-12-31 | 13,193 [Cash_Flow Cell A9458] | -1,617 [Cash_Flow Cell A9482] |\n\n제공된 컨텍스트에는 **2024년 영업현금흐름 값이 없습니다**.",
+  "api_usage": {
+    "prompt_tokens": 15144,
+    "completion_tokens": 945,
+    "cached_tokens": 0,
+    "reasoning_tokens": 443,
+    "total_tokens": 16089
+  },
+  "latency_seconds": 27.471
+}

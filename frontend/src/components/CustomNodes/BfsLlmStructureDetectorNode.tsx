@@ -45,6 +45,7 @@ export const BfsLlmStructureDetectorNode = ({
         eyebrow="Logic Module"
         title="BFS + LLM Table Structure Detector"
         state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
         selected={selected}
         width={data.nodeWidth ?? 370}
         onWidthChange={data.onNodeWidthChange}

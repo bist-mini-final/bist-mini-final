@@ -83,7 +83,15 @@ class ContextExpanderModule(ExecutableModule):
         return documents
 
     @staticmethod
+    def _safe_coord(coord: str, default_row: int = 1) -> Tuple[int, int]:
+        try:
+            return coordinate_to_tuple(coord)
+        except Exception:
+            return (default_row, 1)
+
+    @classmethod
     def _format_row(
+        cls,
         sheet_name: str,
         row_header: List[str],
         documents: List[CellTextDocumentDTO],
@@ -91,7 +99,7 @@ class ContextExpanderModule(ExecutableModule):
         cells = []
         for document in sorted(
             documents,
-            key=lambda item: coordinate_to_tuple(item.cell_coord)[1],
+            key=lambda item: cls._safe_coord(item.cell_coord)[1],
         ):
             column_header = (
                 " > ".join(document.column_header)
@@ -117,8 +125,8 @@ class ContextExpanderModule(ExecutableModule):
         documents_by_id = self._actual_documents(input_data.document_input.items)
         rows: DefaultDict[Tuple[str, int], List[CellTextDocumentDTO]] = defaultdict(list)
         row_headers: Dict[Tuple[str, int], List[str]] = {}
-        for document in documents_by_id.values():
-            row, _ = coordinate_to_tuple(document.cell_coord)
+        for index, document in enumerate(documents_by_id.values()):
+            row, _ = self._safe_coord(document.cell_coord, index + 1)
             row_key = (document.sheet_name, row)
             rows[row_key].append(document)
             row_headers.setdefault(row_key, document.row_header)
@@ -126,12 +134,12 @@ class ContextExpanderModule(ExecutableModule):
         expanded_rows: List[Tuple[str, int]] = []
         seen_rows: Set[Tuple[str, int]] = set()
         matched_candidates = 0
-        for candidate in candidates:
+        for index, candidate in enumerate(candidates):
             document = documents_by_id.get(candidate.cell_id)
             if document is None:
                 continue
             matched_candidates += 1
-            candidate_row, _ = coordinate_to_tuple(document.cell_coord)
+            candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
             for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
                 row_key = (document.sheet_name, candidate_row + offset)
                 if row_key in rows and row_key not in seen_rows:

@@ -45,6 +45,7 @@ export const OpenpyxlRegionDetectorNode = ({ data, selected }: OpenpyxlRegionDet
         eyebrow="Logic Module"
         title="OpenPyXL Table Region Classifier"
         state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
         selected={selected}
         width={data.nodeWidth ?? 350}
         onWidthChange={data.onNodeWidthChange}

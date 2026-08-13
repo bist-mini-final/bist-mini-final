@@ -1,15 +1,30 @@
 import {
-  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Coins,
   DatabaseZap,
   FileSpreadsheet,
   PanelLeft,
+  PanelLeftClose,
   Play,
   RotateCcw,
   Save,
+  Sparkles,
   Square,
-  X,
 } from 'lucide-react';
 import type { SaveStatus } from '../types';
+
+export interface ExecutionMetrics {
+  totalElapsedMs: number;
+  totalCostUsd: number;
+  totalTokens: number;
+  hasExecution: boolean;
+}
+
+export interface WorkflowOption {
+  id: string;
+  name: string;
+}
 
 interface HeaderProps {
   activeStep: number;
@@ -25,6 +40,11 @@ interface HeaderProps {
   onSave: () => void;
   isClearingCache: boolean;
   onClearCache: () => void;
+  metrics?: ExecutionMetrics;
+  // Workflow selector
+  workflows: WorkflowOption[];
+  activeWorkflowId: string;
+  onSelectWorkflow: (id: string) => void;
 }
 
 export function Header({
@@ -41,36 +61,74 @@ export function Header({
   onSave,
   isClearingCache,
   onClearCache,
+  metrics,
+  workflows,
+  activeWorkflowId,
+  onSelectWorkflow,
 }: HeaderProps) {
+
   return (
-    <header className="app-header">
-      <div className="app-header__brand-row">
+    <header className="app-header" data-palette-open={isPaletteOpen}>
+      <div className="app-header__brand-card">
         <button
-          className="icon-button app-header__palette-button"
+          className="app-header__palette-button"
           onClick={onTogglePalette}
           aria-label={isPaletteOpen ? '모듈 패널 닫기' : '모듈 패널 열기'}
           aria-expanded={isPaletteOpen}
+          title={isPaletteOpen ? '모듈 패널 접기' : '모듈 패널 펼치기'}
         >
-          {isPaletteOpen ? <X className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+          {isPaletteOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
         </button>
 
-        <div className="brand-mark" aria-hidden="true">
-          <FileSpreadsheet className="h-5 w-5" />
+        <div className="app-header__brand-divider" aria-hidden="true" />
+
+        <div className="brand-mark" aria-label="Excel RAG Flow" title="Excel RAG Flow Visualizer">
+          <FileSpreadsheet className="h-4 w-4" />
         </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm font-bold tracking-tight text-slate-950">
-              Excel RAG Flow
-            </h1>
-            <span className="brand-badge">
-              <CheckCircle2 className="h-3 w-3" /> DAG Runner
-            </span>
-          </div>
-          <p className="app-header__subtitle">질문 입력 · 모듈 조합 · 결과 확인</p>
-        </div>
+
+        {workflows.length > 0 && (
+          <>
+            <div className="app-header__brand-divider" aria-hidden="true" />
+            <div className="workflow-selector">
+              <select
+                className="workflow-selector__select"
+                value={activeWorkflowId}
+                onChange={(e) => onSelectWorkflow(e.target.value)}
+                title="워크플로 전환"
+                aria-label="활성 워크플로 선택"
+              >
+                {workflows.map((wf) => (
+                  <option key={wf.id} value={wf.id}>
+                    {wf.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="workflow-selector__chevron h-3 w-3" aria-hidden="true" />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="app-header__actions">
+        {metrics && (metrics.hasExecution || isRunning) && (
+          <div className="execution-stats-panel" title="전체 파이프라인 총 실행 통계 (소요 시간 · 비용 · 토큰 수)">
+            <div className="execution-stat-item" title="총 소요 시간">
+              <Clock className="h-3.5 w-3.5 text-emerald-600" />
+              <span>{(metrics.totalElapsedMs / 1000).toFixed(1)}s</span>
+            </div>
+            <div className="execution-stat-divider" />
+            <div className="execution-stat-item" title="총 예상 비용 ($)">
+              <Coins className="h-3.5 w-3.5 text-amber-500" />
+              <span>${metrics.totalCostUsd < 0.0001 && metrics.totalCostUsd > 0 ? '<0.0001' : metrics.totalCostUsd.toFixed(4)}</span>
+            </div>
+            <div className="execution-stat-divider" />
+            <div className="execution-stat-item" title="총 사용 토큰 수">
+              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+              <span>{metrics.totalTokens.toLocaleString()} tk</span>
+            </div>
+          </div>
+        )}
+
         {hasPipeline && (
           <div
             className="step-progress"

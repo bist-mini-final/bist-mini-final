@@ -1,0 +1,15 @@
+{
+  "id": "Q026",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM 영업현금흐름은 얼마인가?",
+  "chatgpt_answer": "$13,193M.",
+  "pipeline_answer": "제공된 셀 컨텍스트만으로는 **IBM의 LTM 영업현금흐름(Cash from Ops.)을 확인할 수 없습니다.**\n\n- 확인 가능한 최근 영업현금흐름은 **2021년 12월 31일 기준 12,796 ($M)**입니다. [Cash_Flow Cell A9448]\n- 그러나 **LTM Cash from Ops. 값이 제공되지 않았습니다.** 따라서 LTM 영업현금흐름은 산출할 수 없습니다.",
+  "api_usage": {
+    "prompt_tokens": 23267,
+    "completion_tokens": 239,
+    "cached_tokens": 0,
+    "reasoning_tokens": 120,
+    "total_tokens": 23506
+  },
+  "latency_seconds": 218.316
+}

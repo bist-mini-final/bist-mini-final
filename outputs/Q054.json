@@ -1,0 +1,15 @@
+{
+  "id": "Q054",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "IBM의 LTM 총자산과 총부채를 알려줘.",
+  "chatgpt_answer": "LTM 총자산 $151,880M, 총부채 $119,139M.",
+  "pipeline_answer": "제공된 셀 문맥만으로는 IBM의 **LTM 총자산**과 **LTM 총부채**를 확인할 수 없습니다.\n\n- **LTM 총자산:** 해당 항목의 셀 값이 제공되지 않았습니다.\n- **LTM 총부채:** 해당 항목의 셀 값이 제공되지 않았습니다.\n- 참고로, LTM **총부채(Total Debt)**는 **64,607**이지만, 이는 회계상 총부채와 동일한 항목이 아닙니다 [Balance_Sheet Cell A6858].\n\n따라서 총자산과 총부채를 산출하려면 해당 항목의 LTM 셀 값이 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 16086,
+    "completion_tokens": 254,
+    "cached_tokens": 0,
+    "reasoning_tokens": 92,
+    "total_tokens": 16340
+  },
+  "latency_seconds": 31.612
+}

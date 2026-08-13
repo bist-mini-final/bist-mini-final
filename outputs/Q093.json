@@ -1,0 +1,15 @@
+{
+  "id": "Q093",
+  "scenario": "유형 5 심층 추론 및 원인 분석",
+  "question": "비스텔리젼스의 영업이익률이 2024년부터 개선된 이유를 설명해줘.",
+  "chatgpt_answer": "파일 내 비스텔리젼스 데이터 없음.",
+  "pipeline_answer": "제공된 셀 기준으로 보면, **영업이익률은 2024년부터 계속 개선된 것이 아니라 2024년에 소폭 하락한 뒤 2025년에 뚜렷하게 개선**되었습니다.\n\n- **2023년:** EBIT 9,903, 매출 61,860 → 영업이익률 **16.0087%** [Key_Stats Cell A114] [Key_Stats Cell A6] [Key_Stats Cell A132]\n- **2024년:** EBIT 9,788, 매출 62,753 → 영업이익률 **15.5977%** [Key_Stats Cell A116] [Key_Stats Cell A8] [Key_Stats Cell A134]  \n  - EBIT: 9,788 − 9,903 = **-115**, 약 **-1.2%** [Key_Stats Cell A116] [Key_Stats Cell A114]\n  - 영업이익률: 15.5977% − 16.0087% = **-0.4111%p** [Key_Stats Cell A134] [Key_Stats Cell A132]\n- **2025년:** EBIT 11,757, 매출 67,535 → 영업이익률 **17.4088%** [Key_Stats Cell A118] [Key_Stats Cell A10] [Key_Stats Cell A136]  \n  - EBIT: 11,757 − 9,788 = **1,969**, 약 **+20.1%** [Key_Stats Cell A118] [Key_Stats Cell A116]\n  - 매출: 67,535 − 62,753 = **4,782**, 약 **+7.6%** [Key_Stats Cell A10] [Key_Stats Cell A8]\n  - 영업이익률: 17.4088% − 15.5977% = **+1.8111%p** [Key_Stats Cell A136] [Key_Stats Cell A134]\n\n**개선 배경으로 확인되는 핵심은 매출보다 총이익과 EBIT가 더 빠르게 증가했다는 점입니다.**\n\n1. **총이익률 상승**  \n   2024년 총이익률은 **56.6539%**, 2025년은 **58.1876%**로 **+1.5337%p** 개선되었습니다. [Key_Stats Cell A62] [Key_Stats Cell A64]  \n   총이익도 **35,552 → 39,297**로 **3,745 증가**, 약 **+10.5%** 증가했습니다. [Key_Stats Cell A44] [Key_Stats Cell A46]\n\n2. **영업 레버리지 효과**  \n   2025년에는 매출 증가율이 약 **7.6%**인데 EBIT 증가율은 약 **20.1%**였습니다. [Key_Stats Cell A10] [Key_Stats Cell A8] [Key_Stats Cell A118] [Key_Stats Cell A116]  \n   즉, 매출 증가분이 총이익 및 영업이익으로 더 크게 전환되면서 영업이익률이 상승한 것으로 해석됩니다.\n\n다만, 제공된 자료에는 **2024~2025년 세부 영업비용, 가격·제품 믹스, 비용절감 내역**이 충분히 제시되지 않았습니다. 따라서 영업이익률 개선의 정확한 원인을 특정 비용 항목이나 사업부문별 요인으로 단정할 수는 없습니다.",
+  "api_usage": {
+    "prompt_tokens": 19995,
+    "completion_tokens": 1521,
+    "cached_tokens": 0,
+    "reasoning_tokens": 732,
+    "total_tokens": 21516
+  },
+  "latency_seconds": 97.317
+}

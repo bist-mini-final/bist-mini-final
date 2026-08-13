@@ -1,0 +1,15 @@
+{
+  "id": "Q103",
+  "scenario": "유형 6 지표 전망 및 예측",
+  "question": "최근 매출 성장 추세가 유지되면 2026년 Total Revenue는?",
+  "chatgpt_answer": "가정: 최근 연간 성장률 7.62% 유지. 2026 Revenue = 67,535×1.0762 ≈ $72,681.2M.",
+  "pipeline_answer": "2026년 Total Revenue는 **71,183.31**로 예상됩니다 [Key_Stats Cell A14].\n\n계산상 2025년 실제 매출 **67,535** [Key_Stats Cell A10] 대비 성장률은:\n\n- 성장률 = (71,183.31159 − 67,535) ÷ 67,535\n- 성장률 ≈ **5.40%**\n\n따라서 최근 성장 추세를 반영한 2026년 매출은 **약 71,183**입니다.",
+  "api_usage": {
+    "prompt_tokens": 15870,
+    "completion_tokens": 635,
+    "cached_tokens": 0,
+    "reasoning_tokens": 512,
+    "total_tokens": 16505
+  },
+  "latency_seconds": 68.673
+}

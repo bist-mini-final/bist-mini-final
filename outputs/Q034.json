@@ -1,0 +1,15 @@
+{
+  "id": "Q034",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "2024년과 2025년 Total Assets 및 Total Liabilities를 비교해줘.",
+  "chatgpt_answer": "IBM 2024→2025 Total Assets 137,175→151,880M(+10.72%), Total Liabilities 109,782→119,139M(+8.52%).",
+  "pipeline_answer": "제공된 셀 컨텍스트만으로는 **2024년과 2025년 Total Assets 및 Total Liabilities의 총액이 확인되지 않아 비교할 수 없습니다.**\n\n- 필요한 값: 2024년·2025년 **Total Assets**\n- 필요한 값: 2024년·2025년 **Total Liabilities**\n- 따라서 증감액과 증감률도 계산할 수 없습니다.  \n  - 증감액 = 2025년 값 − 2024년 값  \n  - 증감률 = (2025년 값 − 2024년 값) ÷ 2024년 값\n\n현재 제공된 `Total Intangible Assets`, `Total Debt` 등은 Total Assets 또는 Total Liabilities와 동일한 항목이 아니므로 대체할 수 없습니다.",
+  "api_usage": {
+    "prompt_tokens": 17461,
+    "completion_tokens": 470,
+    "cached_tokens": 0,
+    "reasoning_tokens": 294,
+    "total_tokens": 17931
+  },
+  "latency_seconds": 333.363
+}

@@ -1,0 +1,1622 @@
+{
+  "Q001": {
+    "id": "Q001",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 기준 시가총액과 TEV는 각각 얼마인가?",
+    "chatgpt_answer": "IBM LTM 시가총액 $270,970.4M, TEV $321,253.4M.",
+    "pipeline_answer": "IBM의 LTM 기준:\n\n- **시가총액:** **270,970.38886734백만 USD** (약 **270.97십억 USD**) [Key_Stats Cell A248]\n- **TEV:** **321,253.38886734백만 USD** (약 **321.25십억 USD**) [Key_Stats Cell A258]\n\n계산 확인:  \n**270,970.38886734 − 14,417 + 64,607 + 93 = 321,253.38886734백만 USD**  \n(시가총액 [Key_Stats Cell A248] − 현금 및 단기투자 [Key_Stats Cell A250] + 총부채 [Key_Stats Cell A266] + 소수주주지분 [Key_Stats Cell A256])",
+    "api_usage": {
+      "prompt_tokens": 15619,
+      "completion_tokens": 447,
+      "cached_tokens": 15616,
+      "reasoning_tokens": 264,
+      "total_tokens": 16066
+    },
+    "latency_seconds": 453.112
+  },
+  "Q002": {
+    "id": "Q002",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 기준일 종가와 발행주식수는?",
+    "chatgpt_answer": "기준일 종가 $289.89, 발행주식수 934,735,206주.",
+    "pipeline_answer": "IBM의 기준일(LTM) 종가는 **289.89**이며, 발행주식수는 **934,735,206주**입니다.\n\n- 기준일 종가: **289.89** [Key_Stats Cell A242]\n- 발행주식수: **934,735,206주** [Key_Stats Cell A244]",
+    "api_usage": {
+      "prompt_tokens": 10828,
+      "completion_tokens": 140,
+      "cached_tokens": 0,
+      "reasoning_tokens": 57,
+      "total_tokens": 10968
+    },
+    "latency_seconds": 222.909
+  },
+  "Q003": {
+    "id": "Q003",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "2025년 LTM 기준 IBM의 총매출액, 매출총이익, 영업이익은?",
+    "chatgpt_answer": "2025/LTM 총매출액 $67,535M, 매출총이익 $39,297M, 영업이익 $11,757M.",
+    "pipeline_answer": "2025년 LTM 기준 IBM의 주요 재무 수치는 다음과 같습니다.\n\n- **총매출액:** 67,535 [Key_Stats Cell A12]\n- **매출총이익:** 39,297 [Key_Stats Cell A48]\n- **영업이익(EBIT):** 11,757 [Key_Stats Cell A120]\n\n제공된 **Key_Stats 셀 문맥에는 단위가 명시되어 있지 않습니다**.",
+    "api_usage": {
+      "prompt_tokens": 16068,
+      "completion_tokens": 338,
+      "cached_tokens": 0,
+      "reasoning_tokens": 227,
+      "total_tokens": 16406
+    },
+    "latency_seconds": 585.511
+  },
+  "Q004": {
+    "id": "Q004",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "2024-12-31 기준 희석 EPS와 DPS는 얼마인가?",
+    "chatgpt_answer": "2024-12-31 희석 EPS $6.429, DPS $6.67.",
+    "pipeline_answer": "2024-12-31 기준:\n\n- **희석 EPS(특별항목 제외): 6.42** [Key_Stats Cell A212]\n- **DPS(주당배당금): 6.67** [Income_Statement Cell A1940]",
+    "api_usage": {
+      "prompt_tokens": 17241,
+      "completion_tokens": 226,
+      "cached_tokens": 0,
+      "reasoning_tokens": 159,
+      "total_tokens": 17467
+    },
+    "latency_seconds": 239.654
+  },
+  "Q005": {
+    "id": "Q005",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "2025년 기준 현금 및 단기투자자산 총액은?",
+    "chatgpt_answer": "2025 현금 및 단기투자자산 $14,417M.",
+    "pipeline_answer": "2025년 기준 현금 및 단기투자자산 총액은 **14,417**입니다. [Key_Stats Cell A250]\n\n다만 제공된 셀 문맥에서는 해당 값의 단위가 명시되어 있지 않습니다. Finance Division의 현금 및 현금성자산과 단기투자자산은 각각 **NA**로 표시되어 있어, 이 두 항목의 합산으로는 산출할 수 없습니다. [Balance_Sheet Cell A7974] [Balance_Sheet Cell A8000]",
+    "api_usage": {
+      "prompt_tokens": 11211,
+      "completion_tokens": 319,
+      "cached_tokens": 0,
+      "reasoning_tokens": 196,
+      "total_tokens": 11530
+    },
+    "latency_seconds": 406.756
+  },
+  "Q006": {
+    "id": "Q006",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "2025년 기준 총자산과 총부채는 얼마인가?",
+    "chatgpt_answer": "2025 총자산 $151,880M, 총부채 $119,139M.",
+    "pipeline_answer": "2025년 기준:\n\n- **총자산:** 제공된 셀 컨텍스트에 해당 값이 없어 확인할 수 없습니다.  \n- **총부채:** **119,139백만 달러(= $119.139B)**입니다. [Balance_Sheet Cell A5686]\n\n따라서 총자산 금액은 관련 셀 값이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 18918,
+      "completion_tokens": 207,
+      "cached_tokens": 0,
+      "reasoning_tokens": 117,
+      "total_tokens": 19125
+    },
+    "latency_seconds": 119.942
+  },
+  "Q007": {
+    "id": "Q007",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "2025년 영업활동 현금흐름과 자본지출은?",
+    "chatgpt_answer": "2025 영업활동 현금흐름 $13,193M, CapEx $1,617M 지출(현금흐름 표시는 -$1,617M).",
+    "pipeline_answer": "2025년:\n\n- **영업활동 현금흐름:** **13,193백만 달러** [Cash_Flow Cell A9458]\n- **자본지출:** **-1,617백만 달러** [Cash_Flow Cell A9482]\n\n자본지출을 현금 유출로 반영한 영업현금흐름-자본지출은 **13,193 + (-1,617) = 11,576백만 달러**입니다. [Cash_Flow Cell A9458] [Cash_Flow Cell A9482]",
+    "api_usage": {
+      "prompt_tokens": 21041,
+      "completion_tokens": 305,
+      "cached_tokens": 0,
+      "reasoning_tokens": 170,
+      "total_tokens": 21346
+    },
+    "latency_seconds": 441.616
+  },
+  "Q008": {
+    "id": "Q008",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "2025년 집행된 총 배당금 규모는?",
+    "chatgpt_answer": "2025 총 배당금 집행 $6,255M.",
+    "pipeline_answer": "2025년 집행된 총 배당금은 **6,255백만 달러(약 62.55억 달러)**입니다. 현금흐름표상 지급액은 현금 유출을 의미하는 **-6,255백만 달러**로 표시됩니다. [Cash_Flow Cell A10080]\n\n계산: **6,255백만 달러 ÷ 1,000 = 6.255십억 달러** [Cash_Flow Cell A10080]",
+    "api_usage": {
+      "prompt_tokens": 17455,
+      "completion_tokens": 208,
+      "cached_tokens": 0,
+      "reasoning_tokens": 92,
+      "total_tokens": 17663
+    },
+    "latency_seconds": 157.742
+  },
+  "Q009": {
+    "id": "Q009",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 최근 회계연도(FY0) 매출액은 얼마인가?",
+    "chatgpt_answer": "FY0 매출액 $67,535M.",
+    "pipeline_answer": "IBM의 최근 회계연도(FY0) 매출액은 **67,535**입니다. [Key_Stats Cell A10]\n\n※ 제공된 셀 컨텍스트에는 단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 18955,
+      "completion_tokens": 126,
+      "cached_tokens": 0,
+      "reasoning_tokens": 68,
+      "total_tokens": 19081
+    },
+    "latency_seconds": 199.786
+  },
+  "Q010": {
+    "id": "Q010",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 기준 EBITDA 마진은 몇 %인가?",
+    "chatgpt_answer": "LTM EBITDA 마진 24.84% (=16,778/67,535).",
+    "pipeline_answer": "IBM의 **LTM EBITDA 마진은 24.843414525801435%**입니다. [Key_Stats Cell A102]\n\n계산: **LTM EBITDA 16,778 ÷ LTM Total Revenue 67,535 × 100 = 24.843414525801435%** [Key_Stats Cell A84] [Key_Stats Cell A12]",
+    "api_usage": {
+      "prompt_tokens": 19808,
+      "completion_tokens": 229,
+      "cached_tokens": 0,
+      "reasoning_tokens": 127,
+      "total_tokens": 20037
+    },
+    "latency_seconds": 400.875
+  },
+  "Q011": {
+    "id": "Q011",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 부채비율(Debt/Equity)은 얼마인가?",
+    "chatgpt_answer": "Debt/Equity 1.98x, 즉 약 197.9% (=총부채성 Debt 64,607 / 보통주자본 32,648).",
+    "pipeline_answer": "IBM의 **LTM Debt/Equity 비율은 약 197.4% (1.97배)**입니다.\n\n- 총부채: **64,607** [Key_Stats Cell A252]\n- 총자본: **97,348** [Key_Stats Cell A268]\n- 총자본에서 총부채를 차감한 자기자본:  \n  **97,348 − 64,607 = 32,741** [Key_Stats Cell A268][Key_Stats Cell A252]\n- Debt/Equity:  \n  **64,607 ÷ 32,741 = 1.9736배 = 197.4%** [Key_Stats Cell A252][Key_Stats Cell A268]\n\n참고로 자기자본은 보통주자본 **32,648**과 소수주주지분 **93**의 합계인 **32,741**로도 확인됩니다 [Key_Stats Cell A260][Key_Stats Cell A264].",
+    "api_usage": {
+      "prompt_tokens": 15617,
+      "completion_tokens": 564,
+      "cached_tokens": 0,
+      "reasoning_tokens": 343,
+      "total_tokens": 16181
+    },
+    "latency_seconds": 272.522
+  },
+  "Q012": {
+    "id": "Q012",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 최근 분기 시가총액은?",
+    "chatgpt_answer": "파일에는 분기 시가총액 시계열이 없어 산출 불가. 현재 valuation date 시가총액은 $270,970.4M.",
+    "pipeline_answer": "제공된 컨텍스트에서 확인되는 IBM의 **LTM 기준 시가총액은 270,970.38886734**입니다 [Key_Stats Cell A248].\n\n계산은 다음과 같습니다.\n\n- 주가: 289.89 [Key_Stats Cell A242]  \n- 발행주식수: 934,735,206주 [Key_Stats Cell A244]  \n- 계산: 289.89 × 934,735,206 ÷ 1,000,000 = **270,970.38886734** [Key_Stats Cell A246]\n\n다만 제공된 셀에는 **최근 분기의 구체적인 기준일자와 시가총액 단위가 명시되어 있지 않으며**, 값은 LTM 기준입니다.",
+    "api_usage": {
+      "prompt_tokens": 12630,
+      "completion_tokens": 524,
+      "cached_tokens": 0,
+      "reasoning_tokens": 350,
+      "total_tokens": 13154
+    },
+    "latency_seconds": 134.701
+  },
+  "Q013": {
+    "id": "Q013",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "Bank of America의 최대주주(1위 Holder)는 누구인가?",
+    "chatgpt_answer": "파일 내 Bank of America 주주 데이터 없음.",
+    "pipeline_answer": "제공된 Excel 셀 context에는 Bank of America의 주주별 보유 현황이나 최대주주(1위 Holder) 정보가 없습니다. 따라서 최대주자가 누구인지 판단할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 13497,
+      "completion_tokens": 113,
+      "cached_tokens": 0,
+      "reasoning_tokens": 61,
+      "total_tokens": 13610
+    },
+    "latency_seconds": 147.506
+  },
+  "Q014": {
+    "id": "Q014",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "BAC의 기관투자자 지분율은?",
+    "chatgpt_answer": "파일 내 BAC 기관투자자 지분율 데이터 없음.",
+    "pipeline_answer": "제공된 Excel 셀 컨텍스트에는 **BAC의 기관투자자 지분율** 데이터가 없습니다. 따라서 기관투자자 지분율은 확인할 수 없습니다. 해당 비율 또는 기관투자자 보유주식 수와 총 발행주식 수에 대한 셀 정보가 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 12829,
+      "completion_tokens": 151,
+      "cached_tokens": 0,
+      "reasoning_tokens": 72,
+      "total_tokens": 12980
+    },
+    "latency_seconds": 140.057
+  },
+  "Q015": {
+    "id": "Q015",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "BAC의 CEO는 누구인가?",
+    "chatgpt_answer": "파일 내 BAC 경영진 데이터 없음.",
+    "pipeline_answer": "제공된 Excel 셀 컨텍스트에는 BAC의 CEO 정보가 없습니다. 따라서 CEO를 확인할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 12075,
+      "completion_tokens": 86,
+      "cached_tokens": 0,
+      "reasoning_tokens": 52,
+      "total_tokens": 12161
+    },
+    "latency_seconds": 197.424
+  },
+  "Q016": {
+    "id": "Q016",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "비스텔리젼스의 2024년 매출은 얼마인가?",
+    "chatgpt_answer": "파일 내 비스텔리젼스 데이터 없음.",
+    "pipeline_answer": "제공된 셀 context에는 **비스텔리젼스**가 아니라 **International Business Machines Corporation(IBM)**의 데이터만 있습니다.  \n\nIBM을 의미하신 것이라면, **2024년 매출(Total Revenue)은 62,753백만 달러(약 627.53억 달러)**입니다 [Income_Statement Cell A534].",
+    "api_usage": {
+      "prompt_tokens": 17727,
+      "completion_tokens": 201,
+      "cached_tokens": 0,
+      "reasoning_tokens": 115,
+      "total_tokens": 17928
+    },
+    "latency_seconds": 313.004
+  },
+  "Q017": {
+    "id": "Q017",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "콜드플레이의 최근 분기 영업이익률은?",
+    "chatgpt_answer": "파일 내 콜드플레이 데이터 없음.",
+    "pipeline_answer": "제공된 셀 컨텍스트에는 **콜드플레이의 최근 분기 영업이익률**이 없습니다. 컨텍스트는 주로 **International Business Machines Corporation(IBM)** 및 연간/LTM 재무 데이터에 관한 내용이므로, 콜드플레이의 최근 분기 영업이익률을 확인할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 11098,
+      "completion_tokens": 127,
+      "cached_tokens": 0,
+      "reasoning_tokens": 43,
+      "total_tokens": 11225
+    },
+    "latency_seconds": 113.769
+  },
+  "Q018": {
+    "id": "Q018",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "비스텔리젼스의 현재 직원 수는?",
+    "chatgpt_answer": "파일 내 비스텔리젼스 직원 수 데이터 없음.",
+    "pipeline_answer": "비스텔리젼스의 현재 직원 수는 **270,300명**입니다(2024년 12월 31일 기준) [Balance_Sheet Cell A7790].  \n2025년 12월 31일 직원 수는 **NA**로 제공됩니다 [Balance_Sheet Cell A7792].",
+    "api_usage": {
+      "prompt_tokens": 13540,
+      "completion_tokens": 174,
+      "cached_tokens": 0,
+      "reasoning_tokens": 98,
+      "total_tokens": 13714
+    },
+    "latency_seconds": 327.749
+  },
+  "Q019": {
+    "id": "Q019",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 시가총액은 얼마인가?",
+    "chatgpt_answer": "$270,970.4M.",
+    "pipeline_answer": "IBM의 LTM 시가총액은 **270,970.38886734백만 달러(약 2,709.70억 달러)**입니다 [Key_Stats Cell A248].\n\n계산:\n- 종가 **289.89달러** × 발행주식수 **934,735,206주** ÷ **1,000,000** = **270,970.38886734백만 달러** [Key_Stats Cell A242] [Key_Stats Cell A244] [Key_Stats Cell A246]",
+    "api_usage": {
+      "prompt_tokens": 15463,
+      "completion_tokens": 309,
+      "cached_tokens": 15460,
+      "reasoning_tokens": 184,
+      "total_tokens": 15772
+    },
+    "latency_seconds": 148.915
+  },
+  "Q020": {
+    "id": "Q020",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM TEV는 얼마인가?",
+    "chatgpt_answer": "$321,253.4M.",
+    "pipeline_answer": "IBM의 LTM TEV는 **321,253.38886734**입니다. 단위는 제공된 셀 context에 명시되어 있지 않습니다. [KS Cell A258]",
+    "api_usage": {
+      "prompt_tokens": 18294,
+      "completion_tokens": 216,
+      "cached_tokens": 0,
+      "reasoning_tokens": 167,
+      "total_tokens": 18510
+    },
+    "latency_seconds": 148.328
+  },
+  "Q021": {
+    "id": "Q021",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 매출은 얼마인가?",
+    "chatgpt_answer": "$67,535M.",
+    "pipeline_answer": "IBM의 LTM 매출은 **67,535백만 달러(약 675억 3,500만 달러)**입니다. [Key_Stats Cell A12]",
+    "api_usage": {
+      "prompt_tokens": 17940,
+      "completion_tokens": 41,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0,
+      "total_tokens": 17981
+    },
+    "latency_seconds": 394.742
+  },
+  "Q022": {
+    "id": "Q022",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM EBITDA는 얼마인가?",
+    "chatgpt_answer": "$16,778M.",
+    "pipeline_answer": "IBM의 LTM EBITDA는 **16,778백만 달러(약 167.78억 달러)**입니다. [Key_Stats Cell A84] [Income_Statement Cell A2100]",
+    "api_usage": {
+      "prompt_tokens": 17368,
+      "completion_tokens": 168,
+      "cached_tokens": 17365,
+      "reasoning_tokens": 116,
+      "total_tokens": 17536
+    },
+    "latency_seconds": 124.061
+  },
+  "Q023": {
+    "id": "Q023",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 순이익은 얼마인가?",
+    "chatgpt_answer": "$10,593M.",
+    "pipeline_answer": "IBM의 LTM 순이익은 **10,593백만 달러(약 105.93억 달러)**입니다. [Key_Stats Cell A180]",
+    "api_usage": {
+      "prompt_tokens": 18339,
+      "completion_tokens": 39,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0,
+      "total_tokens": 18378
+    },
+    "latency_seconds": 161.34
+  },
+  "Q024": {
+    "id": "Q024",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 총자산은 얼마인가?",
+    "chatgpt_answer": "$151,880M.",
+    "pipeline_answer": "제공된 셀 컨텍스트에는 IBM의 **LTM 총자산(Total Assets)** 금액이 없습니다. 따라서 LTM 총자산은 산출할 수 없습니다. LTM 기준일은 **2025-12-31**로 확인됩니다 [Balance_Sheet Cell A8678].",
+    "api_usage": {
+      "prompt_tokens": 14563,
+      "completion_tokens": 145,
+      "cached_tokens": 0,
+      "reasoning_tokens": 72,
+      "total_tokens": 14708
+    },
+    "latency_seconds": 176.021
+  },
+  "Q025": {
+    "id": "Q025",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 장기부채는 얼마인가?",
+    "chatgpt_answer": "LTM Long-Term Debt $54,836M. (Total Non-Current Debt 기준은 $57,383M.)",
+    "pipeline_answer": "IBM의 **LTM 장기부채(Total Non-Current Debt)**는 **57,383백만 달러(약 573억 8,300만 달러)**입니다. [Balance_Sheet Cell A6910]",
+    "api_usage": {
+      "prompt_tokens": 13914,
+      "completion_tokens": 175,
+      "cached_tokens": 0,
+      "reasoning_tokens": 117,
+      "total_tokens": 14089
+    },
+    "latency_seconds": 141.39
+  },
+  "Q026": {
+    "id": "Q026",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM 영업현금흐름은 얼마인가?",
+    "chatgpt_answer": "$13,193M.",
+    "pipeline_answer": "제공된 셀 컨텍스트만으로는 **IBM의 LTM 영업현금흐름(Cash from Ops.)을 확인할 수 없습니다.**\n\n- 확인 가능한 최근 영업현금흐름은 **2021년 12월 31일 기준 12,796 ($M)**입니다. [Cash_Flow Cell A9448]\n- 그러나 **LTM Cash from Ops. 값이 제공되지 않았습니다.** 따라서 LTM 영업현금흐름은 산출할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 23267,
+      "completion_tokens": 239,
+      "cached_tokens": 0,
+      "reasoning_tokens": 120,
+      "total_tokens": 23506
+    },
+    "latency_seconds": 218.316
+  },
+  "Q027": {
+    "id": "Q027",
+    "scenario": "유형 1 단일 지표 조회",
+    "question": "IBM의 LTM CAPEX는 얼마인가?",
+    "chatgpt_answer": "$1,617M 지출(표시값 -$1,617M).",
+    "pipeline_answer": "IBM의 LTM CAPEX는 **-1,617백만 달러(-$1.617B)**입니다. [Cash_Flow Cell A9484]",
+    "api_usage": {
+      "prompt_tokens": 15843,
+      "completion_tokens": 115,
+      "cached_tokens": 0,
+      "reasoning_tokens": 72,
+      "total_tokens": 15958
+    },
+    "latency_seconds": 132.112
+  },
+  "Q028": {
+    "id": "Q028",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "2021년부터 2025년까지 IBM의 매출액 CAGR 및 연도별 YoY는?",
+    "chatgpt_answer": "2021\\~2025 매출 CAGR 4.17%. YoY: 2022 +5.54%, 2023 +2.20%, 2024 +1.44%, 2025 +7.62%.",
+    "pipeline_answer": "IBM의 **2021~2025년 매출액 CAGR은 약 4.1%**입니다.\n\n### 매출액 및 연도별 YoY\n\n| 연도 | 매출액 | YoY |\n|---|---:|---:|\n| 2021년 | 57,351 [KS Cell A2] | 3.936% [KS Cell A20] |\n| 2022년 | 60,530 [KS Cell A4] | **5.54%** |\n| 2023년 | 61,860 [KS Cell A6] | **2.20%** |\n| 2024년 | 62,753 [KS Cell A8] | **1.44%** |\n| 2025년 | 67,535 [KS Cell A10] | **7.62%** |\n\n### 계산\n\n- 2022년 YoY: `(60,530 ÷ 57,351 - 1) × 100 = 5.54%` [KS Cell A2, A4]\n- 2023년 YoY: `(61,860 ÷ 60,530 - 1) × 100 = 2.20%` [KS Cell A4, A6]\n- 2024년 YoY: `(62,753 ÷ 61,860 - 1) × 100 = 1.44%` [KS Cell A6, A8]\n- 2025년 YoY: `(67,535 ÷ 62,753 - 1) × 100 = 7.62%` [KS Cell A8, A10]\n\n### CAGR\n\n2021년부터 2025년까지는 4개 연간 구간이므로:\n\n`(67,535 ÷ 57,351)^(1/4) - 1 = 4.1%`\n\n[KS Cell A2, A10]\n\n※ 매출액의 단위는 제공된 셀 문맥에 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 13357,
+      "completion_tokens": 948,
+      "cached_tokens": 0,
+      "reasoning_tokens": 511,
+      "total_tokens": 14305
+    },
+    "latency_seconds": 762.986
+  },
+  "Q029": {
+    "id": "Q029",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "최근 4년간 Gross Margin, EBITDA Margin, EBIT Margin의 변화 추이는?",
+    "chatgpt_answer": "최근 4년(2022→2025): Gross Margin 54.00%→55.45%→56.65%→58.19%; EBITDA Margin 17.80%→20.59%→20.53%→24.84%; EBIT Margin 12.43%→16.01%→15.60%→17.41%. 전반적 마진 개선.",
+    "pipeline_answer": "최근 4년간(2022~2025년) 마진 추이는 다음과 같습니다.\n\n| 구분 | 2022년 | 2023년 | 2024년 | 2025년 | 변화(2022→2025) |\n|---|---:|---:|---:|---:|---:|\n| Gross Margin | 54.00297% [KS Cell A58] | 55.44779% [KS Cell A60] | 56.65387% [KS Cell A62] | 58.18761% [KS Cell A64] | **+4.18463%p** |\n| EBITDA Margin | 17.80109% [KS Cell A94] | 20.59328% [KS Cell A96] | 20.53448% [KS Cell A98] | 24.84341% [KS Cell A100] | **+7.04232%p** |\n| EBIT Margin | 12.42524% [KS Cell A130] | 16.00873% [KS Cell A132] | 15.59766% [KS Cell A134] | 17.40875% [KS Cell A136] | **+4.98351%p** |\n\n계산:\n- Gross Margin: 58.18761% − 54.00297% = **+4.18463%p**\n- EBITDA Margin: 24.84341% − 17.80109% = **+7.04232%p**\n- EBIT Margin: 17.40875% − 12.42524% = **+4.98351%p**\n\n**추이 해석**\n- **Gross Margin**은 2022년부터 2025년까지 매년 상승하며, 54.00%에서 58.19%로 개선되었습니다.\n- **EBITDA Margin**은 2022년 17.80%에서 2023년 20.59%로 상승한 뒤 2024년 20.53%로 소폭 하락했으나, 2025년 24.84%로 크게 개선되었습니다.\n- **EBIT Margin**은 2022년 12.43%에서 2023년 16.01%로 상승했고, 2024년 15.60%로 소폭 낮아졌다가 2025년 17.41%로 반등했습니다.\n\n따라서 최근 4년 동안 **세 마진 모두 전반적으로 개선**되었으며, 개선 폭은 **EBITDA Margin이 가장 컸습니다**.",
+    "api_usage": {
+      "prompt_tokens": 12884,
+      "completion_tokens": 1077,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 13961
+    },
+    "latency_seconds": 1326.025
+  },
+  "Q030": {
+    "id": "Q030",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "최근 5년간 장기부채와 단기부채의 변동 경향은?",
+    "chatgpt_answer": "최근 5년 Total Non-Current Debt: 47,379→48,379→52,689→52,539→57,383M; Total Debt Current: 7,761→5,634→7,246→5,857→7,224M. 장기부채는 우상향, 단기부채는 변동성이 큼.",
+    "pipeline_answer": "최근 5년을 **2021~2025년**으로 보면, 장기부채는 전반적으로 증가했고 단기부채는 큰 폭의 등락을 보였으나 2021년 대비 소폭 감소했습니다. 아래 수치는 원문에 별도 단위가 표시되지 않아 **단위 미상**입니다.\n\n| 연도 | 단기부채 (Total Debt Current) | 전년 대비 | 장기부채 (Total Non-Current Debt) | 전년 대비 |\n|---|---:|---:|---:|---:|\n| 2021 | 7,761 [KS Cell A6874] | — | 47,379 [KS Cell A6900] | — |\n| 2022 | 5,634 [KS Cell A6876] | 5,634 - 7,761 = **-2,127**, **-27.4%** [KS Cell A6874, A6876] | 48,379 [KS Cell A6902] | 48,379 - 47,379 = **+1,000**, **+2.1%** [KS Cell A6900, A6902] |\n| 2023 | 7,246 [KS Cell A6878] | 7,246 - 5,634 = **+1,612**, **+28.6%** [KS Cell A6876, A6878] | 52,689 [KS Cell A6904] | 52,689 - 48,379 = **+4,310**, **+8.9%** [KS Cell A6902, A6904] |\n| 2024 | 5,857 [KS Cell A6880] | 5,857 - 7,246 = **-1,389**, **-19.2%** [KS Cell A6878, A6880] | 52,539 [KS Cell A6906] | 52,539 - 52,689 = **-150**, **-0.3%** [KS Cell A6904, A6906] |\n| 2025 | 7,224 [KS Cell A6882] | 7,224 - 5,857 = **+1,367**, **+23.3%** [KS Cell A6880, A6882] | 57,383 [KS Cell A6908] | 57,383 - 52,539 = **+4,844**, **+9.2%** [KS Cell A6906, A6908] |\n\n**핵심 경향**\n\n- **장기부채:** 2021년 47,379에서 2025년 57,383으로 증가했습니다.  \n  계산: 57,383 - 47,379 = **+10,004**, 증가율 **+21.1%** [KS Cell A6900, A6908]  \n  특히 2023년과 2025년에 증가폭이 컸습니다. [KS Cell A6902, A6904, A6906, A6908]\n\n- **단기부채:** 2021년 7,761에서 2022년 5,634로 급감한 뒤, 2023년 7,246으로 반등했습니다. 2024년에는 다시 5,857로 감소했고 2025년에는 7,224로 재차 증가했습니다. [KS Cell A6874, A6876, A6878, A6880, A6882]\n\n- **전체적으로:** 부채 구조는 최근 5년간 **단기부채보다 장기부채 중심으로 확대**된 모습입니다. 장기부채는 2021년 대비 21.1% 증가한 반면, 단기부채는 같은 기간 6.9% 감소했습니다.  \n  계산: 7,224 - 7,761 = **-537**, -537 ÷ 7,761 = **-6.9%** [KS Cell A6874, A6882]",
+    "api_usage": {
+      "prompt_tokens": 12158,
+      "completion_tokens": 1277,
+      "cached_tokens": 0,
+      "reasoning_tokens": 400,
+      "total_tokens": 13435
+    },
+    "latency_seconds": 799.285
+  },
+  "Q031": {
+    "id": "Q031",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "비스텔리젼스의 2023년 상반기와 하반기 매출을 비교해줘.",
+    "chatgpt_answer": "파일 내 비스텔리젼스 반기 데이터 없음.",
+    "pipeline_answer": "제공된 셀 context에는 비스텔리젼스의 **2023년 상반기 및 하반기 매출 데이터가 없습니다**. 따라서 두 기간의 매출 비교나 증감률 계산은 할 수 없습니다.\n\n참고로 확인 가능한 값은 **2023년 연간 매출 61,860**뿐입니다 [Key_Stats Cell A6]. 상·하반기 매출 비교를 위해서는 2023년 **H1 매출과 H2 매출** 셀이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 17660,
+      "completion_tokens": 165,
+      "cached_tokens": 0,
+      "reasoning_tokens": 43,
+      "total_tokens": 17825
+    },
+    "latency_seconds": 399.916
+  },
+  "Q032": {
+    "id": "Q032",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "콜드플레이의 작년 동기 대비 매출 성장률은?",
+    "chatgpt_answer": "파일 내 콜드플레이 데이터 없음.",
+    "pipeline_answer": "제공된 Excel 셀 문맥에는 **콜드플레이의 매출 또는 전년 동기 매출 데이터가 없어**, 작년 동기 대비 매출 성장률을 산출할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 14535,
+      "completion_tokens": 160,
+      "cached_tokens": 0,
+      "reasoning_tokens": 107,
+      "total_tokens": 14695
+    },
+    "latency_seconds": 966.456
+  },
+  "Q033": {
+    "id": "Q033",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "2024년 대비 2025년 매출과 영업이익은 얼마나 증가했나?",
+    "chatgpt_answer": "IBM 2024→2025 매출 62,753→67,535M: +4,782M(+7.62%). 영업이익 9,788→11,757M: +1,969M(+20.12%).",
+    "pipeline_answer": "2024년 대비 2025년 증가액과 증가율은 다음과 같습니다.\n\n- **매출**\n  - 증가액: 67,535 − 62,753 = **4,782** [Key_Stats Cell A10] [Key_Stats Cell A8]\n  - 증가율: 4,782 ÷ 62,753 × 100 = **약 7.62%**\n\n- **영업이익(EBIT)**\n  - 증가액: 11,757 − 9,788 = **1,969** [Key_Stats Cell A118] [Key_Stats Cell A116]\n  - 증가율: 1,969 ÷ 9,788 × 100 = **약 20.12%**\n\n따라서 2025년에는 2024년 대비 **매출이 4,782(약 7.62%)**, **영업이익이 1,969(약 20.12%)** 증가했습니다. 제공된 Key_Stats 셀에는 단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 16641,
+      "completion_tokens": 378,
+      "cached_tokens": 0,
+      "reasoning_tokens": 135,
+      "total_tokens": 17019
+    },
+    "latency_seconds": 531.926
+  },
+  "Q034": {
+    "id": "Q034",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "2024년과 2025년 Total Assets 및 Total Liabilities를 비교해줘.",
+    "chatgpt_answer": "IBM 2024→2025 Total Assets 137,175→151,880M(+10.72%), Total Liabilities 109,782→119,139M(+8.52%).",
+    "pipeline_answer": "제공된 셀 컨텍스트만으로는 **2024년과 2025년 Total Assets 및 Total Liabilities의 총액이 확인되지 않아 비교할 수 없습니다.**\n\n- 필요한 값: 2024년·2025년 **Total Assets**\n- 필요한 값: 2024년·2025년 **Total Liabilities**\n- 따라서 증감액과 증감률도 계산할 수 없습니다.  \n  - 증감액 = 2025년 값 − 2024년 값  \n  - 증감률 = (2025년 값 − 2024년 값) ÷ 2024년 값\n\n현재 제공된 `Total Intangible Assets`, `Total Debt` 등은 Total Assets 또는 Total Liabilities와 동일한 항목이 아니므로 대체할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 17461,
+      "completion_tokens": 470,
+      "cached_tokens": 0,
+      "reasoning_tokens": 294,
+      "total_tokens": 17931
+    },
+    "latency_seconds": 333.363
+  },
+  "Q035": {
+    "id": "Q035",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "2024년 대비 2025년 영업현금흐름과 CapEx는 어떻게 변했나?",
+    "chatgpt_answer": "IBM 2024→2025 CFO 13,445→13,193M(-1.87%). CapEx 지출은 1,048→1,617M로 54.3% 증가.",
+    "pipeline_answer": "2024년 대비 2025년의 변화를 **완전히 계산하기에는 2024년 및 2025년 CapEx 값이 부족**합니다.\n\n- **영업현금흐름(Cash from Ops)**: 2025년은 **13,193백만 달러**입니다 [Cash_Flow Cell A9458]. 그러나 2024년 영업현금흐름 값이 제공되지 않아 증감액과 증감률은 계산할 수 없습니다.\n- **CapEx**: 제공된 컨텍스트에는 2025년 CapEx 값이 없으며, 2024년 CapEx 값도 없습니다. 따라서 2024년 대비 2025년 CapEx의 증감액 및 증감률을 계산할 수 없습니다.\n\n계산식은 각각 다음과 같습니다.\n\n- 영업현금흐름 증감액 = 2025년 **13,193** − 2024년 영업현금흐름\n- CapEx 증감액 = 2025년 CapEx − 2024년 CapEx\n\n필요한 **2024년 영업현금흐름, 2024년 CapEx, 2025년 CapEx** 값이 누락되어 있습니다.",
+    "api_usage": {
+      "prompt_tokens": 16976,
+      "completion_tokens": 361,
+      "cached_tokens": 0,
+      "reasoning_tokens": 90,
+      "total_tokens": 17337
+    },
+    "latency_seconds": 853.912
+  },
+  "Q036": {
+    "id": "Q036",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "2024년 대비 2025년 Diluted EPS와 DPS를 비교해줘.",
+    "chatgpt_answer": "IBM 2024→2025 Diluted EPS 6.429→11.163(+73.64%), DPS 6.67→6.71(+0.60%).",
+    "pipeline_answer": "2024년 대비 2025년 비교는 다음과 같습니다.\n\n| 항목 | 2024년 | 2025년 | 증감 | 증감률 |\n|---|---:|---:|---:|---:|\n| Diluted EPS | 6.42 [Key_Stats Cell A212] | 11.14 [Key_Stats Cell A214] | **+4.72** | **+73.5%** |\n| DPS | 6.67 [Income_Statement Cell A1940] | 6.71 [Income_Statement Cell A1942] | **+0.04** | **+0.6%** |\n\n계산:\n- Diluted EPS: 11.14 − 6.42 = **4.72**, 4.72 ÷ 6.42 × 100 = **73.5%** [Key_Stats Cell A212] [Key_Stats Cell A214]\n- DPS: 6.71 − 6.67 = **0.04**, 0.04 ÷ 6.67 × 100 = **0.6%** [Income_Statement Cell A1940] [Income_Statement Cell A1942]\n\n따라서 2025년에는 **Diluted EPS가 크게 증가한 반면, DPS는 거의 변동 없이 소폭 증가**했습니다.",
+    "api_usage": {
+      "prompt_tokens": 15798,
+      "completion_tokens": 397,
+      "cached_tokens": 0,
+      "reasoning_tokens": 100,
+      "total_tokens": 16195
+    },
+    "latency_seconds": 343.376
+  },
+  "Q037": {
+    "id": "Q037",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 FY0 매출과 LTM 매출을 알려줘.",
+    "chatgpt_answer": "FY0 매출과 LTM 매출 모두 $67,535M.",
+    "pipeline_answer": "IBM의 매출은 다음과 같습니다.\n\n- **FY0 매출(2025년 12월 31일 기준): 67,535** [Key_Stats Cell A10]\n- **LTM 매출(2025년 12월 31일 기준): 67,535** [Key_Stats Cell A12]\n\n따라서 **FY0와 LTM 매출은 동일하며, 차이는 0**입니다.  \n계산: 67,535 − 67,535 = **0** [Key_Stats Cell A10][Key_Stats Cell A12]\n\n※ 제공된 셀 문맥에는 매출의 통화 단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 18952,
+      "completion_tokens": 240,
+      "cached_tokens": 0,
+      "reasoning_tokens": 83,
+      "total_tokens": 19192
+    },
+    "latency_seconds": 299.975
+  },
+  "Q038": {
+    "id": "Q038",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 3년 매출 추세를 알려줘.",
+    "chatgpt_answer": "최근 3년 매출: 2023 $61,860M → 2024 $62,753M → 2025 $67,535M. 2025년에 성장 가속.",
+    "pipeline_answer": "IBM의 최근 3년 매출 추세는 **완만한 증가 후 2025년에 성장세가 크게 확대**된 모습입니다.\n\n| 연도 | 매출 | 전년 대비 증감 |\n|---|---:|---:|\n| 2023년 | 61,860 [KS Cell A6] | — |\n| 2024년 | 62,753 [KS Cell A8] | \\((62,753-61,860) ÷ 61,860 = 1.44\\%\\) 증가 [KS Cell A6][KS Cell A8] |\n| 2025년 | 67,535 [KS Cell A10] | \\((67,535-62,753) ÷ 62,753 = 7.62\\%\\) 증가 [KS Cell A8][KS Cell A10] |\n\n- 2023년에서 2025년까지 매출은 **5,675 증가**했으며, \\((67,535-61,860) ÷ 61,860 = 9.17\\%\\) 증가했습니다. [KS Cell A6][KS Cell A10]\n- 따라서 **2024년에는 1.44%의 소폭 성장**, **2025년에는 7.62%로 성장률이 확대**되었습니다. [KS Cell A6][KS Cell A8][KS Cell A10]\n\n제공된 셀 context에는 매출의 통화 및 단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 15244,
+      "completion_tokens": 507,
+      "cached_tokens": 0,
+      "reasoning_tokens": 183,
+      "total_tokens": 15751
+    },
+    "latency_seconds": 688.554
+  },
+  "Q039": {
+    "id": "Q039",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 3년 EBITDA 추세를 알려줘.",
+    "chatgpt_answer": "최근 3년 EBITDA: 2023 $12,739M → 2024 $12,886M → 2025 $16,778M. 2025년 큰 폭 개선.",
+    "pipeline_answer": "IBM의 최근 3년 EBITDA 추세는 **2023년 정체 후 2025년 크게 증가**한 모습입니다. 단위는 **$M**입니다.\n\n| 연도 | EBITDA | 전년 대비 증감 |\n|---|---:|---:|\n| 2023년 | 12,739 [Income_Statement Cell A2094] | — |\n| 2024년 | 12,886 [Income_Statement Cell A2096] | **+147** = 12,886 − 12,739, **+1.2%** = 147 ÷ 12,739 |\n| 2025년 | 16,778 [Income_Statement Cell A2098] | **+3,892** = 16,778 − 12,886, **+30.2%** = 3,892 ÷ 12,886 |\n\n- 2023~2024년 EBITDA는 **12,739에서 12,886로 소폭 증가**했습니다. [Income_Statement Cell A2094] [Income_Statement Cell A2096]\n- 2024~2025년에는 **16,778로 30.2% 급증**했습니다. [Income_Statement Cell A2096] [Income_Statement Cell A2098]\n- 전체적으로 2023년 대비 2025년 EBITDA는 **4,039 증가**했으며, 계산은 **16,778 − 12,739 = 4,039**입니다. [Income_Statement Cell A2094] [Income_Statement Cell A2098]",
+    "api_usage": {
+      "prompt_tokens": 15896,
+      "completion_tokens": 514,
+      "cached_tokens": 0,
+      "reasoning_tokens": 171,
+      "total_tokens": 16410
+    },
+    "latency_seconds": 508.977
+  },
+  "Q040": {
+    "id": "Q040",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 3년 순이익 추세를 알려줘.",
+    "chatgpt_answer": "최근 3년 순이익: 2023 $7,502M → 2024 $6,023M → 2025 $10,593M. 2024 감소 후 2025 급반등.",
+    "pipeline_answer": "IBM의 최근 3년 순이익 추세는 **2024년에 감소한 뒤 2025년에 크게 반등**한 모습입니다. 단위는 **백만 달러($M)**입니다.\n\n- **2023년:** 7,502 [Income_Statement Cell A1572]\n- **2024년:** 6,023 [Income_Statement Cell A1574]  \n  - 전년 대비: 6,023 - 7,502 = **-1,479**\n  - 증감률: -1,479 ÷ 7,502 × 100 = **-19.7%**\n- **2025년:** 10,593 [Income_Statement Cell A1576]  \n  - 전년 대비: 10,593 - 6,023 = **+4,570**\n  - 증감률: 4,570 ÷ 6,023 × 100 = **+75.9%**\n\n종합하면, **2023년 7,502에서 2025년 10,593으로 3,091 증가**했으며, 2023년 대비 **41.2% 증가**했습니다. [Income_Statement Cell A1572] [Income_Statement Cell A1576]",
+    "api_usage": {
+      "prompt_tokens": 13001,
+      "completion_tokens": 459,
+      "cached_tokens": 0,
+      "reasoning_tokens": 186,
+      "total_tokens": 13460
+    },
+    "latency_seconds": 757.2
+  },
+  "Q041": {
+    "id": "Q041",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 3년 총자산 변화를 알려줘.",
+    "chatgpt_answer": "최근 3년 총자산: 2023 $135,241M → 2024 $137,175M → 2025 $151,880M.",
+    "pipeline_answer": "IBM 총자산은 최근 3년간 다음과 같이 증가했습니다. 단위는 **$M**입니다.\n\n| 회계연도 | 총자산 | 전년 대비 변화 |\n|---|---:|---:|\n| 2022-12-31 | 127,243 [Balance_Sheet Cell A5134] | — |\n| 2023-12-31 | 135,241 [Balance_Sheet Cell A5136] | +7,998, **+6.29%** |\n| 2024-12-31 | 137,175 [Balance_Sheet Cell A5138] | +1,934, **+1.43%** |\n\n계산:\n- 2023년 증감: 135,241 - 127,243 = **7,998**; 7,998 ÷ 127,243 × 100 = **6.29%** [Balance_Sheet Cell A5134] [Balance_Sheet Cell A5136]\n- 2024년 증감: 137,175 - 135,241 = **1,934**; 1,934 ÷ 135,241 × 100 = **1.43%** [Balance_Sheet Cell A5136] [Balance_Sheet Cell A5138]\n- 2022~2024년 누적 증감: 137,175 - 127,243 = **9,932**; 9,932 ÷ 127,243 × 100 = **7.81%** [Balance_Sheet Cell A5134] [Balance_Sheet Cell A5138]\n\n즉, 총자산은 **2022년 $127,243M에서 2024년 $137,175M으로 $9,932M 증가**했으며, 증가율은 **7.81%**입니다. [Balance_Sheet Cell A5134] [Balance_Sheet Cell A5138]",
+    "api_usage": {
+      "prompt_tokens": 15114,
+      "completion_tokens": 604,
+      "cached_tokens": 0,
+      "reasoning_tokens": 189,
+      "total_tokens": 15718
+    },
+    "latency_seconds": 323.491
+  },
+  "Q042": {
+    "id": "Q042",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 3년 장기부채가 증가했는지 알려줘.",
+    "chatgpt_answer": "최근 3년 Long-Term Debt: 49,742→49,081→54,836M. 2024 소폭 감소 후 2025 증가; 3년 기준 순증.",
+    "pipeline_answer": "네. IBM의 최근 3년 장기부채는 **증가했습니다**.\n\n- **2023년:** 11,879 [Balance_Sheet Cell A7918]\n- **2024년:** 12,116 [Balance_Sheet Cell A7920]\n- **2025년:** 15,100 [Balance_Sheet Cell A7922]\n\n계산:\n\n- 2023년 → 2024년: `12,116 - 11,879 = 237` 증가, 약 **2.0%** 증가\n- 2024년 → 2025년: `15,100 - 12,116 = 2,984` 증가, 약 **24.6%** 증가\n- 2023년 → 2025년: `15,100 - 11,879 = 3,221` 증가, 약 **27.1%** 증가\n\n따라서 **2023년부터 2025년까지 장기부채는 3,221 증가했으며, 약 27.1% 늘어났습니다.** [Balance_Sheet Cell A7918] [Balance_Sheet Cell A7922]\n\n단, 제공된 셀 컨텍스트에는 금액 단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 12935,
+      "completion_tokens": 502,
+      "cached_tokens": 0,
+      "reasoning_tokens": 227,
+      "total_tokens": 13437
+    },
+    "latency_seconds": 590.63
+  },
+  "Q043": {
+    "id": "Q043",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 3년 영업현금흐름 추세를 알려줘.",
+    "chatgpt_answer": "최근 3년 CFO: 13,931→13,445→13,193M. 완만한 감소 추세.",
+    "pipeline_answer": "IBM의 최근 3년 영업현금흐름(Cash from Ops.) 추세는 **감소세**입니다. 단위는 **$M**입니다.\n\n| 회계연도 | 영업현금흐름 |\n|---|---:|\n| 2023-12-31 | 13,931 [Cash_Flow Cell A9452] |\n| 2024-12-31 | 13,445 [Cash_Flow Cell A9454] |\n| 2025-12-31 | 13,193 [Cash_Flow Cell A9456] |\n\n- **2023년 → 2024년:** 13,445 - 13,931 = **-486 $M**, 즉 **-3.5%** 감소  \n  (486 ÷ 13,931 × 100) [Cash_Flow Cell A9452] [Cash_Flow Cell A9454]\n- **2024년 → 2025년:** 13,193 - 13,445 = **-252 $M**, 즉 **-1.9%** 감소  \n  (252 ÷ 13,445 × 100) [Cash_Flow Cell A9454] [Cash_Flow Cell A9456]\n- **2023년 → 2025년 전체:** 13,193 - 13,931 = **-738 $M**, 즉 **-5.3%** 감소  \n  (738 ÷ 13,931 × 100) [Cash_Flow Cell A9452] [Cash_Flow Cell A9456]\n\n따라서 IBM의 영업현금흐름은 **2023년 13,931 $M에서 2025년 13,193 $M으로 2년간 완만하게 감소**했습니다.",
+    "api_usage": {
+      "prompt_tokens": 15674,
+      "completion_tokens": 502,
+      "cached_tokens": 0,
+      "reasoning_tokens": 116,
+      "total_tokens": 16176
+    },
+    "latency_seconds": 71.747
+  },
+  "Q044": {
+    "id": "Q044",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 최근 매출은 얼마야?",
+    "chatgpt_answer": "최근 매출(LTM/FY2025) $67,535M.",
+    "pipeline_answer": "IBM의 최근 매출은 **67,535**입니다. 이는 **2025년 실제 매출**이며, **LTM 기준도 67,535**입니다. [Key_Stats Cell A10] [Key_Stats Cell A12]\n\n※ 제공된 셀 context에는 매출의 통화·단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "cached_tokens": 18943,
+      "completion_tokens": 162,
+      "prompt_tokens": 18946,
+      "reasoning_tokens": 78,
+      "total_tokens": 19108
+    },
+    "latency_seconds": 18.943
+  },
+  "Q045": {
+    "id": "Q045",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 매출 성장률과 EBITDA 마진 추이를 같이 보여줘.",
+    "chatgpt_answer": "매출 성장률(2022\\~2025): +5.54%, +2.20%, +1.44%, +7.62%; EBITDA 마진: 17.80%, 20.59%, 20.53%, 24.84%. 2025년 성장과 마진이 동반 개선.",
+    "pipeline_answer": "IBM의 **매출 성장률**과 **EBITDA 마진**을 총매출 기준으로 계산해 함께 정리했습니다.  \n- 매출 성장률 = `(당년 총매출 ÷ 전년 총매출 - 1) × 100`\n- EBITDA 마진 = `EBITDA ÷ 총매출 × 100`\n- 금액 단위: **$M**, 비율은 **반올림**\n\n| 연도 | 총매출 ($M) | 매출 성장률 | EBITDA ($M) | EBITDA 마진 |\n|---|---:|---:|---:|---:|\n| 2014 | 92,793 [Income_Statement Cell A514] | — | 24,621 [Income_Statement Cell A2076] | 26.5% |\n| 2015 | 81,741 [Income_Statement Cell A2624] | -11.9% = (81,741 ÷ 92,793 - 1) | 20,372 [Income_Statement Cell A2078] | 24.9% |\n| 2016 | 79,919 [Income_Statement Cell A2626] | -2.2% = (79,919 ÷ 81,741 - 1) | 18,551 [Income_Statement Cell A2080] | 23.2% |\n| 2017 | 79,139 [Income_Statement Cell A2628] | -1.0% = (79,139 ÷ 79,919 - 1) | 16,223 [Income_Statement Cell A2082] | 20.5% |\n| 2018 | 79,591 [Income_Statement Cell A2630] | +0.6% = (79,591 ÷ 79,139 - 1) | 17,698 [Income_Statement Cell A2084] | 22.2% |\n| 2019 | 57,714 [Income_Statement Cell A524] | -27.5% = (57,714 ÷ 79,591 - 1) | 13,598 [Income_Statement Cell A2086] | 23.6% |\n| 2020 | 55,179 [Income_Statement Cell A526] | -4.4% = (55,179 ÷ 57,714 - 1) | 11,357 [Income_Statement Cell A2088] | 20.6% |\n| 2021 | 57,351 [Income_Statement Cell A528] | +3.9% [Key_Stats Cell A20] | 11,309 [Income_Statement Cell A2090] | 19.7% |\n| 2022 | 60,530 [Income_Statement Cell A530] | +5.5% [Key_Stats Cell A22] | 10,775 [Income_Statement Cell A2092] | 17.8% |\n| 2023 | 61,860 [Income_Statement Cell A532] | +2.2% [Key_Stats Cell A24] | 12,739 [Income_Statement Cell A2094] | 20.6% |\n| 2024 | 62,753 [Income_Statement Cell A534] | +1.4% [Key_Stats Cell A26] | 12,886 [Income_Statement Cell A2096] | 20.5% |\n| 2025 | 67,535 [Income_Statement Cell A536] | +7.6% [Key_Stats Cell A28] | 16,778 [Income_Statement Cell A2098] | 24.8% |\n\n**추이 요약**\n\n- **매출:** 2014~2018년 하락 또는 정체 후, 2019년에 **-27.5%**로 크게 감소했습니다. 이후 2021~2025년에는 매출이 연속 증가했으며, 2025년 성장률은 **+7.6%**로 가장 높았습니다. [Income_Statement Cell A514] [Income_Statement Cell A524] [Income_Statement Cell A536] [Key_Stats Cell A28]\n- **EBITDA 마진:** 2014년 **26.5%**에서 2017년 **20.5%**까지 낮아졌고, 2022년에는 **17.8%**로 최저 수준을 기록했습니다. 이후 개선되어 2025년 **24.8%**까지 상승했습니다. [Income_Statement Cell A2076] [Income_Statement Cell A2082] [Income_Statement Cell A2092] [Income_Statement Cell A2098]\n- 따라서 최근에는 **매출 성장 회복과 수익성 개선이 동시에 나타나는 흐름**입니다. 2022년 대비 2025년 EBITDA 마진 개선폭은 **약 7.0%p = 24.8% - 17.8%**입니다. [Income_Statement Cell A2092] [Income_Statement Cell A2098]",
+    "api_usage": {
+      "prompt_tokens": 15190,
+      "completion_tokens": 2645,
+      "cached_tokens": 0,
+      "reasoning_tokens": 1536,
+      "total_tokens": 17835
+    },
+    "latency_seconds": 56.182
+  },
+  "Q046": {
+    "id": "Q046",
+    "scenario": "유형 2 기간·추세 분석",
+    "question": "IBM의 자본구조와 밸류에이션 멀티플을 함께 정리해줘.",
+    "chatgpt_answer": "자본구조: 현금성자산 14,417M, 총Debt 64,607M, 순부채 50,190M, 보통주자본 32,648M, 시총 270,970M, TEV 321,253M. 직접 계산 멀티플: TEV/Revenue 4.76x, TEV/EBITDA 19.15x, TEV/EBIT 27.32x. (Key Stats valuation block 표시값은 각각 5.03x/20.09x/28.50x로 valuation-date 정의 차이 존재.)",
+    "pipeline_answer": "## IBM 자본구조 및 밸류에이션 요약\n\n※ 자본화 수치의 **통화·단위는 제공된 Key_Stats 셀에 별도로 명시되지 않았습니다**. 따라서 아래 금액은 원자료 보고값 기준으로 표시합니다.\n\n### 1. 자본구조\n\n| 항목 | LTM |\n|---|---:|\n| 발행주식수 | 934,735,206주 [Key_Stats Cell A244] |\n| 시장가치 | 270,970.38886734 [Key_Stats Cell A248] |\n| 현금 및 단기투자자산 차감 | 14,417 [Key_Stats Cell A250] |\n| 우선주 | NA [Key_Stats Cell A254] |\n| 소수주주지분 | 93 [Key_Stats Cell A264] |\n| 총부채 | 64,607 [Key_Stats Cell A266] |\n| 보통주자본 | 32,648 [Key_Stats Cell A260] |\n| 총자본 | 97,348 [Key_Stats Cell A268] |\n\n총자본은 다음과 같이 구성됩니다.\n\n- 총부채 + 보통주자본 + 소수주주지분  \n- 64,607 + 32,648 + 93 = **97,348** [Key_Stats Cell A266] [Key_Stats Cell A260] [Key_Stats Cell A264] [Key_Stats Cell A268]\n\n총자본 대비 구성비는 다음과 같습니다.\n\n- 부채 비중: 64,607 ÷ 97,348 = **66.37%** [Key_Stats Cell A266] [Key_Stats Cell A268]\n- 보통주자본 비중: 32,648 ÷ 97,348 = **33.55%** [Key_Stats Cell A260] [Key_Stats Cell A268]\n- 소수주주지분 비중: 93 ÷ 97,348 = **0.10%** [Key_Stats Cell A264] [Key_Stats Cell A268]\n\n### 2. 기업가치 산출\n\n총기업가치(TEV)는 다음과 같이 계산됩니다.\n\n- 시장가치 − 현금 및 단기투자자산 + 우선주 + 소수주주지분 + 총부채\n- 270,970.38886734 − 14,417 + NA + 93 + 64,607  \n- 우선주가 **NA**이므로, 제공된 수치상 계산 가능한 값은 **321,253.38886734**입니다. [Key_Stats Cell A248] [Key_Stats Cell A250] [Key_Stats Cell A254] [Key_Stats Cell A264] [Key_Stats Cell A266]\n- 보고된 TEV: **321,253.38886734** [Key_Stats Cell A258]\n\n### 3. 밸류에이션 멀티플\n\n| 멀티플 | FY2025 | LTM |\n|---|---:|---:|\n| TEV / Total Revenue | 5.025487배 [Key_Stats Cell A270] | 5.025487배 [Key_Stats Cell A272] |\n| TEV / EBITDA | 20.085672배 [Key_Stats Cell A282] | 20.085672배 [Key_Stats Cell A284] |\n| TEV / EBIT | 28.498822배 [Key_Stats Cell A294] | 28.498822배 [Key_Stats Cell A296] |\n| Price / EPS | 35.42758배 [Key_Stats Cell A306] | 35.42758배 [Key_Stats Cell A308] |\n| Price / BV | 9.922286배 [Key_Stats Cell A318] | 9.922286배 [Key_Stats Cell A320] |\n\nFY2026~FY2028의 일부 선행 멀티플은 **NA**로 제공되어 있습니다. 예를 들어 TEV/매출은 FY2026과 FY2028이 NA입니다 [Key_Stats Cell A276] [Key_Stats Cell A280], TEV/EBITDA는 FY2026~FY2028이 NA입니다 [Key_Stats Cell A288] [Key_Stats Cell A290] [Key_Stats Cell A292], Price/EPS도 FY2026~FY2028이 NA입니다 [Key_Stats Cell A312] [Key_Stats Cell A314] [Key_Stats Cell A316].\n\n### 종합 해석\n\nIBM은 총자본 중 **부채가 66.37%**를 차지하고 보통주자본은 **33.55%**입니다 [Key_Stats Cell A266] [Key_Stats Cell A268] [Key_Stats Cell A260]. LTM 기준으로 기업가치는 **321,253.38886734**이며 [Key_Stats Cell A258], 매출 대비 TEV는 **5.025487배**, EBITDA 대비 TEV는 **20.085672배**, EBIT 대비 TEV는 **28.498822배**입니다 [Key_Stats Cell A272] [Key_Stats Cell A284] [Key_Stats Cell A296]. 주주가치 기준으로는 P/E **35.42758배**, P/BV **9.922286배**가 적용되어 있습니다 [Key_Stats Cell A308] [Key_Stats Cell A320].",
+    "api_usage": {
+      "prompt_tokens": 13793,
+      "completion_tokens": 1951,
+      "cached_tokens": 0,
+      "reasoning_tokens": 758,
+      "total_tokens": 15744
+    },
+    "latency_seconds": 104.43
+  },
+  "Q047": {
+    "id": "Q047",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "BAC와 피어 중 기관투자자 지분율이 가장 높은 곳은?",
+    "chatgpt_answer": "파일 내 BAC 및 피어 기관지분 데이터 없음.",
+    "pipeline_answer": "제공된 Excel 셀 컨텍스트에는 **BAC와 피어들의 기관투자자 지분율 데이터가 없습니다.** 따라서 기관투자자 지분율이 가장 높은 곳을 판단할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 13079,
+      "completion_tokens": 92,
+      "cached_tokens": 0,
+      "reasoning_tokens": 37,
+      "total_tokens": 13171
+    },
+    "latency_seconds": 30.047
+  },
+  "Q048": {
+    "id": "Q048",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "콜드플레이와 비스텔리젼스의 최근 3개년 매출 추이를 비교해줘.",
+    "chatgpt_answer": "파일 내 콜드플레이·비스텔리젼스 데이터 없음.",
+    "pipeline_answer": "제공된 셀 문맥만으로는 **콜드플레이와 비스텔리젼스 각각의 매출 데이터가 어느 회사에 해당하는지 식별할 수 없어**, 두 회사를 직접 비교할 수 없습니다. 또한 매출의 **단위도 제공되지 않았습니다**.\n\n다만, 문맥에 포함된 최근 3개년 매출 시계열은 다음과 같습니다.\n\n| 연도 | 매출 |\n|---|---:|\n| 2023년 | 61,860 [Key_Stats Cell A6] |\n| 2024년 | 62,753 [Key_Stats Cell A8] |\n| 2025년 | 67,535 [Key_Stats Cell A10] |\n\n추이 계산:\n\n- **2024년 증가율** = (62,753 - 61,860) ÷ 61,860 = **약 1.44%** [Key_Stats Cell A6] [Key_Stats Cell A8]\n- **2025년 증가율** = (67,535 - 62,753) ÷ 62,753 = **약 7.62%** [Key_Stats Cell A8] [Key_Stats Cell A10]\n- **2023~2025년 총 증가율** = (67,535 - 61,860) ÷ 61,860 = **약 9.17%** [Key_Stats Cell A6] [Key_Stats Cell A10]\n\n따라서 확인 가능한 한 회사의 매출은 **2024년에 소폭 증가한 뒤, 2025년에 증가폭이 확대된 흐름**입니다. 하지만 **콜드플레이와 비스텔리젼스 중 어느 회사의 수치인지, 그리고 다른 회사의 최근 3개년 매출이 얼마인지가 누락**되어 양사의 비교 결론은 낼 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 15159,
+      "completion_tokens": 627,
+      "cached_tokens": 0,
+      "reasoning_tokens": 216,
+      "total_tokens": 15786
+    },
+    "latency_seconds": 146.324
+  },
+  "Q049": {
+    "id": "Q049",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "두 회사 중 영업이익률이 더 개선된 곳은 어디야?",
+    "chatgpt_answer": "파일 내 두 회사 영업이익률 데이터 없음.",
+    "pipeline_answer": "제공된 셀 context만으로는 **두 회사의 회사명과 각 회사에 대응하는 영업이익률 데이터가 명확히 구분되지 않아**, 어느 회사가 더 개선됐는지 판단할 수 없습니다.\n\n다만 IBM으로 식별되는 데이터의 영업이익률은 다음과 같이 개선됐습니다.\n\n- 2024년: 20.5345% [Key_Stats Cell A98]\n- 2025년: 24.8434% [Key_Stats Cell A100]\n- 개선폭: 24.8434% − 20.5345% = **4.3089%p**\n\n비교 대상인 두 번째 회사의 회사명 및 영업이익률 셀이 누락되어 있습니다.",
+    "api_usage": {
+      "prompt_tokens": 11100,
+      "completion_tokens": 492,
+      "cached_tokens": 11097,
+      "reasoning_tokens": 323,
+      "total_tokens": 11592
+    },
+    "latency_seconds": 18.558
+  },
+  "Q050": {
+    "id": "Q050",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "콜드플레이와 비스텔리젼스의 부채비율을 비교했을 때 어느 쪽이 더 안정적이야?",
+    "chatgpt_answer": "파일 내 두 회사 부채비율 데이터 없음.",
+    "pipeline_answer": "제공된 셀 컨텍스트만으로는 **콜드플레이와 비스텔리젼스 중 어느 쪽이 더 안정적인지 판단할 수 없습니다.**\n\n- 콜드플레이의 부채비율 또는 부채·자본 데이터가 없습니다.\n- 비스텔리젼스의 부채비율 또는 부채·자본 데이터도 없습니다.\n- 제공된 자료는 주로 **International Business Machines Corporation(IBM)** 및 Balance Sheet 지표에 관한 내용입니다.\n\n따라서 두 회사의 **부채비율(총부채 ÷ 자기자본 × 100)** 또는 비교에 필요한 총부채와 자기자본 셀이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 15883,
+      "completion_tokens": 223,
+      "cached_tokens": 0,
+      "reasoning_tokens": 64,
+      "total_tokens": 16106
+    },
+    "latency_seconds": 23.711
+  },
+  "Q051": {
+    "id": "Q051",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "두 회사의 분기별 매출 성장 곡선을 나란히 보여줘.",
+    "chatgpt_answer": "파일 내 두 회사 분기 매출 데이터 없음.",
+    "pipeline_answer": "현재 제공된 셀 context만으로는 **두 회사의 분기별 매출 성장 곡선**을 나란히 표시할 수 없습니다.\n\n- 제공된 매출 성장률은 분기별이 아니라 **연간 기준**입니다. IBM의 연간 매출 성장률은 2021년 **3.936%**[KS Cell A20], 2022년 **5.543%**[KS Cell A22], 2023년 **2.197%**[KS Cell A24], 2024년 **1.444%**[KS Cell A26], 2025년 **7.62%**[KS Cell A28]입니다.\n- IBM의 분기별 매출 및 매출 성장률 데이터가 제공되지 않았습니다.\n- 비교 대상인 **두 번째 회사의 이름과 분기별 매출 성장률 데이터도 누락**되어 있습니다.\n- 참고로 IBM의 연간 매출은 2021년 **57,351**[KS Cell A2], 2022년 **60,530**[KS Cell A4], 2023년 **61,860**[KS Cell A6], 2024년 **62,753**[KS Cell A8], 2025년 **67,535**[KS Cell A10]이며, 단위는 context상 명시되어 있지 않습니다.\n\n따라서 분기별 곡선을 작성하려면 **두 회사의 분기별 매출 또는 분기별 매출 성장률 셀 데이터**가 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 12535,
+      "completion_tokens": 479,
+      "cached_tokens": 0,
+      "reasoning_tokens": 143,
+      "total_tokens": 13014
+    },
+    "latency_seconds": 59.846
+  },
+  "Q052": {
+    "id": "Q052",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "비스텔리젼스의 EBITDA 마진을 IBM과 비교하면 어떤 수준이야?",
+    "chatgpt_answer": "비스텔리젼스 데이터가 없어 IBM과 비교 불가. IBM LTM EBITDA 마진은 24.84%.",
+    "pipeline_answer": "제공된 셀 context에는 **비스텔리젼스의 EBITDA 또는 EBITDA 마진 데이터가 없어**, IBM과의 직접 비교 수준을 산출할 수 없습니다.\n\n참고로 IBM의 EBITDA 마진은 다음과 같습니다.\n\n- 2024년: **20.5345%** [Key_Stats Cell A98]\n- 2025년: **24.8434%** [Key_Stats Cell A100]\n- 2025년 증가폭: **24.8434% - 20.5345% = 4.3089%p** [Key_Stats Cell A98] [Key_Stats Cell A100]\n- 2026년 추정치: **28.1271%** [Key_Stats Cell A104]\n\n따라서 비스텔리젼스의 **2024년 또는 2025년 EBITDA 마진**이 제공되어야 IBM 대비 높음·낮음 및 격차를 판단할 수 있습니다.",
+    "api_usage": {
+      "cached_tokens": 0,
+      "completion_tokens": 440,
+      "prompt_tokens": 12950,
+      "reasoning_tokens": 223,
+      "total_tokens": 13390
+    },
+    "latency_seconds": 14.095
+  },
+  "Q053": {
+    "id": "Q053",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 LTM 매출, EBITDA, 순이익을 알려줘.",
+    "chatgpt_answer": "LTM 매출 $67,535M, EBITDA $16,778M, 순이익 $10,593M.",
+    "pipeline_answer": "IBM의 **LTM(2025년 12월 31일 기준)** 실적은 다음과 같습니다.\n\n- **매출:** 67,535 [Key_Stats Cell A12]\n- **EBITDA:** 16,778 [Key_Stats Cell A84]\n- **순이익:** 10,593 [Key_Stats Cell A180]\n\n순이익은 Income_Statement에서도 **$M 기준 10,593**으로 확인됩니다 [Income_Statement Cell A1578].",
+    "api_usage": {
+      "prompt_tokens": 16567,
+      "completion_tokens": 268,
+      "cached_tokens": 0,
+      "reasoning_tokens": 153,
+      "total_tokens": 16835
+    },
+    "latency_seconds": 54.058
+  },
+  "Q054": {
+    "id": "Q054",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 LTM 총자산과 총부채를 알려줘.",
+    "chatgpt_answer": "LTM 총자산 $151,880M, 총부채 $119,139M.",
+    "pipeline_answer": "제공된 셀 문맥만으로는 IBM의 **LTM 총자산**과 **LTM 총부채**를 확인할 수 없습니다.\n\n- **LTM 총자산:** 해당 항목의 셀 값이 제공되지 않았습니다.\n- **LTM 총부채:** 해당 항목의 셀 값이 제공되지 않았습니다.\n- 참고로, LTM **총부채(Total Debt)**는 **64,607**이지만, 이는 회계상 총부채와 동일한 항목이 아닙니다 [Balance_Sheet Cell A6858].\n\n따라서 총자산과 총부채를 산출하려면 해당 항목의 LTM 셀 값이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 16086,
+      "completion_tokens": 254,
+      "cached_tokens": 0,
+      "reasoning_tokens": 92,
+      "total_tokens": 16340
+    },
+    "latency_seconds": 31.612
+  },
+  "Q055": {
+    "id": "Q055",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 현금성 자산과 장기부채를 알려줘.",
+    "chatgpt_answer": "현금 및 단기투자자산 $14,417M, Long-Term Debt $54,836M.",
+    "pipeline_answer": "IBM의 현금성 자산과 장기부채는 다음과 같습니다.\n\n- **현금 및 단기투자자산:** **14,417백만 달러**(LTM 기준) [Key_Stats Cell A250]\n- **장기부채(비유동부채):** **57,383백만 달러**(2025년 12월 31일 이후 LTM 기준) [Balance_Sheet Cell A6910]\n\n참고로 총부채는 다음과 같이 구성됩니다.\n\n- **총부채:** 64,607백만 달러 [Balance_Sheet Cell A6858]\n- 계산: **유동부채 7,224 + 장기부채 57,383 = 총부채 64,607백만 달러** [Balance_Sheet Cell A6884] [Balance_Sheet Cell A6910] [Balance_Sheet Cell A6858]\n\n※ 현금성 자산 수치는 제공된 **Key_Stats의 LTM ‘Cash & Short-Term Investments’** 값이며, 해당 셀에는 별도의 날짜가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 11531,
+      "completion_tokens": 620,
+      "cached_tokens": 0,
+      "reasoning_tokens": 373,
+      "total_tokens": 12151
+    },
+    "latency_seconds": 26.638
+  },
+  "Q056": {
+    "id": "Q056",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 영업현금흐름과 CAPEX를 알려줘.",
+    "chatgpt_answer": "CFO $13,193M, CapEx $1,617M 지출.",
+    "pipeline_answer": "IBM의 영업현금흐름과 CAPEX는 다음과 같습니다. 단위는 **$M(백만 달러)**이며, CAPEX는 원자료에 음수로 표시되어 있습니다.\n\n| 회계연도 | 영업현금흐름 | CAPEX |\n|---|---:|---:|\n| 2015-12-31 | 17,255 [Cash_Flow Cell A9436] | -3,579 [Cash_Flow Cell A9462] |\n| 2016-12-31 | 17,084 [Cash_Flow Cell A9438] | -3,567 [Cash_Flow Cell A9464] |\n| 2017-12-31 | 16,724 [Cash_Flow Cell A9440] | -3,229 [Cash_Flow Cell A9466] |\n| 2018-12-31 | 15,247 [Cash_Flow Cell A9442] | -3,395 [Cash_Flow Cell A9468] |\n| 2019-12-31 | 14,770 [Cash_Flow Cell A9444] | -2,286 [Cash_Flow Cell A9470] |\n| 2020-12-31 | 18,197 [Cash_Flow Cell A9446] | -2,618 [Cash_Flow Cell A9472] |\n| 2021-12-31 | 12,796 [Cash_Flow Cell A9448] | -2,062 [Cash_Flow Cell A9474] |\n| 2022-12-31 | 10,435 [Cash_Flow Cell A9450] | -1,346 [Cash_Flow Cell A9476] |\n| 2023-12-31 | 13,931 [Cash_Flow Cell A9452] | -1,245 [Cash_Flow Cell A9478] |\n| 2024-12-31 | **값 미제공** | -1,048 [Cash_Flow Cell A9480] |\n| 2025-12-31 | 13,193 [Cash_Flow Cell A9458] | -1,617 [Cash_Flow Cell A9482] |\n\n제공된 컨텍스트에는 **2024년 영업현금흐름 값이 없습니다**.",
+    "api_usage": {
+      "prompt_tokens": 15144,
+      "completion_tokens": 945,
+      "cached_tokens": 0,
+      "reasoning_tokens": 443,
+      "total_tokens": 16089
+    },
+    "latency_seconds": 27.471
+  },
+  "Q057": {
+    "id": "Q057",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 영업·투자·재무 현금흐름을 알려줘.",
+    "chatgpt_answer": "영업 CF $13,193M, 투자 CF -$10,302M, 재무 CF -$3,829M.",
+    "pipeline_answer": "제공된 컨텍스트 기준으로 IBM의 현금흐름은 다음과 같습니다. 단위는 **$M**입니다.\n\n> **주의:** ‘영업현금흐름(Cash from Operating)’ 총액 셀은 제공되지 않았습니다. 따라서 아래 영업 항목은 총 영업현금흐름이 아니라 **Other Operating Activities(기타 영업활동)** 값입니다.\n\n| 연도 | 영업활동* | 투자활동 | 재무활동 |\n|---|---:|---:|---:|\n| 2014 | -238 [Cash_Flow Cell A9200] | -3,001 [Cash_Flow Cell A9694] | -15,452 [Cash_Flow Cell A10136] |\n| 2015 | 1,386 [Cash_Flow Cell A9202] | -8,159 [Cash_Flow Cell A9696] | -9,413 [Cash_Flow Cell A10138] |\n| 2016 | -1,132 [Cash_Flow Cell A9204] | -10,928 [Cash_Flow Cell A9698] | -5,917 [Cash_Flow Cell A10140] |\n| 2017 | -931 [Cash_Flow Cell A9206] | -7,081 [Cash_Flow Cell A9700] | -6,418 [Cash_Flow Cell A10142] |\n| 2018 | 852 [Cash_Flow Cell A9208] | -4,913 [Cash_Flow Cell A9702] | -10,469 [Cash_Flow Cell A10144] |\n| 2019 | -1,528 [Cash_Flow Cell A9210] | -26,936 [Cash_Flow Cell A9704] | 9,042 [Cash_Flow Cell A10146] |\n| 2020 | -3,204 [Cash_Flow Cell A9212] | -3,028 [Cash_Flow Cell A9706] | -9,721 [Cash_Flow Cell A10148] |\n| 2021 | -2,001 [Cash_Flow Cell A9214] | -5,975 [Cash_Flow Cell A9708] | -13,354 [Cash_Flow Cell A10150] |\n| 2022 | 3,168 [Cash_Flow Cell A9216] | -4,202 [Cash_Flow Cell A9710] | -4,958 [Cash_Flow Cell A10152] |\n| 2023 | -1,114 [Cash_Flow Cell A9218] | -7,070 [Cash_Flow Cell A9712] | -1,769 [Cash_Flow Cell A10154] |\n| 2024 | 783 [Cash_Flow Cell A9220] | -4,937 [Cash_Flow Cell A9714] | -7,079 [Cash_Flow Cell A10156] |\n| 2025 | 1 [Cash_Flow Cell A9222] | -10,302 [Cash_Flow Cell A9716] | -3,829 [Cash_Flow Cell A10158] |\n\n\\* 영업활동 열은 **총 영업현금흐름이 아닌 기타 영업활동**입니다. 총 영업현금흐름을 산출하려면 해당 항목의 **Cash from Operating 총액 셀**이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 14963,
+      "completion_tokens": 1633,
+      "cached_tokens": 0,
+      "reasoning_tokens": 886,
+      "total_tokens": 16596
+    },
+    "latency_seconds": 36.495
+  },
+  "Q058": {
+    "id": "Q058",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 매출과 영업현금흐름을 알려줘.",
+    "chatgpt_answer": "매출 $67,535M, 영업현금흐름 $13,193M.",
+    "pipeline_answer": "IBM의 **매출**과 **영업현금흐름(Cash from Ops)**은 다음과 같습니다.\n\n| 연도 | 매출 | 영업현금흐름 |\n|---|---:|---:|\n| 2021 | 57,351 [Key_Stats Cell A2] | 12,796백만 달러 [Cash_Flow Cell A9448] |\n| 2022 | 60,530 [Key_Stats Cell A4] | 10,435백만 달러 [Cash_Flow Cell A9450] |\n| 2023 | 61,860 [Key_Stats Cell A6] | 13,931백만 달러 [Cash_Flow Cell A9452] |\n| 2024 | 62,753 [Key_Stats Cell A8] | 해당 값이 제공되지 않음 |\n| 2025 | 67,535 [Key_Stats Cell A10] | 해당 값이 제공되지 않음 |\n\n- 2024년에서 2025년 매출 증가액: **67,535 − 62,753 = 4,782** [Key_Stats Cell A8] [Key_Stats Cell A10]\n- 매출 증가율: **4,782 ÷ 62,753 × 100 = 약 7.62%** [Key_Stats Cell A8] [Key_Stats Cell A10]\n- 영업현금흐름의 단위는 원자료에 따라 **백만 달러($M)**입니다. [Cash_Flow Cell A9448]  \n- 매출의 단위는 제공된 셀 문맥에 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 14073,
+      "completion_tokens": 854,
+      "cached_tokens": 0,
+      "reasoning_tokens": 490,
+      "total_tokens": 14927
+    },
+    "latency_seconds": 26.09
+  },
+  "Q059": {
+    "id": "Q059",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 TEV와 시가총액 중 무엇이 더 커?",
+    "chatgpt_answer": "TEV가 더 큼. $321,253.4M vs 시총 $270,970.4M, 차이 $50,283M.",
+    "pipeline_answer": "IBM의 **TEV가 시가총액보다 더 큽니다.**\n\n- TEV: 321,253.38886734 [Key_Stats Cell A258]\n- 시가총액: 270,970.38886734 [Key_Stats Cell A248]\n- 차이: 321,253.38886734 − 270,970.38886734 = **50,283** [Key_Stats Cell A258] [Key_Stats Cell A248]\n\n따라서 TEV가 시가총액보다 **50,283** 더 큽니다.",
+    "api_usage": {
+      "prompt_tokens": 11313,
+      "completion_tokens": 214,
+      "cached_tokens": 11310,
+      "reasoning_tokens": 82,
+      "total_tokens": 11527
+    },
+    "latency_seconds": 19.461
+  },
+  "Q060": {
+    "id": "Q060",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 EBITDA와 영업현금흐름을 비교해줘.",
+    "chatgpt_answer": "EBITDA $16,778M vs CFO $13,193M. EBITDA가 $3,585M 높고, CFO는 EBITDA의 78.6%.",
+    "pipeline_answer": "IBM의 EBITDA와 영업현금흐름(Cash from Ops)을 공통으로 확인할 수 있는 **2019~2023년** 기준으로 비교하면 다음과 같습니다. 단위는 **$M**입니다.\n\n| 연도 | EBITDA | 영업현금흐름 | 영업현금흐름 - EBITDA | 영업현금흐름/EBITDA |\n|---|---:|---:|---:|---:|\n| 2019 | 13,598 [Income_Statement Cell A2086] | 14,770 [Cash_Flow Cell A9444] | 14,770 - 13,598 = **1,172** [Cash_Flow Cell A9444; Income_Statement Cell A2086] | **108.6%** [Cash_Flow Cell A9444; Income_Statement Cell A2086] |\n| 2020 | 11,357 [Income_Statement Cell A2088] | 18,197 [Cash_Flow Cell A9446] | 18,197 - 11,357 = **6,840** [Cash_Flow Cell A9446; Income_Statement Cell A2088] | **160.2%** [Cash_Flow Cell A9446; Income_Statement Cell A2088] |\n| 2021 | 11,309 [Income_Statement Cell A2090] | 12,796 [Cash_Flow Cell A9448] | 12,796 - 11,309 = **1,487** [Cash_Flow Cell A9448; Income_Statement Cell A2090] | **113.2%** [Cash_Flow Cell A9448; Income_Statement Cell A2090] |\n| 2022 | 10,775 [Income_Statement Cell A2092] | 10,435 [Cash_Flow Cell A9450] | 10,435 - 10,775 = **-340** [Cash_Flow Cell A9450; Income_Statement Cell A2092] | **96.8%** [Cash_Flow Cell A9450; Income_Statement Cell A2092] |\n| 2023 | 12,739 [Income_Statement Cell A2094] | 13,931 [Cash_Flow Cell A9452] | 13,931 - 12,739 = **1,192** [Cash_Flow Cell A9452; Income_Statement Cell A2094] | **109.4%** [Cash_Flow Cell A9452; Income_Statement Cell A2094] |\n\n**핵심 해석**\n\n- **2019년, 2020년, 2021년, 2023년**에는 영업현금흐름이 EBITDA를 상회했습니다. [Cash_Flow Cell A9444; Income_Statement Cell A2086] [Cash_Flow Cell A9446; Income_Statement Cell A2088] [Cash_Flow Cell A9448; Income_Statement Cell A2090] [Cash_Flow Cell A9452; Income_Statement Cell A2094]\n- **2020년**에는 영업현금흐름이 EBITDA보다 **6,840 $M** 많아 가장 큰 초과폭을 기록했습니다. [Cash_Flow Cell A9446; Income_Statement Cell A2088]\n- **2022년**에는 영업현금흐름이 EBITDA보다 **340 $M 낮았고**, 영업현금흐름/EBITDA 비율도 **96.8%**로 비교기간 중 유일하게 100%를 하회했습니다. [Cash_Flow Cell A9450; Income_Statement Cell A2092]\n- 2023년에는 EBITDA가 2022년 **10,775 $M에서 12,739 $M으로 증가**했고, 영업현금흐름도 **10,435 $M에서 13,931 $M으로 증가**했습니다. [Income_Statement Cell A2092; Income_Statement Cell A2094] [Cash_Flow Cell A9450; Cash_Flow Cell A9452]\n\n2024~2025년 EBITDA 값은 제공되어 있으나, 동일 연도의 영업현금흐름 값이 이 문맥에 없어 해당 연도 비교는 할 수 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 17058,
+      "completion_tokens": 1379,
+      "cached_tokens": 0,
+      "reasoning_tokens": 452,
+      "total_tokens": 18437
+    },
+    "latency_seconds": 28.263
+  },
+  "Q061": {
+    "id": "Q061",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 총부채와 보통주 자본을 비교해줘.",
+    "chatgpt_answer": "총부채 $119,139M vs 보통주자본 $32,648M. 총부채가 $86,491M, 약 3.65배 큼.",
+    "pipeline_answer": "### IBM 총부채와 보통주 자본 비교 — LTM 기준\n\n- **총부채:** 64,607 [Key_Stats Cell A252]  \n- **총 보통주 자본:** 32,648 [Key_Stats Cell A260]\n\n**비교 계산**\n\n- 총부채 − 보통주 자본  \n  = 64,607 − 32,648  \n  = **31,959** [Key_Stats Cell A252] [Key_Stats Cell A260]\n\n- 총부채 ÷ 보통주 자본  \n  = 64,607 ÷ 32,648  \n  ≈ **1.98배**, 즉 보통주 자본의 **약 197.9%** [Key_Stats Cell A252] [Key_Stats Cell A260]\n\n따라서 IBM의 LTM 총부채는 보통주 자본보다 **31,959** 많으며, 보통주 자본의 약 **2배**입니다. 제공된 문맥상 금액 단위는 별도로 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 12342,
+      "completion_tokens": 723,
+      "cached_tokens": 12339,
+      "reasoning_tokens": 484,
+      "total_tokens": 13065
+    },
+    "latency_seconds": 24.274
+  },
+  "Q062": {
+    "id": "Q062",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 순이익과 영업현금흐름을 비교해줘.",
+    "chatgpt_answer": "순이익 $10,593M vs CFO $13,193M. CFO가 $2,600M(+24.5%) 높음.",
+    "pipeline_answer": "제공된 셀에서 **순이익과 영업현금흐름이 모두 확인되는 연도는 2021~2022년**입니다.\n\n| 연도 | 순이익 | 영업현금흐름 | 영업현금흐름 - 순이익 | 영업현금흐름/순이익 |\n|---|---:|---:|---:|---:|\n| 2021년 | 5,743 | 12,796 | 12,796 - 5,743 = **7,053** | 12,796 ÷ 5,743 = **2.23배** |\n| 2022년 | 1,639 | 10,435 | 10,435 - 1,639 = **8,796** | 10,435 ÷ 1,639 = **6.37배** |\n\n- 2021년 순이익은 **5,743**입니다. [Key_Stats Cell A170] 영업현금흐름은 **17,084**가 아니라 2021년 값으로 **12,796**입니다. [Cash_Flow Cell A9448]  \n  → 영업현금흐름이 순이익보다 **7,053** 높았습니다. [Key_Stats Cell A170] [Cash_Flow Cell A9448]\n\n- 2022년 순이익은 **1,639**로 2021년보다 **4,104 감소**했습니다. [Key_Stats Cell A170] [Key_Stats Cell A172]  \n  계산: 1,639 - 5,743 = **-4,104**.  \n  반면 영업현금흐름은 **10,435**로 2021년보다 **2,361 감소**했습니다. [Cash_Flow Cell A9448] [Cash_Flow Cell A9450]  \n  계산: 10,435 - 12,796 = **-2,361**.\n\n- 따라서 2022년에는 순이익이 크게 감소했지만 영업현금흐름은 순이익의 **6.37배**로, 회계상 순이익보다 현금창출력이 훨씬 크게 나타났습니다. [Key_Stats Cell A172] [Cash_Flow Cell A9450]\n\n참고로 제공된 컨텍스트상 2023~2025년 순이익은 각각 **7,502**, **6,023**, **10,593**으로 확인되지만, 해당 연도의 **영업현금흐름 값은 누락**되어 두 지표를 같은 기준으로 비교할 수 없습니다. [Key_Stats Cell A174] [Key_Stats Cell A176] [Key_Stats Cell A178]",
+    "api_usage": {
+      "prompt_tokens": 15455,
+      "completion_tokens": 1113,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 16568
+    },
+    "latency_seconds": 31.95
+  },
+  "Q063": {
+    "id": "Q063",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 현금성 자산과 장기부채를 비교해줘.",
+    "chatgpt_answer": "현금성자산 $14,417M vs Long-Term Debt $54,836M. 장기부채가 $40,419M, 약 3.80배 큼.",
+    "pipeline_answer": "IBM의 현금성 자산과 장기부채를 비교하면 다음과 같습니다.\n\n- **현금 및 단기투자자산:** 14,417 [Key_Stats Cell A250]\n- **장기부채(비유동부채):** 57,383 [Balance_Sheet Cell A6910]\n- **장기부채가 현금성 자산보다 많은 금액:**  \n  57,383 - 14,417 = **42,966** [Balance_Sheet Cell A6910][Key_Stats Cell A250]\n- **현금성 자산의 장기부채 커버리지:**  \n  14,417 ÷ 57,383 × 100 = **약 25.1%** [Key_Stats Cell A250][Balance_Sheet Cell A6910]\n- **장기부채 ÷ 현금성 자산:**  \n  57,383 ÷ 14,417 = **약 3.98배** [Balance_Sheet Cell A6910][Key_Stats Cell A250]\n\n따라서 IBM의 현금 및 단기투자자산은 장기부채의 약 **25.1%**에 해당하며, 장기부채가 현금성 자산보다 약 **42,966** 많습니다. 단, 제공된 셀 맥락에는 금액 단위가 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 10858,
+      "completion_tokens": 631,
+      "cached_tokens": 0,
+      "reasoning_tokens": 322,
+      "total_tokens": 11489
+    },
+    "latency_seconds": 28.162
+  },
+  "Q064": {
+    "id": "Q064",
+    "scenario": "유형 3 복수 지표 조회",
+    "question": "IBM의 매출과 TEV를 비교해줘.",
+    "chatgpt_answer": "매출 $67,535M vs TEV $321,253M. TEV는 매출의 4.76배.",
+    "pipeline_answer": "IBM의 **LTM 매출은 67,535**, **LTM TEV는 321,253.3889**입니다. 단위는 제공된 셀 context에 명시되어 있지 않습니다. [Key_Stats Cell A12] [Key_Stats Cell A258]\n\n- **TEV가 매출보다 큰 금액:**  \n  321,253.3889 − 67,535 = **253,718.3889** [Key_Stats Cell A258] [Key_Stats Cell A12]\n\n- **TEV / 매출 배수:**  \n  321,253.3889 ÷ 67,535 = **약 4.76배** [Key_Stats Cell A258] [Key_Stats Cell A12]\n\n- **매출 / TEV 비율:**  \n  67,535 ÷ 321,253.3889 × 100 = **약 21.02%** [Key_Stats Cell A12] [Key_Stats Cell A258]\n\n즉, IBM의 LTM TEV는 LTM 매출의 약 **4.76배**이며, 매출은 TEV의 약 **21.02%** 수준입니다.",
+    "api_usage": {
+      "prompt_tokens": 12512,
+      "completion_tokens": 510,
+      "cached_tokens": 12509,
+      "reasoning_tokens": 234,
+      "total_tokens": 13022
+    },
+    "latency_seconds": 23.222
+  },
+  "Q065": {
+    "id": "Q065",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 2025년 ROE와 ROA는 얼마인가?",
+    "chatgpt_answer": "2025 ROE 약 35.34%, ROA 약 7.33% (각각 2024\\~2025 평균 보통주자본/평균 총자산 사용).",
+    "pipeline_answer": "IBM의 **2025년 ROE와 ROA는 제공된 셀만으로 산출할 수 없습니다.** 2025년 **순이익**이 누락되어 있기 때문입니다.\n\n- 2025년 총자본: **$32,741M** [Balance_Sheet Cell A6024]  \n- 2025년 총자산: **$151,880M** [Balance_Sheet Cell A5140]  \n- 2024년 총자본: **$27,393M** [Balance_Sheet Cell A6022]  \n- 2024년 총자산: **$137,175M** [Balance_Sheet Cell A5138]  \n\n일반적인 평균 잔액 기준으로는:\n\n- 평균 총자본 = (27,393 + 32,741) ÷ 2 = **$30,067M** [Balance_Sheet Cell A6022] [Balance_Sheet Cell A6024]  \n- 평균 총자산 = (137,175 + 151,880) ÷ 2 = **$144,527.5M** [Balance_Sheet Cell A5138] [Balance_Sheet Cell A5140]  \n\n따라서 계산식은 다음과 같습니다.\n\n- **ROE = 2025년 순이익 ÷ 30,067M × 100**\n- **ROA = 2025년 순이익 ÷ 144,527.5M × 100**\n\n그러나 **2025년 순이익 셀 값이 제공되지 않아 정확한 ROE와 ROA 백분율은 확인할 수 없습니다.**",
+    "api_usage": {
+      "prompt_tokens": 21937,
+      "completion_tokens": 617,
+      "cached_tokens": 0,
+      "reasoning_tokens": 264,
+      "total_tokens": 22554
+    },
+    "latency_seconds": 31.529
+  },
+  "Q066": {
+    "id": "Q066",
+    "scenario": "유형 4 재무 계산",
+    "question": "2025년 Cash Conversion Ratio는?",
+    "chatgpt_answer": "Cash Conversion Ratio(CFO/Net Income) 1.25x, 즉 약 124.5%.",
+    "pipeline_answer": "2025년 **Cash Conversion Ratio는 제공된 Excel 셀 컨텍스트에 값이 없어 확인할 수 없습니다.**  \n\n2025년 현금흐름 관련 값으로는 Levered Free Cash Flow **12,770.75** [Cash_Flow Cell A10368], Unlevered Free Cash Flow **13,980.125** [Cash_Flow Cell A10394]가 있으나, Cash Conversion Ratio 계산에 필요한 기준 이익(예: EBITDA 또는 영업이익) 값이 제공되지 않았습니다.",
+    "api_usage": {
+      "prompt_tokens": 16335,
+      "completion_tokens": 259,
+      "cached_tokens": 0,
+      "reasoning_tokens": 138,
+      "total_tokens": 16594
+    },
+    "latency_seconds": 25.259
+  },
+  "Q067": {
+    "id": "Q067",
+    "scenario": "유형 4 재무 계산",
+    "question": "Key Stats의 TEV가 총부채 및 현금 수치와 정합성을 이루는가?",
+    "chatgpt_answer": "정합함. 270,970.4 + 64,607 + 93 - 14,417 = 321,253.4M으로 Key Stats TEV와 정확히 일치.",
+    "pipeline_answer": "네. **Key Stats의 TEV는 총부채 및 현금 수치와 정합적입니다.**\n\n- 시장 capitalization: **270,970.38886734** [KS Cell A248]\n- 현금 및 단기투자자산 차감: **14,417** [KS Cell A250]\n- 총부채 가산: **64,607** [KS Cell A252]\n- 우선주: **NA** [KS Cell A254]\n- 소수주주지분 가산: **93** [KS Cell A256]\n\n계산은 다음과 같습니다.\n\n**270,970.38886734 − 14,417 + 64,607 + 93 = 321,253.38886734**\n\n계산 결과가 Key Stats에 표시된 TEV **321,253.38886734** [KS Cell A258]와 정확히 일치합니다. 따라서 **우선주(NA)를 가산할 수치가 없는 것으로 처리하면**, TEV는 시장 capitalization, 현금 및 단기투자자산, 총부채, 소수주주지분과 정합성을 이룹니다.",
+    "api_usage": {
+      "prompt_tokens": 10618,
+      "completion_tokens": 747,
+      "cached_tokens": 0,
+      "reasoning_tokens": 496,
+      "total_tokens": 11365
+    },
+    "latency_seconds": 28.878
+  },
+  "Q068": {
+    "id": "Q068",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 Net Debt/EBITDA와 유동비율은 얼마인가?",
+    "chatgpt_answer": "Net Debt/EBITDA 2.99x (=50,190/16,778), 유동비율 0.96x (=36,944/38,658).",
+    "pipeline_answer": "IBM의 **Net Debt/EBITDA**와 **유동비율**은 제공된 셀만으로 산출할 수 없습니다.\n\n- **Net Debt/EBITDA:** LTM Net Debt는 **50,190**이지만 [Balance_Sheet Cell A6936], LTM EBITDA 금액이 제공되지 않았습니다. 따라서 계산식인 `50,190 ÷ LTM EBITDA`를 완성할 수 없습니다.  \n  - 참고로 제공된 **TEV/EBITDA**는 **20.085672배**이나 [Key_Stats Cell A284], 이는 Net Debt/EBITDA가 아니므로 대체할 수 없습니다.\n\n- **유동비율:** 유동비율은 `유동자산 ÷ 유동부채`로 계산하지만, 제공된 문맥에는 LTM 또는 최신 기간의 유동자산과 유동부채 총액이 없습니다. 따라서 산출할 수 없습니다.  \n  - 참고로 Working Capital **-1,714** [Balance_Sheet Cell A7014] 및 Net Working Capital **-8,907** [Balance_Sheet Cell A7040]은 유동비율 계산에 필요한 유동자산·유동부채 총액 자체가 아닙니다.\n\n필요한 추가 정보는 **LTM EBITDA, 유동자산 총액, 유동부채 총액**입니다.",
+    "api_usage": {
+      "prompt_tokens": 12316,
+      "completion_tokens": 405,
+      "cached_tokens": 0,
+      "reasoning_tokens": 103,
+      "total_tokens": 12721
+    },
+    "latency_seconds": 36.687
+  },
+  "Q069": {
+    "id": "Q069",
+    "scenario": "유형 4 재무 계산",
+    "question": "FCF 대비 배당 및 자사주 매입 집행 비중은?",
+    "chatgpt_answer": "단순 FCF 11,576M 대비 배당 6,255M은 54.0%. 2025 자사주 매입은 파일에 NA여서 배당+자사주 합계 비중은 엄밀히 산출 불가(NA를 0으로 보면 54.0%).",
+    "pipeline_answer": "FCF 대비 **배당 및 자사주 매입 집행 비중**은 다음과 같습니다. 계산식은 다음과 같습니다.\n\n> **집행 비중 = (배당금 지급액 + 자사주 매입액) ÷ 레버드 FCF × 100**  \n> 현금 유출 항목이 음수로 표시되어 있으므로 절댓값으로 계산했습니다.\n\n| 연도 | 레버드 FCF ($M) | 배당 ($M) | 자사주 매입 ($M) | 계산 | FCF 대비 비중 |\n|---|---:|---:|---:|---:|---:|\n| 2014 | 15,045.125 | 4,265 | 13,679 | (4,265+13,679) ÷ 15,045.125 | **119.27%** [Cash_Flow Cell A10346][Cash_Flow Cell A10058][Cash_Flow Cell A9902] |\n| 2015 | 8,746.625 | 4,897 | 4,857 | (4,897+4,857) ÷ 8,746.625 | **111.52%** [Cash_Flow Cell A10348][Cash_Flow Cell A10060][Cash_Flow Cell A9904] |\n| 2016 | 9,139.500 | 5,256 | 3,628 | (5,256+3,628) ÷ 9,139.5 | **97.20%** [Cash_Flow Cell A10350][Cash_Flow Cell A10062][Cash_Flow Cell A9906] |\n| 2017 | 8,041.875 | 5,506 | 4,533 | (5,506+4,533) ÷ 8,041.875 | **124.84%** [Cash_Flow Cell A10352][Cash_Flow Cell A10064][Cash_Flow Cell A9908] |\n| 2018 | 6,483.375 | 5,666 | 4,614 | (5,666+4,614) ÷ 6,483.375 | **158.51%** [Cash_Flow Cell A10354][Cash_Flow Cell A10066][Cash_Flow Cell A9910] |\n| 2019 | 14,803.875 | 5,707 | 1,633 | (5,707+1,633) ÷ 14,803.875 | **49.58%** [Cash_Flow Cell A10356][Cash_Flow Cell A10068][Cash_Flow Cell A9912] |\n| 2020 | 14,879.750 | 5,797 | 302 | (5,797+302) ÷ 14,879.75 | **40.99%** [Cash_Flow Cell A10358][Cash_Flow Cell A10070][Cash_Flow Cell A9914] |\n| 2021 | 4,626.500 | 5,869 | 319 | (5,869+319) ÷ 4,626.5 | **133.79%** [Cash_Flow Cell A10360][Cash_Flow Cell A10072][Cash_Flow Cell A9916] |\n| 2022 | 9,680.625 | 5,948 | 407 | (5,948+407) ÷ 9,680.625 | **65.64%** [Cash_Flow Cell A10362][Cash_Flow Cell A10074][Cash_Flow Cell A9918] |\n| 2023 | 10,823.000 | 6,040 | 402 | (6,040+402) ÷ 10,823 | **59.50%** [Cash_Flow Cell A10364][Cash_Flow Cell A10076][Cash_Flow Cell A9920] |\n\n**요약:**  \n- 2014~2018년에는 배당과 자사주 매입 합계가 FCF를 초과했으며, 특히 **2018년 158.51%**로 가장 높았습니다. [Cash_Flow Cell A10354][Cash_Flow Cell A10066][Cash_Flow Cell A9910]  \n- 2019~2020년에는 각각 **49.58%, 40.99%**로 낮아졌습니다. [Cash_Flow Cell A10356][Cash_Flow Cell A10068][Cash_Flow Cell A9912][Cash_Flow Cell A10358][Cash_Flow Cell A10070][Cash_Flow Cell A9914]  \n- 2021년에는 **133.79%**로 다시 FCF를 초과했습니다. [Cash_Flow Cell A10360][Cash_Flow Cell A10072][Cash_Flow Cell A9916]\n\n2024년은 레버드 FCF **9,325.5백만 달러**, 자사주 매입 **651백만 달러**, 보통주 배당 **6,147백만 달러**가 확인되지만, **총 배당금 지급액 데이터가 제공되지 않았습니다**. 따라서 총 배당 기준의 2024년 비중은 산출할 수 없습니다. [Cash_Flow Cell A10366][Cash_Flow Cell A9922][Cash_Flow Cell A10000] 보통주 배당만 사용하면 계산은 **(6,147+651) ÷ 9,325.5 = 72.86%**입니다. [Cash_Flow Cell A10366][Cash_Flow Cell A10000][Cash_Flow Cell A9922]",
+    "api_usage": {
+      "prompt_tokens": 17450,
+      "completion_tokens": 2247,
+      "cached_tokens": 17447,
+      "reasoning_tokens": 1024,
+      "total_tokens": 19697
+    },
+    "latency_seconds": 33.391
+  },
+  "Q070": {
+    "id": "Q070",
+    "scenario": "유형 4 재무 계산",
+    "question": "DSO 및 DIO의 추이는?",
+    "chatgpt_answer": "평균잔액 방식 DSO: 2021 48.2일, 2022 48.0일, 2023 47.3일, 2024 48.0일, 2025 46.8일. DIO: 24.9→21.3→18.2→16.7→16.2일. 재고회전은 뚜렷하게 개선.",
+    "pipeline_answer": "현재 제공된 셀 context만으로는 **DSO 및 DIO의 추이 산출이 불가능합니다.**\n\n- **DSO** 산식: `평균 매출채권 ÷ 매출액 × 일수`\n  - 제공된 것은 일부 항목인 **Accounts Receivables Unbilled**뿐이며, 예를 들어 2015년 **1,630**, 2016년 **1,611**입니다 [Balance_Sheet Cell A7096] [Balance_Sheet Cell A7098].\n  - 총매출채권, 매출액 및 적용 일수가 없어 DSO를 계산할 수 없습니다.\n\n- **DIO** 산식: `평균 재고자산 ÷ 매출원가 × 일수`\n  - 재고 구성 항목 일부는 확인되지만, 예를 들어 완제품 재고는 2015년 **352**, 재공품 재고는 **1,199**입니다 [Balance_Sheet Cell A7200] [Balance_Sheet Cell A7174].\n  - 원재료 재고는 해당 기간에 **NA**로 표시되어 있으며 [Balance_Sheet Cell A7146], 총재고자산과 매출원가가 제공되지 않아 DIO를 계산할 수 없습니다.\n\n따라서 **DSO와 DIO의 연도별 수준 및 증감 추이는 판단할 수 없습니다.** 계산을 위해서는 각 기간의 **매출액, 매출원가, 총매출채권 및 총재고자산** 셀이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 11388,
+      "completion_tokens": 657,
+      "cached_tokens": 11385,
+      "reasoning_tokens": 320,
+      "total_tokens": 12045
+    },
+    "latency_seconds": 16.78
+  },
+  "Q071": {
+    "id": "Q071",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 LTM 순부채성 금액을 TEV와 Market Cap 차이로 계산하면?",
+    "chatgpt_answer": "TEV-시총 = $50,283M. 이는 Debt+Minority-Cash(64,607+93-14,417)와 동일.",
+    "pipeline_answer": "IBM의 LTM 순부채성 금액은 **TEV와 Market Cap의 차이로 50,283**입니다.\n\n계산:  \n**321,253.38886734 − 270,970.38886734 = 50,283**  \n- LTM TEV: 321,253.38886734 [Key_Stats Cell A258]  \n- LTM Market Cap: 270,970.38886734 [Key_Stats Cell A248]  \n\n따라서 결과는 **50,283 (Key Stats 기준 단위)**입니다.",
+    "api_usage": {
+      "prompt_tokens": 20142,
+      "completion_tokens": 296,
+      "cached_tokens": 0,
+      "reasoning_tokens": 167,
+      "total_tokens": 20438
+    },
+    "latency_seconds": 38.188
+  },
+  "Q072": {
+    "id": "Q072",
+    "scenario": "유형 4 재무 계산",
+    "question": "2025년 매출총이익률과 영업이익률은?",
+    "chatgpt_answer": "2025 매출총이익률 58.19%, 영업이익률 17.41%.",
+    "pipeline_answer": "2025년:\n\n- **매출총이익률:** **58.1876064263%** [Key_Stats Cell A64]\n- **영업이익률:** **17.4087510180%** [Key_Stats Cell A136]",
+    "api_usage": {
+      "prompt_tokens": 14599,
+      "completion_tokens": 234,
+      "cached_tokens": 14596,
+      "reasoning_tokens": 170,
+      "total_tokens": 14833
+    },
+    "latency_seconds": 46.403
+  },
+  "Q073": {
+    "id": "Q073",
+    "scenario": "유형 4 재무 계산",
+    "question": "2025년 단순 잉여현금흐름은?",
+    "chatgpt_answer": "2025 단순 FCF = CFO 13,193 - CapEx 1,617 = $11,576M.",
+    "pipeline_answer": "2025년 단순 잉여현금흐름(Levered Free Cash Flow)은 **12,770.75백만 달러(약 127.71억 달러)**입니다. [Cash_Flow Cell A10368]\n\n※ 계산: 12,770.75백만 달러 ÷ 100 = 127.7075억 달러.",
+    "api_usage": {
+      "cached_tokens": 0,
+      "completion_tokens": 288,
+      "prompt_tokens": 20483,
+      "reasoning_tokens": 201,
+      "total_tokens": 20771
+    },
+    "latency_seconds": 17.475
+  },
+  "Q074": {
+    "id": "Q074",
+    "scenario": "유형 4 재무 계산",
+    "question": "2025년 총자산 대비 총부채 비율은?",
+    "chatgpt_answer": "2025 총자산 대비 총부채 비율 78.44%.",
+    "pipeline_answer": "계산할 수 없습니다. 2025년 **총자산** 값이 제공된 셀 컨텍스트에 없기 때문입니다.\n\n- 확인 가능한 2025년 총부채(총부채를 Total Debt로 해석): **64,607** [Balance_Sheet Cell A6856]\n- 필요한 2025년 총자산: **자료에 없음**\n\n계산식은 다음과 같습니다.\n\n**총부채 비율 = 2025년 총부채 ÷ 2025년 총자산 × 100**\n\n따라서 2025년 총자산 값이 있어야 총자산 대비 총부채 비율을 산출할 수 있습니다.",
+    "api_usage": {
+      "cached_tokens": 0,
+      "completion_tokens": 238,
+      "prompt_tokens": 17661,
+      "reasoning_tokens": 84,
+      "total_tokens": 17899
+    },
+    "latency_seconds": 45.259
+  },
+  "Q075": {
+    "id": "Q075",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 TEV가 시가총액보다 얼마나 큰가?",
+    "chatgpt_answer": "TEV가 시가총액보다 $50,283M, 즉 시총 대비 18.56% 큼.",
+    "pipeline_answer": "IBM의 TEV는 시가총액보다 **50,283**만큼 큽니다.\n\n- 계산: **321,253.38886734 − 270,970.38886734 = 50,283** [Key_Stats Cell A258] [Key_Stats Cell A248]\n- 시가총액 대비: **50,283 ÷ 270,970.38886734 × 100 = 약 18.56%** [Key_Stats Cell A258] [Key_Stats Cell A248]\n\n따라서 TEV는 시가총액보다 **약 18.56% 높습니다**. 단위는 제공된 셀의 표시 단위를 따릅니다.",
+    "api_usage": {
+      "cached_tokens": 0,
+      "completion_tokens": 338,
+      "prompt_tokens": 11413,
+      "reasoning_tokens": 181,
+      "total_tokens": 11751
+    },
+    "latency_seconds": 22.92
+  },
+  "Q076": {
+    "id": "Q076",
+    "scenario": "유형 4 재무 계산",
+    "question": "FY-1 대비 FY0 매출 성장률은?",
+    "chatgpt_answer": "FY-1 대비 FY0 매출 성장률 7.62%.",
+    "pipeline_answer": "FY-1(2024년) 대비 FY0(2025년) 매출 성장률은 **약 7.62%**입니다.\n\n- FY-1 매출: **62,753** [Key_Stats Cell A8]  \n- FY0 매출: **67,535** [Key_Stats Cell A10]  \n- 계산: \\((67,535 - 62,753) ÷ 62,753 × 100 = 7.62\\%\\)  \n- 셀에 표시된 성장률도 **7.62%**입니다 [Key_Stats Cell A28].",
+    "api_usage": {
+      "prompt_tokens": 14532,
+      "completion_tokens": 313,
+      "cached_tokens": 0,
+      "reasoning_tokens": 176,
+      "total_tokens": 14845
+    },
+    "latency_seconds": 293.894
+  },
+  "Q077": {
+    "id": "Q077",
+    "scenario": "유형 4 재무 계산",
+    "question": "최근 순이익 성장률은?",
+    "chatgpt_answer": "최근 순이익 성장률(2024→2025) +75.88%.",
+    "pipeline_answer": "최근 순이익 성장률은 **약 75.88%**입니다.\n\n- 2024년 순이익: **6,023백만 달러** [Income_Statement Cell A1574]\n- 2025년 순이익: **10,593백만 달러** [Income_Statement Cell A1576]\n- 계산: **(10,593 − 6,023) ÷ 6,023 × 100 = 75.88%**\n\n즉, 2025년 순이익은 전년 대비 **4,570백만 달러 증가**했습니다. [Income_Statement Cell A1574] [Income_Statement Cell A1576]",
+    "api_usage": {
+      "prompt_tokens": 17351,
+      "completion_tokens": 388,
+      "cached_tokens": 0,
+      "reasoning_tokens": 234,
+      "total_tokens": 17739
+    },
+    "latency_seconds": 43.247
+  },
+  "Q078": {
+    "id": "Q078",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 LTM 매출총이익률을 계산해줘.",
+    "chatgpt_answer": "LTM 매출총이익률 58.19% (=39,297/67,535).",
+    "pipeline_answer": "IBM의 LTM 매출총이익률은 다음과 같습니다.\n\n- LTM 매출총이익: 39,297 [Key_Stats Cell A48]\n- LTM 총매출: 67,535 [Key_Stats Cell A12]\n\n계산:  \n**39,297 ÷ 67,535 × 100 = 58.1876%**\n\n따라서 **IBM의 LTM 매출총이익률은 약 58.19%**입니다.",
+    "api_usage": {
+      "prompt_tokens": 16963,
+      "completion_tokens": 165,
+      "cached_tokens": 0,
+      "reasoning_tokens": 52,
+      "total_tokens": 17128
+    },
+    "latency_seconds": 32.635
+  },
+  "Q079": {
+    "id": "Q079",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 LTM 영업이익률은?",
+    "chatgpt_answer": "LTM 영업이익률 17.41% (=11,757/67,535).",
+    "pipeline_answer": "IBM의 **LTM 영업이익률은 17.40875101799067%**입니다(약 **17.41%**). [Key_Stats Cell A137][Key_Stats Cell A138]",
+    "api_usage": {
+      "prompt_tokens": 17370,
+      "completion_tokens": 275,
+      "cached_tokens": 0,
+      "reasoning_tokens": 220,
+      "total_tokens": 17645
+    },
+    "latency_seconds": 22.717
+  },
+  "Q080": {
+    "id": "Q080",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 LTM 순이익률을 계산해줘.",
+    "chatgpt_answer": "LTM 순이익률 15.69% (=10,593/67,535).",
+    "pipeline_answer": "IBM의 **LTM 순이익률**은 다음과 같이 계산됩니다.\n\n\\[\n\\text{LTM 순이익률}\n= \\frac{\\text{LTM 순이익}}{\\text{LTM 총매출}}\n\\times 100\n= \\frac{10{,}593}{67{,}535}\\times 100\n= 15.6852\\%\n\\]\n\n- LTM 순이익: **10,593** [Key_Stats Cell A180]  \n- LTM 총매출: **67,535** [Key_Stats Cell A12]  \n- **LTM 순이익률: 15.6852%** [Key_Stats Cell A198]",
+    "api_usage": {
+      "prompt_tokens": 15171,
+      "completion_tokens": 489,
+      "cached_tokens": 0,
+      "reasoning_tokens": 318,
+      "total_tokens": 15660
+    },
+    "latency_seconds": 40.48
+  },
+  "Q081": {
+    "id": "Q081",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 LTM 유동비율은?",
+    "chatgpt_answer": "LTM 유동비율 0.96x.",
+    "pipeline_answer": "IBM의 **LTM 유동비율은 제공된 셀 컨텍스트만으로 계산할 수 없습니다.**\n\n- 계산식: **유동비율 = 유동자산 ÷ 유동부채 × 100**\n- 제공된 자료에는 LTM **총 유동자산**과 **총 유동부채** 값이 없습니다.\n- 확인 가능한 LTM 항목 중 *Intercompany Current Assets*와 *Intercompany Current Liabilities*는 모두 `NA`입니다 [Balance_Sheet Cell A8522] [Balance_Sheet Cell A8574].\n\n따라서 IBM의 LTM 유동비율을 산출하려면 LTM 총 유동자산 및 총 유동부채 셀이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 15125,
+      "completion_tokens": 248,
+      "cached_tokens": 0,
+      "reasoning_tokens": 82,
+      "total_tokens": 15373
+    },
+    "latency_seconds": 17.615
+  },
+  "Q082": {
+    "id": "Q082",
+    "scenario": "유형 4 재무 계산",
+    "question": "영업현금흐름과 CAPEX로 FCF를 계산해줘.",
+    "chatgpt_answer": "FCF = 13,193 + (-1,617) = $11,576M.",
+    "pipeline_answer": "FCF는 **영업현금흐름(CFO) + CAPEX**로 계산했습니다. CAPEX가 음수로 표시되어 있으므로, 예를 들어 **FCF = CFO - CAPEX 절대값**입니다. 단위는 **$M**입니다.\n\n| 연도 | 계산 | FCF ($M) |\n|---|---:|---:|\n| 2015 | 17,255 + (-3,579) | **13,676** [Cash_Flow Cell A9436] [Cash_Flow Cell A9462] |\n| 2016 | 17,084 + (-3,567) | **13,517** [Cash_Flow Cell A9438] [Cash_Flow Cell A9464] |\n| 2017 | 16,724 + (-3,229) | **13,495** [Cash_Flow Cell A9440] [Cash_Flow Cell A9466] |\n| 2018 | 15,247 + (-3,395) | **11,852** [Cash_Flow Cell A9442] [Cash_Flow Cell A9468] |\n| 2019 | 14,770 + (-2,286) | **12,484** [Cash_Flow Cell A9444] [Cash_Flow Cell A9470] |\n| 2020 | 18,197 + (-2,618) | **15,579** [Cash_Flow Cell A9446] [Cash_Flow Cell A9472] |\n| 2021 | 12,796 + (-2,062) | **10,734** [Cash_Flow Cell A9448] [Cash_Flow Cell A9474] |\n| 2022 | 10,435 + (-1,346) | **9,089** [Cash_Flow Cell A9450] [Cash_Flow Cell A9476] |\n| 2025 | 13,193 + (-1,617) | **11,576** [Cash_Flow Cell A9458] [Cash_Flow Cell A9482] |\n\n**계산 불가 연도:**  \n- **2014년:** 영업현금흐름 값이 제공되지 않았습니다. CAPEX는 **-3,740**입니다. [Cash_Flow Cell A9460]  \n- **2023년 및 2024년:** CAPEX는 각각 **-1,245**, **-1,048**이나, 해당 연도의 영업현금흐름 값이 제공되지 않았습니다. [Cash_Flow Cell A9478] [Cash_Flow Cell A9480]",
+    "api_usage": {
+      "prompt_tokens": 16388,
+      "completion_tokens": 1049,
+      "cached_tokens": 0,
+      "reasoning_tokens": 486,
+      "total_tokens": 17437
+    },
+    "latency_seconds": 23.893
+  },
+  "Q083": {
+    "id": "Q083",
+    "scenario": "유형 4 재무 계산",
+    "question": "종가와 발행주식수로 시가총액을 계산해줘.",
+    "chatgpt_answer": "289.89 × 934,735,206 ÷ 1,000,000 = $270,970.4M.",
+    "pipeline_answer": "시가총액 계산:\n\n- 종가: **289.89** [KS Cell A242]  \n- 발행주식수: **934,735,206주** [KS Cell A244]  \n- 백만 단위 환산: **1,000,000** [KS Cell A246]\n\n계산식:  \n**289.89 × 934,735,206 ÷ 1,000,000 = 270,970.38886734**\n\n따라서 시가총액은 **270,970.38886734백만**(약 **270.97십억**)입니다. [KS Cell A248]",
+    "api_usage": {
+      "prompt_tokens": 10366,
+      "completion_tokens": 198,
+      "cached_tokens": 0,
+      "reasoning_tokens": 54,
+      "total_tokens": 10564
+    },
+    "latency_seconds": 21.464
+  },
+  "Q084": {
+    "id": "Q084",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 TEV는 LTM 매출의 몇 배야?",
+    "chatgpt_answer": "직접 계산 기준 TEV/LTM Revenue = 4.76x.",
+    "pipeline_answer": "IBM의 TEV는 LTM 매출의 약 **4.76배**입니다.\n\n계산: **321,253.3889 ÷ 67,535 = 4.7569배**  \n- LTM TEV: 321,253.38886734 [Key_Stats Cell A258]  \n- LTM 매출: 67,535 [Key_Stats Cell A12]",
+    "api_usage": {
+      "prompt_tokens": 17774,
+      "completion_tokens": 274,
+      "cached_tokens": 0,
+      "reasoning_tokens": 180,
+      "total_tokens": 18048
+    },
+    "latency_seconds": 31.014
+  },
+  "Q085": {
+    "id": "Q085",
+    "scenario": "유형 4 재무 계산",
+    "question": "IBM의 최근 3년 평균 매출은 얼마야?",
+    "chatgpt_answer": "최근 3년(2023\\~2025) 평균 매출 $64,049.3M.",
+    "pipeline_answer": "IBM의 최근 3개 회계연도(2023~2025년) 평균 매출은 **64,049.33**입니다.\n\n계산:  \n(2023년 **61,860** [Key_Stats Cell A6] + 2024년 **62,753** [Key_Stats Cell A8] + 2025년 **67,535** [Key_Stats Cell A10]) ÷ 3  \n= **64,049.33**",
+    "api_usage": {
+      "prompt_tokens": 15601,
+      "completion_tokens": 184,
+      "cached_tokens": 0,
+      "reasoning_tokens": 74,
+      "total_tokens": 15785
+    },
+    "latency_seconds": 69.305
+  },
+  "Q086": {
+    "id": "Q086",
+    "scenario": "유형 4 재무 계산",
+    "question": "장기부채가 현금성 자산보다 얼마나 큰가?",
+    "chatgpt_answer": "Long-Term Debt가 현금성자산보다 $40,419M 큼.",
+    "pipeline_answer": "LTM 기준 장기부채는 현금 및 단기투자자산보다 **42,966**만큼 큽니다.\n\n- 장기부채: **57,383** [Balance_Sheet Cell A6908]\n- 현금 및 단기투자자산: **14,417** [Key_Stats Cell A250]\n- 차이: **57,383 − 14,417 = 42,966**\n- 배수: **57,383 ÷ 14,417 ≈ 3.98배**\n- 현금 및 단기투자자산 대비 초과 비율: **42,966 ÷ 14,417 ≈ 298.0%**\n\n따라서 장기부채는 현금 및 단기투자자산의 약 **3.98배**이며, 약 **298.0%** 더 큽니다. 단위는 제공된 해당 셀 맥락에 명시되어 있지 않습니다.",
+    "api_usage": {
+      "prompt_tokens": 9824,
+      "completion_tokens": 628,
+      "cached_tokens": 0,
+      "reasoning_tokens": 413,
+      "total_tokens": 10452
+    },
+    "latency_seconds": 20.517
+  },
+  "Q087": {
+    "id": "Q087",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "2022년 순이익이 급감했음에도 영업현금흐름이 유지된 원인은?",
+    "chatgpt_answer": "2022 순이익은 1,639M으로 급감했지만 CFO는 10,435M 유지. 손익에 약 -5,894M의 unusual item이 반영된 반면, 현금흐름에서는 D&A 4,154M, SBC 987M, 기타 영업조정 +3,168M 등 비현금/운전자본 조정이 보완했기 때문.",
+    "pipeline_answer": "2022년 순이익 급감에도 영업현금흐름이 유지된 원인은 **순이익에 포함되지 않거나 현금 유출을 수반하지 않는 영업 관련 조정항목이 현금흐름을 보완했기 때문으로 해석할 수 있습니다.** 다만, 제공된 셀에는 **총 영업현금흐름(OCF) 금액이 없어 ‘유지’ 여부 자체는 직접 확인할 수 없습니다.**\n\n- 순이익: 2021년 **5,743**에서 2022년 **1,639**로 감소  \n  - 감소액: `1,639 - 5,743 = -4,104`  \n  - 감소율: `4,104 ÷ 5,743 = 71.5%`  \n  [Key_Stats Cell A170] [Key_Stats Cell A172]\n\n- 반면 2022년 현금흐름 조정 관련 항목은:\n  - 기타 영업활동: **+3,168백만 달러** [Cash_Flow Cell A9216]\n  - 주식보상비용: **+987백만 달러** [Cash_Flow Cell A9112]\n  - 두 항목 합계: `3,168 + 987 = 4,155백만 달러` [Cash_Flow Cell A9216] [Cash_Flow Cell A9112]\n\n이는 순이익 감소액 **4,104**와 유사한 규모로, **주식보상비용 및 기타 영업활동 조정이 순이익 감소의 현금흐름 영향을 상당 부분 상쇄했을 가능성**을 보여줍니다. 특히 기타 영업활동은 2021년 **-2,001백만 달러**에서 2022년 **+3,168백만 달러**로 `3,168 - (-2,001) = 5,169백만 달러` 개선되었습니다. [Cash_Flow Cell A9214] [Cash_Flow Cell A9216]\n\n단, 2022년 **총 영업현금흐름**, 감가상각비, 운전자본 변동 등 전체 조정 내역이 제공되지 않았으므로, 영업현금흐름 유지의 정확한 원인과 규모를 완전히 확정하려면 해당 셀 정보가 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 20863,
+      "completion_tokens": 816,
+      "cached_tokens": 0,
+      "reasoning_tokens": 289,
+      "total_tokens": 21679
+    },
+    "latency_seconds": 54.824
+  },
+  "Q088": {
+    "id": "Q088",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "총부채가 크게 변동한 배경은 차입금 발행인가, M&A/투자 지출 때문인가?",
+    "chatgpt_answer": "가장 큰 부채 점프는 2018→2019 구간으로 보이며, 총부채 106,452→131,201M(+24,749M), Total Debt 45,812→68,158M(+22,346M). 같은 해 Debt Issued 31,825M, Cash Acquisitions -32,630M이어서 'M&A/투자 집행을 차입으로 조달'한 영향이 핵심으로 해석됨.",
+    "pipeline_answer": "결론적으로, **총부채 변동은 단순한 M&A/투자 지출만으로 설명하기 어렵고, 순차입(차입금 발행·상환)의 영향이 함께 반영된 것으로 보입니다.** 다만 제공된 셀에는 차입금 발행액 자체가 충분히 없어, 발행이 직접적인 원인이라고 단정할 수는 없습니다.\n\n- **2019년은 M&A와 부채 증가가 동시에 크게 나타난 사례입니다.**  \n  총부채: 2018년 45,812 → 2019년 68,158, 즉 **+22,346**  \n  산식: `68,158 - 45,812 = +22,346` [Balance_Sheet Cell A6842][Balance_Sheet Cell A6844]  \n  같은 기간 현금 인수액은 **-32,630**이었고 [Cash_Flow Cell A9522], 현금 투자활동은 **-26,936**이었습니다 [Cash_Flow Cell A9704].  \n  따라서 2019년의 큰 부채 증가는 **대규모 M&A 자금 조달과 관련되었을 가능성이 높습니다.**\n\n- **그러나 M&A 지출이 크지 않은데도 부채가 증가한 기간도 있습니다.**  \n  2016년 총부채는 42,176으로 2015년 39,892보다 **+2,284** 증가했습니다.  \n  산식: `42,176 - 39,892 = +2,284` [Balance_Sheet Cell A6836][Balance_Sheet Cell A6838]  \n  반면 현금 인수액은 2016년 **-5,696**이었습니다 [Cash_Flow Cell A9516].  \n  2017년에도 총부채는 46,858로 2016년보다 **+4,682** 증가했지만 [Balance_Sheet Cell A6838][Balance_Sheet Cell A6840], 현금 인수액은 **-496**에 불과했습니다 [Cash_Flow Cell A9518].  \n  이는 부채 변동이 M&A 지출과 항상 일치하지 않음을 보여줍니다.\n\n- **최근에도 부채 증가와 투자 지출이 함께 발생했지만, 규모가 일치하지 않습니다.**  \n  2023년 총부채는 59,935로 2022년 54,013보다 **+5,922** 증가했습니다.  \n  산식: `59,935 - 54,013 = +5,922` [Balance_Sheet Cell A6850][Balance_Sheet Cell A6852]  \n  같은 해 현금 인수액은 **-5,082**, 현금 투자활동은 **-7,070**이었습니다 [Cash_Flow Cell A9530][Cash_Flow Cell A9712].  \n  2025년 총부채도 64,607로 2024년 58,396보다 **+6,211** 증가했고 [Balance_Sheet Cell A6854][Balance_Sheet Cell A6856], 현금 인수액은 **-8,294**, 현금 투자활동은 **-10,302**이었습니다 [Cash_Flow Cell A9534][Cash_Flow Cell A9716].\n\n따라서 **2019년처럼 대규모 M&A가 발생한 시점에는 투자·인수 지출이 부채 증가의 주요 배경으로 보이지만**, 전체 기간의 총부채 변동은 **차입금 발행 및 상환, M&A, 기타 자금 운용이 복합적으로 작용한 결과**로 판단하는 것이 적절합니다. 제공된 자료에는 차입금 발행·상환액의 연도별 세부 내역이 부족하므로, **“차입금 발행 때문”이라고 정량적으로 확정할 수는 없습니다.**",
+    "api_usage": {
+      "prompt_tokens": 14483,
+      "completion_tokens": 1363,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 15846
+    },
+    "latency_seconds": 38.833
+  },
+  "Q089": {
+    "id": "Q089",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "IBM이 영업현금흐름을 초과하는 주주환원을 집행했는가?",
+    "chatgpt_answer": "2025 기준 CFO 13,193M \\> 배당 6,255M. 자사주 매입은 NA이므로 확정 합산은 어렵지만, 확인 가능한 주주환원은 CFO를 초과하지 않음.",
+    "pipeline_answer": "판단할 수 없습니다. 제공된 셀에는 **주주환원 총액(배당금 및 자사주매입액 등)**이 없기 때문입니다. 또한 IBM의 **Annualized Distributions per Unit**는 제공된 기간에 모두 `NA`로 표시되어 있습니다(예: 2024년 [Income_Statement Cell A3188], 2025년 [Income_Statement Cell A3190]).\n\n참고로 영업현금흐름은 2025년에 **$13,193M**입니다 [Cash_Flow Cell A9456]. 그러나 이를 주주환원 총액과 비교할 수 없으므로, **영업현금흐름을 초과하는 주주환원을 집행했는지는 확인 불가**입니다.",
+    "api_usage": {
+      "prompt_tokens": 14953,
+      "completion_tokens": 533,
+      "cached_tokens": 0,
+      "reasoning_tokens": 358,
+      "total_tokens": 15486
+    },
+    "latency_seconds": 23.739
+  },
+  "Q090": {
+    "id": "Q090",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "CapEx와 PP&E 증가 및 이후 매출 성장 간에 시차가 존재하는가?",
+    "chatgpt_answer": "강한 시차 관계는 확인되지 않음. Net PP&E는 2021\\~2025 8,916→8,212→8,721→8,929→9,028M으로 완만했고, 매출은 2025에 +7.62% 가속. 2025 CapEx 증가는 동시 발생했지만 파일만으로 선행 투자→후행 매출의 인과/시차를 입증하기 어려움.",
+    "pipeline_answer": "**결론: 시차는 관찰되지만, CapEx 증가가 PP&E 증가를 거쳐 이후 매출 성장으로 이어졌다고 판단할 근거는 부족합니다.**\n\n- CapEx는 **2014~2020년**에 집행되었고, 금액은 **-3,740 → -2,618**로 감소했습니다. 특히 **2018년 -3,395에서 2019년 -2,286**으로 줄었습니다.  \n  - 2014→2020 변화: `-2,618 - (-3,740) = +1,122` [Cash_Flow Cell A9460] [Cash_Flow Cell A9472]  \n  - 2018→2019 변화: `-2,286 - (-3,395) = +1,109` [Cash_Flow Cell A9468] [Cash_Flow Cell A9470]  \n  *(CapEx 단위: $M)*\n\n- 그러나 Gross PP&E는 CapEx 집행 이후 증가하지 않고 오히려 감소했습니다.  \n  - 2014→2018: `32,460 - 39,034 = -6,574` [Balance_Sheet Cell A6288] [Balance_Sheet Cell A6296]  \n  - 2020→2024: `17,691 - 20,101 = -2,410` [Balance_Sheet Cell A6300] [Balance_Sheet Cell A6308]  \n  - 2021→2023에도 `18,122 - 20,084 = -1,962`로 감소했습니다. [Balance_Sheet Cell A6302] [Balance_Sheet Cell A6306]\n\n- Net PP&E 역시 **2014년 10,771에서 2022년 5,334**로 감소했으며, 이후에만 소폭 회복했습니다.  \n  - 2014→2022: `5,334 - 10,771 = -5,437` [Balance_Sheet Cell A6340] [Balance_Sheet Cell A6356]  \n  - 2022→2025: `5,899 - 5,334 = +565` [Balance_Sheet Cell A6356] [Balance_Sheet Cell A6362]\n\n- 매출 성장률은 이후 기간인 **2021~2025년**에 각각 **3.936%, 5.543%, 2.197%, 1.444%, 7.62%**였습니다. [Key_Stats Cell A20] [Key_Stats Cell A22] [Key_Stats Cell A24] [Key_Stats Cell A26] [Key_Stats Cell A28]\n\n따라서 **CapEx와 매출 성장 사이에 시간상 선후관계는 존재**하지만, 해당 기간의 PP&E가 증가하지 않았으므로 **“CapEx 증가 → PP&E 증가 → 일정 시차 후 매출 성장”이라는 연결고리는 확인되지 않습니다.** 또한 2021년 이후 CapEx 수치가 제공되지 않아, 매출 성장에 대한 CapEx의 직접적인 시차 효과를 정량적으로 검증하기에는 **이후 연도 CapEx 데이터가 부족합니다.**",
+    "api_usage": {
+      "prompt_tokens": 12720,
+      "completion_tokens": 1195,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 13915
+    },
+    "latency_seconds": 32.916
+  },
+  "Q091": {
+    "id": "Q091",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "현재 TEV/EBITDA 멀티플이 IBM의 수익성과 성장 전망 대비 적정한가?",
+    "chatgpt_answer": "현재 직접 계산 TEV/EBITDA 약 19.15x는 매출 성장 7.62%, EBITDA 마진 24.84% 대비 낮은 멀티플은 아님. 다만 2026\\~2028 EBITDA 마진 추정이 28\\~29%대로 개선되고 TEV가 고정된다고 보면 멀티플이 약 16.0x→14.8x→13.9x로 낮아져, 마진 확장이 실현될 경우 프리미엄을 일부 정당화할 수 있음.",
+    "pipeline_answer": "현재 IBM의 **TEV/EBITDA 멀티플은 20.085672배**로, LTM 기준도 동일합니다 [Key_Stats Cell A282] [Key_Stats Cell A284].\n\n- **수익성:** LTM EBITDA는 16,778이며 [Key_Stats Cell A84], EBITDA 마진은 **24.8434%**입니다 [Key_Stats Cell A102]. 수익성 자체는 양호한 편으로 볼 수 있습니다.\n- **성장성:** 매출 성장률은 2025년 **7.62%**였으나 [Key_Stats Cell A28], 전망상 2027년 **4.3154%** [Key_Stats Cell A34], 2028년 **5.7441%**로 제시되어 [Key_Stats Cell A36] 성장률은 중간 한 자릿수 수준으로 둔화될 전망입니다.\n- **EBITDA 전망:** 2026년 EBITDA 추정치는 20,021.77313으로 [Key_Stats Cell A86], LTM 대비 증가율은 다음과 같습니다.  \n  \\[\n  (20{,}021.77313 \\div 16{,}778 - 1) \\times 100\n  = 19.33\\%\n  \\]\n  [Key_Stats Cell A86] [Key_Stats Cell A84]\n\n**판단:** IBM은 **24.8434%의 EBITDA 마진과 EBITDA 증가 전망**을 감안하면 20.085672배가 완전히 정당화될 가능성은 있지만, 매출 성장률이 향후 **4.3154~5.7441%** 수준이라는 점을 고려하면 **성장성 대비 멀티플은 다소 높은 편으로 보입니다** [Key_Stats Cell A102] [Key_Stats Cell A34] [Key_Stats Cell A36]. 따라서 현재 멀티플은 **수익성 대비로는 수용 가능하지만, 성장 전망 대비로는 보수적으로 보면 비싸거나 적정가 상단**에 해당한다고 판단됩니다.\n\n다만 컨텍스트에는 동종업계 비교 멀티플, IBM의 적정 성장률·자본비용, 그리고 FY2026 이후 TEV/EBITDA 전망치가 **NA**로 제시되어 있어 [Key_Stats Cell A288] [Key_Stats Cell A292] [Key_Stats Cell A286], 객관적인 적정가치 여부를 확정할 비교 기준은 부족합니다.",
+    "api_usage": {
+      "prompt_tokens": 16424,
+      "completion_tokens": 965,
+      "cached_tokens": 0,
+      "reasoning_tokens": 414,
+      "total_tokens": 17389
+    },
+    "latency_seconds": 67.004
+  },
+  "Q092": {
+    "id": "Q092",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "콜드플레이와 비스텔리젼스의 매출 차이가 발생하는 이유는?",
+    "chatgpt_answer": "파일 내 콜드플레이·비스텔리젼스 데이터가 없어 원인 분석 불가.",
+    "pipeline_answer": "제공된 Excel 셀 문맥만으로는 **콜드플레이와 비스텔리젼스의 매출 차이가 발생하는 이유를 판단할 수 없습니다.**\n\n문맥에는 IBM의 매출 및 재무 데이터만 포함되어 있으며, 콜드플레이와 비스텔리젼스의 다음 정보가 없습니다.\n\n- 각 회사의 매출액 및 비교 기간\n- 매출 인식 기준과 사업 부문\n- 지역·제품·서비스별 매출 구성\n- 환율, 연결 범위, 회계정책 차이\n\n따라서 두 기업 간 매출 차이의 원인은 **제공된 셀 정보만으로 확인 불가**합니다.",
+    "api_usage": {
+      "prompt_tokens": 15617,
+      "completion_tokens": 210,
+      "cached_tokens": 0,
+      "reasoning_tokens": 51,
+      "total_tokens": 15827
+    },
+    "latency_seconds": 24.708
+  },
+  "Q093": {
+    "id": "Q093",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "비스텔리젼스의 영업이익률이 2024년부터 개선된 이유를 설명해줘.",
+    "chatgpt_answer": "파일 내 비스텔리젼스 데이터 없음.",
+    "pipeline_answer": "제공된 셀 기준으로 보면, **영업이익률은 2024년부터 계속 개선된 것이 아니라 2024년에 소폭 하락한 뒤 2025년에 뚜렷하게 개선**되었습니다.\n\n- **2023년:** EBIT 9,903, 매출 61,860 → 영업이익률 **16.0087%** [Key_Stats Cell A114] [Key_Stats Cell A6] [Key_Stats Cell A132]\n- **2024년:** EBIT 9,788, 매출 62,753 → 영업이익률 **15.5977%** [Key_Stats Cell A116] [Key_Stats Cell A8] [Key_Stats Cell A134]  \n  - EBIT: 9,788 − 9,903 = **-115**, 약 **-1.2%** [Key_Stats Cell A116] [Key_Stats Cell A114]\n  - 영업이익률: 15.5977% − 16.0087% = **-0.4111%p** [Key_Stats Cell A134] [Key_Stats Cell A132]\n- **2025년:** EBIT 11,757, 매출 67,535 → 영업이익률 **17.4088%** [Key_Stats Cell A118] [Key_Stats Cell A10] [Key_Stats Cell A136]  \n  - EBIT: 11,757 − 9,788 = **1,969**, 약 **+20.1%** [Key_Stats Cell A118] [Key_Stats Cell A116]\n  - 매출: 67,535 − 62,753 = **4,782**, 약 **+7.6%** [Key_Stats Cell A10] [Key_Stats Cell A8]\n  - 영업이익률: 17.4088% − 15.5977% = **+1.8111%p** [Key_Stats Cell A136] [Key_Stats Cell A134]\n\n**개선 배경으로 확인되는 핵심은 매출보다 총이익과 EBIT가 더 빠르게 증가했다는 점입니다.**\n\n1. **총이익률 상승**  \n   2024년 총이익률은 **56.6539%**, 2025년은 **58.1876%**로 **+1.5337%p** 개선되었습니다. [Key_Stats Cell A62] [Key_Stats Cell A64]  \n   총이익도 **35,552 → 39,297**로 **3,745 증가**, 약 **+10.5%** 증가했습니다. [Key_Stats Cell A44] [Key_Stats Cell A46]\n\n2. **영업 레버리지 효과**  \n   2025년에는 매출 증가율이 약 **7.6%**인데 EBIT 증가율은 약 **20.1%**였습니다. [Key_Stats Cell A10] [Key_Stats Cell A8] [Key_Stats Cell A118] [Key_Stats Cell A116]  \n   즉, 매출 증가분이 총이익 및 영업이익으로 더 크게 전환되면서 영업이익률이 상승한 것으로 해석됩니다.\n\n다만, 제공된 자료에는 **2024~2025년 세부 영업비용, 가격·제품 믹스, 비용절감 내역**이 충분히 제시되지 않았습니다. 따라서 영업이익률 개선의 정확한 원인을 특정 비용 항목이나 사업부문별 요인으로 단정할 수는 없습니다.",
+    "api_usage": {
+      "prompt_tokens": 19995,
+      "completion_tokens": 1521,
+      "cached_tokens": 0,
+      "reasoning_tokens": 732,
+      "total_tokens": 21516
+    },
+    "latency_seconds": 97.317
+  },
+  "Q094": {
+    "id": "Q094",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "콜드플레이의 부채비율 상승 시점과 매출 둔화 시점이 관련 있어?",
+    "chatgpt_answer": "파일 내 콜드플레이 데이터 없음.",
+    "pipeline_answer": "현재 제공된 셀 맥락만으로는 **콜드플레이의 재무자료인지 확인할 수 없습니다.** 오히려 일부 셀은 **International Business Machines Corporation(IBM)**으로 표시되어 있어, 콜드플레이에 대한 결론을 내릴 수 없습니다.\n\n다만 제공된 수치를 해당 기업의 자료로 해석하면:\n\n- 매출 성장률은 **2022년 5.543% → 2023년 2.197%**로 둔화되었습니다.  \n  계산: 2.197% - 5.543% = **-3.346%p** [Key_Stats Cell A22] [Key_Stats Cell A24]\n- 이후 **2024년 1.444%**까지 추가 둔화되었습니다.  \n  계산: 1.444% - 2.197% = **-0.753%p** [Key_Stats Cell A24] [Key_Stats Cell A26]\n- 총부채는 **2022년 54,013 → 2023년 59,935**로 증가했습니다.  \n  계산: 59,935 - 54,013 = **5,922 증가**, 약 **11.0% 증가** [Balance_Sheet Cell A8462] [Balance_Sheet Cell A8464]\n- 총부채는 **2024년 58,396 → 2025년 64,607**로도 증가했습니다.  \n  계산: 64,607 - 58,396 = **6,211 증가**, 약 **10.6% 증가** [Balance_Sheet Cell A8466] [Balance_Sheet Cell A8468]\n\n따라서 제공된 기업 기준으로는 **2022~2024년 매출 성장률 둔화와 2023년 부채 증가가 시간상 인접**하지만, 이것만으로 부채 증가가 매출 둔화의 원인이라고 보기는 어렵습니다. 또한 **부채비율 계산에 필요한 자기자본 또는 총자본의 시계열 값이 없어 실제 부채비율 상승 시점은 확인할 수 없습니다.** 해당 값과 콜드플레이의 정확한 재무 셀이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 12478,
+      "completion_tokens": 750,
+      "cached_tokens": 0,
+      "reasoning_tokens": 268,
+      "total_tokens": 13228
+    },
+    "latency_seconds": 28.087
+  },
+  "Q095": {
+    "id": "Q095",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "두 회사의 성장 곡선을 볼 때 어느 쪽이 더 지속가능한 성장을 하고 있어?",
+    "chatgpt_answer": "파일 내 두 회사 데이터 없음.",
+    "pipeline_answer": "현재 제공된 셀 컨텍스트만으로는 **두 회사의 성장 지속가능성을 비교할 수 없습니다.** 두 번째 회사의 식별자와 동일 기준의 매출·이익 시계열이 누락되어 있습니다.\n\n다만 제공된 IBM 데이터만 보면:\n\n- 매출 성장률은 2021년 **3.936%**에서 2022년 **5.543%**로 상승했지만, 2023년 **2.197%**, 2024년 **1.444%**로 둔화된 뒤 2025년 **7.62%**로 반등했습니다. [KS Cell A20] [KS Cell A22] [KS Cell A24] [KS Cell A26] [KS Cell A28]  \n- 2021년 매출 **57,351**에서 2025년 **67,535**로 증가했습니다. 계산: **67,535 - 57,351 = 10,184**, 증가율 **10,184 ÷ 57,351 × 100 ≈ 17.76%**. [KS Cell A2] [KS Cell A10]\n- EBIT는 2020년 **4,662**에서 2025년 **11,757**로 회복했지만, 2014년 **20,129** 및 2015년 **16,517**보다 낮습니다. [Income_Statement Cell A968] [Income_Statement Cell A978] [Income_Statement Cell A956] [Income_Statement Cell A958]\n- EBIT 마진은 2021년 **9.735%**, 2022년 **12.425%**, 2023년 **16.009%**로 개선됐고, 2024년 **15.598%**, 2025년 **17.409%**를 기록했습니다. [KS Cell A128] [KS Cell A130] [KS Cell A132] [KS Cell A134] [KS Cell A136]\n\n따라서 IBM만 놓고 보면 **최근에는 수익성 개선이 동반된 회복세**가 나타나지만, 매출 성장률의 연도별 변동성이 있어 이를 곧바로 “지속가능한 성장”이라고 단정하기는 어렵습니다. **두 회사 중 어느 쪽이 더 지속가능한지는 두 번째 회사의 비교 데이터가 필요합니다.**",
+    "api_usage": {
+      "prompt_tokens": 16417,
+      "completion_tokens": 1024,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 17441
+    },
+    "latency_seconds": 44.613
+  },
+  "Q096": {
+    "id": "Q096",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "비스텔리젼스의 재무 상태에서 리스크 요인이 있어?",
+    "chatgpt_answer": "파일 내 비스텔리젼스 데이터 없음.",
+    "pipeline_answer": "제공된 셀 컨텍스트는 **International Business Machines Corporation(IBM)**을 명시하고 있어, 해당 데이터가 질문하신 **비스텔리젼스**와 동일 기업인지 확인할 수 없습니다. 동일 기업이라는 전제에서 보면 다음과 같은 리스크 요인이 있습니다.\n\n- **순부채 부담:** 순부채는 2022년 **45,275**에서 2023년 **46,494**로 증가했습니다.  \n  - 계산: 46,494 − 45,275 = **1,219 증가**  \n  - 증가율: 1,219 ÷ 45,275 × 100 = **약 2.69%** [Balance_Sheet Cell A6928] [Balance_Sheet Cell A6930]  \n  또한 2020년 순부채는 **51,300**이었고, 2021년 **47,890**, 2022년 **45,275**로 감소하다가 2023년에 다시 증가했습니다. [Balance_Sheet Cell A6924] [Balance_Sheet Cell A6926] [Balance_Sheet Cell A6928]\n\n- **높은 비유동부채 수준:** LTM 기준 총 비유동부채는 **57,383**이며, 금융부문 총부채도 **15,100**입니다. [Balance_Sheet Cell A6910] [Balance_Sheet Cell A7950] 다만 해당 값의 세부 단위는 제공된 컨텍스트에 명시되어 있지 않습니다.\n\n- **순이익 변동성:** 순이익은 2021년 **5,743**에서 2022년 **1,639**로 감소했습니다.  \n  - 계산: 1,639 − 5,743 = **4,104 감소**  \n  - 감소율: 4,104 ÷ 5,743 × 100 = **약 71.47% 감소** [Key_Stats Cell A170] [Key_Stats Cell A172]  \n  이후 2023년 **7,502**, 2024년 **6,023**, 2025년 **10,593**으로 회복됐지만, 과거 실적 변동성이 확인됩니다. [Key_Stats Cell A174] [Key_Stats Cell A176] [Key_Stats Cell A178]\n\n- **마진의 최근 약화 가능성:** 마진율은 2025년 실제치 **24.8434%**였으나 LTM 기준 **15.6526%**로 표시됩니다.  \n  - 계산: 15.6526% − 24.8434% = **9.1908%p 하락** [Key_Stats Cell A100] [Key_Stats Cell A102]  \n  LTM 수치가 실제 2025년 수치와 동일 기간을 가리키는 구조인지 컨텍스트만으로는 완전히 확인할 수 있으므로, 이 비교는 참고용으로 봐야 합니다.\n\n- **자금조달 현금흐름의 큰 변동:** 자금조달 현금흐름은 2020년 **−9,721백만 달러**, 2021년 **−13,354백만 달러**, 2022년 **−4,958백만 달러**였습니다. [Cash_Flow Cell A10148] [Cash_Flow Cell A10150] [Cash_Flow Cell A10152] 지속적인 음수 자금조달 현금흐름은 배당, 부채상환 또는 자사주 매입 등으로 현금이 유출되고 있을 가능성을 보여주지만, 구체적인 원인은 제공된 셀만으로 판단할 수 없습니다.\n\n**종합하면**, 동일 기업 데이터라는 전제에서 핵심 리스크는 **부채 부담, 순이익 변동성, 최근 마진 수치의 약화 가능성, 자금조달 현금흐름 변동**입니다. 다만 금융부문 현금및현금성자산과 단기투자는 여러 기간에 걸쳐 **NA**로 표시되어 있어, 부채를 상환할 수 있는 유동성 수준은 이 컨텍스트만으로 평가할 수 없습니다. [Balance_Sheet Cell A7964] [Balance_Sheet Cell A8000]",
+    "api_usage": {
+      "prompt_tokens": 16343,
+      "completion_tokens": 1437,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 17780
+    },
+    "latency_seconds": 47.548
+  },
+  "Q097": {
+    "id": "Q097",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "콜드플레이의 현금흐름과 부채구조를 볼 때 재무 건전성은?",
+    "chatgpt_answer": "파일 내 콜드플레이 데이터 없음.",
+    "pipeline_answer": "제공된 셀 컨텍스트만으로는 **콜드플레이의 재무 건전성을 평가할 수 없습니다.**\n\n- 제공 데이터의 기업명은 **International Business Machines Corporation(IBM)**으로 표시되어 있으며, 콜드플레이의 현금흐름이나 부채 데이터가 없습니다.\n- 따라서 콜드플레이의 영업현금흐름, 잉여현금흐름, 총부채, 순부채 및 부채상환능력을 판단하는 데 필요한 사실이 누락되어 있습니다.\n- 참고로 제공된 IBM 데이터에는 순부채가 2024년 **43,805** 및 2025년 **50,190**으로 나타나지만 [Balance_Sheet Cell A6932] [Balance_Sheet Cell A6934], 이는 콜드플레이에 대한 수치가 아니므로 평가에 사용할 수 없습니다.\n\n콜드플레이의 재무자료 또는 해당 기업으로 식별되는 Excel 셀 컨텍스트가 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 14744,
+      "completion_tokens": 275,
+      "cached_tokens": 0,
+      "reasoning_tokens": 53,
+      "total_tokens": 15019
+    },
+    "latency_seconds": 34.277
+  },
+  "Q098": {
+    "id": "Q098",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "비스텔리젼스에 대한 투자 관점 요약 리포트를 작성해줘.",
+    "chatgpt_answer": "파일 내 비스텔리젼스 데이터가 없어 투자 요약 리포트 작성 근거 부족.",
+    "pipeline_answer": "## 비스텔리젼스 투자 관점 요약\n\n### 1. 결론: 회사 식별 및 자료 한계\n\n제공된 엑셀 문맥에는 **“비스텔리젼스”의 재무·주가 정보가 없고**, 대신 **International Business Machines Corporation(IBM)** 관련 데이터가 포함되어 있습니다. 따라서 아래 평가는 비스텔리젼스에 대한 확정적 투자 의견이 아니라, 제공된 IBM 데이터에 근거한 참고용 요약입니다.\n\n비스텔리젼스의 정확한 법인명, 티커, 매출, 수익성, 부채, 주가 및 밸류에이션 정보가 누락되어 있어 **비스텔리젼스에 대한 독립적인 투자 판단은 현재 자료만으로 불가능합니다.**\n\n---\n\n### 2. 제공 자료상 재무 현황—IBM 기준\n\n- 2025년 총매출은 **67,535**로, 전년 **62,753** 대비 **7.62% 성장**했습니다.  \n  산술: `(67,535 ÷ 62,753 - 1) × 100 ≈ 7.62%`  \n  [Key_Stats Cell A10] [Key_Stats Cell A8] [Key_Stats Cell A28]\n\n- 2025년 매출총이익은 **39,297**, EBIT는 **11,757**, 순이익은 **10,593**입니다.  \n  [Key_Stats Cell A46] [Key_Stats Cell A118] [Key_Stats Cell A178]\n\n- 2025년 Margin %는 **24.8434%**입니다. LTM 기준 Margin %도 **24.8434%**입니다.  \n  [Key_Stats Cell A100] [Key_Stats Cell A102]\n\n- 2026년 매출 추정치는 **71,183.31159**, 순이익 추정치는 **11,882.81851**, EBIT 추정치는 **14,570.78297**입니다.  \n  [Key_Stats Cell A14] [Key_Stats Cell A182] [Key_Stats Cell A122]\n\n- 2026년 추정 매출 성장률은 **-**로 표시되어 있어, 성장률 수치가 제공되지 않았습니다. 반면 2027년 추정 매출 성장률은 **4.3153897471%**입니다.  \n  [Key_Stats Cell A32] [Key_Stats Cell A34]\n\n- 2026년 추정 Margin %는 **28.1271%**로, 2025년 **24.8434%**보다 **3.2836%p** 높습니다.  \n  산술: `28.1270605185% - 24.8434145258% = 3.2836459927%p`  \n  [Key_Stats Cell A104] [Key_Stats Cell A100]\n\n---\n\n### 3. 밸류에이션 및 자본구조\n\n- LTM 기준 주식 수는 **934,735,206주**, 시장자본화 계산용 나눗셈 기준은 **1,000,000**입니다.  \n  [Key_Stats Cell A244] [Key_Stats Cell A246]\n\n- LTM 시장자본화는 **270,970.38886734**, 현금 및 단기투자는 **14,417**, 총 소수주주지분은 **93**입니다.  \n  [Key_Stats Cell A248] [Key_Stats Cell A250] [Key_Stats Cell A256]\n\n- LTM 총기업가치(TEV)는 **321,253.38886734**입니다.  \n  [Key_Stats Cell A258]\n\n- TEV와 시장자본화의 차이는 **50,283.0**입니다.  \n  산술: `321,253.38886734 - 270,970.38886734 = 50,283.0`  \n  [Key_Stats Cell A258] [Key_Stats Cell A248]\n\n- LTM TEV/EBITDA 배수는 **20.085672배**이며, FY2025 수치도 **20.085672배**입니다.  \n  [Key_Stats Cell A284] [Key_Stats Cell A282]\n\n- FY2026, FY2027 및 FY2028 TEV/EBITDA는 모두 **NA**로 표시되어 있습니다. FY2027 및 FY2028 TEV/Total Revenue도 **NA**입니다.  \n  [Key_Stats Cell A288] [Key_Stats Cell A290] [Key_Stats Cell A292] [Key_Stats Cell A278] [Key_Stats Cell A280]\n\n- 총 우선주자본은 **NA**로 표시되어 있어 TEV 조정 항목의 일부를 확인할 수 없습니다. 또한 Key Stats의 **+ Total Debt** 수치도 제공 문맥상 확인되지 않습니다.  \n  [Key_Stats Cell A254] [Key_Stats Cell A251]\n\n---\n\n### 4. 투자 포인트\n\n**긍정적 요인**\n\n1. **매출 성장 회복**  \n   2025년 매출 성장률이 **7.62%**로 나타났습니다. [Key_Stats Cell A28]\n\n2. **수익성 개선 기대**  \n   2025년 Margin % **24.8434%**에서 2026년 추정치 **28.1271%**로 상승할 것으로 제시되어, 수익성 개선 기대가 반영되어 있습니다. [Key_Stats Cell A100] [Key_Stats Cell A104]\n\n3. **이익 성장 전망**  \n   2025년 순이익 **10,593**에서 2026년 추정 순이익 **11,882.81851**로 증가합니다.  \n   산술: `11,882.81851 - 10,593 = 1,289.81851`  \n   증가율: `1,289.81851 ÷ 10,593 × 100 ≈ 12.18%`  \n   [Key_Stats Cell A178] [Key_Stats Cell A182]\n\n**주의 요인**\n\n1. **밸류에이션 부담 가능성**  \n   LTM TEV/EBITDA가 **20.085672배**로, 낮은 배수라고 단정하기 어렵습니다. [Key_Stats Cell A284]\n\n2. **부채 및 TEV 구성 확인 필요**  \n   총부채 수치가 Key Stats 문맥에서 누락되어 있어 TEV **321,253.38886734**의 정확한 부채 조정 내역을 완전히 검증할 수 없습니다. 총 우선주자본도 **NA**입니다. [Key_Stats Cell A258] [Key_Stats Cell A251] [Key_Stats Cell A254]\n\n3. **현금흐름 자료의 단위 및 LTM 수치 부족**  \n   현금흐름 일부 과거 수치는 데이터 단위가 **$M**으로 표시되어 있으나, LTM 현금흐름의 구체적인 수치가 충분히 제공되지 않았습니다. 예를 들어 2025년 Cash from Financing은 **-447 $M**입니다. [Cash_Flow Cell A10134]\n\n---\n\n### 5. 종합 의견\n\n제공된 자료가 IBM 데이터라는 전제하에 보면, **2025년 매출 성장과 2026년 수익성·순이익 개선 전망은 긍정적**입니다. 그러나 **LTM TEV/EBITDA 20.085672배**는 실적 개선이 실제로 지속되는지 확인해야 하는 수준이며, 부채 구성과 현금흐름 정보가 충분하지 않아 적극적인 투자 결론을 내리기에는 자료가 부족합니다. [Key_Stats Cell A284]\n\n따라서 현재 정보만으로는 **“실적 개선을 전제로 한 선별적·중립적 접근”**이 적절합니다. 다만 이 결론은 비스텔리젼스가 아니라, 제공 문맥상 확인되는 IBM 데이터에 대한 분석입니다. 비스텔리젼스의 투자 리포트를 작성하려면 **정확한 티커 또는 법인명과 해당 회사의 재무·시장 데이터**가 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 16992,
+      "completion_tokens": 2358,
+      "cached_tokens": 0,
+      "reasoning_tokens": 555,
+      "total_tokens": 19350
+    },
+    "latency_seconds": 72.684
+  },
+  "Q099": {
+    "id": "Q099",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "콜드플레이와 비스텔리젼스를 비교하는 M&A 검토용 요약본을 만들어줘.",
+    "chatgpt_answer": "파일 내 콜드플레이·비스텔리젼스 데이터가 없어 M&A 비교 요약 작성 불가.",
+    "pipeline_answer": "## M&A 검토용 요약본 작성 가능 여부\n\n현재 제공된 Excel 셀 컨텍스트에는 **콜드플레이**와 **비스텔리젼스**에 대한 재무·거래 정보가 없습니다. 대신 대부분 **International Business Machines Corporation(IBM)** 관련 데이터가 포함되어 있어 두 회사를 비교하거나 M&A 요약본을 작성하기에는 정보가 불충분합니다.\n\n### 확인된 한계\n\n- 콜드플레이의 매출, EBITDA, EBIT, 순이익, 순부채, 기업가치 및 성장률 데이터가 없음\n- 비스텔리젼스의 동일한 재무·밸류에이션 데이터가 없음\n- 거래 구조, 인수가격, 지분율, 예상 시너지, 규제 리스크 및 실사 결과가 없음\n- 제공된 컨텍스트의 주요 재무 데이터는 IBM 관련 수치임  \n  - 예: 2025년 매출 67,535 [Key_Stats Cell A10]\n  - 2025년 EBITDA 16,778 [Key_Stats Cell A82]\n  - 2025년 순부채 50,190 [Balance_Sheet Cell A6934]\n\n따라서 현재 자료만으로는 **콜드플레이와 비스텔리젼스 간 상대적 규모, 수익성, 레버리지, 밸류에이션 또는 M&A 적합성에 대한 신뢰할 수 있는 비교 결론을 낼 수 없습니다.**\n\n## 필요한 추가 정보\n\n두 회사 각각에 대해 다음 항목의 Excel 셀 데이터가 필요합니다.\n\n| 구분 | 필요 항목 |\n|---|---|\n| 사업 규모 | 최근 연도 및 LTM 매출 |\n| 수익성 | EBITDA, EBIT, 순이익, EBITDA 마진 |\n| 재무상태 | 총부채, 현금, 순부채, 자본 |\n| 성장성 | 과거 매출 성장률 및 향후 추정 성장률 |\n| 밸류에이션 | 시가총액, EV, EV/EBITDA, EV/EBIT, P/E |\n| 거래 검토 | 인수가격, 예상 시너지, 자금조달 구조, 주요 리스크 |\n\n해당 데이터가 제공되면 **회사 개요 → 재무 비교 → 밸류에이션 비교 → 시너지 및 리스크 → M&A 예비의견** 형식의 검토용 요약본으로 작성할 수 있습니다.",
+    "api_usage": {
+      "prompt_tokens": 15341,
+      "completion_tokens": 620,
+      "cached_tokens": 0,
+      "reasoning_tokens": 89,
+      "total_tokens": 15961
+    },
+    "latency_seconds": 60.208
+  },
+  "Q100": {
+    "id": "Q100",
+    "scenario": "유형 5 심층 추론 및 원인 분석",
+    "question": "비스텔리젼스의 실적 변화가 특정 이벤트와 시기적으로 맞물려 있어?",
+    "chatgpt_answer": "파일 내 비스텔리젼스 데이터 및 이벤트 정보 없음.",
+    "pipeline_answer": "제공된 셀 컨텍스트만으로는 **비스텔리젼스의 실적 변화가 특정 이벤트와 시기적으로 맞물렸는지 판단할 수 없습니다.** 특정 이벤트의 **종류와 발생일** 정보가 누락되어 있기 때문입니다.\n\n확인 가능한 실적 흐름은 다음과 같습니다.\n\n- 총매출: 2021년 **57,351** → 2022년 **60,530** → 2023년 **61,860** → 2024년 **62,753** → 2025년 **67,535**로 증가했습니다. [Key_Stats Cell A2] [Key_Stats Cell A4] [Key_Stats Cell A6] [Key_Stats Cell A8] [Key_Stats Cell A10]  \n  - 2021→2022: **+3,179**, 약 **+5.54%** = (60,530−57,351)÷57,351 [Key_Stats Cell A2] [Key_Stats Cell A4]\n  - 2024→2025: **+4,782**, 약 **+7.62%** = (67,535−62,753)÷62,753 [Key_Stats Cell A8] [Key_Stats Cell A10]\n\n- 순이익: 2021년 **5,743** → 2022년 **1,639** → 2023년 **7,502** → 2024년 **6,023** → 2025년 **10,593**입니다. [Key_Stats Cell A170] [Key_Stats Cell A172] [Key_Stats Cell A174] [Key_Stats Cell A176] [Key_Stats Cell A178]  \n  - 2021→2022: **−4,104** = 1,639−5,743 [Key_Stats Cell A170] [Key_Stats Cell A172]\n  - 2022→2023: **+5,863** = 7,502−1,639 [Key_Stats Cell A172] [Key_Stats Cell A174]\n  - 2024→2025: **+4,570** = 10,593−6,023 [Key_Stats Cell A176] [Key_Stats Cell A178]\n\n따라서 **2022년 순이익 급감, 2023년 반등, 2025년 개선**이라는 변화는 확인되지만, 이를 특정 이벤트와 연결하려면 해당 이벤트의 **발생 시점 및 내용**이 추가로 필요합니다.",
+    "api_usage": {
+      "prompt_tokens": 15342,
+      "completion_tokens": 617,
+      "cached_tokens": 0,
+      "reasoning_tokens": 58,
+      "total_tokens": 15959
+    },
+    "latency_seconds": 26.896
+  },
+  "Q101": {
+    "id": "Q101",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "2025년 Actual과 2026\\~2028년 매출 및 EPS 성장 전망은?",
+    "chatgpt_answer": "IBM: 2025 Actual Revenue 67,535M(+7.62%), Diluted EPS excl. extra 11.14(+73.52%). 2026E Revenue 71,183.3M(+5.40%), EPS 12.414(+11.44%); 2027E 74,255.1M(+4.32%), EPS 13.417(+8.08%); 2028E 78,520.5M(+5.74%), EPS 14.746(+9.91%).",
+    "pipeline_answer": "### 2025년 Actual 및 2026~2028년 전망\n\n| 구분 | 2025 Actual | 2026E | 2027E | 2028E |\n|---|---:|---:|---:|---:|\n| 매출 | 67,535 [KS Cell A10] | 71,183.31 [KS Cell A14] | 74,255.15 [KS Cell A16] | 78,520.45 [KS Cell A18] |\n| 희석 EPS(일회성 항목 제외) | 11.14 [KS Cell A214] | 12.41425 [KS Cell A218] | 13.41699 [KS Cell A220] | 14.74635 [KS Cell A222] |\n\n#### 매출 성장률\n\n- **2025 Actual 성장률:**  \n  \\((67,535 ÷ 62,753 - 1) × 100 = 7.62\\%\\)  \n  2024년 매출은 62,753 [KS Cell A8], 2025년 매출은 67,535 [KS Cell A10]입니다.\n\n- **2026E:**  \n  \\((71,183.31 ÷ 67,535 - 1) × 100 = 5.40\\%\\) [KS Cell A10, KS Cell A14]\n\n- **2027E:**  \n  \\((74,255.15 ÷ 71,183.31 - 1) × 100 = 4.32\\%\\) [KS Cell A14, KS Cell A16]\n\n- **2028E:**  \n  \\((78,520.45 ÷ 74,255.15 - 1) × 100 = 5.74\\%\\) [KS Cell A16, KS Cell A18]\n\n- **2025~2028년 매출 CAGR:**  \n  \\((78,520.45 ÷ 67,535)^{1/3} - 1 = 약 5.15\\%\\) [KS Cell A10, KS Cell A18]\n\n#### EPS 성장률\n\n- **2025 Actual 성장률:**  \n  \\((11.14 ÷ 6.42 - 1) × 100 = 73.52\\%\\)  \n  2024년 EPS는 6.42 [KS Cell A212], 2025년 EPS는 11.14 [KS Cell A214]입니다.\n\n- **2026E:**  \n  \\((12.41425 ÷ 11.14 - 1) × 100 = 11.44\\%\\) [KS Cell A214, KS Cell A218]\n\n- **2027E:**  \n  \\((13.41699 ÷ 12.41425 - 1) × 100 = 8.08\\%\\) [KS Cell A218, KS Cell A220]\n\n- **2028E:**  \n  \\((14.74635 ÷ 13.41699 - 1) × 100 = 9.91\\%\\) [KS Cell A220, KS Cell A222]\n\n- **2025~2028년 EPS CAGR:**  \n  \\((14.74635 ÷ 11.14)^{1/3} - 1 = 약 9.80\\%\\) [KS Cell A214, KS Cell A222]\n\n**요약:** 2025년에는 매출이 **7.62%**, EPS가 **73.52%** 증가한 것으로 나타납니다. 이후 전망상 2026~2028년 매출 성장률은 연 **4.32~5.74%**, EPS 성장률은 연 **8.08~11.44%** 수준이며, 2025~2028년 CAGR은 매출 **약 5.15%**, EPS **약 9.80%**입니다.",
+    "api_usage": {
+      "prompt_tokens": 15528,
+      "completion_tokens": 1867,
+      "cached_tokens": 0,
+      "reasoning_tokens": 1024,
+      "total_tokens": 17395
+    },
+    "latency_seconds": 81.082
+  },
+  "Q102": {
+    "id": "Q102",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "FY2025 대비 NTM/FY2026\\~2028 TEV/EBITDA 멀티플 변화 전망은?",
+    "chatgpt_answer": "현재 TEV 321,253.4M을 고정해 FY2025 EBITDA 16,778M 및 추정 EBITDA에 적용하면: FY2025 19.15x, NTM/FY2026E 16.05x, FY2027E 14.76x, FY2028E 13.92x. (파일 valuation-multiple 행의 FY2025 표시는 20.09x로 정의 차이 있음.)",
+    "pipeline_answer": "FY2025 TEV/EBITDA 멀티플은 **20.085672배**입니다 [Key_Stats Cell A282].\n\n그러나 이후 멀티플은 다음과 같이 모두 **NA**로 제공되어, FY2025 대비 하락·상승 여부를 판단할 수 없습니다.\n\n- **NTM > LTM:** NA [Key_Stats Cell A286]\n- **FY2026:** NA [Key_Stats Cell A288]\n- **FY2027:** NA [Key_Stats Cell A290]\n- **FY2028:** NA [Key_Stats Cell A292]\n\n따라서 **FY2025의 20.085672배를 기준으로 한 NTM 및 FY2026~FY2028 TEV/EBITDA 멀티플 변화 전망은 산출 불가**합니다. 해당 기간의 TEV/EBITDA 멀티플 수치가 NA로 누락되어 있습니다.",
+    "api_usage": {
+      "prompt_tokens": 12102,
+      "completion_tokens": 332,
+      "cached_tokens": 0,
+      "reasoning_tokens": 125,
+      "total_tokens": 12434
+    },
+    "latency_seconds": 81.822
+  },
+  "Q103": {
+    "id": "Q103",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "최근 매출 성장 추세가 유지되면 2026년 Total Revenue는?",
+    "chatgpt_answer": "가정: 최근 연간 성장률 7.62% 유지. 2026 Revenue = 67,535×1.0762 ≈ $72,681.2M.",
+    "pipeline_answer": "2026년 Total Revenue는 **71,183.31**로 예상됩니다 [Key_Stats Cell A14].\n\n계산상 2025년 실제 매출 **67,535** [Key_Stats Cell A10] 대비 성장률은:\n\n- 성장률 = (71,183.31159 − 67,535) ÷ 67,535\n- 성장률 ≈ **5.40%**\n\n따라서 최근 성장 추세를 반영한 2026년 매출은 **약 71,183**입니다.",
+    "api_usage": {
+      "prompt_tokens": 15870,
+      "completion_tokens": 635,
+      "cached_tokens": 0,
+      "reasoning_tokens": 512,
+      "total_tokens": 16505
+    },
+    "latency_seconds": 68.673
+  },
+  "Q104": {
+    "id": "Q104",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "현재 영업이익률이 유지될 때 2026년 Operating Income은?",
+    "chatgpt_answer": "Q103의 2026 Revenue와 2025 영업이익률 17.41% 유지 가정 시 2026 Operating Income ≈ $12,652.9M.",
+    "pipeline_answer": "현재 영업이익률을 2025년 기준 **17.408751%**로 가정합니다 [Key_Stats Cell A136].\n\n계산:\n\n- 2026년 예상 매출: **71,183.31159** [Key_Stats Cell A14]\n- 2026년 Operating Income = 71,183.31159 × 17.408751%  \n  = **약 12,392.13 ($M)**\n\n따라서 현재 영업이익률이 유지될 경우, **2026년 Operating Income은 약 12,392.1백만 달러(약 123.9억 달러)**입니다.",
+    "api_usage": {
+      "prompt_tokens": 14241,
+      "completion_tokens": 684,
+      "cached_tokens": 0,
+      "reasoning_tokens": 516,
+      "total_tokens": 14925
+    },
+    "latency_seconds": 37.167
+  },
+  "Q105": {
+    "id": "Q105",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "영업현금흐름이 5% 증가하고 CapEx가 동일하면 2026년 FCF는?",
+    "chatgpt_answer": "CFO가 5% 증가하면 13,852.7M. CapEx 1,617M 유지 시 2026 FCF ≈ $12,235.7M.",
+    "pipeline_answer": "2026년 FCF는 **약 12,235.65백만 달러(약 122억 3,565만 달러)**로 계산됩니다.\n\n계산:\n1. 2025년 영업현금흐름: **13,193백만 달러** [Cash_Flow Cell A9458]  \n2. 5% 증가 후 영업현금흐름:  \n   **13,193 × 1.05 = 13,852.65백만 달러**\n3. CapEx: **-1,617백만 달러** [Cash_Flow Cell A9484]  \n4. FCF = 영업현금흐름 + CapEx:  \n   **13,852.65 + (-1,617) = 12,235.65백만 달러**\n\n따라서 **2026년 FCF 추정치는 12,235.65백만 달러**입니다. 단, 2026년 실제 영업현금흐름과 CapEx는 컨텍스트에 없으므로, 2025년 수치를 기준으로 영업현금흐름만 5% 증가하고 CapEx는 동일하다고 가정한 계산입니다.",
+    "api_usage": {
+      "prompt_tokens": 20572,
+      "completion_tokens": 490,
+      "cached_tokens": 0,
+      "reasoning_tokens": 221,
+      "total_tokens": 21062
+    },
+    "latency_seconds": 55.613
+  },
+  "Q106": {
+    "id": "Q106",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "현재 TEV/Revenue 배수를 유지할 경우 2026년 예상 TEV는?",
+    "chatgpt_answer": "현재 직접 계산 TEV/Revenue 4.76x를 유지하고 Q103 Revenue를 적용하면 2026 예상 TEV ≈ $345,732.9M.",
+    "pipeline_answer": "현재 TEV/Revenue 배수 **5.025487배**를 유지하고, 2026년 예상 매출 **71,183.31159**를 적용하면:\n\n**2026년 예상 TEV = 5.025487 × 71,183.31159 = 357,730.8070**\n\n따라서 **2026년 예상 TEV는 약 357,730.81**입니다.  \n- TEV/Revenue 배수: **5.025487배** [Key_Stats Cell A270]  \n- 2026년 예상 Total Revenue: **71,183.31159** [Key_Stats Cell A14]",
+    "api_usage": {
+      "prompt_tokens": 14604,
+      "completion_tokens": 307,
+      "cached_tokens": 0,
+      "reasoning_tokens": 154,
+      "total_tokens": 14911
+    },
+    "latency_seconds": 115.791
+  },
+  "Q107": {
+    "id": "Q107",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "현재 추세라면 비스텔리젼스가 콜드플레이의 매출을 언제 추월할 것으로 예상돼?",
+    "chatgpt_answer": "파일 내 비스텔리젼스·콜드플레이 매출 데이터가 없어 추월 시점 추정 불가.",
+    "pipeline_answer": "제공된 Excel 셀 컨텍스트만으로는 **비스텔리젼스와 콜드플레이의 매출 추월 시점**을 예상할 수 없습니다.\n\n- 제공된 매출 데이터는 **International Business Machines Corporation(IBM)**의 매출로 표시되어 있습니다. 예를 들어 2024년 매출은 62,044($M)입니다 [Income_Statement Cell A352].\n- 또한 Key_Stats에는 총매출 추정치가 2026년 71,183.31159, 2027년 74,255.14892, 2028년 78,520.45204로 제시되어 있지만, 이는 해당 회사의 데이터이며 비스텔리젼스 또는 콜드플레이의 매출이 아닙니다 [Key_Stats Cell A14] [Key_Stats Cell A16] [Key_Stats Cell A18].\n- 비스텔리젼스와 콜드플레이 각각의 현재 매출, 성장률 및 향후 매출 전망이 제공되지 않았습니다.\n\n따라서 **추월 예상 연도를 산출하려면 두 주체의 기준연도 매출과 향후 성장률 또는 연도별 매출 전망이 추가로 필요합니다.**",
+    "api_usage": {
+      "prompt_tokens": 19245,
+      "completion_tokens": 353,
+      "cached_tokens": 0,
+      "reasoning_tokens": 77,
+      "total_tokens": 19598
+    },
+    "latency_seconds": 37.618
+  },
+  "Q108": {
+    "id": "Q108",
+    "scenario": "유형 6 지표 전망 및 예측",
+    "question": "두 회사의 최근 3년 실적을 바탕으로 향후 1년 전망 코멘트를 작성해줘.",
+    "chatgpt_answer": "파일 내 두 회사의 최근 3년 데이터가 없어 향후 1년 비교 전망 코멘트 작성 불가.",
+    "pipeline_answer": "현재 제공된 문맥에는 **IBM(International Business Machines Corporation) 자료만 확인**되며, 두 번째 회사의 재무 데이터가 없습니다. 따라서 두 회사를 직접 비교한 전망 코멘트는 작성할 수 없습니다. 아래는 확인 가능한 **IBM 단독 기준**의 코멘트입니다.\n\n### IBM 최근 3년 실적 및 향후 1년 전망\n\n- **매출:** 2023년 61,860에서 2024년 62,753으로 **893 증가, 약 1.4% 성장**했으며, 2025년에는 67,535로 **4,782 증가, 약 7.6% 성장**했습니다.  \n  - 계산: `(62,753-61,860) ÷ 61,860 = 1.4%`  \n  - 계산: `(67,535-62,753) ÷ 62,753 = 7.6%`  \n  [Key_Stats Cell A6] [Key_Stats Cell A8] [Key_Stats Cell A10]\n\n- **EBIT:** 2023년 9,903에서 2024년 9,788로 **115 감소, 약 1.2% 역성장**했지만, 2025년에는 11,757로 **1,969 증가, 약 20.1% 성장**했습니다.  \n  - 계산: `(9,788-9,903) ÷ 9,903 = -1.2%`  \n  - 계산: `(11,757-9,788) ÷ 9,788 = 20.1%`  \n  [Key_Stats Cell A114] [Key_Stats Cell A116] [Key_Stats Cell A118]\n\n- **순이익:** 2023년 7,502에서 2024년 6,023으로 **1,479 감소, 약 19.7% 하락**했으나, 2025년에는 10,593으로 **4,570 증가, 약 75.9% 반등**했습니다.  \n  - 계산: `(6,023-7,502) ÷ 7,502 = -19.7%`  \n  - 계산: `(10,593-6,023) ÷ 6,023 = 75.9%`  \n  [Key_Stats Cell A174] [Key_Stats Cell A176] [Key_Stats Cell A178]\n\n- **2026년 전망:** 매출 추정치는 71,183.31로 2025년 대비 **약 5.4% 성장**이 예상됩니다. EBIT는 14,570.78로 **약 23.9% 증가**, 순이익은 11,882.82로 **약 12.2% 증가**할 전망입니다.  \n  - 매출: `(71,183.31159-67,535) ÷ 67,535 = 5.4%`  \n  - EBIT: `(14,570.78297-11,757) ÷ 11,757 = 23.9%`  \n  - 순이익: `(11,882.81851-10,593) ÷ 10,593 = 12.2%`  \n  [Key_Stats Cell A10] [Key_Stats Cell A14] [Key_Stats Cell A118] [Key_Stats Cell A122] [Key_Stats Cell A178] [Key_Stats Cell A182]\n\n### 전망 코멘트\n\nIBM은 2025년에 매출 성장세가 강화되었고, EBIT와 순이익도 크게 개선되었습니다. 특히 2026년에는 매출 성장률 전망보다 EBIT 성장률 전망이 높아 **수익성 개선이 매출 증가를 상회할 가능성**이 있습니다. 다만 2024년에 순이익이 감소한 뒤 2025년에 크게 반등한 만큼, 향후 순이익 성장의 지속성은 EBIT 개선이 실제로 유지되는지에 좌우될 것으로 판단됩니다.\n\n두 번째 회사의 최근 3년 실적과 1년 전망 수치가 제공되면, 동일한 기준으로 **두 회사의 성장률·수익성·전망을 비교한 최종 코멘트**를 작성할 수 있습니다.",
+    "api_usage": {
+      "prompt_tokens": 15623,
+      "completion_tokens": 1427,
+      "cached_tokens": 0,
+      "reasoning_tokens": 503,
+      "total_tokens": 17050
+    },
+    "latency_seconds": 35.0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "Q047",
+  "scenario": "유형 3 복수 지표 조회",
+  "question": "BAC와 피어 중 기관투자자 지분율이 가장 높은 곳은?",
+  "chatgpt_answer": "파일 내 BAC 및 피어 기관지분 데이터 없음.",
+  "pipeline_answer": "제공된 Excel 셀 컨텍스트에는 **BAC와 피어들의 기관투자자 지분율 데이터가 없습니다.** 따라서 기관투자자 지분율이 가장 높은 곳을 판단할 수 없습니다.",
+  "api_usage": {
+    "prompt_tokens": 13079,
+    "completion_tokens": 92,
+    "cached_tokens": 0,
+    "reasoning_tokens": 37,
+    "total_tokens": 13171
+  },
+  "latency_seconds": 30.047
+}

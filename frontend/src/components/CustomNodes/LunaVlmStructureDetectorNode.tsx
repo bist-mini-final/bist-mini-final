@@ -42,6 +42,7 @@ export const LunaVlmStructureDetectorNode = ({
         eyebrow="Logic Module"
         title="Luna Full-Sheet Structure Detector"
         state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
         selected={selected}
         width={data.nodeWidth ?? 390}
         onWidthChange={data.onNodeWidthChange}

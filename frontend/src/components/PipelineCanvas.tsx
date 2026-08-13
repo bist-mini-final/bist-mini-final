@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { PanelLeft } from 'lucide-react';
 import {
   Background,
   BackgroundVariant,
@@ -48,7 +47,7 @@ type PipelineGraph = ReturnType<typeof usePipelineGraph>;
 interface PipelineCanvasProps {
   graph: PipelineGraph;
   isPaletteOpen: boolean;
-  onOpenPalette: () => void;
+  onOpenPalette?: () => void;
   modules: ModuleDefinition[];
   runs: WorkflowRun[];
   workflowId: string;
@@ -59,7 +58,6 @@ interface PipelineCanvasProps {
 export function PipelineCanvas({
   graph,
   isPaletteOpen,
-  onOpenPalette,
   modules,
   runs,
   workflowId,
@@ -111,20 +109,10 @@ export function PipelineCanvas({
 
   return (
     <ModuleSettingsContext.Provider value={openModuleSettings}>
-      <section className="pipeline-canvas" aria-label="RAG 파이프라인 편집 캔버스">
-      <div className="canvas-hint">
-        {!isPaletteOpen && (
-          <button
-            className="canvas-hint__palette-button"
-            onClick={onOpenPalette}
-            aria-label="모듈 패널 펼치기"
-            title="모듈 패널 펼치기"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </button>
-        )}
-        <span>휠로 확대 · 빈 영역 드래그로 이동</span>
-      </div>
+      <section className="pipeline-canvas" data-palette-open={isPaletteOpen} aria-label="RAG 파이프라인 편집 캔버스">
+        <div className="canvas-hint">
+          <span>휠로 확대 · 빈 영역 드래그로 이동</span>
+        </div>
         <ReactFlow
         key={workflowId}
         nodes={graph.nodes}
@@ -150,6 +138,7 @@ export function PipelineCanvas({
         defaultEdgeOptions={{ type: 'customEdge' }}
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={['Backspace', 'Delete']}
+        edgesFocusable={true}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cbd5e1" />
         <Controls position="bottom-right" showInteractive={false} />

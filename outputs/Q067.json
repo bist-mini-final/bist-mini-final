@@ -1,0 +1,15 @@
+{
+  "id": "Q067",
+  "scenario": "유형 4 재무 계산",
+  "question": "Key Stats의 TEV가 총부채 및 현금 수치와 정합성을 이루는가?",
+  "chatgpt_answer": "정합함. 270,970.4 + 64,607 + 93 - 14,417 = 321,253.4M으로 Key Stats TEV와 정확히 일치.",
+  "pipeline_answer": "네. **Key Stats의 TEV는 총부채 및 현금 수치와 정합적입니다.**\n\n- 시장 capitalization: **270,970.38886734** [KS Cell A248]\n- 현금 및 단기투자자산 차감: **14,417** [KS Cell A250]\n- 총부채 가산: **64,607** [KS Cell A252]\n- 우선주: **NA** [KS Cell A254]\n- 소수주주지분 가산: **93** [KS Cell A256]\n\n계산은 다음과 같습니다.\n\n**270,970.38886734 − 14,417 + 64,607 + 93 = 321,253.38886734**\n\n계산 결과가 Key Stats에 표시된 TEV **321,253.38886734** [KS Cell A258]와 정확히 일치합니다. 따라서 **우선주(NA)를 가산할 수치가 없는 것으로 처리하면**, TEV는 시장 capitalization, 현금 및 단기투자자산, 총부채, 소수주주지분과 정합성을 이룹니다.",
+  "api_usage": {
+    "prompt_tokens": 10618,
+    "completion_tokens": 747,
+    "cached_tokens": 0,
+    "reasoning_tokens": 496,
+    "total_tokens": 11365
+  },
+  "latency_seconds": 28.878
+}

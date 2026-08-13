@@ -1,0 +1,15 @@
+{
+  "id": "Q025",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM 장기부채는 얼마인가?",
+  "chatgpt_answer": "LTM Long-Term Debt $54,836M. (Total Non-Current Debt 기준은 $57,383M.)",
+  "pipeline_answer": "IBM의 **LTM 장기부채(Total Non-Current Debt)**는 **57,383백만 달러(약 573억 8,300만 달러)**입니다. [Balance_Sheet Cell A6910]",
+  "api_usage": {
+    "prompt_tokens": 13914,
+    "completion_tokens": 175,
+    "cached_tokens": 0,
+    "reasoning_tokens": 117,
+    "total_tokens": 14089
+  },
+  "latency_seconds": 141.39
+}

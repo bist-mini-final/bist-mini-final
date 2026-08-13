@@ -1,0 +1,15 @@
+{
+  "id": "Q009",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 최근 회계연도(FY0) 매출액은 얼마인가?",
+  "chatgpt_answer": "FY0 매출액 $67,535M.",
+  "pipeline_answer": "IBM의 최근 회계연도(FY0) 매출액은 **67,535**입니다. [Key_Stats Cell A10]\n\n※ 제공된 셀 컨텍스트에는 단위가 명시되어 있지 않습니다.",
+  "api_usage": {
+    "prompt_tokens": 18955,
+    "completion_tokens": 126,
+    "cached_tokens": 0,
+    "reasoning_tokens": 68,
+    "total_tokens": 19081
+  },
+  "latency_seconds": 199.786
+}

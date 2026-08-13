@@ -1,0 +1,15 @@
+{
+  "id": "Q091",
+  "scenario": "유형 5 심층 추론 및 원인 분석",
+  "question": "현재 TEV/EBITDA 멀티플이 IBM의 수익성과 성장 전망 대비 적정한가?",
+  "chatgpt_answer": "현재 직접 계산 TEV/EBITDA 약 19.15x는 매출 성장 7.62%, EBITDA 마진 24.84% 대비 낮은 멀티플은 아님. 다만 2026\\~2028 EBITDA 마진 추정이 28\\~29%대로 개선되고 TEV가 고정된다고 보면 멀티플이 약 16.0x→14.8x→13.9x로 낮아져, 마진 확장이 실현될 경우 프리미엄을 일부 정당화할 수 있음.",
+  "pipeline_answer": "현재 IBM의 **TEV/EBITDA 멀티플은 20.085672배**로, LTM 기준도 동일합니다 [Key_Stats Cell A282] [Key_Stats Cell A284].\n\n- **수익성:** LTM EBITDA는 16,778이며 [Key_Stats Cell A84], EBITDA 마진은 **24.8434%**입니다 [Key_Stats Cell A102]. 수익성 자체는 양호한 편으로 볼 수 있습니다.\n- **성장성:** 매출 성장률은 2025년 **7.62%**였으나 [Key_Stats Cell A28], 전망상 2027년 **4.3154%** [Key_Stats Cell A34], 2028년 **5.7441%**로 제시되어 [Key_Stats Cell A36] 성장률은 중간 한 자릿수 수준으로 둔화될 전망입니다.\n- **EBITDA 전망:** 2026년 EBITDA 추정치는 20,021.77313으로 [Key_Stats Cell A86], LTM 대비 증가율은 다음과 같습니다.  \n  \\[\n  (20{,}021.77313 \\div 16{,}778 - 1) \\times 100\n  = 19.33\\%\n  \\]\n  [Key_Stats Cell A86] [Key_Stats Cell A84]\n\n**판단:** IBM은 **24.8434%의 EBITDA 마진과 EBITDA 증가 전망**을 감안하면 20.085672배가 완전히 정당화될 가능성은 있지만, 매출 성장률이 향후 **4.3154~5.7441%** 수준이라는 점을 고려하면 **성장성 대비 멀티플은 다소 높은 편으로 보입니다** [Key_Stats Cell A102] [Key_Stats Cell A34] [Key_Stats Cell A36]. 따라서 현재 멀티플은 **수익성 대비로는 수용 가능하지만, 성장 전망 대비로는 보수적으로 보면 비싸거나 적정가 상단**에 해당한다고 판단됩니다.\n\n다만 컨텍스트에는 동종업계 비교 멀티플, IBM의 적정 성장률·자본비용, 그리고 FY2026 이후 TEV/EBITDA 전망치가 **NA**로 제시되어 있어 [Key_Stats Cell A288] [Key_Stats Cell A292] [Key_Stats Cell A286], 객관적인 적정가치 여부를 확정할 비교 기준은 부족합니다.",
+  "api_usage": {
+    "prompt_tokens": 16424,
+    "completion_tokens": 965,
+    "cached_tokens": 0,
+    "reasoning_tokens": 414,
+    "total_tokens": 17389
+  },
+  "latency_seconds": 67.004
+}

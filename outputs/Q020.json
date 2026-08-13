@@ -1,0 +1,15 @@
+{
+  "id": "Q020",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM TEV는 얼마인가?",
+  "chatgpt_answer": "$321,253.4M.",
+  "pipeline_answer": "IBM의 LTM TEV는 **321,253.38886734**입니다. 단위는 제공된 셀 context에 명시되어 있지 않습니다. [KS Cell A258]",
+  "api_usage": {
+    "prompt_tokens": 18294,
+    "completion_tokens": 216,
+    "cached_tokens": 0,
+    "reasoning_tokens": 167,
+    "total_tokens": 18510
+  },
+  "latency_seconds": 148.328
+}

@@ -1,0 +1,15 @@
+{
+  "id": "Q071",
+  "scenario": "유형 4 재무 계산",
+  "question": "IBM의 LTM 순부채성 금액을 TEV와 Market Cap 차이로 계산하면?",
+  "chatgpt_answer": "TEV-시총 = $50,283M. 이는 Debt+Minority-Cash(64,607+93-14,417)와 동일.",
+  "pipeline_answer": "IBM의 LTM 순부채성 금액은 **TEV와 Market Cap의 차이로 50,283**입니다.\n\n계산:  \n**321,253.38886734 − 270,970.38886734 = 50,283**  \n- LTM TEV: 321,253.38886734 [Key_Stats Cell A258]  \n- LTM Market Cap: 270,970.38886734 [Key_Stats Cell A248]  \n\n따라서 결과는 **50,283 (Key Stats 기준 단위)**입니다.",
+  "api_usage": {
+    "prompt_tokens": 20142,
+    "completion_tokens": 296,
+    "cached_tokens": 0,
+    "reasoning_tokens": 167,
+    "total_tokens": 20438
+  },
+  "latency_seconds": 38.188
+}

@@ -1,0 +1,15 @@
+{
+  "id": "Q081",
+  "scenario": "유형 4 재무 계산",
+  "question": "IBM의 LTM 유동비율은?",
+  "chatgpt_answer": "LTM 유동비율 0.96x.",
+  "pipeline_answer": "IBM의 **LTM 유동비율은 제공된 셀 컨텍스트만으로 계산할 수 없습니다.**\n\n- 계산식: **유동비율 = 유동자산 ÷ 유동부채 × 100**\n- 제공된 자료에는 LTM **총 유동자산**과 **총 유동부채** 값이 없습니다.\n- 확인 가능한 LTM 항목 중 *Intercompany Current Assets*와 *Intercompany Current Liabilities*는 모두 `NA`입니다 [Balance_Sheet Cell A8522] [Balance_Sheet Cell A8574].\n\n따라서 IBM의 LTM 유동비율을 산출하려면 LTM 총 유동자산 및 총 유동부채 셀이 추가로 필요합니다.",
+  "api_usage": {
+    "prompt_tokens": 15125,
+    "completion_tokens": 248,
+    "cached_tokens": 0,
+    "reasoning_tokens": 82,
+    "total_tokens": 15373
+  },
+  "latency_seconds": 17.615
+}

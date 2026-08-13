@@ -24,6 +24,7 @@ export const EmbeddingNode = ({ data, selected }: EmbeddingNodeProps) => {
       eyebrow="Logic Module"
       title="Query Embedder"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={320}
       bodyClassName="space-y-2"

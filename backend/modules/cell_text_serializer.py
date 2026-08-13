@@ -15,6 +15,7 @@ from ..spreadsheets.structured_cell_text import (
     WorksheetValueReader,
     canonical_sheet_name,
     ensure_period_header,
+    generate_header_combinations,
     serialize_structured_cell,
     sheet_code,
 )
@@ -169,38 +170,34 @@ class CellTextSerializerModule(ExecutableModule):
                         f"겹치는 테이블 영역에서 중복 셀이 생성되었습니다: {cell_id}"
                     )
                 seen_cell_ids.add(cell_id)
-                common = {
-                    "cell_id": cell_id,
-                    "sheet_name": canonical_name,
-                    "cell_coord": cell_coord,
-                    "row_header": row_headers,
-                    "column_header": column_headers,
-                    "cell_value": cell_value,
-                }
-                documents.extend(
-                    [
-                        {
-                            **common,
-                            "variant": "header_only",
-                            "text": serialize_structured_cell(
-                                canonical_name,
-                                row_headers,
-                                column_headers,
-                                UNKNOWN_FIELD,
-                            ),
-                        },
-                        {
-                            **common,
-                            "variant": "header_with_value",
-                            "text": serialize_structured_cell(
-                                canonical_name,
-                                row_headers,
-                                column_headers,
-                                cell_value,
-                            ),
-                        },
-                    ]
-                )
+
+                cell_seen_texts: set[str] = set()
+                header_combos = generate_header_combinations(row_headers, column_headers)
+                for r_combo, c_combo in header_combos:
+                    common = {
+                        "cell_id": cell_id,
+                        "sheet_name": canonical_name,
+                        "cell_coord": cell_coord,
+                        "row_header": r_combo,
+                        "column_header": c_combo,
+                        "cell_value": cell_value,
+                    }
+                    for variant, val in [("header_only", UNKNOWN_FIELD), ("header_with_value", cell_value)]:
+                        text = serialize_structured_cell(
+                            canonical_name,
+                            r_combo,
+                            c_combo,
+                            val,
+                        )
+                        if text not in cell_seen_texts:
+                            cell_seen_texts.add(text)
+                            documents.append(
+                                {
+                                    **common,
+                                    "variant": variant,
+                                    "text": text,
+                                }
+                            )
         return documents
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:

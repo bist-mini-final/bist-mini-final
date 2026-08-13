@@ -1,0 +1,15 @@
+{
+  "id": "Q022",
+  "scenario": "유형 1 단일 지표 조회",
+  "question": "IBM의 LTM EBITDA는 얼마인가?",
+  "chatgpt_answer": "$16,778M.",
+  "pipeline_answer": "IBM의 LTM EBITDA는 **16,778백만 달러(약 167.78억 달러)**입니다. [Key_Stats Cell A84] [Income_Statement Cell A2100]",
+  "api_usage": {
+    "prompt_tokens": 17368,
+    "completion_tokens": 168,
+    "cached_tokens": 17365,
+    "reasoning_tokens": 116,
+    "total_tokens": 17536
+  },
+  "latency_seconds": 124.061
+}

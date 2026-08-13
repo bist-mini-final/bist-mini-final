@@ -152,6 +152,7 @@ export const JsonInspectorNode = ({ data, selected }: JsonInspectorNodeProps) =>
       eyebrow="Output Module"
       title="JSON Data Inspector"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={data.nodeWidth ?? 390}
       onWidthChange={data.onNodeWidthChange}

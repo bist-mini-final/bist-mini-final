@@ -27,6 +27,7 @@ export const CellTextEmbedderNode = ({ data, selected }: CellTextEmbedderNodePro
       eyebrow="Logic Module"
       title="BGE Cell Text Embedder"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={340}
       bodyClassName="space-y-2.5"

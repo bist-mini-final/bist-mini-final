@@ -25,6 +25,7 @@ export const VectorIndexWriterNode = ({ data, selected }: VectorIndexWriterNodeP
       eyebrow="Transform Module"
       title="Vector Index Writer"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={350}
       bodyClassName="space-y-2"

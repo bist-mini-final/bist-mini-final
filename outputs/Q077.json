@@ -1,0 +1,15 @@
+{
+  "id": "Q077",
+  "scenario": "유형 4 재무 계산",
+  "question": "최근 순이익 성장률은?",
+  "chatgpt_answer": "최근 순이익 성장률(2024→2025) +75.88%.",
+  "pipeline_answer": "최근 순이익 성장률은 **약 75.88%**입니다.\n\n- 2024년 순이익: **6,023백만 달러** [Income_Statement Cell A1574]\n- 2025년 순이익: **10,593백만 달러** [Income_Statement Cell A1576]\n- 계산: **(10,593 − 6,023) ÷ 6,023 × 100 = 75.88%**\n\n즉, 2025년 순이익은 전년 대비 **4,570백만 달러 증가**했습니다. [Income_Statement Cell A1574] [Income_Statement Cell A1576]",
+  "api_usage": {
+    "prompt_tokens": 17351,
+    "completion_tokens": 388,
+    "cached_tokens": 0,
+    "reasoning_tokens": 234,
+    "total_tokens": 17739
+  },
+  "latency_seconds": 43.247
+}

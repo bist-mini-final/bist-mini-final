@@ -14,7 +14,7 @@ from .embedder import EMBEDDING_MODEL_OPTIONS
 
 class CellTextEmbedderInput(CellTextSerializerOutput):
     model: str = Field(
-        default="text-embedding-3-large",
+        default=DEFAULT_BGE_MODEL,
         min_length=1,
         description="Excel 셀 문서 임베딩에 사용할 Hugging Face 또는 OpenAI 모델 ID",
         json_schema_extra={

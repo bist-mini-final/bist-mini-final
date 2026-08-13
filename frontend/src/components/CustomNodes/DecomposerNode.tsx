@@ -35,6 +35,7 @@ export const DecomposerNode = ({ id, data, selected }: DecomposerNodeProps) => {
       state={getExecutionNodeState(data.executionState)}
       selected={selected}
       width={360}
+      nodeData={data}
       bodyClassName="space-y-3"
     >
       <div className="space-y-1.5">

@@ -27,7 +27,10 @@ dist/
 
 # Runtime output
 *.log
+outputs/
+output/
 data/runs/*
+data/raw/*
 !data/runs/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
@@ -48,4 +51,4 @@ tmp/
 .DS_Store
 .idea/
 .vscode/
-.claude
+.claude/

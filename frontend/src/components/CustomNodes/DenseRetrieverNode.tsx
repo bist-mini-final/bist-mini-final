@@ -26,6 +26,7 @@ export const DenseRetrieverNode = ({ data, selected }: DenseRetrieverNodeProps) 
       eyebrow="Logic Module"
       title="Dense Vector Retriever"
       state={getExecutionNodeState(data.executionState)}
+      nodeData={data}
       selected={selected}
       width={330}
       inputPorts={['query_input', 'index_input']}

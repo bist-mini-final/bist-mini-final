@@ -1,6 +1,6 @@
 from typing import Any, Dict, Union, cast
 
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
 from ..config import SIMILARITY_THRESHOLD
 from ..answer_cache import AnswerCacheRepository
@@ -9,6 +9,8 @@ from .base import ExecutableModule, ModuleDefinition, ModuleDTO
 
 
 class QueryInput(ModuleDTO):
+    model_config = ConfigDict(extra="allow")
+
     query: str = Field(
         min_length=1,
         max_length=1000,

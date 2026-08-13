@@ -1,0 +1,15 @@
+{
+  "id": "Q073",
+  "scenario": "유형 4 재무 계산",
+  "question": "2025년 단순 잉여현금흐름은?",
+  "chatgpt_answer": "2025 단순 FCF = CFO 13,193 - CapEx 1,617 = $11,576M.",
+  "pipeline_answer": "2025년 단순 잉여현금흐름(Levered Free Cash Flow)은 **12,770.75백만 달러(약 127.71억 달러)**입니다. [Cash_Flow Cell A10368]\n\n※ 계산: 12,770.75백만 달러 ÷ 100 = 127.7075억 달러.",
+  "api_usage": {
+    "cached_tokens": 0,
+    "completion_tokens": 288,
+    "prompt_tokens": 20483,
+    "reasoning_tokens": 201,
+    "total_tokens": 20771
+  },
+  "latency_seconds": 17.475
+}

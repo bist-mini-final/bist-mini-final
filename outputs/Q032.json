@@ -1,0 +1,15 @@
+{
+  "id": "Q032",
+  "scenario": "유형 2 기간·추세 분석",
+  "question": "콜드플레이의 작년 동기 대비 매출 성장률은?",
+  "chatgpt_answer": "파일 내 콜드플레이 데이터 없음.",
+  "pipeline_answer": "제공된 Excel 셀 문맥에는 **콜드플레이의 매출 또는 전년 동기 매출 데이터가 없어**, 작년 동기 대비 매출 성장률을 산출할 수 없습니다.",
+  "api_usage": {
+    "prompt_tokens": 14535,
+    "completion_tokens": 160,
+    "cached_tokens": 0,
+    "reasoning_tokens": 107,
+    "total_tokens": 14695
+  },
+  "latency_seconds": 966.456
+}

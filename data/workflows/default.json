@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "id": "workflow",
-  "name": "Excel RAG Flow",
-  "updated_at": "2026-08-12T01:43:42.213410+00:00",
+  "id": "default",
+  "name": "default",
+  "updated_at": "2026-08-13T02:45:33.248256+00:00",
   "graph": {
     "nodes": [
       {
@@ -28,8 +28,8 @@
         "id": "custom-node-1786497092339-3",
         "module_type": "decomposer",
         "position": {
-          "x": 1443.7836816978734,
-          "y": -117.57126350792254
+          "x": 1426.1794166088018,
+          "y": -156.69185259474813
         },
         "config": {
           "model": "gpt-5.6-luna",
@@ -80,11 +80,11 @@
         "id": "custom-node-1786497475934-2",
         "module_type": "prebuilt_index_loader",
         "position": {
-          "x": 1977.4155148073032,
-          "y": 260.3659918372633
+          "x": 2168.070268203153,
+          "y": 266.7211502837916
         },
         "config": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
+          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
         },
         "values": {},
         "ui": {
@@ -318,9 +318,9 @@
       }
     ],
     "viewport": {
-      "x": -5404.214613375442,
-      "y": 465.4495404580863,
-      "zoom": 1.2193158642718154
+      "x": -404.97466088452325,
+      "y": 482.55261331232794,
+      "zoom": 0.7547506007162889
     }
   }
 }
