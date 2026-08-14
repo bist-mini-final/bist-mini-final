@@ -262,10 +262,84 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
         title = cast(Optional[CellBounds], named["title_range"])
         column_header = cast(Optional[CellBounds], named["column_header_range"])
         row_header = cast(Optional[CellBounds], named["row_header_range"])
+        # Reconcile vertical overlaps between title, column_header, and data_range.
+        # Vision models sometimes include header rows inside data_range or title span inside column_header.
+        if title and column_header:
+            if title.max_row >= column_header.min_row:
+                if title.min_row < column_header.min_row:
+                    title = CellBounds(
+                        title.min_row,
+                        column_header.min_row - 1,
+                        title.min_column,
+                        title.max_column,
+                    )
+                else:
+                    title = None
+                named["title_range"] = title
+
+        header_bottom = None
+        if column_header:
+            header_bottom = column_header.max_row
+        elif title:
+            header_bottom = title.max_row
+
+        if header_bottom is not None and header_bottom >= data.min_row:
+            if data.max_row > header_bottom:
+                data = CellBounds(
+                    header_bottom + 1,
+                    data.max_row,
+                    data.min_column,
+                    data.max_column,
+                )
+                named["data_range"] = data
+            else:
+                if column_header and column_header.min_row < data.min_row:
+                    column_header = CellBounds(
+                        column_header.min_row,
+                        data.min_row - 1,
+                        column_header.min_column,
+                        column_header.max_column,
+                    )
+                    named["column_header_range"] = column_header
+                else:
+                    column_header = None
+                    named["column_header_range"] = None
+                if title and title.max_row >= data.min_row:
+                    if title.min_row < data.min_row:
+                        title = CellBounds(
+                            title.min_row,
+                            data.min_row - 1,
+                            title.min_column,
+                            title.max_column,
+                        )
+                    else:
+                        title = None
+                    named["title_range"] = title
+
         if title and title.max_row >= data.min_row:
-            raise ModuleExecutionError("VLM 제목 영역은 데이터 영역보다 위에 있어야 합니다")
+            if title.min_row < data.min_row:
+                title = CellBounds(
+                    title.min_row,
+                    data.min_row - 1,
+                    title.min_column,
+                    title.max_column,
+                )
+            else:
+                title = None
+            named["title_range"] = title
+
         if column_header and column_header.max_row >= data.min_row:
-            raise ModuleExecutionError("VLM 열 헤더 영역은 데이터 영역보다 위에 있어야 합니다")
+            if column_header.min_row < data.min_row:
+                column_header = CellBounds(
+                    column_header.min_row,
+                    data.min_row - 1,
+                    column_header.min_column,
+                    column_header.max_column,
+                )
+            else:
+                column_header = None
+            named["column_header_range"] = column_header
+
         if row_header and row_header.max_column >= data.min_column:
             # Excel ranges are inclusive. Vision models sometimes include the
             # boundary label column in data_range, or include the first data

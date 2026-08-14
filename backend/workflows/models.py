@@ -33,6 +33,7 @@ class CanvasViewport(StrictModel):
 
 class NodeUI(StrictModel):
     width: Optional[float] = Field(default=None, ge=320, le=1200)
+    height: Optional[float] = Field(default=None, ge=280, le=1600)
     execution_stopped: bool = False
     column_widths: Dict[str, Annotated[float, Field(ge=80, le=1200)]] = Field(
         default_factory=dict

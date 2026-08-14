@@ -75,6 +75,7 @@ export interface WorkflowNode {
   values?: Record<string, unknown>;
   ui?: {
     width?: number | null;
+    height?: number | null;
     execution_stopped?: boolean;
     column_widths?: Record<string, number>;
   };

@@ -25,24 +25,31 @@ OUTPUT_DIR = Path('/Users/pileuszu/Repos/bist-mini-final/outputs')
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 BATCH_FILE = OUTPUT_DIR / 'batch_results.json'
 
-INPUT_FILE = '/Users/pileuszu/.gemini/antigravity-ide/brain/84de22fd-68d5-4eee-9d6f-bb4d32126cb3/.system_generated/steps/15/output.txt'
-
-with open(INPUT_FILE, 'r', encoding='utf-8') as f:
-    content = json.loads(f.read())['markdown']
-
-table_content = re.search(r'<table.*?>(.*?)</table>', content, re.DOTALL).group(1)
-rows = re.findall(r'<tr>(.*?)</tr>', table_content, re.DOTALL)
+NOTION_QUESTIONS_FILE = Path(__file__).parent / 'data' / 'notion_questions.json'
+DEFAULT_INPUT_FILE = Path('/Users/pileuszu/.gemini/antigravity-ide/brain/5d01c2af-183d-4ac8-8a70-caee96e08e6c/.system_generated/steps/15/output.txt')
 
 questions = []
-for r in rows:
-    cols = [c.strip() for c in re.findall(r'<td>(.*?)</td>', r, re.DOTALL)]
-    if len(cols) == 5 and cols[0] != "문항 ID":
-        questions.append({
-            "id": cols[0],
-            "scenario": cols[1],
-            "question": cols[2],
-            "chatgpt": cols[3].replace(r'\$', '$')
-        })
+
+if NOTION_QUESTIONS_FILE.exists():
+    with open(NOTION_QUESTIONS_FILE, 'r', encoding='utf-8') as f:
+        questions = json.load(f)
+elif DEFAULT_INPUT_FILE.exists():
+    with open(DEFAULT_INPUT_FILE, 'r', encoding='utf-8') as f:
+        content = json.loads(f.read())['markdown']
+
+    tables = re.findall(r'<table.*?>(.*?)</table>', content, re.DOTALL)
+    for table_content in tables:
+        rows = re.findall(r'<tr>(.*?)</tr>', table_content, re.DOTALL)
+        for r in rows:
+            cols = [re.sub(r'<.*?>', '', c).strip() for c in re.findall(r'<td>(.*?)</td>', r, re.DOTALL)]
+            if len(cols) >= 5 and cols[0] not in ("번호", "문항 ID"):
+                q_id = f"Q{cols[0]}" if cols[0].isdigit() else cols[0]
+                questions.append({
+                    "id": q_id,
+                    "scenario": cols[1],
+                    "question": cols[2],
+                    "chatgpt": cols[4].replace(r'\$', '$') if len(cols) > 4 else (cols[3].replace(r'\$', '$') if len(cols) > 3 else "")
+                })
 
 def extract_answer(res_run):
     json_node = res_run.nodes.get('custom-node-1786497852818-2')

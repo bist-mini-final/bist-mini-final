@@ -132,27 +132,37 @@ class OpenAIResponsesVisionClient:
             method="POST",
         )
         started_at = time.perf_counter()
-        try:
-            with urlopen(
-                request,
-                timeout=float(timeout_seconds or self.timeout_seconds),
-            ) as response:
-                document = json.loads(response.read().decode("utf-8"))
-        except HTTPError as error:
-            message = ""
+        document = None
+        retries = 3
+        for attempt in range(retries):
             try:
-                error_document = json.loads(error.read().decode("utf-8"))
-                message = str((error_document.get("error") or {}).get("message") or "")
-            except (OSError, ValueError, AttributeError):
-                pass
-            detail = f": {message}" if message else ""
-            raise OpenAIResponsesVisionError(
-                f"OpenAI Responses API가 HTTP {error.code}를 반환했습니다{detail}"
-            ) from error
-        except (URLError, TimeoutError, OSError, ValueError) as error:
-            raise OpenAIResponsesVisionError(
-                "OpenAI Responses API 호출 또는 응답 해석에 실패했습니다"
-            ) from error
+                with urlopen(
+                    request,
+                    timeout=float(timeout_seconds or self.timeout_seconds),
+                ) as response:
+                    document = json.loads(response.read().decode("utf-8"))
+                break
+            except HTTPError as error:
+                message = ""
+                try:
+                    error_document = json.loads(error.read().decode("utf-8"))
+                    message = str((error_document.get("error") or {}).get("message") or "")
+                except (OSError, ValueError, AttributeError):
+                    pass
+                detail = f": {message}" if message else ""
+                if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
+                    time.sleep(1.0 * (2 ** attempt))
+                    continue
+                raise OpenAIResponsesVisionError(
+                    f"OpenAI Responses API가 HTTP {error.code}를 반환했습니다{detail}"
+                ) from error
+            except (URLError, TimeoutError, OSError, ValueError) as error:
+                if attempt < retries - 1:
+                    time.sleep(1.0 * (2 ** attempt))
+                    continue
+                raise OpenAIResponsesVisionError(
+                    f"OpenAI Responses API 호출 또는 응답 해석에 실패했습니다: {error}"
+                ) from error
 
         if document.get("status") == "incomplete":
             reason = (document.get("incomplete_details") or {}).get("reason")

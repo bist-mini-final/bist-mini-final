@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
 from time import monotonic
+from urllib.error import URLError
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -34,7 +35,11 @@ from backend.modules.docling_table_detector import DoclingTableDetectorModule
 from backend.modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
-from backend.modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
+from backend.modules.local_vlm_structure_detector import (
+    LocalVlmStructureDetectorModule,
+    LocalVlmTableDecisionDTO,
+)
+from backend.spreadsheets.table_geometry import SheetLayout
 from backend.modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from backend.modules.luna_vlm_structure_detector import LUNA_SHEET_RESPONSE_SCHEMA
 from backend.modules.base import ModuleExecutionError
@@ -171,6 +176,115 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
         self.assertTrue(all(item["image_url"].startswith("data:image/png;base64,") for item in image_inputs))
         self.assertEqual(result.content, '{"tables":[]}')
         self.assertEqual(result.usage["total_tokens"], 105)
+
+    def test_structured_vision_request_retries_on_transient_error(self) -> None:
+        attempts = 0
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "status": "completed",
+                    "output": [{
+                        "type": "message",
+                        "content": [{
+                            "type": "output_text",
+                            "text": '{"tables":[]}',
+                        }],
+                    }],
+                    "usage": {"total_tokens": 50},
+                }).encode("utf-8")
+
+        def flaky_urlopen(request, timeout):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise URLError("Temporary connection timeout")
+            return FakeResponse()
+
+        with TemporaryDirectory() as directory:
+            sheet_image = Path(directory) / "sheet.png"
+            Image.new("RGB", (8, 6), "white").save(sheet_image)
+            client = OpenAIResponsesVisionClient(
+                api_key="test-key",
+                base_url="https://api.openai.com/v1",
+            )
+            with patch("backend.openai_responses_vision.urlopen", side_effect=flaky_urlopen), \
+                 patch("time.sleep", return_value=None):
+                result = client.complete_structured(
+                    model="gpt-5.6-luna",
+                    system_prompt="system",
+                    user_prompt="user",
+                    image_path=sheet_image,
+                    schema_name="luna_spreadsheet_sheet",
+                    json_schema=LUNA_SHEET_RESPONSE_SCHEMA,
+                    reasoning_effort="low",
+                    max_output_tokens=6000,
+                    timeout_seconds=240,
+                )
+        self.assertEqual(attempts, 2)
+        self.assertEqual(result.content, '{"tables":[]}')
+
+
+class TableValidationReconciliationTests(unittest.TestCase):
+    def setUp(self):
+        row_heights = [20.0] * 100
+        column_widths = [15.0] * 30
+        x_offsets = [0.0]
+        for w in column_widths:
+            x_offsets.append(x_offsets[-1] + w)
+        y_offsets = [0.0]
+        for h in row_heights:
+            y_offsets.append(y_offsets[-1] + h)
+        self.layout = SheetLayout(
+            max_row=100,
+            max_column=30,
+            column_widths=column_widths,
+            row_heights=row_heights,
+            x_offsets=x_offsets,
+            y_offsets=y_offsets,
+        )
+        self.visibility = WorksheetVisibility(
+            hidden_rows=frozenset(),
+            hidden_columns=frozenset(),
+        )
+
+    def test_reconciles_title_and_data_range_vertical_overlap(self):
+        # When VLM includes title row in data_range
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B5:P30",
+            title_range="B5:P5",
+            column_header_range="B6:P6",
+            row_header_range="B7:B30",
+            data_range="B5:P30",  # erroneously starts at B5
+        )
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+        self.assertEqual(validated["title_range"].excel_range, "B5:P5")
+        self.assertEqual(validated["column_header_range"].excel_range, "C6:P6")
+        self.assertEqual(validated["data_range"].excel_range, "C7:P30")
+        self.assertEqual(validated["row_header_range"].excel_range, "B7:B30")
+
+    def test_reconciles_title_overlapping_column_header(self):
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B5:P30",
+            title_range="B5:P6",  # overlaps column header at row 6
+            column_header_range="B6:P6",
+            row_header_range="B7:B30",
+            data_range="E7:P30",
+        )
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+        self.assertEqual(validated["title_range"].excel_range, "B5:P5")
+        self.assertEqual(validated["column_header_range"].excel_range, "E6:P6")
+        self.assertEqual(validated["data_range"].excel_range, "E7:P30")
 
 
 def sample_cell_documents():
@@ -1870,6 +1984,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                     ui=(
                         {
                             "width": 640,
+                            "height": 720,
                             "execution_stopped": True,
                             "column_widths": {
                                 "subquery": 320,
@@ -1991,6 +2106,7 @@ class WorkflowExecutionTests(unittest.TestCase):
         )
         self.assertEqual(query_node.values["query"], "저장 후 복원할 사용자 질문")
         self.assertEqual(inspector_node.ui.width, 640)
+        self.assertEqual(inspector_node.ui.height, 720)
         self.assertTrue(inspector_node.ui.execution_stopped)
         self.assertEqual(
             inspector_node.ui.column_widths,

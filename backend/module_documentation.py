@@ -18,7 +18,8 @@ def _inline(value: Any) -> str:
     rendered = json.dumps(value, ensure_ascii=False, sort_keys=True)
     if len(rendered) > 120:
         return "`<long default; see contract>`"
-    return f"`{rendered.replace('|', '\\|')}`"
+    escaped = rendered.replace("|", "\\|")
+    return f"`{escaped}`"
 
 
 def _schema_type(schema: Mapping[str, Any]) -> str:

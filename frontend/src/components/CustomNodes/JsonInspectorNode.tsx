@@ -20,8 +20,10 @@ interface JsonInspectorNodeData extends Record<string, unknown> {
   upstreamModuleType?: ModuleType;
   activeStep?: number;
   nodeWidth?: number;
+  nodeHeight?: number;
   columnWidths?: Record<string, number>;
   onNodeWidthChange?: (width: number) => void;
+  onNodeHeightChange?: (height: number) => void;
   onColumnWidthChange?: (column: string, width: number) => void;
 }
 
@@ -30,6 +32,7 @@ export type JsonInspectorNodeProps = NodeProps<Node<JsonInspectorNodeData>>;
 const INDEX_COLUMN_WIDTH = 36;
 const MIN_COLUMN_WIDTH = 96;
 const MAX_COLUMN_WIDTH = 960;
+const DEFAULT_NODE_HEIGHT = 440;
 
 function defaultColumnWidth(column: string): number {
   if (column === 'subquery' || column === 'query') return 260;
@@ -156,10 +159,14 @@ export const JsonInspectorNode = ({ data, selected }: JsonInspectorNodeProps) =>
       inputPorts={['input']}
       selected={selected}
       width={data.nodeWidth ?? 390}
+      height={data.nodeHeight ?? DEFAULT_NODE_HEIGHT}
       onWidthChange={data.onNodeWidthChange}
+      onHeightChange={data.onNodeHeightChange}
       minWidth={340}
       maxWidth={920}
-      bodyClassName="space-y-2.5"
+      minHeight={280}
+      maxHeight={1600}
+      bodyClassName="json-inspector-node__body"
     >
       {data.executionState === 'failed' && data.executionError && (
         <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-[11px] text-rose-700">
@@ -190,12 +197,12 @@ export const JsonInspectorNode = ({ data, selected }: JsonInspectorNodeProps) =>
       )}
 
       {content?.kind === 'table' && rows.length > 0 && (
-        <div className="space-y-2">
+        <div className="json-inspector-table space-y-2">
           <div className="flex items-center justify-between text-[10px] text-slate-500">
             <span className="font-semibold text-slate-700">{content.label}</span>
             <span>전체 {content.totalRows}개 중 임의 {previewRows.length}개 · {columns.length}열</span>
           </div>
-          <div className="nodrag nopan max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white">
+          <div className="json-inspector-table__scroll nodrag nopan overflow-auto rounded-xl border border-slate-200 bg-white">
             <table
               className="table-fixed border-collapse text-left text-[10px]"
               style={{ width: `${tableWidth}px`, minWidth: '100%' }}

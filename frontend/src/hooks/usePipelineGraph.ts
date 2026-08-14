@@ -406,6 +406,20 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     [setNodes, updateNodeInternals]
   );
 
+  const updateNodeHeight = useCallback(
+    (nodeId: string, height: number) => {
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, nodeHeight: height } }
+            : node
+        )
+      );
+      window.requestAnimationFrame(() => updateNodeInternals(nodeId));
+    },
+    [setNodes, updateNodeInternals]
+  );
+
   const updateNodeColumnWidth = useCallback(
     (nodeId: string, column: string, width: number) => {
       setNodes((currentNodes) =>
@@ -441,11 +455,12 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
         onConfigChange: (patch: Record<string, unknown>) => updateNodeConfig(nodeId, patch),
         onValuesChange: (patch: Record<string, unknown>) => updateNodeValues(nodeId, patch),
         onNodeWidthChange: (width: number) => updateNodeWidth(nodeId, width),
+        onNodeHeightChange: (height: number) => updateNodeHeight(nodeId, height),
         onColumnWidthChange: (column: string, width: number) =>
           updateNodeColumnWidth(nodeId, column, width),
       };
     },
-    [sharedNodeData, updateNodeColumnWidth, updateNodeConfig, updateNodeValues, updateNodeWidth]
+    [sharedNodeData, updateNodeColumnWidth, updateNodeConfig, updateNodeHeight, updateNodeValues, updateNodeWidth]
   );
 
   useEffect(() => {
@@ -652,6 +667,9 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
           ...(typeof node.data.nodeWidth === 'number'
             ? { width: node.data.nodeWidth }
             : {}),
+          ...(typeof node.data.nodeHeight === 'number'
+            ? { height: node.data.nodeHeight }
+            : {}),
           execution_stopped: node.data.executionStopped === true,
           column_widths: numericRecord(node.data.columnWidths),
         },
@@ -709,6 +727,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
               config: workflowNode.config,
               values: workflowNode.values,
               nodeWidth: workflowNode.ui?.width ?? undefined,
+              nodeHeight: workflowNode.ui?.height ?? undefined,
               columnWidths: workflowNode.ui?.column_widths ?? {},
               executionStopped: workflowNode.ui?.execution_stopped === true,
             }),

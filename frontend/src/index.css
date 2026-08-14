@@ -884,6 +884,8 @@ textarea:focus-visible {
 
 .flow-node {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: var(--node-width);
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--node-accent) 18%, #d8e2dc);
@@ -923,6 +925,7 @@ textarea:focus-visible {
 
 .flow-node__header {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 0.65rem;
   border-bottom: 1px solid #edf2ef;
@@ -1059,6 +1062,7 @@ textarea:focus-visible {
 }
 
 .flow-node__body {
+  min-height: 0;
   padding: 0.875rem;
   font-size: 0.75rem;
   line-height: 1.5;
@@ -1092,6 +1096,39 @@ textarea:focus-visible {
 .flow-node__resize-handle:hover::after,
 .flow-node__resize-handle:focus-visible::after {
   border-color: var(--node-accent);
+  opacity: 1;
+}
+
+.flow-node__height-resize-handle {
+  position: absolute;
+  z-index: 4;
+  right: 2rem;
+  bottom: -0.22rem;
+  left: 2rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.flow-node__height-resize-handle::after {
+  position: absolute;
+  bottom: 0.18rem;
+  left: 50%;
+  width: 2.5rem;
+  height: 0.18rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--node-accent) 48%, #cbd5e1);
+  content: "";
+  opacity: 0.55;
+  transform: translateX(-50%);
+  transition: width 150ms ease, background-color 150ms ease, opacity 150ms ease;
+}
+
+.flow-node__height-resize-handle:hover::after,
+.flow-node__height-resize-handle:focus-visible::after {
+  width: 3.5rem;
+  background: var(--node-accent);
   opacity: 1;
 }
 
@@ -1916,6 +1953,10 @@ textarea:focus-visible {
 }
 
 .json-inspector-answer {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid #bae6fd;
   border-radius: 0.8rem;
@@ -1955,13 +1996,34 @@ textarea:focus-visible {
 }
 
 .json-inspector-markdown {
-  max-height: 18rem;
+  min-height: 0;
+  flex: 1;
   overflow: auto;
   padding: 0.7rem;
   color: #334155;
   font-size: 0.66rem;
   line-height: 1.65;
   user-select: text;
+}
+
+.json-inspector-node__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.json-inspector-table {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.json-inspector-table__scroll {
+  min-height: 0;
+  flex: 1;
 }
 
 .json-inspector-markdown> :first-child {

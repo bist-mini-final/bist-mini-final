@@ -21,6 +21,7 @@ interface NodeShellProps {
   state?: NodeState;
   selected?: boolean;
   width?: number;
+  height?: number;
   hasInput?: boolean;
   inputPorts?: string[];
   hasOutput?: boolean;
@@ -29,8 +30,11 @@ interface NodeShellProps {
   headerActions?: ReactNode;
   bodyClassName?: string;
   onWidthChange?: (width: number) => void;
+  onHeightChange?: (height: number) => void;
   minWidth?: number;
   maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
   nodeData?: Record<string, unknown>;
 }
 
@@ -48,6 +52,7 @@ export function NodeShell({
   state = 'idle',
   selected = false,
   width = 320,
+  height,
   hasInput = true,
   inputPorts = [],
   hasOutput = true,
@@ -56,8 +61,11 @@ export function NodeShell({
   headerActions,
   bodyClassName = '',
   onWidthChange,
+  onHeightChange,
   minWidth = 320,
   maxWidth = 1200,
+  minHeight = 280,
+  maxHeight = 1600,
   nodeData: propNodeData,
 }: NodeShellProps) {
   const nodeId = useNodeId();
@@ -75,6 +83,10 @@ export function NodeShell({
   const clampWidth = useCallback(
     (nextWidth: number) => Math.min(maxWidth, Math.max(minWidth, Math.round(nextWidth))),
     [maxWidth, minWidth]
+  );
+  const clampHeight = useCallback(
+    (nextHeight: number) => Math.min(maxHeight, Math.max(minHeight, Math.round(nextHeight))),
+    [maxHeight, minHeight]
   );
 
   const stopResize = useCallback(() => {
@@ -111,6 +123,38 @@ export function NodeShell({
     event.stopPropagation();
     onWidthChange(clampWidth(width + (event.key === 'ArrowRight' ? 24 : -24)));
   }, [clampWidth, onWidthChange, width]);
+
+  const startHeightResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!onHeightChange || height === undefined) return;
+    event.preventDefault();
+    event.stopPropagation();
+    stopResize();
+    const startY = event.clientY;
+    const startHeight = height;
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      onHeightChange(clampHeight(startHeight + moveEvent.clientY - startY));
+    };
+    const handlePointerUp = () => stopResize();
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    resizeCleanupRef.current = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [clampHeight, height, onHeightChange, stopResize]);
+
+  const resizeHeightWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (
+      !onHeightChange
+      || height === undefined
+      || !['ArrowUp', 'ArrowDown'].includes(event.key)
+    ) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onHeightChange(clampHeight(height + (event.key === 'ArrowDown' ? 24 : -24)));
+  }, [clampHeight, height, onHeightChange]);
 
   const graphEdges = getEdges();
   const incomingEdges = nodeId
@@ -206,6 +250,7 @@ export function NodeShell({
   const style: NodeStyle = {
     '--node-accent': accent,
     '--node-width': `${width}px`,
+    ...(height === undefined ? {} : { height: `${height}px` }),
   };
 
   return (
@@ -345,6 +390,22 @@ export function NodeShell({
           title="드래그하여 모듈 너비 조절"
           onPointerDown={startResize}
           onKeyDown={resizeWithKeyboard}
+        />
+      )}
+
+      {onHeightChange && height !== undefined && (
+        <div
+          className="nodrag nopan flow-node__height-resize-handle"
+          role="separator"
+          aria-label={`${title} 세로 크기 조절`}
+          aria-orientation="horizontal"
+          aria-valuemin={minHeight}
+          aria-valuemax={maxHeight}
+          aria-valuenow={height}
+          tabIndex={0}
+          title="위아래로 드래그하여 모듈 높이 조절"
+          onPointerDown={startHeightResize}
+          onKeyDown={resizeHeightWithKeyboard}
         />
       )}
 
