@@ -18,7 +18,10 @@ from ..openai_responses_vision import (
 from ..spreadsheets.cell_semantics import collect_non_empty_cells, compact_sheet_context
 from ..spreadsheets.cell_type_overlay import render_cell_type_overlay
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
-from ..spreadsheets.prompt_guidance import TEXT_CELL_ROLE_GUIDANCE
+from ..spreadsheets.prompt_guidance import (
+    TABLE_UNIFICATION_GUIDANCE,
+    TEXT_CELL_ROLE_GUIDANCE,
+)
 from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
 from ..spreadsheets.table_fragment_merge import parse_excel_range
 from ..spreadsheets.table_geometry import CellBounds, SheetLayout
@@ -29,6 +32,7 @@ from .local_vlm_structure_detector import (
     LocalVlmStructureDetectorModule,
     LocalVlmTableDecisionDTO,
     _contains,
+    unify_sheet_tables,
 )
 from .processed_file_selector import WorkbookSelectionDTO
 from .spreadsheet_structure import SpreadsheetStructureOutput
@@ -42,6 +46,8 @@ You receive exactly one high-detail image containing the complete visible worksh
 The image preserves the original worksheet style while populated cells are tinted and labeled by exact Excel coordinate. Colors are: text amber, number green, date blue, boolean purple, error red, unresolved formula gray. A magenta inner border marks a formula. Exact coordinate, type, value, formula, and merged-range facts for the complete sheet are supplied as text and are authoritative.
 
 {TEXT_CELL_ROLE_GUIDANCE}
+
+{TABLE_UNIFICATION_GUIDANCE}
 
 Return every independent rectangular table in the worksheet. A table must contain data cells; do not emit decorations, isolated notes, or empty rectangles. Every returned coordinate must be inside sheet_range. Use:
 - excel_range: the complete visible table.
@@ -320,9 +326,10 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                     else str(response)
                 )
                 decision = LunaSheetDecisionDTO.model_validate_json(previous_response)
+                unified_tables = unify_sheet_tables(decision.tables)
                 tables = [
                     _validated_sheet_decision(table, sheet_bounds)
-                    for table in decision.tables
+                    for table in unified_tables
                 ]
                 for table in tables:
                     self.structure_assembler._validate_table(table, layout, visibility)

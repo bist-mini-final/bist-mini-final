@@ -50,3 +50,8 @@ tmp/
 .DS_Store
 .idea/
 .vscode/
+
+# Evaluation / Questions data
+data/notion_questions.json
+*notion_question*.json
+scripts/generate_evaluation_report.py

@@ -2852,6 +2852,40 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         )
         self.assertTrue(len(bm25_res["items"]) > 0)
 
+    def test_unify_sheet_tables(self) -> None:
+        from backend.modules.local_vlm_structure_detector import (
+            LocalVlmTableDecisionDTO,
+            unify_sheet_tables,
+        )
+        t1 = LocalVlmTableDecisionDTO(
+            excel_range="A1:K45",
+            title_range="A1:K2",
+            column_header_range="A3:K4",
+            row_header_range="A5:A45",
+            data_range="B5:K45",
+        )
+        t2 = LocalVlmTableDecisionDTO(
+            excel_range="A46:K60",
+            title_range="A46:K46",
+            column_header_range=None,
+            row_header_range="A47:A60",
+            data_range="B47:K60",
+        )
+        t3 = LocalVlmTableDecisionDTO(
+            excel_range="A61:K100",
+            title_range=None,
+            column_header_range=None,
+            row_header_range="A61:A100",
+            data_range="B61:K100",
+        )
+        unified = unify_sheet_tables([t1, t2, t3])
+        self.assertEqual(len(unified), 1)
+        self.assertEqual(unified[0].excel_range, "A1:K100")
+        self.assertEqual(unified[0].column_header_range, "A3:K4")
+        self.assertEqual(unified[0].title_range, "A1:K2")
+        self.assertEqual(unified[0].row_header_range, "A5:A100")
+        self.assertEqual(unified[0].data_range, "B5:K100")
+
 
 if __name__ == "__main__":
     unittest.main()

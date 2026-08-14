@@ -2,24 +2,25 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-13T08:26:14.891498+00:00",
+  "updated_at": "2026-08-14T05:31:14.880914+00:00",
   "graph": {
     "nodes": [
       {
         "id": "custom-node-1786497067905-2",
         "module_type": "query_input",
         "position": {
-          "x": 1057.3594930497372,
+          "x": 974.6897321879878,
           "y": -367.4342037563349
         },
         "config": {
           "threshold": 0.65
         },
         "values": {
-          "query": "IBM의 LTM 기준 시가총액과 TEV는 각각 얼마인가?"
+          "query": "최근 추세 유지 시 2026년 Total Revenue는?"
         },
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -40,6 +41,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -55,6 +57,7 @@
         "values": {},
         "ui": {
           "width": 502.0,
+          "height": 281.0,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -72,6 +75,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -89,6 +93,7 @@
         },
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -108,6 +113,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -125,6 +131,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -144,6 +151,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -163,6 +171,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -183,6 +192,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -197,7 +207,8 @@
         "config": {},
         "values": {},
         "ui": {
-          "width": null,
+          "width": 881.0,
+          "height": 1315.0,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -310,9 +321,9 @@
       }
     ],
     "viewport": {
-      "x": -1758.6018556847562,
-      "y": 323.3784189807061,
-      "zoom": 0.6164568866867304
+      "x": -257.78453861672597,
+      "y": 441.87130995710527,
+      "zoom": 0.6462086220876893
     }
   }
 }
