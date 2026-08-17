@@ -17,10 +17,10 @@ from typing import Any, Sequence
 
 from pydantic import ValidationError
 
-from ..answer_cache import AnswerCacheRepository
-from ..config import CACHE_DIR
-from ..module_registry import ModuleRegistry
+from ..core.settings import CACHE_DIR
 from ..modules.base import ModuleExecutionError, ModuleExecutionRequestDTO
+from ..runtime.registry import ModuleRegistry
+from ..storage.answer_cache import AnswerCacheRepository
 
 
 def _parser() -> argparse.ArgumentParser:

@@ -1,3 +1,5 @@
+"""OpenAI-compatible chat-completion client used by language modules."""
+
 import json
 import os
 import time

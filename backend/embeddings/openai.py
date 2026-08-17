@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .modules.base import ModuleExecutionError
+from ..modules.base import ModuleExecutionError
 
 
 def _project_env_value(name: str) -> Optional[str]:

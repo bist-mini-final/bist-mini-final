@@ -1,3 +1,5 @@
+"""Text similarity functions used for cached-answer retrieval."""
+
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher

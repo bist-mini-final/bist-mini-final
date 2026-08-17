@@ -1,4 +1,6 @@
-from typing import Dict, Any, Tuple, Optional
+"""OpenAI token-usage cost estimation."""
+
+from typing import Any, Dict, Optional, Tuple
 
 # Official OpenAI Pricing per 1 Million Tokens (USD)
 # (input_rate, cached_input_rate, output_rate)

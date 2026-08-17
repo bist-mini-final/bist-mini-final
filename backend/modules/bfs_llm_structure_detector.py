@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 import openpyxl
 from pydantic import BaseModel, Field
 
-from ..chat_completion import ChatCompletionClient, ChatCompletionError
-from ..config import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from ..llm.chat_completion import ChatCompletionClient, ChatCompletionError
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
 from ..spreadsheets.grid_structure import (
     build_column_header_tree,

@@ -15,15 +15,20 @@ from PIL import Image
 from pydantic import ValidationError
 
 from app import app
-from backend.answer_cache import AnswerCacheRepository
+from backend.api.router import create_api_router
+from backend.documentation.module_docs import MODULE_DOCS_DIR, render_module_markdown
+from backend.embeddings.bge import BgeEncoder
+from backend.embeddings.factory import get_embedding_encoder
+from backend.embeddings.openai import OpenAIEmbeddingEncoder
+from backend.llm.chat_completion import ChatCompletionError
+from backend.retrieval.similarity import combined_similarity, rank_candidates
+from backend.runtime.registry import ModuleRegistry
+from backend.runtime.worker import ModuleWorkerCancelled
+from backend.storage.answer_cache import AnswerCacheRepository
+from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.vector_index import VectorIndexStore
+from backend.vision.openai_responses import OpenAIResponsesVisionClient
 from backend.api.spreadsheet_artifact_routes import create_spreadsheet_artifact_router
-from backend.chat_completion import ChatCompletionError
-from backend.embedding_artifacts import EmbeddingArtifactStore
-from backend.vector_index_store import VectorIndexStore
-from backend.module_registry import ModuleRegistry
-from backend.module_documentation import MODULE_DOCS_DIR, render_module_markdown
-from backend.module_worker import ModuleWorkerCancelled
-from backend.openai_responses_vision import OpenAIResponsesVisionClient
 from backend.modules.decomposer import DecomposerModule
 from backend.modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from backend.modules.dense_retriever import DenseRetrieverModule
@@ -48,8 +53,6 @@ from backend.modules.processed_file_selector import ProcessedFileSelectorModule
 from backend.modules.reader import ReaderModule
 from backend.modules.rrf_fusion import RrfFusionModule
 from backend.modules.vector_index_writer import VectorIndexWriterModule
-from backend.routes import create_api_router
-from backend.similarity import combined_similarity, rank_candidates
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
@@ -149,7 +152,7 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
                 base_url="https://api.openai.com/v1",
             )
             with patch(
-                "backend.openai_responses_vision.urlopen",
+                "backend.vision.openai_responses.urlopen",
                 side_effect=fake_urlopen,
             ):
                 result = client.complete_structured(
@@ -214,7 +217,7 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
                 api_key="test-key",
                 base_url="https://api.openai.com/v1",
             )
-            with patch("backend.openai_responses_vision.urlopen", side_effect=flaky_urlopen), \
+            with patch("backend.vision.openai_responses.urlopen", side_effect=flaky_urlopen), \
                  patch("time.sleep", return_value=None):
                 result = client.complete_structured(
                     model="gpt-5.6-luna",
@@ -769,6 +772,21 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
 class ApiContractTests(unittest.TestCase):
     client = TestClient(app)
+
+    def test_frontend_history_routes_return_spa_without_masking_api_404s(self) -> None:
+        with TemporaryDirectory() as directory:
+            dist_dir = Path(directory)
+            (dist_dir / "index.html").write_text(
+                "<html><body>frontend shell</body></html>",
+                encoding="utf-8",
+            )
+            with patch("app.DIST_DIR", dist_dir):
+                response = self.client.get("/playground")
+                missing_api = self.client.get("/api/not-a-real-endpoint")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("frontend shell", response.text)
+        self.assertEqual(missing_api.status_code, 404)
 
     def test_module_definitions_are_available_to_frontend(self) -> None:
         response = self.client.get("/api/modules")
@@ -2644,19 +2662,14 @@ class WorkflowExecutionTests(unittest.TestCase):
 
 class OpenAIEmbeddingEncoderTest(unittest.TestCase):
     def test_get_embedding_encoder_factory(self):
-        from backend.bge_encoder import BgeEncoder
-        from backend.embedding_factory import get_embedding_encoder
-        from backend.openai_embedding_encoder import OpenAIEmbeddingEncoder
-
         openai_encoder = get_embedding_encoder("text-embedding-3-small")
         self.assertIsInstance(openai_encoder, OpenAIEmbeddingEncoder)
 
         bge_encoder = get_embedding_encoder("BAAI/bge-large-en-v1.5")
         self.assertIsInstance(bge_encoder, BgeEncoder)
 
-    @patch("backend.openai_embedding_encoder.urlopen")
+    @patch("backend.embeddings.openai.urlopen")
     def test_openai_embedding_encode_success(self, mock_urlopen):
-        from backend.openai_embedding_encoder import OpenAIEmbeddingEncoder
         import io
 
         mock_response_data = json.dumps({

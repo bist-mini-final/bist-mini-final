@@ -1,7 +1,7 @@
 from typing import Dict, Optional, Protocol
 
-from .bge_encoder import BgeEncoder, DEFAULT_BGE_MODEL
-from .openai_embedding_encoder import OpenAIEmbeddingEncoder
+from .bge import BgeEncoder, DEFAULT_BGE_MODEL
+from .openai import OpenAIEmbeddingEncoder
 
 
 class EmbeddingEncoder(Protocol):

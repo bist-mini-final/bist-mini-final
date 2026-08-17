@@ -8,8 +8,8 @@ import openpyxl
 from openpyxl.utils.cell import range_boundaries
 from pydantic import BaseModel, Field
 
-from ..config import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
-from ..ollama_vision import OllamaVisionClient, OllamaVisionError
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from ..vision.ollama import OllamaVisionClient, OllamaVisionError
 from ..spreadsheets.cell_semantics import collect_non_empty_cells, compact_sheet_context
 from ..spreadsheets.cell_type_overlay import render_cell_type_overlay
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible

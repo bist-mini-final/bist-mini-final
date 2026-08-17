@@ -7,7 +7,7 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel, Field
 
-from ..config import PROCESSED_DATA_DIR
+from ..core.settings import PROCESSED_DATA_DIR
 from ..spreadsheets.cell_visibility import worksheet_visible
 from ..spreadsheets.structured_cell_text import (
     SERIALIZATION_VERSION,

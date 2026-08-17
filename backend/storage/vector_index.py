@@ -5,8 +5,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Sequence, Tuple
 
-from .config import VECTOR_INDEX_DIR
-from .modules.base import ModuleExecutionError
+from ..core.settings import VECTOR_INDEX_DIR
+from ..modules.base import ModuleExecutionError
 
 
 INDEX_ID_PATTERN = re.compile(r"^[a-f0-9]{64}$")

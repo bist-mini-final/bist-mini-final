@@ -5,8 +5,8 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from ..module_registry import ModuleRegistry
-from ..module_worker import (
+from ..runtime.registry import ModuleRegistry
+from ..runtime.worker import (
     CancellableModuleWorker,
     ModuleWorkerCancelled,
 )
@@ -555,7 +555,7 @@ class WorkflowExecutor:
         )
 
         import time
-        from ..openai_cost import calculate_openai_cost
+        from ..llm.cost import calculate_openai_cost
 
         t_start = time.perf_counter()
         state.status = "running"

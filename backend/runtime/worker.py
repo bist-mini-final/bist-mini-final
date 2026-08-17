@@ -24,10 +24,10 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
 
     from pathlib import Path
 
-    from .answer_cache import AnswerCacheRepository
-    from .embedding_artifacts import EmbeddingArtifactStore
-    from .module_registry import ModuleRegistry
-    from .vector_index_store import VectorIndexStore
+    from ..storage.answer_cache import AnswerCacheRepository
+    from ..storage.embedding_artifacts import EmbeddingArtifactStore
+    from ..storage.vector_index import VectorIndexStore
+    from .registry import ModuleRegistry
 
     registry = ModuleRegistry(
         AnswerCacheRepository(Path(spec["answer_cache_path"])),

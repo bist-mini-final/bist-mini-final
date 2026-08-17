@@ -2,7 +2,7 @@ from typing import Any, Dict, cast
 
 from pydantic import BaseModel, Field
 
-from ..answer_cache import AnswerCacheRepository
+from ..storage.answer_cache import AnswerCacheRepository
 from .base import (
     EmptyModuleConfigDTO,
     ExecutableModule,

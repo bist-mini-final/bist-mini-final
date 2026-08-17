@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from ..answer_cache import AnswerCacheRepository
-from ..module_documentation import write_module_guides
-from ..module_registry import ModuleRegistry
+from ..documentation.module_docs import write_module_guides
+from ..runtime.registry import ModuleRegistry
+from ..storage.answer_cache import AnswerCacheRepository
 
 
 def main() -> int:

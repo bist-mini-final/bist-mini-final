@@ -5,8 +5,8 @@ from typing import Any, Dict, List
 
 import numpy
 
-from ..config import PROCESSED_DATA_DIR, VECTOR_INDEX_DIR
-from ..vector_index_store import VectorIndexStore
+from ..core.settings import PROCESSED_DATA_DIR, VECTOR_INDEX_DIR
+from ..storage.vector_index import VectorIndexStore
 
 
 def export_prebuilt_index(

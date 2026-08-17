@@ -9,8 +9,8 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, cast
 import openpyxl
 from pydantic import BaseModel, Field, model_validator
 
-from ..config import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
-from ..openai_responses_vision import (
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from ..vision.openai_responses import (
     OpenAIResponsesVisionClient,
     OpenAIResponsesVisionError,
     OpenAIResponsesVisionResult,

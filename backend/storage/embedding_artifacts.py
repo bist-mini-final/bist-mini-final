@@ -4,8 +4,8 @@ from threading import Lock
 from typing import List
 import re
 
-from .config import EMBEDDING_ARTIFACT_DIR
-from .modules.base import ModuleExecutionError
+from ..core.settings import EMBEDDING_ARTIFACT_DIR
+from ..modules.base import ModuleExecutionError
 
 
 ARTIFACT_ID_PATTERN = re.compile(r"^[a-f0-9]{64}$")

@@ -5,9 +5,9 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from pydantic import ValidationError
 
-from ..module_documentation import render_module_markdown
-from ..module_registry import ModuleRegistry
+from ..documentation.module_docs import render_module_markdown
 from ..modules.base import ModuleExecutionError
+from ..runtime.registry import ModuleRegistry
 
 
 def _execution_handler(

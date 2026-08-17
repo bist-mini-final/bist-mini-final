@@ -1,3 +1,5 @@
+"""JSON-backed repository for cached question and answer pairs."""
+
 import json
 from pathlib import Path
 from threading import Lock

@@ -3,14 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter
 
-from .answer_cache import AnswerCacheRepository
-from .chat_completion import ChatCompletionClient
-from .embedding_artifacts import EmbeddingArtifactStore
-from .vector_index_store import VectorIndexStore
-from .api.module_routes import create_module_router
-from .api.spreadsheet_artifact_routes import create_spreadsheet_artifact_router
-from .api.workflow_routes import create_workflow_router
-from .config import (
+from ..core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
     RUN_DIR,
@@ -18,8 +11,15 @@ from .config import (
     VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
-from .module_registry import ModuleRegistry
-from .modules.embedder import EmbeddingEncoder
+from ..embeddings.factory import EmbeddingEncoder
+from ..llm.chat_completion import ChatCompletionClient
+from ..runtime.registry import ModuleRegistry
+from ..storage.answer_cache import AnswerCacheRepository
+from ..storage.embedding_artifacts import EmbeddingArtifactStore
+from ..storage.vector_index import VectorIndexStore
+from .module_routes import create_module_router
+from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
+from .workflow_routes import create_workflow_router
 
 
 def create_api_router(

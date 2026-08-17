@@ -2,7 +2,7 @@ import os
 from threading import Lock
 from typing import Any, List, Optional
 
-from .modules.base import ModuleExecutionError
+from ..modules.base import ModuleExecutionError
 
 
 DEFAULT_BGE_MODEL = "BAAI/bge-large-en-v1.5"

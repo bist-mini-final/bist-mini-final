@@ -8,6 +8,7 @@
 |---|---|---|
 | [프로젝트 README](../README.md) | 수동 | 설치, 실행, 전체 구조, 주요 워크플로와 API |
 | [Backend module architecture](./backend_module_architecture.md) | 수동 | DTO 경계, 데이터 계보, 독립 실행, 모듈 추가 규칙 |
+| [Frontend architecture](./frontend_architecture.md) | 수동 | 서비스 셸, 페이지 라우팅, Playground 기능 격리와 협업 규칙 |
 | [Module guides](../backend/modules/docs/README.md) | 자동 생성 | 등록된 25개 모듈의 포트와 Input/Config/Output DTO 사용법 |
 | ReDoc `/redoc` | 런타임 자동 생성 | 읽기 중심 전체 REST API 레퍼런스 |
 | Swagger UI `/docs` | 런타임 자동 생성 | 모듈별 JSON 요청·응답 확인 및 API 직접 실행 |

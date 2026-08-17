@@ -1,13 +1,13 @@
 """FastAPI entry point for the RAG Pipeline Visualizer."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.answer_cache import AnswerCacheRepository
-from backend.config import CACHE_DIR, DEV_CORS_ORIGINS, DIST_DIR
-from backend.routes import create_api_router
+from backend.api.router import create_api_router
+from backend.core.settings import CACHE_DIR, DEV_CORS_ORIGINS, DIST_DIR
+from backend.storage.answer_cache import AnswerCacheRepository
 
 def create_app() -> FastAPI:
     repository = AnswerCacheRepository(CACHE_DIR / "answers.json")
@@ -52,15 +52,24 @@ def create_app() -> FastAPI:
             "/assets", StaticFiles(directory=assets_dir), name="assets"
         )
 
-    @application.get("/")
-    def serve_index():
+    def frontend_index_response():
         index_path = DIST_DIR / "index.html"
         if index_path.exists():
             return FileResponse(index_path, media_type="text/html")
-        return HTMLResponse(
-            "<h1>Frontend build not found</h1><p>Run the frontend build first.</p>",
-            status_code=404,
-        )
+        return RedirectResponse(url="/redoc")
+
+    @application.get("/", include_in_schema=False)
+    def serve_index():
+        return frontend_index_response()
+
+    @application.get("/{frontend_path:path}", include_in_schema=False)
+    def serve_frontend_route(frontend_path: str):
+        """Return the SPA entry point for direct navigation to frontend routes."""
+
+        reserved_prefix = frontend_path.partition("/")[0]
+        if reserved_prefix in {"api", "assets", "docs", "redoc", "openapi.json"}:
+            raise HTTPException(status_code=404, detail="Not Found")
+        return frontend_index_response()
 
     return application
 

@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from .modules.base import ExecutableModule
+from ..modules.base import ExecutableModule
 
 
-MODULE_DOCS_DIR = Path(__file__).resolve().parent / "modules" / "docs"
+MODULE_DOCS_DIR = Path(__file__).resolve().parents[1] / "modules" / "docs"
 
 
 def _inline(value: Any) -> str:

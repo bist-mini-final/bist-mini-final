@@ -12,7 +12,7 @@ from typing import Any, Dict, Literal, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .chat_completion import _project_env_value
+from ..llm.chat_completion import _project_env_value
 
 
 class OpenAIResponsesVisionError(RuntimeError):
