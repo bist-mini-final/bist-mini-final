@@ -4,6 +4,8 @@ import {
   BookOpen,
   ChevronDown,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sparkles,
   Workflow,
   X,
@@ -19,44 +21,95 @@ interface AppShellProps {
   children: ReactNode;
 }
 
+const SIDEBAR_STORAGE_KEY = 'rag-flow:sidebar-collapsed';
+
 export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
-  const [isNavigationOpen, setIsNavigationOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
-    setIsNavigationOpen(false);
+    setIsMobileNavOpen(false);
   }, [pathname]);
 
   return (
-    <div className="product-shell">
+    <div className={clsx('product-shell', isSidebarCollapsed && 'product-shell--collapsed')}>
+      <button
+        className="product-mobile-trigger"
+        type="button"
+        onClick={() => setIsMobileNavOpen(true)}
+        aria-label="메뉴 열기"
+      >
+        <Menu size={19} />
+      </button>
+
       <aside
-        className={clsx('product-sidebar', isNavigationOpen && 'product-sidebar--open')}
+        className={clsx(
+          'product-sidebar',
+          isSidebarCollapsed && 'product-sidebar--collapsed',
+          isMobileNavOpen && 'product-sidebar--open'
+        )}
         aria-label="서비스 내비게이션"
       >
         <div className="product-brand">
-          <span className="product-brand__mark" aria-hidden="true">
-            <Workflow size={18} strokeWidth={2.2} />
-          </span>
-          <span className="product-brand__copy">
-            <strong>RAG Flow</strong>
-            <small>AI Workspace</small>
-          </span>
+          <AppLink to="/" className="product-brand__link" title="RAG Flow 홈">
+            <span className="product-brand__mark" aria-hidden="true">
+              <Workflow size={18} strokeWidth={2.2} />
+            </span>
+            <span className="product-brand__copy">
+              <strong>RAG Flow</strong>
+              <small>AI Workspace</small>
+            </span>
+          </AppLink>
+          <button
+            className="product-sidebar__collapse-btn"
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
           <button
             className="product-sidebar__close"
             type="button"
-            onClick={() => setIsNavigationOpen(false)}
+            onClick={() => setIsMobileNavOpen(false)}
             aria-label="메뉴 닫기"
           >
             <X size={18} />
           </button>
         </div>
 
-        <button className="workspace-switcher" type="button">
+        <button
+          className="workspace-switcher"
+          type="button"
+          title="BIST Workspace (Team project)"
+          aria-label="BIST Workspace"
+        >
           <span className="workspace-switcher__avatar">B</span>
-          <span>
+          <span className="workspace-switcher__copy">
             <strong>BIST Workspace</strong>
             <small>Team project</small>
           </span>
-          <ChevronDown size={15} aria-hidden="true" />
+          <ChevronDown className="workspace-switcher__chevron" size={15} aria-hidden="true" />
         </button>
 
         <nav className="product-nav" aria-label="주요 메뉴">
@@ -70,9 +123,11 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
                 to={route.path}
                 className={clsx('product-nav__item', isActive && 'is-active')}
                 aria-current={isActive ? 'page' : undefined}
+                title={route.label}
+                aria-label={route.label}
               >
                 <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
-                <span>{route.label}</span>
+                <span className="product-nav__label">{route.label}</span>
                 {route.status === 'planned' && (
                   <small className="product-nav__badge">예정</small>
                 )}
@@ -91,52 +146,54 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           </div>
         </div>
 
-        <a className="product-sidebar__docs" href="/redoc" target="_blank" rel="noreferrer">
+        <a
+          className="product-sidebar__docs"
+          href="/redoc"
+          target="_blank"
+          rel="noreferrer"
+          title="API 문서 (ReDoc)"
+          aria-label="API 문서"
+        >
           <BookOpen size={17} aria-hidden="true" />
-          <span>API 문서</span>
-          <ArrowUpRight size={14} aria-hidden="true" />
+          <span className="product-sidebar__docs-label">API 문서</span>
+          <ArrowUpRight className="product-sidebar__docs-arrow" size={14} aria-hidden="true" />
         </a>
+
+        <button
+          className="product-sidebar__toggle-footer"
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+        >
+          {isSidebarCollapsed ? (
+            <PanelLeftOpen size={17} aria-hidden="true" />
+          ) : (
+            <>
+              <PanelLeftClose size={17} aria-hidden="true" />
+              <span>사이드바 접기</span>
+            </>
+          )}
+        </button>
       </aside>
 
-      {isNavigationOpen && (
+      {isMobileNavOpen && (
         <button
           className="product-sidebar-backdrop"
           type="button"
-          onClick={() => setIsNavigationOpen(false)}
+          onClick={() => setIsMobileNavOpen(false)}
           aria-label="메뉴 닫기"
         />
       )}
 
-      <section className="product-content">
-        <header className="product-topbar">
-          <button
-            className="product-topbar__menu"
-            type="button"
-            onClick={() => setIsNavigationOpen(true)}
-            aria-label="메뉴 열기"
-          >
-            <Menu size={19} />
-          </button>
-          <div className="product-breadcrumb">
-            <span>BIST Workspace</span>
-            <span aria-hidden="true">/</span>
-            <strong>{activeRoute?.label ?? '페이지를 찾을 수 없음'}</strong>
-          </div>
-          <div className="product-topbar__status">
-            <span aria-hidden="true" />
-            API connected
-          </div>
-        </header>
-
-        <main
-          className={clsx(
-            'product-page',
-            activeRoute?.path === '/playground' && 'product-page--playground'
-          )}
-        >
-          {children}
-        </main>
-      </section>
+      <main
+        className={clsx(
+          'product-page',
+          activeRoute?.path === '/playground' && 'product-page--playground'
+        )}
+      >
+        {children}
+      </main>
     </div>
   );
 }

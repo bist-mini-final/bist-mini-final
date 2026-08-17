@@ -3,8 +3,6 @@ import {
   ChartNoAxesCombined,
   Database,
   FileCode2,
-  Play,
-  Sparkles,
   Users,
   Workflow,
 } from 'lucide-react';
@@ -37,20 +35,6 @@ const plannedCards = [
 export function HomePage() {
   return (
     <div className="home-page">
-      <header className="home-hero">
-        <div>
-          <span className="home-eyebrow"><Sparkles size={14} /> MODULAR AI WORKSPACE</span>
-          <h1>아이디어를 연결하고,<br />실행 가능한 흐름으로 만드세요.</h1>
-          <p>
-            독립적인 RAG 모듈을 실험하고 조합하는 팀 워크스페이스입니다.
-            플레이그라운드에서 JSON 계약을 확인하며 빠르게 검증하세요.
-          </p>
-        </div>
-        <AppLink to="/playground" className="primary-button">
-          <Play size={16} fill="currentColor" /> 플레이그라운드 열기
-        </AppLink>
-      </header>
-
       <section className="home-section" aria-labelledby="workspace-title">
         <div className="home-section__heading">
           <div>
