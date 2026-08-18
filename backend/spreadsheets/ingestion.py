@@ -397,18 +397,24 @@ def ingest_excel_workbook(
                     sheet_docs = [d for d in documents if getattr(d, "sheet_name", "") == s_name]
                     s_rows = len(sheet_docs)
 
+                sheet_tables = [
+                    t.model_dump(mode="json") if hasattr(t, "model_dump") else t
+                    for t in tables
+                    if (getattr(t, "sheet_name", None) or (isinstance(t, dict) and t.get("sheet_name"))) == s_name
+                ] if ('tables' in locals() and tables) else []
+
                 sheets_data.append({
                     "sheet_name": s_name,
                     "sheet_index": s_idx,
                     "is_visible": True,
                     "row_count": s_rows,
                     "column_count": s_cols,
-                    "detected_tables": tables if structure_mode in ("luna_vlm", "auto") and 'tables' in locals() else [],
+                    "detected_tables": sheet_tables,
                 })
             db_mgr.save_sheets(file_id=workbook_hash, sheets_info=sheets_data)
             stored_in_pgvector = True
 
-            # 3. Attach company metadata to pgvector collection and chunks
+            # 3. Attach company metadata and sheet list to pgvector collection
             if company_name:
                 try:
                     pg.update_index_company(index_id, company_name)
@@ -418,6 +424,17 @@ def ingest_excel_workbook(
             import traceback
             traceback.print_exc()
             stored_in_pgvector = False
+
+    raw_tables = [
+        t.model_dump(mode="json") if hasattr(t, "model_dump") else t
+        for t in (tables if ('tables' in locals() and tables) else [])
+    ]
+    luna_out = {
+        "file_name": file_name,
+        "workbook_hash": workbook_hash,
+        "sheet_names": visible_sheets,
+        "tables": raw_tables,
+    } if raw_tables else None
 
     return {
         "index_id": index_id,
@@ -430,6 +447,9 @@ def ingest_excel_workbook(
         "document_count": index_result["document_count"],
         "sheet_count": len(visible_sheets),
         "sheets": visible_sheets,
+        "sheet_names": visible_sheets,
+        "tables": raw_tables,
+        "luna_output": luna_out,
         "pipeline": used_pipeline,
         "duration_seconds": embedding_result.get("duration_seconds"),
         "total_tokens": embedding_result.get("total_tokens"),

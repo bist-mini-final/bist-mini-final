@@ -357,6 +357,12 @@ export function DataSourcesView() {
           costUsd,
           costKrw,
           modules: nextMods,
+          lunaOutput: idxData.luna_output || (idxData.tables && idxData.tables.length > 0 ? {
+            file_name: idxData.file_name || file.name,
+            workbook_hash: idxData.workbook_hash,
+            sheet_names: idxData.sheet_names || idxData.sheets || ['Key_Stats', 'Income_Statement', 'Balance_Sheet', 'Cash_Flow'],
+            tables: idxData.tables,
+          } : undefined),
         };
       });
 

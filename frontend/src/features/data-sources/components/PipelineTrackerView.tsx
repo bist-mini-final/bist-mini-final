@@ -418,113 +418,14 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
           kind="luna_vlm"
           input={{
             file_name: pipeline.fileName,
-            sheet_names: ['Income_Statement', 'Key_Stats'],
+            sheet_names: pipeline.lunaOutput?.sheet_names || ['Key_Stats', 'Income_Statement', 'Balance_Sheet', 'Cash_Flow'],
           }}
           output={
             pipeline.lunaOutput || {
               file_name: pipeline.fileName,
-              workbook_hash: pipeline.workbookHash || '6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4',
-              sheet_names: ['Income_Statement', 'Key_Stats'],
-              tables: [
-                {
-                  sheet_name: 'Income_Statement',
-                  table_index: 1,
-                  excel_range: 'A1:U190',
-                  bbox_px: [0, 0, 1920, 1080],
-                  cell_bounds: {
-                    min_row: 1,
-                    max_row: 190,
-                    min_column: 1,
-                    max_column: 21,
-                  },
-                  regions: [
-                    {
-                      region_id: 'r_title',
-                      type: 'title',
-                      excel_range: 'A1:U2',
-                      bbox_px: [0, 0, 1920, 90],
-                      rows: [1, 2],
-                      columns: [1, 21],
-                    },
-                    {
-                      region_id: 'r_col_header',
-                      type: 'column_header',
-                      excel_range: 'C3:U4',
-                      bbox_px: [240, 90, 1920, 160],
-                      rows: [3, 4],
-                      columns: [3, 21],
-                    },
-                    {
-                      region_id: 'r_row_header',
-                      type: 'row_header',
-                      excel_range: 'A5:B190',
-                      bbox_px: [0, 160, 240, 1080],
-                      rows: [5, 190],
-                      columns: [1, 2],
-                    },
-                    {
-                      region_id: 'r_data',
-                      type: 'data',
-                      excel_range: 'C5:U190',
-                      bbox_px: [240, 160, 1920, 1080],
-                      rows: [5, 190],
-                      columns: [3, 21],
-                    },
-                  ],
-                  header_tree: [
-                    {
-                      name: 'Consolidated Statements of Operations',
-                      col_start: 1,
-                      col_end: 21,
-                      row_start: 1,
-                      row_end: 1,
-                      children: [
-                        {
-                          name: 'For the Years Ended December 31',
-                          col_start: 3,
-                          col_end: 21,
-                          row_start: 2,
-                          row_end: 3,
-                          children: [],
-                        },
-                      ],
-                    },
-                    {
-                      name: 'Total Revenues and Operating Items',
-                      col_start: 1,
-                      col_end: 2,
-                      row_start: 5,
-                      row_end: 190,
-                      children: [
-                        {
-                          name: 'Total Revenue',
-                          col_start: 1,
-                          col_end: 2,
-                          row_start: 10,
-                          row_end: 10,
-                          children: [],
-                        },
-                        {
-                          name: 'Operating Income (EBIT)',
-                          col_start: 1,
-                          col_end: 2,
-                          row_start: 45,
-                          row_end: 45,
-                          children: [],
-                        },
-                        {
-                          name: 'Net Income Attributable to Common Stockholders',
-                          col_start: 1,
-                          col_end: 2,
-                          row_start: 120,
-                          row_end: 120,
-                          children: [],
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
+              workbook_hash: pipeline.workbookHash || '',
+              sheet_names: ['Key_Stats', 'Income_Statement', 'Balance_Sheet', 'Cash_Flow'],
+              tables: [],
             }
           }
           onClose={() => setIsLunaInspectorOpen(false)}
