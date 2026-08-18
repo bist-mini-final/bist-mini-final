@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import time
 from typing import Any, Dict, List, Optional, cast
 
@@ -9,6 +10,8 @@ from ..core.cost_tracker import calculate_embedding_cost
 from ..embeddings.bge import DEFAULT_BGE_MODEL
 from ..embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
+
+logger = logging.getLogger(__name__)
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,
@@ -111,9 +114,12 @@ class CellTextEmbedderModule(ExecutableModule):
 
         start_perf = time.perf_counter()
         total_tokens = 0
+        total_items = len(input_data.items)
+        total_batches = max(1, (total_items + input_data.batch_size - 1) // input_data.batch_size)
 
-        for start in range(0, len(input_data.items), input_data.batch_size):
+        for batch_idx, start in enumerate(range(0, total_items, input_data.batch_size), start=1):
             batch = input_data.items[start : start + input_data.batch_size]
+            logger.info("임베딩 배치 %d/%d 실행 중 (%d개 문서, 모델: %s)...", batch_idx, total_batches, len(batch), input_data.model)
             batch_vectors = encoder.encode([document.text for document in batch])
             if len(batch_vectors) != len(batch):
                 raise ModuleExecutionError(

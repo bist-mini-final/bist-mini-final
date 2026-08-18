@@ -80,6 +80,9 @@ function buildCompletedPipelineFromIndex(index: VectorIndexInfo): PipelineRunSta
   const batchSize = typeof index.batch_size === 'number' ? index.batch_size : 64;
   const dimension = typeof index.dimension === 'number' ? index.dimension : 3072;
 
+  const totalBatches = Math.max(1, Math.ceil(docCount / batchSize));
+  const midBatch = Math.max(1, Math.ceil(totalBatches / 2));
+
   return {
     pipelineId: indexId,
     fileName,
@@ -135,10 +138,12 @@ function buildCompletedPipelineFromIndex(index: VectorIndexInfo): PipelineRunSta
         icon: Zap,
         status: 'done',
         durationSeconds: Math.round(duration * 0.4 * 10) / 10,
-        metaInfo: { 임베딩모델: modelName, 차원: `${dimension}D`, 소비토큰: `${tokens.toLocaleString()} tokens` },
+        metaInfo: { 임베딩모델: modelName, 차원: `${dimension}D`, 소비토큰: `${tokens.toLocaleString()} tokens`, 총배치수: `${totalBatches}개 배치` },
         sublogs: [
-          { time: '00:01.9', msg: `⚡ 문서를 배치 크기 ${batchSize} 단위로 분할하여 OpenAI Embeddings 호출`, status: 'done' },
-          { time: '00:02.8', msg: `🌐 ${modelName} (${dimension}D) 고밀도 벡터 생성 및 L2 정규화 완료`, status: 'done' },
+          { time: '00:01.9', msg: `⚡ 총 ${docCount}개 셀 문서를 배치 크기 ${batchSize}개 단위(${totalBatches}개 배치)로 분할`, status: 'done' },
+          { time: '00:02.4', msg: `🌐 배치 1/${totalBatches} 임베딩 완료 (${Math.min(batchSize, docCount)}개 벡터 생성)`, status: 'done' },
+          ...(totalBatches > 1 ? [{ time: '00:02.8', msg: `🌐 배치 ${midBatch}/${totalBatches} 임베딩 진행 (${Math.min(midBatch * batchSize, docCount)}개 벡터 누적)`, status: 'done' as const }] : []),
+          { time: '00:03.2', msg: `🌐 배치 ${totalBatches}/${totalBatches} 전체 임베딩 완료 (총 ${docCount}개 ${dimension}D 벡터 생성)`, status: 'done' },
           { time: '00:03.4', msg: `📊 소비 토큰 집계: ${tokens.toLocaleString()} tokens (예상 비용: $${cost.toFixed(4)})`, status: 'done' },
         ],
       },
