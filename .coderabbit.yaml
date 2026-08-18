@@ -4,11 +4,11 @@ reviews:
   profile: "chill"
   auto_review:
     enabled: true
-    branches:
-      - "main"
-      - "master"
+    base_branches:
       - "dev"
       - "develop"
+      - "main"
+      - "master"
   review_status: true
   collapse_walkthrough: false
 chat:
