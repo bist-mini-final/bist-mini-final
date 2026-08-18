@@ -3,7 +3,6 @@ import {
   ChartNoAxesCombined,
   Database,
   FileCode2,
-  Users,
   Workflow,
 } from 'lucide-react';
 import { AppLink } from '../app/router';
@@ -24,10 +23,10 @@ const plannedCards = [
     tone: 'amber',
   },
   {
-    path: '/team',
-    title: '팀 워크스페이스',
-    description: '워크플로와 실험 결과를 함께 관리합니다.',
-    icon: Users,
+    path: '/bi',
+    title: 'BI',
+    description: 'BI 기능을 위한 독립 화면을 구성합니다.',
+    icon: ChartNoAxesCombined,
     tone: 'violet',
   },
 ] as const;
