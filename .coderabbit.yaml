@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "ko-KR"
+reviews:
+  profile: "chill"
+  auto_review:
+    enabled: true
+    branches:
+      - "main"
+      - "master"
+      - "dev"
+      - "develop"
+  review_status: true
+  collapse_walkthrough: false
+chat:
+  auto_reply: true
