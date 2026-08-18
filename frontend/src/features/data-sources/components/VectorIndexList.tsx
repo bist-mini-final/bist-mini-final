@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  AlertCircle,
   Building2,
   Check,
   Clock,
@@ -22,7 +23,10 @@ interface VectorIndexListProps {
   indexes: VectorIndexInfo[];
   isLoading?: boolean;
   activeRunningPipeline?: PipelineRunState | null;
+  failedRuns?: PipelineRunState[];
   onResumePipeline?: () => void;
+  onViewFailedLog?: (run: PipelineRunState) => void;
+  onDismissFailedRun?: (pipelineId: string) => void;
   onRefresh?: () => void;
   onDetailClick: (indexId: string) => void;
   onSearchClick: (index: VectorIndexInfo) => void;
@@ -49,7 +53,10 @@ export function VectorIndexList({
   indexes,
   isLoading,
   activeRunningPipeline,
+  failedRuns = [],
   onResumePipeline,
+  onViewFailedLog,
+  onDismissFailedRun,
   onRefresh,
   onDetailClick,
   onSearchClick,
@@ -90,6 +97,11 @@ export function VectorIndexList({
     }
   };
 
+  const hasContent =
+    indexes.length > 0 ||
+    failedRuns.length > 0 ||
+    (activeRunningPipeline && activeRunningPipeline.status === 'running');
+
   return (
     <div className="ds-panel">
       <div className="ds-panel__header">
@@ -116,7 +128,7 @@ export function VectorIndexList({
         </div>
       </div>
 
-      {indexes.length === 0 && !(activeRunningPipeline && activeRunningPipeline.status === 'running') ? (
+      {!hasContent ? (
         <div className="ds-empty-state">
           <Database size={44} />
           <h4>pgvector 데이터베이스에 등록된 컬렉션이 없습니다</h4>
@@ -142,6 +154,7 @@ export function VectorIndexList({
               </tr>
             </thead>
             <tbody>
+              {/* ── Running pipeline row ── */}
               {activeRunningPipeline && activeRunningPipeline.status === 'running' && (
                 <tr style={{ background: 'rgba(34, 197, 94, 0.07)', borderLeft: '3px solid #16a34a' }}>
                   <td className="ds-font-mono ds-id-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
@@ -191,6 +204,67 @@ export function VectorIndexList({
                   </td>
                 </tr>
               )}
+
+              {/* ── Failed / interrupted pipeline rows ── */}
+              {failedRuns.map((run) => {
+                const failedStageLabel = run.modules?.find((m) => (m.status as any) === 'failed' || m.status === 'running')?.name
+                  || run.modules?.[run.currentStageIndex]?.name
+                  || '알 수 없는 단계';
+                return (
+                  <tr key={run.pipelineId} style={{ background: 'rgba(239, 68, 68, 0.05)', borderLeft: '3px solid #dc2626' }}>
+                    <td className="ds-font-mono ds-id-cell" style={{ color: '#dc2626', fontWeight: 600 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <AlertCircle size={12} style={{ color: '#dc2626', flexShrink: 0 }} />
+                        실패
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 650, color: '#0f172a' }}>{run.fileName}</div>
+                      <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '2px', maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}                   title={run.error ?? undefined}>
+                        ⚠️ {run.error || '알 수 없는 오류'}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="ds-badge ds-badge--gray" style={{ background: '#fee2e2', color: '#991b1b' }}>
+                        실패 단계: {failedStageLabel.split('(')[0].trim()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="ds-badge ds-badge--blue">{run.model}</span>
+                    </td>
+                    <td style={{ color: '#94a3b8' }}>—</td>
+                    <td style={{ color: '#94a3b8', fontSize: '12px' }}>—</td>
+                    <td style={{ color: '#94a3b8', fontSize: '12px' }}>—</td>
+                    <td style={{ color: '#64748b', fontSize: '12px' }}>
+                      {Math.round(run.elapsedSeconds || 0)}초 경과
+                    </td>
+                    <td className="ds-text-right">
+                      <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          style={{ padding: '0.3rem 0.55rem', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#dc2626', borderColor: '#fca5a5' }}
+                          onClick={() => onViewFailedLog?.(run)}
+                          title="실패 단계 및 모듈 로그 확인"
+                        >
+                          <Layers size={12} /> 실패 로그
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          style={{ padding: '0.3rem 0.55rem', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                          onClick={() => onDismissFailedRun?.(run.pipelineId)}
+                          title="목록에서 제거"
+                        >
+                          <Trash2 size={12} /> 삭제
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* ── Successful index rows ── */}
               {indexes.map((idx) => {
                 const isEditingThis = editingIndexId === idx.index_id;
                 const companyDisplay = idx.company_name || '';

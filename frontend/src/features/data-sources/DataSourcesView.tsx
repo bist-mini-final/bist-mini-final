@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Database,
   Layers,
@@ -16,6 +16,33 @@ import { VectorIndexList } from './components/VectorIndexList';
 import { dataSourceApi } from './services/dataSourceApi';
 import type { DbStatusInfo, VectorIndexInfo } from './types';
 import './data-sources.css';
+
+// ── localStorage key ──────────────────────────────────────────────────────────
+const FAILED_RUNS_KEY = 'ds_failed_pipeline_runs';
+
+function loadFailedRunsFromStorage(): PipelineRunState[] {
+  try {
+    const raw = localStorage.getItem(FAILED_RUNS_KEY);
+    return raw ? (JSON.parse(raw) as PipelineRunState[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFailedRunToStorage(run: PipelineRunState): void {
+  try {
+    const existing = loadFailedRunsFromStorage().filter((r) => r.pipelineId !== run.pipelineId);
+    localStorage.setItem(FAILED_RUNS_KEY, JSON.stringify([...existing, run]));
+  } catch { /* storage full — ignore */ }
+}
+
+function removeFailedRunFromStorage(pipelineId: string): void {
+  try {
+    const updated = loadFailedRunsFromStorage().filter((r) => r.pipelineId !== pipelineId);
+    localStorage.setItem(FAILED_RUNS_KEY, JSON.stringify(updated));
+  } catch { /* ignore */ }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function formatNow(): string {
   const now = new Date();
@@ -176,6 +203,9 @@ export function DataSourcesView() {
   const [activePipelineRun, setActivePipelineRun] = useState<PipelineRunState | null>(null);
   const [isViewingTracker, setIsViewingTracker] = useState(false);
 
+  // Failed / interrupted runs that persist across navigation
+  const [failedRuns, setFailedRuns] = useState<PipelineRunState[]>(() => loadFailedRunsFromStorage());
+
   // Modals state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [detailIndexId, setDetailIndexId] = useState<string | null>(null);
@@ -183,7 +213,7 @@ export function DataSourcesView() {
 
   const pipelineTimerRef = useRef<any>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -198,11 +228,11 @@ export function DataSourcesView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -210,6 +240,18 @@ export function DataSourcesView() {
       if (pipelineTimerRef.current) clearInterval(pipelineTimerRef.current);
     };
   }, []);
+
+  // ── Dismiss a persisted failed/interrupted run from the list ─────────────
+  const handleDismissFailedRun = (pipelineId: string) => {
+    removeFailedRunFromStorage(pipelineId);
+    setFailedRuns((prev) => prev.filter((r) => r.pipelineId !== pipelineId));
+  };
+
+  // ── View logs of a failed run in the full-screen tracker ─────────────────
+  const handleViewFailedRunLog = (run: PipelineRunState) => {
+    setActivePipelineRun(run);
+    setIsViewingTracker(true);
+  };
 
   const handleStartUploadPipeline = async (file: File, model: string, batchSize: number) => {
     setIsUploadOpen(false);
@@ -222,8 +264,10 @@ export function DataSourcesView() {
       { time: formatNow(), msg: `👁️ Luna VLM 다차원 표 영역 바운딩 박스 & 헤더 계층 추출 시작...`, status: 'running' },
     ];
 
+    const pipelineId = `pipe_${Date.now()}`;
+
     const pipelineState: PipelineRunState = {
-      pipelineId: `pipe_${Date.now()}`,
+      pipelineId,
       fileName: file.name,
       model,
       batchSize,
@@ -237,19 +281,27 @@ export function DataSourcesView() {
 
     setActivePipelineRun(pipelineState);
 
+    // Immediately persist as "interrupted" — will be cleaned up on success
+    const interruptedEntry: PipelineRunState = {
+      ...pipelineState,
+      status: 'failed',
+      error: '처리 중 페이지를 이탈하여 결과를 알 수 없습니다. 재시도하거나 삭제하세요.',
+    };
+    saveFailedRunToStorage(interruptedEntry);
+    setFailedRuns((prev) => {
+      const filtered = prev.filter((r) => r.pipelineId !== pipelineId);
+      return [...filtered, interruptedEntry];
+    });
+
     const start = Date.now();
     pipelineTimerRef.current = setInterval(() => {
       setActivePipelineRun((prev) => {
         if (!prev || prev.status !== 'running') return prev;
-        return {
-          ...prev,
-          elapsedSeconds: (Date.now() - start) / 1000,
-        };
+        return { ...prev, elapsedSeconds: (Date.now() - start) / 1000 };
       });
     }, 100);
 
-    // Pulse timer — adds a heartbeat log every 15 s so the user knows it's still working.
-    // It does NOT advance stages or mark anything 'done'. Only the API response does that.
+    // Pulse heartbeat — adds a log every 15s; does NOT advance stages
     let pulseCount = 0;
     const pulseTimer = setInterval(() => {
       pulseCount += 1;
@@ -299,19 +351,16 @@ export function DataSourcesView() {
           status: 'done' as const,
           durationSeconds: m.durationSeconds || 1.0,
         }));
-        // Step 0 final log
         nextMods[0].sublogs.push({
           time: formatNow(),
           msg: `📐 Luna VLM ${lunaWasUsed ? '✅ 성공 — 표 바운딩 박스 및 헤더 계층 추출 완료' : '⚠️ 폴백 — Exhaustive 직렬화 사용'}`,
           status: lunaWasUsed ? 'done' : 'warn' as any,
         });
-        // Step 2 final log (embedder)
         nextMods[2].sublogs.push({
           time: formatNow(),
           msg: `💾 전체 임베딩 완료 — 총 ${chunkCount}개 3072D 벡터 생성`,
           status: 'done',
         });
-        // Step 3 final log (pgvector)
         nextMods[3].sublogs.push({
           time: formatNow(),
           msg: `🚀 PostgreSQL 16 pgvector HNSW 인덱스 동기화 완료! (${chunkCount}개 청크, ${sheetCount}개 시트)`,
@@ -337,12 +386,37 @@ export function DataSourcesView() {
         };
       });
 
-      // Refresh background index list
+      // Success → remove the interrupted-entry placeholder
+      removeFailedRunFromStorage(pipelineId);
+      setFailedRuns((prev) => prev.filter((r) => r.pipelineId !== pipelineId));
+
       fetchData();
     } catch (err: any) {
       clearInterval(pulseTimer);
       if (pipelineTimerRef.current) clearInterval(pipelineTimerRef.current);
-      setActivePipelineRun((prev) => (prev ? { ...prev, status: 'failed', error: err.message || '인덱싱 처리 실패' } : null));
+
+      const errorMsg = err.message || '인덱싱 처리 실패';
+
+      setActivePipelineRun((prev) => {
+        if (!prev) return null;
+        const failedMods = prev.modules.map((m) => ({
+          ...m,
+          status: (m.status === 'running' ? 'failed' : m.status) as any,
+        }));
+        const failedState: PipelineRunState = {
+          ...prev,
+          status: 'failed',
+          error: errorMsg,
+          modules: failedMods,
+        };
+        // Persist actual failure with error message + stage snapshot
+        saveFailedRunToStorage(failedState);
+        setFailedRuns((existing) => {
+          const filtered = existing.filter((r) => r.pipelineId !== pipelineId);
+          return [...filtered, failedState];
+        });
+        return failedState;
+      });
     }
   };
 
@@ -393,7 +467,10 @@ export function DataSourcesView() {
             indexes={indexes}
             isLoading={isLoading}
             activeRunningPipeline={activePipelineRun}
+            failedRuns={failedRuns}
             onResumePipeline={() => setIsViewingTracker(true)}
+            onViewFailedLog={handleViewFailedRunLog}
+            onDismissFailedRun={handleDismissFailedRun}
             onRefresh={fetchData}
             onDetailClick={(id) => setDetailIndexId(id)}
             onSearchClick={(idx) => setSearchTargetIndex(idx)}
