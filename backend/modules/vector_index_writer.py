@@ -2,8 +2,8 @@ from typing import Any, Dict, cast
 
 from pydantic import BaseModel, Field
 
-from ..embedding_artifacts import EmbeddingArtifactStore
-from ..vector_index_store import VectorIndexStore
+from ..storage.embedding_artifacts import EmbeddingArtifactStore
+from ..storage.vector_index import VectorIndexStore
 from .base import EmptyModuleConfigDTO, ExecutableModule, ModuleDefinition, ModuleDTO
 from .cell_text_embedder import CellTextEmbeddingsDTO
 

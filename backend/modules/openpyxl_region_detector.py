@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Literal, cast
 import openpyxl
 from pydantic import BaseModel, Field
 
-from ..config import PROCESSED_DATA_DIR
+from ..core.settings import PROCESSED_DATA_DIR
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
 from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox, compute_sheet_layout
 from ..spreadsheets.grid_structure import build_column_header_tree

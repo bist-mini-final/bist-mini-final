@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..config import PROJECT_DIR
+from ..core.settings import PROJECT_DIR
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,

@@ -8,13 +8,13 @@ import openpyxl
 from openpyxl.utils.cell import range_boundaries
 from pydantic import BaseModel, Field
 
-from ..config import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
-from ..ollama_vision import OllamaVisionClient, OllamaVisionError
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from ..vision.ollama import OllamaVisionClient, OllamaVisionError
 from ..spreadsheets.cell_semantics import collect_non_empty_cells, compact_sheet_context
 from ..spreadsheets.cell_type_overlay import render_cell_type_overlay
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
 from ..spreadsheets.grid_structure import build_column_header_tree
-from ..spreadsheets.prompt_guidance import TEXT_CELL_ROLE_GUIDANCE
+from ..spreadsheets.prompt_guidance import TABLE_UNIFICATION_GUIDANCE, TEXT_CELL_ROLE_GUIDANCE
 from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
 from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
@@ -30,6 +30,8 @@ The image preserves the worksheet layout. Every populated cell is tinted by valu
 
 {TEXT_CELL_ROLE_GUIDANCE}
 
+{TABLE_UNIFICATION_GUIDANCE}
+
 Find every independent rectangular table. For each table, return exact Excel ranges for:
 - excel_range: the whole table only, excluding unrelated notes and disclaimers.
 - title_range: optional title rows describing the whole table.
@@ -39,7 +41,7 @@ Find every independent rectangular table. For each table, return exact Excel ran
 
 The column_header_range must include every header level and span every data column. The row_header_range must span every data row; it may contain only the merged-cell anchor column when the supplied merged_range shows that the label visually spans more columns. Include all period rows (for example Actuals/LTM and the exact dates), not only the nearest header row.
 
-Use the supplied coordinates, types, values, formulas, and merged ranges as factual authority. Use the image for spatial grouping and visual style. A data cell's parent headers are the row-header cells on its row plus column-header cells above its column, including merged ancestors. Do not invent coordinates or values. Detect multiple tables when blank separation or distinct headers indicate separate structures. Return only JSON conforming to the schema."""
+Use the supplied coordinates, types, values, formulas, and merged ranges as factual authority. Use the image for spatial grouping and visual style. A data cell's parent headers are the row-header cells on its row plus column-header cells above its column, including merged ancestors. Do not invent coordinates or values. Return only JSON conforming to the schema."""
 
 
 LOCAL_VLM_USER_TEMPLATE = """Analyze sheet {sheet_name}.
@@ -168,6 +170,69 @@ def _visible_bounds(
     return CellBounds(rows[0], rows[-1], columns[0], columns[-1])
 
 
+def unify_sheet_tables(
+    tables: List[LocalVlmTableDecisionDTO],
+) -> List[LocalVlmTableDecisionDTO]:
+    """Merge vertically stacked sub-sections sharing the same column timeline into unified tables."""
+    if len(tables) <= 1:
+        return tables
+
+    parsed_tables = []
+    for table in tables:
+        try:
+            data_bounds = _bounds(table.data_range, "data_range")
+            excel_bounds = _bounds(table.excel_range, "excel_range")
+            header_bounds = _bounds(table.column_header_range, "column_header_range") if table.column_header_range else None
+            title_bounds = _bounds(table.title_range, "title_range") if table.title_range else None
+            row_bounds = _bounds(table.row_header_range, "row_header_range") if table.row_header_range else None
+            parsed_tables.append((table, excel_bounds, data_bounds, header_bounds, title_bounds, row_bounds))
+        except ModuleExecutionError:
+            return tables
+
+    first_data = parsed_tables[0][2]
+    all_same_columns = all(
+        item[2].min_column == first_data.min_column and item[2].max_column == first_data.max_column
+        for item in parsed_tables
+    )
+
+    if all_same_columns:
+        primary_header = next(
+            (item[3] for item in parsed_tables if item[3] is not None),
+            None,
+        )
+        primary_title = next(
+            (item[4] for item in parsed_tables if item[4] is not None),
+            None,
+        )
+        min_whole_row = min(item[1].min_row for item in parsed_tables)
+        max_whole_row = max(item[1].max_row for item in parsed_tables)
+        min_whole_col = min(item[1].min_column for item in parsed_tables)
+        max_whole_col = max(item[1].max_column for item in parsed_tables)
+
+        min_data_row = min(item[2].min_row for item in parsed_tables)
+        max_data_row = max(item[2].max_row for item in parsed_tables)
+
+        row_header_cols = [item[5] for item in parsed_tables if item[5] is not None]
+        if row_header_cols:
+            min_r_col = min(r.min_column for r in row_header_cols)
+            max_r_col = max(r.max_column for r in row_header_cols)
+            unified_row_header = CellBounds(min_data_row, max_data_row, min_r_col, max_r_col).excel_range
+        else:
+            unified_row_header = None
+
+        return [
+            LocalVlmTableDecisionDTO(
+                excel_range=CellBounds(min_whole_row, max_whole_row, min_whole_col, max_whole_col).excel_range,
+                title_range=primary_title.excel_range if primary_title else None,
+                column_header_range=primary_header.excel_range if primary_header else None,
+                row_header_range=unified_row_header,
+                data_range=CellBounds(min_data_row, max_data_row, first_data.min_column, first_data.max_column).excel_range,
+            )
+        ]
+
+    return tables
+
+
 class LocalVlmStructureDetectorModule(ExecutableModule):
     definition = ModuleDefinition(
         type="local_vlm_structure_detector",
@@ -262,10 +327,84 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
         title = cast(Optional[CellBounds], named["title_range"])
         column_header = cast(Optional[CellBounds], named["column_header_range"])
         row_header = cast(Optional[CellBounds], named["row_header_range"])
+        # Reconcile vertical overlaps between title, column_header, and data_range.
+        # Vision models sometimes include header rows inside data_range or title span inside column_header.
+        if title and column_header:
+            if title.max_row >= column_header.min_row:
+                if title.min_row < column_header.min_row:
+                    title = CellBounds(
+                        title.min_row,
+                        column_header.min_row - 1,
+                        title.min_column,
+                        title.max_column,
+                    )
+                else:
+                    title = None
+                named["title_range"] = title
+
+        header_bottom = None
+        if column_header:
+            header_bottom = column_header.max_row
+        elif title:
+            header_bottom = title.max_row
+
+        if header_bottom is not None and header_bottom >= data.min_row:
+            if data.max_row > header_bottom:
+                data = CellBounds(
+                    header_bottom + 1,
+                    data.max_row,
+                    data.min_column,
+                    data.max_column,
+                )
+                named["data_range"] = data
+            else:
+                if column_header and column_header.min_row < data.min_row:
+                    column_header = CellBounds(
+                        column_header.min_row,
+                        data.min_row - 1,
+                        column_header.min_column,
+                        column_header.max_column,
+                    )
+                    named["column_header_range"] = column_header
+                else:
+                    column_header = None
+                    named["column_header_range"] = None
+                if title and title.max_row >= data.min_row:
+                    if title.min_row < data.min_row:
+                        title = CellBounds(
+                            title.min_row,
+                            data.min_row - 1,
+                            title.min_column,
+                            title.max_column,
+                        )
+                    else:
+                        title = None
+                    named["title_range"] = title
+
         if title and title.max_row >= data.min_row:
-            raise ModuleExecutionError("VLM 제목 영역은 데이터 영역보다 위에 있어야 합니다")
+            if title.min_row < data.min_row:
+                title = CellBounds(
+                    title.min_row,
+                    data.min_row - 1,
+                    title.min_column,
+                    title.max_column,
+                )
+            else:
+                title = None
+            named["title_range"] = title
+
         if column_header and column_header.max_row >= data.min_row:
-            raise ModuleExecutionError("VLM 열 헤더 영역은 데이터 영역보다 위에 있어야 합니다")
+            if column_header.min_row < data.min_row:
+                column_header = CellBounds(
+                    column_header.min_row,
+                    data.min_row - 1,
+                    column_header.min_column,
+                    column_header.max_column,
+                )
+            else:
+                column_header = None
+            named["column_header_range"] = column_header
+
         if row_header and row_header.max_column >= data.min_column:
             # Excel ranges are inclusive. Vision models sometimes include the
             # boundary label column in data_range, or include the first data
@@ -443,6 +582,7 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
                                 _bounds(item.excel_range, "excel_range").min_column,
                             ),
                         )
+                        ordered = unify_sheet_tables(ordered)
                         sheet_outputs = [
                             self._table_output(index, table, value_sheet, layout)
                             for index, table in enumerate(ordered, start=1)

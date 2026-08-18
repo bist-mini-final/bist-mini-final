@@ -8,7 +8,7 @@ import openpyxl
 from openpyxl.cell.cell import MergedCell
 from pydantic import BaseModel, Field
 
-from ..config import PROCESSED_DATA_DIR
+from ..core.settings import PROCESSED_DATA_DIR
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
 from ..spreadsheets.structured_cell_text import (
     UNKNOWN_FIELD,

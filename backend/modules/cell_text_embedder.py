@@ -4,9 +4,9 @@ from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..bge_encoder import DEFAULT_BGE_MODEL
-from ..embedding_artifacts import EmbeddingArtifactStore
-from ..embedding_factory import EmbeddingEncoder, get_embedding_encoder
+from ..embeddings.bge import DEFAULT_BGE_MODEL
+from ..embeddings.factory import EmbeddingEncoder, get_embedding_encoder
+from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,

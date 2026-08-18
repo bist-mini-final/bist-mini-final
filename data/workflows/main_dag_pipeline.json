@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "main_dag_pipeline",
   "name": "main_dag_pipeline",
-  "updated_at": "2026-08-13T02:05:48.781936+00:00",
+  "updated_at": "2026-08-14T01:55:50.586511+00:00",
   "graph": {
     "nodes": [
       {
@@ -16,10 +16,11 @@
           "threshold": 0.65
         },
         "values": {
-          "query": "IBM의 LTM 기준 시가총액과 TEV는 각각 얼마인가?"
+          "query": "TEV가 뭐의 약자야?"
         },
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -40,6 +41,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -55,6 +57,7 @@
         "values": {},
         "ui": {
           "width": 502.0,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -72,6 +75,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -80,8 +84,8 @@
         "id": "custom-node-1786497475934-2",
         "module_type": "prebuilt_index_loader",
         "position": {
-          "x": 2168.070268203153,
-          "y": 266.7211502837916
+          "x": 1917.958588101183,
+          "y": 519.2610991246156
         },
         "config": {},
         "values": {
@@ -89,6 +93,7 @@
         },
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -108,6 +113,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -125,6 +131,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -144,6 +151,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -163,6 +171,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -183,6 +192,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -198,6 +208,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -310,9 +321,9 @@
       }
     ],
     "viewport": {
-      "x": -180.33017941957542,
-      "y": 391.11391626535953,
-      "zoom": 0.4118160333735999
+      "x": -3148.912443871699,
+      "y": 585.1439409339988,
+      "zoom": 0.8888869829240749
     }
   }
 }

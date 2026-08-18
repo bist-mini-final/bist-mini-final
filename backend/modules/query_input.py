@@ -2,9 +2,9 @@ from typing import Any, Dict, Union, cast
 
 from pydantic import BaseModel, Field, RootModel, field_validator
 
-from ..config import SIMILARITY_THRESHOLD
-from ..answer_cache import AnswerCacheRepository
-from ..similarity import rank_candidates
+from ..core.settings import SIMILARITY_THRESHOLD
+from ..retrieval.similarity import rank_candidates
+from ..storage.answer_cache import AnswerCacheRepository
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,

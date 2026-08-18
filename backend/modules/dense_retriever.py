@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
-from ..vector_index_store import VectorIndexStore
+from ..storage.vector_index import VectorIndexStore
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,

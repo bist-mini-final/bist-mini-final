@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..config import SPREADSHEET_ARTIFACT_DIR, PROCESSED_DATA_DIR
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from .base import (
     ExecutableModule,

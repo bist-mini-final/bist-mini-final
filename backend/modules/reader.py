@@ -3,7 +3,7 @@ from typing import Any, Dict, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..chat_completion import (
+from ..llm.chat_completion import (
     ChatCompletionClient,
     ChatCompletionError,
     ChatCompletionResult,

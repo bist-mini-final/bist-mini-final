@@ -2,8 +2,8 @@ from typing import Annotated, Any, Dict, List, Optional, Protocol, cast
 
 from pydantic import BaseModel, Field
 
-from ..bge_encoder import DEFAULT_BGE_MODEL
-from ..embedding_factory import EmbeddingEncoder, get_embedding_encoder
+from ..embeddings.bge import DEFAULT_BGE_MODEL
+from ..embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,

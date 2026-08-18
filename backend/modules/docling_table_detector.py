@@ -7,7 +7,7 @@ import openpyxl
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, Field
 
-from ..config import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..spreadsheets.cell_visibility import worksheet_visible
 from ..spreadsheets.docling_extractor import DoclingTableExtractor, TableExtractor
 from ..spreadsheets.sheet_renderer import ExcelSheetRenderer

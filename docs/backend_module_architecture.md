@@ -13,6 +13,40 @@ flowchart LR
     J --> N["Next module Input DTO"]
 ```
 
+## Package boundaries
+
+`backend/` 루트는 namespace 역할만 하며 구현 파일은 책임별 패키지에 둡니다.
+
+| Package | 책임 |
+|---|---|
+| `core` | 경로와 애플리케이션 공통 설정 |
+| `api` | HTTP 요청·응답과 서비스 조립 |
+| `runtime` | 모듈 등록, 조회, 독립 실행, worker process 수명주기 |
+| `modules` | Pydantic DTO 계약과 단일 파이프라인 기능 |
+| `storage` | 답변·임베딩·벡터 인덱스 영속화 |
+| `embeddings`, `llm`, `vision` | 외부 또는 로컬 AI provider adapter |
+| `retrieval` | provider와 무관한 검색 알고리즘 |
+| `documentation` | 실행 계약에서 Markdown 문서를 생성하는 도구 |
+| `workflows` | 독립 모듈을 포트로 조합하는 DAG 실행·저장 |
+
+```mermaid
+flowchart LR
+    APP["app.py"] --> API["api"]
+    API --> RT["runtime"]
+    API --> WF["workflows"]
+    WF --> RT
+    RT --> MOD["modules"]
+    MOD --> STORE["storage"]
+    MOD --> PROVIDER["embeddings / llm / vision"]
+    MOD --> RET["retrieval"]
+    DOC["documentation"] --> MOD
+    CORE["core settings"] --> API
+    CORE --> MOD
+    CORE --> STORE
+```
+
+`api`와 `workflows`는 모듈 로직을 구현하지 않고 `runtime`의 공개 실행 경계를 사용합니다. provider client와 저장소는 워크플로 DTO를 정의하지 않습니다. 새 파일을 편의상 루트나 범용 `utils`에 두지 말고, 변경 이유가 가장 명확한 패키지에 배치합니다.
+
 ## DTO layers
 
 | Layer | 책임 | 공개 여부 |
@@ -142,7 +176,7 @@ Source 노드에서 사용자가 선택한 `file_name`, `sheet_name`, `query` �
 4. 내부 합성 타입을 `*ExecutionDTO`로 선언하고 `execution_model`로 지정합니다.
 5. 외부 결과를 별도 `*OutputDTO`로 선언하고 `output_model`로 지정합니다.
 6. `ModuleDefinition`에 type, label, description, ports, config fields, version을 선언합니다.
-7. `backend/module_registry.py`에 인스턴스를 등록합니다.
+7. `backend/runtime/registry.py`에 인스턴스를 등록합니다.
 8. API 또는 CLI로 독립 실행 JSON fixture를 검증합니다.
 9. 다음 모듈에 필요한 데이터 계보가 Output DTO에 포함됐는지 확인합니다.
 10. 계약 변경 시 version을 올려 기존 결과 캐시와 구분합니다.

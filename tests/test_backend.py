@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
 from time import monotonic
+from urllib.error import URLError
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -14,15 +15,20 @@ from PIL import Image
 from pydantic import ValidationError
 
 from app import app
-from backend.answer_cache import AnswerCacheRepository
+from backend.api.router import create_api_router
+from backend.documentation.module_docs import MODULE_DOCS_DIR, render_module_markdown
+from backend.embeddings.bge import BgeEncoder
+from backend.embeddings.factory import get_embedding_encoder
+from backend.embeddings.openai import OpenAIEmbeddingEncoder
+from backend.llm.chat_completion import ChatCompletionError
+from backend.retrieval.similarity import combined_similarity, rank_candidates
+from backend.runtime.registry import ModuleRegistry
+from backend.runtime.worker import ModuleWorkerCancelled
+from backend.storage.answer_cache import AnswerCacheRepository
+from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.vector_index import VectorIndexStore
+from backend.vision.openai_responses import OpenAIResponsesVisionClient
 from backend.api.spreadsheet_artifact_routes import create_spreadsheet_artifact_router
-from backend.chat_completion import ChatCompletionError
-from backend.embedding_artifacts import EmbeddingArtifactStore
-from backend.vector_index_store import VectorIndexStore
-from backend.module_registry import ModuleRegistry
-from backend.module_documentation import MODULE_DOCS_DIR, render_module_markdown
-from backend.module_worker import ModuleWorkerCancelled
-from backend.openai_responses_vision import OpenAIResponsesVisionClient
 from backend.modules.decomposer import DecomposerModule
 from backend.modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from backend.modules.dense_retriever import DenseRetrieverModule
@@ -34,7 +40,11 @@ from backend.modules.docling_table_detector import DoclingTableDetectorModule
 from backend.modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
-from backend.modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
+from backend.modules.local_vlm_structure_detector import (
+    LocalVlmStructureDetectorModule,
+    LocalVlmTableDecisionDTO,
+)
+from backend.spreadsheets.table_geometry import SheetLayout
 from backend.modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from backend.modules.luna_vlm_structure_detector import LUNA_SHEET_RESPONSE_SCHEMA
 from backend.modules.base import ModuleExecutionError
@@ -47,8 +57,6 @@ from backend.modules.semantic_scoped_dense_retriever import SemanticScopedDenseR
 from backend.semantic_matching.catalog import QueryExample
 from backend.semantic_matching.matcher import SemanticQueryMatcher
 from backend.modules.vector_index_writer import VectorIndexWriterModule
-from backend.routes import create_api_router
-from backend.similarity import combined_similarity, rank_candidates
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
@@ -148,7 +156,7 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
                 base_url="https://api.openai.com/v1",
             )
             with patch(
-                "backend.openai_responses_vision.urlopen",
+                "backend.vision.openai_responses.urlopen",
                 side_effect=fake_urlopen,
             ):
                 result = client.complete_structured(
@@ -175,6 +183,115 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
         self.assertTrue(all(item["image_url"].startswith("data:image/png;base64,") for item in image_inputs))
         self.assertEqual(result.content, '{"tables":[]}')
         self.assertEqual(result.usage["total_tokens"], 105)
+
+    def test_structured_vision_request_retries_on_transient_error(self) -> None:
+        attempts = 0
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "status": "completed",
+                    "output": [{
+                        "type": "message",
+                        "content": [{
+                            "type": "output_text",
+                            "text": '{"tables":[]}',
+                        }],
+                    }],
+                    "usage": {"total_tokens": 50},
+                }).encode("utf-8")
+
+        def flaky_urlopen(request, timeout):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise URLError("Temporary connection timeout")
+            return FakeResponse()
+
+        with TemporaryDirectory() as directory:
+            sheet_image = Path(directory) / "sheet.png"
+            Image.new("RGB", (8, 6), "white").save(sheet_image)
+            client = OpenAIResponsesVisionClient(
+                api_key="test-key",
+                base_url="https://api.openai.com/v1",
+            )
+            with patch("backend.vision.openai_responses.urlopen", side_effect=flaky_urlopen), \
+                 patch("time.sleep", return_value=None):
+                result = client.complete_structured(
+                    model="gpt-5.6-luna",
+                    system_prompt="system",
+                    user_prompt="user",
+                    image_path=sheet_image,
+                    schema_name="luna_spreadsheet_sheet",
+                    json_schema=LUNA_SHEET_RESPONSE_SCHEMA,
+                    reasoning_effort="low",
+                    max_output_tokens=6000,
+                    timeout_seconds=240,
+                )
+        self.assertEqual(attempts, 2)
+        self.assertEqual(result.content, '{"tables":[]}')
+
+
+class TableValidationReconciliationTests(unittest.TestCase):
+    def setUp(self):
+        row_heights = [20.0] * 100
+        column_widths = [15.0] * 30
+        x_offsets = [0.0]
+        for w in column_widths:
+            x_offsets.append(x_offsets[-1] + w)
+        y_offsets = [0.0]
+        for h in row_heights:
+            y_offsets.append(y_offsets[-1] + h)
+        self.layout = SheetLayout(
+            max_row=100,
+            max_column=30,
+            column_widths=column_widths,
+            row_heights=row_heights,
+            x_offsets=x_offsets,
+            y_offsets=y_offsets,
+        )
+        self.visibility = WorksheetVisibility(
+            hidden_rows=frozenset(),
+            hidden_columns=frozenset(),
+        )
+
+    def test_reconciles_title_and_data_range_vertical_overlap(self):
+        # When VLM includes title row in data_range
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B5:P30",
+            title_range="B5:P5",
+            column_header_range="B6:P6",
+            row_header_range="B7:B30",
+            data_range="B5:P30",  # erroneously starts at B5
+        )
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+        self.assertEqual(validated["title_range"].excel_range, "B5:P5")
+        self.assertEqual(validated["column_header_range"].excel_range, "C6:P6")
+        self.assertEqual(validated["data_range"].excel_range, "C7:P30")
+        self.assertEqual(validated["row_header_range"].excel_range, "B7:B30")
+
+    def test_reconciles_title_overlapping_column_header(self):
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B5:P30",
+            title_range="B5:P6",  # overlaps column header at row 6
+            column_header_range="B6:P6",
+            row_header_range="B7:B30",
+            data_range="E7:P30",
+        )
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+        self.assertEqual(validated["title_range"].excel_range, "B5:P5")
+        self.assertEqual(validated["column_header_range"].excel_range, "E6:P6")
+        self.assertEqual(validated["data_range"].excel_range, "E7:P30")
 
 
 def sample_cell_documents():
@@ -729,6 +846,21 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
 class ApiContractTests(unittest.TestCase):
     client = TestClient(app)
+
+    def test_frontend_history_routes_return_spa_without_masking_api_404s(self) -> None:
+        with TemporaryDirectory() as directory:
+            dist_dir = Path(directory)
+            (dist_dir / "index.html").write_text(
+                "<html><body>frontend shell</body></html>",
+                encoding="utf-8",
+            )
+            with patch("app.DIST_DIR", dist_dir):
+                response = self.client.get("/playground")
+                missing_api = self.client.get("/api/not-a-real-endpoint")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("frontend shell", response.text)
+        self.assertEqual(missing_api.status_code, 404)
 
     def test_module_definitions_are_available_to_frontend(self) -> None:
         response = self.client.get("/api/modules")
@@ -1944,6 +2076,7 @@ class WorkflowExecutionTests(unittest.TestCase):
                     ui=(
                         {
                             "width": 640,
+                            "height": 720,
                             "execution_stopped": True,
                             "column_widths": {
                                 "subquery": 320,
@@ -2065,6 +2198,7 @@ class WorkflowExecutionTests(unittest.TestCase):
         )
         self.assertEqual(query_node.values["query"], "저장 후 복원할 사용자 질문")
         self.assertEqual(inspector_node.ui.width, 640)
+        self.assertEqual(inspector_node.ui.height, 720)
         self.assertTrue(inspector_node.ui.execution_stopped)
         self.assertEqual(
             inspector_node.ui.column_widths,
@@ -2602,19 +2736,14 @@ class WorkflowExecutionTests(unittest.TestCase):
 
 class OpenAIEmbeddingEncoderTest(unittest.TestCase):
     def test_get_embedding_encoder_factory(self):
-        from backend.bge_encoder import BgeEncoder
-        from backend.embedding_factory import get_embedding_encoder
-        from backend.openai_embedding_encoder import OpenAIEmbeddingEncoder
-
         openai_encoder = get_embedding_encoder("text-embedding-3-small")
         self.assertIsInstance(openai_encoder, OpenAIEmbeddingEncoder)
 
         bge_encoder = get_embedding_encoder("BAAI/bge-large-en-v1.5")
         self.assertIsInstance(bge_encoder, BgeEncoder)
 
-    @patch("backend.openai_embedding_encoder.urlopen")
+    @patch("backend.embeddings.openai.urlopen")
     def test_openai_embedding_encode_success(self, mock_urlopen):
-        from backend.openai_embedding_encoder import OpenAIEmbeddingEncoder
         import io
 
         mock_response_data = json.dumps({
@@ -2809,6 +2938,40 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
             })
         )
         self.assertTrue(len(bm25_res["items"]) > 0)
+
+    def test_unify_sheet_tables(self) -> None:
+        from backend.modules.local_vlm_structure_detector import (
+            LocalVlmTableDecisionDTO,
+            unify_sheet_tables,
+        )
+        t1 = LocalVlmTableDecisionDTO(
+            excel_range="A1:K45",
+            title_range="A1:K2",
+            column_header_range="A3:K4",
+            row_header_range="A5:A45",
+            data_range="B5:K45",
+        )
+        t2 = LocalVlmTableDecisionDTO(
+            excel_range="A46:K60",
+            title_range="A46:K46",
+            column_header_range=None,
+            row_header_range="A47:A60",
+            data_range="B47:K60",
+        )
+        t3 = LocalVlmTableDecisionDTO(
+            excel_range="A61:K100",
+            title_range=None,
+            column_header_range=None,
+            row_header_range="A61:A100",
+            data_range="B61:K100",
+        )
+        unified = unify_sheet_tables([t1, t2, t3])
+        self.assertEqual(len(unified), 1)
+        self.assertEqual(unified[0].excel_range, "A1:K100")
+        self.assertEqual(unified[0].column_header_range, "A3:K4")
+        self.assertEqual(unified[0].title_range, "A1:K2")
+        self.assertEqual(unified[0].row_header_range, "A5:A100")
+        self.assertEqual(unified[0].data_range, "B5:K100")
 
 
 if __name__ == "__main__":

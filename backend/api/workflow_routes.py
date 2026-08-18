@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from ..module_registry import ModuleRegistry
+from ..runtime.registry import ModuleRegistry
 from ..workflows import (
     DagExecutionCancelled,
     DagExecutionError,

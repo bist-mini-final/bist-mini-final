@@ -179,25 +179,18 @@ python3 -m unittest discover -s tests
 | 파일 / 디렉터리 | 역할 |
 |---|---|
 | `app.py` | 애플리케이션 생성, 정적 프론트엔드 제공 |
-| `backend/config.py` | 디렉터리 경로·환경 설정 상수 정의 |
-| `backend/routes.py` | 공유 서비스 인스턴스화 및 도메인별 라우터 조립 |
-| `backend/answer_cache.py` | 질문·답변 캐시 영속화 |
-| `backend/similarity.py` | 문자열 유사도 계산 |
-| `backend/module_worker.py` | `CancellableModuleWorker` — 모듈을 격리 프로세스에서 실행 |
-| `backend/module_registry.py` | 모듈 조회·독립 실행 진입점 |
-| `backend/module_documentation.py` | Pydantic 계약 기반 모듈별 Markdown 생성 |
-| `backend/bge_encoder.py` | BGE 임베딩 인코더 로딩·추론 |
-| `backend/chat_completion.py` | OpenAI 호환 Chat Completions API 클라이언트 |
-| `backend/ollama_vision.py` | 로컬 Ollama 멀티모달 API 호출 |
-| `backend/openai_responses_vision.py` | OpenAI Responses API 비전 호출 |
-| `backend/embedding_artifacts.py` | 콘텐츠 주소형 float32 임베딩 파일 저장·조회 |
-| `backend/vector_index_store.py` | exact cosine 인덱스·셀 메타데이터 영속 저장·검색 |
-| `backend/api/module_routes.py` | 독립 모듈 조회·실행 API |
-| `backend/api/workflow_routes.py` | 워크플로 저장·run 실행 API |
-| `backend/api/spreadsheet_artifact_routes.py` | 스프레드시트 렌더 아티팩트 조회 API |
+| `backend/core/settings.py` | 디렉터리 경로·환경 설정 상수 정의 |
+| `backend/api/` | 공유 서비스 조립과 Modules·Workflows·Artifact HTTP 라우터 |
+| `backend/runtime/` | 모듈 등록소와 취소 가능한 격리 프로세스 실행기 |
 | `backend/modules/` | 프론트 노드와 1:1 대응하는 Python 실행 모듈 |
 | `backend/modules/data_lineage.py` | 질문·문서 계보를 보존하는 공통 DTO |
 | `backend/modules/docs/` | 등록된 25개 모듈의 자동 생성 사용 가이드 |
+| `backend/storage/` | 답변 캐시·임베딩 아티팩트·벡터 인덱스 영속화 |
+| `backend/embeddings/` | BGE·OpenAI 임베딩 인코더와 provider factory |
+| `backend/llm/` | OpenAI 호환 Chat Completions 클라이언트와 비용 계산 |
+| `backend/vision/` | Ollama·OpenAI Responses 비전 클라이언트 |
+| `backend/retrieval/` | 캐시 검색 등 재사용 가능한 검색 알고리즘 |
+| `backend/documentation/` | Pydantic 계약 기반 모듈별 Markdown 생성기 |
 | `backend/tools/run_module.py` | 프론트 없이 단일 모듈을 실행하는 CLI |
 | `backend/tools/generate_module_docs.py` | 모듈 가이드 재생성 CLI |
 | `backend/spreadsheets/` | Excel 탐색, 원본 스타일 PNG 렌더링, 셀 가시성·의미 분석, BFS 표 분리, 테이블 기하 계산, 계층 헤더 구성, Docling 좌표 변환 |
@@ -206,17 +199,23 @@ python3 -m unittest discover -s tests
 | `backend/workflows/executor.py` | 포트 검증, 위상 배치, 순환 검출, 실행 재개 |
 | `backend/workflows/history.py` | run 노드 출력 이력 압축 |
 
+`backend/` 바로 아래에는 패키지 표시용 `__init__.py`만 둡니다. 새 코드는 역할에 맞는 하위 패키지에 배치하고, 외부 API·워크플로 계층에서 모듈 구현 세부사항을 직접 소유하지 않습니다. 세부 의존 방향과 모듈 추가 규칙은 [Backend module architecture](./docs/backend_module_architecture.md)를 참고하세요.
+
 ### 프론트엔드
 
 | 파일 / 디렉터리 | 역할 |
 |---|---|
-| `frontend/src/services/api.ts` | API 통신 단일 창구 |
-| `frontend/src/hooks/` | `usePipelineController` · `usePipelineGraph` · `useWorkflowPersistence` · `useResizablePanel` |
-| `frontend/src/config/` | 단계·모듈 메타데이터 단일 소스 |
-| `frontend/src/contexts/` | 모듈 실행·설정 컨텍스트 |
-| `frontend/src/utils/` | JSON 미리보기 등 공통 유틸리티 |
-| `frontend/src/components/FlowNode/NodeShell.tsx` | 모든 그래프 노드의 공통 구조·상태 표현 |
-| `frontend/src/index.css` | 디자인 토큰·반응형 규칙 |
+| `frontend/src/App.tsx` | 현재 URL을 공통 셸과 페이지에 연결하는 애플리케이션 진입점 |
+| `frontend/src/app/routes.ts` | 메뉴와 페이지 컴포넌트의 단일 라우트 레지스트리 |
+| `frontend/src/app/router.tsx` | History API 기반 내부 탐색과 링크 |
+| `frontend/src/app/AppShell.tsx` | 홈·기능 페이지가 공유하는 사이드바와 상단 바 |
+| `frontend/src/pages/` | 홈과 팀원이 독립적으로 구현할 서비스 페이지 경계 |
+| `frontend/src/features/playground/` | 기존 RAG 캔버스의 컴포넌트·상태·API·스타일 전체 |
+| `frontend/src/shared/` | 여러 서비스 페이지가 함께 사용하는 UI |
+| `frontend/src/styles/global.css` | 디자인 토큰과 전역 reset |
+| `frontend/src/styles/app.css` | 서비스 셸·홈·빈 페이지의 반응형 스타일 |
+
+서비스 홈은 `/`, 파이프라인 실험 기능은 `/playground`입니다. 향후 메뉴 페이지를 추가하는 방법과 디렉터리 의존 규칙은 [Frontend architecture](./docs/frontend_architecture.md)에 정리되어 있습니다.
 
 ### 데이터 디렉터리 (Git 제외)
 
