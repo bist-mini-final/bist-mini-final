@@ -14,6 +14,7 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   rrf_fusion: { icon: 'Merge', color: '#059669' },
   context: { icon: 'Maximize2', color: '#d97706' },
   reader: { icon: 'Sparkles', color: '#e11d48' },
+  answer_refiner: { icon: 'Sparkles', color: '#059669' },
   answer_cache_writer: { icon: 'ArchiveRestore', color: '#be123c' },
   json_transformer: { icon: 'FileCode', color: '#7c3aed' },
   json_inspector: { icon: 'Eye', color: '#0284c7' },

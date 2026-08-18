@@ -600,3 +600,114 @@ class PgVectorStore:
                 return []
         finally:
             conn.close()
+
+    def fetch_cells_by_metadata(
+        self,
+        cell_identifiers: List[str],
+        workbook_hash: Optional[str] = None,
+        collection_name: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Directly fetch cell documents and metadata from langchain_pg_embedding by exact cell_id, cell_coord, or coordinate patterns."""
+        if not cell_identifiers:
+            return []
+
+        clean_ids = [cid.strip() for cid in cell_identifiers if cid and cid.strip()]
+        if not clean_ids:
+            return []
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                col_uuid = None
+                if collection_name:
+                    cur.execute(
+                        "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
+                        (collection_name,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        col_uuid = row[0]
+
+                # We search matching cell_id, cell_coord, or cell_id ILIKE pattern
+                extracted_coords = []
+                for cid in clean_ids:
+                    parts = cid.replace(":", " ").replace("!", " ").split()
+                    for p in parts:
+                        p_clean = p.strip()
+                        if p_clean and p_clean[0].isalpha() and any(ch.isdigit() for ch in p_clean):
+                            extracted_coords.append(p_clean.upper())
+
+                all_search_targets = list(set(clean_ids + extracted_coords))
+
+                query = """
+                    SELECT 
+                        id,
+                        document,
+                        cmetadata,
+                        cmetadata->>'cell_id' AS cell_id,
+                        cmetadata->>'cell_coord' AS cell_coord,
+                        cmetadata->>'sheet_name' AS sheet_name,
+                        cmetadata->>'cell_value' AS cell_value,
+                        cmetadata->'row_header' AS row_header,
+                        cmetadata->'column_header' AS column_header,
+                        cmetadata->>'company_name' AS company_name
+                    FROM langchain_pg_embedding
+                    WHERE (
+                        cmetadata->>'cell_id' = ANY(%s)
+                        OR cmetadata->>'cell_coord' = ANY(%s)
+                        OR UPPER(cmetadata->>'cell_coord') = ANY(%s)
+                    )
+                """
+                params: List[Any] = [all_search_targets, all_search_targets, [t.upper() for t in all_search_targets]]
+
+                if col_uuid:
+                    query += " AND collection_id = %s"
+                    params.append(col_uuid)
+                elif workbook_hash:
+                    query += " AND cmetadata->>'workbook_hash' = %s"
+                    params.append(workbook_hash)
+
+                query += " LIMIT %s;"
+                params.append(limit)
+
+                cur.execute(query, tuple(params))
+                rows = cur.fetchall()
+
+            import json
+            results = []
+            seen_coords = set()
+            for r in rows:
+                _id, text, cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
+                key = (sheet_name, cell_coord)
+                if key in seen_coords:
+                    continue
+                seen_coords.add(key)
+
+                if isinstance(row_header, str):
+                    try:
+                        row_header = json.loads(row_header)
+                    except Exception:
+                        pass
+                if isinstance(col_header, str):
+                    try:
+                        col_header = json.loads(col_header)
+                    except Exception:
+                        pass
+
+                results.append({
+                    "cell_id": cell_id or f"{sheet_name}:{cell_coord}",
+                    "cell_coord": cell_coord,
+                    "sheet_name": sheet_name,
+                    "cell_value": cell_value,
+                    "row_header": row_header if isinstance(row_header, list) else ([row_header] if row_header else []),
+                    "column_header": col_header if isinstance(col_header, list) else ([col_header] if col_header else []),
+                    "company_name": company_name,
+                    "source_text": text,
+                })
+            return results
+        except Exception:
+            return []
+        finally:
+            conn.close()
+

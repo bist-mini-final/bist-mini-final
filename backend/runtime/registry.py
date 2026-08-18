@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
+from ..modules.answer_refiner import AnswerRefinerModule
 from ..modules.answer_cache_writer import AnswerCacheWriterModule
 from ..modules.base import ExecutableModule
 from ..modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
@@ -104,6 +105,10 @@ class ModuleRegistry:
             RrfFusionModule(),
             ContextExpanderModule(),
             ReaderModule(completion_client),
+            AnswerRefinerModule(
+                completion_client=completion_client,
+                pgvector_store=self.pgvector_store,
+            ),
             AnswerCacheWriterModule(repository),
             JsonTransformerModule(),
             JsonInspectorModule(),

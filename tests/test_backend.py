@@ -540,7 +540,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 28)
+        self.assertEqual(len(definitions), 29)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
@@ -557,6 +557,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "rrf_fusion",
                 "context",
                 "reader",
+                "answer_refiner",
                 "answer_cache_writer",
                 "json_transformer",
                 "json_inspector",
@@ -794,7 +795,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 28)
+        self.assertEqual(len(modules), 29)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -1158,6 +1159,18 @@ class ApiContractTests(unittest.TestCase):
             "pgvector_retriever": (
                 {"query_input", "index_input"},
                 {"top_k"},
+            ),
+            "answer_refiner": (
+                {"answer_json", "target_cell_ids"},
+                {
+                    "model",
+                    "preset",
+                    "system_prompt",
+                    "user_prompt_template",
+                    "max_direct_cells",
+                    "spatial_column_radius",
+                    "enable_auto_cell_discovery",
+                },
             ),
         }
 

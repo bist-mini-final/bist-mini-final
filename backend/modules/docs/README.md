@@ -22,6 +22,7 @@ python -m backend.tools.generate_module_docs
 | Module | Category | Guide |
 |---|---|---|
 | `answer_cache_writer` | Output | [Answer Cache Writer](./answer_cache_writer.md) |
+| `answer_refiner` | Output | [Direct Cell Answer Refiner](./answer_refiner.md) |
 | `bfs_llm_structure_detector` | Logic | [BFS + LLM Table Structure Detector](./bfs_llm_structure_detector.md) |
 | `bm25_retriever` | Logic | [BM25 Keyword Retriever](./bm25_retriever.md) |
 | `cell_text_embedder` | Logic | [Cell Text Embedder](./cell_text_embedder.md) |
