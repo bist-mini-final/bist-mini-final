@@ -153,81 +153,47 @@ export function FileUploadModal({ onClose, onSuccess, onStartPipeline }: UploadP
     ];
     setModules(initialMods);
 
-    // Module 1 completion -> Module 2 running
-    const t1 = setTimeout(() => {
-      setCurrentStageIndex(1);
-      setProgressPercent(40);
+    // Heartbeat: adds a "still working" log every 15s without touching stage state.
+    // Stage transitions happen ONLY when the real API response arrives.
+    let pulseCount = 0;
+    const elapsedRef = { current: 0 };
+    const elapsedTick = setInterval(() => { elapsedRef.current += 0.1; }, 100);
+    const pulseTimer = setInterval(() => {
+      pulseCount += 1;
       setModules((prev) => {
-        const next = [...prev];
-        next[0].status = 'done';
-        next[0].durationSeconds = 1.1;
-        next[0].sublogs.push({
-          time: formatNow(),
-          msg: `📐 Luna VLM 표 바운딩 박스 및 헤더 계층 추출 완료 (2개 표 검출)`,
-          status: 'done',
-        });
-        next[1].status = 'running';
-        next[1].sublogs = [
-          { time: formatNow(), msg: `📝 4-Field 직렬화 템플릿 적용 ([SHEET] / [COL] / [ROW] / [VALUE])`, status: 'running' },
-          { time: formatNow(), msg: `🧹 공백 셀 필터링 및 서식 정규화 완료`, status: 'running' },
-        ];
+        const next = prev.map((m) => ({ ...m }));
+        const activeIdx = currentStageIndex;
+        if (next[activeIdx] && next[activeIdx].status === 'running') {
+          next[activeIdx] = {
+            ...next[activeIdx],
+            sublogs: [
+              ...next[activeIdx].sublogs,
+              {
+                time: formatNow(),
+                msg: `⏳ 백엔드 처리 중... (${Math.round(elapsedRef.current)}초 경과, 대기 ${pulseCount * 15}s)`,
+                status: 'running' as const,
+              },
+            ],
+          };
+        }
         return next;
       });
-    }, 1100);
-
-    // Module 2 completion -> Module 3 running
-    const t2 = setTimeout(() => {
-      setCurrentStageIndex(2);
-      setProgressPercent(70);
-      setModules((prev) => {
-        const next = [...prev];
-        next[1].status = 'done';
-        next[1].durationSeconds = 0.9;
-        next[1].sublogs.push({
-          time: formatNow(),
-          msg: `📑 총 직렬화 문서(CellTextDocumentDTO) 생성 완료`,
-          status: 'done',
-        });
-        next[2].status = 'running';
-        next[2].sublogs = [
-          { time: formatNow(), msg: `⚡ 문서를 배치 크기 ${batchSize} 단위로 분할하여 OpenAI Embeddings 호출`, status: 'running' },
-          { time: formatNow(), msg: `🌐 ${selectedModel} 고밀도 3072D 벡터 생성 및 토큰 누적 집계 중...`, status: 'running' },
-        ];
-        return next;
-      });
-    }, 2200);
-
-    // Module 3 completion -> Module 4 running
-    const t3 = setTimeout(() => {
-      setCurrentStageIndex(3);
-      setProgressPercent(90);
-      setModules((prev) => {
-        const next = [...prev];
-        next[2].status = 'done';
-        next[2].durationSeconds = 1.6;
-        next[2].sublogs.push({
-          time: formatNow(),
-          msg: `💾 float32 L2 정규화 및 임베딩 아티팩트 해시 생성 완료`,
-          status: 'done',
-        });
-        next[3].status = 'running';
-        next[3].sublogs = [
-          { time: formatNow(), msg: `🔌 PostgreSQL 16 langchain_pg_collection 연결 및 cmetadata 등록`, status: 'running' },
-          { time: formatNow(), msg: `📥 langchain_pg_embedding 테이블 벡터 및 메타데이터 적재 중...`, status: 'running' },
-        ];
-        return next;
-      });
-    }, 3800);
+    }, 15000);
 
     try {
       const uploadRes = await dataSourceApi.uploadFile(selectedFile, true, selectedModel, batchSize);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      clearInterval(pulseTimer);
+      clearInterval(elapsedTick);
 
       if (uploadRes.error) {
         throw new Error(uploadRes.error);
       }
+
+      const idxData = uploadRes.ingested_index || {};
+      const chunkCount = idxData.document_count || 0;
+      const usedPipeline: string = idxData.used_pipeline || 'exhaustive';
+      const lunaWasUsed = usedPipeline === 'luna_vlm_structured';
+      const sheetCount = idxData.sheet_names?.length || idxData.sheets?.length || 1;
 
       setCurrentStageIndex(3);
       setProgressPercent(100);
@@ -238,9 +204,19 @@ export function FileUploadModal({ onClose, onSuccess, onStartPipeline }: UploadP
           status: 'done' as const,
           durationSeconds: m.durationSeconds || 1.0,
         }));
+        next[0].sublogs.push({
+          time: formatNow(),
+          msg: `📐 Luna VLM ${lunaWasUsed ? '✅ 성공 — 표 바운딩 박스 및 헤더 계층 추출 완료' : '⚠️ 폴백 — Exhaustive 직렬화로 처리'}`,
+          status: 'done',
+        });
+        next[2].sublogs.push({
+          time: formatNow(),
+          msg: `💾 전체 임베딩 완료 — 총 ${chunkCount}개 3072D 벡터 생성`,
+          status: 'done',
+        });
         next[3].sublogs.push({
           time: formatNow(),
-          msg: `🚀 PostgreSQL 16 pgvector HNSW 코사인 유사도 인덱스 동기화 완료! (LIVE READY)`,
+          msg: `🚀 PostgreSQL 16 pgvector HNSW 인덱스 동기화 완료! (${chunkCount}개 청크, ${sheetCount}개 시트)`,
           status: 'done',
         });
         return next;
@@ -250,9 +226,8 @@ export function FileUploadModal({ onClose, onSuccess, onStartPipeline }: UploadP
       setPhase('success');
       onSuccess(uploadRes.file);
     } catch (err: any) {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      clearInterval(pulseTimer);
+      clearInterval(elapsedTick);
       setError(err.message || '인덱싱 파이프라인 처리 중 오류가 발생했습니다.');
       setPhase('idle');
     }

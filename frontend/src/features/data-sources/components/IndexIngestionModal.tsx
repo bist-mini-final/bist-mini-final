@@ -192,68 +192,31 @@ export function IndexIngestionModal({
     ];
     setModules(initialMods);
 
-    const t1 = setTimeout(() => {
-      setCurrentStageIndex(1);
-      setProgressPercent(40);
+    // Heartbeat: adds a "still working" log every 15s without touching stage state.
+    // Stage transitions happen ONLY when the real API response arrives.
+    let pulseCount = 0;
+    const elapsedRef = { current: 0 };
+    const elapsedTick = setInterval(() => { elapsedRef.current += 0.1; }, 100);
+    const pulseTimer = setInterval(() => {
+      pulseCount += 1;
       setModules((prev) => {
-        const next = [...prev];
-        next[0].status = 'done';
-        next[0].durationSeconds = 1.1;
-        next[0].sublogs.push({
-          time: formatNow(),
-          msg: `📐 Luna VLM 표 바운딩 박스 및 헤더 계층 추출 완료`,
-          status: 'done',
-        });
-        next[1].status = 'running';
-        next[1].sublogs = [
-          { time: formatNow(), msg: `📝 4-Field 직렬화 템플릿 적용 ([SHEET] / [COL] / [ROW] / [VALUE])`, status: 'running' },
-          { time: formatNow(), msg: `🧹 공백 셀 필터링 및 서식 정규화 완료`, status: 'running' },
-        ];
+        const next = prev.map((m) => ({ ...m }));
+        const runningIdx = next.findIndex((m) => m.status === 'running');
+        const activeIdx = runningIdx >= 0 ? runningIdx : next.length - 1;
+        next[activeIdx] = {
+          ...next[activeIdx],
+          sublogs: [
+            ...next[activeIdx].sublogs,
+            {
+              time: formatNow(),
+              msg: `⏳ 백엔드 처리 중... (${Math.round(elapsedRef.current)}초 경과, 대기 ${pulseCount * 15}s)`,
+              status: 'running' as const,
+            },
+          ],
+        };
         return next;
       });
-    }, 1100);
-
-    const t2 = setTimeout(() => {
-      setCurrentStageIndex(2);
-      setProgressPercent(70);
-      setModules((prev) => {
-        const next = [...prev];
-        next[1].status = 'done';
-        next[1].durationSeconds = 0.9;
-        next[1].sublogs.push({
-          time: formatNow(),
-          msg: `📑 총 직렬화 문서(CellTextDocumentDTO) 생성 완료`,
-          status: 'done',
-        });
-        next[2].status = 'running';
-        next[2].sublogs = [
-          { time: formatNow(), msg: `⚡ 문서를 배치 크기 ${batchSize} 단위로 분할하여 OpenAI Embeddings 호출`, status: 'running' },
-          { time: formatNow(), msg: `🌐 ${model} 고밀도 3072D 벡터 생성 및 토큰 누적 집계 중...`, status: 'running' },
-        ];
-        return next;
-      });
-    }, 2200);
-
-    const t3 = setTimeout(() => {
-      setCurrentStageIndex(3);
-      setProgressPercent(90);
-      setModules((prev) => {
-        const next = [...prev];
-        next[2].status = 'done';
-        next[2].durationSeconds = 1.6;
-        next[2].sublogs.push({
-          time: formatNow(),
-          msg: `💾 float32 L2 정규화 및 임베딩 아티팩트 해시 생성 완료`,
-          status: 'done',
-        });
-        next[3].status = 'running';
-        next[3].sublogs = [
-          { time: formatNow(), msg: `🔌 PostgreSQL 16 langchain_pg_collection 연결 및 cmetadata 등록`, status: 'running' },
-          { time: formatNow(), msg: `📥 langchain_pg_embedding 테이블 벡터 및 메타데이터 적재 중...`, status: 'running' },
-        ];
-        return next;
-      });
-    }, 3800);
+    }, 15000);
 
     try {
       const newIndex = await dataSourceApi.ingestWorkbook({
@@ -265,9 +228,13 @@ export function IndexIngestionModal({
         batch_size: batchSize,
       });
 
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      clearInterval(pulseTimer);
+      clearInterval(elapsedTick);
+
+      const chunkCount = newIndex.document_count || 0;
+      const usedPipeline: string = (newIndex as any).used_pipeline || 'exhaustive';
+      const lunaWasUsed = usedPipeline === 'luna_vlm_structured';
+      const sheetCount = selectedSheets.length;
 
       setCurrentStageIndex(3);
       setProgressPercent(100);
@@ -278,9 +245,19 @@ export function IndexIngestionModal({
           status: 'done' as const,
           durationSeconds: m.durationSeconds || 1.0,
         }));
+        next[0].sublogs.push({
+          time: formatNow(),
+          msg: `📐 Luna VLM ${lunaWasUsed ? '✅ 성공 — 표 바운딩 박스 및 헤더 계층 추출 완료' : '⚠️ 폴백 — Exhaustive 직렬화로 처리'}`,
+          status: 'done',
+        });
+        next[2].sublogs.push({
+          time: formatNow(),
+          msg: `💾 전체 임베딩 완료 — 총 ${chunkCount}개 3072D 벡터 생성`,
+          status: 'done',
+        });
         next[3].sublogs.push({
           time: formatNow(),
-          msg: `🚀 PostgreSQL 16 pgvector HNSW 코사인 유사도 인덱스 동기화 완료! (${newIndex.document_count || 0}개 청크)`,
+          msg: `🚀 PostgreSQL 16 pgvector HNSW 인덱스 동기화 완료! (${chunkCount}개 청크, ${sheetCount}개 시트)`,
           status: 'done',
         });
         return next;
@@ -291,9 +268,8 @@ export function IndexIngestionModal({
         onClose();
       }, 700);
     } catch (err: any) {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      clearInterval(pulseTimer);
+      clearInterval(elapsedTick);
       setError(err.message || '벡터 인덱싱에 실패했습니다.');
       setIsIngesting(false);
     }
