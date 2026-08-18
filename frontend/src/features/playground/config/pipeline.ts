@@ -38,6 +38,9 @@ export const MODULE_NODE_TYPES: Partial<Record<ModuleType, string>> = {
   cell_text_serializer: 'cell_text_serializer',
   exhaustive_cell_text_serializer: 'exhaustive_cell_text_serializer',
   prebuilt_index_loader: 'prebuilt_index_loader',
+  pgvector_index_writer: 'pgvector_index_writer',
+  pgvector_collection_loader: 'pgvector_collection_loader',
+  pgvector_retriever: 'pgvector_retriever',
 };
 
 export const NODE_MODULE_TYPES: Record<string, ModuleType> = Object.fromEntries(
@@ -53,6 +56,9 @@ export const NODE_COLORS: Record<string, string> = {
   cell_text_embedder: '#0f766e',
   vector_index_writer: '#0f766e',
   prebuilt_index_loader: '#059669',
+  pgvector_index_writer: '#0f766e',
+  pgvector_collection_loader: '#0f766e',
+  pgvector_retriever: '#0f766e',
   bm25_retriever: PIPELINE_STAGES[3].color,
   dense_retriever: PIPELINE_STAGES[4].color,
   rrf_fusion: PIPELINE_STAGES[5].color,

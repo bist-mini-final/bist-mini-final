@@ -1,9 +1,11 @@
 import hashlib
 import json
+import time
 from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
+from ..core.cost_tracker import calculate_embedding_cost
 from ..embeddings.bge import DEFAULT_BGE_MODEL
 from ..embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
@@ -55,6 +57,7 @@ class EmbeddedCellTextDocumentDTO(CellTextDocumentDTO):
 
 
 class CellTextEmbeddingsDTO(ModuleDTO):
+    model_config = {"extra": "allow"}
     file_name: str
     workbook_hash: str
     model: str = Field(description="문서 임베딩에 사용된 모델 ID")
@@ -106,6 +109,9 @@ class CellTextEmbedderModule(ExecutableModule):
         if not input_data.items:
             raise ModuleExecutionError("임베딩할 Excel 셀 문서가 없습니다")
 
+        start_perf = time.perf_counter()
+        total_tokens = 0
+
         for start in range(0, len(input_data.items), input_data.batch_size):
             batch = input_data.items[start : start + input_data.batch_size]
             batch_vectors = encoder.encode([document.text for document in batch])
@@ -114,6 +120,17 @@ class CellTextEmbedderModule(ExecutableModule):
                     "Excel 셀 문서 개수와 생성된 임베딩 개수가 일치하지 않습니다"
                 )
             vectors.extend(batch_vectors)
+
+            # Accumulate token usage
+            if hasattr(encoder, "last_usage") and getattr(encoder, "last_usage", None):
+                usage = getattr(encoder, "last_usage")
+                total_tokens += usage.get("total_tokens", 0)
+            else:
+                # Estimate ~15 tokens per cell text for local models
+                total_tokens += sum(max(1, len(doc.text.split()) * 2) for doc in batch)
+
+        duration_seconds = round(time.perf_counter() - start_perf, 3)
+        cost_info = calculate_embedding_cost(input_data.model, total_tokens)
 
         dimensions = {len(vector) for vector in vectors}
         if len(dimensions) != 1 or not dimensions or 0 in dimensions:
@@ -138,6 +155,11 @@ class CellTextEmbedderModule(ExecutableModule):
             "model": input_data.model,
             "artifact_id": artifact_id,
             "dimension": dimension,
+            "duration_seconds": duration_seconds,
+            "total_tokens": total_tokens,
+            "estimated_cost_usd": cost_info["cost_usd"],
+            "estimated_cost_krw": cost_info["cost_krw"],
+            "batch_size": input_data.batch_size,
             "items": [
                 {
                     **document.model_dump(),

@@ -53,6 +53,7 @@ class OpenAIEmbeddingEncoder:
         )
         self.endpoint = f"{configured_base.rstrip('/')}/embeddings"
         self.timeout_seconds = timeout_seconds
+        self.last_usage: Dict[str, int] = {}
 
     def encode(self, queries: List[str]) -> List[List[float]]:
         if not queries:
@@ -105,6 +106,11 @@ class OpenAIEmbeddingEncoder:
 
         try:
             data_items = document["data"]
+            usage_doc = document.get("usage") or {}
+            self.last_usage = {
+                "prompt_tokens": int(usage_doc.get("prompt_tokens") or len(queries) * 15),
+                "total_tokens": int(usage_doc.get("total_tokens") or len(queries) * 15),
+            }
             # API can return items sorted by index or in arbitrary order
             sorted_items = sorted(data_items, key=lambda item: item["index"])
             vectors = [item["embedding"] for item in sorted_items]

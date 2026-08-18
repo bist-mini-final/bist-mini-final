@@ -2,17 +2,18 @@ import {
   ChartNoAxesCombined,
   Database,
   House,
+  Settings,
   Users,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import { lazy, type ComponentType } from 'react';
+import type { ComponentType } from 'react';
 import { DataSourcesPage } from '../pages/DataSourcesPage';
 import { EvaluationsPage } from '../pages/EvaluationsPage';
 import { HomePage } from '../pages/HomePage';
+import { PlaygroundPage } from '../pages/PlaygroundPage';
+import { SettingsPage } from '../pages/SettingsPage';
 import { TeamWorkspacePage } from '../pages/TeamWorkspacePage';
-
-const PlaygroundPage = lazy(() => import('../features/playground/PlaygroundPage'));
 
 export type RouteStatus = 'ready' | 'planned';
 
@@ -53,7 +54,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
     description: '문서와 데이터셋을 관리하는 공간',
     icon: Database,
     component: DataSourcesPage,
-    status: 'planned',
+    status: 'ready',
   },
   {
     path: '/evaluations',
@@ -72,6 +73,15 @@ export const APP_ROUTES: readonly AppRoute[] = [
     icon: Users,
     component: TeamWorkspacePage,
     status: 'planned',
+  },
+  {
+    path: '/settings',
+    label: '설정',
+    shortLabel: 'Settings',
+    description: '데이터베이스 연결 및 시스템 환경 설정',
+    icon: Settings,
+    component: SettingsPage,
+    status: 'ready',
   },
 ] as const;
 

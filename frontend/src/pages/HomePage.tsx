@@ -2,20 +2,14 @@ import {
   ArrowRight,
   ChartNoAxesCombined,
   Database,
-  FileCode2,
+  FileSpreadsheet,
+  Sparkles,
   Users,
   Workflow,
 } from 'lucide-react';
 import { AppLink } from '../app/router';
 
 const plannedCards = [
-  {
-    path: '/data-sources',
-    title: '데이터 소스',
-    description: '문서와 인덱스 자산을 한곳에서 관리합니다.',
-    icon: Database,
-    tone: 'blue',
-  },
   {
     path: '/evaluations',
     title: '평가',
@@ -41,7 +35,7 @@ export function HomePage() {
             <span>WORKSPACE</span>
             <h2 id="workspace-title">작업 공간</h2>
           </div>
-          <small>1개 사용 가능 · 3개 준비 중</small>
+          <small>2개 사용 가능 · 2개 준비 중</small>
         </div>
 
         <div className="workspace-grid">
@@ -73,6 +67,64 @@ export function HomePage() {
             </div>
           </AppLink>
 
+          <AppLink to="/data-sources" className="workspace-card">
+            <div className="datasources-preview" aria-hidden="true">
+              <span className="preview-glow preview-glow--blue-one" />
+              <span className="preview-glow preview-glow--blue-two" />
+              <div className="ds-preview-container">
+                {/* Left Card: Ingestion / Chunk */}
+                <div className="ds-preview-card">
+                  <div className="ds-preview-card__header">
+                    <div className="ds-preview-card__header-left">
+                      <FileSpreadsheet size={13} style={{ color: '#2563eb' }} />
+                      <span>Luna VLM 청킹</span>
+                    </div>
+                    <span className="ds-preview-card__badge">4-Field</span>
+                  </div>
+                  <div className="ds-preview-card__items">
+                    <span>[SHEET] KeyStats</span>
+                    <span>[COL] 매출액 / 2024</span>
+                    <span>[VALUE] 1,240억원</span>
+                  </div>
+                </div>
+
+                {/* Center Connector */}
+                <div className="ds-preview-connector">
+                  <span className="ds-preview-connector__pill">
+                    <Sparkles size={9} /> 3072D
+                  </span>
+                  <ArrowRight size={14} />
+                </div>
+
+                {/* Right Card: Vector Store */}
+                <div className="ds-preview-card">
+                  <div className="ds-preview-card__header">
+                    <div className="ds-preview-card__header-left">
+                      <Database size={13} style={{ color: '#4f46e5' }} />
+                      <span>pgvector DB</span>
+                    </div>
+                    <span className="ds-preview-card__badge">HNSW</span>
+                  </div>
+                  <div className="ds-preview-card__items">
+                    <span style={{ color: '#2563eb', fontWeight: 700 }}>sim: 0.985 (Match)</span>
+                    <span>table: langchain_pg</span>
+                    <span>dim: 3072 Cosine</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="workspace-card__footer">
+              <span className="workspace-card__icon workspace-card__icon--blue">
+                <Database size={18} />
+              </span>
+              <div>
+                <strong>데이터 소스 & pgvector</strong>
+                <small>엑셀 구조화 및 고밀도 벡터 인덱스 관리</small>
+              </div>
+              <span className="workspace-card__action"><ArrowRight size={17} /></span>
+            </div>
+          </AppLink>
+
           {plannedCards.map(({ path, title, description, icon: Icon, tone }) => (
             <AppLink key={path} to={path} className="workspace-card workspace-card--planned">
               <div className={`planned-preview planned-preview--${tone}`}>
@@ -94,7 +146,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="home-bottom-grid">
+      {/* <section className="home-bottom-grid">
         <article className="home-info-card">
           <span className="home-info-card__icon"><FileCode2 size={19} /></span>
           <div>
@@ -113,7 +165,7 @@ export function HomePage() {
           </div>
           <AppLink to="/playground">실험 시작하기 <ArrowRight size={15} /></AppLink>
         </article>
-      </section>
+      </section> */}
     </div>
   );
 }

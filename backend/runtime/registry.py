@@ -23,6 +23,9 @@ from ..modules.json_transformer import JsonTransformerModule
 from ..modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
 from ..modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from ..modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
+from ..modules.pgvector_collection_loader import PgVectorCollectionLoaderModule
+from ..modules.pgvector_index_writer import PgVectorIndexWriterModule
+from ..modules.pgvector_retriever import PgVectorRetrieverModule
 from ..modules.prebuilt_index_loader import PrebuiltIndexLoaderModule
 from ..modules.processed_file_selector import ProcessedFileSelectorModule
 from ..modules.qa_example_loader import QaExampleLoaderModule
@@ -31,7 +34,9 @@ from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
 from ..modules.vector_index_writer import VectorIndexWriterModule
 from ..storage.answer_cache import AnswerCacheRepository
+from ..storage.db_manager import DatabaseManager
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
+from ..storage.pgvector_store import PgVectorStore
 from ..storage.vector_index import VectorIndexStore
 
 
@@ -48,12 +53,16 @@ class ModuleRegistry:
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
         vector_index_store: Optional[VectorIndexStore] = None,
+        pgvector_store: Optional[PgVectorStore] = None,
+        db_manager: Optional[DatabaseManager] = None,
     ) -> None:
         self.repository = repository
         self.embedding_artifact_store = (
             embedding_artifact_store or EmbeddingArtifactStore()
         )
         self.vector_index_store = vector_index_store or VectorIndexStore()
+        self.pgvector_store = pgvector_store or PgVectorStore()
+        self.db_manager = db_manager or DatabaseManager()
         self.isolated_worker_spec: Optional[Dict[str, str]] = None
         if (
             completion_client is None
@@ -77,11 +86,21 @@ class ModuleRegistry:
                 artifact_store=self.embedding_artifact_store,
                 index_store=self.vector_index_store,
             ),
+            PgVectorIndexWriterModule(
+                artifact_store=self.embedding_artifact_store,
+                db_manager=self.db_manager,
+                pgvector_store=self.pgvector_store,
+            ),
             PrebuiltIndexLoaderModule(
                 vector_index_store=self.vector_index_store,
             ),
+            PgVectorCollectionLoaderModule(
+                pgvector_store=self.pgvector_store,
+                db_manager=self.db_manager,
+            ),
             Bm25RetrieverModule(),
             DenseRetrieverModule(self.vector_index_store),
+            PgVectorRetrieverModule(self.pgvector_store),
             RrfFusionModule(),
             ContextExpanderModule(),
             ReaderModule(completion_client),
