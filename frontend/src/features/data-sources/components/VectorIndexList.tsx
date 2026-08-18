@@ -15,11 +15,14 @@ import {
   X,
 } from 'lucide-react';
 import type { VectorIndexInfo } from '../types';
+import type { PipelineRunState } from './PipelineTrackerView';
 import { dataSourceApi } from '../services/dataSourceApi';
 
 interface VectorIndexListProps {
   indexes: VectorIndexInfo[];
   isLoading?: boolean;
+  activeRunningPipeline?: PipelineRunState | null;
+  onResumePipeline?: () => void;
   onRefresh?: () => void;
   onDetailClick: (indexId: string) => void;
   onSearchClick: (index: VectorIndexInfo) => void;
@@ -45,6 +48,8 @@ function formatDate(iso: string): string {
 export function VectorIndexList({
   indexes,
   isLoading,
+  activeRunningPipeline,
+  onResumePipeline,
   onRefresh,
   onDetailClick,
   onSearchClick,
@@ -111,7 +116,7 @@ export function VectorIndexList({
         </div>
       </div>
 
-      {indexes.length === 0 ? (
+      {indexes.length === 0 && !(activeRunningPipeline && activeRunningPipeline.status === 'running') ? (
         <div className="ds-empty-state">
           <Database size={44} />
           <h4>pgvector 데이터베이스에 등록된 컬렉션이 없습니다</h4>
@@ -137,6 +142,55 @@ export function VectorIndexList({
               </tr>
             </thead>
             <tbody>
+              {activeRunningPipeline && activeRunningPipeline.status === 'running' && (
+                <tr style={{ background: 'rgba(34, 197, 94, 0.07)', borderLeft: '3px solid #16a34a' }}>
+                  <td className="ds-font-mono ds-id-cell" style={{ color: '#16a34a', fontWeight: 600 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <RefreshCw size={12} className="ds-spin" style={{ color: '#16a34a' }} />
+                      인덱싱 중
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 650, color: '#0f172a' }}>{activeRunningPipeline.fileName}</div>
+                    <div style={{ fontSize: '11px', color: '#166534', marginTop: '2px' }}>
+                      {activeRunningPipeline.modules[activeRunningPipeline.currentStageIndex]?.name || '파이프라인 실행 중...'}
+                    </div>
+                  </td>
+                  <td>
+                    <span className="ds-badge ds-badge--gray" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <Sparkles size={11} /> 자동 분석 중
+                    </span>
+                  </td>
+                  <td>
+                    <span className="ds-badge ds-badge--blue">{activeRunningPipeline.model}</span>
+                  </td>
+                  <td>3072D</td>
+                  <td>
+                    <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                      {Math.round(activeRunningPipeline.progressPercent)}% ({activeRunningPipeline.currentStageIndex + 1}/4단계)
+                    </span>
+                  </td>
+                  <td>
+                    <span className="ds-badge ds-badge--green" style={{ background: '#dcfce7', color: '#166534' }}>
+                      pgvector 적재 중
+                    </span>
+                  </td>
+                  <td style={{ color: '#64748b', fontSize: '12px' }}>
+                    {Math.round(activeRunningPipeline.elapsedSeconds)}초 경과
+                  </td>
+                  <td className="ds-text-right">
+                    <button
+                      type="button"
+                      className="primary-button"
+                      style={{ padding: '0.35rem 0.65rem', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={onResumePipeline}
+                      title="실시간 파이프라인 HUD 및 모듈 로그로 재진입"
+                    >
+                      <Layers size={13} /> 진행상황 / 모듈 로그
+                    </button>
+                  </td>
+                </tr>
+              )}
               {indexes.map((idx) => {
                 const isEditingThis = editingIndexId === idx.index_id;
                 const companyDisplay = idx.company_name || '';

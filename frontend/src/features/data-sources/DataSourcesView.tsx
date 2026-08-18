@@ -169,6 +169,7 @@ export function DataSourcesView() {
 
   // Full-page active pipeline tracker
   const [activePipelineRun, setActivePipelineRun] = useState<PipelineRunState | null>(null);
+  const [isViewingTracker, setIsViewingTracker] = useState(false);
 
   // Modals state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -207,6 +208,7 @@ export function DataSourcesView() {
 
   const handleStartUploadPipeline = async (file: File, model: string, batchSize: number) => {
     setIsUploadOpen(false);
+    setIsViewingTracker(true);
 
     const initialMods = createInitialModules(model, batchSize);
     initialMods[0].status = 'running';
@@ -249,7 +251,7 @@ export function DataSourcesView() {
         nextMods[0].durationSeconds = 1.1;
         nextMods[0].sublogs.push({
           time: formatNow(),
-          msg: `📐 Luna VLM 표 바운딩 박스 및 복합 계층 헤더 추출 완료 (2개 표 검출)`,
+          msg: `📐 Luna VLM 표 바운딩 박스 및 복합 계층 헤더 추출 완료 (전체 시트 검출)`,
           status: 'done',
         });
         nextMods[1].status = 'running';
@@ -390,13 +392,13 @@ export function DataSourcesView() {
   };
 
   // If Full-Page Pipeline Tracker is active, render it exclusively
-  if (activePipelineRun) {
+  if (activePipelineRun && isViewingTracker) {
     return (
       <div className="ds-page">
         <PipelineTrackerView
           pipeline={activePipelineRun}
           onBack={() => {
-            setActivePipelineRun(null);
+            setIsViewingTracker(false);
             fetchData();
           }}
           onRefresh={fetchData}
@@ -423,6 +425,8 @@ export function DataSourcesView() {
           <VectorIndexList
             indexes={indexes}
             isLoading={isLoading}
+            activeRunningPipeline={activePipelineRun}
+            onResumePipeline={() => setIsViewingTracker(true)}
             onRefresh={fetchData}
             onDetailClick={(id) => setDetailIndexId(id)}
             onSearchClick={(idx) => setSearchTargetIndex(idx)}
@@ -431,6 +435,7 @@ export function DataSourcesView() {
             onPipelineLogClick={async (idx) => {
               const built = buildCompletedPipelineFromIndex(idx);
               setActivePipelineRun(built);
+              setIsViewingTracker(true);
               try {
                 const detail = await dataSourceApi.getIndexDetail(idx.index_id);
                 if (detail.luna_output || (detail.tables && detail.tables.length > 0)) {
@@ -441,7 +446,7 @@ export function DataSourcesView() {
                           lunaOutput: detail.luna_output || {
                             file_name: detail.file_name,
                             workbook_hash: detail.workbook_hash,
-                            sheet_names: detail.sheet_names || ['Income_Statement', 'Key_Stats'],
+                            sheet_names: detail.sheet_names || ['Key_Stats', 'Income_Statement', 'Balance_Sheet', 'Cash_Flow'],
                             tables: detail.tables || [],
                           },
                         }
