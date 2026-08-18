@@ -2,6 +2,7 @@ import type { CSSProperties, DragEvent, KeyboardEvent, PointerEvent } from 'reac
 import {
   Cpu,
   CloudCog,
+  Database,
   Eye,
   FileCode,
   FileSpreadsheet,
@@ -47,6 +48,7 @@ const ICONS: Record<string, LucideIcon> = {
   TableProperties,
   Rows3,
   FolderArchive,
+  Database,
 };
 
 interface ModulePaletteProps {

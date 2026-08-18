@@ -41,6 +41,12 @@ from ..modules.vector_index_writer import (
     VectorIndexWriterInputDTO,
     VectorIndexWriterModule,
 )
+from ..modules.pgvector_index_writer import (
+    PgVectorIndexWriterInputDTO,
+    PgVectorIndexWriterModule,
+)
+from .company_extractor import extract_company_metadata
+from ..storage.db_manager import DatabaseManager
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.pgvector_store import PgVectorStore
 from ..storage.vector_index import VectorIndexStore
@@ -255,6 +261,11 @@ def ingest_excel_workbook(
     if not visible_sheets:
         raise ModuleExecutionError("인덱싱할 대상 시트가 없습니다")
 
+    # Step 0: Extract Company Entity Metadata (LLM with heuristic fallback)
+    company_info = extract_company_metadata(workbook_path, file_name, visible_sheets)
+    company_name = company_info.get("display_name") or company_info.get("company_name", "")
+    ticker = company_info.get("ticker", "")
+
     # Step 1: Structure Detection & Cell Text Serialization (Luna VLM + Structured Serializer)
     documents: List[CellTextDocumentDTO] = []
     used_pipeline = "exhaustive"
@@ -342,43 +353,62 @@ def ingest_excel_workbook(
     index_result = writer.execute(writer_input)
     index_id = index_result["index_id"]
 
-    # Step 4: Write to PostgreSQL + pgvector if enabled / connected
+    # Step 4: Write to PostgreSQL full ERD + pgvector via PgVectorIndexWriterModule
     pg = pgvector_store or PgVectorStore()
+    db_mgr = DatabaseManager()
     stored_in_pgvector = False
-    if pg.is_connected():
+
+    if db_mgr.is_connected():
         try:
-            vectors = artifact_store.get(
-                embedding_result["artifact_id"],
-                len(embedding_result["items"]),
-                embedding_result["dimension"],
+            # 1. Execute modular PgVectorIndexWriterModule (persists source_files, chunks, indexes, embeddings)
+            pg_writer = PgVectorIndexWriterModule(
+                artifact_store=artifact_store,
+                db_manager=db_mgr,
+                pgvector_store=pg,
+                embedding_encoder=embedding_encoder,
             )
-            pg_metadata = {
-                "file_name": file_name,
-                "workbook_hash": workbook_hash,
-                "model": model,
-                "dimension": embedding_result["dimension"],
-                "document_count": len(embedding_result["items"]),
-                "artifact_id": embedding_result["artifact_id"],
-                "pipeline": used_pipeline,
-                "duration_seconds": embedding_result.get("duration_seconds"),
-                "total_tokens": embedding_result.get("total_tokens"),
-                "estimated_cost_usd": embedding_result.get("estimated_cost_usd"),
-                "estimated_cost_krw": embedding_result.get("estimated_cost_krw"),
-                "batch_size": batch_size,
-                "items": [
-                    item.model_dump(mode="json") if hasattr(item, "model_dump") else item
-                    for item in embedding_result["items"]
-                ],
-            }
-            pg.put(index_id, vectors, pg_metadata, embedding_encoder=embedding_encoder)
+            pg_writer_input = PgVectorIndexWriterInputDTO(
+                file_name=file_name,
+                workbook_hash=workbook_hash,
+                model=embedding_result["model"],
+                artifact_id=embedding_result["artifact_id"],
+                dimension=embedding_result["dimension"],
+                items=embedding_result["items"],
+            )
+            pg_writer.execute(pg_writer_input)
+
+            # 2. Save sheets metadata
+            sheets_data = []
+            for s_idx, s_name in enumerate(visible_sheets):
+                sheet_docs = [d for d in documents if getattr(d, "sheet_name", "") == s_name]
+                sheets_data.append({
+                    "sheet_name": s_name,
+                    "sheet_index": s_idx,
+                    "is_visible": True,
+                    "row_count": len(sheet_docs),
+                    "column_count": 0,
+                    "detected_tables": tables if structure_mode in ("luna_vlm", "auto") and 'tables' in locals() else [],
+                })
+            db_mgr.save_sheets(file_id=workbook_hash, sheets_info=sheets_data)
             stored_in_pgvector = True
-        except Exception:
+
+            # 3. Attach company metadata to pgvector collection and chunks
+            if company_name:
+                try:
+                    pg.update_index_company(index_id, company_name)
+                except Exception:
+                    pass
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
             stored_in_pgvector = False
 
     return {
         "index_id": index_id,
         "file_name": file_name,
         "workbook_hash": workbook_hash,
+        "company_name": company_name,
+        "ticker": ticker,
         "model": model,
         "dimension": index_result["dimension"],
         "document_count": index_result["document_count"],

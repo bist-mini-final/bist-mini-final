@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
-  "id": "default",
-  "name": "default",
-  "updated_at": "2026-08-18T02:55:42.001244+00:00",
+  "id": "main_pgvector_rag_pipeline",
+  "name": "main_pgvector_rag_pipeline",
+  "updated_at": "2026-08-18T02:59:45.758214+00:00",
   "graph": {
     "nodes": [
       {
-        "id": "custom-node-1786497067905-2",
+        "id": "pg-rag-node-1-query",
         "module_type": "query_input",
         "position": {
-          "x": 974.6897321879878,
-          "y": -367.4342037563349
+          "x": 1050.0,
+          "y": -360.0
         },
         "config": {
           "threshold": 0.95
         },
         "values": {
-          "query": "최근 추세 유지 시 2026년 Total Revenue는?"
+          "query": "2024년 Total Revenue는?"
         },
         "ui": {
           "width": null,
@@ -26,11 +26,11 @@
         }
       },
       {
-        "id": "custom-node-1786497092339-3",
+        "id": "pg-rag-node-2-decomposer",
         "module_type": "decomposer",
         "position": {
-          "x": 1426.1794166088018,
-          "y": -156.69185259474813
+          "x": 1420.0,
+          "y": -150.0
         },
         "config": {
           "model": "gpt-5.6-luna",
@@ -47,27 +47,27 @@
         }
       },
       {
-        "id": "custom-node-1786497122336-4",
+        "id": "pg-rag-node-3-inspector",
         "module_type": "json_inspector",
         "position": {
-          "x": 1834.0115578389562,
-          "y": -132.24148441548206
+          "x": 1830.0,
+          "y": -130.0
         },
         "config": {},
         "values": {},
         "ui": {
-          "width": 502.0,
-          "height": 281.0,
+          "width": 500.0,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "custom-node-1786497464152-1",
+        "id": "pg-rag-node-4-embedder",
         "module_type": "embedder",
         "position": {
-          "x": 2620.9964282611377,
-          "y": 52.54613221170793
+          "x": 2620.0,
+          "y": 50.0
         },
         "config": {
           "model": "text-embedding-3-large"
@@ -81,15 +81,19 @@
         }
       },
       {
-        "id": "custom-node-1786497475934-2",
-        "module_type": "prebuilt_index_loader",
+        "id": "pg-rag-node-5-pg-loader",
+        "module_type": "pgvector_collection_loader",
         "position": {
-          "x": 2168.070268203153,
-          "y": 266.7211502837916
+          "x": 1920.0,
+          "y": 520.0
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
+          "collection_name": "SPG_Company_KeyStats_v4.xlsm,f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928",
+          "collection_names": [
+            "SPG_Company_KeyStats_v4.xlsm",
+            "f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928"
+          ]
         },
         "ui": {
           "width": null,
@@ -99,11 +103,11 @@
         }
       },
       {
-        "id": "custom-node-1786497522370-4",
+        "id": "pg-rag-node-6-bm25",
         "module_type": "bm25_retriever",
         "position": {
-          "x": 2644.906603580416,
-          "y": -167.71085042488016
+          "x": 2640.0,
+          "y": -170.0
         },
         "config": {
           "k1": 1.5,
@@ -119,11 +123,11 @@
         }
       },
       {
-        "id": "custom-node-1786497551832-5",
-        "module_type": "dense_retriever",
+        "id": "pg-rag-node-7-pg-retriever",
+        "module_type": "pgvector_retriever",
         "position": {
-          "x": 3038.6349662377042,
-          "y": 285.62668906454
+          "x": 3038.7360598989358,
+          "y": 415.24159081386136
         },
         "config": {
           "top_k": 1000
@@ -137,11 +141,11 @@
         }
       },
       {
-        "id": "custom-node-1786497565202-6",
+        "id": "pg-rag-node-8-rrf",
         "module_type": "rrf_fusion",
         "position": {
-          "x": 3461.3642072020707,
-          "y": 252.07197187556838
+          "x": 3460.0,
+          "y": 250.0
         },
         "config": {
           "rrf_k": 60,
@@ -157,11 +161,11 @@
         }
       },
       {
-        "id": "custom-node-1786497623603-7",
+        "id": "pg-rag-node-9-context",
         "module_type": "context",
         "position": {
-          "x": 3871.254803653204,
-          "y": 81.88585563253258
+          "x": 3870.0,
+          "y": 80.0
         },
         "config": {
           "top_k": 100,
@@ -177,11 +181,11 @@
         }
       },
       {
-        "id": "custom-node-1786497793017-1",
+        "id": "pg-rag-node-10-reader",
         "module_type": "reader",
         "position": {
-          "x": 4287.4382250201415,
-          "y": -287.92125725426297
+          "x": 4290.0,
+          "y": -280.0
         },
         "config": {
           "model": "gpt-5.6-luna",
@@ -198,32 +202,30 @@
         }
       },
       {
-        "id": "custom-node-1786497852818-2",
-        "module_type": "json_inspector",
+        "id": "pg-rag-node-11-cache",
+        "module_type": "answer_cache_writer",
         "position": {
-          "x": 4750.795356549791,
-          "y": -353.77556399237073
+          "x": 4720.0,
+          "y": -280.0
         },
         "config": {},
         "values": {},
         "ui": {
-          "width": 881.0,
-          "height": 1315.0,
+          "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "custom-node-1787020430289-1",
-        "module_type": "pgvector_collection_loader",
+        "id": "custom-node-1787021973276-1",
+        "module_type": "json_inspector",
         "position": {
-          "x": 2478.2880582893004,
-          "y": 433.354939451034
+          "x": 4811.647562377916,
+          "y": -134.72850634091648
         },
         "config": {},
-        "values": {
-          "collection_name": "SPG_Company_KeyStats_v4.xlsm"
-        },
+        "values": {},
         "ui": {
           "width": null,
           "height": null,
@@ -234,114 +236,122 @@
     ],
     "edges": [
       {
-        "id": "edge-1786497098970-3",
-        "source": "custom-node-1786497067905-2",
-        "target": "custom-node-1786497092339-3",
+        "id": "edge-pgrag-1-2",
+        "source": "pg-rag-node-1-query",
+        "target": "pg-rag-node-2-decomposer",
         "source_output": "query_context",
         "target_input": "query_context",
         "source_branch": "generated"
       },
       {
-        "id": "edge-1786497126170-4",
-        "source": "custom-node-1786497092339-3",
-        "target": "custom-node-1786497122336-4",
+        "id": "edge-pgrag-2-3",
+        "source": "pg-rag-node-2-decomposer",
+        "target": "pg-rag-node-3-inspector",
         "source_output": "output",
         "target_input": "input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497499115-4",
-        "source": "custom-node-1786497122336-4",
-        "target": "custom-node-1786497464152-1",
+        "id": "edge-pgrag-3-4",
+        "source": "pg-rag-node-3-inspector",
+        "target": "pg-rag-node-4-embedder",
         "source_output": "output",
         "target_input": "input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497528368-5",
-        "source": "custom-node-1786497122336-4",
-        "target": "custom-node-1786497522370-4",
+        "id": "edge-pgrag-3-6",
+        "source": "pg-rag-node-3-inspector",
+        "target": "pg-rag-node-6-bm25",
         "source_output": "output",
         "target_input": "query_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497535281-6",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497522370-4",
+        "id": "edge-pgrag-5-6",
+        "source": "pg-rag-node-5-pg-loader",
+        "target": "pg-rag-node-6-bm25",
         "source_output": "document_output",
         "target_input": "document_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497559034-7",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497551832-5",
+        "id": "edge-pgrag-4-7",
+        "source": "pg-rag-node-4-embedder",
+        "target": "pg-rag-node-7-pg-retriever",
+        "source_output": "output",
+        "target_input": "query_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-pgrag-5-7",
+        "source": "pg-rag-node-5-pg-loader",
+        "target": "pg-rag-node-7-pg-retriever",
         "source_output": "index_output",
         "target_input": "index_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497569933-9",
-        "source": "custom-node-1786497522370-4",
-        "target": "custom-node-1786497565202-6",
+        "id": "edge-pgrag-6-8",
+        "source": "pg-rag-node-6-bm25",
+        "target": "pg-rag-node-8-rrf",
         "source_output": "bm25_result",
         "target_input": "bm25_result",
         "source_branch": null
       },
       {
-        "id": "edge-1786497572235-10",
-        "source": "custom-node-1786497551832-5",
-        "target": "custom-node-1786497565202-6",
+        "id": "edge-pgrag-7-8",
+        "source": "pg-rag-node-7-pg-retriever",
+        "target": "pg-rag-node-8-rrf",
         "source_output": "dense_result",
         "target_input": "dense_result",
         "source_branch": null
       },
       {
-        "id": "edge-1786497599492-11",
-        "source": "custom-node-1786497464152-1",
-        "target": "custom-node-1786497551832-5",
-        "source_output": "output",
-        "target_input": "query_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-1786497644149-12",
-        "source": "custom-node-1786497565202-6",
-        "target": "custom-node-1786497623603-7",
+        "id": "edge-pgrag-8-9",
+        "source": "pg-rag-node-8-rrf",
+        "target": "pg-rag-node-9-context",
         "source_output": "retrieval_json",
         "target_input": "retrieval_json",
         "source_branch": null
       },
       {
-        "id": "edge-1786497776786-1",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497623603-7",
+        "id": "edge-pgrag-5-9",
+        "source": "pg-rag-node-5-pg-loader",
+        "target": "pg-rag-node-9-context",
         "source_output": "document_output",
         "target_input": "document_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497806961-2",
-        "source": "custom-node-1786497623603-7",
-        "target": "custom-node-1786497793017-1",
+        "id": "edge-pgrag-9-10",
+        "source": "pg-rag-node-9-context",
+        "target": "pg-rag-node-10-reader",
         "source_output": "context_json",
         "target_input": "context_json",
         "source_branch": null
       },
       {
-        "id": "edge-1786497857633-6",
-        "source": "custom-node-1786497793017-1",
-        "target": "custom-node-1786497852818-2",
+        "id": "edge-pgrag-10-11",
+        "source": "pg-rag-node-10-reader",
+        "target": "pg-rag-node-11-cache",
+        "source_output": "answer_json",
+        "target_input": "answer_json",
+        "source_branch": null
+      },
+      {
+        "id": "edge-1787021976200-1",
+        "source": "pg-rag-node-10-reader",
+        "target": "custom-node-1787021973276-1",
         "source_output": "answer_json",
         "target_input": "input",
         "source_branch": null
       }
     ],
     "viewport": {
-      "x": 95.85513659650815,
-      "y": 397.0157408341538,
-      "zoom": 0.4084048502828803
+      "x": -65.11127036453672,
+      "y": 296.54415390467136,
+      "zoom": 0.5344296313560436
     }
   }
 }

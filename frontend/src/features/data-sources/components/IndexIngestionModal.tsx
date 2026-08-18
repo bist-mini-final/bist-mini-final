@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
-  CheckCircle2,
   Database,
   Layers,
-  Loader2,
   Play,
   Settings2,
   Sparkles,
   X,
+  Zap,
 } from 'lucide-react';
 import { dataSourceApi } from '../services/dataSourceApi';
 import type { DataSourceFile, VectorIndexInfo } from '../types';
+import { ModulePipelineMonitor, type ModuleStepState } from './ModulePipelineMonitor';
 
 interface IngestModalProps {
   files: DataSourceFile[];
@@ -28,13 +28,65 @@ const EMBEDDING_MODELS = [
     description: '3072차원 고정밀 임베딩. 질의-테이블 복합 검색 성능 우수',
   },
   {
-    id: 'BAAI/bge-large-en-v1.5',
-    name: 'BAAI/bge-large-en-v1.5',
+    id: 'text-embedding-3-small',
+    name: 'OpenAI text-embedding-3-small',
+    dimension: 1536,
+    badge: '경량 모델',
+    description: '1536차원 경량 임베딩. 경제적인 API 비용',
+  },
+  {
+    id: 'BAAI/bge-m3',
+    name: 'BAAI/bge-m3 (로컬 모델)',
     dimension: 1024,
-    badge: '로컬 모델',
-    description: '1024차원 오픈소스 로컬 임베딩. API 비용 없음',
+    badge: '오픈소스',
+    description: '1024차원 로컬 임베딩. API 비용 없음',
   },
 ];
+
+function createInitialModules(modelName: string, batchSize: number): ModuleStepState[] {
+  return [
+    {
+      id: 'mod_vlm_detector',
+      name: '테이블 구조 추출 (Luna VLM Detector)',
+      moduleType: 'luna_vlm_structure_detector',
+      category: 'VLM Vision',
+      icon: Sparkles,
+      status: 'waiting',
+      sublogs: [],
+      metaInfo: { 모델: 'gpt-5.6-luna', '추출 방식': '다차원 시각적 바운딩 박스' },
+    },
+    {
+      id: 'mod_serializer',
+      name: '4-Field 셀 문서 직렬화 (Cell Text Serializer)',
+      moduleType: 'cell_text_serializer',
+      category: 'Transform',
+      icon: Layers,
+      status: 'waiting',
+      sublogs: [],
+      metaInfo: { 템플릿: '[SHEET]/[COL]/[ROW]/[VALUE]', 포맷: 'CellTextDocumentDTO' },
+    },
+    {
+      id: 'mod_embedder',
+      name: '고밀도 벡터 임베딩 (Cell Text Embedder)',
+      moduleType: 'cell_text_embedder',
+      category: 'Logic / Embedder',
+      icon: Zap,
+      status: 'waiting',
+      sublogs: [],
+      metaInfo: { 임베딩모델: modelName, 배치크기: `${batchSize}개 / 요청` },
+    },
+    {
+      id: 'mod_pgvector_writer',
+      name: 'pgvector 영구 저장 & HNSW 인덱싱 (Vector DB Store)',
+      moduleType: 'vector_index_writer',
+      category: 'Storage / DB',
+      icon: Database,
+      status: 'waiting',
+      sublogs: [],
+      metaInfo: { 스토리지: 'PostgreSQL 16 pgvector', 인덱스: 'HNSW 코사인 유사도' },
+    },
+  ];
+}
 
 export function IndexIngestionModal({
   files,
@@ -59,8 +111,30 @@ export function IndexIngestionModal({
   const [batchSize, setBatchSize] = useState<number>(64);
 
   const [isIngesting, setIsIngesting] = useState(false);
+  const [currentStageIndex, setCurrentStageIndex] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [stepMessage, setStepMessage] = useState<string>('');
+
+  const [modules, setModules] = useState<ModuleStepState[]>(() =>
+    createInitialModules('text-embedding-3-large', 64)
+  );
+
+  const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (isIngesting) {
+      const start = Date.now();
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((Date.now() - start) / 1000);
+      }, 100);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isIngesting]);
 
   const handleFileChange = (newFileName: string) => {
     setSelectedFile(newFileName);
@@ -80,6 +154,11 @@ export function IndexIngestionModal({
     }
   };
 
+  const formatNow = () => {
+    const now = new Date();
+    return `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(Math.floor(now.getMilliseconds() / 100))}`;
+  };
+
   const handleStartIngest = async () => {
     if (!selectedFile) {
       setError('인덱싱할 대상 엑셀 파일을 선택하세요.');
@@ -92,14 +171,81 @@ export function IndexIngestionModal({
 
     setIsIngesting(true);
     setError(null);
-    setStepMessage('엑셀 표 구조를 분석하고 셀 텍스트를 직렬화하는 중...');
+    setCurrentStageIndex(0);
+    setProgressPercent(15);
+
+    const initialMods = createInitialModules(model, batchSize);
+    initialMods[0].status = 'running';
+    initialMods[0].sublogs = [
+      { time: formatNow(), msg: `📂 엑셀 파일 로드: "${selectedFile}" (${selectedSheets.length}개 시트 선택)`, status: 'running' },
+      { time: formatNow(), msg: `👁️ Luna VLM: [${selectedSheets.join(', ')}] 시트 표 바운딩 박스 & 헤더 계층 추출 시작...`, status: 'running' },
+    ];
+    setModules(initialMods);
+
+    const t1 = setTimeout(() => {
+      setCurrentStageIndex(1);
+      setProgressPercent(40);
+      setModules((prev) => {
+        const next = [...prev];
+        next[0].status = 'done';
+        next[0].durationSeconds = 1.1;
+        next[0].sublogs.push({
+          time: formatNow(),
+          msg: `📐 Luna VLM 표 바운딩 박스 및 헤더 계층 추출 완료`,
+          status: 'done',
+        });
+        next[1].status = 'running';
+        next[1].sublogs = [
+          { time: formatNow(), msg: `📝 4-Field 직렬화 템플릿 적용 ([SHEET] / [COL] / [ROW] / [VALUE])`, status: 'running' },
+          { time: formatNow(), msg: `🧹 공백 셀 필터링 및 서식 정규화 완료`, status: 'running' },
+        ];
+        return next;
+      });
+    }, 1100);
+
+    const t2 = setTimeout(() => {
+      setCurrentStageIndex(2);
+      setProgressPercent(70);
+      setModules((prev) => {
+        const next = [...prev];
+        next[1].status = 'done';
+        next[1].durationSeconds = 0.9;
+        next[1].sublogs.push({
+          time: formatNow(),
+          msg: `📑 총 직렬화 문서(CellTextDocumentDTO) 생성 완료`,
+          status: 'done',
+        });
+        next[2].status = 'running';
+        next[2].sublogs = [
+          { time: formatNow(), msg: `⚡ 문서를 배치 크기 ${batchSize} 단위로 분할하여 OpenAI Embeddings 호출`, status: 'running' },
+          { time: formatNow(), msg: `🌐 ${model} 고밀도 3072D 벡터 생성 및 토큰 누적 집계 중...`, status: 'running' },
+        ];
+        return next;
+      });
+    }, 2200);
+
+    const t3 = setTimeout(() => {
+      setCurrentStageIndex(3);
+      setProgressPercent(90);
+      setModules((prev) => {
+        const next = [...prev];
+        next[2].status = 'done';
+        next[2].durationSeconds = 1.6;
+        next[2].sublogs.push({
+          time: formatNow(),
+          msg: `💾 float32 L2 정규화 및 임베딩 아티팩트 해시 생성 완료`,
+          status: 'done',
+        });
+        next[3].status = 'running';
+        next[3].sublogs = [
+          { time: formatNow(), msg: `🔌 PostgreSQL 16 langchain_pg_collection 연결 및 cmetadata 등록`, status: 'running' },
+          { time: formatNow(), msg: `📥 langchain_pg_embedding 테이블 벡터 및 메타데이터 적재 중...`, status: 'running' },
+        ];
+        return next;
+      });
+    }, 3800);
 
     try {
-      // Small simulated step feedback
-      setTimeout(() => {
-        setStepMessage('고차원 벡터 임베딩 생성 및 배치 연산 수행 중...');
-      }, 1200);
-
       const newIndex = await dataSourceApi.ingestWorkbook({
         file_name: selectedFile,
         model,
@@ -109,16 +255,42 @@ export function IndexIngestionModal({
         batch_size: batchSize,
       });
 
-      onSuccess(newIndex);
-      onClose();
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+
+      setCurrentStageIndex(3);
+      setProgressPercent(100);
+
+      setModules((prev) => {
+        const next = prev.map((m) => ({
+          ...m,
+          status: 'done' as const,
+          durationSeconds: m.durationSeconds || 1.0,
+        }));
+        next[3].sublogs.push({
+          time: formatNow(),
+          msg: `🚀 PostgreSQL 16 pgvector HNSW 코사인 유사도 인덱스 동기화 완료! (${newIndex.document_count || 0}개 청크)`,
+          status: 'done',
+        });
+        return next;
+      });
+
+      setTimeout(() => {
+        onSuccess(newIndex);
+        onClose();
+      }, 700);
     } catch (err: any) {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       setError(err.message || '벡터 인덱싱에 실패했습니다.');
       setIsIngesting(false);
     }
   };
 
   return (
-    <div className="ds-modal-backdrop" onClick={onClose}>
+    <div className="ds-modal-backdrop" onClick={isIngesting ? undefined : onClose}>
       <div
         className="ds-modal ds-modal--large"
         onClick={(e) => e.stopPropagation()}
@@ -135,36 +307,26 @@ export function IndexIngestionModal({
               <small>표 구조 분석부터 임베딩과 영속 벡터 인덱스 적재까지 자동 수행</small>
             </div>
           </div>
-          <button className="ds-modal__close" onClick={onClose} aria-label="닫기" disabled={isIngesting}>
-            <X size={18} />
-          </button>
+          {!isIngesting && (
+            <button className="ds-modal__close" onClick={onClose} aria-label="닫기">
+              <X size={18} />
+            </button>
+          )}
         </header>
 
         <div className="ds-modal__body">
           {error && <div className="ds-error-alert">{error}</div>}
 
           {isIngesting ? (
-            <div className="ds-ingesting-state">
-              <div className="ds-ingesting-spinner">
-                <Loader2 className="ds-spin" size={44} />
-              </div>
-              <h4>인덱싱 파이프라인이 실행 중입니다</h4>
-              <p>{stepMessage}</p>
-              <div className="ds-ingesting-steps">
-                <div className="ds-step is-done">
-                  <CheckCircle2 size={16} /> <span>엑셀 데이터 로드</span>
-                </div>
-                <div className="ds-step is-active">
-                  <Loader2 size={16} className="ds-spin" /> <span>Luna VLM / 4필드 직렬화</span>
-                </div>
-                <div className="ds-step">
-                  <Layers size={16} /> <span>배치 임베딩 생성</span>
-                </div>
-                <div className="ds-step">
-                  <Database size={16} /> <span>Vector DB 적재</span>
-                </div>
-              </div>
-            </div>
+            <ModulePipelineMonitor
+              fileName={selectedFile}
+              model={model}
+              batchSize={batchSize}
+              elapsedSeconds={elapsedSeconds}
+              currentStageIndex={currentStageIndex}
+              progressPercent={progressPercent}
+              modules={modules}
+            />
           ) : (
             <div className="ds-form-stack">
               {/* 1. File Selection */}
@@ -288,10 +450,10 @@ export function IndexIngestionModal({
                         value={batchSize}
                         onChange={(e) => setBatchSize(Number(e.target.value))}
                       >
-                        <option value={32}>32</option>
-                        <option value={64}>64 (기본값)</option>
-                        <option value={128}>128</option>
-                        <option value={256}>256</option>
+                        <option value={32}>32개 / 요청</option>
+                        <option value={64}>64개 / 요청 (표준)</option>
+                        <option value={128}>128개 / 요청 (빠름)</option>
+                        <option value={256}>256개 / 요청 (대용량)</option>
                       </select>
                     </div>
                   </div>
@@ -302,22 +464,29 @@ export function IndexIngestionModal({
         </div>
 
         <footer className="ds-modal__footer">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={onClose}
-            disabled={isIngesting}
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleStartIngest}
-            disabled={isIngesting || !selectedFile || selectedSheets.length === 0}
-          >
-            <Play size={15} fill="currentColor" /> 인덱싱 시작
-          </button>
+          {isIngesting ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f766e', fontSize: '0.8rem', fontWeight: 600 }}>
+              <span>각 파이프라인 모듈 카드를 클릭하면 세부 실행 로그를 확인할 수 있습니다.</span>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onClose}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleStartIngest}
+                disabled={!selectedFile || selectedSheets.length === 0}
+              >
+                <Play size={15} fill="currentColor" /> 인덱싱 시작
+              </button>
+            </>
+          )}
         </footer>
       </div>
     </div>

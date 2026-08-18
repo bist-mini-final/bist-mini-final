@@ -14,6 +14,8 @@ export interface VectorIndexInfo {
   index_id: string;
   file_name: string;
   workbook_hash: string;
+  company_name?: string;
+  ticker?: string;
   model: string;
   dimension: number;
   document_count: number;
@@ -53,6 +55,8 @@ export interface VectorIndexDetail {
   index_id: string;
   file_name: string;
   workbook_hash: string;
+  company_name?: string;
+  ticker?: string;
   model: string;
   dimension: number;
   document_count: number;
@@ -62,6 +66,9 @@ export interface VectorIndexDetail {
   estimated_cost_usd?: number;
   estimated_cost_krw?: number;
   batch_size?: number;
+  sheet_names?: string[];
+  tables?: any[];
+  luna_output?: any;
 }
 
 export interface IngestRequest {

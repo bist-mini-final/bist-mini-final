@@ -133,6 +133,8 @@ class PgVectorStore:
             "estimated_cost_usd": meta_dict.get("estimated_cost_usd"),
             "estimated_cost_krw": meta_dict.get("estimated_cost_krw"),
             "batch_size": meta_dict.get("batch_size"),
+            "company_name": meta_dict.get("company_name", ""),
+            "ticker": meta_dict.get("ticker", ""),
         }
 
         store = get_vector_store(
@@ -181,21 +183,25 @@ class PgVectorStore:
     def put(
         self,
         index_id: str,
-        vectors_or_items: Any,
-        metadata: Dict[str, Any],
+        vectors_or_items: Any = None,
+        metadata: Optional[Dict[str, Any]] = None,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
+        vectors: Any = None,
     ) -> None:
         """Backwards-compatible put: converts cell items to LangChain documents and inserts."""
-        raw_items = metadata.get("items") or []
-        model_name = metadata.get("model", "text-embedding-3-large")
-        file_name = metadata.get("file_name", "")
-        workbook_hash = metadata.get("workbook_hash", "")
+        meta_dict = metadata or {}
+        raw_items = meta_dict.get("items") or []
+        model_name = meta_dict.get("model", "text-embedding-3-large")
+        file_name = meta_dict.get("file_name", "")
+        workbook_hash = meta_dict.get("workbook_hash", "")
+        company_name = meta_dict.get("company_name", "")
 
         docs = cell_items_to_langchain_documents(
             items=raw_items,
             file_name=file_name,
             workbook_hash=workbook_hash,
             index_id=index_id,
+            company_name=company_name,
         )
         self.put_documents(
             index_id=index_id,
@@ -241,6 +247,8 @@ class PgVectorStore:
                     "index_id": name,
                     "file_name": meta.get("file_name", "unknown"),
                     "workbook_hash": meta.get("workbook_hash", ""),
+                    "company_name": meta.get("company_name", ""),
+                    "ticker": meta.get("ticker", ""),
                     "model": meta.get("model", "text-embedding-3-large"),
                     "dimension": meta.get("dimension", 3072),
                     "document_count": count,
@@ -255,6 +263,13 @@ class PgVectorStore:
             return results
         finally:
             conn.close()
+
+    def get_index_metadata(self, index_id: str) -> Dict[str, Any]:
+        """Retrieve metadata dictionary for a pgvector collection."""
+        try:
+            return self.get_index_detail(index_id, limit=1)
+        except Exception:
+            return {}
 
     def get_index_detail(self, index_id: str, limit: int = 15) -> Dict[str, Any]:
         """Retrieve collection detail and sample document chunks."""
@@ -294,6 +309,20 @@ class PgVectorStore:
                 )
                 chunk_rows = cur.fetchall()
 
+                detected_tables_list = []
+                sheet_names_list = []
+                if meta.get("workbook_hash"):
+                    cur.execute(
+                        "SELECT sheet_name, detected_tables FROM sheets WHERE file_id = %s;",
+                        (meta.get("workbook_hash"),)
+                    )
+                    sheet_rows = cur.fetchall()
+                    for s_row in sheet_rows:
+                        s_name = s_row[0]
+                        sheet_names_list.append(s_name)
+                        if s_row[1] and isinstance(s_row[1], list):
+                            detected_tables_list.extend(s_row[1])
+
             sample_items = []
             for c in chunk_rows:
                 text = c[0]
@@ -314,10 +343,21 @@ class PgVectorStore:
                     "text": text,
                 })
 
+            luna_output = None
+            if detected_tables_list:
+                luna_output = {
+                    "file_name": meta.get("file_name", ""),
+                    "workbook_hash": meta.get("workbook_hash", ""),
+                    "sheet_names": sheet_names_list,
+                    "tables": detected_tables_list,
+                }
+
             return {
                 "index_id": index_id,
                 "file_name": meta.get("file_name", ""),
                 "workbook_hash": meta.get("workbook_hash", ""),
+                "company_name": meta.get("company_name", ""),
+                "ticker": meta.get("ticker", ""),
                 "model": meta.get("model", ""),
                 "dimension": meta.get("dimension", 3072),
                 "document_count": row[3],
@@ -329,9 +369,83 @@ class PgVectorStore:
                 "estimated_cost_krw": meta.get("estimated_cost_krw"),
                 "batch_size": meta.get("batch_size"),
                 "sample_items": sample_items,
+                "sheet_names": sheet_names_list,
+                "tables": detected_tables_list,
+                "luna_output": luna_output,
             }
         finally:
             conn.close()
+
+    def update_index_company(self, index_id: str, company_name: str) -> Dict[str, Any]:
+        """Update company_name in collection metadata and cascade to all chunks and DB tables."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                # 1. Update langchain_pg_collection (cmetadata is column type json)
+                cur.execute(
+                    """
+                    UPDATE langchain_pg_collection
+                    SET cmetadata = jsonb_set(
+                        COALESCE(cmetadata::jsonb, '{}'::jsonb),
+                        '{company_name}',
+                        to_jsonb(%s::text)
+                    )::json
+                    WHERE name = %s
+                    RETURNING uuid, cmetadata;
+                    """,
+                    (company_name, index_id),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise PgVectorStoreError(f"pgvector 컬렉션을 찾을 수 없습니다: {index_id}")
+
+                collection_uuid = row[0]
+                col_meta = row[1] or {}
+                if isinstance(col_meta, str):
+                    import json
+                    try:
+                        col_meta = json.loads(col_meta)
+                    except Exception:
+                        col_meta = {}
+                workbook_hash = col_meta.get("workbook_hash", "")
+
+                # 2. Update langchain_pg_embedding (cascade to all chunks in this collection)
+                cur.execute(
+                    """
+                    UPDATE langchain_pg_embedding
+                    SET cmetadata = jsonb_set(
+                        COALESCE(cmetadata, '{}'::jsonb),
+                        '{company_name}',
+                        to_jsonb(%s::text)
+                    )
+                    WHERE collection_id = %s;
+                    """,
+                    (company_name, collection_uuid),
+                )
+
+                # 3. Update source_files table if exists
+                if workbook_hash:
+                    cur.execute(
+                        """
+                        UPDATE source_files
+                        SET metadata = jsonb_set(
+                            COALESCE(metadata, '{}'::jsonb),
+                            '{company_name}',
+                            to_jsonb(%s::text)
+                        )
+                        WHERE file_id = %s;
+                        """,
+                        (company_name, workbook_hash),
+                    )
+
+            conn.commit()
+        except Exception as err:
+            conn.rollback()
+            raise PgVectorStoreError(f"기업명 수정 실패: {err}") from err
+        finally:
+            conn.close()
+
+        return self.get_index_detail(index_id)
 
     def ensure_optimized_indexes(self) -> None:
         """Create HNSW vector index and jsonb_path_ops GIN metadata index if they don't exist."""
@@ -436,3 +550,63 @@ class PgVectorStore:
             cell_item = langchain_document_to_cell_item(doc, score=similarity)
             results.append((similarity, cell_item))
         return results
+
+    def similarity_search_by_vector_with_score(
+        self,
+        collection_name: str,
+        embedding: List[float],
+        k: int = 10,
+    ) -> List[Tuple[Any, float]]:
+        """Perform vector similarity search on PostgreSQL pgvector with cosine operator (<=>)."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
+                    (collection_name,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return []
+                col_uuid = row[0]
+
+                cur.execute(
+                    """
+                    SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
+                    FROM langchain_pg_embedding
+                    WHERE collection_id = %s
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s;
+                    """,
+                    (embedding, col_uuid, embedding, k),
+                )
+                rows = cur.fetchall()
+
+            from langchain_core.documents import Document
+            results = []
+            for r in rows:
+                _id, text, cmeta, dist = r
+                if isinstance(cmeta, str):
+                    import json
+                    try:
+                        cmeta = json.loads(cmeta)
+                    except Exception:
+                        cmeta = {}
+                doc = Document(
+                    page_content=text,
+                    metadata=cmeta or {},
+                )
+                results.append((doc, float(dist) if dist is not None else 0.0))
+            return results
+        except Exception:
+            try:
+                store = get_vector_store(
+                    collection_name=collection_name,
+                    backend="pgvector",
+                    database_url=self.database_url,
+                )
+                return store.similarity_search_by_vector_with_score(embedding, k=k)
+            except Exception:
+                return []
+        finally:
+            conn.close()

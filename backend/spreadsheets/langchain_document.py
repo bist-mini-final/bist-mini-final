@@ -14,6 +14,7 @@ def cell_items_to_langchain_documents(
     file_name: str = "",
     workbook_hash: str = "",
     index_id: str = "",
+    company_name: str = "",
 ) -> List[Document]:
     """Convert raw cell DTOs or dicts into standard LangChain Document objects."""
     documents: List[Document] = []
@@ -36,6 +37,7 @@ def cell_items_to_langchain_documents(
             "file_name": file_name,
             "workbook_hash": workbook_hash,
             "index_id": index_id,
+            "company_name": doc_dict.get("company_name") or company_name,
         }
         documents.append(
             Document(

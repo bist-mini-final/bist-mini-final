@@ -540,7 +540,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 25)
+        self.assertEqual(len(definitions), 28)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
@@ -549,6 +549,9 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "embedder",
                 "cell_text_embedder",
                 "vector_index_writer",
+                "pgvector_index_writer",
+                "pgvector_collection_loader",
+                "pgvector_retriever",
                 "bm25_retriever",
                 "dense_retriever",
                 "rrf_fusion",
@@ -791,7 +794,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 25)
+        self.assertEqual(len(modules), 28)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -1143,6 +1146,18 @@ class ApiContractTests(unittest.TestCase):
             "qa_example_loader": (
                 {"file_name"},
                 {"include_builtin"},
+            ),
+            "pgvector_index_writer": (
+                {"file_name", "workbook_hash", "model", "artifact_id", "dimension", "items"},
+                set(),
+            ),
+            "pgvector_collection_loader": (
+                {"collection_name", "collection_names"},
+                set(),
+            ),
+            "pgvector_retriever": (
+                {"query_input", "index_input"},
+                {"top_k"},
             ),
         }
 
@@ -2897,6 +2912,42 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(unified[0].title_range, "A1:K2")
         self.assertEqual(unified[0].row_header_range, "A5:A100")
         self.assertEqual(unified[0].data_range, "B5:K100")
+
+    def test_pgvector_retriever_execution(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        mock_store = MagicMock()
+        mock_doc = MagicMock()
+        mock_doc.page_content = "Total Revenue in 2024 is 500M"
+        mock_doc.metadata = {"cell_id": "c1", "sheet_name": "IS"}
+        mock_store.similarity_search_by_vector_with_score.return_value = [(mock_doc, 0.1)]
+
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO(
+            query_input={
+                "query_context": {"question_id": "q1", "question_text": "Revenue query"},
+                "items": {"Revenue query": [0.1, 0.2]},
+            },
+            index_input={
+                "index_id": "col_1,col_2",
+                "file_name": "dataset.xlsm",
+                "workbook_hash": "hash_1",
+                "model": "text-embedding-3-large",
+                "dimension": 2,
+                "document_count": 10,
+            },
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertIn("query_context", res)
+        self.assertIn("document_context", res)
+        self.assertEqual(res["document_context"]["file_name"], "dataset.xlsm")
+        self.assertEqual(len(res["items"]), 1)
+        self.assertEqual(res["items"][0]["cell_id"], "c1")
+        self.assertAlmostEqual(res["items"][0]["score"], 0.9)
 
 
 if __name__ == "__main__":

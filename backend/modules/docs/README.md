@@ -39,6 +39,9 @@ python -m backend.tools.generate_module_docs
 | `local_vlm_structure_detector` | Logic | [Local VLM Table Structure Detector](./local_vlm_structure_detector.md) |
 | `luna_vlm_structure_detector` | Logic | [Luna Full-Sheet Structure Detector](./luna_vlm_structure_detector.md) |
 | `openpyxl_region_detector` | Logic | [OpenPyXL Table Region Classifier](./openpyxl_region_detector.md) |
+| `pgvector_collection_loader` | Source | [PostgreSQL pgvector Collection Loader](./pgvector_collection_loader.md) |
+| `pgvector_index_writer` | Transform | [PostgreSQL pgvector Writer](./pgvector_index_writer.md) |
+| `pgvector_retriever` | Logic | [PostgreSQL pgvector Retriever](./pgvector_retriever.md) |
 | `prebuilt_index_loader` | Source | [Pre-built Vector Index Loader](./prebuilt_index_loader.md) |
 | `processed_file_selector` | Source | [Processed Excel File Selector](./processed_file_selector.md) |
 | `qa_example_loader` | Source | [QA Example Bank Loader](./qa_example_loader.md) |

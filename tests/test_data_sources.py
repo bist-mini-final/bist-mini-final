@@ -45,9 +45,7 @@ class DataSourceApiTests(unittest.TestCase):
         wb.save(self.sample_file)
 
         self.pg_store = PgVectorStore()
-        if self.pg_store.is_connected():
-            for idx in self.pg_store.list_indexes():
-                self.pg_store.delete(idx["index_id"])
+        self.clean_test_indexes()
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
         self.app = FastAPI()
@@ -63,10 +61,14 @@ class DataSourceApiTests(unittest.TestCase):
         )
         self.client = TestClient(self.app)
 
-    def tearDown(self):
+    def clean_test_indexes(self):
         if hasattr(self, "pg_store") and self.pg_store.is_connected():
             for idx in self.pg_store.list_indexes():
-                self.pg_store.delete(idx["index_id"])
+                if "Test_Workbook" in idx.get("file_name", "") or idx["index_id"].startswith("test_"):
+                    self.pg_store.delete(idx["index_id"])
+
+    def tearDown(self):
+        self.clean_test_indexes()
         self.temp_dir.cleanup()
 
     def test_list_files(self):
@@ -120,8 +122,8 @@ class DataSourceApiTests(unittest.TestCase):
         list_resp = self.client.get("/api/data-sources/indexes")
         self.assertEqual(list_resp.status_code, 200)
         indexes_data = list_resp.json()
-        self.assertEqual(indexes_data["total"], 1)
-        self.assertEqual(indexes_data["indexes"][0]["index_id"], index_id)
+        found_ids = [idx["index_id"] for idx in indexes_data["indexes"]]
+        self.assertIn(index_id, found_ids)
 
         # Get index detail
         detail_resp = self.client.get(f"/api/data-sources/indexes/{index_id}")
@@ -148,7 +150,8 @@ class DataSourceApiTests(unittest.TestCase):
 
         # Confirm deleted
         list_after = self.client.get("/api/data-sources/indexes").json()
-        self.assertEqual(list_after["total"], 0)
+        deleted_ids = [idx["index_id"] for idx in list_after["indexes"]]
+        self.assertNotIn(index_id, deleted_ids)
 
 
 if __name__ == "__main__":

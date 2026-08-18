@@ -50,6 +50,26 @@ async function postJson<T>(url: string, payload: unknown, signal?: AbortSignal):
   return response.json() as Promise<T>;
 }
 
+async function patchJson<T>(url: string, payload: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok) {
+    let detail = `요청 실패 (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === 'string') detail = body.detail;
+    } catch {
+      // fallback
+    }
+    throw new DataSourceApiError(detail, response.status);
+  }
+  return response.json() as Promise<T>;
+}
+
 async function deleteJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     method: 'DELETE',
@@ -89,15 +109,24 @@ export const dataSourceApi = {
     return requestJson<SheetPreviewData>(url, signal);
   },
 
-  async uploadFile(file: File, autoIngest: boolean = true, signal?: AbortSignal): Promise<DataSourceFile> {
+  async uploadFile(
+    file: File,
+    autoIngest: boolean = true,
+    model: string = 'text-embedding-3-large',
+    batchSize: number = 64,
+    signal?: AbortSignal
+  ): Promise<{ file: DataSourceFile; auto_ingested: boolean; ingested_index?: any; error?: string }> {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`/api/data-sources/files/upload?auto_ingest=${autoIngest}`, {
-      method: 'POST',
-      body: formData,
-      signal,
-    });
+    const response = await fetch(
+      `/api/data-sources/files/upload?auto_ingest=${autoIngest}&model=${encodeURIComponent(model)}&batch_size=${batchSize}`,
+      {
+        method: 'POST',
+        body: formData,
+        signal,
+      }
+    );
 
     if (!response.ok) {
       let detail = `업로드 실패 (${response.status})`;
@@ -110,8 +139,7 @@ export const dataSourceApi = {
       throw new DataSourceApiError(detail, response.status);
     }
 
-    const data = (await response.json()) as { status: string; file: DataSourceFile };
-    return data.file;
+    return response.json();
   },
 
   async deleteFile(fileName: string, signal?: AbortSignal): Promise<void> {
@@ -135,6 +163,18 @@ export const dataSourceApi = {
 
   async deleteIndex(indexId: string, signal?: AbortSignal): Promise<void> {
     await deleteJson(`/api/data-sources/indexes/${encodeURIComponent(indexId)}`, signal);
+  },
+
+  async updateIndexCompany(
+    indexId: string,
+    companyName: string,
+    signal?: AbortSignal
+  ): Promise<VectorIndexDetail> {
+    return patchJson<VectorIndexDetail>(
+      `/api/data-sources/indexes/${encodeURIComponent(indexId)}`,
+      { company_name: companyName },
+      signal
+    );
   },
 
   async searchIndex(

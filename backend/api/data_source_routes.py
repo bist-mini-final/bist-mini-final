@@ -61,6 +61,10 @@ class DbConnectRequestDTO(BaseModel):
     database_url: str = Field(min_length=1, description="PostgreSQL + pgvector 접속 URL")
 
 
+class UpdateIndexCompanyRequestDTO(BaseModel):
+    company_name: str = Field(min_length=1, max_length=200, description="수정할 기업명 / Entity Name")
+
+
 def create_data_source_router(
     processed_dir: Path = PROCESSED_DATA_DIR,
     vector_index_dir: Path = VECTOR_INDEX_DIR,
@@ -117,6 +121,8 @@ def create_data_source_router(
     async def upload_file(
         file: UploadFile = File(...),
         auto_ingest: bool = Query(default=True, description="업로드 즉시 Luna VLM 구조화 & 벡터 인덱싱 자동 실행"),
+        model: str = Query(default="text-embedding-3-large", description="임베딩 모델"),
+        batch_size: int = Query(default=64, description="임베딩 배치 크기"),
     ) -> Dict[str, Any]:
         """Upload a new raw file to data/processed/ and optionally trigger auto-ingest."""
         if not file.filename:
@@ -134,11 +140,14 @@ def create_data_source_router(
             file.file.close()
 
         ingested_index = None
+        ingest_error = None
         suffix = dest_path.suffix.lower()
         if auto_ingest and suffix in (".xlsx", ".xlsm"):
             try:
                 ingested_index = ingest_excel_workbook(
                     file_name=safe_filename,
+                    model=model,
+                    batch_size=batch_size,
                     structure_mode="auto",
                     processed_dir=processed_dir,
                     vector_index_store=vector_index_store,
@@ -146,8 +155,10 @@ def create_data_source_router(
                     embedding_artifact_store=embedding_artifact_store,
                     embedding_encoder=embedding_encoder,
                 )
-            except Exception:
-                ingested_index = None
+            except Exception as err:
+                import traceback
+                traceback.print_exc()
+                ingest_error = str(err)
 
         files = list_processed_files(processed_dir, vector_index_store, pg_store)
         uploaded = next((f for f in files if f["file_name"] == safe_filename), None)
@@ -156,6 +167,7 @@ def create_data_source_router(
             "file": uploaded,
             "auto_ingested": ingested_index is not None,
             "ingested_index": ingested_index,
+            "error": ingest_error,
         }
 
     # 4. Delete file
@@ -209,6 +221,21 @@ def create_data_source_router(
             )
         except Exception as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+
+    # 6-1. Update index company name
+    @router.patch("/indexes/{index_id}")
+    @router.put("/indexes/{index_id}/company")
+    def update_index_company(
+        index_id: str,
+        request: UpdateIndexCompanyRequestDTO,
+    ) -> Dict[str, Any]:
+        """Update company name in pgvector collection metadata and cascade to all chunks."""
+        if not pg_store or not pg_store.is_connected():
+            raise HTTPException(status_code=503, detail="pgvector 데이터베이스에 연결할 수 없습니다")
+        try:
+            return pg_store.update_index_company(index_id, request.company_name)
+        except Exception as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     # 7. Delete vector index
     @router.delete("/indexes/{index_id}")
