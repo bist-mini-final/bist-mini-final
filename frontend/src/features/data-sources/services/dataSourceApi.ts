@@ -209,4 +209,18 @@ export const dataSourceApi = {
     );
     return data.index;
   },
+
+  async rerunFromStep(
+    indexId: string,
+    fromStep: 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store',
+    model?: string,
+    batchSize = 64,
+    signal?: AbortSignal
+  ): Promise<{ status: string; from_step: string; index: VectorIndexInfo }> {
+    return postJson<{ status: string; from_step: string; index: VectorIndexInfo }>(
+      `/api/data-sources/indexes/${encodeURIComponent(indexId)}/rerun`,
+      { from_step: fromStep, ...(model ? { model } : {}), batch_size: batchSize },
+      signal
+    );
+  },
 };

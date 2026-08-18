@@ -180,3 +180,61 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def get_detected_tables(self, workbook_hash: str) -> List[Dict[str, Any]]:
+        """Return all detected_tables rows from the sheets table for the given workbook hash.
+
+        Used by the partial re-run feature to restore Step 1 (Luna VLM) results when
+        re-starting the pipeline from Step 2 (Serializer).
+
+        Returns a flat list of table dicts, each compatible with ClassifiedTableDTO(**t).
+        """
+        import logging
+        _log = logging.getLogger(__name__)
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT sheet_name, detected_tables FROM sheets WHERE file_id = %s ORDER BY sheet_index;",
+                    (workbook_hash,),
+                )
+                rows = cur.fetchall()
+
+            tables: List[Dict[str, Any]] = []
+            for sheet_name, detected in rows:
+                if not detected:
+                    continue
+                # Normalise: psycopg2 returns JSONB as Python object
+                if isinstance(detected, dict):
+                    # Stored as single object instead of array — wrap it
+                    detected = [detected]
+                if not isinstance(detected, list):
+                    _log.warning(
+                        "[DB] sheets.detected_tables for %s/%s has unexpected type %s — skipping",
+                        workbook_hash[:16], sheet_name, type(detected).__name__,
+                    )
+                    continue
+                for item in detected:
+                    if not isinstance(item, dict):
+                        _log.warning(
+                            "[DB] Non-dict entry in detected_tables for %s/%s — skipping",
+                            workbook_hash[:16], sheet_name,
+                        )
+                        continue
+                    # Validate minimum required fields for ClassifiedTableDTO
+                    if "sheet_name" not in item or "regions" not in item:
+                        _log.warning(
+                            "[DB] detected_tables entry missing sheet_name or regions for %s — skipping",
+                            sheet_name,
+                        )
+                        continue
+                    tables.append(item)
+
+            _log.info(
+                "[DB] get_detected_tables: %d tables restored for workbook %s",
+                len(tables), workbook_hash[:16],
+            )
+            return tables
+        finally:
+            conn.close()
+

@@ -434,6 +434,94 @@ export function DataSourcesView() {
 
   // If Full-Page Pipeline Tracker is active, render it exclusively
   if (activePipelineRun && isViewingTracker) {
+    const handleRerunFromStep = async (
+      fromStep: 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store'
+    ) => {
+      const indexId = activePipelineRun.pipelineId;
+      // Reset pipeline UI state: steps at/after fromStep become running, earlier steps stay done
+      const STEP_ORDER: Array<'luna_vlm' | 'serializer' | 'embedder' | 'vector_store'> = [
+        'luna_vlm', 'serializer', 'embedder', 'vector_store',
+      ];
+      const fromIdx = STEP_ORDER.indexOf(fromStep);
+      const resetMods = activePipelineRun.modules.map((m, i) => ({
+        ...m,
+        status: (i < fromIdx ? 'done' : i === fromIdx ? 'running' : 'waiting') as any,
+        durationSeconds: i < fromIdx ? m.durationSeconds : undefined,
+        sublogs: i < fromIdx ? m.sublogs : [
+          { time: new Date().toLocaleTimeString('ko-KR', { hour12: false }), msg: `↺ ${fromStep} 스텝부터 재실행 시작...`, status: 'running' as const },
+        ],
+      }));
+      setActivePipelineRun((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'running',
+              currentStageIndex: fromIdx,
+              progressPercent: Math.round((fromIdx / prev.modules.length) * 100),
+              error: null,
+              modules: resetMods,
+            }
+          : prev
+      );
+
+      const start = Date.now();
+      if (pipelineTimerRef.current) clearInterval(pipelineTimerRef.current);
+      pipelineTimerRef.current = setInterval(() => {
+        setActivePipelineRun((prev) => {
+          if (!prev || prev.status !== 'running') return prev;
+          return { ...prev, elapsedSeconds: (Date.now() - start) / 1000 };
+        });
+      }, 100);
+
+      try {
+        const res = await dataSourceApi.rerunFromStep(
+          indexId,
+          fromStep,
+          activePipelineRun.model,
+          activePipelineRun.batchSize
+        );
+        if (pipelineTimerRef.current) clearInterval(pipelineTimerRef.current);
+
+        const idxData = res.index || {};
+        const finalElapsed = idxData.duration_seconds || (Date.now() - start) / 1000;
+        const chunkCount = idxData.document_count || activePipelineRun.chunkCount || 0;
+
+        setActivePipelineRun((prev) => {
+          if (!prev) return prev;
+          const doneMods = prev.modules.map((m) => ({
+            ...m,
+            status: 'done' as const,
+            durationSeconds: m.durationSeconds || 1.0,
+          }));
+          doneMods[doneMods.length - 1].sublogs.push({
+            time: new Date().toLocaleTimeString('ko-KR', { hour12: false }),
+            msg: `🚀 재실행 완료 — ${chunkCount}개 청크 pgvector 저장 완료`,
+            status: 'done',
+          });
+          return {
+            ...prev,
+            status: 'completed',
+            currentStageIndex: prev.modules.length - 1,
+            progressPercent: 100,
+            elapsedSeconds: finalElapsed,
+            chunkCount,
+            modules: doneMods,
+          };
+        });
+        fetchData();
+      } catch (err: any) {
+        if (pipelineTimerRef.current) clearInterval(pipelineTimerRef.current);
+        setActivePipelineRun((prev) => {
+          if (!prev) return prev;
+          const failedMods = prev.modules.map((m) => ({
+            ...m,
+            status: (m.status === 'running' ? 'failed' : m.status) as any,
+          }));
+          return { ...prev, status: 'failed', error: err.message || '재실행 실패', modules: failedMods };
+        });
+      }
+    };
+
     return (
       <div className="ds-page">
         <PipelineTrackerView
@@ -443,6 +531,7 @@ export function DataSourcesView() {
             fetchData();
           }}
           onRefresh={fetchData}
+          onRerunFromStep={handleRerunFromStep}
         />
       </div>
     );

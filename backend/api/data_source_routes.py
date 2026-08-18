@@ -73,6 +73,18 @@ class UpdateIndexCompanyRequestDTO(BaseModel):
     company_name: str = Field(min_length=1, max_length=200, description="수정할 기업명 / Entity Name")
 
 
+class RerunFromStepRequestDTO(BaseModel):
+    from_step: Literal["luna_vlm", "serializer", "embedder", "vector_store"] = Field(
+        default="luna_vlm",
+        description="재실행 시작 스텝 (luna_vlm: 처음부터, serializer: Step 2부터, embedder: Step 3부터, vector_store: Step 4부터)",
+    )
+    model: str = Field(
+        default="text-embedding-3-large",
+        description="임베딩 모델 (기존 인덱스 모델과 같아야 정상 작동합니다)",
+    )
+    batch_size: int = Field(default=64, ge=1, le=512, description="임베딩 배치 크기")
+
+
 def create_data_source_router(
     processed_dir: Path = PROCESSED_DATA_DIR,
     vector_index_dir: Path = VECTOR_INDEX_DIR,
@@ -368,5 +380,54 @@ def create_data_source_router(
             raise HTTPException(status_code=400, detail=str(error)) from error
         except Exception as error:
             raise HTTPException(status_code=500, detail=f"인덱싱 처리 중 오류 발생: {error}") from error
+
+    # 10. Re-run pipeline from a specific step for an existing index
+    @router.post("/indexes/{index_id}/rerun")
+    async def rerun_from_step(
+        index_id: str,
+        request: RerunFromStepRequestDTO,
+    ) -> Dict[str, Any]:
+        """Re-run the ingestion pipeline from a specific step for an existing vector index.
+
+        Looks up the index to get file_name / workbook_hash, then calls ingest_excel_workbook
+        with from_step set to the requested stage so earlier stages are skipped.
+        """
+        # Resolve index metadata
+        try:
+            detail = get_vector_index_detail(
+                index_id,
+                sample_items_count=0,
+                vector_index_store=vector_index_store,
+                pgvector_store=pg_store,
+            )
+        except Exception as error:
+            raise HTTPException(status_code=404, detail=f"인덱스를 찾을 수 없습니다: {error}") from error
+
+        file_name: str = detail.get("file_name", "")
+        resolved_model: str = request.model or detail.get("model", "text-embedding-3-large")
+        if not file_name:
+            raise HTTPException(status_code=400, detail="인덱스에 연결된 파일명을 확인할 수 없습니다")
+
+        try:
+            result = await anyio.to_thread.run_sync(
+                lambda: ingest_excel_workbook(
+                    file_name=file_name,
+                    model=resolved_model,
+                    structure_mode="luna_vlm",
+                    from_step=request.from_step,
+                    batch_size=request.batch_size,
+                    processed_dir=processed_dir,
+                    spreadsheet_artifact_dir=spreadsheet_artifact_dir,
+                    vector_index_store=vector_index_store,
+                    pgvector_store=pg_store,
+                    embedding_artifact_store=embedding_artifact_store,
+                    embedding_encoder=embedding_encoder,
+                )
+            )
+            return {"status": "success", "from_step": request.from_step, "index": result}
+        except ModuleExecutionError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"재실행 처리 중 오류 발생: {error}") from error
 
     return router

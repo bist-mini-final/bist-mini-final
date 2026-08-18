@@ -45,9 +45,10 @@ interface TrackerProps {
   pipeline: PipelineRunState;
   onBack: () => void;
   onRefresh?: () => void;
+  onRerunFromStep?: (fromStep: 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store') => void;
 }
 
-export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
+export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: TrackerProps) {
   const [openModuleIds, setOpenModuleIds] = useState<Record<string, boolean>>({
     [pipeline.modules[pipeline.currentStageIndex]?.id || '']: true,
   });
@@ -210,6 +211,19 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
               const isModWaiting = mod.status === 'waiting';
               const isLunaModule = mod.id === 'mod_vlm_detector' || mod.moduleType === 'luna_vlm_structure_detector';
 
+              // Map module type to from_step key for partial re-run
+              const STEP_MAP: Record<string, 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store'> = {
+                luna_vlm_structure_detector: 'luna_vlm',
+                local_vlm_structure_detector: 'luna_vlm',
+                cell_text_serializer: 'serializer',
+                exhaustive_cell_text_serializer: 'serializer',
+                cell_text_embedder: 'embedder',
+                vector_index_writer: 'vector_store',
+                pgvector_index_writer: 'vector_store',
+              };
+              const rerunStep = STEP_MAP[mod.moduleType ?? ''];
+              const canRerun = !!onRerunFromStep && !!rerunStep && !isRunning;
+
               return (
                 <div
                   key={mod.id}
@@ -256,6 +270,28 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                         >
                           <Search size={13} />
                           <span>Luna 구조 돋보기 검사</span>
+                        </button>
+                      )}
+
+                      {/* Partial Re-run Button: shown on completed steps when not running */}
+                      {canRerun && (
+                        <button
+                          type="button"
+                          className="ds-action-btn ds-action-btn--secondary"
+                          style={{
+                            padding: '0.22rem 0.55rem',
+                            fontSize: '0.68rem',
+                            marginRight: '0.3rem',
+                            gap: '0.25rem',
+                          }}
+                          title={`이 스텝(${rerunStep})부터 파이프라인 재실행`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRerunFromStep!(rerunStep!);
+                          }}
+                        >
+                          <RotateCcw size={12} />
+                          <span>여기서부터</span>
                         </button>
                       )}
 
