@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence
@@ -51,6 +53,8 @@ from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.pgvector_store import PgVectorStore
 from ..storage.vector_index import VectorIndexStore
 from .workbook_catalog import SUPPORTED_WORKBOOK_SUFFIXES, WorkbookCatalog
+
+logger = logging.getLogger(__name__)
 
 
 def list_processed_files(
@@ -303,7 +307,14 @@ def ingest_excel_workbook(
                 ]
                 if documents:
                     used_pipeline = "luna_vlm_structured"
-        except Exception:
+        except Exception as luna_err:
+            logger.error(
+                "[Luna VLM] 구조 검출 실패 — exhaustive 폴백으로 전환합니다.\n"
+                "파일: %s, 시트: %s\n%s",
+                file_name,
+                visible_sheets,
+                traceback.format_exc(),
+            )
             documents = []
 
     if not documents:
