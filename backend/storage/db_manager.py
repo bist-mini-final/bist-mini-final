@@ -23,8 +23,6 @@ CREATE TABLE IF NOT EXISTS source_files (
     file_type VARCHAR(32) NOT NULL,
     file_size BIGINT NOT NULL,
     storage_path VARCHAR(512) NOT NULL,
-    file_content BYTEA,
-    metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -87,7 +85,8 @@ class DatabaseManager:
             conn = self._raw_connection()
             with conn.cursor() as cur:
                 cur.execute(DDL_INIT)
-                cur.execute("ALTER TABLE source_files ADD COLUMN IF NOT EXISTS file_content BYTEA;")
+                cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
+                cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
             conn.commit()
             conn.close()
         except Exception:
@@ -101,34 +100,22 @@ class DatabaseManager:
         file_type: str,
         file_size: int,
         storage_path: str,
-        file_content: Optional[bytes] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        **_ignored: Any,
     ) -> None:
-        """Upsert a source file record in PostgreSQL with binary blob content."""
-        if file_content is None and storage_path and Path(storage_path).is_file():
-            try:
-                file_content = Path(storage_path).read_bytes()
-                if file_size == 0:
-                    file_size = len(file_content)
-            except Exception:
-                pass
-
-        binary_data = psycopg2.Binary(file_content) if file_content is not None else None
+        """Upsert a source file record in PostgreSQL with storage_path."""
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, file_content, metadata, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
                     ON CONFLICT (file_id) DO UPDATE SET
                         file_name = EXCLUDED.file_name,
                         file_hash = EXCLUDED.file_hash,
                         file_type = EXCLUDED.file_type,
                         file_size = EXCLUDED.file_size,
-                        storage_path = EXCLUDED.storage_path,
-                        file_content = COALESCE(EXCLUDED.file_content, source_files.file_content),
-                        metadata = EXCLUDED.metadata;
+                        storage_path = EXCLUDED.storage_path;
                     """,
                     (
                         file_id,
@@ -137,43 +124,9 @@ class DatabaseManager:
                         file_type,
                         file_size,
                         storage_path,
-                        binary_data,
-                        psycopg2.extras.Json(metadata or {}),
                     ),
                 )
             conn.commit()
-        finally:
-            conn.close()
-
-    def get_source_file_blob(self, file_id_or_hash: str) -> Optional[bytes]:
-        """Retrieve binary blob of a source file by file_id or hash."""
-        conn = self._raw_connection()
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT file_content FROM source_files WHERE file_id = %s OR file_hash = %s LIMIT 1;",
-                    (file_id_or_hash, file_id_or_hash),
-                )
-                row = cur.fetchone()
-                if row and row[0] is not None:
-                    return bytes(row[0])
-                return None
-        finally:
-            conn.close()
-
-    def get_source_file_blob_by_name(self, file_name: str) -> Optional[bytes]:
-        """Retrieve binary blob of a source file by filename."""
-        conn = self._raw_connection()
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT file_content FROM source_files WHERE file_name = %s LIMIT 1;",
-                    (file_name,),
-                )
-                row = cur.fetchone()
-                if row and row[0] is not None:
-                    return bytes(row[0])
-                return None
         finally:
             conn.close()
 

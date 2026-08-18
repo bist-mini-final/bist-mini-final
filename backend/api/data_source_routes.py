@@ -9,7 +9,13 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from ..core.settings import EMBEDDING_ARTIFACT_DIR, PGVECTOR_URL, PROCESSED_DATA_DIR, VECTOR_INDEX_DIR
+from ..core.settings import (
+    EMBEDDING_ARTIFACT_DIR,
+    PGVECTOR_URL,
+    PROCESSED_DATA_DIR,
+    SPREADSHEET_ARTIFACT_DIR,
+    VECTOR_INDEX_DIR,
+)
 from ..embeddings.factory import EmbeddingEncoder
 from ..modules.base import ModuleExecutionError
 from ..spreadsheets.ingestion import (
@@ -21,6 +27,7 @@ from ..spreadsheets.ingestion import (
     preview_excel_sheet,
     search_vector_index,
 )
+from ..storage.db_manager import DatabaseManager
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.pgvector_store import PgVectorStore
 from ..storage.vector_index import VectorIndexStore
@@ -69,6 +76,7 @@ def create_data_source_router(
     processed_dir: Path = PROCESSED_DATA_DIR,
     vector_index_dir: Path = VECTOR_INDEX_DIR,
     embedding_artifact_dir: Path = EMBEDDING_ARTIFACT_DIR,
+    spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     embedding_encoder: Optional[EmbeddingEncoder] = None,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> APIRouter:
@@ -145,8 +153,7 @@ def create_data_source_router(
                     file_hash=file_hash,
                     file_type=dest_path.suffix.lstrip(".").lower() or "bin",
                     file_size=len(file_bytes),
-                    storage_path=f"data/processed/{safe_filename}",
-                    file_content=file_bytes,
+                    storage_path=f"data/source_files/{safe_filename}",
                 )
         except Exception as error:
             raise HTTPException(status_code=500, detail=f"파일 저장 실패: {error}") from error
@@ -164,6 +171,7 @@ def create_data_source_router(
                     batch_size=batch_size,
                     structure_mode="auto",
                     processed_dir=processed_dir,
+                    spreadsheet_artifact_dir=spreadsheet_artifact_dir,
                     vector_index_store=vector_index_store,
                     pgvector_store=pg_store,
                     embedding_artifact_store=embedding_artifact_store,
@@ -184,24 +192,19 @@ def create_data_source_router(
             "error": ingest_error,
         }
 
-    # 3-1. Download raw file from PostgreSQL BLOB or disk
+    # 3-1. Download raw file from server disk storage
     @router.get("/files/{filename}/download")
     def download_file(filename: str) -> Response:
-        """Download raw file bytes from PostgreSQL BLOB object storage or local disk."""
+        """Download raw file from server disk storage."""
         from fastapi.responses import Response
         safe_filename = Path(filename).name
         target_path = processed_dir / safe_filename
 
-        db_mgr = DatabaseManager()
-        blob = db_mgr.get_source_file_blob_by_name(safe_filename)
-        if not blob and target_path.is_file():
-            blob = target_path.read_bytes()
-
-        if not blob:
+        if not target_path.is_file():
             raise HTTPException(status_code=404, detail="다운로드할 파일을 찾을 수 없습니다")
 
         return Response(
-            content=blob,
+            content=target_path.read_bytes(),
             media_type="application/octet-stream",
             headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
         )
@@ -325,6 +328,7 @@ def create_data_source_router(
                 sheet_names=request.sheet_names,
                 batch_size=request.batch_size,
                 processed_dir=processed_dir,
+                spreadsheet_artifact_dir=spreadsheet_artifact_dir,
                 vector_index_store=vector_index_store,
                 pgvector_store=pg_store,
                 embedding_artifact_store=embedding_artifact_store,

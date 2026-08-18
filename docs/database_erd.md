@@ -169,12 +169,11 @@ erDiagram
 | 컬럼명 | 데이터 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `file_id` | `VARCHAR(64)` | `PRIMARY KEY` | 파일 고유 식별자 (SHA256 해시 또는 UUID) |
-| `file_name` | `VARCHAR(255)` | `NOT NULL` | 원본 파일명 (예: `SPG_Company_KeyStats_v3.xlsm`) |
+| `file_name` | `VARCHAR(255)` | `NOT NULL` | 원본 파일명 (예: `SPG_Company_KeyStats_v4.xlsm`) |
 | `file_hash` | `VARCHAR(64)` | `NOT NULL` | 파일 무결성 검증용 SHA256 해시 |
 | `file_type` | `VARCHAR(32)` | `NOT NULL` | 확장자 (`xlsx`, `xlsm`, `csv`, `pdf` 등) |
 | `file_size` | `BIGINT` | `NOT NULL` | 파일 크기 (바이트 단위) |
-| `storage_path` | `VARCHAR(512)` | `NOT NULL` | 서버 로컬 또는 스토리지 저장 경로 (`data/processed/...`) |
-| `metadata` | `JSONB` | `DEFAULT '{}'` | 엑셀 작성자, 시트 목록 요약 등 부가 정보 |
+| `storage_path` | `VARCHAR(512)` | `NOT NULL` | 서버 파일시스템 저장 경로 (`data/source_files/...`) |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | 업로드 일시 |
 
 ---

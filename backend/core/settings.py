@@ -4,8 +4,8 @@ import dotenv
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 dotenv.load_dotenv(PROJECT_DIR / ".env")
-dotenv.load_dotenv()
-PROCESSED_DATA_DIR = PROJECT_DIR / "data" / "processed"
+PROCESSED_DATA_DIR = PROJECT_DIR / "data" / "source_files"
+SOURCE_FILES_DIR = PROCESSED_DATA_DIR
 SPREADSHEET_ARTIFACT_DIR = PROJECT_DIR / "data" / "artifacts" / "spreadsheets"
 EMBEDDING_ARTIFACT_DIR = PROJECT_DIR / "data" / "artifacts" / "embeddings"
 VECTOR_INDEX_DIR = PROJECT_DIR / "data" / "vector_db"

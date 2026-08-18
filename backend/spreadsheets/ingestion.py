@@ -377,16 +377,32 @@ def ingest_excel_workbook(
             )
             pg_writer.execute(pg_writer_input)
 
-            # 2. Save sheets metadata
+            # 2. Save sheets metadata with accurate row and column counts
+            sheet_dims: Dict[str, Tuple[int, int]] = {}
+            try:
+                import openpyxl
+                wb_dim = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
+                for s in wb_dim.sheetnames:
+                    ws_dim = wb_dim[s]
+                    sheet_dims[s] = (ws_dim.max_row or 0, ws_dim.max_column or 0)
+                wb_dim.close()
+            except Exception:
+                pass
+
             sheets_data = []
             for s_idx, s_name in enumerate(visible_sheets):
-                sheet_docs = [d for d in documents if getattr(d, "sheet_name", "") == s_name]
+                s_rows, s_cols = sheet_dims.get(s_name, (0, 0))
+                # Fallback to document coordinates if openpyxl was unavailable
+                if s_rows == 0:
+                    sheet_docs = [d for d in documents if getattr(d, "sheet_name", "") == s_name]
+                    s_rows = len(sheet_docs)
+
                 sheets_data.append({
                     "sheet_name": s_name,
                     "sheet_index": s_idx,
                     "is_visible": True,
-                    "row_count": len(sheet_docs),
-                    "column_count": 0,
+                    "row_count": s_rows,
+                    "column_count": s_cols,
                     "detected_tables": tables if structure_mode in ("luna_vlm", "auto") and 'tables' in locals() else [],
                 })
             db_mgr.save_sheets(file_id=workbook_hash, sheets_info=sheets_data)

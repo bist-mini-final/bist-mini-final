@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from backend.api.data_source_routes import create_data_source_router
+from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
@@ -30,9 +31,11 @@ class DataSourceApiTests(unittest.TestCase):
         self.processed_dir = self.root / "processed"
         self.vector_index_dir = self.root / "vector_db"
         self.embedding_artifact_dir = self.root / "artifacts"
+        self.spreadsheet_artifact_dir = self.root / "spreadsheet_artifacts"
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         self.vector_index_dir.mkdir(parents=True, exist_ok=True)
         self.embedding_artifact_dir.mkdir(parents=True, exist_ok=True)
+        self.spreadsheet_artifact_dir.mkdir(parents=True, exist_ok=True)
 
         # Create a sample workbook
         self.sample_file = self.processed_dir / "Test_Workbook.xlsx"
@@ -45,6 +48,7 @@ class DataSourceApiTests(unittest.TestCase):
         wb.save(self.sample_file)
 
         self.pg_store = PgVectorStore()
+        self.db_mgr = DatabaseManager()
         self.clean_test_indexes()
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
@@ -54,6 +58,7 @@ class DataSourceApiTests(unittest.TestCase):
                 processed_dir=self.processed_dir,
                 vector_index_dir=self.vector_index_dir,
                 embedding_artifact_dir=self.embedding_artifact_dir,
+                spreadsheet_artifact_dir=self.spreadsheet_artifact_dir,
                 embedding_encoder=self.encoder,
                 pgvector_store=self.pg_store,
             ),
@@ -66,6 +71,16 @@ class DataSourceApiTests(unittest.TestCase):
             for idx in self.pg_store.list_indexes():
                 if "Test_Workbook" in idx.get("file_name", "") or idx["index_id"].startswith("test_"):
                     self.pg_store.delete(idx["index_id"])
+        if hasattr(self, "db_mgr") and self.db_mgr.is_connected():
+            with self.db_mgr._raw_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        DELETE FROM source_files 
+                        WHERE file_name ILIKE '%Test_Workbook%' 
+                           OR file_name ILIKE '%test_%' 
+                           OR file_name = 'uploaded_data.parquet';
+                    """)
+                conn.commit()
 
     def tearDown(self):
         self.clean_test_indexes()
@@ -86,14 +101,19 @@ class DataSourceApiTests(unittest.TestCase):
         self.assertEqual(data["sheet_name"], "KeyStats")
         self.assertGreater(len(data["preview_rows"]), 0)
 
-    def test_upload_and_delete_file(self):
-        file_content = b"fake-parquet-content"
+    def test_upload_download_and_delete_file(self):
+        file_content = b"fake-parquet-content-12345"
         response = self.client.post(
             "/api/data-sources/files/upload",
             files={"file": ("uploaded_data.parquet", file_content, "application/octet-stream")},
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue((self.processed_dir / "uploaded_data.parquet").exists())
+
+        # Test download endpoint from DB BLOB
+        dl_resp = self.client.get("/api/data-sources/files/uploaded_data.parquet/download")
+        self.assertEqual(dl_resp.status_code, 200)
+        self.assertEqual(dl_resp.content, file_content)
 
         # Delete it
         del_resp = self.client.delete("/api/data-sources/files/uploaded_data.parquet")

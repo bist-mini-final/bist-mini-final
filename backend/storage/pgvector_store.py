@@ -423,21 +423,6 @@ class PgVectorStore:
                     (company_name, collection_uuid),
                 )
 
-                # 3. Update source_files table if exists
-                if workbook_hash:
-                    cur.execute(
-                        """
-                        UPDATE source_files
-                        SET metadata = jsonb_set(
-                            COALESCE(metadata, '{}'::jsonb),
-                            '{company_name}',
-                            to_jsonb(%s::text)
-                        )
-                        WHERE file_id = %s;
-                        """,
-                        (company_name, workbook_hash),
-                    )
-
             conn.commit()
         except Exception as err:
             conn.rollback()

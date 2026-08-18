@@ -72,7 +72,7 @@ class PgVectorIndexWriterModule(ExecutableModule):
             file_hash=input_data.workbook_hash,
             file_size=0,
             file_type="excel",
-            storage_path=f"data/processed/{input_data.file_name}",
+            storage_path=f"data/source_files/{input_data.file_name}",
         )
 
         # 2. Save embeddings into pgvector via PgVectorStore (LangChain collection & embeddings)

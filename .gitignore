@@ -43,6 +43,10 @@ data/vector_db/*
 !data/vector_db/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/source_files/*
+!data/source_files/.gitkeep
+data/sources/*
+!data/sources/.gitkeep
 data/workflows/workflow.json
 tmp/
 
