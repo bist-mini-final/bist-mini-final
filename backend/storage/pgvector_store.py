@@ -119,14 +119,20 @@ class PgVectorStore:
         if not documents:
             return
 
+        meta_dict = metadata or {}
         clean_meta = {
-            "file_name": (metadata or {}).get("file_name", ""),
-            "workbook_hash": (metadata or {}).get("workbook_hash", ""),
-            "model": (metadata or {}).get("model", model_name),
-            "dimension": (metadata or {}).get("dimension", 3072),
+            "file_name": meta_dict.get("file_name", ""),
+            "workbook_hash": meta_dict.get("workbook_hash", ""),
+            "model": meta_dict.get("model", model_name),
+            "dimension": meta_dict.get("dimension", 3072),
             "document_count": len(documents),
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "pipeline": (metadata or {}).get("pipeline", "luna_vlm_structured"),
+            "pipeline": meta_dict.get("pipeline", "luna_vlm_structured"),
+            "duration_seconds": meta_dict.get("duration_seconds"),
+            "total_tokens": meta_dict.get("total_tokens"),
+            "estimated_cost_usd": meta_dict.get("estimated_cost_usd"),
+            "estimated_cost_krw": meta_dict.get("estimated_cost_krw"),
+            "batch_size": meta_dict.get("batch_size"),
         }
 
         store = get_vector_store(
@@ -240,6 +246,11 @@ class PgVectorStore:
                     "document_count": count,
                     "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
                     "storage": "pgvector (LangChain)",
+                    "duration_seconds": meta.get("duration_seconds"),
+                    "total_tokens": meta.get("total_tokens"),
+                    "estimated_cost_usd": meta.get("estimated_cost_usd"),
+                    "estimated_cost_krw": meta.get("estimated_cost_krw"),
+                    "batch_size": meta.get("batch_size"),
                 })
             return results
         finally:
@@ -310,7 +321,13 @@ class PgVectorStore:
                 "model": meta.get("model", ""),
                 "dimension": meta.get("dimension", 3072),
                 "document_count": row[3],
+                "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
                 "storage": "pgvector (LangChain)",
+                "duration_seconds": meta.get("duration_seconds"),
+                "total_tokens": meta.get("total_tokens"),
+                "estimated_cost_usd": meta.get("estimated_cost_usd"),
+                "estimated_cost_krw": meta.get("estimated_cost_krw"),
+                "batch_size": meta.get("batch_size"),
                 "sample_items": sample_items,
             }
         finally:

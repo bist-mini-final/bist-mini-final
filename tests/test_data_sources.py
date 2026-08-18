@@ -129,6 +129,9 @@ class DataSourceApiTests(unittest.TestCase):
         detail_data = detail_resp.json()
         self.assertEqual(detail_data["index_id"], index_id)
         self.assertGreater(len(detail_data["sample_items"]), 0)
+        self.assertIn("duration_seconds", detail_data)
+        self.assertIn("total_tokens", detail_data)
+        self.assertIn("estimated_cost_usd", detail_data)
 
         # Test search
         search_resp = self.client.post(

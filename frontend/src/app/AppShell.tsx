@@ -5,9 +5,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  Sparkles,
   Workflow,
-  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppRoute } from './routes';
@@ -78,42 +76,13 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
               <small>AI Workspace</small>
             </span>
           </AppLink>
-          <button
-            className="product-sidebar__collapse-btn"
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-          </button>
-          <button
-            className="product-sidebar__close"
-            type="button"
-            onClick={() => setIsMobileNavOpen(false)}
-            aria-label="메뉴 닫기"
-          >
-            <X size={18} />
-          </button>
         </div>
 
-        {/* <button
-          className="workspace-switcher"
-          type="button"
-          title="BIST Workspace (Team project)"
-          aria-label="BIST Workspace"
-        >
-          <span className="workspace-switcher__avatar">B</span>
-          <span className="workspace-switcher__copy">
-            <strong>BIST Workspace</strong>
-            <small>Team project</small>
-          </span>
-          <ChevronDown className="workspace-switcher__chevron" size={15} aria-hidden="true" />
-        </button> */}
+        <div className="product-sidebar__divider" />
 
         <nav className="product-nav" aria-label="주요 메뉴">
           {/* <span className="product-nav__caption">WORKSPACE</span> */}
-          {APP_ROUTES.map((route) => {
+          {APP_ROUTES.filter((r) => r.path !== '/settings').map((route) => {
             const Icon = route.icon;
             const isActive = route.path === pathname;
             return (
@@ -137,43 +106,58 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
 
         <div className="product-sidebar__spacer" />
 
-        <div className="product-sidebar__guide">
-          <Sparkles size={17} aria-hidden="true" />
-          <div>
-            <strong>모듈 중심 개발</strong>
-            <p>독립 DTO를 연결해 워크플로를 구성하세요.</p>
-          </div>
+        <div className="product-sidebar__divider" />
+
+        <div className="product-nav product-nav--bottom" aria-label="시스템 및 설정">
+          {(() => {
+            const settingsRoute = APP_ROUTES.find((r) => r.path === '/settings');
+            if (!settingsRoute) return null;
+            const Icon = settingsRoute.icon;
+            const isActive = pathname === '/settings';
+            return (
+              <AppLink
+                to="/settings"
+                className={clsx('product-nav__item', isActive && 'is-active')}
+                aria-current={isActive ? 'page' : undefined}
+                title={settingsRoute.label}
+                aria-label={settingsRoute.label}
+              >
+                <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
+                <span className="product-nav__label">{settingsRoute.label}</span>
+              </AppLink>
+            );
+          })()}
+
+          <a
+            className="product-sidebar__docs"
+            href="/redoc"
+            target="_blank"
+            rel="noreferrer"
+            title="API 문서 (ReDoc)"
+            aria-label="API 문서"
+          >
+            <BookOpen size={17} aria-hidden="true" />
+            <span className="product-sidebar__docs-label">API 문서</span>
+            <ArrowUpRight className="product-sidebar__docs-arrow" size={14} aria-hidden="true" />
+          </a>
+
+          <button
+            className="product-sidebar__toggle-footer"
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          >
+            {isSidebarCollapsed ? (
+              <PanelLeftOpen size={17} aria-hidden="true" />
+            ) : (
+              <>
+                <PanelLeftClose size={17} aria-hidden="true" />
+                <span>사이드바 접기</span>
+              </>
+            )}
+          </button>
         </div>
-
-        <a
-          className="product-sidebar__docs"
-          href="/redoc"
-          target="_blank"
-          rel="noreferrer"
-          title="API 문서 (ReDoc)"
-          aria-label="API 문서"
-        >
-          <BookOpen size={17} aria-hidden="true" />
-          <span className="product-sidebar__docs-label">API 문서</span>
-          <ArrowUpRight className="product-sidebar__docs-arrow" size={14} aria-hidden="true" />
-        </a>
-
-        <button
-          className="product-sidebar__toggle-footer"
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-          title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-        >
-          {isSidebarCollapsed ? (
-            <PanelLeftOpen size={17} aria-hidden="true" />
-          ) : (
-            <>
-              <PanelLeftClose size={17} aria-hidden="true" />
-              <span>사이드바 접기</span>
-            </>
-          )}
-        </button>
       </aside>
 
       {isMobileNavOpen && (

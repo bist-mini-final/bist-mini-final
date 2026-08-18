@@ -2,6 +2,7 @@ import {
   ChartNoAxesCombined,
   Database,
   House,
+  Settings,
   Users,
   Workflow,
   type LucideIcon,
@@ -11,6 +12,7 @@ import { DataSourcesPage } from '../pages/DataSourcesPage';
 import { EvaluationsPage } from '../pages/EvaluationsPage';
 import { HomePage } from '../pages/HomePage';
 import { PlaygroundPage } from '../pages/PlaygroundPage';
+import { SettingsPage } from '../pages/SettingsPage';
 import { TeamWorkspacePage } from '../pages/TeamWorkspacePage';
 
 export type RouteStatus = 'ready' | 'planned';
@@ -71,6 +73,15 @@ export const APP_ROUTES: readonly AppRoute[] = [
     icon: Users,
     component: TeamWorkspacePage,
     status: 'planned',
+  },
+  {
+    path: '/settings',
+    label: '설정',
+    shortLabel: 'Settings',
+    description: '데이터베이스 연결 및 시스템 환경 설정',
+    icon: Settings,
+    component: SettingsPage,
+    status: 'ready',
   },
 ] as const;
 

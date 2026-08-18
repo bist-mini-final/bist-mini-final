@@ -5,18 +5,15 @@ import {
   Layers,
   RefreshCw,
   Search,
-  Server,
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import type { DbStatusInfo, VectorIndexInfo } from '../types';
+import type { VectorIndexInfo } from '../types';
 
 interface VectorIndexListProps {
   indexes: VectorIndexInfo[];
-  dbStatus?: DbStatusInfo | null;
   isLoading?: boolean;
   onRefresh?: () => void;
-  onDbModalClick?: () => void;
   onDetailClick: (indexId: string) => void;
   onSearchClick: (index: VectorIndexInfo) => void;
   onDeleteClick: (indexId: string) => void;
@@ -40,10 +37,8 @@ function formatDate(iso: string): string {
 
 export function VectorIndexList({
   indexes,
-  dbStatus,
   isLoading,
   onRefresh,
-  onDbModalClick,
   onDetailClick,
   onSearchClick,
   onDeleteClick,
@@ -53,26 +48,7 @@ export function VectorIndexList({
     <div className="ds-panel">
       <div className="ds-panel__header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <h3>PostgreSQL pgvector 컬렉션 목록</h3>
-            {dbStatus && (
-              <button
-                type="button"
-                className={`ds-db-status-pill ${dbStatus.connected ? 'is-connected' : 'is-disconnected'}`}
-                onClick={onDbModalClick}
-                title="PostgreSQL pgvector 연결 정보 확인"
-                style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
-              >
-                <span className="ds-db-status-pill__dot" />
-                <Server size={11} />
-                <span>
-                  {dbStatus.connected
-                    ? `localhost:${dbStatus.port} / ${dbStatus.database}`
-                    : '연결 안 됨'}
-                </span>
-              </button>
-            )}
-          </div>
+          <h3>PostgreSQL pgvector 컬렉션 목록</h3>
           <small>PostgreSQL 16 + pgvector에 적재된 LangChain 표준 벡터 컬렉션 (HNSW 코사인 유사도 인덱스)</small>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -138,6 +114,11 @@ export function VectorIndexList({
                       <Layers size={14} />
                       {idx.document_count.toLocaleString()}개
                     </span>
+                    {idx.duration_seconds !== undefined && idx.duration_seconds !== null && (
+                      <small style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', marginTop: '0.15rem' }}>
+                        ⏱️ {idx.duration_seconds}s {idx.estimated_cost_usd ? `· $${idx.estimated_cost_usd.toFixed(4)}` : ''}
+                      </small>
+                    )}
                   </td>
                   <td>
                     <span className="ds-badge ds-badge--green" title="PostgreSQL 16 pgvector HNSW">

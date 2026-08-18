@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { DataSourcesSummary } from './components/DataSourcesSummary';
-import { DbConnectionModal } from './components/DbConnectionModal';
 import { FileUploadModal } from './components/FileUploadModal';
 import { IndexDetailModal } from './components/IndexDetailModal';
 import { IndexSearchTester } from './components/IndexSearchTester';
@@ -17,7 +16,6 @@ export function DataSourcesView() {
   const [error, setError] = useState<string | null>(null);
 
   // Modals state
-  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [detailIndexId, setDetailIndexId] = useState<string | null>(null);
   const [searchTargetIndex, setSearchTargetIndex] = useState<VectorIndexInfo | null>(null);
@@ -72,10 +70,8 @@ export function DataSourcesView() {
         <div className="ds-tab-content">
           <VectorIndexList
             indexes={indexes}
-            dbStatus={dbStatus}
             isLoading={isLoading}
             onRefresh={fetchData}
-            onDbModalClick={() => setIsDbModalOpen(true)}
             onDetailClick={(id) => setDetailIndexId(id)}
             onSearchClick={(idx) => setSearchTargetIndex(idx)}
             onDeleteClick={handleDeleteIndex}
@@ -85,14 +81,6 @@ export function DataSourcesView() {
       )}
 
       {/* Modals */}
-      {isDbModalOpen && (
-        <DbConnectionModal
-          status={dbStatus}
-          onClose={() => setIsDbModalOpen(false)}
-          onRefresh={fetchData}
-        />
-      )}
-
       {isUploadOpen && (
         <FileUploadModal
           onClose={() => setIsUploadOpen(false)}

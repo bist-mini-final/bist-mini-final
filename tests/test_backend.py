@@ -679,8 +679,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
             set(bm25_result),
             {"query_context", "document_context", "items"},
         )
-        self.assertEqual(
-            set(document_embeddings),
+        self.assertTrue(
             {
                 "file_name",
                 "workbook_hash",
@@ -688,7 +687,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "artifact_id",
                 "dimension",
                 "items",
-            },
+            }.issubset(set(document_embeddings))
         )
         self.assertEqual(
             len(document_embeddings["items"]),

@@ -91,6 +91,33 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
                   <small>저장된 청크 수</small>
                   <strong>{detail.document_count.toLocaleString()}개</strong>
                 </div>
+                {detail.duration_seconds !== undefined && detail.duration_seconds !== null && (
+                  <div>
+                    <small>인덱싱 소요 시간</small>
+                    <strong style={{ color: '#166534' }}>{detail.duration_seconds}초</strong>
+                  </div>
+                )}
+                {detail.total_tokens !== undefined && detail.total_tokens !== null && (
+                  <div>
+                    <small>소비 토큰 수</small>
+                    <strong className="ds-font-mono">{detail.total_tokens.toLocaleString()} tokens</strong>
+                  </div>
+                )}
+                {detail.estimated_cost_usd !== undefined && detail.estimated_cost_usd !== null && (
+                  <div>
+                    <small>예상 API 비용</small>
+                    <strong style={{ color: '#1d4ed8' }}>
+                      ${detail.estimated_cost_usd.toFixed(4)}
+                      {detail.estimated_cost_krw ? ` (약 ₩${detail.estimated_cost_krw.toLocaleString()})` : ''}
+                    </strong>
+                  </div>
+                )}
+                {detail.batch_size && (
+                  <div>
+                    <small>배치 크기</small>
+                    <strong className="ds-font-mono">{detail.batch_size}개 / 요청</strong>
+                  </div>
+                )}
               </div>
 
               {/* Serialized chunks sample */}

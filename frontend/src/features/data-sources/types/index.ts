@@ -20,6 +20,11 @@ export interface VectorIndexInfo {
   created_at: string;
   total_size_bytes?: number;
   storage?: 'pgvector' | 'local';
+  duration_seconds?: number;
+  total_tokens?: number;
+  estimated_cost_usd?: number;
+  estimated_cost_krw?: number;
+  batch_size?: number;
 }
 
 export interface DbStatusInfo {
@@ -52,6 +57,11 @@ export interface VectorIndexDetail {
   dimension: number;
   document_count: number;
   sample_items: SerializedSampleItem[];
+  duration_seconds?: number;
+  total_tokens?: number;
+  estimated_cost_usd?: number;
+  estimated_cost_krw?: number;
+  batch_size?: number;
 }
 
 export interface IngestRequest {

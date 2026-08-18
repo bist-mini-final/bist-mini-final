@@ -360,6 +360,11 @@ def ingest_excel_workbook(
                 "document_count": len(embedding_result["items"]),
                 "artifact_id": embedding_result["artifact_id"],
                 "pipeline": used_pipeline,
+                "duration_seconds": embedding_result.get("duration_seconds"),
+                "total_tokens": embedding_result.get("total_tokens"),
+                "estimated_cost_usd": embedding_result.get("estimated_cost_usd"),
+                "estimated_cost_krw": embedding_result.get("estimated_cost_krw"),
+                "batch_size": batch_size,
                 "items": [
                     item.model_dump(mode="json") if hasattr(item, "model_dump") else item
                     for item in embedding_result["items"]
@@ -380,5 +385,10 @@ def ingest_excel_workbook(
         "sheet_count": len(visible_sheets),
         "sheets": visible_sheets,
         "pipeline": used_pipeline,
+        "duration_seconds": embedding_result.get("duration_seconds"),
+        "total_tokens": embedding_result.get("total_tokens"),
+        "estimated_cost_usd": embedding_result.get("estimated_cost_usd"),
+        "estimated_cost_krw": embedding_result.get("estimated_cost_krw"),
+        "batch_size": batch_size,
         "storage": "pgvector (LangChain)" if stored_in_pgvector else "local",
     }
