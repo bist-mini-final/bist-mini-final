@@ -46,6 +46,7 @@ data/processed/*
 !data/processed/.gitkeep
 data/workflows/workflow.json
 tmp/
+data/bencmarks/*
 
 # OS / editors
 .DS_Store
