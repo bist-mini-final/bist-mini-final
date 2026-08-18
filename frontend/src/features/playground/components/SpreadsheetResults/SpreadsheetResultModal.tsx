@@ -314,7 +314,15 @@ export function SpreadsheetResultModal({
   if (!parsed) return null;
 
   return createPortal(
-    <div className="spreadsheet-result-overlay" role="presentation" onMouseDown={onClose}>
+    <div
+      className="spreadsheet-result-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <section
         className="spreadsheet-result-modal"
         role="dialog"
@@ -322,6 +330,7 @@ export function SpreadsheetResultModal({
         aria-labelledby="spreadsheet-result-title"
         data-kind={kind}
         onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <header className="spreadsheet-result-modal__header">
           <span className="spreadsheet-result-modal__mark"><InspectorIcon className="h-5 w-5" /></span>
@@ -352,6 +361,8 @@ export function SpreadsheetResultModal({
             <select
               value={selectedSheet}
               onChange={(event) => setSelectedSheet(event.currentTarget.value)}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
             >
               {parsed.sheetNames.map((sheetName) => (
                 <option key={sheetName} value={sheetName}>{sheetName}</option>
