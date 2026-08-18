@@ -4,7 +4,6 @@ import {
   Database,
   FileSpreadsheet,
   Sparkles,
-  Users,
   Workflow,
 } from 'lucide-react';
 import { AppLink } from '../app/router';
@@ -18,10 +17,10 @@ const plannedCards = [
     tone: 'amber',
   },
   {
-    path: '/team',
-    title: '팀 워크스페이스',
-    description: '워크플로와 실험 결과를 함께 관리합니다.',
-    icon: Users,
+    path: '/bi',
+    title: 'BI',
+    description: 'BI 기능을 위한 독립 화면을 구성합니다.',
+    icon: ChartNoAxesCombined,
     tone: 'violet',
   },
 ] as const;
@@ -145,27 +144,6 @@ export function HomePage() {
           ))}
         </div>
       </section>
-
-      {/* <section className="home-bottom-grid">
-        <article className="home-info-card">
-          <span className="home-info-card__icon"><FileCode2 size={19} /></span>
-          <div>
-            <small>DEVELOPER CONTRACT</small>
-            <h3>모든 모듈은 독립 JSON API입니다</h3>
-            <p>Input, Config, Output DTO를 ReDoc에서 확인하고 프론트 없이도 실행할 수 있습니다.</p>
-          </div>
-          <a href="/redoc" target="_blank" rel="noreferrer">API 문서 보기 <ArrowRight size={15} /></a>
-        </article>
-        <article className="home-info-card home-info-card--dark">
-          <span className="home-info-card__icon"><Workflow size={19} /></span>
-          <div>
-            <small>QUICK START</small>
-            <h3>연결만으로 워크플로 완성</h3>
-            <p>상류 Output 포트를 하류 Input 포트에 연결하면 실행 순서와 데이터 계보가 보존됩니다.</p>
-          </div>
-          <AppLink to="/playground">실험 시작하기 <ArrowRight size={15} /></AppLink>
-        </article>
-      </section> */}
     </div>
   );
 }

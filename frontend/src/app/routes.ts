@@ -3,17 +3,17 @@ import {
   Database,
   House,
   Settings,
-  Users,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import type { ComponentType } from 'react';
+import { type ComponentType, lazy } from 'react';
 import { DataSourcesPage } from '../pages/DataSourcesPage';
 import { EvaluationsPage } from '../pages/EvaluationsPage';
 import { HomePage } from '../pages/HomePage';
 import { PlaygroundPage } from '../pages/PlaygroundPage';
 import { SettingsPage } from '../pages/SettingsPage';
-import { TeamWorkspacePage } from '../pages/TeamWorkspacePage';
+
+const BiPage = lazy(() => import('../features/bi/BiPage'));
 
 export type RouteStatus = 'ready' | 'planned';
 
@@ -66,12 +66,12 @@ export const APP_ROUTES: readonly AppRoute[] = [
     status: 'planned',
   },
   {
-    path: '/team',
-    label: '팀 워크스페이스',
-    shortLabel: 'Team workspace',
-    description: '실험과 자산을 공유하는 협업 공간',
-    icon: Users,
-    component: TeamWorkspacePage,
+    path: '/bi',
+    label: 'BI',
+    shortLabel: 'BI',
+    description: 'BI 기능을 구현하는 독립 작업 공간',
+    icon: ChartNoAxesCombined,
+    component: BiPage,
     status: 'planned',
   },
   {

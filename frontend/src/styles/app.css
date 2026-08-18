@@ -1072,7 +1072,7 @@
 }
 
 .planned-workspace > p {
-  max-width: 30rem;
+  max-width: 34rem;
   margin: 0.55rem 0 0;
   color: #8c9891;
   font-size: 0.72rem;
@@ -1162,6 +1162,10 @@
     background: #f4f7f5;
   }
 
+  .planned-page {
+    padding-top: 4.5rem;
+  }
+
   .product-sidebar {
     position: fixed;
     top: 0;
@@ -1236,7 +1240,7 @@
   }
 
   .planned-page {
-    padding: 2.25rem 1rem;
+    padding: 4.5rem 1rem 2.25rem;
   }
 
   .planned-page__header {

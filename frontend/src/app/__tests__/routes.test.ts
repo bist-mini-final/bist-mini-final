@@ -8,7 +8,8 @@ describe('APP_ROUTES registry', () => {
     expect(paths).toContain('/playground');
     expect(paths).toContain('/data-sources');
     expect(paths).toContain('/evaluations');
-    expect(paths).toContain('/team');
+    expect(paths).toContain('/bi');
+    expect(paths).toContain('/settings');
   });
 
   it('has ready status for core pages', () => {
