@@ -134,6 +134,20 @@ def create_data_source_router(
         try:
             with dest_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
+            file_bytes = dest_path.read_bytes()
+            import hashlib
+            file_hash = hashlib.sha256(file_bytes).hexdigest()
+            db_mgr = DatabaseManager()
+            if db_mgr.is_connected():
+                db_mgr.save_source_file(
+                    file_id=file_hash,
+                    file_name=safe_filename,
+                    file_hash=file_hash,
+                    file_type=dest_path.suffix.lstrip(".").lower() or "bin",
+                    file_size=len(file_bytes),
+                    storage_path=f"data/processed/{safe_filename}",
+                    file_content=file_bytes,
+                )
         except Exception as error:
             raise HTTPException(status_code=500, detail=f"파일 저장 실패: {error}") from error
         finally:
@@ -170,6 +184,28 @@ def create_data_source_router(
             "error": ingest_error,
         }
 
+    # 3-1. Download raw file from PostgreSQL BLOB or disk
+    @router.get("/files/{filename}/download")
+    def download_file(filename: str) -> Response:
+        """Download raw file bytes from PostgreSQL BLOB object storage or local disk."""
+        from fastapi.responses import Response
+        safe_filename = Path(filename).name
+        target_path = processed_dir / safe_filename
+
+        db_mgr = DatabaseManager()
+        blob = db_mgr.get_source_file_blob_by_name(safe_filename)
+        if not blob and target_path.is_file():
+            blob = target_path.read_bytes()
+
+        if not blob:
+            raise HTTPException(status_code=404, detail="다운로드할 파일을 찾을 수 없습니다")
+
+        return Response(
+            content=blob,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+        )
+
     # 4. Delete file
     @router.delete("/files/{filename}")
     def delete_file(
@@ -179,27 +215,30 @@ def create_data_source_router(
         """Delete a raw file from data/processed/ with logical cascade to vector DB."""
         safe_filename = Path(filename).name
         target_path = processed_dir / safe_filename
-        if not target_path.is_file():
-            raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다")
 
-        try:
+        file_bytes = None
+        workbook_hash = None
+        if target_path.is_file():
             import hashlib
             file_bytes = target_path.read_bytes()
             workbook_hash = hashlib.sha256(file_bytes).hexdigest()
             target_path.unlink()
 
-            cascade_deleted = 0
-            if cascade_indexes and pg_store and pg_store.is_connected():
-                cascade_deleted = pg_store.delete_by_workbook_hash(workbook_hash)
+        db_mgr = DatabaseManager()
+        if workbook_hash and db_mgr.is_connected():
+            db_mgr.delete_source_file(workbook_hash)
+        elif db_mgr.is_connected():
+            db_mgr.delete_source_file(safe_filename)
 
-            return {
-                "status": "success",
-                "deleted_file": safe_filename,
-                "cascade_indexes_deleted": cascade_deleted,
-            }
-        except Exception as error:
-            raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
-            raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
+        cascade_deleted = 0
+        if cascade_indexes and workbook_hash and pg_store and pg_store.is_connected():
+            cascade_deleted = pg_store.delete_by_workbook_hash(workbook_hash)
+
+        return {
+            "status": "success",
+            "deleted_file": safe_filename,
+            "cascade_indexes_deleted": cascade_deleted,
+        }
 
     # 5. List vector indexes
     @router.get("/indexes")
