@@ -80,6 +80,20 @@ def create_data_source_router(
     embedding_encoder: Optional[EmbeddingEncoder] = None,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> APIRouter:
+    """
+    Create the data-source API router and initialize its storage dependencies.
+    
+    Parameters:
+        processed_dir (Path): Directory containing uploaded source files.
+        vector_index_dir (Path): Directory containing local vector indexes.
+        embedding_artifact_dir (Path): Directory containing embedding artifacts.
+        spreadsheet_artifact_dir (Path): Directory containing spreadsheet artifacts.
+        embedding_encoder (Optional[EmbeddingEncoder]): Encoder used for embedding operations.
+        pgvector_store (Optional[PgVectorStore]): Existing pgvector store to use.
+    
+    Returns:
+        APIRouter: Router exposing file, ingestion, vector-index, and database endpoints.
+    """
     router = APIRouter(prefix="/data-sources", tags=["Data Sources"])
 
     vector_index_store = VectorIndexStore(vector_index_dir)
@@ -195,7 +209,18 @@ def create_data_source_router(
     # 3-1. Download raw file from server disk storage
     @router.get("/files/{filename}/download")
     def download_file(filename: str) -> Response:
-        """Download raw file from server disk storage."""
+        """
+        Download a processed file as an attachment.
+        
+        Parameters:
+            filename (str): Name of the file to download.
+        
+        Returns:
+            Response: File contents with an attachment disposition.
+        
+        Raises:
+            HTTPException: If the requested file does not exist.
+        """
         safe_filename = Path(filename).name
         target_path = processed_dir / safe_filename
 

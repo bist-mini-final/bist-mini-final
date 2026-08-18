@@ -212,7 +212,12 @@ class PgVectorStore:
         )
 
     def list_indexes(self) -> List[Dict[str, Any]]:
-        """List all collections registered in pgvector via LangChain."""
+        """
+        List all collections registered in the LangChain pgvector storage.
+        
+        Returns:
+            List[Dict[str, Any]]: Collection summaries with metadata and document counts.
+        """
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
