@@ -212,7 +212,12 @@ class PgVectorStore:
         )
 
     def list_indexes(self) -> List[Dict[str, Any]]:
-        """List all collections registered in pgvector via LangChain."""
+        """
+        List all collections registered in the LangChain pgvector storage.
+        
+        Returns:
+            List[Dict[str, Any]]: Collection summaries with metadata and document counts.
+        """
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
@@ -227,7 +232,7 @@ class PgVectorStore:
                     SELECT c.name, c.cmetadata, COUNT(e.id) AS chunk_count
                     FROM langchain_pg_collection c
                     LEFT JOIN langchain_pg_embedding e ON c.uuid = e.collection_id
-                    GROUP BY c.uuid;
+                    GROUP BY c.name, c.uuid, c.cmetadata::text;
                     """
                 )
                 rows = cur.fetchall()
