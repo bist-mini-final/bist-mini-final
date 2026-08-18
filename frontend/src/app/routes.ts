@@ -6,13 +6,12 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import { lazy, type ComponentType } from 'react';
+import type { ComponentType } from 'react';
 import { DataSourcesPage } from '../pages/DataSourcesPage';
 import { EvaluationsPage } from '../pages/EvaluationsPage';
 import { HomePage } from '../pages/HomePage';
+import { PlaygroundPage } from '../pages/PlaygroundPage';
 import { TeamWorkspacePage } from '../pages/TeamWorkspacePage';
-
-const PlaygroundPage = lazy(() => import('../features/playground/PlaygroundPage'));
 
 export type RouteStatus = 'ready' | 'planned';
 

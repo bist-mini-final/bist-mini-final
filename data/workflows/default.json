@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-18T00:24:08.901207+00:00",
+  "updated_at": "2026-08-18T01:04:42.750829+00:00",
   "graph": {
     "nodes": [
       {
@@ -13,7 +13,7 @@
           "y": -367.4342037563349
         },
         "config": {
-          "threshold": 0.65
+          "threshold": 0.95
         },
         "values": {
           "query": "최근 추세 유지 시 2026년 Total Revenue는?"

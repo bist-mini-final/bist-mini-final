@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   BookOpen,
-  ChevronDown,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -98,7 +97,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           </button>
         </div>
 
-        <button
+        {/* <button
           className="workspace-switcher"
           type="button"
           title="BIST Workspace (Team project)"
@@ -110,10 +109,10 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
             <small>Team project</small>
           </span>
           <ChevronDown className="workspace-switcher__chevron" size={15} aria-hidden="true" />
-        </button>
+        </button> */}
 
         <nav className="product-nav" aria-label="주요 메뉴">
-          <span className="product-nav__caption">WORKSPACE</span>
+          {/* <span className="product-nav__caption">WORKSPACE</span> */}
           {APP_ROUTES.map((route) => {
             const Icon = route.icon;
             const isActive = route.path === pathname;

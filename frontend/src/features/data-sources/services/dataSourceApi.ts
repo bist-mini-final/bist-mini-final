@@ -89,11 +89,11 @@ export const dataSourceApi = {
     return requestJson<SheetPreviewData>(url, signal);
   },
 
-  async uploadFile(file: File, signal?: AbortSignal): Promise<DataSourceFile> {
+  async uploadFile(file: File, autoIngest: boolean = true, signal?: AbortSignal): Promise<DataSourceFile> {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/data-sources/files/upload', {
+    const response = await fetch(`/api/data-sources/files/upload?auto_ingest=${autoIngest}`, {
       method: 'POST',
       body: formData,
       signal,

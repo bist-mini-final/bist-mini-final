@@ -55,6 +55,7 @@ export function IndexIngestionModal({
   const [variantMode, setVariantMode] = useState<'header_only' | 'header_with_value' | 'both'>(
     'header_only'
   );
+  const [structureMode, setStructureMode] = useState<'auto' | 'luna_vlm' | 'exhaustive'>('auto');
   const [batchSize, setBatchSize] = useState<number>(64);
 
   const [isIngesting, setIsIngesting] = useState(false);
@@ -103,6 +104,7 @@ export function IndexIngestionModal({
         file_name: selectedFile,
         model,
         variant_mode: variantMode,
+        structure_mode: structureMode,
         sheet_names: selectedSheets,
         batch_size: batchSize,
       });
@@ -153,7 +155,7 @@ export function IndexIngestionModal({
                   <CheckCircle2 size={16} /> <span>엑셀 데이터 로드</span>
                 </div>
                 <div className="ds-step is-active">
-                  <Loader2 size={16} className="ds-spin" /> <span>4필드 텍스트 직렬화</span>
+                  <Loader2 size={16} className="ds-spin" /> <span>Luna VLM / 4필드 직렬화</span>
                 </div>
                 <div className="ds-step">
                   <Layers size={16} /> <span>배치 임베딩 생성</span>
@@ -248,14 +250,25 @@ export function IndexIngestionModal({
               </div>
 
               {/* 4. Advanced Ingestion Options */}
-              <details className="ds-advanced-details">
+              <details className="ds-advanced-details" open>
                 <summary className="ds-advanced-summary">
-                  <Settings2 size={15} /> 고급 설정 (직렬화 형태 & 배치 크기)
+                  <Settings2 size={15} /> 구조화 및 직렬화 설정
                 </summary>
                 <div className="ds-advanced-body">
                   <div className="ds-form-row">
                     <div className="ds-form-group">
-                      <label className="ds-form-label">직렬화 방식</label>
+                      <label className="ds-form-label">구조화 모드</label>
+                      <select
+                        className="ds-select"
+                        value={structureMode}
+                        onChange={(e) => setStructureMode(e.target.value as any)}
+                      >
+                        <option value="auto">Luna VLM 자동 구조화 (권장 / indexing_prebuilt)</option>
+                        <option value="exhaustive">전수 셀 직렬화 (빠른 모드)</option>
+                      </select>
+                    </div>
+                    <div className="ds-form-group">
+                      <label className="ds-form-label">직렬화 형태</label>
                       <select
                         className="ds-select"
                         value={variantMode}
@@ -266,6 +279,8 @@ export function IndexIngestionModal({
                         <option value="both">Both (헤더 및 값 조합 생성)</option>
                       </select>
                     </div>
+                  </div>
+                  <div className="ds-form-row" style={{ marginTop: '0.6rem' }}>
                     <div className="ds-form-group">
                       <label className="ds-form-label">배치 크기</label>
                       <select

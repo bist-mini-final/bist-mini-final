@@ -58,6 +58,7 @@ export interface IngestRequest {
   file_name: string;
   model: string;
   variant_mode: 'header_only' | 'header_with_value' | 'both';
+  structure_mode?: 'auto' | 'luna_vlm' | 'exhaustive';
   sheet_names?: string[];
   batch_size?: number;
 }

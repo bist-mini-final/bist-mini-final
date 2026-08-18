@@ -36,6 +36,10 @@ class IngestRequestDTO(BaseModel):
         default="header_only",
         description="직렬화 형태 (header_only, header_with_value, both)",
     )
+    structure_mode: Literal["auto", "luna_vlm", "exhaustive"] = Field(
+        default="auto",
+        description="구조화 모드 (auto: Luna VLM 감지 후 직렬화, luna_vlm: 강제 VLM, exhaustive: 전수 직렬화)",
+    )
     sheet_names: Optional[List[str]] = Field(
         default=None,
         description="인덱싱할 시트 목록 (기본값: 모든 표시 시트)",
@@ -110,8 +114,11 @@ def create_data_source_router(
 
     # 3. Upload file
     @router.post("/files/upload")
-    async def upload_file(file: UploadFile = File(...)) -> Dict[str, Any]:
-        """Upload a new raw file to data/processed/."""
+    async def upload_file(
+        file: UploadFile = File(...),
+        auto_ingest: bool = Query(default=True, description="업로드 즉시 Luna VLM 구조화 & 벡터 인덱싱 자동 실행"),
+    ) -> Dict[str, Any]:
+        """Upload a new raw file to data/processed/ and optionally trigger auto-ingest."""
         if not file.filename:
             raise HTTPException(status_code=400, detail="유효한 파일명이 필요합니다")
 
@@ -126,23 +133,60 @@ def create_data_source_router(
         finally:
             file.file.close()
 
+        ingested_index = None
+        suffix = dest_path.suffix.lower()
+        if auto_ingest and suffix in (".xlsx", ".xlsm"):
+            try:
+                ingested_index = ingest_excel_workbook(
+                    file_name=safe_filename,
+                    structure_mode="auto",
+                    processed_dir=processed_dir,
+                    vector_index_store=vector_index_store,
+                    pgvector_store=pg_store,
+                    embedding_artifact_store=embedding_artifact_store,
+                    embedding_encoder=embedding_encoder,
+                )
+            except Exception:
+                ingested_index = None
+
         files = list_processed_files(processed_dir, vector_index_store, pg_store)
         uploaded = next((f for f in files if f["file_name"] == safe_filename), None)
-        return {"status": "success", "file": uploaded}
+        return {
+            "status": "success",
+            "file": uploaded,
+            "auto_ingested": ingested_index is not None,
+            "ingested_index": ingested_index,
+        }
 
     # 4. Delete file
     @router.delete("/files/{filename}")
-    def delete_file(filename: str) -> Dict[str, Any]:
-        """Delete a raw file from data/processed/."""
+    def delete_file(
+        filename: str,
+        cascade_indexes: bool = Query(default=True, description="연관된 벡터 인덱스도 함께 삭제(고아 벡터 방지)"),
+    ) -> Dict[str, Any]:
+        """Delete a raw file from data/processed/ with logical cascade to vector DB."""
         safe_filename = Path(filename).name
         target_path = processed_dir / safe_filename
         if not target_path.is_file():
             raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다")
 
         try:
+            import hashlib
+            file_bytes = target_path.read_bytes()
+            workbook_hash = hashlib.sha256(file_bytes).hexdigest()
             target_path.unlink()
-            return {"status": "success", "deleted_file": safe_filename}
+
+            cascade_deleted = 0
+            if cascade_indexes and pg_store and pg_store.is_connected():
+                cascade_deleted = pg_store.delete_by_workbook_hash(workbook_hash)
+
+            return {
+                "status": "success",
+                "deleted_file": safe_filename,
+                "cascade_indexes_deleted": cascade_deleted,
+            }
         except Exception as error:
+            raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
             raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
 
     # 5. List vector indexes
@@ -211,6 +255,7 @@ def create_data_source_router(
                 file_name=request.file_name,
                 model=request.model,
                 variant_mode=request.variant_mode,
+                structure_mode=request.structure_mode,
                 sheet_names=request.sheet_names,
                 batch_size=request.batch_size,
                 processed_dir=processed_dir,

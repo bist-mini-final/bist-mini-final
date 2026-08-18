@@ -4,25 +4,36 @@
 
 ---
 
-## 1. 데이터베이스 개요 및 설계 원칙
+## 1. 데이터베이스 개요 및 5대 핵심 설계 원칙
 
 ### 1.1 저장소 아키텍처 개요
 - **DBMS**: PostgreSQL 16
 - **벡터 확장**: `pgvector v0.8.6` (`CREATE EXTENSION IF NOT EXISTS vector;`)
 - **데이터베이스명**: `rag_flow`
 - **표준 프레임워크**: `LangChain` (`langchain-postgres`)
-- **핵심 목표**: 
-  1. 엑셀 원본 파일 $\rightarrow$ 시트/영역 파싱 $\rightarrow$ 셀 텍스트 직렬화 $\rightarrow$ 벡터 임베딩 간의 **완전한 데이터 계보(Data Lineage) 보장**
-  2. 프론트엔드 DAG 캔버스에서 생성된 워크플로와 배치 실행 이력의 **영속성 및 추적성 제공**
-  3. LLM 질의응답 캐시 및 RAG 평가 메트릭 데이터의 **효율적인 인덱싱**
+- **연결 주소**: `postgresql://postgres:postgres@localhost:5432/rag_flow`
 
-### 1.2 pgAdmin 테이블 통합 및 정제 방향
-현재 초기 개발 과정에서 생성된 raw 테이블과 LangChain 표준 테이블이 공존하고 있습니다:
-- `document_chunks`, `vector_indexes`: 초기 raw SQL 프로토타입 테이블 (정리 대상)
-- `langchain_pg_collection`, `langchain_pg_embedding`: **LangChain 표준 벡터 저장소 테이블 (운영 기준)**
+---
 
-> [!NOTE]
-> 도메인 엔티티(`files`, `workflows`, `workflow_runs`, `answer_cache`)는 표준 RDB 테이블로 구성하고, 벡터 검색 영역은 LangChain 표준 테이블(`langchain_pg_collection`, `langchain_pg_embedding`)과 외래키/식별자로 유기적으로 연동합니다.
+### 1.2 프로덕션 안정성을 위한 5대 엔지니어링 원칙 (Core Principles)
+
+#### ① 고아 벡터(Orphan Vectors) 방지 (Logical Cascade 강제화)
+- **문제점**: `source_files`와 `langchain_pg_collection` 간에는 LangChain 라이브러리 규격 상 물리적 외래키(FK)가 존재하지 않습니다.
+- **대응책**: 파일 삭제(`DELETE /api/data-sources/files/{filename}`) 시 백엔드 트랜잭션에서 해당 파일 해시(`workbook_hash`)와 연관된 LangChain 컬렉션과 벡터 임베딩을 함께 정리하는 **논리적 캐스케이드(Logical Cascade)** 삭제를 강제합니다.
+
+#### ② 메타데이터 GIN 인덱스 성능 최적화 (`jsonb_path_ops`)
+- **문제점**: 범용 `gin (cmetadata)` 인덱스는 키-값 쌍을 모두 인덱싱하여 디스크 사용량이 크고 연산 부하가 있습니다.
+- **대응책**: LangChain 메타데이터 필터링(`@>` JSON 포함 연산자)에 특화된 **`gin (cmetadata jsonb_path_ops)`**를 적용하여 디스크 공간을 절약하고 필터링 속도를 수배 이상 향상시킵니다.
+
+#### ③ 지식 변경 기반 캐시 무효화 (Smart Cache Invalidation)
+- **문제점**: 질문과 모델명만으로 캐시 키를 생성할 경우, 엑셀 데이터가 수정되거나 검색 파라미터가 변경되어도 과거의 낡은 답변이 반환될 수 있습니다.
+- **대응책**: 캐시 키(`cache_id`) 생성 시 **`SHA256(query + model + source_file_hashes + workflow_config_hash)`**를 적용하여 원본 데이터나 파이프라인 로직이 변하면 즉시 새 답변을 생성하도록 무효화합니다.
+
+#### ④ LangChain 100% 표준 스키마 정합성 보장 (No Custom Column)
+- **대응책**: `langchain_pg_embedding` 테이블에 별도의 커스텀 컬럼을 추가하지 않고, 셀 식별자 등 모든 도메인 메타데이터는 **`cmetadata` (`{"cell_id": "c12", ...}`)** 내부에 저장하며, 테이블 DDL 생성은 LangChain의 자동 생성에 100% 위임합니다.
+
+#### ⑤ 벡터 폭발(Row Explosion) 관리 및 다차원 청킹 전략
+- **대응책**: 대용량 엑셀 처리 시 단순 1셀=1벡터 정책 외에도, 사용자가 상황에 따라 **행(Row) 단위 묶음 청킹** 또는 **표(Table Region) 단위 블록 청킹**을 선택할 수 있는 다차원 청킹 파이프라인을 지원합니다.
 
 ---
 
@@ -34,7 +45,7 @@ erDiagram
     %% 1. Raw Data & Spreadsheet Domain
     %% ==========================================
     SOURCE_FILES ||--o{ SHEETS : "contains"
-    SOURCE_FILES ||--o{ LANGCHAIN_PG_COLLECTION : "indexed into"
+    SOURCE_FILES ||..o{ LANGCHAIN_PG_COLLECTION : "logical cascade"
     
     SOURCE_FILES {
         varchar file_id PK "UUID / SHA256"
@@ -48,7 +59,7 @@ erDiagram
     }
 
     SHEETS {
-        varchar sheet_id PK "file_id + sheet_name"
+        varchar sheet_id PK "file_id:sheet_name"
         varchar file_id FK "SOURCE_FILES.file_id"
         varchar sheet_name "시트명 (예: Key_Stats)"
         int sheet_index "시트 순서 인덱스"
@@ -71,12 +82,11 @@ erDiagram
     }
 
     LANGCHAIN_PG_EMBEDDING {
-        uuid id PK "청크 고유 UUID"
+        uuid id PK "청크 고유 UUID (LangChain 자동 발급)"
         uuid collection_id FK "LANGCHAIN_PG_COLLECTION.uuid"
         text document "직렬화된 셀 텍스트 (Page Content)"
-        vector embedding "임베딩 벡터 (예: 3072차원 or 1024차원)"
+        vector embedding "임베딩 벡터 (HNSW 인덱스 적용)"
         jsonb cmetadata "cell_id, sheet_name, cell_coord, row_header, column_header, cell_value"
-        varchar custom_id "셀 고유 ID (예: sheet!C12)"
     }
 
     %% ==========================================
@@ -127,10 +137,11 @@ erDiagram
     %% 4. Caching & Evaluation Domain
     %% ==========================================
     ANSWER_CACHE {
-        varchar cache_id PK "질문+모델 해시"
+        varchar cache_id PK "SHA256(query + model + source_file_hashes + workflow_config_hash)"
         varchar query_text "사용자 원본 질문"
         varchar model_name "응답 생성 LLM 모델명"
-        text answer_text "캐시된 답변 텍스트"
+        varchar source_hashes "참조 데이터 파일 해시 목록"
+        text answer_text "캐시된 최종 답변 텍스트"
         jsonb sources "참조된 검색 청크 출처 목록"
         int hit_count "캐시 적중 횟수"
         timestamp created_at "생성 일시"
@@ -194,29 +205,27 @@ erDiagram
 ---
 
 ### 3.4 `langchain_pg_embedding` (LangChain 벡터 청크 저장소)
-*LangChain 공식 `langchain-postgres` 테이블*
+*LangChain 공식 `langchain-postgres` 100% 호환 테이블*
 | 컬럼명 | 데이터 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `id` | `UUID` | `PRIMARY KEY` | 청크 고유 UUID |
+| `id` | `UUID` | `PRIMARY KEY` | 청크 고유 UUID (LangChain 자동 발급) |
 | `collection_id` | `UUID` | `FOREIGN KEY` | `langchain_pg_collection.uuid` 참조 (`ON DELETE CASCADE`) |
-| `document` | `TEXT` | `NOT NULL` | 직렬화된 텍스트 (`[SHEET] ... [COL] ... [ROW] ... [VALUE] ...`) |
-| `embedding` | `VECTOR(3072)` | `NOT NULL` | 고차원 임베딩 벡터 (HNSW / IVFFlat 인덱스 적용) |
+| `document` | `TEXT` | `NOT NULL` | 직렬화된 셀 텍스트 (`[SHEET] ... [COL] ... [ROW] ... [VALUE] ...`) |
+| `embedding` | `VECTOR(3072)` | `NOT NULL` | 고차원 임베딩 벡터 |
 | `cmetadata` | `JSONB` | `NOT NULL` | `cell_id`, `sheet_name`, `cell_coord`, `row_header`, `column_header`, `cell_value` |
-| `custom_id` | `VARCHAR` | `NULLABLE` | 셀 고유 식별자 (예: `c1`, `c2`) |
 
-#### 인덱스 설정
-- **Cosine Similarity 검색용 HNSW 인덱스**:
-  ```sql
-  CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw 
-  ON langchain_pg_embedding 
-  USING hnsw (embedding vector_cosine_ops);
-  ```
-- **메타데이터 JSONB GIN 인덱스** (필터링 가속):
-  ```sql
-  CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata 
-  ON langchain_pg_embedding 
-  USING gin (cmetadata);
-  ```
+#### 최적화 인덱스 DDL
+```sql
+-- 1. Cosine Similarity 고속 검색용 HNSW 인덱스
+CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw 
+ON langchain_pg_embedding 
+USING hnsw (embedding vector_cosine_ops);
+
+-- 2. 메타데이터 고속 필터링을 위한 jsonb_path_ops GIN 인덱스 (용량 절감 및 속도 극대화)
+CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata 
+ON langchain_pg_embedding 
+USING gin (cmetadata jsonb_path_ops);
+```
 
 ---
 
@@ -251,12 +260,13 @@ erDiagram
 
 ---
 
-### 3.7 `answer_cache` (질의응답 캐시)
+### 3.7 `answer_cache` (질의응답 스마트 캐시)
 | 컬럼명 | 데이터 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `cache_id` | `VARCHAR(64)` | `PRIMARY KEY` | `SHA256(query + model_name)` |
+| `cache_id` | `VARCHAR(64)` | `PRIMARY KEY` | `SHA256(query + model + source_file_hashes + workflow_config_hash)` |
 | `query_text` | `TEXT` | `NOT NULL` | 원본 질의문 |
 | `model_name` | `VARCHAR(64)` | `NOT NULL` | 답변 생성에 사용된 LLM 모델 |
+| `source_hashes` | `TEXT` | `NOT NULL` | 참조된 원본 데이터 파일들의 SHA256 해시 목록 |
 | `answer_text` | `TEXT` | `NOT NULL` | 캐시된 최종 답변 텍스트 |
 | `sources` | `JSONB` | `DEFAULT '[]'` | 답변 작성에 인용된 셀 청크 및 파일 출처 |
 | `hit_count` | `INT` | `DEFAULT 1` | 캐시 히트 횟수 |
@@ -278,7 +288,8 @@ erDiagram
   "row_header": ["Financial Summary", "Total Revenue"],
   "column_header": ["2024", "Annual"],
   "cell_value": "1,200M",
-  "workbook_hash": "67bad6e2365a6a682..."
+  "workbook_hash": "67bad6e2365a6a682...",
+  "sheet_summary": "2024년 SPG 주요 재무 지표 및 매출 통계 요약"
 }
 ```
 
@@ -286,17 +297,13 @@ erDiagram
 
 ## 5. 데이터베이스 정제 및 단계별 적용 계획
 
-### 1단계: 임시 프로토타입 테이블 정리 (Drop Legacy Tables)
-초기 raw SQL 테이블인 `document_chunks`와 `vector_indexes`를 삭제하여 LangChain 표준 구조로 단일화합니다.
-```sql
-DROP TABLE IF EXISTS document_chunks CASCADE;
-DROP TABLE IF EXISTS vector_indexes CASCADE;
-```
+### 1단계: 임시 프로토타입 테이블 정리 (완료)
+초기 raw SQL 테이블인 `document_chunks`와 `vector_indexes`를 삭제하여 LangChain 표준 구조로 단일화 완료.
 
-### 2단계: 필수 도메인 DDL 적용 스크립트 실행
-위 명세서의 DDL을 담은 `backend/storage/schema.sql` 또는 마이그레이션 스크립트를 통해 `source_files`, `sheets`, `workflows`, `workflow_runs`, `answer_cache` 테이블을 안전하게 생성합니다.
+### 2단계: LangChain 테이블 자동 위임 및 최적화 인덱스 주입
+- `langchain_pg_collection`과 `langchain_pg_embedding` 테이블은 LangChain `PGVector` 인스턴스 초기화 시 자동 생성되도록 위임.
+- 생성 후 `idx_langchain_pg_embedding_hnsw` 및 `idx_langchain_pg_embedding_cmetadata (jsonb_path_ops)` 인덱스 자동 적용.
 
-### 3단계: 스토리지 레이어 연결
-- `WorkflowStore`: JSON 파일 $\rightarrow$ `workflows` 테이블 지원
-- `RunHistoryStore`: JSON 파일 $\rightarrow$ `workflow_runs` 테이블 지원
-- `AnswerCache`: JSON 파일 $\rightarrow$ `answer_cache` 테이블 지원
+### 3단계: 도메인 DDL 및 스토리지 어댑터 연동
+- `source_files`, `sheets`, `workflows`, `workflow_runs`, `answer_cache` 테이블 구축
+- 파일 삭제 시 연관 LangChain 컬렉션/벡터 청크를 함께 지우는 **Logical Cascade 삭제 로직** 보장

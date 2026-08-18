@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence
 from ..core.settings import (
     EMBEDDING_ARTIFACT_DIR,
     PROCESSED_DATA_DIR,
+    SPREADSHEET_ARTIFACT_DIR,
     USE_PGVECTOR,
     VECTOR_INDEX_DIR,
 )
@@ -21,10 +22,19 @@ from ..modules.cell_text_embedder import (
     CellTextEmbedderExecutionDTO,
     CellTextEmbedderModule,
 )
-from ..modules.cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
+from ..modules.cell_text_serializer import (
+    CellTextDocumentDTO,
+    CellTextSerializerInputDTO,
+    CellTextSerializerModule,
+    CellTextSerializerOutput,
+)
 from ..modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerExecutionDTO,
     ExhaustiveCellTextSerializerModule,
+)
+from ..modules.luna_vlm_structure_detector import (
+    LunaVlmStructureDetectorExecutionDTO,
+    LunaVlmStructureDetectorModule,
 )
 from ..modules.vector_index_writer import (
     VectorIndexDTO,
@@ -145,52 +155,11 @@ def list_vector_indexes(
     vector_index_dir: Path = VECTOR_INDEX_DIR,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> List[Dict[str, Any]]:
-    """List all stored vector indexes (from both pgvector DB and local vector_db dir)."""
-    index_dict: Dict[str, Dict[str, Any]] = {}
-
-    # 1. Check pgvector store first if available
+    """List all stored vector indexes directly from pgvector DB."""
     pg = pgvector_store or PgVectorStore()
     if pg.is_connected():
-        try:
-            for idx in pg.list_indexes():
-                idx["storage"] = "pgvector"
-                index_dict[idx["index_id"]] = idx
-        except Exception:
-            pass
-
-    # 2. Check local vector_db files
-    if vector_index_dir.exists():
-        for meta_path in sorted(vector_index_dir.glob("*.json")):
-            npy_path = meta_path.with_suffix(".npy")
-            if not npy_path.is_file():
-                continue
-
-            try:
-                data = json.loads(meta_path.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-
-            idx_id = data.get("index_id", meta_path.stem)
-            total_size = meta_path.stat().st_size + npy_path.stat().st_size
-            created_at = datetime.fromtimestamp(meta_path.stat().st_mtime, tz=timezone.utc).isoformat()
-
-            if idx_id in index_dict:
-                # Mark as dual / pgvector backed
-                index_dict[idx_id]["total_size_bytes"] = total_size
-            else:
-                index_dict[idx_id] = {
-                    "index_id": idx_id,
-                    "file_name": data.get("file_name", "unknown"),
-                    "workbook_hash": data.get("workbook_hash", ""),
-                    "model": data.get("model", "text-embedding-3-large"),
-                    "dimension": data.get("dimension", 0),
-                    "document_count": data.get("document_count", 0),
-                    "created_at": created_at,
-                    "total_size_bytes": total_size,
-                    "storage": "local",
-                }
-
-    return list(index_dict.values())
+        return pg.list_indexes()
+    return []
 
 
 def get_vector_index_detail(
@@ -199,41 +168,11 @@ def get_vector_index_detail(
     vector_index_store: Optional[VectorIndexStore] = None,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> Dict[str, Any]:
-    """Retrieve full metadata and sample serialized items for an index."""
+    """Retrieve full metadata and sample serialized items directly from pgvector DB."""
     pg = pgvector_store or PgVectorStore()
-    if pg.is_connected():
-        try:
-            return pg.get_index_detail(index_id, limit=sample_items_count)
-        except Exception:
-            pass
-
-    store = vector_index_store or VectorIndexStore(VECTOR_INDEX_DIR)
-    meta = store.metadata(index_id)
-    items = meta.get("items") or []
-
-    sample_items = [
-        {
-            "cell_id": doc.get("cell_id", ""),
-            "sheet_name": doc.get("sheet_name", ""),
-            "cell_coord": doc.get("cell_coord") or doc.get("cell_address", ""),
-            "row_header": doc.get("row_header", []),
-            "column_header": doc.get("column_header", []),
-            "cell_value": doc.get("cell_value", ""),
-            "text": doc.get("text", ""),
-        }
-        for doc in items[:sample_items_count]
-    ]
-
-    return {
-        "index_id": index_id,
-        "file_name": meta.get("file_name", ""),
-        "workbook_hash": meta.get("workbook_hash", ""),
-        "model": meta.get("model", ""),
-        "dimension": meta.get("dimension", 0),
-        "document_count": meta.get("document_count", len(items)),
-        "storage": "local",
-        "sample_items": sample_items,
-    }
+    if not pg.is_connected():
+        raise ModuleExecutionError("pgvector 데이터베이스에 연결할 수 없습니다. Docker 컨테이너를 구동해주세요.")
+    return pg.get_index_detail(index_id, limit=sample_items_count)
 
 
 def delete_vector_index(
@@ -241,31 +180,11 @@ def delete_vector_index(
     vector_index_store: Optional[VectorIndexStore] = None,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> bool:
-    """Delete an index from both pgvector and vector_db store."""
-    deleted = False
-
+    """Delete an index directly from pgvector DB."""
     pg = pgvector_store or PgVectorStore()
-    if pg.is_connected():
-        try:
-            if pg.delete(index_id):
-                deleted = True
-        except Exception:
-            pass
-
-    store = vector_index_store or VectorIndexStore(VECTOR_INDEX_DIR)
-    index_path, metadata_path = store._paths(index_id)
-    faiss_path = store.directory / f"{index_id}.faiss"
-
-    if index_path.exists():
-        index_path.unlink(missing_ok=True)
-        deleted = True
-    if metadata_path.exists():
-        metadata_path.unlink(missing_ok=True)
-        deleted = True
-    if faiss_path.exists():
-        faiss_path.unlink(missing_ok=True)
-
-    return deleted
+    if not pg.is_connected():
+        raise ModuleExecutionError("pgvector 데이터베이스에 연결할 수 없습니다")
+    return pg.delete(index_id)
 
 
 def search_vector_index(
@@ -276,57 +195,28 @@ def search_vector_index(
     pgvector_store: Optional[PgVectorStore] = None,
     embedding_encoder: Optional[EmbeddingEncoder] = None,
 ) -> List[Dict[str, Any]]:
-    """Execute a test query search on the specified vector index (via pgvector or local store)."""
-    # 1. Retrieve metadata for model name
-    store = vector_index_store or VectorIndexStore(VECTOR_INDEX_DIR)
+    """Execute cosine similarity search directly against pgvector DB using LangChain."""
+    pg = pgvector_store or PgVectorStore()
+    if not pg.is_connected():
+        raise ModuleExecutionError("pgvector 데이터베이스에 연결할 수 없습니다")
+
+    # Retrieve model name from pgvector metadata
     model_name = "text-embedding-3-large"
     try:
-        meta = store.metadata(index_id)
-        model_name = meta.get("model", "text-embedding-3-large")
+        detail = pg.get_index_detail(index_id, limit=1)
+        model_name = detail.get("model") or "text-embedding-3-large"
     except Exception:
-        pg = pgvector_store or PgVectorStore()
-        if pg.is_connected():
-            try:
-                pg_detail = pg.get_index_detail(index_id, limit=1)
-                model_name = pg_detail.get("model", "text-embedding-3-large")
-            except Exception:
-                pass
+        pass
 
-    encoder = get_embedding_encoder(model_name, override_encoder=embedding_encoder)
-    query_vectors = encoder.encode([query_text])
-    if not query_vectors:
-        raise ModuleExecutionError("질의 임베딩 생성에 실패했습니다")
-
-    query_vector = query_vectors[0]
-
-    # 2. Try searching pgvector first
-    pg = pgvector_store or PgVectorStore()
-    if pg.is_connected():
-        try:
-            hits = pg.search(index_id, query_vector, limit=limit)
-            if hits:
-                return [
-                    {
-                        "score": round(float(score), 4),
-                        "cell_id": doc.get("cell_id", ""),
-                        "sheet_name": doc.get("sheet_name", ""),
-                        "cell_coord": doc.get("cell_coord") or doc.get("cell_address", ""),
-                        "row_header": doc.get("row_header", []),
-                        "column_header": doc.get("column_header", []),
-                        "cell_value": doc.get("cell_value", ""),
-                        "text": doc.get("text", ""),
-                        "storage": "pgvector",
-                    }
-                    for score, doc in hits
-                ]
-        except Exception:
-            pass
-
-    # 3. Fallback to local numpy vector_index_store
-    hits = store.search(index_id, query_vector, limit=limit)
-    results: List[Dict[str, Any]] = []
-    for score, doc in hits:
-        results.append({
+    hits = pg.search(
+        index_id,
+        query_text=query_text,
+        model_name=model_name,
+        embedding_encoder=embedding_encoder,
+        limit=limit,
+    )
+    return [
+        {
             "score": round(float(score), 4),
             "cell_id": doc.get("cell_id", ""),
             "sheet_name": doc.get("sheet_name", ""),
@@ -335,10 +225,10 @@ def search_vector_index(
             "column_header": doc.get("column_header", []),
             "cell_value": doc.get("cell_value", ""),
             "text": doc.get("text", ""),
-            "storage": "local",
-        })
-
-    return results
+            "storage": "pgvector (LangChain)",
+        }
+        for score, doc in hits
+    ]
 
 
 def ingest_excel_workbook(
@@ -347,13 +237,15 @@ def ingest_excel_workbook(
     variant_mode: Literal["header_only", "header_with_value", "both"] = "header_only",
     sheet_names: Optional[List[str]] = None,
     batch_size: int = 64,
+    structure_mode: Literal["auto", "luna_vlm", "exhaustive"] = "auto",
     processed_dir: Path = PROCESSED_DATA_DIR,
+    spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     vector_index_store: Optional[VectorIndexStore] = None,
     pgvector_store: Optional[PgVectorStore] = None,
     embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
     embedding_encoder: Optional[EmbeddingEncoder] = None,
 ) -> Dict[str, Any]:
-    """End-to-end ingestion pipeline: Excel -> Serialized Cell Documents -> Dense Embeddings -> Vector DB (pgvector & local)."""
+    """End-to-end ingestion pipeline: Excel -> Luna VLM Structure Detector -> Structured Cell Serializer -> Dense Embeddings -> Vector DB (pgvector & local)."""
     catalog = WorkbookCatalog(processed_dir)
     workbook_path = catalog.resolve(file_name)
     workbook_hash = catalog.sha256(workbook_path)
@@ -363,17 +255,64 @@ def ingest_excel_workbook(
     if not visible_sheets:
         raise ModuleExecutionError("인덱싱할 대상 시트가 없습니다")
 
-    # Step 1: Serialization
-    serializer = ExhaustiveCellTextSerializerModule(processed_dir=processed_dir)
-    serializer_input = ExhaustiveCellTextSerializerExecutionDTO(
-        file_name=file_name,
-        workbook_hash=workbook_hash,
-        sheet_names=visible_sheets,
-        variant_mode=variant_mode,
-        deduplicate_header_values=True,
-    )
-    serialized_result = serializer.execute(serializer_input)
-    documents = serialized_result.get("items") or []
+    # Step 1: Structure Detection & Cell Text Serialization (Luna VLM + Structured Serializer)
+    documents: List[CellTextDocumentDTO] = []
+    used_pipeline = "exhaustive"
+
+    if structure_mode in ("luna_vlm", "auto") and os.getenv("OPENAI_API_KEY"):
+        try:
+            detector = LunaVlmStructureDetectorModule(
+                artifact_dir=spreadsheet_artifact_dir,
+                catalog=catalog,
+            )
+            detector_input = LunaVlmStructureDetectorExecutionDTO(
+                file_name=file_name,
+                workbook_hash=workbook_hash,
+                sheet_names=visible_sheets,
+                model="gpt-5.6-luna",
+                reasoning_effort="low",
+                max_rows=400,
+                max_columns=60,
+                max_context_cells=50000,
+            )
+            structure_output = detector.execute(detector_input)
+            tables = structure_output.get("tables") or []
+            if tables:
+                serializer = CellTextSerializerModule(processed_dir=processed_dir)
+                serializer_input = CellTextSerializerInputDTO(
+                    file_name=file_name,
+                    workbook_hash=workbook_hash,
+                    tables=tables,
+                )
+                serialized = serializer.execute(serializer_input)
+                raw_docs = serialized.get("items") or []
+                documents = [
+                    d if isinstance(d, CellTextDocumentDTO) else CellTextDocumentDTO(**d)
+                    for d in raw_docs
+                ]
+                if documents:
+                    used_pipeline = "luna_vlm_structured"
+        except Exception:
+            documents = []
+
+    if not documents:
+        # Fallback to exhaustive cell serializer
+        serializer = ExhaustiveCellTextSerializerModule(processed_dir=processed_dir)
+        serializer_input = ExhaustiveCellTextSerializerExecutionDTO(
+            file_name=file_name,
+            workbook_hash=workbook_hash,
+            sheet_names=visible_sheets,
+            variant_mode=variant_mode,
+            deduplicate_header_values=True,
+        )
+        serialized_result = serializer.execute(serializer_input)
+        raw_docs = serialized_result.get("items") or []
+        documents = [
+            d if isinstance(d, CellTextDocumentDTO) else CellTextDocumentDTO(**d)
+            for d in raw_docs
+        ]
+        used_pipeline = "exhaustive"
+
     if not documents:
         raise ModuleExecutionError("생성된 셀 문서가 없습니다")
 
@@ -383,7 +322,7 @@ def ingest_excel_workbook(
     embedder_input = CellTextEmbedderExecutionDTO(
         file_name=file_name,
         workbook_hash=workbook_hash,
-        items=[CellTextDocumentDTO(**doc) for doc in documents],
+        items=documents,
         model=model,
         batch_size=batch_size,
     )
@@ -420,9 +359,13 @@ def ingest_excel_workbook(
                 "dimension": embedding_result["dimension"],
                 "document_count": len(embedding_result["items"]),
                 "artifact_id": embedding_result["artifact_id"],
-                "items": [item.model_dump(mode="json") for item in embedding_result["items"]],
+                "pipeline": used_pipeline,
+                "items": [
+                    item.model_dump(mode="json") if hasattr(item, "model_dump") else item
+                    for item in embedding_result["items"]
+                ],
             }
-            pg.put(index_id, vectors, pg_metadata)
+            pg.put(index_id, vectors, pg_metadata, embedding_encoder=embedding_encoder)
             stored_in_pgvector = True
         except Exception:
             stored_in_pgvector = False
@@ -436,5 +379,6 @@ def ingest_excel_workbook(
         "document_count": index_result["document_count"],
         "sheet_count": len(visible_sheets),
         "sheets": visible_sheets,
-        "storage": "pgvector" if stored_in_pgvector else "local",
+        "pipeline": used_pipeline,
+        "storage": "pgvector (LangChain)" if stored_in_pgvector else "local",
     }

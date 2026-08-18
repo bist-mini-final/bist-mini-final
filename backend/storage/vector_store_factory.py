@@ -30,6 +30,7 @@ def get_vector_store(
     backend: VectorDbBackend = "pgvector",
     model_name: str = "text-embedding-3-large",
     embedding_encoder: Optional[EmbeddingEncoder] = None,
+    collection_metadata: Optional[Dict[str, Any]] = None,
     database_url: str = PGVECTOR_URL,
     distance_strategy: DistanceStrategy = DistanceStrategy.COSINE,
 ) -> VectorStore:
@@ -45,6 +46,7 @@ def get_vector_store(
             embeddings=adapter,
             collection_name=collection_name,
             connection=conn_str,
+            collection_metadata=collection_metadata,
             distance_strategy=distance_strategy,
             use_jsonb=True,
             create_extension=True,

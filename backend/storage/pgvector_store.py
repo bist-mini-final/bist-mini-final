@@ -119,11 +119,22 @@ class PgVectorStore:
         if not documents:
             return
 
+        clean_meta = {
+            "file_name": (metadata or {}).get("file_name", ""),
+            "workbook_hash": (metadata or {}).get("workbook_hash", ""),
+            "model": (metadata or {}).get("model", model_name),
+            "dimension": (metadata or {}).get("dimension", 3072),
+            "document_count": len(documents),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "pipeline": (metadata or {}).get("pipeline", "luna_vlm_structured"),
+        }
+
         store = get_vector_store(
             collection_name=index_id,
             backend="pgvector",
             model_name=model_name,
             embedding_encoder=embedding_encoder,
+            collection_metadata=clean_meta,
             database_url=self.database_url,
         )
 
@@ -133,32 +144,33 @@ class PgVectorStore:
         except Exception:
             pass
 
-        # Ensure collection is created
+        # Ensure collection is created with metadata
         try:
             store.create_collection()
         except Exception:
             pass
 
-        # Update collection metadata if provided
-        if metadata:
-            conn = self._raw_connection()
-            try:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        UPDATE langchain_pg_collection
-                        SET cmetadata = %s
-                        WHERE name = %s;
-                        """,
-                        (psycopg2.extras.Json(metadata), index_id),
-                    )
-                conn.commit()
-            except Exception:
-                conn.rollback()
-            finally:
-                conn.close()
-
         store.add_documents(documents)
+
+        # Also execute direct update for guarantee
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE langchain_pg_collection
+                    SET cmetadata = %s
+                    WHERE name = %s;
+                    """,
+                    (psycopg2.extras.Json(clean_meta), index_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        finally:
+            conn.close()
+
+        self.ensure_optimized_indexes()
 
     def put(
         self,
@@ -203,7 +215,7 @@ class PgVectorStore:
                     SELECT c.name, c.cmetadata, COUNT(e.id) AS chunk_count
                     FROM langchain_pg_collection c
                     LEFT JOIN langchain_pg_embedding e ON c.uuid = e.collection_id
-                    GROUP BY c.uuid, c.name, c.cmetadata::text;
+                    GROUP BY c.uuid;
                     """
                 )
                 rows = cur.fetchall()
@@ -214,7 +226,10 @@ class PgVectorStore:
                 meta = r[1] or {}
                 if isinstance(meta, str):
                     import json
-                    meta = json.loads(meta)
+                    try:
+                        meta = json.loads(meta)
+                    except Exception:
+                        meta = {}
                 count = r[2]
                 results.append({
                     "index_id": name,
@@ -223,7 +238,7 @@ class PgVectorStore:
                     "model": meta.get("model", "text-embedding-3-large"),
                     "dimension": meta.get("dimension", 3072),
                     "document_count": count,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
                     "storage": "pgvector (LangChain)",
                 })
             return results
@@ -250,6 +265,13 @@ class PgVectorStore:
                     raise PgVectorStoreError(f"pgvector 컬렉션을 찾을 수 없습니다: {index_id}")
 
                 meta = row[2] or {}
+                if isinstance(meta, str):
+                    import json
+                    try:
+                        meta = json.loads(meta)
+                    except Exception:
+                        meta = {}
+
                 cur.execute(
                     """
                     SELECT document, cmetadata
@@ -265,6 +287,12 @@ class PgVectorStore:
             for c in chunk_rows:
                 text = c[0]
                 cmeta = c[1] or {}
+                if isinstance(cmeta, str):
+                    import json
+                    try:
+                        cmeta = json.loads(cmeta)
+                    except Exception:
+                        cmeta = {}
                 sample_items.append({
                     "cell_id": cmeta.get("cell_id", ""),
                     "sheet_name": cmeta.get("sheet_name", ""),
@@ -288,6 +316,36 @@ class PgVectorStore:
         finally:
             conn.close()
 
+    def ensure_optimized_indexes(self) -> None:
+        """Create HNSW vector index and jsonb_path_ops GIN metadata index if they don't exist."""
+        try:
+            conn = self._raw_connection()
+            conn.autocommit = True
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_embedding';"
+                    )
+                    if cur.fetchone()[0] > 0:
+                        cur.execute(
+                            """
+                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw
+                            ON langchain_pg_embedding
+                            USING hnsw (embedding vector_cosine_ops);
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
+                            ON langchain_pg_embedding
+                            USING gin (cmetadata jsonb_path_ops);
+                            """
+                        )
+            finally:
+                conn.close()
+        except Exception:
+            pass
+
     def delete(self, index_id: str) -> bool:
         """Delete a collection from pgvector."""
         try:
@@ -308,6 +366,33 @@ class PgVectorStore:
                 conn.close()
         except Exception:
             return False
+
+    def delete_by_workbook_hash(self, workbook_hash: str) -> int:
+        """Logical cascade deletion: remove all collections matching a deleted workbook hash."""
+        if not workbook_hash:
+            return 0
+        try:
+            conn = self._raw_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        DELETE FROM langchain_pg_collection
+                        WHERE cmetadata->>'workbook_hash' = %s
+                        RETURNING name;
+                        """,
+                        (workbook_hash,),
+                    )
+                    deleted_rows = cur.fetchall()
+                conn.commit()
+                return len(deleted_rows)
+            except Exception:
+                conn.rollback()
+                return 0
+            finally:
+                conn.close()
+        except Exception:
+            return 0
 
     def search(
         self,

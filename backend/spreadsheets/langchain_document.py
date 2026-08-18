@@ -17,7 +17,7 @@ def cell_items_to_langchain_documents(
 ) -> List[Document]:
     """Convert raw cell DTOs or dicts into standard LangChain Document objects."""
     documents: List[Document] = []
-    for doc in items:
+    for idx, doc in enumerate(items):
         if isinstance(doc, CellTextDocumentDTO):
             doc_dict = doc.model_dump()
         else:
@@ -25,6 +25,7 @@ def cell_items_to_langchain_documents(
 
         text = doc_dict.get("text", "")
         cell_id = doc_dict.get("cell_id", "")
+        doc_id = f"{cell_id}#{idx}" if cell_id else None
         metadata = {
             "cell_id": cell_id,
             "sheet_name": doc_dict.get("sheet_name", ""),
@@ -40,7 +41,7 @@ def cell_items_to_langchain_documents(
             Document(
                 page_content=text,
                 metadata=metadata,
-                id=cell_id or None,
+                id=doc_id,
             )
         )
     return documents

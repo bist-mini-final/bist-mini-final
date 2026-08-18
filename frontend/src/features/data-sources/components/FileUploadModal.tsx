@@ -40,12 +40,14 @@ export function FileUploadModal({ onClose, onSuccess }: UploadProps) {
     }
   };
 
+  const [autoIngest, setAutoIngest] = useState(true);
+
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
     setError(null);
     try {
-      const uploaded = await dataSourceApi.uploadFile(selectedFile);
+      const uploaded = await dataSourceApi.uploadFile(selectedFile, autoIngest);
       onSuccess(uploaded);
       onClose();
     } catch (err: any) {
@@ -68,8 +70,8 @@ export function FileUploadModal({ onClose, onSuccess }: UploadProps) {
               <CloudUpload size={19} />
             </span>
             <div>
-              <h3 id="upload-title">새 데이터 파일 업로드</h3>
-              <small>Excel(.xlsx, .xlsm), Parquet(.parquet), JSON(.json)</small>
+              <h3 id="upload-title">새 엑셀 파일 인덱싱 (pgvector 적재)</h3>
+              <small>Luna VLM 표 구조 분석 & 4필드 직렬화 후 PostgreSQL pgvector로 고밀도 임베딩을 즉시 적재합니다</small>
             </div>
           </div>
           <button className="ds-modal__close" onClick={onClose} aria-label="닫기">
@@ -89,7 +91,7 @@ export function FileUploadModal({ onClose, onSuccess }: UploadProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xlsm,.parquet,.json"
+              accept=".xlsx,.xlsm"
               style={{ display: 'none' }}
               onChange={handleChange}
             />
@@ -98,15 +100,28 @@ export function FileUploadModal({ onClose, onSuccess }: UploadProps) {
                 <FileCheck2 size={36} className="ds-icon-success" />
                 <strong>{selectedFile.name}</strong>
                 <small>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</small>
-                <span>다른 파일을 선택하려면 클릭하거나 드래그하세요</span>
+                <span>다른 엑셀 파일을 선택하려면 클릭하거나 드래그하세요</span>
               </div>
             ) : (
               <div className="ds-dropzone__prompt">
                 <UploadCloud size={38} />
-                <strong>클릭하거나 파일을 여기로 끌어다 놓으세요</strong>
-                <small>지원 형식: .xlsx, .xlsm, .parquet, .json (최대 500MB)</small>
+                <strong>클릭하거나 엑셀 파일을 여기로 끌어다 놓으세요</strong>
+                <small>지원 형식: .xlsx, .xlsm (최대 500MB)</small>
               </div>
             )}
+          </div>
+
+          <div style={{ marginTop: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--color-text-secondary, #94a3b8)' }}>
+            <input
+              id="auto-ingest-cb"
+              type="checkbox"
+              checked={autoIngest}
+              onChange={(e) => setAutoIngest(e.target.checked)}
+              style={{ cursor: 'pointer', accentColor: 'var(--color-accent-teal, #14b8a6)' }}
+            />
+            <label htmlFor="auto-ingest-cb" style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <strong>Luna VLM 구조화 및 벡터 인덱싱 자동 실행</strong> (Excel 업로드 즉시 pgvector 적재)
+            </label>
           </div>
 
           {error && <div className="ds-error-alert">{error}</div>}
@@ -124,10 +139,10 @@ export function FileUploadModal({ onClose, onSuccess }: UploadProps) {
           >
             {isUploading ? (
               <>
-                <Loader2 className="ds-spin" size={16} /> 업로드 중...
+                <Loader2 className="ds-spin" size={16} /> 인덱싱 및 pgvector 적재 중...
               </>
             ) : (
-              '업로드 시작'
+              '인덱싱 시작'
             )}
           </button>
         </footer>

@@ -8,6 +8,7 @@ from openpyxl import Workbook
 
 from backend.api.data_source_routes import create_data_source_router
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
 
 
@@ -43,6 +44,11 @@ class DataSourceApiTests(unittest.TestCase):
         ws.append(["Net Income", "20M", "25M"])
         wb.save(self.sample_file)
 
+        self.pg_store = PgVectorStore()
+        if self.pg_store.is_connected():
+            for idx in self.pg_store.list_indexes():
+                self.pg_store.delete(idx["index_id"])
+
         self.encoder = FakeEmbeddingEncoder(dimension=8)
         self.app = FastAPI()
         self.app.include_router(
@@ -51,12 +57,16 @@ class DataSourceApiTests(unittest.TestCase):
                 vector_index_dir=self.vector_index_dir,
                 embedding_artifact_dir=self.embedding_artifact_dir,
                 embedding_encoder=self.encoder,
+                pgvector_store=self.pg_store,
             ),
             prefix="/api",
         )
         self.client = TestClient(self.app)
 
     def tearDown(self):
+        if hasattr(self, "pg_store") and self.pg_store.is_connected():
+            for idx in self.pg_store.list_indexes():
+                self.pg_store.delete(idx["index_id"])
         self.temp_dir.cleanup()
 
     def test_list_files(self):
