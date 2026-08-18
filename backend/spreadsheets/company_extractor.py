@@ -39,14 +39,15 @@ def _clean_text(val: Any) -> str:
     if val is None:
         return ""
     text = str(val).strip()
-    return re.sub(r"\s+", " ", text)
+    cleaned = re.sub(r"\s+", " ", text)
+    return cleaned[:60]
 
 
 def sample_top_cells_text(
     workbook_path: Path,
     max_sheets: int = 2,
-    max_rows: int = 12,
-    max_cols: int = 15,
+    max_rows: int = 8,
+    max_cols: int = 10,
 ) -> List[str]:
     """Sample top cell values from an Excel workbook without heavy memory overhead."""
     sampled_lines: List[str] = []
@@ -68,7 +69,7 @@ def sample_top_cells_text(
                     break
                 row_vals = [_clean_text(c) for c in row[:max_cols] if c is not None and _clean_text(c)]
                 if row_vals:
-                    sheet_cells.append(f"Row {r_idx}: " + " | ".join(row_vals[:8]))
+                    sheet_cells.append(f"Row {r_idx}: " + " | ".join(row_vals[:6]))
             if sheet_cells:
                 sampled_lines.append(f"[Sheet: {sheetname}]\n" + "\n".join(sheet_cells))
         wb.close()
@@ -119,10 +120,11 @@ def extract_company_metadata(
     if not sampled_texts:
         return heuristic_company_name(file_name)
 
+    raw_cells_text = "\n\n".join(sampled_texts)[:2500]
     context_str = (
         f"File Name: {file_name}\n"
         f"Sheet Names: {sheet_names or []}\n\n"
-        f"Top Cells Content:\n" + "\n\n".join(sampled_texts)
+        f"Top Cells Content:\n{raw_cells_text}"
     )
 
     try:

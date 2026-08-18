@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "main_pgvector_direct_cell_refiner_pipeline",
   "name": "main_pgvector_direct_cell_refiner_pipeline",
-  "updated_at": "2026-08-18T15:55:00.000000+00:00",
+  "updated_at": "2026-08-18T06:58:31.145408+00:00",
   "graph": {
     "nodes": [
       {
@@ -16,7 +16,7 @@
           "threshold": 0.95
         },
         "values": {
-          "query": "IBM의 2025년 환율 관련 손익과 현금 및 현금성자산 차이는 얼마야?"
+          "query": "IBM의 환율 관련 손익과 현금 및 현금성자산 차이는 얼마야?"
         },
         "ui": {
           "width": null,
@@ -371,9 +371,9 @@
       }
     ],
     "viewport": {
-      "x": -100.0,
-      "y": 250.0,
-      "zoom": 0.5
+      "x": -1026.651540988707,
+      "y": 55.51651547222514,
+      "zoom": 0.9513182763318003
     }
   }
 }

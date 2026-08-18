@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
+import anyio
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
@@ -179,17 +180,19 @@ def create_data_source_router(
         suffix = dest_path.suffix.lower()
         if auto_ingest and suffix in (".xlsx", ".xlsm"):
             try:
-                ingested_index = ingest_excel_workbook(
-                    file_name=safe_filename,
-                    model=model,
-                    batch_size=batch_size,
-                    structure_mode="auto",
-                    processed_dir=processed_dir,
-                    spreadsheet_artifact_dir=spreadsheet_artifact_dir,
-                    vector_index_store=vector_index_store,
-                    pgvector_store=pg_store,
-                    embedding_artifact_store=embedding_artifact_store,
-                    embedding_encoder=embedding_encoder,
+                ingested_index = await anyio.to_thread.run_sync(
+                    lambda: ingest_excel_workbook(
+                        file_name=safe_filename,
+                        model=model,
+                        batch_size=batch_size,
+                        structure_mode="auto",
+                        processed_dir=processed_dir,
+                        spreadsheet_artifact_dir=spreadsheet_artifact_dir,
+                        vector_index_store=vector_index_store,
+                        pgvector_store=pg_store,
+                        embedding_artifact_store=embedding_artifact_store,
+                        embedding_encoder=embedding_encoder,
+                    )
                 )
             except Exception as err:
                 import traceback
@@ -341,22 +344,24 @@ def create_data_source_router(
 
     # 9. Ingest Excel workbook into Vector DB
     @router.post("/ingest")
-    def ingest_workbook(request: IngestRequestDTO) -> Dict[str, Any]:
+    async def ingest_workbook(request: IngestRequestDTO) -> Dict[str, Any]:
         """Execute end-to-end ingestion from Excel to Vector DB (pgvector & local store)."""
         try:
-            result = ingest_excel_workbook(
-                file_name=request.file_name,
-                model=request.model,
-                variant_mode=request.variant_mode,
-                structure_mode=request.structure_mode,
-                sheet_names=request.sheet_names,
-                batch_size=request.batch_size,
-                processed_dir=processed_dir,
-                spreadsheet_artifact_dir=spreadsheet_artifact_dir,
-                vector_index_store=vector_index_store,
-                pgvector_store=pg_store,
-                embedding_artifact_store=embedding_artifact_store,
-                embedding_encoder=embedding_encoder,
+            result = await anyio.to_thread.run_sync(
+                lambda: ingest_excel_workbook(
+                    file_name=request.file_name,
+                    model=request.model,
+                    variant_mode=request.variant_mode,
+                    structure_mode=request.structure_mode,
+                    sheet_names=request.sheet_names,
+                    batch_size=request.batch_size,
+                    processed_dir=processed_dir,
+                    spreadsheet_artifact_dir=spreadsheet_artifact_dir,
+                    vector_index_store=vector_index_store,
+                    pgvector_store=pg_store,
+                    embedding_artifact_store=embedding_artifact_store,
+                    embedding_encoder=embedding_encoder,
+                )
             )
             return {"status": "success", "index": result}
         except ModuleExecutionError as error:

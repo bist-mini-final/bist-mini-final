@@ -136,6 +136,16 @@ export function IndexIngestionModal({
     };
   }, [isIngesting]);
 
+  useEffect(() => {
+    if (initialFileName) {
+      setSelectedFile(initialFileName);
+      const found = excelFiles.find((f) => f.file_name === initialFileName);
+      if (found) {
+        setSelectedSheets([...found.sheet_names]);
+      }
+    }
+  }, [initialFileName]);
+
   const handleFileChange = (newFileName: string) => {
     setSelectedFile(newFileName);
     const found = excelFiles.find((f) => f.file_name === newFileName);
