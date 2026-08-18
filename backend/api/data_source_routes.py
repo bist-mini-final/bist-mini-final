@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from ..core.settings import (
@@ -196,7 +196,6 @@ def create_data_source_router(
     @router.get("/files/{filename}/download")
     def download_file(filename: str) -> Response:
         """Download raw file from server disk storage."""
-        from fastapi.responses import Response
         safe_filename = Path(filename).name
         target_path = processed_dir / safe_filename
 

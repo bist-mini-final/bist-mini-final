@@ -227,7 +227,7 @@ class PgVectorStore:
                     SELECT c.name, c.cmetadata, COUNT(e.id) AS chunk_count
                     FROM langchain_pg_collection c
                     LEFT JOIN langchain_pg_embedding e ON c.uuid = e.collection_id
-                    GROUP BY c.uuid;
+                    GROUP BY c.name, c.uuid, c.cmetadata::text;
                     """
                 )
                 rows = cur.fetchall()
