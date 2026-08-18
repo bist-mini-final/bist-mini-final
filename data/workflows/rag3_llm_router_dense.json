@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "rag3_llm_router_dense",
   "name": "rag3_llm_router_dense",
-  "updated_at": "2026-08-13T07:45:39.014652+00:00",
+  "updated_at": "2026-08-14T00:07:43.647766+00:00",
   "graph": {
     "nodes": [
       {
@@ -80,10 +80,10 @@
           "x": 680.0,
           "y": 360.0
         },
-        "config": {
+        "config": {},
+        "values": {
           "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
         },
-        "values": {},
         "ui": {
           "width": null,
           "execution_stopped": false,
@@ -165,16 +165,16 @@
         "id": "q-router",
         "source": "query",
         "target": "router",
-        "source_output": "question_text",
-        "target_input": "question_text",
+        "source_output": "query_context",
+        "target_input": "query_context",
         "source_branch": "generated"
       },
       {
         "id": "q-direct",
         "source": "query",
         "target": "direct",
-        "source_output": "question_text",
-        "target_input": "question_text",
+        "source_output": "query_context",
+        "target_input": "query_context",
         "source_branch": "generated"
       },
       {
@@ -234,14 +234,6 @@
         "source_branch": null
       },
       {
-        "id": "q-reader",
-        "source": "query",
-        "target": "reader",
-        "source_output": "question_text",
-        "target_input": "question_text",
-        "source_branch": "generated"
-      },
-      {
         "id": "edge-1786607101902-1",
         "source": "reader",
         "target": "custom-node-1786607099829-1",
@@ -251,9 +243,9 @@
       }
     ],
     "viewport": {
-      "x": 410.78016056718985,
-      "y": 396.4958894308701,
-      "zoom": 0.4594793419988144
+      "x": 388.1330832858625,
+      "y": 153.2945573480526,
+      "zoom": 1.096968656323165
     }
   }
 }

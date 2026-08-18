@@ -63,10 +63,10 @@
           "x": 568.2159032198584,
           "y": 228.7383458157231
         },
-        "config": {
+        "config": {},
+        "values": {
           "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
         },
-        "values": {},
         "ui": {
           "width": null,
           "execution_stopped": false,
@@ -148,8 +148,8 @@
         "id": "q-direct",
         "source": "query",
         "target": "direct",
-        "source_output": "question_text",
-        "target_input": "question_text",
+        "source_output": "query_context",
+        "target_input": "query_context",
         "source_branch": "generated"
       },
       {
@@ -199,14 +199,6 @@
         "source_output": "context_json",
         "target_input": "context_json",
         "source_branch": null
-      },
-      {
-        "id": "q-reader",
-        "source": "query",
-        "target": "reader",
-        "source_output": "question_text",
-        "target_input": "question_text",
-        "source_branch": "generated"
       },
       {
         "id": "edge-1786607200481-2",

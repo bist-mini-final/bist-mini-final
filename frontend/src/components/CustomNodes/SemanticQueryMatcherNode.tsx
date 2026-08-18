@@ -32,7 +32,7 @@ export const SemanticQueryMatcherNode = ({ data, selected }: SemanticQueryMatche
       state={getExecutionNodeState(data.executionState)}
       selected={selected}
       width={340}
-      inputPorts={['question_text']}
+      inputPorts={['query_context']}
       outputBranches={['semantic_match']}
       bodyClassName="space-y-2.5"
     >

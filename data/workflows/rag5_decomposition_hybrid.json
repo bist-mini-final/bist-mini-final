@@ -4,14 +4,14 @@
     {"id":"query","module_type":"query_input","position":{"x":0,"y":0},"config":{"threshold":1},"values":{"query":"IBM의 LTM 매출과 EBITDA는 얼마야?"}},
     {"id":"decompose","module_type":"decomposer","position":{"x":340,"y":0},"config":{"model":"gpt-5.6-luna","preset":"luna_decomposer"}},
     {"id":"embed","module_type":"embedder","position":{"x":680,"y":100},"config":{"model":"text-embedding-3-large"}},
-    {"id":"index","module_type":"prebuilt_index_loader","position":{"x":680,"y":360},"config":{"file_name":"SPG_Company_KeyStats_v3_prebuilt.json"}},
+    {"id":"index","module_type":"prebuilt_index_loader","position":{"x":680,"y":360},"config":{},"values":{"file_name":"SPG_Company_KeyStats_v3_prebuilt.json"}},
     {"id":"bm25","module_type":"bm25_retriever","position":{"x":1040,"y":-100},"config":{"k1":1.5,"b":0.75,"top_k":1000}},
     {"id":"dense","module_type":"dense_retriever","position":{"x":1040,"y":160},"config":{"top_k":1000}},
     {"id":"rrf","module_type":"rrf_fusion","position":{"x":1380,"y":30},"config":{"rrf_k":60,"top_k":100,"ratio_penalty":0.4}},
     {"id":"context","module_type":"context","position":{"x":1720,"y":30},"config":{"top_k":100,"adjacent_radius":3,"max_blocks":500}},
     {"id":"reader","module_type":"reader","position":{"x":2060,"y":30},"config":{"model":"gpt-5.6-luna","preset":"luna_reader"}}
   ],"edges":[
-    {"id":"q-decompose","source":"query","target":"decompose","source_output":"question_text","target_input":"question_text","source_branch":"generated"},
+    {"id":"q-decompose","source":"query","target":"decompose","source_output":"query_context","target_input":"query_context","source_branch":"generated"},
     {"id":"decompose-embed","source":"decompose","target":"embed","source_output":"output","target_input":"input"},
     {"id":"decompose-bm25","source":"decompose","target":"bm25","source_output":"output","target_input":"query_input"},
     {"id":"index-bm25","source":"index","target":"bm25","source_output":"document_output","target_input":"document_input"},
@@ -21,7 +21,6 @@
     {"id":"dense-rrf","source":"dense","target":"rrf","source_output":"dense_result","target_input":"dense_result"},
     {"id":"rrf-context","source":"rrf","target":"context","source_output":"retrieval_json","target_input":"retrieval_json"},
     {"id":"index-context","source":"index","target":"context","source_output":"document_output","target_input":"document_input"},
-    {"id":"context-reader","source":"context","target":"reader","source_output":"context_json","target_input":"context_json"},
-    {"id":"q-reader","source":"query","target":"reader","source_output":"question_text","target_input":"question_text","source_branch":"generated"}
+    {"id":"context-reader","source":"context","target":"reader","source_output":"context_json","target_input":"context_json"}
   ],"viewport":{"x":0,"y":0,"zoom":0.55}}
 }

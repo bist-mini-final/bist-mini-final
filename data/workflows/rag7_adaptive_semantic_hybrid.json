@@ -5,15 +5,15 @@
     {"id":"semantic","module_type":"semantic_query_matcher","position":{"x":320,"y":-160},"config":{"model":"text-embedding-3-small","threshold":0.74,"top_k":5,"vote_margin":0.05}},
     {"id":"adaptive","module_type":"adaptive_query_decomposer","position":{"x":360,"y":100},"config":{"model":"gpt-5.6-luna","preset":"luna_decomposer"}},
     {"id":"embed","module_type":"embedder","position":{"x":720,"y":140},"config":{"model":"text-embedding-3-large"}},
-    {"id":"index","module_type":"prebuilt_index_loader","position":{"x":720,"y":430},"config":{"file_name":"SPG_Company_KeyStats_v3_prebuilt.json"}},
+    {"id":"index","module_type":"prebuilt_index_loader","position":{"x":720,"y":430},"config":{},"values":{"file_name":"SPG_Company_KeyStats_v3_prebuilt.json"}},
     {"id":"bm25","module_type":"bm25_retriever","position":{"x":1080,"y":-20},"config":{"k1":1.5,"b":0.75,"top_k":1000}},
     {"id":"dense","module_type":"semantic_scoped_dense_retriever","position":{"x":1080,"y":240},"config":{"top_k":1000}},
     {"id":"rrf","module_type":"rrf_fusion","position":{"x":1440,"y":100},"config":{"rrf_k":60,"top_k":100,"ratio_penalty":0.4}},
     {"id":"context","module_type":"context","position":{"x":1780,"y":100},"config":{"top_k":100,"adjacent_radius":3,"max_blocks":500}},
     {"id":"reader","module_type":"reader","position":{"x":2120,"y":100},"config":{"model":"gpt-5.6-luna","preset":"luna_reader"}}
   ],"edges":[
-    {"id":"q-semantic","source":"query","target":"semantic","source_output":"question_text","target_input":"question_text","source_branch":"generated"},
-    {"id":"q-adaptive","source":"query","target":"adaptive","source_output":"question_text","target_input":"question_text","source_branch":"generated"},
+    {"id":"q-semantic","source":"query","target":"semantic","source_output":"query_context","target_input":"query_context","source_branch":"generated"},
+    {"id":"q-adaptive","source":"query","target":"adaptive","source_output":"query_context","target_input":"query_context","source_branch":"generated"},
     {"id":"semantic-adaptive","source":"semantic","target":"adaptive","source_output":"semantic_match","target_input":"semantic_match"},
     {"id":"adaptive-embed","source":"adaptive","target":"embed","source_output":"output","target_input":"input"},
     {"id":"adaptive-bm25","source":"adaptive","target":"bm25","source_output":"output","target_input":"query_input"},
@@ -25,7 +25,6 @@
     {"id":"dense-rrf","source":"dense","target":"rrf","source_output":"dense_result","target_input":"dense_result"},
     {"id":"rrf-context","source":"rrf","target":"context","source_output":"retrieval_json","target_input":"retrieval_json"},
     {"id":"index-context","source":"index","target":"context","source_output":"document_output","target_input":"document_input"},
-    {"id":"context-reader","source":"context","target":"reader","source_output":"context_json","target_input":"context_json"},
-    {"id":"q-reader","source":"query","target":"reader","source_output":"question_text","target_input":"question_text","source_branch":"generated"}
+    {"id":"context-reader","source":"context","target":"reader","source_output":"context_json","target_input":"context_json"}
   ],"viewport":{"x":0,"y":0,"zoom":0.5}}
 }

@@ -108,12 +108,16 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
 
 
 def _score(case: BenchmarkCase, answer: str) -> Dict[str, Any]:
+    # Free-form, one-line inputs deliberately have no reference answer.  They
+    # measure latency/cost only and must never be reported as 100% accurate.
+    scored = bool(case.expected_numbers or case.expected_terms)
     values = _numbers(answer)
     number_ok = all(_matches(expected, values) for expected in case.expected_numbers)
     lowered = answer.lower()
     term_ok = all(term.lower() in lowered for term in case.expected_terms)
     return {
-        "correct": bool(answer) and number_ok and term_ok,
+        "scored": scored,
+        "correct": (bool(answer) and number_ok and term_ok) if scored else None,
         "matched_numbers": sum(_matches(expected, values) for expected in case.expected_numbers),
         "expected_numbers": len(case.expected_numbers),
         "matched_terms": sum(term.lower() in lowered for term in case.expected_terms),
@@ -199,7 +203,7 @@ def create_benchmark_router(workflow_store: WorkflowStore, workflow_executor: Wo
                     error = None
                 except (DagExecutionCancelled, DagExecutionError, ValueError) as exc:
                     metrics = {"run_id": None, "status": "failed", "latency_seconds": round(perf_counter() - started, 3), "total_tokens": 0, "estimated_cost_usd": 0, "answer": "", "router": None, "timeline": []}
-                    score = {"correct": False, "matched_numbers": 0, "expected_numbers": len(case.expected_numbers), "matched_terms": 0, "expected_terms": len(case.expected_terms)}
+                    score = {"scored": bool(case.expected_numbers or case.expected_terms), "correct": False if (case.expected_numbers or case.expected_terms) else None, "matched_numbers": 0, "expected_numbers": len(case.expected_numbers), "matched_terms": 0, "expected_terms": len(case.expected_terms)}
                     route_score = _route_score(case, None)
                     error = str(exc)
                 rows.append({"workflow_id": workflow_id, "case_id": case.id, "question": case.question, **metrics, "score": score, "route_score": route_score, "error": error})
@@ -207,12 +211,14 @@ def create_benchmark_router(workflow_store: WorkflowStore, workflow_executor: Wo
         summary = []
         for workflow_id in request.workflow_ids:
             group = [row for row in rows if row["workflow_id"] == workflow_id]
+            scored = [row for row in group if row["score"]["scored"]]
             routed = [row for row in group if row["route_score"] is not None]
             router_rows = [row for row in group if row["router"] is not None]
             summary.append({
                 "workflow_id": workflow_id,
                 "cases": len(group),
-                "accuracy": round(sum(row["score"]["correct"] for row in group) / len(group), 4),
+                "scored_cases": len(scored),
+                "accuracy": round(sum(bool(row["score"]["correct"]) for row in scored) / len(scored), 4) if scored else None,
                 "average_latency_seconds": round(mean(row["latency_seconds"] for row in group), 3),
                 "average_tokens": round(mean(row["total_tokens"] for row in group), 1),
                 "average_cost_usd": round(mean(row["estimated_cost_usd"] for row in group), 6),

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, cast
 from pydantic import BaseModel, Field
 
 from ..vector_index_store import VectorIndexStore
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError, ModuleInputDTO
 from .dense_retriever import DenseRetrieverModule
 from .embedder import EmbeddingsDTO
 from .retrieval_models import RankedSearchResultDTO
@@ -18,11 +18,18 @@ def _normalized_sheet_name(value: str) -> str:
     return re.sub(r"[^a-z0-9가-힣]", "", value.lower())
 
 
-class SemanticScopedDenseRetrieverInput(ModuleDTO):
+class SemanticScopedDenseRetrieverInput(ModuleInputDTO):
     query_input: EmbeddingsDTO
     index_input: VectorIndexDTO
     semantic_match: SemanticQueryMatchOutput
+
+
+class SemanticScopedDenseRetrieverConfig(ModuleConfigDTO):
     top_k: int = Field(default=1000, gt=0, le=10000)
+
+
+class SemanticScopedDenseRetrieverExecution(SemanticScopedDenseRetrieverInput, SemanticScopedDenseRetrieverConfig):
+    """Runtime union of retriever inputs and configuration."""
 
 
 class SemanticScopedDenseRetrieverModule(ExecutableModule):
@@ -38,13 +45,15 @@ class SemanticScopedDenseRetrieverModule(ExecutableModule):
         version="1",
     )
     input_model = SemanticScopedDenseRetrieverInput
+    config_model = SemanticScopedDenseRetrieverConfig
+    execution_model = SemanticScopedDenseRetrieverExecution
     output_model = RankedSearchResultDTO
 
     def __init__(self, index_store: VectorIndexStore | None = None) -> None:
         self.index_store = index_store or VectorIndexStore()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(SemanticScopedDenseRetrieverInput, payload)
+        input_data = cast(SemanticScopedDenseRetrieverExecution, payload)
         metadata = self.index_store.metadata(input_data.index_input.index_id)
         expected = {
             "workbook_hash": input_data.index_input.workbook_hash,
@@ -76,4 +85,11 @@ class SemanticScopedDenseRetrieverModule(ExecutableModule):
                 if scoped_hits:
                     hits = scoped_hits
             ranked_items.extend(DenseRetrieverModule._rank_query(hits, query, input_data.top_k))
-        return {"question_id": input_data.query_input.question_id.upper(), "items": ranked_items}
+        return {
+            "query_context": input_data.query_input.query_context.model_dump(mode="json"),
+            "document_context": {
+                "file_name": input_data.index_input.file_name,
+                "workbook_hash": input_data.index_input.workbook_hash,
+            },
+            "items": ranked_items,
+        }

@@ -13,17 +13,25 @@ from pydantic import BaseModel, Field
 
 from ..chat_completion import ChatCompletionClient, ChatCompletionError
 from ..semantic_matching.catalog import QueryExample, load_examples
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError, ModuleInputDTO
 from .semantic_query_matcher import (
     RouterMetricsDTO,
     SemanticMatchItemDTO,
     SemanticQueryMatchOutput,
 )
+from .data_lineage import QueryContextDTO
 
 
-class LlmQueryRouterInput(ModuleDTO):
-    question_text: str = Field(min_length=1)
+class LlmQueryRouterInput(ModuleInputDTO):
+    query_context: QueryContextDTO
+
+
+class LlmQueryRouterConfig(ModuleConfigDTO):
     model: str = Field(default="gpt-5.6-luna")
+
+
+class LlmQueryRouterExecution(LlmQueryRouterInput, LlmQueryRouterConfig):
+    """Runtime union of the graph input and node configuration."""
 
 
 class LlmQueryRouterOutput(ModuleDTO):
@@ -52,19 +60,21 @@ class LlmQueryRouterModule(ExecutableModule):
         label="LLM Query Router",
         category="Logic",
         description="LLM이 질문에 맞는 source/sheet 범위를 선택합니다. 시맨틱 라우터의 A/B 비교 대상입니다.",
-        inputs=["question_text"],
+        inputs=["query_context"],
         outputs=["semantic_match"],
         config_fields=["model"],
         version="1",
     )
     input_model = LlmQueryRouterInput
+    config_model = LlmQueryRouterConfig
+    execution_model = LlmQueryRouterExecution
     output_model = LlmQueryRouterOutput
 
     def __init__(self, completion_client: Optional[ChatCompletionClient] = None) -> None:
         self.completion_client = completion_client or ChatCompletionClient()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(LlmQueryRouterInput, payload)
+        input_data = cast(LlmQueryRouterExecution, payload)
         examples = load_examples()
         valid_sheets: Dict[str, List[str]] = {}
         for example in examples:
@@ -76,7 +86,7 @@ class LlmQueryRouterModule(ExecutableModule):
                 input_data.model,
                 [
                     {"role": "system", "content": _catalog_prompt(examples)},
-                    {"role": "user", "content": input_data.question_text},
+                    {"role": "user", "content": input_data.query_context.question_text},
                 ],
             )
             document = json.loads(result.content.strip().removeprefix("```json").removesuffix("```").strip())

@@ -27,7 +27,7 @@ export const AdaptiveQueryDecomposerNode = ({ data, selected }: AdaptiveQueryDec
       state={getExecutionNodeState(data.executionState)}
       selected={selected}
       width={350}
-      inputPorts={['question_text', 'semantic_match']}
+      inputPorts={['query_context', 'semantic_match']}
       bodyClassName="space-y-2.5"
     >
       <div className="rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-[10px] text-slate-600">

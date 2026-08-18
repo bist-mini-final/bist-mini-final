@@ -5,17 +5,17 @@ used by dense, hybrid, and router experiments where query-decomposition cost
 must not be included in the measurement.
 """
 
-import hashlib
 from typing import Any, Dict, cast
 
 from pydantic import BaseModel, Field
 
-from .base import ExecutableModule, ModuleDefinition, ModuleDTO
+from .base import EmptyModuleConfigDTO, ExecutableModule, ModuleDefinition, ModuleInputDTO
+from .data_lineage import QueryContextDTO
 from .decomposer import SubqueriesDTO
 
 
-class DirectQueryDecomposerInput(ModuleDTO):
-    question_text: str = Field(min_length=1)
+class DirectQueryDecomposerInput(ModuleInputDTO):
+    query_context: QueryContextDTO
 
 
 class DirectQueryDecomposerModule(ExecutableModule):
@@ -24,23 +24,21 @@ class DirectQueryDecomposerModule(ExecutableModule):
         label="Direct Query Baseline",
         category="Logic",
         description="LLM 분해 없이 원본 질문 하나를 그대로 검색 쿼리로 전달합니다.",
-        inputs=["question_text"],
+        inputs=["query_context"],
         outputs=["output"],
         raw_output=True,
         version="1",
     )
     input_model = DirectQueryDecomposerInput
+    config_model = EmptyModuleConfigDTO
     output_model = SubqueriesDTO
-
-    @staticmethod
-    def _question_id(question_text: str) -> str:
-        normalized = " ".join(question_text.split())
-        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16].upper()
-        return f"QUERY-{digest}"
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(DirectQueryDecomposerInput, payload)
         return {
-            "question_id": self._question_id(input_data.question_text),
-            "subqueries": [input_data.question_text],
+            "query_context": QueryContextDTO(
+                question_id=input_data.query_context.question_id,
+                question_text=input_data.query_context.question_text,
+            ).model_dump(mode="json"),
+            "subqueries": [input_data.query_context.question_text],
         }

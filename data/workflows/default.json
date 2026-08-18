@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-13T08:26:14.891498+00:00",
+  "updated_at": "2026-08-18T00:07:37.330470+00:00",
   "graph": {
     "nodes": [
       {
@@ -20,7 +20,7 @@
         },
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -40,7 +40,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -48,14 +48,14 @@
         "id": "custom-node-1786497122336-4",
         "module_type": "json_inspector",
         "position": {
-          "x": 1834.0115578389562,
-          "y": -132.24148441548206
+          "x": 1882.4596454099208,
+          "y": -162.9873861432096
         },
         "config": {},
         "values": {},
         "ui": {
           "width": 502.0,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -72,7 +72,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -108,7 +108,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -125,7 +125,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -144,7 +144,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -163,7 +163,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -183,7 +183,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       },
@@ -198,7 +198,7 @@
         "values": {},
         "ui": {
           "width": null,
-          "execution_stopped": false,
+          "execution_stopped": true,
           "column_widths": {}
         }
       }
@@ -310,9 +310,9 @@
       }
     ],
     "viewport": {
-      "x": -1758.6018556847562,
-      "y": 323.3784189807061,
-      "zoom": 0.6164568866867304
+      "x": -707.631900570354,
+      "y": 679.0443934769786,
+      "zoom": 1.0935156456975113
     }
   }
 }

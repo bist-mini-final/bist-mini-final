@@ -630,6 +630,12 @@ class WorkflowExecutor:
                 node_cost = aj.get("estimated_cost_usd")
                 if isinstance(aj.get("api_usage"), Mapping):
                     node_usage = {k: int(v) for k, v in aj["api_usage"].items() if v is not None}
+            elif "semantic_match" in output and isinstance(output["semantic_match"], Mapping):
+                metrics = output["semantic_match"].get("metrics") or {}
+                raw_usage = metrics.get("api_usage") or {}
+                if isinstance(raw_usage, Mapping):
+                    node_usage = {k: int(v) for k, v in raw_usage.items() if v is not None}
+                node_cost = metrics.get("estimated_cost_usd")
             elif "usage" in output or "_usage" in output:
                 raw_u = output.get("usage") or output.get("_usage")
                 model_used = output.get("model") or validated_config.get("model") or ""

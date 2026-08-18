@@ -16,6 +16,7 @@ export const DirectQueryDecomposerNode = ({ data, selected }: NodeProps<Node<Dir
     selected={selected}
     width={320}
     nodeData={data}
+    inputPorts={['query_context']}
   >
     <p className="m-0 text-[11px] leading-relaxed text-slate-600">
       LLM 호출 없이 질문을 하나의 검색 쿼리로 사용합니다.

@@ -161,7 +161,8 @@ export interface BenchmarkCase {
 export interface BenchmarkSummary {
   workflow_id: string;
   cases: number;
-  accuracy: number;
+  scored_cases: number;
+  accuracy: number | null;
   average_latency_seconds: number;
   average_tokens: number;
   average_cost_usd: number;
@@ -187,7 +188,7 @@ export interface BenchmarkComparison {
     latency_seconds: number;
     total_tokens: number;
     estimated_cost_usd: number;
-    score: { correct: boolean };
+    score: { scored: boolean; correct: boolean | null };
     route_score: { correct: boolean; target_correct: boolean; sheets_correct: boolean } | null;
     router: {
       kind: string;

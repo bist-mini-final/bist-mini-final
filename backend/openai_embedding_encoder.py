@@ -96,4 +96,13 @@ class OpenAIEmbeddingEncoder:
         if len(vectors) != len(queries):
             raise ModuleExecutionError("생성된 OpenAI 임베딩 개수가 요청과 일치하지 않습니다")
 
+        # Keep the API-reported usage available to the workflow modules.  This
+        # lets a semantic-router experiment count its extra query embedding.
+        raw_usage = document.get("usage") or {}
+        self.last_usage = {
+            "prompt_tokens": int(raw_usage.get("prompt_tokens", 0) or 0),
+            "completion_tokens": 0,
+            "cached_tokens": 0,
+            "total_tokens": int(raw_usage.get("total_tokens", raw_usage.get("prompt_tokens", 0)) or 0),
+        }
         return [_l2_normalize(vec) for vec in vectors]
