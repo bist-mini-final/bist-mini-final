@@ -53,7 +53,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
     description: '문서와 데이터셋을 관리하는 공간',
     icon: Database,
     component: DataSourcesPage,
-    status: 'planned',
+    status: 'ready',
   },
   {
     path: '/evaluations',

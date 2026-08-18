@@ -54,13 +54,36 @@ cp .env.example .env
 |---|---|---|
 | `OPENAI_API_KEY` | ✅ | Decomposer, Reader, OpenAI Embeddings (`text-embedding-3-large`) 모듈에 사용 |
 | `OPENAI_BASE_URL` | ⬜ | 기본값 `https://api.openai.com/v1`. 호환 API 사용 시 변경 |
+| `PGVECTOR_URL` | ⬜ | 기본값 `postgresql://postgres:postgres@localhost:5432/rag_flow`. Docker pgvector 접속 URL |
+| `USE_PGVECTOR` | ⬜ | 기본값 `true`. pgvector DB 연결 및 자동 적재 활성화 여부 |
 
 > [!IMPORTANT]
 > 기본 워크플로의 임베딩 모듈(`Embedder`, `Cell Text Embedder`)은 `text-embedding-3-large` (OpenAI API)를 기본값으로 사용합니다. `OPENAI_API_KEY`가 없으면 임베딩 단계를 실행할 수 없습니다.
 
 ---
 
-### 3. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
+### 3. Docker pgvector 컨테이너 실행 (Vector DB)
+
+벡터 DB 저장소로 **PostgreSQL 16 + pgvector (`vector v0.8.6`)** 컨테이너를 구동합니다. LangChain의 `langchain-postgres`를 통해 표준 포맷으로 인덱스를 적재 및 검색합니다.
+
+```bash
+# 1) Docker 컨테이너 백그라운드 구동 (docker-compose.db.yml)
+docker compose -f docker-compose.db.yml up -d
+
+# 2) 컨테이너 상태 및 헬스체크 확인
+docker compose -f docker-compose.db.yml ps
+
+# 3) (선택) DB 로그 실시간 확인
+docker compose -f docker-compose.db.yml logs -f pgvector
+```
+
+- **설정 파일**: [`docker-compose.db.yml`](file:///Users/pileuszu/Repos/bist-mini-final/docker-compose.db.yml)
+- **접속 주소**: `postgresql://postgres:postgres@localhost:5432/rag_flow`
+- **컨테이너 중지**: `docker compose -f docker-compose.db.yml down` (데이터는 `pgvector_data` 볼륨에 영속 보존)
+
+---
+
+### 4. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
 
 > [!IMPORTANT]
 > 기본 워크플로(`Pre-built Vector Index Loader` 노드)는 사전 임베딩된 인덱스 파일을 로드합니다. 아래 파일을 구글 드라이브에서 받아 `data/processed/`에 배치해야 파이프라인을 바로 실행할 수 있습니다.
@@ -89,7 +112,7 @@ python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output da
 
 ---
 
-### 4. Excel 파일 배치
+### 5. Excel 파일 배치
 
 팀 구글 드라이브에서 분석 대상 Excel 파일을 다운로드하여 `data/processed/` 에 복사합니다.
 
@@ -103,14 +126,14 @@ data/processed/
 > [!NOTE]
 > 사전 구축 인덱스(`prebuilt.parquet`)를 사용하는 기본 워크플로에서는 Excel 원본 파일 없이도 검색·답변 파이프라인을 실행할 수 있습니다. Loader는 이전 JSON 포맷도 호환합니다.
 
-### 5. 프론트엔드 의존성 설치
+### 6. 프론트엔드 의존성 설치
 
 ```bash
 cd frontend
 npm install
 ```
 
-### 6. (선택) 로컬 VLM 모델 설치
+### 7. (선택) 로컬 VLM 모델 설치
 
 Local VLM Structure Detector 노드를 사용하려면 Ollama와 모델이 필요합니다.
 
@@ -119,7 +142,7 @@ Local VLM Structure Detector 노드를 사용하려면 Ollama와 모델이 필�
 ollama pull qwen3-vl:4b-instruct
 ```
 
-### 7. (선택) 로컬 BGE 임베딩 모델 설치
+### 8. (선택) 로컬 BGE 임베딩 모델 설치
 
 `BAAI/bge-large-en-v1.5` 모델을 사용하려면 (OpenAI API 없이 로컬 임베딩을 원할 때) 최초 1회 모델을 다운로드해야 합니다.
 
@@ -136,16 +159,17 @@ python3 -c "from transformers import AutoModel, AutoTokenizer; AutoTokenizer.fro
 
 ## 개발 서버 실행
 
-프론트엔드와 백엔드를 **별도 터미널**에서 각각 실행합니다.
+데이터베이스, 프론트엔드, 백엔드를 순서대로 실행합니다.
 
 ```bash
-# 터미널 1 — 프론트엔드 (Hot Reload)
+# 1. Vector DB (Docker pgvector 컨테이너) 백그라운드 실행
+docker compose -f docker-compose.db.yml up -d
+
+# 2. 터미널 1 — 프론트엔드 개발 서버 (Hot Reload)
 cd frontend
 npm run dev
-```
 
-```bash
-# 터미널 2 — 백엔드
+# 3. 터미널 2 — 백엔드 FastAPI 서버
 python3 -m uvicorn app:app --host 127.0.0.1 --port 8765
 ```
 

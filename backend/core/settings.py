@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
@@ -10,8 +11,16 @@ WORKFLOW_DIR = PROJECT_DIR / "data" / "workflows"
 RUN_DIR = PROJECT_DIR / "data" / "runs"
 CACHE_DIR = PROJECT_DIR / "data" / "cache"
 
+# PostgreSQL + pgvector Configuration
+PGVECTOR_URL = os.getenv(
+    "PGVECTOR_URL",
+    os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/rag_flow"),
+)
+USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() in ("true", "1", "yes")
+
 SIMILARITY_THRESHOLD = 0.65
 DEV_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
+

@@ -17,6 +17,7 @@ from ..runtime.registry import ModuleRegistry
 from ..storage.answer_cache import AnswerCacheRepository
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.vector_index import VectorIndexStore
+from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
 from .workflow_routes import create_workflow_router
@@ -55,6 +56,13 @@ def create_api_router(
             workflow_dir=workflow_dir,
             run_dir=run_dir,
             cache_dir=cache_dir,
+        )
+    )
+    router.include_router(
+        create_data_source_router(
+            vector_index_dir=vector_index_dir,
+            embedding_artifact_dir=embedding_artifact_dir,
+            embedding_encoder=embedding_encoder,
         )
     )
     return router
