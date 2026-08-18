@@ -58,4 +58,5 @@ tmp/
 # Evaluation / Questions data & Scripts
 data/notion_questions.json
 *notion_question*.json
-scripts/
+/scripts/
+!/.github/scripts/
