@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import atexit
+import os
+import sys
 from multiprocessing import get_context
 from multiprocessing.process import BaseProcess
 from queue import Empty
@@ -17,6 +19,25 @@ class ModuleWorkerCancelled(RuntimeError):
 
 class ModuleWorkerError(RuntimeError):
     """Raised when an isolated module cannot return a valid result."""
+
+
+def _redirect_broken_standard_streams() -> None:
+    """Keep multiprocessing startup from failing on an orphaned output pipe."""
+
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            continue
+        try:
+            stream.flush()
+        except BrokenPipeError:
+            replacement = open(os.devnull, "w", encoding="utf-8")
+            try:
+                os.dup2(replacement.fileno(), stream.fileno())
+            except (AttributeError, OSError, ValueError):
+                setattr(sys, stream_name, replacement)
+            else:
+                replacement.close()
 
 
 def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
@@ -215,6 +236,7 @@ class CancellableModuleWorker:
         if self._process is not None and self._process.is_alive():
             return
         self._detach_worker_locked()
+        _redirect_broken_standard_streams()
         self._request_queue = self._context.Queue()
         self._response_queue = self._context.Queue()
         self._process = self._context.Process(
