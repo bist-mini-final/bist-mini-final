@@ -186,7 +186,10 @@ def test_answer_refiner_module_contract():
 def test_answer_refiner_execution_with_mock_data():
     """Verify end-to-end execution of AnswerRefinerModule."""
     store = FakeCellStore()
-    module = AnswerRefinerModule(pgvector_store=store)
+    module = AnswerRefinerModule(
+        pgvector_store=store,
+        completion_client=FakeCompletionClient(),
+    )
 
     mock_input = {
         "answer_json": {

@@ -36,10 +36,10 @@ export interface PipelineRunState {
   progressPercent: number;
   elapsedSeconds: number;
   modules: ModuleStepState[];
-  chunkCount?: number;
-  totalTokens?: number;
-  costUsd?: number;
-  costKrw?: number;
+  chunkCount?: number | null;
+  totalTokens?: number | null;
+  costUsd?: number | null;
+  costKrw?: number | null;
   error?: string | null;
   isLiveUpload?: boolean;
   lunaOutput?: LunaInspectionOutput;

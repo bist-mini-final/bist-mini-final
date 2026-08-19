@@ -64,6 +64,9 @@ class DataSourceApiTests(unittest.TestCase):
 
         self.pg_store = PgVectorStore()
         self.db_mgr = DatabaseManager()
+        if not self.pg_store.is_connected() or not self.db_mgr.is_connected():
+            self.temp_dir.cleanup()
+            self.skipTest("pgvector database is not accessible")
         self.clean_test_indexes()
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
@@ -113,6 +116,7 @@ class DataSourceApiTests(unittest.TestCase):
         self.client = TestClient(self.app)
 
     def clean_test_indexes(self):
+        """Remove test-created vector indexes and source-file records from connected stores."""
         if hasattr(self, "pg_store") and self.pg_store.is_connected():
             for idx in self.pg_store.list_indexes():
                 if "Test_Workbook" in idx.get("file_name", "") or idx["index_id"].startswith("test_"):
@@ -120,24 +124,45 @@ class DataSourceApiTests(unittest.TestCase):
         if hasattr(self, "db_mgr") and self.db_mgr.is_connected():
             with self.db_mgr._raw_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         DELETE FROM source_files 
-                        WHERE file_name ILIKE '%Test_Workbook%' 
-                           OR file_name ILIKE '%test_%' 
-                           OR file_name = 'uploaded_data.parquet';
-                    """)
+                        WHERE file_name = ANY(%s);
+                        """,
+                        (["Test_Workbook.xlsx", "uploaded_data.parquet"],),
+                    )
                 conn.commit()
 
     def tearDown(self):
-        for run in self.run_store.list():
-            if run.status in {"queued", "running"}:
-                self.workflow_dispatcher.cancel(run.id)
-        self.workflow_dispatcher.shutdown(wait=True)
-        self.client.close()
+        """
+        Release resources created during the test and cancel any queued or running workflows.
+        """
+        if hasattr(self, "run_store") and hasattr(self, "workflow_dispatcher"):
+            for run in self.run_store.list():
+                if run.status in {"queued", "running"}:
+                    self.workflow_dispatcher.cancel(run.id)
+        if hasattr(self, "workflow_dispatcher"):
+            self.workflow_dispatcher.shutdown(wait=True)
+        if hasattr(self, "client"):
+            self.client.close()
         self.clean_test_indexes()
-        self.temp_dir.cleanup()
+        if hasattr(self, "temp_dir"):
+            self.temp_dir.cleanup()
 
     def _await_job(self, run_id: str, timeout: float = 5.0) -> dict:
+        """
+        Wait for an ingestion job to reach a terminal status and return its final payload.
+        
+        Parameters:
+        	run_id (str): Identifier of the ingestion job to monitor.
+        	timeout (float): Maximum number of seconds to wait for completion.
+        
+        Returns:
+        	dict: The job payload with a completed or failed status.
+        
+        Raises:
+        	AssertionError: If a status request fails or the job does not finish within the timeout.
+        """
         deadline = time.monotonic() + timeout
         response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
         self.assertEqual(response.status_code, 200)

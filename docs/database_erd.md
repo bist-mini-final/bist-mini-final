@@ -210,7 +210,7 @@ erDiagram
 | `id` | `UUID` | `PRIMARY KEY` | 청크 고유 UUID (LangChain 자동 발급) |
 | `collection_id` | `UUID` | `FOREIGN KEY` | `langchain_pg_collection.uuid` 참조 (`ON DELETE CASCADE`) |
 | `document` | `TEXT` | `NOT NULL` | 직렬화된 셀 텍스트 (`[SHEET] ... [COL] ... [ROW] ... [VALUE] ...`) |
-| `embedding` | `VECTOR(3072)` | `NOT NULL` | 고차원 임베딩 벡터 |
+| `embedding` | `VECTOR` | `NOT NULL` | 고차원 임베딩 벡터 (동적 차원 지원: 1536 / 3072 등) |
 | `cmetadata` | `JSONB` | `NOT NULL` | `cell_id`, `sheet_name`, `cell_coord`, `row_header`, `column_header`, `cell_value` |
 
 #### 최적화 인덱스 DDL

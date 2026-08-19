@@ -9,7 +9,17 @@ import urllib.error
 
 
 def fetch_pr_commits(repo: str, pr_number: str, github_token: str) -> list[str]:
-    """Fetch commit messages from GitHub PR API."""
+    """
+    Fetch the subject lines of commits associated with a GitHub pull request.
+    
+    Parameters:
+        repo (str): GitHub repository in `owner/name` format.
+        pr_number (str): Pull request number.
+        github_token (str): GitHub API authentication token.
+    
+    Returns:
+        list[str]: Nonempty commit-message subject lines.
+    """
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/commits?per_page=100"
     req = urllib.request.Request(
         url,
@@ -19,7 +29,7 @@ def fetch_pr_commits(repo: str, pr_number: str, github_token: str) -> list[str]:
             "User-Agent": "PR-Title-Auto-Formatter",
         },
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         commits_data = json.loads(resp.read().decode("utf-8"))
 
     commit_messages = []
@@ -39,7 +49,22 @@ def generate_pr_title_with_llm(
     base_url: str = "https://api.openai.com/v1",
     model: str = "gpt-5.6-luna",
 ) -> str:
-    """Call GPT-5.6-Luna (OpenAI compatible API) to generate a concise conventional PR title."""
+    """
+    Generate a concise Conventional Commit title from pull-request commits.
+    
+    Parameters:
+        commits (list[str]): Commit message subjects used to derive the title.
+        current_title (str): Existing pull-request title provided as context.
+        api_key (str): API key for the compatible chat-completions service.
+        base_url (str): Base URL of the chat-completions service.
+        model (str): Model used to generate the title.
+    
+    Returns:
+        str: The cleaned generated pull-request title.
+    
+    Raises:
+        urllib.error.HTTPError: If the chat-completions request fails.
+    """
     system_prompt = (
         "You are an expert Git release engineer and code reviewer.\n"
         "Your task is to generate a concise, standardized Conventional Commit PR title based on a list of Git commit messages.\n\n"
@@ -80,7 +105,7 @@ def generate_pr_title_with_llm(
     )
 
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             title = data["choices"][0]["message"]["content"].strip()
             # Clean any surrounding quotes or markdown
@@ -106,7 +131,7 @@ def update_pr_title(repo: str, pr_number: str, new_title: str, github_token: str
         },
         method="PATCH",
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         print(f"Successfully updated PR #{pr_number} title (HTTP {resp.status})")
 
 

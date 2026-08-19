@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..core.cost_tracker import calculate_embedding_cost
 from ..embeddings.bge import DEFAULT_BGE_MODEL
@@ -60,7 +60,7 @@ class EmbeddedCellTextDocumentDTO(CellTextDocumentDTO):
 
 
 class CellTextEmbeddingsDTO(ModuleDTO):
-    model_config = {"extra": "allow"}
+    model_config = ConfigDict(extra="forbid")
     file_name: str
     workbook_hash: str
     model: str = Field(description="문서 임베딩에 사용된 모델 ID")
@@ -70,6 +70,11 @@ class CellTextEmbeddingsDTO(ModuleDTO):
     )
     dimension: int = Field(gt=0, description="각 문서 임베딩 벡터 차원")
     items: List[EmbeddedCellTextDocumentDTO]
+    duration_seconds: Optional[float] = None
+    total_tokens: Optional[int] = None
+    estimated_cost_usd: Optional[float] = None
+    estimated_cost_krw: Optional[float] = None
+    batch_size: Optional[int] = None
 
 
 class CellTextEmbedderModule(ExecutableModule):

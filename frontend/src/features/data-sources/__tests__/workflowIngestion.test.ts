@@ -84,4 +84,61 @@ describe('pipelineFromIngestionJob', () => {
     });
     expect(pipeline.modules[2].sublogs[0].msg).toContain('3/10 배치 완료');
   });
+
+  it('safely skips missing batch node IDs or missing nodes entries', () => {
+    const job = {
+      job_id: 'run-missing-node',
+      status: 'running',
+      workflow_id: 'indexing_pgvector',
+      worker_active: true,
+      index: null,
+      luna_output: null,
+      run: {
+        schema_version: 1,
+        id: 'run-missing-node',
+        workflow_id: 'indexing_pgvector',
+        workflow_updated_at: '2026-08-19T00:00:00Z',
+        status: 'running',
+        created_at: '2026-08-19T00:00:00Z',
+        updated_at: '2026-08-19T00:00:01Z',
+        graph: {
+          nodes: [
+            { id: 'valid-node', module_type: 'processed_file_selector', position: { x: 0, y: 0 }, config: {} },
+          ],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+        },
+        runtime_inputs: {},
+        use_cache: true,
+        batches: [
+          { index: 0, node_ids: ['valid-node', 'missing-node-1'], status: 'completed', started_at: null, completed_at: null },
+          { index: 1, node_ids: ['missing-node-2'], status: 'running', started_at: null, completed_at: null },
+        ],
+        nodes: {
+          'valid-node': {
+            node_id: 'valid-node',
+            module_type: 'processed_file_selector',
+            batch_index: 0,
+            status: 'succeeded',
+            input_payload: null,
+            config_payload: {},
+            output: null,
+            error: null,
+            cache_key: null,
+            cache_hit: false,
+            outcome: 'generated',
+            skip_reason: null,
+            started_at: null,
+            completed_at: null,
+            progress: {},
+          },
+        },
+      },
+    } satisfies IngestionJobResponse;
+
+    const pipeline = pipelineFromIngestionJob(job);
+    expect(pipeline.modules).toHaveLength(1);
+    expect(pipeline.modules[0].id).toBe('valid-node');
+  });
 });
+

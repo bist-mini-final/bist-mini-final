@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tup
 from urllib.parse import urlparse
 
 import psycopg2
+import psycopg2.extras
 from langchain_core.documents import Document
 
 from ..core.settings import PGVECTOR_URL
@@ -156,19 +157,19 @@ class PgVectorStore:
         progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     ) -> None:
         """
-        Add documents to a pgvector collection, replacing any existing collection with the same identifier.
+        Store documents in a pgvector collection, replacing any existing collection with the same identifier.
         
         Parameters:
             index_id (str): Identifier of the collection to replace.
             documents (List[Document]): Documents to store.
-            model_name (str): Embedding model name used when embeddings are generated.
-            embedding_encoder (Optional[EmbeddingEncoder]): Encoder used to generate embeddings.
-            metadata (Optional[Dict[str, Any]]): Collection metadata.
-            vectors (Optional[Any]): Precomputed vectors corresponding to every document.
+            model_name (str): Embedding model to use when generating vectors.
+            embedding_encoder (Optional[EmbeddingEncoder]): Encoder for generating embeddings.
+            metadata (Optional[Dict[str, Any]]): Metadata to associate with the collection.
+            vectors (Optional[Any]): Precomputed vectors corresponding to all documents.
             progress_callback (Optional[Callable[[Dict[str, int]], None]]): Callback receiving batch and item progress.
         
         Raises:
-            PgVectorStoreError: If document insertion fails.
+            PgVectorStoreError: If inserting a document batch fails.
         """
         if not documents:
             return
@@ -291,6 +292,11 @@ class PgVectorStore:
                 )
             conn.commit()
         except Exception:
+            logger.warning(
+                "langchain_pg_collection 메타데이터 직접 업데이트 실패: %s",
+                index_id,
+                exc_info=True,
+            )
             conn.rollback()
         finally:
             conn.close()
@@ -734,18 +740,22 @@ class PgVectorStore:
         k: int = 10,
     ) -> List[Tuple[Any, float]]:
         """
-        Perform vector similarity search within a pgvector collection.
-        
+        Search a pgvector collection using an embedding vector.
+
         Parameters:
             collection_name (str): Name of the collection to search.
             embedding (List[float]): Query embedding vector.
-            k (int): Maximum number of results to retrieve.
-        
+            k (int): Maximum number of results to return.
+
         Returns:
-            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection is unavailable or the search fails.
+            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection does not exist.
+
+        Raises:
+            PgVectorStoreError: If both direct SQL and fallback similarity searches fail.
         """
-        conn = self._raw_connection()
+        conn = None
         try:
+            conn = self._raw_connection()
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
@@ -781,21 +791,37 @@ class PgVectorStore:
                 doc = Document(
                     page_content=text,
                     metadata=cmeta or {},
+                    id=str(_id),
                 )
                 results.append((doc, float(dist) if dist is not None else 0.0))
             return results
-        except Exception:
+        except Exception as error:
+            logger.warning(
+                "직접 SQL 벡터 유사도 검색 실패 (%s): %s",
+                collection_name,
+                error,
+                exc_info=True,
+            )
             try:
                 store = get_vector_store(
                     collection_name=collection_name,
                     backend="pgvector",
                     database_url=self.database_url,
                 )
-                return store.similarity_search_by_vector_with_score(embedding, k=k)
-            except Exception:
-                return []
+                return store.similarity_search_with_score_by_vector(embedding, k=k)
+            except Exception as fallback_error:
+                logger.warning(
+                    "폴백 PGVector 유사도 검색 실패 (%s): %s",
+                    collection_name,
+                    fallback_error,
+                    exc_info=True,
+                )
+                raise PgVectorStoreError(
+                    f"PostgreSQL pgvector 유사도 검색 실패 ({collection_name}): {fallback_error}"
+                ) from fallback_error
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     def fetch_cells_by_metadata(
         self,

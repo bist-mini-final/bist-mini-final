@@ -481,7 +481,7 @@ export function PipelineTrackerView({
                 <span>생성된 벡터 청크</span>
               </div>
               <div className="ds-hud-metric-value">
-                {pipeline.chunkCount ? `${pipeline.chunkCount.toLocaleString()}개` : '분석 중...'}
+                {pipeline.chunkCount != null ? `${pipeline.chunkCount.toLocaleString()}개` : '분석 중...'}
               </div>
             </div>
 
@@ -491,7 +491,7 @@ export function PipelineTrackerView({
                 <span>소비 토큰 수</span>
               </div>
               <div className="ds-hud-metric-value ds-font-mono">
-                {pipeline.totalTokens ? `${pipeline.totalTokens.toLocaleString()} tokens` : '집계 중...'}
+                {pipeline.totalTokens != null ? `${pipeline.totalTokens.toLocaleString()} tokens` : '집계 중...'}
               </div>
             </div>
 
@@ -501,8 +501,8 @@ export function PipelineTrackerView({
                 <span>예상 API 비용</span>
               </div>
               <div className="ds-hud-metric-value" style={{ color: '#1d4ed8' }}>
-                {pipeline.costUsd !== undefined ? `$${pipeline.costUsd.toFixed(4)}` : '$0.0000'}
-                {pipeline.costKrw ? ` (약 ₩${pipeline.costKrw.toLocaleString()})` : ''}
+                {pipeline.costUsd != null ? `$${pipeline.costUsd.toFixed(4)}` : '$0.0000'}
+                {pipeline.costKrw != null ? ` (약 ₩${pipeline.costKrw.toLocaleString()})` : ''}
               </div>
             </div>
 

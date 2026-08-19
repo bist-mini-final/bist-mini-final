@@ -869,7 +869,8 @@ class RepositoryIntegrationTests(unittest.TestCase):
             set(bm25_result),
             {"query_context", "document_context", "items"},
         )
-        self.assertTrue(
+        self.assertEqual(
+            set(document_embeddings),
             {
                 "file_name",
                 "workbook_hash",
@@ -877,7 +878,12 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "artifact_id",
                 "dimension",
                 "items",
-            }.issubset(set(document_embeddings))
+                "duration_seconds",
+                "total_tokens",
+                "estimated_cost_usd",
+                "estimated_cost_krw",
+                "batch_size",
+            },
         )
         self.assertEqual(
             len(document_embeddings["items"]),
@@ -1110,6 +1116,11 @@ class ApiContractTests(unittest.TestCase):
                 "artifact_id",
                 "dimension",
                 "items",
+                "duration_seconds",
+                "total_tokens",
+                "estimated_cost_usd",
+                "estimated_cost_krw",
+                "batch_size",
             },
         )
 
@@ -1223,7 +1234,19 @@ class ApiContractTests(unittest.TestCase):
                 {"model", "batch_size"},
             ),
             "vector_index_writer": (
-                {"file_name", "workbook_hash", "model", "artifact_id", "dimension", "items"},
+                {
+                    "file_name",
+                    "workbook_hash",
+                    "model",
+                    "artifact_id",
+                    "dimension",
+                    "items",
+                    "duration_seconds",
+                    "total_tokens",
+                    "estimated_cost_usd",
+                    "estimated_cost_krw",
+                    "batch_size",
+                },
                 set(),
             ),
             "prebuilt_index_loader": ({"file_name"}, set()),
@@ -1342,7 +1365,19 @@ class ApiContractTests(unittest.TestCase):
                 {"include_builtin"},
             ),
             "pgvector_index_writer": (
-                {"file_name", "workbook_hash", "model", "artifact_id", "dimension", "items"},
+                {
+                    "file_name",
+                    "workbook_hash",
+                    "model",
+                    "artifact_id",
+                    "dimension",
+                    "items",
+                    "duration_seconds",
+                    "total_tokens",
+                    "estimated_cost_usd",
+                    "estimated_cost_krw",
+                    "batch_size",
+                },
                 set(),
             ),
             "pgvector_collection_loader": (
@@ -2895,6 +2930,40 @@ class WorkflowExecutionTests(unittest.TestCase):
             dispatcher.cancel(active_run.id)
             dispatcher.shutdown()
 
+    def test_dispatcher_submit_duplicate_rejection_and_done_callback_cleanup(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        worker = BlockingModuleWorker()
+        executor = WorkflowExecutor(
+            self.registry,
+            self.run_store,
+            self.cache,
+            module_worker=worker,
+        )
+        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+
+        try:
+            self.assertTrue(dispatcher.submit(run.id))
+            self.assertTrue(worker.started.wait(timeout=1))
+
+            # Duplicate submit while running is rejected
+            self.assertFalse(dispatcher.submit(run.id))
+            self.assertTrue(dispatcher.is_active(run.id))
+
+            # Cancel run to let worker complete
+            dispatcher.cancel(run.id)
+            deadline = monotonic() + 2
+            while dispatcher.is_active(run.id) and monotonic() < deadline:
+                Event().wait(0.01)
+
+            # Once finished, future tracking should be cleaned up via _forget
+            self.assertFalse(dispatcher.is_active(run.id))
+            with dispatcher._lock:
+                self.assertNotIn(run.id, dispatcher._futures)
+        finally:
+            dispatcher.shutdown()
+
+
     def test_cache_clear_terminates_active_module_before_removing_runs(self) -> None:
         workflow = self.save_workflow()
         run = self.executor.create_run(workflow, self.runtime_request())
@@ -3477,7 +3546,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
                 "items": {"Revenue query": [0.1, 0.2]},
             },
             index_input={
-                "index_id": "col_1,col_2",
+                "index_id": "col_1",
                 "file_name": "dataset.xlsm",
                 "workbook_hash": "hash_1",
                 "model": "text-embedding-3-large",
@@ -3493,6 +3562,448 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(len(res["items"]), 1)
         self.assertEqual(res["items"][0]["cell_id"], "c1")
         self.assertAlmostEqual(res["items"][0]["score"], 0.9)
+
+    def test_pgvector_retriever_empty_query_items(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Empty query"),
+                items={},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="col_1",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertIn("query_context", res)
+        self.assertEqual(res["query_context"]["question_id"], "q1")
+        self.assertIn("document_context", res)
+        self.assertEqual(res["document_context"]["file_name"], "dataset.xlsm")
+        self.assertEqual(res["document_context"]["workbook_hash"], "hash_1")
+        self.assertEqual(res["items"], [])
+        mock_store.similarity_search_by_vector_with_score.assert_not_called()
+
+    def test_pgvector_retriever_all_collections_fail(self) -> None:
+        from unittest.mock import MagicMock, patch
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from backend.storage.pgvector_store import PgVectorStore
+
+        store = PgVectorStore()
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.execute.side_effect = RuntimeError("Direct SQL query error")
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch.object(store, "_raw_connection", return_value=mock_conn):
+            with patch("backend.storage.pgvector_store.get_vector_store", side_effect=RuntimeError("Fallback LangChain error")):
+                retriever = PgVectorRetrieverModule(pgvector_store=store)
+                payload = PgVectorRetrieverExecutionDTO.model_construct(
+                    query_input=EmbeddingsDTO.model_construct(
+                        query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                        items={"q": [0.1, 0.2]},
+                    ),
+                    index_input=IndexOutputDTO.model_construct(
+                        index_id="col_1,col_2",
+                        file_name="dataset.xlsm",
+                        workbook_hash="hash_1",
+                        model="text-embedding-3-large",
+                        dimension=2,
+                        document_count=10,
+                    ),
+                    top_k=5,
+                )
+                with self.assertRaises(ModuleExecutionError) as ctx:
+                    retriever.execute(payload)
+                self.assertIn("PostgreSQL pgvector 유사도 검색 실패", str(ctx.exception))
+                mock_conn.close.assert_called()
+
+    def test_pgvector_retriever_partial_collection_failure(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        mock_doc = MagicMock()
+        mock_doc.page_content = "Total Revenue 2024"
+        mock_doc.metadata = {"cell_id": "c1"}
+
+        def side_effect(collection_name, **_kwargs):
+            """
+            Return a matching document for supported collections.
+            
+            Parameters:
+                collection_name (str): Collection to query.
+            
+            Returns:
+                list: A document-score pair for collections other than ``col_1``.
+            
+            Raises:
+                RuntimeError: If ``collection_name`` is ``col_1``.
+            """
+            if collection_name == "col_1":
+                raise RuntimeError("col_1 error")
+            return [(mock_doc, 0.2)]
+
+        mock_store.similarity_search_by_vector_with_score.side_effect = side_effect
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="col_1,col_2",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 1)
+        self.assertEqual(res["items"][0]["cell_id"], "c1")
+
+    def test_pgvector_retriever_multi_collection_dedup_and_fallback_ids(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_col1 = MagicMock()
+        doc_col1.page_content = "Doc 1"
+        doc_col1.metadata = {}  # No cell_id or chunk_id
+        doc_col2 = MagicMock()
+        doc_col2.page_content = "Doc 2"
+        doc_col2.metadata = {}  # No cell_id or chunk_id
+
+        def side_effect(collection_name, **_kwargs):
+            """
+            Provide a fixed document-score result for a collection lookup.
+            
+            Parameters:
+                collection_name (str): Collection name used to select the result set.
+                **_kwargs: Ignored lookup options.
+            
+            Returns:
+                list: A single document-score pair for the selected collection.
+            """
+            if collection_name == "col_1":
+                return [(doc_col1, 0.1)]
+            return [(doc_col2, 0.2)]
+
+        mock_store.similarity_search_by_vector_with_score.side_effect = side_effect
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="col_1,col_2",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        cell_ids = [item["cell_id"] for item in res["items"]]
+        self.assertTrue(any(cid.startswith("col_1:chunk:") for cid in cell_ids))
+        self.assertTrue(any(cid.startswith("col_2:chunk:") for cid in cell_ids))
+
+    def test_pgvector_retriever_anonymous_documents_multi_subquery(self) -> None:
+        import hashlib
+        from unittest.mock import MagicMock
+        from langchain_core.documents import Document
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_a = Document(page_content="Alpha Unique Text")
+        doc_b = Document(page_content="Beta Unique Text")
+
+        # Return doc_a for subquery "q1" (score 0.8) and doc_b for subquery "q2" (score 0.9)
+        def side_effect(embedding, **_kwargs):
+            if embedding == [0.1, 0.1]:
+                return [(doc_a, 0.2)]  # score = 0.8
+            return [(doc_b, 0.1)]  # score = 0.9
+
+        mock_store.similarity_search_by_vector_with_score.side_effect = side_effect
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q1": [0.1, 0.1], "q2": [0.2, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="single_col",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        hash_a = hashlib.sha256(b"Alpha Unique Text").hexdigest()[:16]
+        hash_b = hashlib.sha256(b"Beta Unique Text").hexdigest()[:16]
+        expected_ids = {f"single_col:chunk:{hash_a}", f"single_col:chunk:{hash_b}"}
+        returned_ids = {item["cell_id"] for item in res["items"]}
+        self.assertEqual(returned_ids, expected_ids)
+
+    def test_pgvector_retriever_identical_content_different_row_ids(self) -> None:
+        from unittest.mock import MagicMock
+        from langchain_core.documents import Document
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_a = Document(page_content="Identical Content", metadata={}, id="123")
+        doc_b = Document(page_content="Identical Content", metadata={}, id="456")
+
+        mock_store.similarity_search_by_vector_with_score.return_value = [
+            (doc_a, 0.1),
+            (doc_b, 0.1),
+        ]
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q1": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="test_col",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=10,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        returned_ids = {item["cell_id"] for item in res["items"]}
+        self.assertEqual(returned_ids, {"123", "456"})
+
+    def test_pgvector_collection_loader_success(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [
+                {"cell_id": "c1", "sheet_name": "S1", "cell_coord": "A1", "text": "Header"}
+            ],
+        }
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="col_1")
+        res = loader.execute(payload)
+        self.assertIn("document_output", res)
+        self.assertIn("index_output", res)
+        self.assertEqual(res["document_output"]["file_name"], "data.xlsx")
+        self.assertEqual(len(res["document_output"]["items"]), 1)
+        self.assertEqual(res["index_output"]["document_count"], 1)
+
+    def test_pgvector_collection_loader_sql_reload_preserves_variant(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [],
+        }
+        mock_db = MagicMock()
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_cur.fetchall.return_value = [
+            (
+                "chunk_1",
+                "Header Text",
+                {
+                    "cell_id": "c1",
+                    "sheet_name": "Sheet1",
+                    "cell_coord": "B2",
+                    "variant": "header_with_value",
+                    "cell_value": "100",
+                },
+            )
+        ]
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_db._raw_connection.return_value = mock_conn
+
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store, db_manager=mock_db)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="col_1")
+        res = loader.execute(payload)
+        items = res["document_output"]["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["cell_id"], "c1")
+        self.assertEqual(items[0]["variant"], "header_with_value")
+
+    def test_pgvector_collection_loader_missing_target(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="non_existent")
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("요청한 pgvector 컬렉션을 찾을 수 없습니다", str(ctx.exception))
+
+    def test_pgvector_collection_loader_db_error(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        mock_store.get_index_metadata.return_value = None
+        mock_db = MagicMock()
+        mock_db._raw_connection.side_effect = RuntimeError("DB connection failed")
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store, db_manager=mock_db)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="col_1")
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("pgvector 컬렉션 문서를 읽지 못했습니다", str(ctx.exception))
+
+    def test_pgvector_collection_loader_dimension_mismatch(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data1.xlsx", "workbook_hash": "hash_1"},
+            {"index_id": "col_2", "file_name": "data2.xlsx", "workbook_hash": "hash_2"},
+        ]
+
+        def get_meta(cid):
+            """Return metadata for the specified embedding collection.
+            
+            Parameters:
+            	cid (str): Collection identifier.
+            
+            Returns:
+            	dict: Collection metadata containing the embedding model, vector dimension, and an empty item list.
+            """
+            if cid == "col_1":
+                return {"model": "text-embedding-3-large", "dimension": 3072, "items": []}
+            return {"model": "text-embedding-3-large", "dimension": 1536, "items": []}
+
+        mock_store.get_index_metadata.side_effect = get_meta
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_names=["col_1", "col_2"])
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("선택된 pgvector 컬렉션들의 임베딩 차원이 일치하지 않습니다", str(ctx.exception))
+
+    def test_pgvector_collection_loader_model_mismatch(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data1.xlsx", "workbook_hash": "hash_1"},
+            {"index_id": "col_2", "file_name": "data2.xlsx", "workbook_hash": "hash_2"},
+        ]
+
+        def get_meta(cid):
+            """
+            Return embedding metadata for the specified collection identifier.
+            
+            Parameters:
+            	cid (str): Collection identifier used to select the embedding metadata.
+            
+            Returns:
+            	dict: A metadata dictionary containing the embedding model, dimension, and an empty item list.
+            """
+            if cid == "col_1":
+                return {"model": "text-embedding-3-small", "dimension": 1536, "items": []}
+            return {"model": "text-embedding-ada-002", "dimension": 1536, "items": []}
+
+        mock_store.get_index_metadata.side_effect = get_meta
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_names=["col_1", "col_2"])
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("선택된 pgvector 컬렉션들의 임베딩 모델이 일치하지 않습니다", str(ctx.exception))
 
 
 if __name__ == "__main__":

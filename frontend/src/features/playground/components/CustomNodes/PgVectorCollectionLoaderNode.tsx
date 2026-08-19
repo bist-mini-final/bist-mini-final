@@ -44,14 +44,33 @@ export const PgVectorCollectionLoaderNode = ({
   >([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const rawSavedIds = Array.isArray(data.values?.collection_names)
+    ? (data.values.collection_names as string[]).map((id) => id.trim()).filter(Boolean)
+    : typeof data.values?.collection_name === 'string'
+      ? data.values.collection_name.split(',').map((id) => id.trim()).filter(Boolean)
+      : [];
+
+  // Normalize savedIds against availableCollections
+  const availableIds = new Set(availableCollections.map((c) => c.id));
+  const savedIds = rawSavedIds.filter((id) => availableIds.has(id));
+  const hasSavedValue = savedIds.length > 0;
+
   // Selected collection IDs (array)
-  const selectedIds: string[] = Array.isArray(data.values?.collection_names)
-    ? (data.values?.collection_names as string[])
-    : data.values?.collection_name
-    ? (data.values?.collection_name as string).split(',').map((s) => s.trim()).filter(Boolean)
+  const selectedIds: string[] = hasSavedValue
+    ? savedIds
     : availableCollections.length > 0
     ? [availableCollections[0].id]
-    : ['SPG_Company_KeyStats_v4.xlsm'];
+    : [];
+
+  useEffect(() => {
+    if (!hasSavedValue && availableCollections.length > 0) {
+      const defaultId = availableCollections[0].id;
+      data.onValuesChange?.({
+        collection_names: [defaultId],
+        collection_name: defaultId,
+      });
+    }
+  }, [availableCollections, data.onValuesChange, hasSavedValue]);
 
   const { docCount, indexId } = getOutputSummary(data.executionOutput);
 
@@ -153,10 +172,13 @@ export const PgVectorCollectionLoaderNode = ({
             {availableCollections.map((col) => {
               const isChecked = selectedIds.includes(col.id);
               return (
-                <div
+                <button
+                  type="button"
                   key={col.id}
+                  role="checkbox"
+                  aria-checked={isChecked}
                   onClick={() => handleToggleCollection(col.id)}
-                  className={`flex items-center justify-between px-2 py-1.5 rounded cursor-pointer text-xs transition-colors ${
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded cursor-pointer text-xs transition-colors ${
                     isChecked
                       ? 'bg-teal-600 text-white font-medium shadow-xs'
                       : 'bg-white text-slate-700 hover:bg-teal-100/70 border border-teal-100'
@@ -173,7 +195,7 @@ export const PgVectorCollectionLoaderNode = ({
                   <span className={`text-[10px] shrink-0 font-mono ${isChecked ? 'text-teal-100' : 'text-slate-500'}`}>
                     {col.count.toLocaleString()}개 벡터
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>

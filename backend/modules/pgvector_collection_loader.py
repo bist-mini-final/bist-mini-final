@@ -54,6 +54,18 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         self.db_manager = db_manager or DatabaseManager()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Load selected pgvector collections and combine their documents and index metadata.
+        
+        Parameters:
+        	payload (BaseModel): Input specifying collection IDs, file names, or workbook hashes.
+        
+        Returns:
+        	Dict[str, Any]: Combined document and index outputs for the selected collections.
+        
+        Raises:
+        	ModuleExecutionError: If no collections are available, a requested collection is missing, selected collections have inconsistent embedding models or dimensions, or collection documents cannot be loaded.
+        """
         input_data = cast(PgVectorCollectionLoaderInputDTO, payload)
         
         # 1. Resolve target collection list (support multi-select and single-select)
@@ -75,6 +87,8 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         matched_collection_ids: List[str] = []
         matched_file_names: List[str] = []
         matched_hashes: List[str] = []
+        matched_dimensions: set = set()
+        matched_models: set = set()
         model_name = "text-embedding-3-large"
         dimension = 3072
 
@@ -86,7 +100,9 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                     break
 
             if not matched:
-                continue
+                raise ModuleExecutionError(
+                    f"요청한 pgvector 컬렉션을 찾을 수 없습니다: {target}"
+                )
 
             cid = matched["index_id"]
             if cid in matched_collection_ids:
@@ -96,10 +112,25 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
             matched_hashes.append(matched.get("workbook_hash", cid))
 
             meta = self.pgvector_store.get_index_metadata(cid) or matched
-            if meta.get("model"):
-                model_name = meta["model"]
-            if meta.get("dimension"):
-                dimension = meta["dimension"]
+            col_model = meta.get("model")
+            if col_model:
+                if matched_models and col_model not in matched_models:
+                    prev_model = next(iter(matched_models))
+                    raise ModuleExecutionError(
+                        f"선택된 pgvector 컬렉션들의 임베딩 모델이 일치하지 않습니다: {cid} (모델: {col_model}, 기존 모델: {prev_model})"
+                    )
+                matched_models.add(col_model)
+                model_name = col_model
+
+            col_dim = meta.get("dimension")
+            if col_dim is not None:
+                if matched_dimensions and col_dim not in matched_dimensions:
+                    prev_dim = next(iter(matched_dimensions))
+                    raise ModuleExecutionError(
+                        f"선택된 pgvector 컬렉션들의 임베딩 차원이 일치하지 않습니다: {cid} (차원: {col_dim}, 기존 차원: {prev_dim})"
+                    )
+                matched_dimensions.add(col_dim)
+                dimension = col_dim
 
             items = meta.get("items") or []
             if not items:
@@ -132,6 +163,7 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                                     "cell_id": cmeta.get("cell_id") or chunk_id,
                                     "sheet_name": cmeta.get("sheet_name", ""),
                                     "cell_coord": cmeta.get("cell_coord", ""),
+                                    "variant": cmeta.get("variant") or "header_only",
                                     "row_header": cmeta.get("row_header", []),
                                     "column_header": cmeta.get("column_header", []),
                                     "cell_value": str(cmeta.get("cell_value", "")),
@@ -140,8 +172,10 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                                 })
                     finally:
                         conn.close()
-                except Exception:
-                    pass
+                except Exception as error:
+                    raise ModuleExecutionError(
+                        f"pgvector 컬렉션 문서를 읽지 못했습니다: {cid}"
+                    ) from error
 
             clean_items = []
             for item in items:
@@ -157,13 +191,6 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                 })
 
             all_items.extend(clean_items)
-
-        if not matched_collection_ids:
-            # Fallback to first available index if none matched
-            matched = indexes[0]
-            matched_collection_ids.append(matched["index_id"])
-            matched_file_names.append(matched.get("file_name", matched["index_id"]))
-            matched_hashes.append(matched.get("workbook_hash", matched["index_id"]))
 
         return {
             "document_output": {
