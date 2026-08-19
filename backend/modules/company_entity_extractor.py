@@ -82,10 +82,25 @@ class CompanyEntityExtractorModule(ExecutableModule):
         catalog: WorkbookCatalog | None = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
     ) -> None:
+        """Initialize the extractor with a workbook catalog.
+        
+        Parameters:
+        	catalog (WorkbookCatalog | None): Catalog used to resolve workbooks. A catalog for `processed_dir` is created when omitted.
+        	processed_dir (Path): Directory used to create the default workbook catalog.
+        """
         self.catalog = catalog or WorkbookCatalog(processed_dir)
 
     @staticmethod
     def _heuristic(file_name: str) -> Dict[str, Any]:
+        """
+        Derive company metadata from a workbook filename.
+        
+        Parameters:
+        	file_name (str): Workbook filename used to derive the company name.
+        
+        Returns:
+        	Dict[str, Any]: Metadata containing the derived company name and display name, an empty ticker, low confidence, and a heuristic source.
+        """
         name = Path(file_name).stem.replace("_", " ").replace("-", " ").strip()
         return {
             "company_name": name,
@@ -97,6 +112,15 @@ class CompanyEntityExtractorModule(ExecutableModule):
 
     @staticmethod
     def _sample_workbook(path: Path, sheet_names: list[str]) -> list[str]:
+        """Extracts representative text from the first two requested workbook sheets.
+        
+        Parameters:
+            path (Path): Path to the Excel workbook.
+            sheet_names (list[str]): Names of the sheets to sample.
+        
+        Returns:
+            list[str]: Sampled sheet contents, with populated cells from the first eight rows and ten columns.
+        """
         import openpyxl
 
         sampled: list[str] = []
@@ -128,6 +152,18 @@ class CompanyEntityExtractorModule(ExecutableModule):
         self,
         payload: CompanyEntityExtractorExecutionDTO,
     ) -> Dict[str, Any]:
+        """
+        Extract company metadata from the selected workbook.
+        
+        Parameters:
+        	payload (CompanyEntityExtractorExecutionDTO): Workbook selection and model configuration used for extraction.
+        
+        Returns:
+        	Dict[str, Any]: Extracted company name, ticker, display name, confidence, and source. Uses filename-based metadata when workbook sampling or LLM extraction is unavailable or fails.
+        
+        Raises:
+        	ModuleExecutionError: If the workbook cannot be resolved from the catalog.
+        """
         try:
             workbook_path = self.catalog.resolve(payload.file_name)
         except (OSError, ValueError, WorkbookCatalogError) as error:

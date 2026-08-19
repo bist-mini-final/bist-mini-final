@@ -43,7 +43,23 @@ def create_api_router(
     completion_client: Optional[ChatCompletionClient] = None,
     embedding_encoder: Optional[EmbeddingEncoder] = None,
 ) -> APIRouter:
-    """Compose domain-specific API routers and shared services."""
+    """
+    Compose the application's `/api` router with shared services and domain-specific endpoints.
+    
+    Parameters:
+    	repository (AnswerCacheRepository): Repository used for answer caching.
+    	workflow_dir (Path): Directory containing workflow definitions.
+    	run_dir (Path): Directory used to store workflow runs.
+    	cache_dir (Path): Directory used for workflow result caching.
+    	embedding_artifact_dir (Path): Directory for embedding artifacts.
+    	spreadsheet_artifact_dir (Path): Directory for spreadsheet artifacts.
+    	vector_index_dir (Path): Directory for vector indexes.
+    	completion_client (Optional[ChatCompletionClient]): Optional chat-completion service.
+    	embedding_encoder (Optional[EmbeddingEncoder]): Optional embedding encoder.
+    
+    Returns:
+    	APIRouter: Configured router containing the application's API endpoints.
+    """
 
     router = APIRouter(prefix="/api")
     pgvector_store = PgVectorStore()

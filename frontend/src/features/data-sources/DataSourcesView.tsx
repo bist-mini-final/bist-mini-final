@@ -15,6 +15,12 @@ import './data-sources.css';
 const ACTIVE_JOB_KEY = 'ds_active_ingestion_job_id';
 const PENDING_FILE_KEY = 'ds_pending_ingestion_file_name';
 
+/**
+ * Collects the latest failed pipeline run for each file.
+ *
+ * @param jobs - Ingestion jobs ordered from latest to oldest
+ * @returns Failed pipeline states, with at most one state per file
+ */
 function latestFailedRuns(jobs: IngestionJobResponse[]): PipelineRunState[] {
   const seenFiles = new Set<string>();
   const failures: PipelineRunState[] = [];
@@ -27,6 +33,12 @@ function latestFailedRuns(jobs: IngestionJobResponse[]): PipelineRunState[] {
   return failures;
 }
 
+/**
+ * Displays vector indexes, database status, and ingestion pipeline activity.
+ *
+ * Provides controls for uploading files, viewing index details, testing searches,
+ * and monitoring, resuming, cancelling, or deleting ingestion pipelines.
+ */
 export function DataSourcesView() {
   const [indexes, setIndexes] = useState<VectorIndexInfo[]>([]);
   const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);

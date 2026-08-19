@@ -55,12 +55,24 @@ function hasSerializedTexts(value: unknown): boolean {
   return isJsonRow(candidate) && typeof candidate.text === 'string';
 }
 
+/**
+ * Determines whether a value contains an answer.
+ *
+ * @param value - The value to inspect
+ * @returns `true` if the value contains a string or object answer, `false` otherwise
+ */
 function hasAnswer(value: unknown): boolean {
   if (!isJsonRow(value)) return false;
   const answerJson = isJsonRow(value.answer_json) ? value.answer_json : value;
   return typeof answerJson.answer === 'string' || isJsonRow(answerJson.answer);
 }
 
+/**
+ * Extracts the refined answer data from a row when available.
+ *
+ * @param value - The value to inspect
+ * @returns The nested `refined_answer_json` object or the original object, or `null` for non-object values
+ */
 function refinedAnswerJson(value: unknown): JsonRow | null {
   if (!isJsonRow(value)) return null;
   return isJsonRow(value.refined_answer_json)
@@ -68,6 +80,12 @@ function refinedAnswerJson(value: unknown): JsonRow | null {
     : value;
 }
 
+/**
+ * Determines whether a value contains a refined answer.
+ *
+ * @param value - The value to inspect
+ * @returns `true` if the value contains a string or object refined answer, `false` otherwise.
+ */
 function hasRefinedAnswer(value: unknown): boolean {
   const refined = refinedAnswerJson(value);
   if (!refined) return false;
@@ -75,6 +93,12 @@ function hasRefinedAnswer(value: unknown): boolean {
     || isJsonRow(refined.refined_answer);
 }
 
+/**
+ * Determines whether a value contains a subqueries collection.
+ *
+ * @param value - The value to inspect
+ * @returns `true` if the value is an object with a valid subqueries collection, `false` otherwise.
+ */
 function hasSubqueries(value: unknown): boolean {
   return isJsonRow(value) && collectionItems(value.subqueries) !== null;
 }
@@ -103,6 +127,12 @@ function serializedTextContent(value: unknown): TableInspectorContent | null {
   };
 }
 
+/**
+ * Creates Markdown inspector content from a reader answer or its preview.
+ *
+ * @param value - A value containing an answer or an `answer_json` object
+ * @returns Markdown content for the answer, or `null` when no supported answer is present
+ */
 function answerMarkdown(value: unknown): MarkdownInspectorContent | null {
   if (!isJsonRow(value)) return null;
   const answerJson = isJsonRow(value.answer_json) ? value.answer_json : value;
@@ -125,6 +155,12 @@ function answerMarkdown(value: unknown): MarkdownInspectorContent | null {
   };
 }
 
+/**
+ * Converts a refined answer into Markdown inspector content.
+ *
+ * @param value - The value containing the refined answer
+ * @returns Markdown content for the refined answer, or `null` when the value is not a supported refined answer
+ */
 function refinedAnswerMarkdown(value: unknown): MarkdownInspectorContent | null {
   const refined = refinedAnswerJson(value);
   if (!refined) return null;
@@ -147,6 +183,12 @@ function refinedAnswerMarkdown(value: unknown): MarkdownInspectorContent | null 
   };
 }
 
+/**
+ * Creates table content for a collection of subqueries.
+ *
+ * @param value - The value containing the subqueries collection
+ * @returns Table content for the subqueries, or `null` when the value does not contain a supported collection
+ */
 function subqueryContent(value: unknown): TableInspectorContent | null {
   if (!isJsonRow(value)) return null;
   const collection = collectionItems(value.subqueries);

@@ -69,6 +69,12 @@ async function patchJson<T>(url: string, payload: unknown, signal?: AbortSignal)
   return response.json() as Promise<T>;
 }
 
+/**
+ * Sends a DELETE request and parses the successful JSON response.
+ *
+ * @param url - The request URL
+ * @returns The parsed response data
+ */
 async function deleteJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     method: 'DELETE',

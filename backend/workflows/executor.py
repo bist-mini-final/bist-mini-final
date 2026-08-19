@@ -165,6 +165,19 @@ class WorkflowExecutor:
         workflow: WorkflowDocument,
         request: WorkflowExecutionRequest,
     ) -> WorkflowRun:
+        """
+        Create and persist a workflow run from the requested inputs and configuration.
+        
+        Parameters:
+            workflow (WorkflowDocument): Workflow definition to execute.
+            request (WorkflowExecutionRequest): Runtime inputs, configuration overrides, cache settings, and optional run inheritance settings.
+        
+        Returns:
+            WorkflowRun: The newly created and persisted workflow run.
+        
+        Raises:
+            DagExecutionError: If the request references unknown nodes or contains invalid runtime inputs, or if the workflow graph is invalid.
+        """
         execution_graph = workflow.graph.model_copy(deep=True)
         known_nodes = {node.id for node in execution_graph.nodes}
         unknown_inputs = sorted(set(request.inputs) - known_nodes)
@@ -303,6 +316,21 @@ class WorkflowExecutor:
             )
 
     def _execute_single_node(self, run_id: str, node_id: str) -> WorkflowRun:
+        """
+        Execute a node and its downstream dependents as a standalone run segment.
+        
+        Parameters:
+            run_id (str): Identifier of the workflow run.
+            node_id (str): Identifier of the node to execute.
+        
+        Returns:
+            WorkflowRun: The persisted workflow run after execution.
+        
+        Raises:
+            DagExecutionError: If the node is unknown or cannot currently be executed.
+            DagExecutionCancelled: If execution is cancelled.
+            ModuleWorkerCancelled: If the execution worker is cancelled.
+        """
         self._raise_if_cancelled(run_id)
         run = self.run_store.load(run_id)
         self._recover_interrupted_state(run)
@@ -350,6 +378,12 @@ class WorkflowExecutor:
 
 
     def _execute_next_batch(self, run_id: str) -> WorkflowRun:
+        """
+        Execute the next incomplete batch of a workflow run.
+        
+        Returns:
+        	WorkflowRun: The updated workflow run after batch execution.
+        """
         self._raise_if_cancelled(run_id)
         run = self.run_store.load(run_id)
         self._recover_interrupted_state(run)
@@ -436,6 +470,12 @@ class WorkflowExecutor:
 
     @staticmethod
     def _reset_node_state(state: RunNodeState) -> None:
+        """
+        Reset a node state to its initial pending state.
+        
+        Parameters:
+        	state (RunNodeState): The node state to reset.
+        """
         state.status = "pending"
         state.input_payload = None
         state.config_payload = {}
@@ -454,6 +494,15 @@ class WorkflowExecutor:
 
     @staticmethod
     def _descendant_node_ids(run: WorkflowRun, node_id: str) -> Set[str]:
+        """Return the identifiers of all nodes downstream from the specified node.
+        
+        Parameters:
+        	run (WorkflowRun): The workflow run containing the graph.
+        	node_id (str): The identifier of the starting node.
+        
+        Returns:
+        	Set[str]: The identifiers of all reachable downstream nodes.
+        """
         outgoing: Dict[str, List[str]] = defaultdict(list)
         for edge in run.graph.edges:
             outgoing[edge.source].append(edge.target)
@@ -560,6 +609,14 @@ class WorkflowExecutor:
         node: WorkflowNode,
         state: RunNodeState,
     ) -> None:
+        """
+        Execute a workflow node, recording its input, output, status, cache state, progress, usage, and cost.
+        
+        Parameters:
+            run (WorkflowRun): The workflow run containing the node.
+            node (WorkflowNode): The node to execute.
+            state (RunNodeState): The node state to update with execution results.
+        """
         input_payload = self._assemble_input(run, node)
         module = self.module_registry.get(node.module_type)
         validated_config = module.validate_config(node.config).model_dump(mode="json")
@@ -598,6 +655,7 @@ class WorkflowExecutor:
                 )
             else:
                 def persist_progress(progress: Dict[str, Any]) -> None:
+                    """Persist the current node execution progress for the workflow run."""
                     state.progress = compact_history_value(progress)
                     self.run_store.save(run)
 
@@ -750,6 +808,14 @@ class WorkflowExecutor:
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다")
 
     def _persist_cancelled_run(self, run_id: str) -> WorkflowRun:
+        """Persist a run after cancellation, resetting running nodes and marking non-terminal runs as paused.
+        
+        Parameters:
+        	run_id (str): Identifier of the run to persist.
+        
+        Returns:
+        	WorkflowRun: The saved run with updated node and execution statuses.
+        """
         run = self.run_store.load(run_id)
         was_terminal = run.status in ("completed", "failed")
         for state in run.nodes.values():
@@ -763,6 +829,16 @@ class WorkflowExecutor:
     def _should_execute_node(
         self, run: WorkflowRun, node: WorkflowNode
     ) -> Tuple[bool, Optional[str]]:
+        """
+        Determine whether a node has all prerequisites required for execution.
+        
+        Parameters:
+            run (WorkflowRun): Workflow run containing the node's inputs and incoming edges.
+            node (WorkflowNode): Node whose execution prerequisites are evaluated.
+        
+        Returns:
+            Tuple[bool, Optional[str]]: Whether the node can execute and, when it cannot, the reason it will be skipped.
+        """
         incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
         if not incoming_edges:
             module = self.module_registry.get(node.module_type)
@@ -949,6 +1025,7 @@ class WorkflowExecutor:
         return source_output, target_input
 
     def _recover_interrupted_state(self, run: WorkflowRun) -> None:
+        """Restore interrupted workflow execution state to pending or queued status and persist the changes."""
         changed = False
         for state in run.nodes.values():
             if state.status == "running":
@@ -969,6 +1046,16 @@ class WorkflowExecutor:
 
     @staticmethod
     def _format_error(error: Exception, *, include_type: bool = False) -> str:
+        """
+        Format an exception into a concise, user-facing error message.
+        
+        Parameters:
+            error (Exception): The exception to format.
+            include_type (bool): Whether to prefix ordinary error messages with the exception type.
+        
+        Returns:
+            str: The formatted error message, truncated to 4,000 characters when necessary.
+        """
         if isinstance(error, ValidationError):
             messages = [
                 f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"

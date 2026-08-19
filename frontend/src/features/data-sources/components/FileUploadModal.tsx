@@ -13,6 +13,12 @@ interface UploadProps {
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024;
 const SUPPORTED_EXTENSIONS = ['.xlsx', '.xlsm'];
 
+/**
+ * Validates a workbook's file format and size.
+ *
+ * @param file - The workbook file to validate
+ * @returns An error message for an unsupported format or oversized file, or `null` when the file is valid
+ */
 function validateWorkbook(file: File): string | null {
   const lowerName = file.name.toLowerCase();
   if (!SUPPORTED_EXTENSIONS.some((extension) => lowerName.endsWith(extension))) {
@@ -24,6 +30,12 @@ function validateWorkbook(file: File): string | null {
   return null;
 }
 
+/**
+ * Displays a modal for selecting and configuring an Excel workbook for indexing.
+ *
+ * @param onClose - Called when the modal is closed or cancelled
+ * @param onStartPipeline - Called with the selected workbook and indexing configuration
+ */
 export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

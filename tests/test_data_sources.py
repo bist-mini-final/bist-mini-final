@@ -28,6 +28,9 @@ class FakeEmbeddingEncoder:
 
 class DataSourceApiTests(unittest.TestCase):
     def setUp(self):
+        """
+        Prepare isolated test fixtures, sample spreadsheet data, storage clients, and a FastAPI test client.
+        """
         self.temp_dir = TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
         self.processed_dir = self.root / "processed"

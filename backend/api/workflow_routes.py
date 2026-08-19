@@ -25,6 +25,21 @@ def create_workflow_router(
     run_store: Optional[RunStore] = None,
     workflow_executor: Optional[WorkflowExecutor] = None,
 ) -> APIRouter:
+    """
+    Build a FastAPI router for workflow storage and run execution.
+    
+    Parameters:
+        module_registry (ModuleRegistry): Registry used to resolve workflow modules.
+        workflow_dir (Path): Directory containing workflow data.
+        run_dir (Path): Directory containing run data.
+        cache_dir (Path): Directory used for runtime cache data.
+        workflow_store (Optional[WorkflowStore]): Workflow store to use, or a default store when omitted.
+        run_store (Optional[RunStore]): Run store to use, or a default store when omitted.
+        workflow_executor (Optional[WorkflowExecutor]): Executor to use, or a default executor when omitted.
+    
+    Returns:
+        APIRouter: Configured router for workflow and run management.
+    """
     router = APIRouter(tags=["Workflows"])
     workflow_store = workflow_store or WorkflowStore(workflow_dir)
     run_store = run_store or RunStore(run_dir)

@@ -20,7 +20,12 @@ class ModuleWorkerError(RuntimeError):
 
 
 def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
-    """Build process-local services once and execute JSON-compatible tasks."""
+    """
+    Initialize process-local services and execute tasks received from the worker queue.
+    
+    Parameters:
+        spec (Dict[str, str]): Paths used to configure storage and artifact services.
+    """
 
     from pathlib import Path
 
@@ -107,6 +112,23 @@ class CancellableModuleWorker:
         execution_id: str,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Any:
+        """
+        Execute a module in the isolated worker process.
+        
+        Parameters:
+            module_type (str): Type of module to execute.
+            input_payload (Any): Input data supplied to the module.
+            config (Any): Configuration supplied to the module.
+            execution_id (str): Identifier used to associate cancellation requests with this execution.
+            progress_callback (Optional[Callable[[Dict[str, Any]], None]]): Callback invoked with progress events reported by the module.
+        
+        Returns:
+            Any: The module's execution output.
+        
+        Raises:
+            ModuleWorkerError: If another task is active, the worker fails, or module execution reports an error.
+            ModuleWorkerCancelled: If the worker is replaced or execution is interrupted.
+        """
         task_id = uuid4().hex
         with self._state_lock:
             if self._active_task_id is not None:

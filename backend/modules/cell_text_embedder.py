@@ -106,6 +106,22 @@ class CellTextEmbedderModule(ExecutableModule):
         )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Embed cell documents and store their vectors as a content-addressed artifact.
+        
+        Parameters:
+            payload (BaseModel): Execution data containing the documents, workbook metadata,
+                embedding model, and batch size.
+        
+        Returns:
+            Dict[str, Any]: Embedding metadata, artifact information, usage and cost
+                estimates, and the input documents with embedding row indices.
+        
+        Raises:
+            ModuleExecutionError: If no documents are provided, the encoder returns an
+                incorrect number of vectors, or the vectors have inconsistent or zero
+                dimensions.
+        """
         input_data = cast(CellTextEmbedderExecutionDTO, payload)
         encoder = self._encoder_for(input_data.model)
         vectors: List[List[float]] = []

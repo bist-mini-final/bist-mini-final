@@ -72,6 +72,21 @@ class ProcessedFileSelectorModule(ExecutableModule):
         return contract
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Resolve the requested processed workbook and select its processing sheets.
+        
+        Parameters:
+            payload (BaseModel): Input containing the processed workbook filename and
+                optionally the sheet names to select.
+        
+        Returns:
+            Dict[str, Any]: The resolved filename, workbook SHA-256 hash, and selected
+                sheet names in catalog order.
+        
+        Raises:
+            ModuleExecutionError: If the workbook cannot be resolved, a requested sheet
+                does not exist, or no processing sheets are selected.
+        """
         input_data = cast(ProcessedFileSelectorInputDTO, payload)
         try:
             path = self.catalog.resolve(input_data.file_name)

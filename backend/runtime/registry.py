@@ -64,6 +64,17 @@ class ModuleRegistry:
         processed_dir: Path = PROCESSED_DATA_DIR,
         spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
+        """
+        Initialize the registry and register all supported executable modules.
+        
+        Parameters:
+            repository (AnswerCacheRepository): Repository used for answer caching.
+            processed_dir (Path): Directory containing processed data artifacts.
+            spreadsheet_artifact_dir (Path): Directory containing spreadsheet artifacts.
+        
+        Raises:
+            ValueError: If multiple modules declare the same type.
+        """
         self.repository = repository
         self.embedding_artifact_store = (
             embedding_artifact_store or EmbeddingArtifactStore()

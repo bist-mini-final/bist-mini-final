@@ -54,9 +54,22 @@ class IndexCompanyPersistenceModule(ExecutableModule):
     output_model = IndexCompanyPersistenceOutputDTO
 
     def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
+        """Initialize the module with the provided pgvector store or a default store."""
         self.pgvector_store = pgvector_store or PgVectorStore()
 
     def execute(self, payload: IndexCompanyPersistenceInputDTO) -> Dict[str, Any]:
+        """
+        Persist the company name for an index and return the resulting company metadata.
+        
+        Parameters:
+            payload (IndexCompanyPersistenceInputDTO): Index persistence result and extracted company information.
+        
+        Returns:
+            Dict[str, Any]: The index ID, stored company name, and ticker.
+        
+        Raises:
+            ModuleExecutionError: If no company name is available or the index update fails.
+        """
         company = payload.company_input
         company_name = company.display_name or company.company_name
         if not company_name:

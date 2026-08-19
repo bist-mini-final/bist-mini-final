@@ -348,6 +348,15 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
         return []
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Analyzes the selected workbook and assembles detected table structures from its visible sheets.
+        
+        Parameters:
+        	payload (BaseModel): Execution settings containing the workbook name, hash, sheet names, and detector configuration.
+        
+        Returns:
+        	Dict[str, Any]: A mapping containing the workbook filename, verified hash, and assembled table outputs.
+        """
         settings = cast(LunaVlmStructureDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(settings.file_name)
@@ -430,6 +439,15 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
             import concurrent.futures
 
             def _call_vlm(ctx: Dict[str, Any]) -> Tuple[Dict[str, Any], List[LocalVlmTableDecisionDTO]]:
+                """
+                Analyze a prepared worksheet with the vision-language model.
+                
+                Parameters:
+                    ctx (Dict[str, Any]): Prepared worksheet context, including the sheet name, bounds, typed cell path, layout, visibility, and cell metadata.
+                
+                Returns:
+                    Tuple[Dict[str, Any], List[LocalVlmTableDecisionDTO]]: The original worksheet context and the detected table decisions.
+                """
                 print(f"[Luna VLM] 시트 '{ctx['sheet_name']}' OpenAI VLM 호출 시작...", flush=True)
                 decisions = self._analyze_sheet(
                     settings,

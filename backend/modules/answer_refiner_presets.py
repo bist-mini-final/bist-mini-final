@@ -67,6 +67,13 @@ Based on the direct cell evidence above, provide your refined response in the fo
 
 
 def answer_refiner_config_presets() -> List[Dict[str, Any]]:
+    """
+    Provide configuration presets for spreadsheet-cell answer refinement.
+    
+    Returns:
+        List[Dict[str, Any]]: Configuration dictionaries for default and strict
+        cell-verification refinement modes.
+    """
     return [
         {
             "id": "luna_cell_refiner",

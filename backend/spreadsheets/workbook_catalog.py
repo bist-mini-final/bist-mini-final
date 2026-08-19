@@ -66,6 +66,15 @@ class WorkbookCatalog:
 
     @staticmethod
     def sheet_names(path: Path) -> List[str]:
+        """
+        Return the titles of visible worksheets with nonzero dimensions.
+        
+        Parameters:
+        	path (Path): Path to the workbook to inspect.
+        
+        Returns:
+        	List[str]: Worksheet titles that are visible, do not use a skipped prefix, and contain rows and columns.
+        """
         workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
         try:
             sheet_names: List[str] = []

@@ -120,7 +120,21 @@ class PgVectorStore:
         vectors: Optional[Any] = None,
         progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     ) -> None:
-        """Add standardized LangChain Document objects to pgvector."""
+        """
+        Add documents to a pgvector collection, replacing any existing collection with the same identifier.
+        
+        Parameters:
+            index_id (str): Identifier of the collection to replace.
+            documents (List[Document]): Documents to store.
+            model_name (str): Embedding model name used when embeddings are generated.
+            embedding_encoder (Optional[EmbeddingEncoder]): Encoder used to generate embeddings.
+            metadata (Optional[Dict[str, Any]]): Collection metadata.
+            vectors (Optional[Any]): Precomputed vectors corresponding to every document.
+            progress_callback (Optional[Callable[[Dict[str, int]], None]]): Callback receiving batch and item progress.
+        
+        Raises:
+            PgVectorStoreError: If document insertion fails.
+        """
         if not documents:
             return
 
@@ -257,7 +271,14 @@ class PgVectorStore:
         vectors: Any = None,
         progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     ) -> None:
-        """Backwards-compatible put: converts cell items to LangChain documents and inserts."""
+        """
+        Insert spreadsheet cell items into a vector collection.
+        
+        Parameters:
+            vectors_or_items (Any): Cell items or precomputed vectors to use when inserting documents.
+            metadata (Optional[Dict[str, Any]]): Collection and workbook metadata, including the cell items.
+            progress_callback (Optional[Callable[[Dict[str, int]], None]]): Callback receiving insertion progress updates.
+        """
         meta_dict = metadata or {}
         raw_items = meta_dict.get("items") or []
         model_name = meta_dict.get("model", "text-embedding-3-large")
@@ -620,7 +641,17 @@ class PgVectorStore:
         embedding: List[float],
         k: int = 10,
     ) -> List[Tuple[Any, float]]:
-        """Perform vector similarity search on PostgreSQL pgvector with cosine operator (<=>)."""
+        """
+        Perform vector similarity search within a pgvector collection.
+        
+        Parameters:
+            collection_name (str): Name of the collection to search.
+            embedding (List[float]): Query embedding vector.
+            k (int): Maximum number of results to retrieve.
+        
+        Returns:
+            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection is unavailable or the search fails.
+        """
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
@@ -681,7 +712,18 @@ class PgVectorStore:
         collection_name: Optional[str] = None,
         limit: int = 50,
     ) -> List[Dict[str, Any]]:
-        """Directly fetch cell documents and metadata from langchain_pg_embedding by exact cell_id, cell_coord, or coordinate patterns."""
+        """
+        Fetch cell documents matching the provided identifiers, optionally filtered by workbook or collection.
+        
+        Parameters:
+            cell_identifiers (List[str]): Cell IDs, coordinates, or strings containing coordinate-like values.
+            workbook_hash (Optional[str]): Restricts results to a workbook with this hash.
+            collection_name (Optional[str]): Restricts results to this collection.
+            limit (int): Maximum number of matching cells to return.
+        
+        Returns:
+            List[Dict[str, Any]]: Normalized cell records containing identifiers, values, headers, source text, and company metadata. Returns an empty list when the input is empty or retrieval fails.
+        """
         if not cell_identifiers:
             return []
 

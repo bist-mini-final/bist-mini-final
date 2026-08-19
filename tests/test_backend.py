@@ -107,6 +107,18 @@ class BlockingModuleWorker:
         execution_id,
         progress_callback=None,
     ):
+        """Waits for termination of the test worker, then raises a cancellation error.
+        
+        Parameters:
+            module_type: The module type being executed.
+            input_payload: The module's input data.
+            config: The module configuration.
+            execution_id: Identifier for the current execution.
+            progress_callback: Optional callback for reporting progress.
+        
+        Raises:
+            ModuleWorkerCancelled: Always raised after the worker is terminated or the wait times out.
+        """
         self.execution_id = execution_id
         self.started.set()
         self.terminated.wait(timeout=5)
@@ -404,6 +416,16 @@ class PgVectorStoreBatchingTests(unittest.TestCase):
 class ModularRagArchitectureTests(unittest.TestCase):
     def test_rrf_fuses_ranks_within_the_same_subquery(self) -> None:
         def candidate(rank, cell_id, subquery):
+            """Create a ranked candidate record for a matched cell and subquery.
+            
+            Parameters:
+            	rank (int): The candidate's ranking position.
+            	cell_id: The identifier of the matched cell.
+            	subquery: The subquery associated with the match.
+            
+            Returns:
+            	dict: A candidate record containing the rank, reciprocal-rank score, cell text, and matched subquery.
+            """
             return {
                 "rank": rank,
                 "cell_id": cell_id,

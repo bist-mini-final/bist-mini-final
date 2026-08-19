@@ -20,7 +20,17 @@ def get_processed_file_info(
     workbook_hash: Optional[str] = None,
     associated_index_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Build metadata for one source file without scanning the source directory."""
+    """
+    Build metadata for a single processed source file.
+    
+    Parameters:
+    	path (Path): File whose metadata should be collected.
+    	workbook_hash (Optional[str]): Existing hash to use instead of calculating one.
+    	associated_index_ids (Optional[List[str]]): Vector index IDs associated with the file.
+    
+    Returns:
+    	Dict[str, Any]: File name, size, UTC modification time, file type, sheet names, hash, and associated index IDs.
+    """
 
     stat = path.stat()
     suffix = path.suffix.lower()
@@ -72,7 +82,15 @@ def list_processed_files(
     processed_dir: Path = PROCESSED_DATA_DIR,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> List[Dict[str, Any]]:
-    """List source files with workbook metadata and associated pgvector indexes."""
+    """List processed source files with metadata and associated vector index identifiers.
+    
+    Parameters:
+    	processed_dir (Path): Directory containing processed files.
+    	pgvector_store (Optional[PgVectorStore]): Store used to retrieve vector index metadata.
+    
+    Returns:
+    	List[Dict[str, Any]]: Metadata for each eligible file, or an empty list when the directory does not exist.
+    """
 
     if not processed_dir.exists():
         return []
@@ -110,7 +128,22 @@ def preview_excel_sheet(
     max_cols: int = 15,
     processed_dir: Path = PROCESSED_DATA_DIR,
 ) -> Dict[str, Any]:
-    """Read a bounded preview from one visible workbook sheet."""
+    """
+    Read a bounded preview from a workbook sheet.
+    
+    Parameters:
+        file_name (str): Name of the workbook to preview.
+        sheet_name (Optional[str]): Sheet to preview; the first available sheet is used when omitted.
+        max_rows (int): Maximum number of rows to include.
+        max_cols (int): Maximum number of columns per row to include.
+        processed_dir (Path): Directory containing the workbook.
+    
+    Returns:
+        Dict[str, Any]: Preview metadata, including the selected sheet, available sheets, and cell values.
+    
+    Raises:
+        ModuleExecutionError: If the requested sheet does not exist.
+    """
 
     catalog = WorkbookCatalog(processed_dir)
     path = catalog.resolve(file_name)
@@ -165,7 +198,19 @@ def get_vector_index_detail(
     sample_items_count: int = 15,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> Dict[str, Any]:
-    """Return pgvector collection metadata and sample cell documents."""
+    """
+    Retrieve metadata and sample cell documents for a vector index.
+    
+    Parameters:
+        index_id (str): Identifier of the vector index.
+        sample_items_count (int): Maximum number of sample documents to include.
+    
+    Returns:
+        Dict[str, Any]: Vector index metadata and sample documents.
+    
+    Raises:
+        ModuleExecutionError: If the pgvector database is unavailable.
+    """
 
     store = pgvector_store or PgVectorStore()
     if not store.is_connected():
@@ -180,7 +225,15 @@ def delete_vector_index(
     index_id: str,
     pgvector_store: Optional[PgVectorStore] = None,
 ) -> bool:
-    """Delete one pgvector collection."""
+    """
+    Delete a pgvector collection.
+    
+    Parameters:
+    	index_id (str): Identifier of the collection to delete.
+    
+    Returns:
+    	bool: The deletion result.
+    """
 
     store = pgvector_store or PgVectorStore()
     if not store.is_connected():
@@ -195,7 +248,17 @@ def search_vector_index(
     pgvector_store: Optional[PgVectorStore] = None,
     embedding_encoder: Optional[EmbeddingEncoder] = None,
 ) -> List[Dict[str, Any]]:
-    """Run similarity search against one pgvector collection."""
+    """
+    Search a vector index for documents similar to the provided query.
+    
+    Parameters:
+    	index_id (str): Identifier of the vector index to search.
+    	query_text (str): Text used to find similar documents.
+    	limit (int): Maximum number of results to return.
+    
+    Returns:
+    	List[Dict[str, Any]]: Search results containing similarity scores and document metadata.
+    """
 
     store = pgvector_store or PgVectorStore()
     if not store.is_connected():

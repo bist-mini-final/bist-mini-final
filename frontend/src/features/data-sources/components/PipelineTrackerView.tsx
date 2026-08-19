@@ -33,6 +33,17 @@ interface TrackerProps {
   isDeleting?: boolean;
 }
 
+/**
+ * Displays live pipeline progress, module details, execution metrics, and available pipeline controls.
+ *
+ * @param pipeline - The pipeline run state to monitor.
+ * @param onBack - Navigates back to the data source list.
+ * @param onResume - Resumes a paused or failed pipeline from its current point.
+ * @param onCancel - Stops a running or queued pipeline.
+ * @param onDelete - Deletes the pipeline run and its generated partial data.
+ * @param isCancelling - Indicates that pipeline cancellation is in progress.
+ * @param isDeleting - Indicates that pipeline deletion is in progress.
+ */
 export function PipelineTrackerView({
   pipeline,
   onBack,

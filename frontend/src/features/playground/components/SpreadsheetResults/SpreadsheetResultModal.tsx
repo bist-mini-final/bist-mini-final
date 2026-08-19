@@ -169,6 +169,14 @@ type InspectorBodyStyle = CSSProperties & {
   '--spreadsheet-sidebar-width': string;
 };
 
+/**
+ * Displays spreadsheet structure detection results in an interactive modal inspector.
+ *
+ * @param kind - The inspection mode used to determine displayed metadata and overlays
+ * @param input - The source data for the spreadsheet inspection
+ * @param output - The inspection results to display
+ * @param onClose - Callback invoked when the modal is closed
+ */
 export function SpreadsheetResultModal({
   kind,
   input,

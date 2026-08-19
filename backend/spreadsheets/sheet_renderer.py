@@ -40,7 +40,16 @@ INDEXED_COLORS = [
 
 
 def _rgb_color(color: Any, default: str) -> str:
-    """Resolve an OpenPyXL Color object (RGB, Theme, Indexed) to a hex string (#RRGGBB)."""
+    """
+    Resolve an OpenPyXL color to a hexadecimal RGB string.
+    
+    Parameters:
+        color (Any): Color value represented as an OpenPyXL color object or RGB string.
+        default (str): Fallback color returned when the value cannot be resolved.
+    
+    Returns:
+        str: Color in `#RRGGBB` format, or the specified default.
+    """
     if color is None:
         return default
 
@@ -81,7 +90,15 @@ def _rgb_color(color: Any, default: str) -> str:
 
 
 def _cell_fill(cell: Any) -> str:
-    """Extract cell background fill color, handling solid fills, tints, and themes."""
+    """
+    Extracts the cell's background color from its fill definition.
+    
+    Parameters:
+    	cell (Any): Cell whose background fill color is resolved.
+    
+    Returns:
+    	str: The resolved hexadecimal background color, defaulting to white.
+    """
     fill = getattr(cell, "fill", None)
     if fill is None or getattr(fill, "fill_type", None) in (None, "none"):
         return "#FFFFFF"
@@ -102,7 +119,15 @@ def _cell_fill(cell: Any) -> str:
 
 
 def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
-    """Format cell value according to its Excel number_format, returning (text, font_color)."""
+    """
+    Format a cell's value according to its Excel number format and determine its font color.
+    
+    Parameters:
+        cell (Any): Cell whose value, number format, font color, and fill are inspected.
+    
+    Returns:
+        Tuple[str, str]: Formatted cell text and its hexadecimal font color.
+    """
     value = cell.value
     default_font_color = _rgb_color(getattr(cell.font, "color", None), "#111827")
     if default_font_color == "#FFFFFF":
@@ -163,7 +188,17 @@ def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
 
 
 def _font(size: int, bold: bool, italic: bool = False) -> ImageFont.ImageFont:
-    """Load matching system font for Excel typography."""
+    """
+    Select a font matching the requested size and text styles.
+    
+    Parameters:
+        size (int): Font size to load.
+        bold (bool): Whether to use bold styling.
+        italic (bool): Whether to use italic styling.
+    
+    Returns:
+        ImageFont.ImageFont: The matching system font, or PIL's default font when no candidate is available.
+    """
     style_candidates = {
         (False, False): (
             "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -256,6 +291,16 @@ def _fit_text(
     max_width: float,
     max_height: float,
 ) -> Tuple[str, ImageFont.ImageFont, int, int]:
+    """
+    Finds the largest font size that allows text to fit within the specified dimensions.
+    
+    Parameters:
+        max_width (float): Maximum allowed text width.
+        max_height (float): Maximum allowed text height.
+    
+    Returns:
+        Tuple[str, ImageFont.ImageFont, int, int]: The wrapped text, selected font, and rendered width and height.
+    """
     for candidate_size in range(font_size, 5, -1):
         font = _font(candidate_size, bold, italic)
         wrapped = _wrap_text(draw, text, font, max_width)
@@ -276,7 +321,15 @@ def _draw_border_line(
     color: str,
     side: str,  # 'top', 'bottom', 'left', 'right'
 ) -> None:
-    """Draw realistic Excel borders including double, medium, thick, thin, and dashed lines."""
+    """
+    Draws a worksheet border along a line segment using the specified style and color.
+    
+    Parameters:
+        style (Optional[str]): Border style, such as ``double``, ``medium``, ``thick``,
+            ``dashed``, ``dotted``, or ``hair``.
+        side (str): Position of the border on the cell: ``top``, ``bottom``, ``left``,
+            or ``right``.
+    """
     if not style or style in ("none", ""):
         return
 
@@ -305,6 +358,15 @@ def _draw_border_line(
 
 
 def _merge_map(worksheet: Any) -> Dict[Tuple[int, int], Optional[Tuple[int, int]]]:
+    """
+    Map each cell in merged ranges to its bottom-right boundary.
+    
+    Parameters:
+    	worksheet (Any): Worksheet containing the merged cell ranges.
+    
+    Returns:
+    	Dict[Tuple[int, int], Optional[Tuple[int, int]]]: Mapping from cell coordinates to the merged range's bottom-right coordinate for anchor cells, or `None` for other cells.
+    """
     merged: Dict[Tuple[int, int], Optional[Tuple[int, int]]] = {}
     for cell_range in worksheet.merged_cells.ranges:
         for row in range(cell_range.min_row, cell_range.max_row + 1):
@@ -327,6 +389,18 @@ class ExcelSheetRenderer:
         max_rows: int,
         max_columns: int,
     ) -> SheetLayout:
+        """
+        Render a worksheet as a PNG image.
+        
+        Parameters:
+            worksheet (Any): Worksheet to render.
+            output_path (Path): Destination path for the PNG image.
+            max_rows (int): Maximum number of rows to include.
+            max_columns (int): Maximum number of columns to include.
+        
+        Returns:
+            SheetLayout: Computed layout of the rendered worksheet.
+        """
         layout = compute_sheet_layout(worksheet, max_rows, max_columns)
 
         # Check if Excel gridlines should be shown

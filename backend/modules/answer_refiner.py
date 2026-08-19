@@ -52,7 +52,15 @@ def _num_to_col(num: int) -> str:
 
 
 def _split_cell_coord(coord: str) -> Optional[Tuple[str, int]]:
-    """Parse coordinate like 'O50' into ('O', 50)."""
+    """
+    Parse a spreadsheet cell coordinate into its column label and row number.
+    
+    Parameters:
+        coord (str): Cell coordinate, such as ``"O50"``.
+    
+    Returns:
+        Optional[Tuple[str, int]]: An uppercase column label and row number, or ``None`` for an invalid coordinate.
+    """
     match = re.match(r"^([A-Za-z]+)(\d+)$", coord.strip())
     if match:
         return match.group(1).upper(), int(match.group(2))
@@ -167,11 +175,21 @@ class AnswerRefinerModule(ExecutableModule):
         completion_client: Optional[ChatCompletionClient] = None,
         pgvector_store: Optional[PgVectorStore] = None,
     ) -> None:
+        """Initialize the answer refiner with optional completion and vector-store dependencies."""
         self.completion_client = completion_client
         self.pgvector_store = pgvector_store or PgVectorStore()
 
     def _expand_spatial_neighbors(self, coord: str, radius: int) -> List[str]:
-        """Expand a cell coordinate like 'O50' to adjacent columns (e.g. 'N50', 'P50', 'Q50', 'R50')."""
+        """
+        Expand a valid cell coordinate to neighboring columns within the specified radius.
+        
+        Parameters:
+        	coord (str): Cell coordinate to expand.
+        	radius (int): Number of columns to include on each side.
+        
+        Returns:
+        	List[str]: The original coordinate followed by right- and left-side neighboring coordinates. Invalid coordinates or non-positive radii return the uppercased original coordinate.
+        """
         parsed = _split_cell_coord(coord)
         if not parsed or radius <= 0:
             return [coord.upper()]
@@ -198,7 +216,18 @@ class AnswerRefinerModule(ExecutableModule):
         explicit_cell_ids: Optional[List[str]] = None,
         spatial_radius: int = 3,
     ) -> List[str]:
-        """Extract candidate cell identifiers and expand spatial timeline neighbors."""
+        """
+        Extracts cell references from the question and initial answer, then adds nearby horizontal cell coordinates.
+        
+        Parameters:
+        	question (str): The question text to scan for cell references.
+        	initial_answer (str): The initial answer text to scan for cell references.
+        	explicit_cell_ids (Optional[List[str]]): Cell identifiers to include in the candidate set.
+        	spatial_radius (int): Number of neighboring columns to include around each candidate cell.
+        
+        Returns:
+        	List[str]: Unique cell identifiers found or generated from the supplied text and explicit identifiers.
+        """
         base_candidates: List[str] = list(explicit_cell_ids or [])
 
         # Heuristic 1: Regex matches for cell patterns like 'IS Cell O50', 'O50', 'Income_Statement!E16'
@@ -227,6 +256,18 @@ class AnswerRefinerModule(ExecutableModule):
         return final_candidates
 
     def execute(self, payload: Any) -> Dict[str, Any]:
+        """
+        Refine an initial Reader answer using matching spreadsheet cell metadata and optional language-model processing.
+        
+        Parameters:
+            payload (Any): Answer-refinement input containing the initial answer, configuration, and optional target cell identifiers.
+        
+        Returns:
+            Dict[str, Any]: JSON-serializable refined answer data, including direct cells, refinement details, usage, latency, and estimated cost.
+        
+        Raises:
+            ModuleExecutionError: If the language-model refinement request fails.
+        """
         started_at = time.perf_counter()
         if isinstance(payload, AnswerRefinerExecutionDTO):
             parsed = payload

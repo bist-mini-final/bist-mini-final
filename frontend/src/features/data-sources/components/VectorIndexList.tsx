@@ -51,6 +51,16 @@ function formatDate(iso: string): string {
   }
 }
 
+/**
+ * Renders the pgvector collection list with indexing progress, failed runs, and collection actions.
+ *
+ * @param indexes - The available vector indexes to display
+ * @param isLoading - Whether index data is loading
+ * @param failedRuns - Pipeline runs that failed or were interrupted
+ * @param activeRunningPipeline - The currently queued, running, or paused pipeline
+ * @param onRefresh - Callback to refresh the collection list
+ * @param onCreateClick - Callback to start a new indexing operation
+ */
 export function VectorIndexList({
   indexes,
   isLoading,

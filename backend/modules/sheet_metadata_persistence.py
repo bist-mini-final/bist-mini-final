@@ -69,10 +69,30 @@ class SheetMetadataPersistenceModule(ExecutableModule):
         catalog: WorkbookCatalog | None = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
     ) -> None:
+        """Initialize the module with an optional database manager and workbook catalog.
+        
+        Parameters:
+            db_manager (Any): Database manager used for persistence.
+            catalog (WorkbookCatalog | None): Workbook catalog to use. A catalog for
+                `processed_dir` is created when omitted.
+            processed_dir (Path): Directory containing processed workbook data.
+        """
         self._db_manager = db_manager
         self.catalog = catalog or WorkbookCatalog(processed_dir)
 
     def execute(self, payload: SheetMetadataPersistenceInputDTO) -> Dict[str, Any]:
+        """
+        Persist workbook sheet metadata and detected tables for the selected visible sheets.
+        
+        Parameters:
+            payload (SheetMetadataPersistenceInputDTO): Workbook structure and index data used to identify and describe the sheets.
+        
+        Returns:
+            Dict[str, Any]: The number of saved sheets and per-sheet summaries containing dimensions and detected-table counts.
+        
+        Raises:
+            ModuleExecutionError: If workbook inputs reference different workbooks, the database is unavailable, workbook metadata cannot be loaded, or persistence fails.
+        """
         from ..storage.db_manager import DatabaseManager
 
         structure = payload.structure_input

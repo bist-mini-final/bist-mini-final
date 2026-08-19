@@ -99,19 +99,34 @@ class ExecutableModule(ABC):
         self,
         callback: Optional[Callable[[Dict[str, Any]], None]],
     ) -> None:
-        """Attach a run-scoped progress sink without coupling modules to workflows."""
+        """
+        Attach or clear the callback used to receive progress updates for the current run.
+        
+        Parameters:
+        	callback (Optional[Callable[[Dict[str, Any]], None]]): Callback that receives progress mappings, or `None` to disable progress updates.
+        """
 
         self._progress_callback = callback
 
     def report_progress(self, progress: Mapping[str, Any]) -> None:
-        """Publish JSON-compatible progress when the current executor supports it."""
+        """
+        Publish progress information to the registered execution callback, when available.
+        
+        Parameters:
+            progress (Mapping[str, Any]): Progress data to publish.
+        """
 
         callback = getattr(self, "_progress_callback", None)
         if callback is not None:
             callback(dict(progress))
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """Validate DTO boundaries and materialize the execution request DTO."""
+        """
+        Validate a module subclass's DTO declarations and prepare its execution request model.
+        
+        Raises:
+        	TypeError: If the subclass defines incompatible, incomplete, or inconsistent DTO declarations.
+        """
 
         super().__init_subclass__(**kwargs)
         definition = cls.__dict__.get("definition")

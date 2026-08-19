@@ -58,6 +58,16 @@ logger = logging.getLogger(__name__)
 
 
 def _public_error(value: Optional[str], limit: int = 2000) -> Optional[str]:
+    """
+    Sanitizes an error message for public responses.
+    
+    Parameters:
+        value (Optional[str]): The error message to sanitize.
+        limit (int): Maximum length of the returned message.
+    
+    Returns:
+        Optional[str]: The sanitized message, or `None` when `value` is `None`.
+    """
     if value is None:
         return None
     message = value
@@ -69,6 +79,14 @@ def _public_error(value: Optional[str], limit: int = 2000) -> Optional[str]:
 
 
 def _sha256_file(path: Path) -> str:
+    """Compute the SHA-256 digest of a file.
+    
+    Parameters:
+        path (Path): Path to the file to hash.
+    
+    Returns:
+        str: The file's SHA-256 digest in hexadecimal form.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
@@ -132,21 +150,26 @@ def create_data_source_router(
     workflow_dispatcher: Optional[WorkflowRunDispatcher] = None,
 ) -> APIRouter:
     """
-    Create the data-source API router and initialize its storage dependencies.
+    Create the data-source API router and configure its file, vector-index, database, and ingestion workflow dependencies.
     
     Parameters:
         processed_dir (Path): Directory containing uploaded source files.
-        vector_index_dir (Path): Directory containing local vector indexes.
+        vector_index_dir (Path): Directory used for vector-index artifacts.
         embedding_artifact_dir (Path): Directory containing embedding artifacts.
         spreadsheet_artifact_dir (Path): Directory containing spreadsheet artifacts.
-        workflow_dir (Path): Directory containing canonical workflow documents.
+        workflow_dir (Path): Directory containing workflow definitions.
         run_dir (Path): Directory for persisted workflow runs.
-        cache_dir (Path): Directory for reusable workflow node results.
+        cache_dir (Path): Directory for cached workflow results.
         embedding_encoder (Optional[EmbeddingEncoder]): Encoder used for embedding operations.
         pgvector_store (Optional[PgVectorStore]): Existing pgvector store to use.
+        module_registry (Optional[ModuleRegistry]): Existing module registry to use.
+        workflow_store (Optional[WorkflowStore]): Existing workflow store to use.
+        run_store (Optional[RunStore]): Existing workflow run store to use.
+        workflow_executor (Optional[WorkflowExecutor]): Existing workflow executor to use.
+        workflow_dispatcher (Optional[WorkflowRunDispatcher]): Existing workflow dispatcher to use.
     
     Returns:
-        APIRouter: Router exposing file, ingestion, vector-index, and database endpoints.
+        APIRouter: Router exposing data-source, vector-index, database, and ingestion-job endpoints.
     """
     router = APIRouter(prefix="/data-sources", tags=["Data Sources"])
 
@@ -180,11 +203,33 @@ def create_data_source_router(
     db_manager = registry.db_manager
 
     def _workflow_id_for(request: IngestRequestDTO) -> str:
+        """Selects the pgvector ingestion workflow for the requested structure mode.
+        
+        Parameters:
+        	request (IngestRequestDTO): Ingestion request containing the structure mode.
+        
+        Returns:
+        	str: The exhaustive pgvector workflow identifier for exhaustive mode; otherwise, the standard pgvector workflow identifier.
+        """
         if request.structure_mode == "exhaustive":
             return "indexing_pgvector_exhaustive"
         return "indexing_pgvector"
 
     def _create_ingestion_run(request: IngestRequestDTO) -> WorkflowRun:
+        """
+        Create a cached workflow run for the requested ingestion operation.
+        
+        Parameters:
+            request (IngestRequestDTO): Ingestion settings, including the source file,
+                optional sheets, embedding model, serialization mode, and batch size.
+        
+        Returns:
+            WorkflowRun: The newly created ingestion workflow run.
+        
+        Raises:
+            DagExecutionError: If the workflow lacks a processed file selector or
+                pgvector index writer.
+        """
         workflow = workflow_store.load(_workflow_id_for(request))
         runtime_inputs: Dict[str, Dict[str, Any]] = {}
         config_overrides: Dict[str, Dict[str, Any]] = {}
@@ -230,6 +275,16 @@ def create_data_source_router(
         )
 
     def _node_output(run: WorkflowRun, module_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Finds the dictionary output produced by the first node of the specified module type.
+        
+        Parameters:
+        	run (WorkflowRun): The workflow run containing the node outputs.
+        	module_type (str): The module type to locate.
+        
+        Returns:
+        	Optional[Dict[str, Any]]: The matching node's dictionary output, or `None` if no matching dictionary output exists.
+        """
         for node in run.graph.nodes:
             if node.module_type != module_type:
                 continue
@@ -239,6 +294,15 @@ def create_data_source_router(
         return None
 
     def _target_index_id(run: WorkflowRun) -> Optional[str]:
+        """
+        Determine the vector index identifier associated with a workflow run.
+        
+        Parameters:
+        	run (WorkflowRun): The ingestion workflow run to inspect.
+        
+        Returns:
+        	Optional[str]: The target vector index identifier, or `None` when no identifier is available.
+        """
         writer_output = _node_output(run, "pgvector_index_writer") or {}
         if isinstance(writer_output.get("index_id"), str):
             return writer_output["index_id"]
@@ -265,6 +329,16 @@ def create_data_source_router(
         *,
         include_index: bool = True,
     ) -> Dict[str, Any]:
+        """
+        Build a sanitized public representation of an ingestion workflow run.
+        
+        Parameters:
+            run (WorkflowRun): Workflow run to represent.
+            include_index (bool): Whether to include details produced by the vector index writer.
+        
+        Returns:
+            Dict[str, Any]: Job payload containing run status, sanitized node state, structure output, index details when requested, target index identifier, error information, and worker activity.
+        """
         selector_output = _node_output(run, "processed_file_selector") or {}
         structure_output = _node_output(run, "luna_vlm_structure_detector")
         luna_output = None
@@ -326,6 +400,18 @@ def create_data_source_router(
         }
 
     def _load_ingestion_run(run_id: str) -> WorkflowRun:
+        """
+        Load an ingestion workflow run by its identifier.
+        
+        Parameters:
+        	run_id (str): Identifier of the workflow run.
+        
+        Returns:
+        	WorkflowRun: The matching ingestion workflow run.
+        
+        Raises:
+        	FileNotFoundError: If the run does not exist or belongs to a different workflow.
+        """
         run = run_store.load(run_id)
         if run.workflow_id not in INGESTION_WORKFLOW_IDS:
             raise FileNotFoundError(run_id)
@@ -334,6 +420,15 @@ def create_data_source_router(
     def _list_ingestion_runs(
         file_name: Optional[str] = None,
     ) -> List[WorkflowRun]:
+        """
+        List ingestion workflow runs, optionally filtered by source file name.
+        
+        Parameters:
+            file_name (Optional[str]): Source file name used to filter runs. Directory components are ignored.
+        
+        Returns:
+            List[WorkflowRun]: Ingestion runs sorted by most recently updated.
+        """
         runs = [
             run
             for run in run_store.list()
@@ -399,7 +494,17 @@ def create_data_source_router(
         model: str = Query(default="text-embedding-3-large", description="임베딩 모델"),
         batch_size: int = Query(default=2048, ge=1, le=2048, description="임베딩 배치 크기"),
     ) -> Dict[str, Any]:
-        """Upload a new raw file to data/processed/ and optionally trigger auto-ingest."""
+        """
+        Upload a file to processed storage and optionally submit an Excel file for ingestion.
+        
+        Parameters:
+            auto_ingest (bool): Whether to automatically submit supported Excel files for ingestion.
+            model (str): Embedding model used for automatic ingestion.
+            batch_size (int): Number of items processed per embedding batch.
+        
+        Returns:
+            Dict[str, Any]: Upload status, file metadata, optional ingestion job details, and any ingestion error.
+        """
         if not file.filename:
             raise HTTPException(status_code=400, detail="유효한 파일명이 필요합니다")
 
@@ -494,10 +599,10 @@ def create_data_source_router(
         Download a processed file as an attachment.
         
         Parameters:
-            filename (str): Name of the file to download.
+            filename (str): Name of the processed file to download.
         
         Returns:
-            Response: File contents with an attachment disposition.
+            FileResponse: The requested file with an attachment disposition.
         
         Raises:
             HTTPException: If the requested file does not exist.
@@ -520,7 +625,16 @@ def create_data_source_router(
         filename: str,
         cascade_indexes: bool = Query(default=True, description="연관된 벡터 인덱스도 함께 삭제(고아 벡터 방지)"),
     ) -> Dict[str, Any]:
-        """Delete a raw file from data/processed/ with logical cascade to vector DB."""
+        """
+        Delete a processed source file and optionally remove its associated vector indexes.
+        
+        Parameters:
+            filename (str): Name of the processed file to delete.
+            cascade_indexes (bool): Whether to delete vector indexes associated with the file.
+        
+        Returns:
+            Dict[str, Any]: Deletion status, sanitized filename, and count of removed vector indexes.
+        """
         safe_filename = Path(filename).name
         target_path = processed_dir / safe_filename
 
@@ -582,7 +696,15 @@ def create_data_source_router(
     # 7. Delete vector index
     @router.delete("/indexes/{index_id}")
     def remove_index(index_id: str) -> Dict[str, Any]:
-        """Delete a vector index from storage."""
+        """
+        Delete a vector index from storage.
+        
+        Returns:
+        	dict[str, Any]: A success status and the deleted index identifier.
+        
+        Raises:
+        	HTTPException: With status 404 if the index does not exist, or 500 if deletion fails.
+        """
         try:
             deleted = delete_vector_index(index_id, pg_store)
             if not deleted:
@@ -596,7 +718,18 @@ def create_data_source_router(
     # 8. Test similarity search
     @router.post("/indexes/{index_id}/search")
     def test_search(index_id: str, request: SearchRequestDTO) -> Dict[str, Any]:
-        """Run similarity search test on a vector index."""
+        """
+        Perform a similarity search against a vector index.
+        
+        Parameters:
+            request (SearchRequestDTO): Search query and result limit.
+        
+        Returns:
+            Dict[str, Any]: Search response containing the index ID, query, matching results, and result count.
+        
+        Raises:
+            HTTPException: If the search fails.
+        """
         try:
             hits = search_vector_index(
                 index_id,
@@ -620,6 +753,16 @@ def create_data_source_router(
         file_name: Optional[str] = Query(default=None),
         limit: int = Query(default=20, ge=1, le=100),
     ) -> Dict[str, Any]:
+        """
+        List persisted ingestion jobs, optionally filtered by source filename.
+        
+        Parameters:
+            file_name (Optional[str]): Source filename used to filter jobs.
+            limit (int): Maximum number of jobs to include.
+        
+        Returns:
+            Dict[str, Any]: A mapping containing the selected jobs and the total number of matching jobs.
+        """
         candidates = _list_ingestion_runs(file_name)
         selected = candidates[:limit]
         return {
@@ -632,6 +775,18 @@ def create_data_source_router(
 
     @router.post("/ingestion-jobs", status_code=202)
     def create_ingestion_job(request: IngestRequestDTO) -> Dict[str, Any]:
+        """
+        Create and submit a persistent ingestion job for the requested source file.
+        
+        Parameters:
+            request (IngestRequestDTO): Ingestion configuration and source file details.
+        
+        Returns:
+            Dict[str, Any]: Public representation of the submitted ingestion job.
+        
+        Raises:
+            HTTPException: If the ingestion workflow is missing or the request is invalid.
+        """
         try:
             run = _create_ingestion_run(request)
             workflow_dispatcher.submit(run.id)
@@ -646,6 +801,18 @@ def create_data_source_router(
 
     @router.get("/ingestion-jobs/{run_id}")
     def get_ingestion_job(run_id: str) -> Dict[str, Any]:
+        """
+        Retrieve the public status and details of an ingestion job.
+        
+        Parameters:
+            run_id (str): Identifier of the ingestion job.
+        
+        Returns:
+            Dict[str, Any]: Sanitized job status, metadata, execution state, and results.
+        
+        Raises:
+            HTTPException: With status 404 if the job does not exist, or 422 if the job is invalid.
+        """
         try:
             _load_ingestion_run(run_id)
             workflow_dispatcher.ensure_submitted(run_id)
@@ -660,6 +827,18 @@ def create_data_source_router(
 
     @router.get("/ingestion-jobs/by-index/{index_id}")
     def get_ingestion_job_by_index(index_id: str) -> Dict[str, Any]:
+        """
+        Finds the ingestion job that produced the specified index.
+        
+        Parameters:
+            index_id (str): Identifier of the pgvector index.
+        
+        Returns:
+            Dict[str, Any]: Public representation of the matching ingestion job.
+        
+        Raises:
+            HTTPException: If no ingestion job produced the specified index.
+        """
         for summary in _list_ingestion_runs():
             writer_output = _node_output(summary, "pgvector_index_writer")
             if writer_output and writer_output.get("index_id") == index_id:
@@ -671,6 +850,18 @@ def create_data_source_router(
 
     @router.post("/ingestion-jobs/{run_id}/resume", status_code=202)
     def resume_ingestion_job(run_id: str) -> Dict[str, Any]:
+        """
+        Resume an ingestion job according to its current state.
+        
+        Parameters:
+            run_id (str): Identifier of the ingestion job to resume.
+        
+        Returns:
+            Dict[str, Any]: Updated public representation of the ingestion job.
+        
+        Raises:
+            HTTPException: With status code 404 if the ingestion job does not exist.
+        """
         try:
             run = _load_ingestion_run(run_id)
             if run.status == "failed":
@@ -686,6 +877,18 @@ def create_data_source_router(
 
     @router.post("/ingestion-jobs/{run_id}/cancel")
     def cancel_ingestion_job(run_id: str) -> Dict[str, Any]:
+        """
+        Cancel an ingestion job and return its updated state.
+        
+        Parameters:
+            run_id (str): Identifier of the ingestion job to cancel.
+        
+        Returns:
+            Dict[str, Any]: The updated public job representation.
+        
+        Raises:
+            HTTPException: If the ingestion job does not exist.
+        """
         try:
             _load_ingestion_run(run_id)
             workflow_dispatcher.cancel(run_id)
@@ -698,7 +901,16 @@ def create_data_source_router(
 
     @router.delete("/ingestion-jobs/{run_id}")
     def delete_ingestion_job(run_id: str) -> Dict[str, Any]:
-        """Stop and remove one run plus any collection created by that run."""
+        """
+        Stop and remove an ingestion job and delete its associated vector index when present.
+        
+        Parameters:
+            run_id (str): Identifier of the ingestion job to remove.
+        
+        Returns:
+            Dict[str, Any]: Deletion status, job identifier, target index identifier,
+                index deletion status, and confirmation that the source file was preserved.
+        """
 
         try:
             run = _load_ingestion_run(run_id)

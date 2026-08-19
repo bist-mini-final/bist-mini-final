@@ -55,6 +55,17 @@ class PgVectorIndexWriterModule(ExecutableModule):
         self.embedding_encoder = embedding_encoder
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Persist cell embeddings and workbook metadata in a PostgreSQL pgvector index.
+        
+        Parameters:
+            payload (BaseModel): Input containing the embedding artifact, workbook metadata,
+                embedding configuration, and source items.
+        
+        Returns:
+            Dict[str, Any]: Metadata for the created index, including its identifier,
+                workbook, model, embedding dimension, and document count.
+        """
         input_data = cast(PgVectorIndexWriterInputDTO, payload)
         vectors = self.artifact_store.get(
             input_data.artifact_id,

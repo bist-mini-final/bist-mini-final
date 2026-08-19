@@ -30,6 +30,14 @@ class WorkflowRunDispatcher:
         run_store: RunStore,
         max_workers: int = 1,
     ) -> None:
+        """
+        Initialize a dispatcher with the workflow executor, run store, and worker capacity.
+        
+        Parameters:
+            executor (WorkflowExecutor): Executor used to run workflows.
+            run_store (RunStore): Persistent store for workflow run state.
+            max_workers (int): Maximum number of background worker threads.
+        """
         self.executor = executor
         self.run_store = run_store
         self._pool = ThreadPoolExecutor(
@@ -41,7 +49,16 @@ class WorkflowRunDispatcher:
         atexit.register(self.shutdown)
 
     def submit(self, run_id: str, *, resume_failed: bool = False) -> bool:
-        """Queue a run once and report whether it was newly scheduled."""
+        """
+        Queue a workflow run if it does not already have an active execution.
+        
+        Parameters:
+            run_id (str): Identifier of the workflow run.
+            resume_failed (bool): Whether to resume failed nodes when executing the run.
+        
+        Returns:
+            bool: `true` if the run was newly scheduled, `false` if it already has an active execution.
+        """
 
         with self._lock:
             existing = self._futures.get(run_id)
@@ -69,7 +86,16 @@ class WorkflowRunDispatcher:
             self.submit(run_id)
 
     def cancel(self, run_id: str) -> WorkflowRun:
-        """Stop an active run or remove a queued run before it starts."""
+        """
+        Stop a queued or active workflow run.
+        
+        A queued run is marked as paused before execution begins. An active run is
+        cancelled through the workflow executor, and its persisted cancellation state
+        is returned.
+        
+        Returns:
+            WorkflowRun: The persisted run state after cancellation.
+        """
 
         with self._lock:
             future = self._futures.get(run_id)
@@ -97,7 +123,15 @@ class WorkflowRunDispatcher:
         self,
         workflow_ids: Optional[Collection[str]] = None,
     ) -> int:
-        """Requeue persisted non-terminal runs after a server restart."""
+        """
+        Requeue persisted workflow runs that can resume after a server restart.
+        
+        Parameters:
+            workflow_ids (Optional[Collection[str]]): Workflow identifiers to recover. If omitted, recover eligible runs from all workflows.
+        
+        Returns:
+            int: Number of runs successfully requeued.
+        """
 
         allowed_workflow_ids = set(workflow_ids) if workflow_ids is not None else None
         recovered = 0
@@ -111,14 +145,32 @@ class WorkflowRunDispatcher:
         return recovered
 
     def is_active(self, run_id: str) -> bool:
+        """Determine whether a workflow run currently has an active execution.
+        
+        Parameters:
+        	run_id (str): Identifier of the workflow run.
+        
+        Returns:
+        	bool: `true` if the run has an unfinished execution, `false` otherwise.
+        """
         with self._lock:
             future = self._futures.get(run_id)
             return future is not None and not future.done()
 
     def shutdown(self) -> None:
+        """Stops the dispatcher and cancels futures that have not started running."""
         self._pool.shutdown(wait=False, cancel_futures=True)
 
     def _execute(self, run_id: str, resume_failed: bool) -> object:
+        """
+        Execute or resume a workflow run in the background.
+        
+        Parameters:
+            resume_failed (bool): Whether to resume failed work instead of starting normal execution.
+        
+        Returns:
+            The workflow execution result, or the persisted run when execution is cancelled.
+        """
         try:
             if resume_failed:
                 return self.executor.resume(run_id)
@@ -132,7 +184,13 @@ class WorkflowRunDispatcher:
             raise
 
     def _persist_unexpected_failure(self, run_id: str, error: Exception) -> None:
-        """Prevent an infrastructure failure from leaving a run stuck forever."""
+        """
+        Persist an unexpected execution failure for a workflow run.
+        
+        Parameters:
+            run_id (str): Identifier of the affected workflow run.
+            error (Exception): Unexpected failure to record.
+        """
 
         try:
             run = self.run_store.load(run_id)
@@ -165,6 +223,7 @@ class WorkflowRunDispatcher:
             )
 
     def _forget(self, run_id: str, future: Future[object]) -> None:
+        """Remove the tracked future for a run when it is still the active future."""
         with self._lock:
             if self._futures.get(run_id) is future:
                 self._futures.pop(run_id, None)

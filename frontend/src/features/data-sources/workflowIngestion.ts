@@ -63,12 +63,24 @@ const MODULE_VIEW: Record<
   },
 };
 
+/**
+ * Formats a timestamp as minutes, seconds, and tenths of a second.
+ *
+ * @param value - The timestamp value to format
+ * @returns The formatted timestamp, or `--:--.-` when no value is provided
+ */
 function timestamp(value: string | null | undefined): string {
   if (!value) return '--:--.-';
   const date = new Date(value);
   return `${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}.${Math.floor(date.getMilliseconds() / 100)}`;
 }
 
+/**
+ * Calculates the elapsed runtime of a workflow run.
+ *
+ * @param run - The workflow run whose duration is measured
+ * @returns The elapsed time in seconds, or `0` when either timestamp is invalid
+ */
 function elapsedSeconds(run: WorkflowRun): number {
   const start = new Date(run.created_at).getTime();
   const end = run.status === 'queued' || run.status === 'running'
@@ -78,6 +90,13 @@ function elapsedSeconds(run: WorkflowRun): number {
   return Math.max(0, (end - start) / 1000);
 }
 
+/**
+ * Builds the display state for a workflow module, including its status, progress, metadata, and activity log.
+ *
+ * @param run - The workflow execution containing the module node and runtime state
+ * @param nodeId - The identifier of the module node
+ * @returns The module's display state
+ */
 function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState {
   const node = run.graph.nodes.find((candidate) => candidate.id === nodeId)!;
   const state = run.nodes[nodeId];
@@ -161,6 +180,12 @@ function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState {
   };
 }
 
+/**
+ * Converts an ingestion job response into the pipeline run state used by the interface.
+ *
+ * @param job - Ingestion job response containing workflow, index, and output data
+ * @returns Pipeline state with module statuses, progress, runtime metadata, and costs
+ */
 export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRunState {
   const run = job.run;
   const orderedNodeIds = run.batches.flatMap((batch) => batch.node_ids);

@@ -44,6 +44,15 @@ class OpenAIEmbeddingEncoder:
         base_url: Optional[str] = None,
         timeout_seconds: float = 60,
     ) -> None:
+        """
+        Initialize an OpenAI-compatible embedding encoder.
+        
+        Parameters:
+            model_name (str): Embedding model to use.
+            api_key (Optional[str]): API key; project configuration is used when omitted.
+            base_url (Optional[str]): API base URL; project configuration or the default OpenAI URL is used when omitted.
+            timeout_seconds (float): Request timeout in seconds.
+        """
         self.model_name = model_name
         self.api_key = api_key or _project_env_value("OPENAI_API_KEY")
         configured_base = (
@@ -56,6 +65,19 @@ class OpenAIEmbeddingEncoder:
         self.last_usage: Dict[str, int] = {}
 
     def encode(self, queries: List[str], batch_size: int = 2048) -> List[List[float]]:
+        """
+        Encode texts into L2-normalized embedding vectors.
+        
+        Parameters:
+            queries (List[str]): Texts to encode.
+            batch_size (int): Requested number of texts per API batch, capped at 2,048.
+        
+        Returns:
+            List[List[float]]: Normalized embedding vectors in the same order as the input texts.
+        
+        Raises:
+            ModuleExecutionError: If the API key is missing, an API request fails, the response is invalid, or the number of returned embeddings differs from the number of queries.
+        """
         if not queries:
             return []
         if not self.api_key:
@@ -71,6 +93,18 @@ class OpenAIEmbeddingEncoder:
         ]
 
         def _fetch_batch(batch_tuple):
+            """
+            Fetches embeddings for a single batch of texts from the OpenAI-compatible API.
+            
+            Parameters:
+            	batch_tuple (tuple): A batch index and the texts to embed.
+            
+            Returns:
+            	tuple: The batch index, embeddings ordered by input position, prompt token count, and total token count.
+            
+            Raises:
+            	ModuleExecutionError: If the request fails after retries or the response has an invalid format.
+            """
             b_idx, batch_items = batch_tuple
             request_body: Dict[str, Any] = {
                 "model": self.model_name,

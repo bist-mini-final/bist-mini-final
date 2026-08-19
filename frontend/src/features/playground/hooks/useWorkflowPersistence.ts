@@ -231,6 +231,15 @@ async function executeNextOrResume(
   }
 }
 
+/**
+ * Manages workflow persistence, execution runs, cancellation, and cache clearing.
+ *
+ * @param graph - The workflow graph to load, update, and execute
+ * @param moduleCatalogReady - Whether the module catalog is ready for workflow loading
+ * @param activeWorkflowId - The identifier of the active workflow
+ * @param activeWorkflowName - The name used when saving the active workflow
+ * @returns Workflow state and controls for saving, executing, canceling, and clearing cached results
+ */
 export function useWorkflowPersistence(
   graph: WorkflowGraphBridge,
   moduleCatalogReady: boolean,

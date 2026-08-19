@@ -55,6 +55,12 @@ class JsonModelStore:
         return document
 
     def list_documents(self) -> List[ModelType]:
+        """
+        Load all JSON documents from the store in filename order.
+        
+        Returns:
+            List[ModelType]: The validated documents found in the store.
+        """
         documents: List[ModelType] = []
         for path in sorted(self.directory.glob("*.json")):
             documents.append(
@@ -63,6 +69,15 @@ class JsonModelStore:
         return documents
 
     def delete(self, document_id: str) -> bool:
+        """
+        Delete the stored document with the specified identifier.
+        
+        Parameters:
+            document_id (str): Identifier of the document to delete.
+        
+        Returns:
+            bool: `True` if the document was deleted, `False` if it did not exist.
+        """
         path = self._path(document_id)
         with self._lock:
             if not path.is_file():
@@ -71,6 +86,12 @@ class JsonModelStore:
             return True
 
     def clear(self) -> int:
+        """
+        Remove all JSON files from the store.
+        
+        Returns:
+            int: The number of files removed.
+        """
         removed = 0
         with self._lock:
             for path in self.directory.glob("*.json"):
@@ -144,6 +165,15 @@ class RunStore:
         return self._store.load(run_id)
 
     def list(self, workflow_id: Optional[str] = None) -> List[WorkflowRun]:
+        """
+        List workflow run summaries, optionally filtered by workflow identifier.
+        
+        Parameters:
+        	workflow_id (Optional[str]): Identifier of the workflow whose runs should be included.
+        
+        Returns:
+        	List[WorkflowRun]: Loaded workflow run summaries, filtered when a workflow identifier is provided.
+        """
         runs = [
             WorkflowRun.model_validate_json(path.read_text(encoding="utf-8"))
             for path in sorted(self._store.directory.glob("*.summary.json"))
@@ -166,6 +196,11 @@ class RunStore:
         return removed
 
     def clear(self) -> int:
+        """Delete all stored workflow runs and their summary files.
+        
+        Returns:
+            int: The number of full workflow runs deleted.
+        """
         full_run_paths = [
             path
             for path in self._store.directory.glob("*.json")
