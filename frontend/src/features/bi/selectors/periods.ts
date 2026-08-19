@@ -1,0 +1,47 @@
+import type { BiPeriod, MetricObservation, MetricSeries, PeriodRange } from '../types';
+
+const RANGE_LIMIT: Readonly<Record<PeriodRange, number | null>> = {
+  '최근 3개': 3,
+  '최근 5개': 5,
+  '전체': null,
+};
+
+export function selectPeriods(periods: readonly BiPeriod[], range: PeriodRange): readonly BiPeriod[] {
+  const sorted = [...periods].sort((left, right) => left.ordinal - right.ordinal);
+  const fyPeriods = sorted.filter((period) => period.kind === 'fy');
+  const ltmPeriod = [...sorted].reverse().find((period) => period.kind === 'ltm');
+  const limit = RANGE_LIMIT[range];
+  const selectedFy = limit === null ? fyPeriods : fyPeriods.slice(-limit);
+  return ltmPeriod ? [...selectedFy, ltmPeriod] : selectedFy;
+}
+
+export function selectObservations(
+  series: MetricSeries,
+  periods: readonly BiPeriod[],
+): readonly MetricObservation[] {
+  const observationsByPeriod = new Map(series.observations.map((observation) => [observation.periodId, observation]));
+  const selected = periods.flatMap((period) => {
+    const observation = observationsByPeriod.get(period.periodId);
+    return observation ? [{ period, observation }] : [];
+  });
+  const ltm = [...selected].reverse().find((item) => item.period.kind === 'ltm');
+  if (!ltm || ltm.observation.status !== 'available') return selected.map((item) => item.observation);
+
+  return selected
+    .filter((item) => {
+      if (item.period.kind !== 'fy' || item.period.endDate !== ltm.period.endDate) return true;
+      return item.observation.status !== 'available'
+        || item.observation.normalizedValue !== ltm.observation.normalizedValue;
+    })
+    .map((item) => item.observation);
+}
+
+export function selectRepresentativeObservation(
+  series: MetricSeries,
+  periods: readonly BiPeriod[],
+): MetricObservation | null {
+  const observations = selectObservations(series, periods);
+  const available = observations.filter((observation) => observation.status === 'available');
+  return available[available.length - 1] ?? observations[observations.length - 1] ?? null;
+}
+

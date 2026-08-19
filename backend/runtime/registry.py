@@ -1,17 +1,21 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
 from ..storage.answer_cache import AnswerCacheRepository
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.vector_index import VectorIndexStore
 from ..modules.base import ExecutableModule
+from ..modules.answer_refiner import AnswerRefinerModule
 from ..modules.answer_cache_writer import AnswerCacheWriterModule
 from ..modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
 from ..modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from ..modules.bm25_retriever import Bm25RetrieverModule
 from ..modules.cell_text_embedder import CellTextEmbedderModule
 from ..modules.cell_text_serializer import CellTextSerializerModule
+from ..modules.company_entity_extractor import CompanyEntityExtractorModule
 from ..modules.context_expander import ContextExpanderModule
 from ..modules.dataframe_source import DataframeSourceModule
 from ..modules.decomposer import DecomposerModule
@@ -23,12 +27,16 @@ from ..modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
 from ..modules.image_tile_source import ImageTileSourceModule
+from ..modules.index_company_persistence import IndexCompanyPersistenceModule
 from ..modules.json_inspector import JsonInspectorModule
 from ..modules.json_transformer import JsonTransformerModule
 from ..modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
 from ..modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from ..modules.llm_query_router import LlmQueryRouterModule
 from ..modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
+from ..modules.pgvector_collection_loader import PgVectorCollectionLoaderModule
+from ..modules.pgvector_index_writer import PgVectorIndexWriterModule
+from ..modules.pgvector_retriever import PgVectorRetrieverModule
 from ..modules.prebuilt_index_loader import PrebuiltIndexLoaderModule
 from ..modules.processed_file_selector import ProcessedFileSelectorModule
 from ..modules.qa_example_loader import QaExampleLoaderModule
@@ -37,7 +45,13 @@ from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
 from ..modules.semantic_query_matcher import SemanticQueryMatcherModule
 from ..modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from ..modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from ..modules.vector_index_writer import VectorIndexWriterModule
+from ..storage.answer_cache import AnswerCacheRepository
+from ..storage.db_manager import DatabaseManager
+from ..storage.embedding_artifacts import EmbeddingArtifactStore
+from ..storage.pgvector_store import PgVectorStore
+from ..storage.vector_index import VectorIndexStore
 
 
 _CONFIG_UNSET = object()
@@ -53,12 +67,29 @@ class ModuleRegistry:
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
         vector_index_store: Optional[VectorIndexStore] = None,
+        pgvector_store: Optional[PgVectorStore] = None,
+        db_manager: Optional[DatabaseManager] = None,
+        processed_dir: Path = PROCESSED_DATA_DIR,
+        spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
+        """
+        Initialize the registry and register all supported executable modules.
+        
+        Parameters:
+            repository (AnswerCacheRepository): Repository used to cache answers.
+            processed_dir (Path): Directory containing processed data artifacts.
+            spreadsheet_artifact_dir (Path): Directory for spreadsheet processing artifacts.
+        
+        Raises:
+            ValueError: If multiple modules declare the same type.
+        """
         self.repository = repository
         self.embedding_artifact_store = (
             embedding_artifact_store or EmbeddingArtifactStore()
         )
         self.vector_index_store = vector_index_store or VectorIndexStore()
+        self.pgvector_store = pgvector_store or PgVectorStore()
+        self.db_manager = db_manager or DatabaseManager()
         self.isolated_worker_spec: Optional[Dict[str, str]] = None
         if (
             completion_client is None
@@ -69,6 +100,8 @@ class ModuleRegistry:
                 "answer_cache_path": str(repository.path),
                 "embedding_artifact_dir": str(self.embedding_artifact_store.directory),
                 "vector_index_dir": str(self.vector_index_store.directory),
+                "processed_dir": str(processed_dir),
+                "spreadsheet_artifact_dir": str(spreadsheet_artifact_dir),
             }
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
@@ -84,28 +117,65 @@ class ModuleRegistry:
                 artifact_store=self.embedding_artifact_store,
                 index_store=self.vector_index_store,
             ),
+            PgVectorIndexWriterModule(
+                artifact_store=self.embedding_artifact_store,
+                db_manager=self.db_manager,
+                pgvector_store=self.pgvector_store,
+                processed_dir=processed_dir,
+            ),
             PrebuiltIndexLoaderModule(
                 vector_index_store=self.vector_index_store,
             ),
+            PgVectorCollectionLoaderModule(
+                pgvector_store=self.pgvector_store,
+                db_manager=self.db_manager,
+            ),
             Bm25RetrieverModule(),
             DenseRetrieverModule(self.vector_index_store),
+            PgVectorRetrieverModule(self.pgvector_store),
             RrfFusionModule(),
             SemanticQueryMatcherModule(encoder=embedding_encoder),
             LlmQueryRouterModule(completion_client=completion_client),
             SemanticScopedDenseRetrieverModule(self.vector_index_store),
             ContextExpanderModule(),
             ReaderModule(completion_client),
+            AnswerRefinerModule(
+                completion_client=completion_client,
+                pgvector_store=self.pgvector_store,
+            ),
             AnswerCacheWriterModule(repository),
             JsonTransformerModule(),
             JsonInspectorModule(),
-            ProcessedFileSelectorModule(),
-            BfsLlmStructureDetectorModule(completion_client),
-            LocalVlmStructureDetectorModule(),
-            LunaVlmStructureDetectorModule(),
-            DoclingTableDetectorModule(),
-            OpenpyxlRegionDetectorModule(),
-            CellTextSerializerModule(),
-            ExhaustiveCellTextSerializerModule(),
+            ProcessedFileSelectorModule(processed_dir=processed_dir),
+            BfsLlmStructureDetectorModule(
+                completion_client=completion_client,
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
+            LocalVlmStructureDetectorModule(
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
+            LunaVlmStructureDetectorModule(
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
+            DoclingTableDetectorModule(
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
+            OpenpyxlRegionDetectorModule(processed_dir=processed_dir),
+            CellTextSerializerModule(processed_dir=processed_dir),
+            ExhaustiveCellTextSerializerModule(processed_dir=processed_dir),
+            CompanyEntityExtractorModule(
+                processed_dir=processed_dir,
+                completion_client=completion_client,
+            ),
+            SheetMetadataPersistenceModule(
+                db_manager=self.db_manager,
+                processed_dir=processed_dir,
+            ),
+            IndexCompanyPersistenceModule(pgvector_store=self.pgvector_store),
             DataframeSourceModule(),
             ImageTileSourceModule(),
             QaExampleLoaderModule(),

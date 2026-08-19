@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-19T06:23:58.373165+00:00",
+  "updated_at": "2026-08-19T02:19:50.430411+00:00",
   "graph": {
     "nodes": [
       {
@@ -13,7 +13,7 @@
           "y": -367.4342037563349
         },
         "config": {
-          "threshold": 0.65
+          "threshold": 0.95
         },
         "values": {
           "query": "최근 추세 유지 시 2026년 Total Revenue는?"
@@ -212,6 +212,24 @@
           "execution_stopped": false,
           "column_widths": {}
         }
+      },
+      {
+        "id": "custom-node-1787020430289-1",
+        "module_type": "pgvector_collection_loader",
+        "position": {
+          "x": 2478.2880582893004,
+          "y": 433.354939451034
+        },
+        "config": {},
+        "values": {
+          "collection_name": "SPG_Company_KeyStats_v4.xlsm"
+        },
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
       }
     ],
     "edges": [
@@ -321,9 +339,9 @@
       }
     ],
     "viewport": {
-      "x": -165.31477159109272,
-      "y": 374.9342814886574,
-      "zoom": 0.8000000000000025
+      "x": -1053.976105234979,
+      "y": 295.9299251820323,
+      "zoom": 0.5494544933718556
     }
   }
 }

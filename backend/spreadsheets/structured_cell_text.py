@@ -71,7 +71,7 @@ def generate_header_combinations(
     row_headers: List[str],
     column_headers: List[str],
 ) -> List[Tuple[List[str], List[str]]]:
-    """Generate the comprehensive full header path plus granular single/sub-level header combinations."""
+    """Generate the comprehensive full header path plus granular single/sub-level header combinations for RAG retrieval."""
     if not row_headers and not column_headers:
         return [([], [])]
 

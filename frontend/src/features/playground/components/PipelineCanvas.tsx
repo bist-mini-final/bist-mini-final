@@ -33,6 +33,9 @@ import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDete
 import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
 import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
 import { PrebuiltIndexLoaderNode } from './CustomNodes/PrebuiltIndexLoaderNode';
+import { PgVectorCollectionLoaderNode } from './CustomNodes/PgVectorCollectionLoaderNode';
+import { PgVectorRetrieverNode } from './CustomNodes/PgVectorRetrieverNode';
+import { PgVectorIndexWriterNode } from './CustomNodes/PgVectorIndexWriterNode';
 import { QueryNode } from './CustomNodes/QueryNode';
 import { ReaderNode } from './CustomNodes/ReaderNode';
 import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
@@ -79,6 +82,9 @@ export function PipelineCanvas({
       embeddingNode: EmbeddingNode,
       cell_text_embedder: CellTextEmbedderNode,
       vector_index_writer: VectorIndexWriterNode,
+      pgvector_index_writer: PgVectorIndexWriterNode,
+      pgvector_collection_loader: PgVectorCollectionLoaderNode,
+      pgvector_retriever: PgVectorRetrieverNode,
       bm25_retriever: Bm25RetrieverNode,
       dense_retriever: DenseRetrieverNode,
       rrf_fusion: RrfFusionNode,

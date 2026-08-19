@@ -1,6 +1,6 @@
 # BFS + LLM Table Structure Detector
 
-> Module type: `bfs_llm_structure_detector` · Category: `Logic` · Version: `3`
+> Module type: `bfs_llm_structure_detector` · Category: `Logic` · Version: `4`
 
 셀 연결요소로 표를 분리하고 상단 행만 LLM으로 판단해 제목·계층 헤더·데이터 영역을 구성합니다.
 
@@ -41,7 +41,9 @@
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
+| `sheet_names` | `array<string>` | no | - | 구조 분석 대상으로 선택된 표시 시트명 |
 | `tables` | `array<ClassifiedTableDTO>` | yes | - | - |
+| `failed_sheets` | `array<object<string, string>>` | no | - | 분석하지 못한 시트명과 실패 사유 |
 
 ## Referenced DTOs
 

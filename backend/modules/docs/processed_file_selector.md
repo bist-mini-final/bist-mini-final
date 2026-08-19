@@ -17,6 +17,7 @@ data/processed의 Excel 파일 하나를 안전하게 선택합니다.
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | data/processed에서 선택할 Excel 파일명 |
+| `sheet_names` | `array<string> \| null` | no | `null` | 처리할 표시 시트 목록. 생략하면 모든 표시 시트를 선택합니다. |
 
 ## Config DTO
 

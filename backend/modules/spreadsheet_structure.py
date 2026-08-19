@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal, Tuple
+from typing import Dict, List, Literal, Tuple
 
 from pydantic import Field
 
@@ -41,4 +41,12 @@ class SpreadsheetStructureOutput(ModuleDTO):
 
     file_name: str
     workbook_hash: str
+    sheet_names: List[str] = Field(
+        default_factory=list,
+        description="구조 분석 대상으로 선택된 표시 시트명",
+    )
     tables: List[ClassifiedTableDTO]
+    failed_sheets: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="분석하지 못한 시트명과 실패 사유",
+    )

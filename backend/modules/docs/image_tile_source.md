@@ -17,7 +17,7 @@ Excel 시트를 행 단위로 타일링한 이미지 목록을 출력합니다. 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | data/processed에서 선택할 Excel 파일명 (이미지 타일 소스로 사용) |
-| `sheet_name` | `string | null` | no | `null` | 특정 시트만 선택. 비워두면 모든 시트 포함 |
+| `sheet_name` | `string \| null` | no | `null` | 특정 시트만 선택. 비워두면 모든 시트 포함 |
 
 ## Config DTO
 

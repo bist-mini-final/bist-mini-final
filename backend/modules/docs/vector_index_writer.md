@@ -22,6 +22,11 @@
 | `artifact_id` | `string` | yes | - | float32 문서 벡터 아티팩트의 콘텐츠 주소 |
 | `dimension` | `integer` | yes | - | 각 문서 임베딩 벡터 차원 |
 | `items` | `array<EmbeddedCellTextDocumentDTO>` | yes | - | - |
+| `duration_seconds` | `number \| null` | no | `null` | - |
+| `total_tokens` | `integer \| null` | no | `null` | - |
+| `estimated_cost_usd` | `number \| null` | no | `null` | - |
+| `estimated_cost_krw` | `number \| null` | no | `null` | - |
+| `batch_size` | `integer \| null` | no | `null` | - |
 
 ## Config DTO
 

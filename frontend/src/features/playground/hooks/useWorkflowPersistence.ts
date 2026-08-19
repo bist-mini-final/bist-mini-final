@@ -48,6 +48,15 @@ function executionFingerprint(graph: WorkflowGraph): string {
   });
 }
 
+function executionRunMatchesRequest(
+  run: WorkflowRun,
+  graph: WorkflowGraph,
+  query: string,
+): boolean {
+  return executionFingerprint(run.graph) === executionFingerprint(graph)
+    && JSON.stringify(run.runtime_inputs) === JSON.stringify(runInputs(graph, query));
+}
+
 function executionRunCompatibleWithGraph(
   run: WorkflowRun,
   graph: WorkflowGraph
@@ -233,6 +242,15 @@ async function executeNextOrResume(
   }
 }
 
+/**
+ * Manages workflow persistence, execution runs, cancellation, and cache clearing.
+ *
+ * @param graph - The workflow graph to load, update, and execute
+ * @param moduleCatalogReady - Whether the module catalog is ready for workflow loading
+ * @param activeWorkflowId - The identifier of the active workflow
+ * @param activeWorkflowName - The name used when saving the active workflow
+ * @returns Workflow state and controls for saving, executing, canceling, and clearing cached results
+ */
 export function useWorkflowPersistence(
   graph: WorkflowGraphBridge,
   moduleCatalogReady: boolean,
@@ -385,14 +403,37 @@ export function useWorkflowPersistence(
         let run = latestRun &&
           (latestRun.status === 'queued' ||
             latestRun.status === 'running' ||
+            latestRun.status === 'paused' ||
             latestRun.status === 'failed') &&
-          executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
+          executionRunMatchesRequest(latestRun, currentExecutionGraph, query)
           && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs)
           ? latestRun
           : await createRun(query, controller.signal);
         applyRun(run);
         onBatch?.(run);
-        while (run.status === 'queued' || run.status === 'running') {
+        if (run.status === 'failed') {
+          const stableRun = run;
+          const runningRun = markNextBatchRunning(run);
+          stableRunRef.current = stableRun;
+          applyRun(runningRun);
+          onBatch?.(runningRun);
+          try {
+            run = await executeNextOrResume(run, controller.signal);
+          } catch (error) {
+            if (!controller.signal.aborted) {
+              applyRun(stableRun);
+              onBatch?.(stableRun);
+            }
+            throw error;
+          } finally {
+            if (executionController.current === controller) {
+              stableRunRef.current = null;
+            }
+          }
+          applyRun(run);
+          onBatch?.(run);
+        }
+        while (run.status === 'queued' || run.status === 'running' || run.status === 'paused') {
           const stableRun = run;
           const runningRun = markNextBatchRunning(run);
           stableRunRef.current = stableRun;
@@ -436,13 +477,13 @@ export function useWorkflowPersistence(
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
         let run = latestRun &&
-          executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
+          executionRunMatchesRequest(latestRun, currentExecutionGraph, query)
           ? latestRun
           : null;
         if (!run || run.status === 'completed') {
           run = await createRun(query, controller.signal);
         }
-        if (run.status === 'queued' || run.status === 'running' || run.status === 'failed') {
+        if (run.status === 'queued' || run.status === 'running' || run.status === 'paused' || run.status === 'failed') {
           const stableRun = run;
           const runningRun = markNextBatchRunning(run);
           stableRunRef.current = stableRun;

@@ -331,7 +331,7 @@ function PlaygroundWorkspace() {
   );
 }
 
-export function PlaygroundPage() {
+export function PlaygroundView() {
   return (
     <ReactFlowProvider>
       <PlaygroundWorkspace />
@@ -339,4 +339,4 @@ export function PlaygroundPage() {
   );
 }
 
-export default PlaygroundPage;
+export default PlaygroundView;
