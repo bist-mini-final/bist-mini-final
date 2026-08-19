@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,10 @@ class ProcessedFileSelectorInputDTO(ModuleInputDTO):
     file_name: str = Field(
         min_length=1,
         description="data/processed에서 선택할 Excel 파일명",
+    )
+    sheet_names: Optional[List[str]] = Field(
+        default=None,
+        description="처리할 표시 시트 목록. 생략하면 모든 표시 시트를 선택합니다.",
     )
 
 
@@ -71,9 +75,25 @@ class ProcessedFileSelectorModule(ExecutableModule):
         input_data = cast(ProcessedFileSelectorInputDTO, payload)
         try:
             path = self.catalog.resolve(input_data.file_name)
-            sheet_names = self.catalog.sheet_names(path)
+            available_sheet_names = self.catalog.sheet_names(path)
         except (OSError, ValueError, WorkbookCatalogError) as error:
             raise ModuleExecutionError(str(error)) from error
+        requested_sheet_names = input_data.sheet_names
+        if requested_sheet_names is None:
+            sheet_names = available_sheet_names
+        else:
+            unknown_sheet_names = sorted(
+                set(requested_sheet_names) - set(available_sheet_names)
+            )
+            if unknown_sheet_names:
+                raise ModuleExecutionError(
+                    "Excel 파일에 없는 시트가 선택되었습니다: "
+                    + ", ".join(unknown_sheet_names)
+                )
+            requested = set(requested_sheet_names)
+            sheet_names = [
+                name for name in available_sheet_names if name in requested
+            ]
         if not sheet_names:
             raise ModuleExecutionError("선택한 Excel 파일에 처리할 시트가 없습니다")
         return {

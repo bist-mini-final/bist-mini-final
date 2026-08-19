@@ -1,9 +1,8 @@
 import type {
-  DataSourceFile,
   DbStatusInfo,
-  IngestRequest,
+  DeleteIngestionJobResponse,
+  IngestionJobResponse,
   SearchResponse,
-  SheetPreviewData,
   VectorIndexDetail,
   VectorIndexInfo,
 } from '../types';
@@ -89,33 +88,16 @@ async function deleteJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 
 export const dataSourceApi = {
-  async listFiles(signal?: AbortSignal): Promise<DataSourceFile[]> {
-    const data = await requestJson<{ files: DataSourceFile[]; total: number }>(
-      '/api/data-sources/files',
-      signal
-    );
-    return data.files;
-  },
-
-  async previewSheet(
-    fileName: string,
-    sheetName?: string,
-    maxRows = 15,
-    signal?: AbortSignal
-  ): Promise<SheetPreviewData> {
-    const url = `/api/data-sources/files/${encodeURIComponent(fileName)}/preview?max_rows=${maxRows}${
-      sheetName ? `&sheet_name=${encodeURIComponent(sheetName)}` : ''
-    }`;
-    return requestJson<SheetPreviewData>(url, signal);
-  },
-
   async uploadFile(
     file: File,
     autoIngest: boolean = true,
     model: string = 'text-embedding-3-large',
-    batchSize: number = 64,
+    batchSize: number = 2048,
     signal?: AbortSignal
-  ): Promise<{ file: DataSourceFile; auto_ingested: boolean; ingested_index?: any; error?: string }> {
+  ): Promise<{
+    ingestion_job?: IngestionJobResponse;
+    error?: string;
+  }> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -140,10 +122,6 @@ export const dataSourceApi = {
     }
 
     return response.json();
-  },
-
-  async deleteFile(fileName: string, signal?: AbortSignal): Promise<void> {
-    await deleteJson(`/api/data-sources/files/${encodeURIComponent(fileName)}`, signal);
   },
 
   async listIndexes(signal?: AbortSignal): Promise<VectorIndexInfo[]> {
@@ -194,32 +172,66 @@ export const dataSourceApi = {
     return requestJson<DbStatusInfo>('/api/data-sources/db-status', signal);
   },
 
-  async testDbConnect(databaseUrl: string, signal?: AbortSignal): Promise<DbStatusInfo> {
-    return postJson<DbStatusInfo>('/api/data-sources/db-connect', { database_url: databaseUrl }, signal);
-  },
-
-  async ingestWorkbook(
-    payload: IngestRequest,
+  async listIngestionJobs(
+    fileName?: string,
     signal?: AbortSignal
-  ): Promise<VectorIndexInfo> {
-    const data = await postJson<{ status: string; index: VectorIndexInfo }>(
-      '/api/data-sources/ingest',
-      payload,
+  ): Promise<IngestionJobResponse[]> {
+    const query = fileName ? `?file_name=${encodeURIComponent(fileName)}` : '';
+    const data = await requestJson<{ jobs: IngestionJobResponse[]; total: number }>(
+      `/api/data-sources/ingestion-jobs${query}`,
       signal
     );
-    return data.index;
+    return data.jobs;
   },
 
-  async rerunFromStep(
-    indexId: string,
-    fromStep: 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store',
-    model?: string,
-    batchSize = 64,
+  async getIngestionJob(
+    runId: string,
     signal?: AbortSignal
-  ): Promise<{ status: string; from_step: string; index: VectorIndexInfo }> {
-    return postJson<{ status: string; from_step: string; index: VectorIndexInfo }>(
-      `/api/data-sources/indexes/${encodeURIComponent(indexId)}/rerun`,
-      { from_step: fromStep, ...(model ? { model } : {}), batch_size: batchSize },
+  ): Promise<IngestionJobResponse> {
+    return requestJson<IngestionJobResponse>(
+      `/api/data-sources/ingestion-jobs/${encodeURIComponent(runId)}`,
+      signal
+    );
+  },
+
+  async getIngestionJobByIndex(
+    indexId: string,
+    signal?: AbortSignal
+  ): Promise<IngestionJobResponse> {
+    return requestJson<IngestionJobResponse>(
+      `/api/data-sources/ingestion-jobs/by-index/${encodeURIComponent(indexId)}`,
+      signal
+    );
+  },
+
+  async resumeIngestionJob(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<IngestionJobResponse> {
+    return postJson<IngestionJobResponse>(
+      `/api/data-sources/ingestion-jobs/${encodeURIComponent(runId)}/resume`,
+      {},
+      signal
+    );
+  },
+
+  async cancelIngestionJob(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<IngestionJobResponse> {
+    return postJson<IngestionJobResponse>(
+      `/api/data-sources/ingestion-jobs/${encodeURIComponent(runId)}/cancel`,
+      {},
+      signal
+    );
+  },
+
+  async deleteIngestionJob(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<DeleteIngestionJobResponse> {
+    return deleteJson<DeleteIngestionJobResponse>(
+      `/api/data-sources/ingestion-jobs/${encodeURIComponent(runId)}`,
       signal
     );
   },

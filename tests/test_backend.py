@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,12 +7,14 @@ from threading import Event, Thread
 from time import monotonic
 from urllib.error import URLError
 from unittest.mock import patch
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from PIL import Image
+from langchain_core.documents import Document
 from pydantic import ValidationError
 
 from app import app
@@ -26,6 +29,7 @@ from backend.runtime.registry import ModuleRegistry
 from backend.runtime.worker import ModuleWorkerCancelled
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
 from backend.vision.openai_responses import OpenAIResponsesVisionClient
 from backend.api.spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -62,6 +66,7 @@ from backend.workflows.executor import (
     DagExecutionError,
     WorkflowExecutor,
 )
+from backend.workflows.dispatcher import WorkflowRunDispatcher
 from backend.workflows.models import (
     CanvasPosition,
     WorkflowEdge,
@@ -94,7 +99,14 @@ class BlockingModuleWorker:
         self.terminated = Event()
         self.execution_id = None
 
-    def execute(self, module_type, input_payload, config, execution_id):
+    def execute(
+        self,
+        module_type,
+        input_payload,
+        config,
+        execution_id,
+        progress_callback=None,
+    ):
         self.execution_id = execution_id
         self.started.set()
         self.terminated.wait(timeout=5)
@@ -350,6 +362,45 @@ class SimilarityTests(unittest.TestCase):
         self.assertEqual(matches[0].question_id, "Q2")
 
 
+class PgVectorStoreBatchingTests(unittest.TestCase):
+    def test_precomputed_vectors_are_inserted_in_bounded_batches(self) -> None:
+        from unittest.mock import MagicMock
+
+        langchain_store = MagicMock()
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = MagicMock()
+        store = PgVectorStore("postgresql://unused")
+        documents = [
+            Document(page_content=f"cell-{index}", metadata={"index": index})
+            for index in range(2101)
+        ]
+        vectors = [[float(index), 1.0] for index in range(2101)]
+        progress = []
+
+        with (
+            patch(
+                "backend.storage.pgvector_store.get_vector_store",
+                return_value=langchain_store,
+            ),
+            patch.object(store, "_raw_connection", return_value=connection),
+            patch.object(store, "ensure_optimized_indexes"),
+        ):
+            store.put_documents(
+                "test-index",
+                documents,
+                vectors=vectors,
+                progress_callback=progress.append,
+            )
+
+        batch_sizes = [
+            len(call.kwargs["texts"])
+            for call in langchain_store.add_embeddings.call_args_list
+        ]
+        self.assertEqual(batch_sizes, [1000, 1000, 101])
+        self.assertEqual(progress[-1]["completed_batches"], 3)
+        self.assertEqual(progress[-1]["completed_items"], 2101)
+
+
 class ModularRagArchitectureTests(unittest.TestCase):
     def test_rrf_fuses_ranks_within_the_same_subquery(self) -> None:
         def candidate(rank, cell_id, subquery):
@@ -474,6 +525,22 @@ class ModularRagArchitectureTests(unittest.TestCase):
                 all("embedding" not in item for item in output["items"])
             )
 
+    def test_cell_document_embedding_reports_completed_batches(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            module = CellTextEmbedderModule(
+                StubEmbeddingEncoder(),
+                EmbeddingArtifactStore(Path(temporary_directory)),
+            )
+            progress = []
+            module.set_progress_callback(progress.append)
+
+            module.run(sample_cell_documents(), {"batch_size": 1})
+
+            self.assertEqual(progress[0]["completed_batches"], 0)
+            self.assertEqual(progress[-1]["completed_batches"], 3)
+            self.assertEqual(progress[-1]["total_batches"], 3)
+            self.assertEqual(progress[-1]["completed_items"], 3)
+
     def test_vector_index_persists_and_dense_retriever_uses_only_its_reference(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -540,7 +607,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 29)
+        self.assertEqual(len(definitions), 32)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
@@ -569,6 +636,9 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "openpyxl_region_detector",
                 "cell_text_serializer",
                 "exhaustive_cell_text_serializer",
+                "company_entity_extractor",
+                "sheet_metadata_persistence",
+                "index_company_persistence",
                 "prebuilt_index_loader",
                 "dataframe_source",
                 "image_tile_source",
@@ -795,7 +865,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 29)
+        self.assertEqual(len(modules), 32)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -1067,7 +1137,7 @@ class ApiContractTests(unittest.TestCase):
             ),
             "json_transformer": ({"any_json"}, {"mappings"}),
             "json_inspector": (set(), set()),
-            "processed_file_selector": ({"file_name"}, set()),
+            "processed_file_selector": ({"file_name", "sheet_names"}, set()),
             "bfs_llm_structure_detector": (
                 {"file_name", "workbook_hash", "sheet_names"},
                 {
@@ -1126,7 +1196,7 @@ class ApiContractTests(unittest.TestCase):
             ),
             "cell_text_serializer": (
                 {"file_name", "workbook_hash", "tables"},
-                set(),
+                {"variant_mode"},
             ),
             "exhaustive_cell_text_serializer": (
                 {"file_name", "workbook_hash", "sheet_names"},
@@ -1171,6 +1241,18 @@ class ApiContractTests(unittest.TestCase):
                     "spatial_column_radius",
                     "enable_auto_cell_discovery",
                 },
+            ),
+            "company_entity_extractor": (
+                {"file_name", "workbook_hash", "sheet_names"},
+                {"model"},
+            ),
+            "sheet_metadata_persistence": (
+                {"structure_input", "index_input"},
+                set(),
+            ),
+            "index_company_persistence": (
+                {"index_input", "company_input"},
+                set(),
             ),
         }
 
@@ -1531,6 +1613,38 @@ class SpreadsheetModuleTests(unittest.TestCase):
             with_value["text"],
             "Sheet: Key_Stats | Row Header: Revenue | Column Header: LTM | Cell Value: 100",
         )
+
+    def test_selector_accepts_workbook_without_cached_sheet_dimensions(self) -> None:
+        workbook_path = self.processed_dir / "dimensionless.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "KeyStats"
+        sheet.append(["Metric", "FY2025"])
+        sheet.append(["Revenue", 135])
+        workbook.save(workbook_path)
+        workbook.close()
+
+        with ZipFile(workbook_path, "r") as archive:
+            entries = {
+                info.filename: archive.read(info.filename)
+                for info in archive.infolist()
+            }
+        sheet_path = "xl/worksheets/sheet1.xml"
+        entries[sheet_path] = re.sub(
+            rb"<dimension\s+ref=\"[^\"]+\"\s*/>",
+            b"",
+            entries[sheet_path],
+            count=1,
+        )
+        with ZipFile(workbook_path, "w", ZIP_DEFLATED) as archive:
+            for filename, content in entries.items():
+                archive.writestr(filename, content)
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": workbook_path.name}
+        )
+
+        self.assertEqual(selection["sheet_names"], ["KeyStats"])
 
     def test_exhaustive_serializer_embeds_every_left_above_combination(self) -> None:
         workbook_path = self.processed_dir / "cartesian.xlsx"
@@ -2218,6 +2332,18 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertEqual(listed_output["embedding"]["length"], len(vector))
         self.assertEqual(self.run_store.load(run.id).nodes["query"].output["embedding"], vector)
 
+    def test_run_store_delete_removes_full_state_and_summary(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        run_dir = Path(self.temporary_directory.name) / "runs"
+
+        self.assertTrue(self.run_store.delete(run.id))
+
+        self.assertFalse((run_dir / f"{run.id}.json").exists())
+        self.assertFalse((run_dir / f"{run.id}.summary.json").exists())
+        with self.assertRaises(FileNotFoundError):
+            self.run_store.load(run.id)
+
     def test_graph_fixture_matches_registered_modules(self) -> None:
         graph = self.graph()
         batches = self.executor.validate_graph(graph)
@@ -2296,6 +2422,29 @@ class WorkflowExecutionTests(unittest.TestCase):
                     inputs={"query": {"query": "질문", "threshold": 0.1}}
                 ),
             )
+
+    def test_run_config_override_is_validated_and_kept_in_run_snapshot(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(
+            workflow,
+            WorkflowExecutionRequest(
+                inputs=self.runtime_request().inputs,
+                config_overrides={"query": {"threshold": 0.25}},
+            ),
+        )
+
+        run_query = next(node for node in run.graph.nodes if node.id == "query")
+        saved_query = next(
+            node for node in workflow.graph.nodes if node.id == "query"
+        )
+        self.assertEqual(run_query.config["threshold"], 0.25)
+        self.assertEqual(saved_query.config["threshold"], 0.99)
+
+        after_query = self.executor.execute_next_batch(run.id)
+        self.assertEqual(
+            after_query.nodes["query"].config_payload["threshold"],
+            0.25,
+        )
 
     def test_rrf_is_skipped_when_one_required_input_is_missing(self) -> None:
         graph = self.graph()
@@ -2405,9 +2554,64 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertLess(elapsed, 1)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], DagExecutionCancelled)
-        self.assertEqual(cancelled.status, "queued")
+        self.assertEqual(cancelled.status, "paused")
         self.assertEqual(cancelled.nodes["query"].status, "pending")
         self.assertIsNone(cancelled.nodes["query"].output)
+
+    def test_dispatcher_keeps_user_cancelled_run_paused(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        worker = BlockingModuleWorker()
+        executor = WorkflowExecutor(
+            self.registry,
+            self.run_store,
+            self.cache,
+            module_worker=worker,
+        )
+        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+
+        try:
+            self.assertTrue(dispatcher.submit(run.id))
+            self.assertTrue(worker.started.wait(timeout=1))
+
+            cancelled = dispatcher.cancel(run.id)
+            deadline = monotonic() + 1
+            while dispatcher.is_active(run.id) and monotonic() < deadline:
+                Event().wait(0.01)
+
+            self.assertFalse(dispatcher.is_active(run.id))
+            self.assertEqual(cancelled.status, "paused")
+            self.assertEqual(self.run_store.load(run.id).status, "paused")
+        finally:
+            dispatcher.shutdown()
+
+    def test_dispatcher_cancels_queued_run_without_waiting_for_active_run(self) -> None:
+        workflow = self.save_workflow()
+        active_run = self.executor.create_run(workflow, self.runtime_request())
+        queued_run = self.executor.create_run(workflow, self.runtime_request())
+        worker = BlockingModuleWorker()
+        executor = WorkflowExecutor(
+            self.registry,
+            self.run_store,
+            self.cache,
+            module_worker=worker,
+        )
+        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+
+        try:
+            self.assertTrue(dispatcher.submit(active_run.id))
+            self.assertTrue(worker.started.wait(timeout=1))
+            self.assertTrue(dispatcher.submit(queued_run.id))
+
+            started_at = monotonic()
+            cancelled = dispatcher.cancel(queued_run.id)
+
+            self.assertLess(monotonic() - started_at, 1)
+            self.assertEqual(cancelled.status, "paused")
+            self.assertFalse(dispatcher.is_active(queued_run.id))
+        finally:
+            dispatcher.cancel(active_run.id)
+            dispatcher.shutdown()
 
     def test_cache_clear_terminates_active_module_before_removing_runs(self) -> None:
         workflow = self.save_workflow()
@@ -2478,6 +2682,24 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertEqual(completed.nodes["decompose"].output, upstream_output)
         self.assertEqual(completed.nodes["reader"].status, "succeeded")
         self.assertIn("answer_json", completed.nodes["reader"].output)
+
+    def test_dispatcher_recovers_only_matching_pending_runs(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        dispatcher = WorkflowRunDispatcher(self.executor, self.run_store)
+        try:
+            self.assertEqual(dispatcher.recover_pending({"other-flow"}), 0)
+            self.assertEqual(dispatcher.recover_pending({workflow.id}), 1)
+            self.assertEqual(dispatcher.recover_pending({workflow.id}), 0)
+
+            deadline = monotonic() + 5
+            current = self.run_store.load(run.id)
+            while current.status not in {"completed", "failed"} and monotonic() < deadline:
+                Event().wait(0.02)
+                current = self.run_store.load(run.id)
+            self.assertEqual(current.status, "completed")
+        finally:
+            dispatcher.shutdown()
 
     def test_same_inputs_reuse_cached_module_outputs(self) -> None:
         graph = WorkflowGraph(
@@ -2644,7 +2866,7 @@ class WorkflowExecutionTests(unittest.TestCase):
 
         cancel_response = client.post(f"/api/runs/{run_id}/cancel")
         self.assertEqual(cancel_response.status_code, 200)
-        self.assertEqual(cancel_response.json()["status"], "queued")
+        self.assertEqual(cancel_response.json()["status"], "paused")
 
         next_response = client.post(f"/api/runs/{run_id}/execute-next")
         self.assertEqual(next_response.status_code, 200)

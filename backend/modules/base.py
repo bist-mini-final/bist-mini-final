@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, ClassVar, Dict, List, Mapping, Type
+from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -94,6 +94,21 @@ class ExecutableModule(ABC):
     output_model: ClassVar[Type[BaseModel]]
     request_model: ClassVar[Type[BaseModel]]
     branch_output_models: ClassVar[Dict[str, Type[BaseModel]]] = {}
+
+    def set_progress_callback(
+        self,
+        callback: Optional[Callable[[Dict[str, Any]], None]],
+    ) -> None:
+        """Attach a run-scoped progress sink without coupling modules to workflows."""
+
+        self._progress_callback = callback
+
+    def report_progress(self, progress: Mapping[str, Any]) -> None:
+        """Publish JSON-compatible progress when the current executor supports it."""
+
+        callback = getattr(self, "_progress_callback", None)
+        if callback is not None:
+            callback(dict(progress))
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Validate DTO boundaries and materialize the execution request DTO."""

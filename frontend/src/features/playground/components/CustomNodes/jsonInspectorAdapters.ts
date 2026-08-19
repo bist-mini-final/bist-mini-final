@@ -61,6 +61,20 @@ function hasAnswer(value: unknown): boolean {
   return typeof answerJson.answer === 'string' || isJsonRow(answerJson.answer);
 }
 
+function refinedAnswerJson(value: unknown): JsonRow | null {
+  if (!isJsonRow(value)) return null;
+  return isJsonRow(value.refined_answer_json)
+    ? value.refined_answer_json
+    : value;
+}
+
+function hasRefinedAnswer(value: unknown): boolean {
+  const refined = refinedAnswerJson(value);
+  if (!refined) return false;
+  return typeof refined.refined_answer === 'string'
+    || isJsonRow(refined.refined_answer);
+}
+
 function hasSubqueries(value: unknown): boolean {
   return isJsonRow(value) && collectionItems(value.subqueries) !== null;
 }
@@ -105,6 +119,28 @@ function answerMarkdown(value: unknown): MarkdownInspectorContent | null {
   return {
     kind: 'markdown',
     label: 'Reader 답변',
+    markdown: answer.preview,
+    sourceCharacters: typeof answer.characters === 'number' ? answer.characters : undefined,
+    truncated: true,
+  };
+}
+
+function refinedAnswerMarkdown(value: unknown): MarkdownInspectorContent | null {
+  const refined = refinedAnswerJson(value);
+  if (!refined) return null;
+  const answer = refined.refined_answer;
+  if (typeof answer === 'string') {
+    return {
+      kind: 'markdown',
+      label: 'Refiner 개선 답변',
+      markdown: answer,
+      truncated: false,
+    };
+  }
+  if (!isJsonRow(answer) || typeof answer.preview !== 'string') return null;
+  return {
+    kind: 'markdown',
+    label: 'Refiner 개선 답변',
     markdown: answer.preview,
     sourceCharacters: typeof answer.characters === 'number' ? answer.characters : undefined,
     truncated: true,
@@ -188,8 +224,16 @@ const INSPECTOR_ADAPTERS: InspectorAdapter[] = [
     adapt: answerMarkdown,
   },
   {
+    accepts: (moduleType) => moduleType === 'answer_refiner',
+    adapt: refinedAnswerMarkdown,
+  },
+  {
     accepts: (_moduleType, value) => hasSerializedTexts(value),
     adapt: serializedTextContent,
+  },
+  {
+    accepts: (_moduleType, value) => hasRefinedAnswer(value),
+    adapt: refinedAnswerMarkdown,
   },
   {
     accepts: (_moduleType, value) => hasAnswer(value),

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "id": "indexing_pgvector",
-  "name": "indexing_pgvector",
-  "updated_at": "2026-08-18T13:16:25.661213+00:00",
+  "id": "luna_vlm_validation",
+  "name": "luna_vlm_validation",
+  "updated_at": "2026-08-18T10:02:32.169919+00:00",
   "graph": {
     "nodes": [
       {
@@ -14,7 +14,7 @@
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v4.xlsm"
+          "file_name": "SPG_Company_KeyStats_v3.xlsm"
         },
         "ui": {
           "width": null,
@@ -49,107 +49,6 @@
           "execution_stopped": false,
           "column_widths": {}
         }
-      },
-      {
-        "id": "idx-pg-3-serializer",
-        "module_type": "cell_text_serializer",
-        "position": {
-          "x": 1200.0,
-          "y": 0.0
-        },
-        "config": {},
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "idx-pg-4-embedder",
-        "module_type": "cell_text_embedder",
-        "position": {
-          "x": 1750.0,
-          "y": 0.0
-        },
-        "config": {
-          "model": "text-embedding-3-large",
-          "batch_size": 2048
-        },
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "idx-pg-5-writer",
-        "module_type": "pgvector_index_writer",
-        "position": {
-          "x": 2300.0,
-          "y": 0.0
-        },
-        "config": {},
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "idx-pg-6-company",
-        "module_type": "company_entity_extractor",
-        "position": {
-          "x": 650.0,
-          "y": 500.0
-        },
-        "config": {
-          "model": "gpt-5.6-luna"
-        },
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "idx-pg-7-sheet-meta",
-        "module_type": "sheet_metadata_persistence",
-        "position": {
-          "x": 2850.0,
-          "y": 0.0
-        },
-        "config": {},
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "idx-pg-8-company-meta",
-        "module_type": "index_company_persistence",
-        "position": {
-          "x": 2850.0,
-          "y": 500.0
-        },
-        "config": {},
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
       }
     ],
     "edges": [
@@ -160,76 +59,12 @@
         "source_output": "output",
         "target_input": "input",
         "source_branch": null
-      },
-      {
-        "id": "edge-pg-2-3",
-        "source": "idx-pg-2-vlm",
-        "target": "idx-pg-3-serializer",
-        "source_output": "output",
-        "target_input": "input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-3-4",
-        "source": "idx-pg-3-serializer",
-        "target": "idx-pg-4-embedder",
-        "source_output": "output",
-        "target_input": "input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-4-5",
-        "source": "idx-pg-4-embedder",
-        "target": "idx-pg-5-writer",
-        "source_output": "output",
-        "target_input": "input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-1-6",
-        "source": "idx-pg-1-selector",
-        "target": "idx-pg-6-company",
-        "source_output": "output",
-        "target_input": "input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-2-7",
-        "source": "idx-pg-2-vlm",
-        "target": "idx-pg-7-sheet-meta",
-        "source_output": "output",
-        "target_input": "structure_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-5-7",
-        "source": "idx-pg-5-writer",
-        "target": "idx-pg-7-sheet-meta",
-        "source_output": "index_output",
-        "target_input": "index_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-5-8",
-        "source": "idx-pg-5-writer",
-        "target": "idx-pg-8-company-meta",
-        "source_output": "index_output",
-        "target_input": "index_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-pg-6-8",
-        "source": "idx-pg-6-company",
-        "target": "idx-pg-8-company-meta",
-        "source_output": "output",
-        "target_input": "company_input",
-        "source_branch": null
       }
     ],
     "viewport": {
-      "x": -192.93611135342735,
-      "y": 240.40557518852435,
-      "zoom": 0.5799787331515415
+      "x": 520.1981943090082,
+      "y": 292.69063073929135,
+      "zoom": 0.7674112954602128
     }
   }
 }

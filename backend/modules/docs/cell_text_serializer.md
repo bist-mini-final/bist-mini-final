@@ -22,7 +22,9 @@
 
 ## Config DTO
 
-원본 JSON 값 전체를 DTO로 사용합니다.
+| Field | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `variant_mode` | `string` | no | `"both"` | 생성할 검색 문서 변형 (header_only, header_with_value, 또는 both) |
 
 ## Output DTO
 
@@ -91,7 +93,9 @@
     "workbook_hash": "<workbook_hash>",
     "tables": []
   },
-  "config": {}
+  "config": {
+    "variant_mode": "both"
+  }
 }
 ```
 

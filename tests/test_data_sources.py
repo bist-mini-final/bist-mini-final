@@ -1,7 +1,9 @@
-import json
+import os
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
@@ -32,6 +34,8 @@ class DataSourceApiTests(unittest.TestCase):
         self.vector_index_dir = self.root / "vector_db"
         self.embedding_artifact_dir = self.root / "artifacts"
         self.spreadsheet_artifact_dir = self.root / "spreadsheet_artifacts"
+        self.run_dir = self.root / "runs"
+        self.cache_dir = self.root / "cache"
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         self.vector_index_dir.mkdir(parents=True, exist_ok=True)
         self.embedding_artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -59,6 +63,8 @@ class DataSourceApiTests(unittest.TestCase):
                 vector_index_dir=self.vector_index_dir,
                 embedding_artifact_dir=self.embedding_artifact_dir,
                 spreadsheet_artifact_dir=self.spreadsheet_artifact_dir,
+                run_dir=self.run_dir,
+                cache_dir=self.cache_dir,
                 embedding_encoder=self.encoder,
                 pgvector_store=self.pg_store,
             ),
@@ -101,6 +107,20 @@ class DataSourceApiTests(unittest.TestCase):
         self.assertEqual(data["sheet_name"], "KeyStats")
         self.assertGreater(len(data["preview_rows"]), 0)
 
+    def test_cancel_unknown_ingestion_job_returns_not_found(self):
+        response = self.client.post(
+            "/api/data-sources/ingestion-jobs/run-missing/cancel"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_unknown_ingestion_job_returns_not_found(self):
+        response = self.client.delete(
+            "/api/data-sources/ingestion-jobs/run-missing"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_upload_download_and_delete_file(self):
         file_content = b"fake-parquet-content-12345"
         response = self.client.post(
@@ -120,21 +140,38 @@ class DataSourceApiTests(unittest.TestCase):
         self.assertEqual(del_resp.status_code, 200)
         self.assertFalse((self.processed_dir / "uploaded_data.parquet").exists())
 
+    @patch.dict(os.environ, {"OPENAI_API_KEY": ""})
     def test_ingest_excel_and_search(self):
-        # Ingest the test workbook
+        # Queue and poll the canonical workflow job.
         ingest_resp = self.client.post(
-            "/api/data-sources/ingest",
+            "/api/data-sources/ingestion-jobs",
             json={
                 "file_name": "Test_Workbook.xlsx",
                 "model": "text-embedding-3-large",
                 "variant_mode": "header_only",
+                "structure_mode": "exhaustive",
                 "sheet_names": ["KeyStats"],
                 "batch_size": 16,
             },
         )
-        self.assertEqual(ingest_resp.status_code, 200)
+        self.assertEqual(ingest_resp.status_code, 202)
         ingest_data = ingest_resp.json()
-        self.assertEqual(ingest_data["status"], "success")
+        run_id = ingest_data["job_id"]
+        deadline = time.monotonic() + 5
+        while (
+            ingest_data["status"] not in {"completed", "failed"}
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.05)
+            ingest_data = self.client.get(
+                f"/api/data-sources/ingestion-jobs/{run_id}"
+            ).json()
+
+        self.assertEqual(
+            ingest_data["status"],
+            "completed",
+            ingest_data.get("error"),
+        )
         index_id = ingest_data["index"]["index_id"]
         self.assertIsNotNone(index_id)
 
@@ -172,6 +209,71 @@ class DataSourceApiTests(unittest.TestCase):
         list_after = self.client.get("/api/data-sources/indexes").json()
         deleted_ids = [idx["index_id"] for idx in list_after["indexes"]]
         self.assertNotIn(index_id, deleted_ids)
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": ""})
+    def test_background_ingestion_job_is_persisted_and_pollable(self):
+        start_response = self.client.post(
+            "/api/data-sources/ingestion-jobs",
+            json={
+                "file_name": "Test_Workbook.xlsx",
+                "model": "text-embedding-3-large",
+                "variant_mode": "header_only",
+                "structure_mode": "exhaustive",
+                "sheet_names": ["KeyStats"],
+                "batch_size": 16,
+            },
+        )
+        self.assertEqual(start_response.status_code, 202)
+        started = start_response.json()
+        self.assertEqual(started["workflow_id"], "indexing_pgvector_exhaustive")
+        self.assertIn(started["status"], {"queued", "running", "completed"})
+        run_id = started["job_id"]
+        self.assertTrue((self.run_dir / f"{run_id}.json").is_file())
+
+        deadline = time.monotonic() + 5
+        current = started
+        while current["status"] not in {"completed", "failed"} and time.monotonic() < deadline:
+            time.sleep(0.05)
+            response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
+            self.assertEqual(response.status_code, 200)
+            current = response.json()
+
+        self.assertEqual(current["status"], "completed", current.get("error"))
+        self.assertIsNotNone(current["index"])
+        self.assertGreater(current["index"]["document_count"], 0)
+        status_by_module = {
+            node["module_type"]: current["run"]["nodes"][node["id"]]["status"]
+            for node in current["run"]["graph"]["nodes"]
+        }
+        for module_type in (
+            "company_entity_extractor",
+            "sheet_metadata_persistence",
+            "index_company_persistence",
+        ):
+            self.assertEqual(status_by_module[module_type], "succeeded")
+        self.assertEqual(current["index"]["company_name"], "Test Workbook")
+        history_response = self.client.get(
+            f"/api/data-sources/ingestion-jobs/by-index/{current['index']['index_id']}"
+        )
+        self.assertEqual(history_response.status_code, 200)
+        self.assertEqual(history_response.json()["job_id"], run_id)
+        list_response = self.client.get(
+            "/api/data-sources/ingestion-jobs",
+            params={"file_name": "Test_Workbook.xlsx"},
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertIn(run_id, [job["job_id"] for job in list_response.json()["jobs"]])
+
+        delete_response = self.client.delete(
+            f"/api/data-sources/ingestion-jobs/{run_id}"
+        )
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["source_file_preserved"])
+        self.assertTrue(self.sample_file.is_file())
+        self.assertEqual(
+            self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}").status_code,
+            404,
+        )
 
 
 if __name__ == "__main__":

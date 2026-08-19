@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "main_pgvector_direct_cell_refiner_pipeline",
   "name": "main_pgvector_direct_cell_refiner_pipeline",
-  "updated_at": "2026-08-18T07:40:18.365332+00:00",
+  "updated_at": "2026-08-19T00:11:09.964311+00:00",
   "graph": {
     "nodes": [
       {
@@ -89,10 +89,11 @@
         },
         "config": {},
         "values": {
-          "collection_name": "SPG_Company_KeyStats_v4.xlsm,f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928",
+          "collection_name": "SPG_Company_KeyStats_v4.xlsm,f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928,7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
           "collection_names": [
             "SPG_Company_KeyStats_v4.xlsm",
-            "f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928"
+            "f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928",
+            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
           ]
         },
         "ui": {
@@ -205,8 +206,8 @@
         "id": "refiner-rag-node-11-refiner",
         "module_type": "answer_refiner",
         "position": {
-          "x": 4650.0,
-          "y": -280.0
+          "x": 4644.972197098007,
+          "y": 83.0073695238454
         },
         "config": {
           "model": "gpt-5.6-luna",
@@ -233,18 +234,18 @@
         "config": {},
         "values": {},
         "ui": {
-          "width": 550.0,
+          "width": 920.0,
           "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "refiner-rag-node-13-cache",
-        "module_type": "answer_cache_writer",
+        "id": "custom-node-1787097961258-1",
+        "module_type": "json_inspector",
         "position": {
-          "x": 5100.0,
-          "y": -380.0
+          "x": 4663.520553401833,
+          "y": -480.2618267270275
         },
         "config": {},
         "values": {},
@@ -368,12 +369,20 @@
         "source_output": "refined_answer_json",
         "target_input": "input",
         "source_branch": null
+      },
+      {
+        "id": "edge-1787097964337-1",
+        "source": "refiner-rag-node-10-reader",
+        "target": "custom-node-1787097961258-1",
+        "source_output": "answer_json",
+        "target_input": "input",
+        "source_branch": null
       }
     ],
     "viewport": {
-      "x": -1026.651540988707,
-      "y": 55.51651547222514,
-      "zoom": 0.9513182763318003
+      "x": -3983.097929985577,
+      "y": 429.0494075349145,
+      "zoom": 0.9835020740262592
     }
   }
 }

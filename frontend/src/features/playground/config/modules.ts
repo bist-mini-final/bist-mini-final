@@ -22,6 +22,7 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   bfs_llm_structure_detector: { icon: 'Network', color: '#0f766e' },
   local_vlm_structure_detector: { icon: 'ScanText', color: '#4f46e5' },
   luna_vlm_structure_detector: { icon: 'CloudCog', color: '#4338ca' },
+  company_entity_extractor: { icon: 'Building2', color: '#7c3aed' },
   docling_table_detector: { icon: 'ScanSearch', color: '#0891b2' },
   openpyxl_region_detector: { icon: 'TableProperties', color: '#d97706' },
   cell_text_serializer: { icon: 'Rows3', color: '#7c3aed' },

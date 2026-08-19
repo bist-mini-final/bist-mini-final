@@ -62,6 +62,14 @@ class JsonModelStore:
             )
         return documents
 
+    def delete(self, document_id: str) -> bool:
+        path = self._path(document_id)
+        with self._lock:
+            if not path.is_file():
+                return False
+            path.unlink()
+            return True
+
     def clear(self) -> int:
         removed = 0
         with self._lock:
@@ -143,6 +151,19 @@ class RunStore:
         if workflow_id is None:
             return runs
         return [run for run in runs if run.workflow_id == workflow_id]
+
+    def delete(self, run_id: str) -> bool:
+        """Remove one full run and its compact summary."""
+
+        removed = self._store.delete(run_id)
+        summary_path = self._store.directory / (
+            f"{_validate_identifier(run_id)}.summary.json"
+        )
+        with self._summary_lock:
+            if summary_path.is_file():
+                summary_path.unlink()
+                removed = True
+        return removed
 
     def clear(self) -> int:
         full_run_paths = [

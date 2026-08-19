@@ -23,6 +23,7 @@ from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogErro
 from .base import (
     EmptyModuleConfigDTO,
     ExecutableModule,
+    ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
     ModuleExecutionError,
@@ -36,6 +37,24 @@ from .spreadsheet_structure import (
 
 class CellTextSerializerInputDTO(SpreadsheetStructureOutput):
     """Classified workbook data received from a structure detector."""
+
+
+class CellTextSerializerConfigDTO(ModuleConfigDTO):
+    variant_mode: Literal["header_only", "header_with_value", "both"] = Field(
+        default="both",
+        description="생성할 검색 문서 변형 (header_only, header_with_value, 또는 both)",
+        json_schema_extra={
+            "enum": ["header_only", "header_with_value", "both"],
+            "options": ["header_only", "header_with_value", "both"],
+        },
+    )
+
+
+class CellTextSerializerExecutionDTO(
+    CellTextSerializerInputDTO,
+    CellTextSerializerConfigDTO,
+):
+    """Combined input and config DTO for execution."""
 
 
 class CellTextDocumentDTO(ModuleDTO):
@@ -63,13 +82,13 @@ class CellTextSerializerModule(ExecutableModule):
         description="분류된 Excel 셀을 Sheet·Row Header·Column Header·Cell Value 포맷으로 직렬화합니다.",
         inputs=["input"],
         outputs=["output"],
-        config_fields=[],
+        config_fields=["variant_mode"],
         raw_output=True,
         version=SERIALIZATION_VERSION,
     )
     input_model = CellTextSerializerInputDTO
-    config_model = EmptyModuleConfigDTO
-    execution_model = CellTextSerializerInputDTO
+    config_model = CellTextSerializerConfigDTO
+    execution_model = CellTextSerializerExecutionDTO
     output_model = CellTextSerializerOutput
 
     def __init__(
@@ -141,6 +160,7 @@ class CellTextSerializerModule(ExecutableModule):
         reader: WorksheetValueReader,
         table: ClassifiedTableDTO,
         seen_cell_ids: set[str],
+        variant_mode: str = "both",
     ) -> List[Dict[str, Any]]:
         data_region = self._region(table, "data")
         if data_region is None:
@@ -194,7 +214,14 @@ class CellTextSerializerModule(ExecutableModule):
                         "column_header": c_combo,
                         "cell_value": cell_value,
                     }
-                    for variant, val in [("header_only", UNKNOWN_FIELD), ("header_with_value", cell_value)]:
+                    if variant_mode == "both":
+                        active_variants = [("header_only", UNKNOWN_FIELD), ("header_with_value", cell_value)]
+                    elif variant_mode == "header_with_value":
+                        active_variants = [("header_with_value", cell_value)]
+                    else:
+                        active_variants = [("header_only", UNKNOWN_FIELD)]
+
+                    for variant, val in active_variants:
                         text = serialize_structured_cell(
                             canonical_name,
                             r_combo,
@@ -254,6 +281,7 @@ class CellTextSerializerModule(ExecutableModule):
                         reader,
                         table,
                         seen_cell_ids,
+                        variant_mode=getattr(input_data, "variant_mode", "both"),
                     )
                 )
         finally:

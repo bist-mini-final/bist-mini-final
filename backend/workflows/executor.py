@@ -165,17 +165,30 @@ class WorkflowExecutor:
         workflow: WorkflowDocument,
         request: WorkflowExecutionRequest,
     ) -> WorkflowRun:
-        batches = self.validate_graph(workflow.graph)
-        known_nodes = {node.id for node in workflow.graph.nodes}
+        execution_graph = workflow.graph.model_copy(deep=True)
+        known_nodes = {node.id for node in execution_graph.nodes}
         unknown_inputs = sorted(set(request.inputs) - known_nodes)
         if unknown_inputs:
             raise DagExecutionError(
                 "실행 입력이 존재하지 않는 노드를 참조합니다: "
                 + ", ".join(unknown_inputs)
             )
+        unknown_config_nodes = sorted(set(request.config_overrides) - known_nodes)
+        if unknown_config_nodes:
+            raise DagExecutionError(
+                "실행 설정이 존재하지 않는 노드를 참조합니다: "
+                + ", ".join(unknown_config_nodes)
+            )
+
+        for node in execution_graph.nodes:
+            override = request.config_overrides.get(node.id)
+            if override:
+                node.config = {**node.config, **override}
+
+        batches = self.validate_graph(execution_graph)
         for node_id, runtime_input in request.inputs.items():
             node = next(
-                item for item in workflow.graph.nodes if item.id == node_id
+                item for item in execution_graph.nodes if item.id == node_id
             )
             module = self.module_registry.get(node.module_type)
             if module.definition.raw_input:
@@ -206,11 +219,11 @@ class WorkflowExecutor:
                 prev_run = self.run_store.load(request.inherit_from_run_id)
                 # Build a lookup of the new graph's nodes
                 new_node_map = {
-                    node.id: node for node in workflow.graph.nodes
+                    node.id: node for node in execution_graph.nodes
                 }
                 new_edge_set = {
                     (e.source, e.target, e.source_output, e.target_input, e.source_branch)
-                    for e in workflow.graph.edges
+                    for e in execution_graph.edges
                 }
                 prev_edge_set = {
                     (e.source, e.target, e.source_output, e.target_input, e.source_branch)
@@ -246,7 +259,7 @@ class WorkflowExecutor:
             id=f"run-{uuid4().hex}",
             workflow_id=workflow.id,
             workflow_updated_at=workflow.updated_at,
-            graph=workflow.graph.model_copy(deep=True),
+            graph=execution_graph,
             runtime_inputs=request.inputs,
             use_cache=request.use_cache,
             batches=[
@@ -265,7 +278,7 @@ class WorkflowExecutor:
                         batch_index=batch_index_by_node[node.id],
                     )
                 )
-                for node in workflow.graph.nodes
+                for node in execution_graph.nodes
             },
         )
         # When inheriting, update the run status to reflect already-completed
@@ -329,7 +342,7 @@ class WorkflowExecutor:
         except Exception as error:  # keep the run inspectable on unexpected failures
             state.status = "failed"
             state.outcome = "failed"
-            state.error = f"{type(error).__name__}: {error}"
+            state.error = self._format_error(error, include_type=True)
             state.completed_at = utc_now_iso()
 
         self._refresh_run_status(run)
@@ -389,7 +402,7 @@ class WorkflowExecutor:
             except Exception as error:  # keep the run inspectable on unexpected failures
                 state.status = "failed"
                 state.outcome = "failed"
-                state.error = f"{type(error).__name__}: {error}"
+                state.error = self._format_error(error, include_type=True)
                 state.completed_at = utc_now_iso()
                 batch_failed = True
             self.run_store.save(run)
@@ -437,6 +450,7 @@ class WorkflowExecutor:
         state.elapsed_ms = None
         state.cost_usd = None
         state.usage = None
+        state.progress = {}
 
     @staticmethod
     def _descendant_node_ids(run: WorkflowRun, node_id: str) -> Set[str]:
@@ -566,6 +580,7 @@ class WorkflowExecutor:
         state.outcome = None
         state.cache_key = cache_key
         state.cache_hit = False
+        state.progress = {}
         state.started_at = utc_now_iso()
         self.run_store.save(run)
 
@@ -582,11 +597,16 @@ class WorkflowExecutor:
                     validated_config,
                 )
             else:
+                def persist_progress(progress: Dict[str, Any]) -> None:
+                    state.progress = compact_history_value(progress)
+                    self.run_store.save(run)
+
                 output = self._module_worker.execute(
                     node.module_type,
                     input_payload,
                     validated_config,
                     run.id,
+                    progress_callback=persist_progress,
                 )
             self._raise_if_cancelled(run.id)
             if run.use_cache and module.definition.cacheable:
@@ -731,10 +751,13 @@ class WorkflowExecutor:
 
     def _persist_cancelled_run(self, run_id: str) -> WorkflowRun:
         run = self.run_store.load(run_id)
+        was_terminal = run.status in ("completed", "failed")
         for state in run.nodes.values():
             if state.status == "running":
                 self._reset_node_state(state)
         self._refresh_run_status(run)
+        if not was_terminal and run.status not in ("completed", "failed"):
+            run.status = "paused"
         return self.run_store.save(run)
 
     def _should_execute_node(
@@ -945,11 +968,21 @@ class WorkflowExecutor:
             self.run_store.save(run)
 
     @staticmethod
-    def _format_error(error: Exception) -> str:
+    def _format_error(error: Exception, *, include_type: bool = False) -> str:
         if isinstance(error, ValidationError):
             messages = [
                 f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
                 for item in error.errors(include_url=False)
             ]
-            return "; ".join(messages)
-        return str(error)
+            message = "; ".join(messages)
+        else:
+            message = str(error)
+            for marker in ("\n[SQL:", " [SQL:"):
+                if marker in message:
+                    message = message.split(marker, 1)[0].rstrip()
+                    break
+            if include_type:
+                message = f"{type(error).__name__}: {message}"
+        if len(message) > 4000:
+            return message[:4000].rstrip() + "…"
+        return message

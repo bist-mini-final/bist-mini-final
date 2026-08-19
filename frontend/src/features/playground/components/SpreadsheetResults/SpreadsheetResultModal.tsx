@@ -178,6 +178,10 @@ export function SpreadsheetResultModal({
   const meta = INSPECTOR_META[kind];
   const InspectorIcon = meta.icon;
   const parsed = useMemo(() => parseSpreadsheetResult(input, output), [input, output]);
+  const firstSheet = parsed?.sheetNames[0] ?? '';
+  const workbookIdentity = parsed
+    ? `${parsed.workbookHash}\u0000${parsed.fileName}\u0000${parsed.sheetNames.join('\u0000')}`
+    : '';
   const [selectedSheet, setSelectedSheet] = useState(parsed?.sheetNames[0] ?? '');
   const [selectedTableKey, setSelectedTableKey] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.6);
@@ -223,10 +227,9 @@ export function SpreadsheetResultModal({
   }, []);
 
   useEffect(() => {
-    const nextSheet = parsed?.sheetNames[0] ?? '';
-    setSelectedSheet(nextSheet);
+    setSelectedSheet(firstSheet);
     setSelectedTableKey(null);
-  }, [parsed]);
+  }, [firstSheet, workbookIdentity]);
 
   useEffect(() => {
     setSelectedTableKey(sheetTables[0] ? spreadsheetTableKey(sheetTables[0]) : null);

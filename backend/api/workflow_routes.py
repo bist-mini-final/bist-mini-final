@@ -21,15 +21,17 @@ def create_workflow_router(
     workflow_dir: Path,
     run_dir: Path,
     cache_dir: Path,
+    workflow_store: Optional[WorkflowStore] = None,
+    run_store: Optional[RunStore] = None,
+    workflow_executor: Optional[WorkflowExecutor] = None,
 ) -> APIRouter:
     router = APIRouter(tags=["Workflows"])
-    workflow_store = WorkflowStore(workflow_dir)
-    run_store = RunStore(run_dir)
-    result_cache = ResultCache(cache_dir)
-    workflow_executor = WorkflowExecutor(
+    workflow_store = workflow_store or WorkflowStore(workflow_dir)
+    run_store = run_store or RunStore(run_dir)
+    workflow_executor = workflow_executor or WorkflowExecutor(
         module_registry,
         run_store,
-        result_cache,
+        ResultCache(cache_dir),
     )
 
     @router.delete("/cache")

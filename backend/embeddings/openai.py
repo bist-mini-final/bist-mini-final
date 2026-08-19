@@ -55,69 +55,108 @@ class OpenAIEmbeddingEncoder:
         self.timeout_seconds = timeout_seconds
         self.last_usage: Dict[str, int] = {}
 
-    def encode(self, queries: List[str]) -> List[List[float]]:
+    def encode(self, queries: List[str], batch_size: int = 2048) -> List[List[float]]:
         if not queries:
             return []
         if not self.api_key:
             raise ModuleExecutionError("OPENAI_API_KEY가 설정되지 않았습니다")
 
-        request_body: Dict[str, Any] = {
-            "model": self.model_name,
-            "input": queries,
-        }
-        body = json.dumps(request_body, ensure_ascii=False).encode("utf-8")
-        request = Request(
-            self.endpoint,
-            data=body,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        started_at = time.perf_counter()
-        document = None
-        retries = 3
-        for attempt in range(retries):
-            try:
-                with urlopen(request, timeout=self.timeout_seconds) as response:
-                    document = json.loads(response.read().decode("utf-8"))
-                break
-            except HTTPError as error:
-                message = ""
-                try:
-                    error_doc = json.loads(error.read().decode("utf-8"))
-                    message = str((error_doc.get("error") or {}).get("message") or "")
-                except (OSError, ValueError, AttributeError):
-                    pass
-                detail = f": {message}" if message else ""
-                if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
-                    time.sleep(1.0 * (2 ** attempt))
-                    continue
-                raise ModuleExecutionError(
-                    f"OpenAI Embeddings API가 HTTP {error.code}를 반환했습니다{detail}"
-                ) from error
-            except (URLError, TimeoutError, OSError, ValueError) as error:
-                if attempt < retries - 1:
-                    time.sleep(1.0 * (2 ** attempt))
-                    continue
-                raise ModuleExecutionError(f"OpenAI Embeddings API 호출 또는 응답 해석에 실패했습니다: {error}") from error
+        # OpenAI allows up to 2048 inputs per request
+        effective_batch_size = min(max(1, batch_size), 2048)
+        batches = [
+            (idx, queries[i : i + effective_batch_size])
+            for idx, i in enumerate(range(0, len(queries), effective_batch_size))
+        ]
 
-        try:
-            data_items = document["data"]
-            usage_doc = document.get("usage") or {}
-            self.last_usage = {
-                "prompt_tokens": int(usage_doc.get("prompt_tokens") or len(queries) * 15),
-                "total_tokens": int(usage_doc.get("total_tokens") or len(queries) * 15),
+        def _fetch_batch(batch_tuple):
+            b_idx, batch_items = batch_tuple
+            request_body: Dict[str, Any] = {
+                "model": self.model_name,
+                "input": batch_items,
             }
-            # API can return items sorted by index or in arbitrary order
-            sorted_items = sorted(data_items, key=lambda item: item["index"])
-            vectors = [item["embedding"] for item in sorted_items]
-        except (KeyError, IndexError, TypeError) as error:
-            raise ModuleExecutionError("OpenAI Embeddings API 응답 포맷이 올바르지 않습니다") from error
+            body = json.dumps(request_body, ensure_ascii=False).encode("utf-8")
+            request = Request(
+                self.endpoint,
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
 
-        if len(vectors) != len(queries):
+            document = None
+            retries = 4
+            for attempt in range(retries):
+                try:
+                    with urlopen(request, timeout=self.timeout_seconds) as response:
+                        document = json.loads(response.read().decode("utf-8"))
+                    break
+                except HTTPError as error:
+                    message = ""
+                    try:
+                        error_doc = json.loads(error.read().decode("utf-8"))
+                        message = str((error_doc.get("error") or {}).get("message") or "")
+                    except (OSError, ValueError, AttributeError):
+                        pass
+                    detail = f": {message}" if message else ""
+                    if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
+                        time.sleep(1.5 * (2 ** attempt))
+                        continue
+                    raise ModuleExecutionError(
+                        f"OpenAI Embeddings API가 HTTP {error.code}를 반환했습니다{detail}"
+                    ) from error
+                except (URLError, TimeoutError, OSError, ValueError) as error:
+                    if attempt < retries - 1:
+                        time.sleep(1.5 * (2 ** attempt))
+                        continue
+                    raise ModuleExecutionError(f"OpenAI Embeddings API 호출 또는 응답 해석에 실패했습니다: {error}") from error
+
+            try:
+                data_items = document["data"]
+                usage_doc = document.get("usage") or {}
+                p_tokens = int(usage_doc.get("prompt_tokens") or len(batch_items) * 15)
+                t_tokens = int(usage_doc.get("total_tokens") or len(batch_items) * 15)
+                sorted_items = sorted(data_items, key=lambda item: item["index"])
+                batch_vectors = [item["embedding"] for item in sorted_items]
+                return b_idx, batch_vectors, p_tokens, t_tokens
+            except (KeyError, IndexError, TypeError) as error:
+                raise ModuleExecutionError("OpenAI Embeddings API 응답 포맷이 올바르지 않습니다") from error
+
+        # Run batch requests with concurrency (up to 8 parallel workers)
+        max_workers = min(8, len(batches))
+        results_by_idx: Dict[int, List[List[float]]] = {}
+        total_prompt_tokens = 0
+        total_tokens = 0
+
+        if max_workers <= 1:
+            for b in batches:
+                idx, b_vecs, p_tok, t_tok = _fetch_batch(b)
+                results_by_idx[idx] = b_vecs
+                total_prompt_tokens += p_tok
+                total_tokens += t_tok
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = [pool.submit(_fetch_batch, b) for b in batches]
+                for fut in as_completed(futures):
+                    idx, b_vecs, p_tok, t_tok = fut.result()
+                    results_by_idx[idx] = b_vecs
+                    total_prompt_tokens += p_tok
+                    total_tokens += t_tok
+
+        # Reconstruct ordered vectors
+        all_vectors: List[List[float]] = []
+        for i in range(len(batches)):
+            all_vectors.extend(results_by_idx[i])
+
+        self.last_usage = {
+            "prompt_tokens": total_prompt_tokens,
+            "total_tokens": total_tokens,
+        }
+
+        if len(all_vectors) != len(queries):
             raise ModuleExecutionError("생성된 OpenAI 임베딩 개수가 요청과 일치하지 않습니다")
 
-        return [_l2_normalize(vec) for vec in vectors]
+        return [_l2_normalize(vec) for vec in all_vectors]

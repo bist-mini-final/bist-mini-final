@@ -75,7 +75,7 @@
         },
         "config": {
           "model": "text-embedding-3-large",
-          "batch_size": 256
+          "batch_size": 2048
         },
         "values": {},
         "ui": {

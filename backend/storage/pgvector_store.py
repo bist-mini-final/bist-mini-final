@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
 import psycopg2
@@ -21,6 +21,9 @@ from .vector_store_factory import get_langchain_connection_string, get_vector_st
 
 class PgVectorStoreError(RuntimeError):
     """Raised when a pgvector database operation fails."""
+
+
+PGVECTOR_INSERT_BATCH_SIZE = 1000
 
 
 class PgVectorStore:
@@ -114,6 +117,8 @@ class PgVectorStore:
         model_name: str = "text-embedding-3-large",
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        vectors: Optional[Any] = None,
+        progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     ) -> None:
         """Add standardized LangChain Document objects to pgvector."""
         if not documents:
@@ -158,7 +163,70 @@ class PgVectorStore:
         except Exception:
             pass
 
-        store.add_documents(documents)
+        # SQLAlchemy expands each embedding row into several bind parameters.
+        # Sending an entire large workbook at once crosses psycopg's 65,535
+        # parameter protocol limit, so persist bounded batches explicitly.
+        total_items = len(documents)
+        total_batches = max(
+            1,
+            (total_items + PGVECTOR_INSERT_BATCH_SIZE - 1)
+            // PGVECTOR_INSERT_BATCH_SIZE,
+        )
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "completed_batches": 0,
+                    "total_batches": total_batches,
+                    "completed_items": 0,
+                    "total_items": total_items,
+                }
+            )
+        try:
+            for batch_index, start in enumerate(
+                range(0, total_items, PGVECTOR_INSERT_BATCH_SIZE),
+                start=1,
+            ):
+                stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
+                document_batch = documents[start:stop]
+                if vectors is not None and len(vectors) == total_items:
+                    vector_batch = vectors[start:stop]
+                    texts = [doc.page_content for doc in document_batch]
+                    metadatas = [doc.metadata for doc in document_batch]
+                    vec_list = [
+                        vector.tolist() if hasattr(vector, "tolist") else list(vector)
+                        for vector in vector_batch
+                    ]
+                    store.add_embeddings(
+                        texts=texts,
+                        embeddings=vec_list,
+                        metadatas=metadatas,
+                    )
+                else:
+                    store.add_documents(document_batch)
+                if progress_callback is not None:
+                    progress_callback(
+                        {
+                            "completed_batches": batch_index,
+                            "total_batches": total_batches,
+                            "completed_items": stop,
+                            "total_items": total_items,
+                        }
+                    )
+        except Exception as error:
+            # A failed write must not leave a queryable partial collection.
+            try:
+                store.delete_collection()
+            except Exception:
+                pass
+            error_message = str(error)
+            for marker in ("\n[SQL:", " [SQL:"):
+                if marker in error_message:
+                    error_message = error_message.split(marker, 1)[0].rstrip()
+                    break
+            raise PgVectorStoreError(
+                "pgvector 문서 배치 적재 실패 "
+                f"({batch_index}/{total_batches}): {error_message[:2000]}"
+            ) from error
 
         # Also execute direct update for guarantee
         conn = self._raw_connection()
@@ -187,6 +255,7 @@ class PgVectorStore:
         metadata: Optional[Dict[str, Any]] = None,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         vectors: Any = None,
+        progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     ) -> None:
         """Backwards-compatible put: converts cell items to LangChain documents and inserts."""
         meta_dict = metadata or {}
@@ -195,6 +264,8 @@ class PgVectorStore:
         file_name = meta_dict.get("file_name", "")
         workbook_hash = meta_dict.get("workbook_hash", "")
         company_name = meta_dict.get("company_name", "")
+
+        resolved_vectors = vectors if vectors is not None else vectors_or_items
 
         docs = cell_items_to_langchain_documents(
             items=raw_items,
@@ -209,6 +280,8 @@ class PgVectorStore:
             model_name=model_name,
             embedding_encoder=embedding_encoder,
             metadata=metadata,
+            vectors=resolved_vectors if isinstance(resolved_vectors, (list, tuple)) or hasattr(resolved_vectors, "__len__") and not isinstance(resolved_vectors, dict) else None,
+            progress_callback=progress_callback,
         )
 
     def list_indexes(self) -> List[Dict[str, Any]]:
@@ -710,4 +783,3 @@ class PgVectorStore:
             return []
         finally:
             conn.close()
-

@@ -7,13 +7,17 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { type ComponentType, lazy } from 'react';
-import { DataSourcesPage } from '../pages/DataSourcesPage';
 import { EvaluationsPage } from '../pages/EvaluationsPage';
 import { HomePage } from '../pages/HomePage';
-import { PlaygroundPage } from '../pages/PlaygroundPage';
 import { SettingsPage } from '../pages/SettingsPage';
 
 const BiPage = lazy(() => import('../features/bi/BiPage'));
+const PlaygroundPage = lazy(() => import('../pages/PlaygroundPage'));
+const DataSourcesPage = lazy(() =>
+  import('../pages/DataSourcesPage').then((module) => ({
+    default: module.DataSourcesPage,
+  }))
+);
 
 export type RouteStatus = 'ready' | 'planned';
 

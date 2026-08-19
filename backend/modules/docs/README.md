@@ -27,6 +27,7 @@ python -m backend.tools.generate_module_docs
 | `bm25_retriever` | Logic | [BM25 Keyword Retriever](./bm25_retriever.md) |
 | `cell_text_embedder` | Logic | [Cell Text Embedder](./cell_text_embedder.md) |
 | `cell_text_serializer` | Transform | [Structured Cell Text Serializer](./cell_text_serializer.md) |
+| `company_entity_extractor` | VLM Vision | [Company Entity Extractor](./company_entity_extractor.md) |
 | `context` | Transform | [Context Expander](./context.md) |
 | `dataframe_source` | Source | [DataFrame Source (Code RAG)](./dataframe_source.md) |
 | `decomposer` | Logic | [LLM Query Decomposer](./decomposer.md) |
@@ -35,6 +36,7 @@ python -m backend.tools.generate_module_docs
 | `embedder` | Logic | [Query Embedder](./embedder.md) |
 | `exhaustive_cell_text_serializer` | Transform | [Exhaustive Cell Header Serializer](./exhaustive_cell_text_serializer.md) |
 | `image_tile_source` | Source | [Image Tile Source (PixelRAG)](./image_tile_source.md) |
+| `index_company_persistence` | Storage / DB | [Index Company Persistence](./index_company_persistence.md) |
 | `json_inspector` | Output | [JSON Data Inspector](./json_inspector.md) |
 | `json_transformer` | Transform | [JSON Format Mapper](./json_transformer.md) |
 | `local_vlm_structure_detector` | Logic | [Local VLM Table Structure Detector](./local_vlm_structure_detector.md) |
@@ -49,4 +51,5 @@ python -m backend.tools.generate_module_docs
 | `query_input` | Source | [Query Input & Search](./query_input.md) |
 | `reader` | Output | [LLM Reader Answer](./reader.md) |
 | `rrf_fusion` | Logic | [RRF Fusion](./rrf_fusion.md) |
+| `sheet_metadata_persistence` | Storage / DB | [Sheet Metadata Persistence](./sheet_metadata_persistence.md) |
 | `vector_index_writer` | Transform | [Vector Index Writer](./vector_index_writer.md) |

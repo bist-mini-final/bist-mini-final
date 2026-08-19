@@ -38,9 +38,9 @@ class CellTextEmbedderConfigDTO(ModuleConfigDTO):
         },
     )
     batch_size: int = Field(
-        default=64,
+        default=2048,
         ge=1,
-        le=512,
+        le=2048,
         description="Excel 셀 문서를 한 번에 임베딩할 배치 크기",
     )
 
@@ -116,9 +116,19 @@ class CellTextEmbedderModule(ExecutableModule):
         total_tokens = 0
         total_items = len(input_data.items)
         total_batches = max(1, (total_items + input_data.batch_size - 1) // input_data.batch_size)
+        self.report_progress(
+            {
+                "phase": "embedding_batches",
+                "completed_batches": 0,
+                "total_batches": total_batches,
+                "completed_items": 0,
+                "total_items": total_items,
+            }
+        )
 
         for batch_idx, start in enumerate(range(0, total_items, input_data.batch_size), start=1):
             batch = input_data.items[start : start + input_data.batch_size]
+            print(f"[CellTextEmbedder] 배치 {batch_idx}/{total_batches} ({len(batch)}개 문서) 임베딩 중...", flush=True)
             logger.info("임베딩 배치 %d/%d 실행 중 (%d개 문서, 모델: %s)...", batch_idx, total_batches, len(batch), input_data.model)
             batch_vectors = encoder.encode([document.text for document in batch])
             if len(batch_vectors) != len(batch):
@@ -134,6 +144,15 @@ class CellTextEmbedderModule(ExecutableModule):
             else:
                 # Estimate ~15 tokens per cell text for local models
                 total_tokens += sum(max(1, len(doc.text.split()) * 2) for doc in batch)
+            self.report_progress(
+                {
+                    "phase": "embedding_batches",
+                    "completed_batches": batch_idx,
+                    "total_batches": total_batches,
+                    "completed_items": min(start + len(batch), total_items),
+                    "total_items": total_items,
+                }
+            )
 
         duration_seconds = round(time.perf_counter() - start_perf, 3)
         cost_info = calculate_embedding_cost(input_data.model, total_tokens)

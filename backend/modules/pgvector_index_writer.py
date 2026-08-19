@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from ..embeddings.factory import EmbeddingEncoder
 from ..storage.db_manager import DatabaseManager
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
-from ..storage.pgvector_store import PgVectorStore
+from ..storage.pgvector_store import PGVECTOR_INSERT_BATCH_SIZE, PgVectorStore
 from ..storage.vector_index import VectorIndexStore
 from .base import (
     EmptyModuleConfigDTO,
@@ -64,6 +64,20 @@ class PgVectorIndexWriterModule(ExecutableModule):
 
         collection_name = VectorIndexStore.index_id(input_data.artifact_id)
         items_dict = [item.model_dump(mode="json") for item in input_data.items]
+        self.report_progress(
+            {
+                "phase": "storage_batches",
+                "target_index_id": collection_name,
+                "completed_batches": 0,
+                "total_batches": max(
+                    1,
+                    (len(items_dict) + PGVECTOR_INSERT_BATCH_SIZE - 1)
+                    // PGVECTOR_INSERT_BATCH_SIZE,
+                ),
+                "completed_items": 0,
+                "total_items": len(items_dict),
+            }
+        )
 
         # 1. Save source file metadata to PostgreSQL
         self.db_manager.save_source_file(
@@ -85,9 +99,29 @@ class PgVectorIndexWriterModule(ExecutableModule):
                 "model": input_data.model,
                 "dimension": input_data.dimension,
                 "document_count": len(items_dict),
+                "duration_seconds": getattr(input_data, "duration_seconds", None),
+                "total_tokens": getattr(input_data, "total_tokens", None),
+                "estimated_cost_usd": getattr(
+                    input_data,
+                    "estimated_cost_usd",
+                    None,
+                ),
+                "estimated_cost_krw": getattr(
+                    input_data,
+                    "estimated_cost_krw",
+                    None,
+                ),
+                "batch_size": getattr(input_data, "batch_size", None),
                 "items": items_dict,
             },
             embedding_encoder=self.embedding_encoder,
+            progress_callback=lambda progress: self.report_progress(
+                {
+                    "phase": "storage_batches",
+                    "target_index_id": collection_name,
+                    **progress,
+                }
+            ),
         )
 
         return {

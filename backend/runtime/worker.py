@@ -7,7 +7,7 @@ from multiprocessing import get_context
 from multiprocessing.process import BaseProcess
 from queue import Empty
 from threading import Lock
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
 
@@ -35,14 +35,26 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
             Path(spec["embedding_artifact_dir"])
         ),
         vector_index_store=VectorIndexStore(Path(spec["vector_index_dir"])),
+        processed_dir=Path(spec["processed_dir"]),
+        spreadsheet_artifact_dir=Path(spec["spreadsheet_artifact_dir"]),
     )
     while True:
         task = request_queue.get()
         if task is None:
             return
         task_id = task["task_id"]
+        module = None
         try:
             module = registry.get(task["module_type"])
+            module.set_progress_callback(
+                lambda progress: response_queue.put(
+                    {
+                        "task_id": task_id,
+                        "event": "progress",
+                        "progress": progress,
+                    }
+                )
+            )
             output = module.run(
                 task["input"],
                 task["config"],
@@ -67,6 +79,9 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
                     "error": str(error),
                 }
             )
+        finally:
+            if module is not None:
+                module.set_progress_callback(None)
 
 
 class CancellableModuleWorker:
@@ -90,6 +105,7 @@ class CancellableModuleWorker:
         input_payload: Any,
         config: Any,
         execution_id: str,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Any:
         task_id = uuid4().hex
         with self._state_lock:
@@ -128,6 +144,11 @@ class CancellableModuleWorker:
                     continue
 
                 if result.get("task_id") != task_id:
+                    continue
+                if result.get("event") == "progress":
+                    progress = result.get("progress")
+                    if progress_callback is not None and isinstance(progress, dict):
+                        progress_callback(dict(progress))
                     continue
                 if result.get("ok") is True:
                     metadata = result.get("metadata")

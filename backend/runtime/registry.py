@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
 from ..modules.answer_refiner import AnswerRefinerModule
@@ -9,6 +11,7 @@ from ..modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from ..modules.bm25_retriever import Bm25RetrieverModule
 from ..modules.cell_text_embedder import CellTextEmbedderModule
 from ..modules.cell_text_serializer import CellTextSerializerModule
+from ..modules.company_entity_extractor import CompanyEntityExtractorModule
 from ..modules.context_expander import ContextExpanderModule
 from ..modules.dataframe_source import DataframeSourceModule
 from ..modules.decomposer import DecomposerModule
@@ -19,6 +22,7 @@ from ..modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
 from ..modules.image_tile_source import ImageTileSourceModule
+from ..modules.index_company_persistence import IndexCompanyPersistenceModule
 from ..modules.json_inspector import JsonInspectorModule
 from ..modules.json_transformer import JsonTransformerModule
 from ..modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
@@ -33,6 +37,7 @@ from ..modules.qa_example_loader import QaExampleLoaderModule
 from ..modules.query_input import QueryInputModule
 from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
+from ..modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from ..modules.vector_index_writer import VectorIndexWriterModule
 from ..storage.answer_cache import AnswerCacheRepository
 from ..storage.db_manager import DatabaseManager
@@ -56,6 +61,8 @@ class ModuleRegistry:
         vector_index_store: Optional[VectorIndexStore] = None,
         pgvector_store: Optional[PgVectorStore] = None,
         db_manager: Optional[DatabaseManager] = None,
+        processed_dir: Path = PROCESSED_DATA_DIR,
+        spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
         self.repository = repository
         self.embedding_artifact_store = (
@@ -74,6 +81,8 @@ class ModuleRegistry:
                 "answer_cache_path": str(repository.path),
                 "embedding_artifact_dir": str(self.embedding_artifact_store.directory),
                 "vector_index_dir": str(self.vector_index_store.directory),
+                "processed_dir": str(processed_dir),
+                "spreadsheet_artifact_dir": str(spreadsheet_artifact_dir),
             }
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
@@ -112,14 +121,23 @@ class ModuleRegistry:
             AnswerCacheWriterModule(repository),
             JsonTransformerModule(),
             JsonInspectorModule(),
-            ProcessedFileSelectorModule(),
+            ProcessedFileSelectorModule(processed_dir=processed_dir),
             BfsLlmStructureDetectorModule(completion_client),
             LocalVlmStructureDetectorModule(),
-            LunaVlmStructureDetectorModule(),
+            LunaVlmStructureDetectorModule(
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
             DoclingTableDetectorModule(),
             OpenpyxlRegionDetectorModule(),
-            CellTextSerializerModule(),
-            ExhaustiveCellTextSerializerModule(),
+            CellTextSerializerModule(processed_dir=processed_dir),
+            ExhaustiveCellTextSerializerModule(processed_dir=processed_dir),
+            CompanyEntityExtractorModule(processed_dir=processed_dir),
+            SheetMetadataPersistenceModule(
+                db_manager=self.db_manager,
+                processed_dir=processed_dir,
+            ),
+            IndexCompanyPersistenceModule(pgvector_store=self.pgvector_store),
             DataframeSourceModule(),
             ImageTileSourceModule(),
             QaExampleLoaderModule(),

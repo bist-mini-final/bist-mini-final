@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
+  AlertCircle,
   Building2,
   CheckCircle2,
   ChevronDown,
@@ -15,40 +16,32 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Square,
+  Trash2,
   Zap,
 } from 'lucide-react';
-import type { ModuleStepState } from './ModulePipelineMonitor';
+import type { PipelineRunState } from '../pipelineTypes';
 import { SpreadsheetResultModal } from '../../playground/components/SpreadsheetResults/SpreadsheetResultModal';
-
-export interface PipelineRunState {
-  pipelineId: string;
-  fileName: string;
-  workbookHash?: string;
-  companyName?: string;
-  model: string;
-  batchSize: number;
-  status: 'running' | 'completed' | 'failed';
-  currentStageIndex: number;
-  progressPercent: number;
-  elapsedSeconds: number;
-  modules: ModuleStepState[];
-  chunkCount?: number;
-  totalTokens?: number;
-  costUsd?: number;
-  costKrw?: number;
-  error?: string | null;
-  isLiveUpload?: boolean;
-  lunaOutput?: any;
-}
 
 interface TrackerProps {
   pipeline: PipelineRunState;
   onBack: () => void;
-  onRefresh?: () => void;
-  onRerunFromStep?: (fromStep: 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store') => void;
+  onResume?: () => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+  isCancelling?: boolean;
+  isDeleting?: boolean;
 }
 
-export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: TrackerProps) {
+export function PipelineTrackerView({
+  pipeline,
+  onBack,
+  onResume,
+  onCancel,
+  onDelete,
+  isCancelling = false,
+  isDeleting = false,
+}: TrackerProps) {
   const [openModuleIds, setOpenModuleIds] = useState<Record<string, boolean>>({
     [pipeline.modules[pipeline.currentStageIndex]?.id || '']: true,
   });
@@ -77,7 +70,12 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
   }, [pipeline.isLiveUpload, pipeline.status, autoReturnSeconds]);
 
   useEffect(() => {
-    if (autoReturnSeconds !== null && autoReturnSeconds > 0 && !isAutoReturnPaused) {
+    if (
+      autoReturnSeconds !== null
+      && autoReturnSeconds > 0
+      && !isAutoReturnPaused
+      && !isLunaInspectorOpen
+    ) {
       autoReturnTimerRef.current = setTimeout(() => {
         setAutoReturnSeconds((prev) => (prev !== null ? prev - 1 : null));
       }, 1000);
@@ -87,7 +85,7 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
     return () => {
       if (autoReturnTimerRef.current) clearTimeout(autoReturnTimerRef.current);
     };
-  }, [autoReturnSeconds, isAutoReturnPaused, onBack]);
+  }, [autoReturnSeconds, isAutoReturnPaused, isLunaInspectorOpen, onBack]);
 
   const toggleModule = (id: string) => {
     setOpenModuleIds((prev) => ({
@@ -97,7 +95,10 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
   };
 
   const isRunning = pipeline.status === 'running';
+  const isQueued = pipeline.status === 'queued';
+  const isPaused = pipeline.status === 'paused';
   const isCompleted = pipeline.status === 'completed';
+  const isFailed = pipeline.status === 'failed';
   const activeModule = pipeline.modules[pipeline.currentStageIndex];
 
   return (
@@ -127,15 +128,54 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                 실행 중 ({pipeline.elapsedSeconds.toFixed(1)}s)
               </span>
             )}
+            {isQueued && (
+              <span className="ds-module-status-badge ds-module-status-badge--waiting">
+                <Clock size={13} /> 서버 작업 큐 대기 중
+              </span>
+            )}
             {isCompleted && (
               <span className="ds-module-status-badge ds-module-status-badge--done">
                 <CheckCircle2 size={13} /> 적재 완료 ({pipeline.elapsedSeconds.toFixed(1)}s)
+              </span>
+            )}
+            {isPaused && (
+              <span className="ds-module-status-badge ds-module-status-badge--paused">
+                <Pause size={13} /> 사용자 중단
+              </span>
+            )}
+            {isFailed && (
+              <span className="ds-module-status-badge ds-module-status-badge--failed">
+                <AlertCircle size={13} /> 실행 실패
               </span>
             )}
           </div>
         </div>
 
         <div className="ds-pipeline-header__right">
+          {(isRunning || isQueued) && onCancel && (
+            <button
+              type="button"
+              className="ds-stop-ingestion-button"
+              onClick={onCancel}
+              disabled={isCancelling}
+              title="현재 모듈 실행을 중단하고 나중에 같은 지점부터 재개"
+            >
+              {isCancelling ? <Loader2 size={14} className="ds-spin" /> : <Square size={13} />}
+              <span>{isCancelling ? '중단 중...' : '작업 중단'}</span>
+            </button>
+          )}
+          {!isCompleted && onDelete && (
+            <button
+              type="button"
+              className="ds-delete-ingestion-button"
+              onClick={onDelete}
+              disabled={isDeleting || isCancelling}
+              title="실행 기록과 생성 중인 부분 컬렉션 삭제 (원본 Excel은 보존)"
+            >
+              {isDeleting ? <Loader2 size={14} className="ds-spin" /> : <Trash2 size={14} />}
+              <span>{isDeleting ? '삭제 중...' : '작업 삭제'}</span>
+            </button>
+          )}
           <button
             type="button"
             className="secondary-button"
@@ -147,6 +187,30 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
           </button>
         </div>
       </header>
+
+      {isFailed && (
+        <div className="ds-error-alert" style={{ margin: '0 0 0.8rem' }}>
+          <AlertCircle size={16} />
+          <span>{pipeline.error || '워크플로 모듈 실행 중 오류가 발생했습니다.'}</span>
+          {onResume && (
+            <button type="button" className="secondary-button" onClick={onResume}>
+              <RotateCcw size={13} /> 실패 모듈부터 다시 실행
+            </button>
+          )}
+        </div>
+      )}
+
+      {isPaused && (
+        <div className="ds-paused-alert" style={{ margin: '0 0 0.8rem' }}>
+          <Pause size={16} />
+          <span>사용자 요청으로 작업이 중단됐습니다. 완료된 모듈 결과는 보존됩니다.</span>
+          {onResume && (
+            <button type="button" className="secondary-button" onClick={onResume}>
+              <RotateCcw size={13} /> 중단 지점부터 다시 실행
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Auto-return countdown banner ONLY when it was a live upload */}
       {pipeline.isLiveUpload && isCompleted && autoReturnSeconds !== null && (
@@ -191,7 +255,11 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                 <span>
                   {activeModule && isRunning
                     ? `[모듈 ${pipeline.currentStageIndex + 1}/${pipeline.modules.length}] ${activeModule.name}`
-                    : '전체 모듈 파이프라인 완료'}
+                    : isQueued
+                      ? '서버 작업 큐에서 실행 대기 중'
+                    : isFailed
+                      ? `모듈 ${pipeline.currentStageIndex + 1}에서 실행 실패`
+                      : '전체 모듈 파이프라인 완료'}
                 </span>
               </span>
               <span style={{ fontWeight: 750, color: '#0f766e' }}>{pipeline.progressPercent}%</span>
@@ -209,26 +277,14 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
               const isModDone = mod.status === 'done';
               const isModRunning = mod.status === 'running';
               const isModWaiting = mod.status === 'waiting';
+              const isModFailed = mod.status === 'failed';
               const isLunaModule = mod.id === 'mod_vlm_detector' || mod.moduleType === 'luna_vlm_structure_detector';
-
-              // Map module type to from_step key for partial re-run
-              const STEP_MAP: Record<string, 'luna_vlm' | 'serializer' | 'embedder' | 'vector_store'> = {
-                luna_vlm_structure_detector: 'luna_vlm',
-                local_vlm_structure_detector: 'luna_vlm',
-                cell_text_serializer: 'serializer',
-                exhaustive_cell_text_serializer: 'serializer',
-                cell_text_embedder: 'embedder',
-                vector_index_writer: 'vector_store',
-                pgvector_index_writer: 'vector_store',
-              };
-              const rerunStep = STEP_MAP[mod.moduleType ?? ''];
-              const canRerun = !!onRerunFromStep && !!rerunStep && !isRunning;
 
               return (
                 <div
                   key={mod.id}
                   className={`ds-module-card ${
-                    isModDone ? 'is-done' : isModRunning ? 'is-running' : 'is-waiting'
+                    isModDone ? 'is-done' : isModRunning ? 'is-running' : isModFailed ? 'is-failed' : 'is-waiting'
                   }`}
                 >
                   {/* Card Header (Click to toggle) */}
@@ -243,6 +299,8 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                           <CheckCircle2 size={16} />
                         ) : isModRunning ? (
                           <Loader2 size={16} className="ds-spin" />
+                        ) : isModFailed ? (
+                          <AlertCircle size={16} />
                         ) : (
                           <Icon size={16} />
                         )}
@@ -257,7 +315,7 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
 
                     <div className="ds-module-card__right">
                       {/* Luna VLM Magnifying Glass Inspection Action */}
-                      {isLunaModule && (isModDone || isCompleted) && (
+                      {isLunaModule && (isModDone || isCompleted) && pipeline.lunaOutput && (
                         <button
                           type="button"
                           className="ds-action-btn ds-action-btn--primary"
@@ -270,28 +328,6 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                         >
                           <Search size={13} />
                           <span>Luna 구조 돋보기 검사</span>
-                        </button>
-                      )}
-
-                      {/* Partial Re-run Button: shown on completed steps when not running */}
-                      {canRerun && (
-                        <button
-                          type="button"
-                          className="ds-action-btn ds-action-btn--secondary"
-                          style={{
-                            padding: '0.22rem 0.55rem',
-                            fontSize: '0.68rem',
-                            marginRight: '0.3rem',
-                            gap: '0.25rem',
-                          }}
-                          title={`이 스텝(${rerunStep})부터 파이프라인 재실행`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRerunFromStep!(rerunStep!);
-                          }}
-                        >
-                          <RotateCcw size={12} />
-                          <span>여기서부터</span>
                         </button>
                       )}
 
@@ -314,6 +350,11 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                           <CheckCircle2 size={11} /> 완료 {mod.durationSeconds ? `(${mod.durationSeconds.toFixed(1)}s)` : ''}
                         </span>
                       )}
+                      {isModFailed && (
+                        <span className="ds-module-status-badge ds-module-status-badge--failed">
+                          <AlertCircle size={11} /> 실패
+                        </span>
+                      )}
 
                       <ChevronDown
                         size={16}
@@ -325,6 +366,32 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                   {/* Card Body (Detailed Sub-logs & Metadata) */}
                   {isOpen && (
                     <div className="ds-module-card__body">
+                      {mod.batchProgress && (
+                        <div className="ds-batch-progress" aria-label={`${mod.name} 배치 진행률`}>
+                          <div className="ds-batch-progress__label">
+                            <strong>
+                              {mod.batchProgress.completed}/{mod.batchProgress.total} 배치 완료
+                            </strong>
+                            {mod.batchProgress.totalItems !== undefined && (
+                              <span>
+                                문서 {(mod.batchProgress.completedItems ?? 0).toLocaleString()}
+                                /{mod.batchProgress.totalItems.toLocaleString()}개
+                              </span>
+                            )}
+                          </div>
+                          <div className="ds-batch-progress__track">
+                            <div
+                              className="ds-batch-progress__fill"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (mod.batchProgress.completed / Math.max(1, mod.batchProgress.total)) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                       {mod.metaInfo && Object.keys(mod.metaInfo).length > 0 && (
                         <div className="ds-module-meta-row">
                           {Object.entries(mod.metaInfo).map(([k, v]) => (
@@ -350,6 +417,8 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
                                   ? 'is-done'
                                   : sub.status === 'running'
                                   ? 'is-running'
+                                  : sub.status === 'failed'
+                                  ? 'is-failed'
                                   : ''
                               }`}
                             >
@@ -449,21 +518,14 @@ export function PipelineTrackerView({ pipeline, onBack, onRerunFromStep }: Track
       </div>
 
       {/* Luna VLM Structure Result Magnifying Glass Modal */}
-      {isLunaInspectorOpen && (
+      {isLunaInspectorOpen && pipeline.lunaOutput && (
         <SpreadsheetResultModal
           kind="luna_vlm"
           input={{
             file_name: pipeline.fileName,
-            sheet_names: pipeline.lunaOutput?.sheet_names || ['Key_Stats', 'Income_Statement', 'Balance_Sheet', 'Cash_Flow'],
+            sheet_names: pipeline.lunaOutput.sheet_names || [],
           }}
-          output={
-            pipeline.lunaOutput || {
-              file_name: pipeline.fileName,
-              workbook_hash: pipeline.workbookHash || '',
-              sheet_names: ['Key_Stats', 'Income_Statement', 'Balance_Sheet', 'Cash_Flow'],
-              tables: [],
-            }
-          }
+          output={pipeline.lunaOutput}
           onClose={() => setIsLunaInspectorOpen(false)}
         />
       )}

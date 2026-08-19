@@ -382,13 +382,14 @@ export function useWorkflowPersistence(
         let run = latestRun &&
           (latestRun.status === 'queued' ||
             latestRun.status === 'running' ||
+            latestRun.status === 'paused' ||
             latestRun.status === 'failed') &&
           executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
           ? latestRun
           : await createRun(query, controller.signal);
         applyRun(run);
         onBatch?.(run);
-        while (run.status === 'queued' || run.status === 'running') {
+        while (run.status === 'queued' || run.status === 'running' || run.status === 'paused') {
           const stableRun = run;
           const runningRun = markNextBatchRunning(run);
           stableRunRef.current = stableRun;
@@ -438,7 +439,7 @@ export function useWorkflowPersistence(
         if (!run || run.status === 'completed') {
           run = await createRun(query, controller.signal);
         }
-        if (run.status === 'queued' || run.status === 'running' || run.status === 'failed') {
+        if (run.status === 'queued' || run.status === 'running' || run.status === 'paused' || run.status === 'failed') {
           const stableRun = run;
           const runningRun = markNextBatchRunning(run);
           stableRunRef.current = stableRun;

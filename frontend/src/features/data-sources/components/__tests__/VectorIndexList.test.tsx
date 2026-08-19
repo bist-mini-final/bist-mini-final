@@ -1,7 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { FileSpreadsheet } from 'lucide-react';
 import { VectorIndexList } from '../VectorIndexList';
 import type { VectorIndexInfo } from '../../types';
+import type { PipelineRunState } from '../../pipelineTypes';
 
 describe('VectorIndexList', () => {
   it('renders empty state when no collections exist', () => {
@@ -67,5 +69,51 @@ describe('VectorIndexList', () => {
     const deleteBtn = screen.getByRole('button', { name: /삭제/i });
     fireEvent.click(deleteBtn);
     expect(handleDelete).toHaveBeenCalledWith('col-uuid-1234567890');
+  });
+
+  it('does not render a DB collection twice while its owning pipeline is active', () => {
+    const index: VectorIndexInfo = {
+      index_id: 'target-index',
+      file_name: 'sample.xlsx',
+      workbook_hash: 'hash-test',
+      model: 'text-embedding-3-large',
+      dimension: 3072,
+      document_count: 1000,
+      created_at: '2026-08-18T10:00:00Z',
+    };
+    const pipeline: PipelineRunState = {
+      pipelineId: 'run-active',
+      targetIndexId: 'target-index',
+      fileName: 'sample.xlsx',
+      model: 'text-embedding-3-large',
+      batchSize: 1000,
+      status: 'running',
+      currentStageIndex: 0,
+      progressPercent: 80,
+      elapsedSeconds: 10,
+      modules: [{
+        id: 'writer',
+        name: 'pgvector 적재',
+        moduleType: 'pgvector_index_writer',
+        category: 'Storage',
+        icon: FileSpreadsheet,
+        status: 'running',
+        sublogs: [],
+      }],
+    };
+
+    render(
+      <VectorIndexList
+        indexes={[index]}
+        activeRunningPipeline={pipeline}
+        onDetailClick={vi.fn()}
+        onSearchClick={vi.fn()}
+        onDeleteClick={vi.fn()}
+        onCreateClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText('sample.xlsx')).toHaveLength(1);
+    expect(screen.queryByText('1,000개')).not.toBeInTheDocument();
   });
 });
