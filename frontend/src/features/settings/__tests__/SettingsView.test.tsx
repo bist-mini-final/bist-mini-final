@@ -17,7 +17,7 @@ describe('SettingsView', () => {
   it('renders system settings and connected status banner', async () => {
     vi.mocked(dataSourceApi.getDbStatus).mockResolvedValue({
       connected: true,
-      host: 'localhost',
+      host: '192.168.5.4',
       port: 5432,
       database: 'rag_flow',
       postgres_version: '16.15',
@@ -34,7 +34,10 @@ describe('SettingsView', () => {
       expect(screen.getByText('PostgreSQL pgvector 정상 연결됨')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('localhost:5432')).toBeInTheDocument();
+    expect(screen.getByText('192.168.5.4:5432')).toBeInTheDocument();
+    expect(
+      screen.getByText('postgresql://<user>:<password>@192.168.5.4:5432/rag_flow')
+    ).toBeInTheDocument();
     expect(screen.getByText('rag_flow')).toBeInTheDocument();
     expect(screen.getByText('2개')).toBeInTheDocument();
     expect(screen.getByText('1,024청크')).toBeInTheDocument();

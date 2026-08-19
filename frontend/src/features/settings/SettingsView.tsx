@@ -50,7 +50,10 @@ export function SettingsView() {
     }
   };
 
-  const dbUrl = 'postgresql://rag_user:rag_password@localhost:5432/rag_flow';
+  const dbHost = dbStatus?.host || 'localhost';
+  const dbPort = dbStatus?.port || 5432;
+  const dbName = dbStatus?.database || 'rag_flow';
+  const dbUrl = `postgresql://<user>:<password>@${dbHost}:${dbPort}/${dbName}`;
   const dockerCmd = 'docker compose -f docker-compose.db.yml up -d';
 
   const copyToClipboard = (text: string, type: 'url' | 'cmd') => {
@@ -139,7 +142,7 @@ export function SettingsView() {
               <Server size={14} /> 호스트 / 포트
             </span>
             <span className="settings-card__val">
-              {dbStatus?.host || 'localhost'}:{dbStatus?.port || 5432}
+              {dbHost}:{dbPort}
             </span>
           </div>
 
@@ -148,7 +151,7 @@ export function SettingsView() {
               <Database size={14} /> 데이터베이스명
             </span>
             <span className="settings-card__val">
-              {dbStatus?.database || 'rag_flow'}
+              {dbName}
             </span>
           </div>
 
