@@ -68,9 +68,9 @@ class ModuleRegistry:
         Initialize the registry and register all supported executable modules.
         
         Parameters:
-            repository (AnswerCacheRepository): Repository used for answer caching.
+            repository (AnswerCacheRepository): Repository used to cache answers.
             processed_dir (Path): Directory containing processed data artifacts.
-            spreadsheet_artifact_dir (Path): Directory containing spreadsheet artifacts.
+            spreadsheet_artifact_dir (Path): Directory for spreadsheet processing artifacts.
         
         Raises:
             ValueError: If multiple modules declare the same type.

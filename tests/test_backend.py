@@ -3938,6 +3938,15 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         ]
 
         def get_meta(cid):
+            """
+            Return embedding metadata for the specified collection identifier.
+            
+            Parameters:
+            	cid (str): Collection identifier used to select the embedding metadata.
+            
+            Returns:
+            	dict: A metadata dictionary containing the embedding model, dimension, and an empty item list.
+            """
             if cid == "col_1":
                 return {"model": "text-embedding-3-small", "dimension": 1536, "items": []}
             return {"model": "text-embedding-ada-002", "dimension": 1536, "items": []}

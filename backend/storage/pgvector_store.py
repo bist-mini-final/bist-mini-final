@@ -740,7 +740,7 @@ class PgVectorStore:
         k: int = 10,
     ) -> List[Tuple[Any, float]]:
         """
-        Perform vector similarity search within a pgvector collection.
+        Search a pgvector collection using an embedding vector.
         
         Parameters:
             collection_name (str): Name of the collection to search.
@@ -748,7 +748,10 @@ class PgVectorStore:
             k (int): Maximum number of results to return.
         
         Returns:
-            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if both the direct and fallback searches fail.
+            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection does not exist.
+        
+        Raises:
+            PgVectorStoreError: If both direct SQL and fallback similarity searches fail.
         """
         conn = self._raw_connection()
         try:

@@ -58,13 +58,13 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         Load selected pgvector collections and combine their documents and index metadata.
         
         Parameters:
-        	payload (BaseModel): Input containing one or more collection names, file names, or workbook hashes.
+        	payload (BaseModel): Input specifying collection IDs, file names, or workbook hashes.
         
         Returns:
         	Dict[str, Any]: Combined document and index outputs for the selected collections.
         
         Raises:
-        	ModuleExecutionError: If no collections are available, a requested collection cannot be found, selected collections have inconsistent embedding dimensions, or collection documents cannot be loaded.
+        	ModuleExecutionError: If no collections are available, a requested collection is missing, selected collections have inconsistent embedding models or dimensions, or collection documents cannot be loaded.
         """
         input_data = cast(PgVectorCollectionLoaderInputDTO, payload)
         
