@@ -903,7 +903,8 @@ class PgVectorStore:
                         return []
 
                 query = f"""
-                    SELECT 
+                    WITH ranked_cells AS (
+                    SELECT
                         id,
                         document,
                         cmetadata,
@@ -913,7 +914,22 @@ class PgVectorStore:
                         cmetadata->>'cell_value' AS cell_value,
                         cmetadata->'row_header' AS row_header,
                         cmetadata->'column_header' AS column_header,
-                        cmetadata->>'company_name' AS company_name
+                        cmetadata->>'company_name' AS company_name,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                UPPER(cmetadata->>'sheet_name'),
+                                UPPER(cmetadata->>'cell_coord')
+                            ORDER BY
+                                CASE cmetadata->>'variant'
+                                    WHEN 'header_with_value' THEN 0
+                                    WHEN 'header_only' THEN 1
+                                    ELSE 2
+                                END,
+                                COALESCE(cmetadata->'row_header', '[]'::jsonb)::text,
+                                COALESCE(cmetadata->'column_header', '[]'::jsonb)::text,
+                                COALESCE(document, ''),
+                                id
+                        ) AS cell_rank
                     FROM langchain_pg_embedding
                     WHERE ({' OR '.join(where_clauses)})
                 """
@@ -925,7 +941,24 @@ class PgVectorStore:
                     query += " AND cmetadata->>'workbook_hash' = %s"
                     params.append(workbook_hash)
 
-                query += " LIMIT %s;"
+                query += """
+                    )
+                    SELECT
+                        id,
+                        document,
+                        cmetadata,
+                        cell_id,
+                        cell_coord,
+                        sheet_name,
+                        cell_value,
+                        row_header,
+                        column_header,
+                        company_name
+                    FROM ranked_cells
+                    WHERE cell_rank = 1
+                    ORDER BY UPPER(sheet_name), UPPER(cell_coord), id
+                    LIMIT %s;
+                """
                 params.append(limit)
 
                 cur.execute(query, tuple(params))
@@ -933,14 +966,8 @@ class PgVectorStore:
 
             import json
             results = []
-            seen_coords = set()
             for r in rows:
                 _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
-                key = (sheet_name, cell_coord)
-                if key in seen_coords:
-                    continue
-                seen_coords.add(key)
-
                 if isinstance(row_header, str):
                     try:
                         row_header = json.loads(row_header)

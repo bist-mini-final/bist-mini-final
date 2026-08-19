@@ -64,6 +64,9 @@ class PgVectorMetadataQueryTests(unittest.TestCase):
         query, params = cursor.executions[-1]
         self.assertIn("UPPER(cmetadata->>'sheet_name') = reference.sheet_name", query)
         self.assertIn("UPPER(cmetadata->>'cell_coord') = reference.cell_coord", query)
+        self.assertIn("ROW_NUMBER() OVER", query)
+        self.assertIn("WHERE cell_rank = 1", query)
+        self.assertIn("ORDER BY UPPER(sheet_name), UPPER(cell_coord), id LIMIT %s", query)
         self.assertEqual(params[:2], (["INCOME_STATEMENT"], ["O17"]))
         self.assertEqual(params[2], "workbook-hash")
 
@@ -108,6 +111,15 @@ class PgVectorIntegrationTests(unittest.TestCase):
                     "cell_value": "120M",
                 },
                 {
+                    "cell_id": "c1",
+                    "sheet_name": "IS",
+                    "cell_coord": "B2",
+                    "text": "ZZZ alternate Gross Profit serialization",
+                    "row_header": ["Gross Profit alternate"],
+                    "column_header": ["2024"],
+                    "cell_value": "500M",
+                },
+                {
                     "cell_id": "c3",
                     "sheet_name": "BS",
                     "cell_coord": "B2",
@@ -149,10 +161,24 @@ class PgVectorIntegrationTests(unittest.TestCase):
         self.assertEqual(len(balance_sheet_cells), 1)
         self.assertEqual(balance_sheet_cells[0]["cell_id"], "c3")
 
+        limited_cells = self.store.fetch_cells_by_metadata(
+            ["B2", "B3"],
+            collection_name=index_id,
+            cell_references=[
+                {"sheet_name": "IS", "cell_coord": "B2"},
+                {"sheet_name": "IS", "cell_coord": "B3"},
+            ],
+            limit=2,
+        )
+        self.assertEqual(
+            [(cell["sheet_name"], cell["cell_coord"]) for cell in limited_cells],
+            [("IS", "B2"), ("IS", "B3")],
+        )
+
         # 3. Get Detail
         detail = self.store.get_index_detail(index_id, limit=5)
         self.assertEqual(detail["index_id"], index_id)
-        self.assertEqual(detail["document_count"], 3)
+        self.assertEqual(detail["document_count"], 4)
 
         # 4. Delete
         deleted = self.store.delete(index_id)
