@@ -2,7 +2,9 @@ import hashlib
 import json
 from pathlib import Path
 from threading import Lock
+import time
 from typing import Any, Dict, List, Optional, Type, TypeVar
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -17,6 +19,24 @@ from .history import compact_history_value
 
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Write text atomically, tolerating transient Windows file locks."""
+
+    temporary_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+    temporary_path.write_text(content, encoding="utf-8")
+    try:
+        for attempt in range(6):
+            try:
+                temporary_path.replace(path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _validate_identifier(value: str) -> str:
@@ -47,11 +67,9 @@ class JsonModelStore:
 
     def write(self, document_id: str, document: ModelType) -> ModelType:
         path = self._path(document_id)
-        temporary_path = path.with_suffix(".json.tmp")
         serialized = document.model_dump_json(indent=2)
         with self._lock:
-            temporary_path.write_text(serialized + "\n", encoding="utf-8")
-            temporary_path.replace(path)
+            _atomic_write_text(path, serialized + "\n")
         return document
 
     def list_documents(self) -> List[ModelType]:
@@ -152,13 +170,11 @@ class RunStore:
             state.input_payload = compact_history_value(state.input_payload)
             state.output = compact_history_value(state.output)
         summary_path = self._store.directory / f"{run.id}.summary.json"
-        temporary_path = summary_path.with_name(f"{summary_path.name}.tmp")
         with self._summary_lock:
-            temporary_path.write_text(
+            _atomic_write_text(
+                summary_path,
                 summary.model_dump_json(indent=2) + "\n",
-                encoding="utf-8",
             )
-            temporary_path.replace(summary_path)
         return saved
 
     def load(self, run_id: str) -> WorkflowRun:
@@ -247,14 +263,12 @@ class ResultCache:
 
     def put(self, cache_key: str, value: Any) -> None:
         path = self.directory / f"{cache_key}.json"
-        temporary_path = path.with_suffix(".json.tmp")
         with self._lock:
-            temporary_path.write_text(
+            _atomic_write_text(
+                path,
                 json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2)
                 + "\n",
-                encoding="utf-8",
             )
-            temporary_path.replace(path)
 
     def clear(self) -> int:
         removed = 0
