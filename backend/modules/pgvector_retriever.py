@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from typing import Any, Dict, List, Optional, Tuple, cast
 
@@ -63,13 +64,16 @@ class PgVectorRetrieverModule(ExecutableModule):
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         """
-        Searches selected pgvector collections for the configured query embeddings and returns ranked matching documents.
+        Searches selected pgvector collections using the configured query embeddings and ranks the matching documents.
         
         Parameters:
             payload (BaseModel): Execution data containing query embeddings, collection identifiers, retrieval configuration, and document context.
         
         Returns:
-            Dict[str, Any]: Query and document context with ranked matching items, or an empty item list when no query embeddings are provided.
+            Dict[str, Any]: Query and document context with ranked matches, or an empty item list when no query embeddings are provided.
+        
+        Raises:
+            ModuleExecutionError: If every collection search fails and no matches are available.
         """
         input_data = cast(PgVectorRetrieverExecutionDTO, payload)
         raw_col_name = input_data.index_input.index_id
@@ -104,11 +108,17 @@ class PgVectorRetrieverModule(ExecutableModule):
                     )
                     for offset, (doc, dist) in enumerate(results):
                         score = 1.0 - float(dist) if dist is not None else 0.5
-                        cell_id = (
-                            doc.metadata.get("cell_id")
+                        content_str = doc.page_content or ""
+                        content_hash = hashlib.sha256(content_str.encode("utf-8")).hexdigest()[:16]
+                        doc_id = getattr(doc, "id", None)
+                        row_id = doc_id if isinstance(doc_id, str) and doc_id else None
+                        persistent_id = (
+                            row_id
+                            or doc.metadata.get("cell_id")
                             or doc.metadata.get("chunk_id")
-                            or f"{target_col}:unknown:{offset}"
+                            or doc.metadata.get("id")
                         )
+                        cell_id = persistent_id or f"{target_col}:chunk:{content_hash}"
                         raw_doc = {
                             "cell_id": cell_id,
                             "text": doc.page_content,

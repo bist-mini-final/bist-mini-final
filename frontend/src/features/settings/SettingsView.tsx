@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Copy,
@@ -24,8 +24,13 @@ export function SettingsView() {
   const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
-  const [copiedCmd, setCopiedCmd] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<'idle' | 'success' | 'error'>('idle');
+  const [copiedCmd, setCopiedCmd] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const copyResetTimers = useRef<
+    Partial<Record<'url' | 'cmd', ReturnType<typeof setTimeout>>>
+  >({});
+  const copyRequestIds = useRef<Partial<Record<'url' | 'cmd', number>>>({});
 
   const fetchStatus = async () => {
     setIsLoading(true);
@@ -41,6 +46,14 @@ export function SettingsView() {
 
   useEffect(() => {
     fetchStatus();
+    return () => {
+      if (copyResetTimers.current.url) {
+        clearTimeout(copyResetTimers.current.url);
+      }
+      if (copyResetTimers.current.cmd) {
+        clearTimeout(copyResetTimers.current.cmd);
+      }
+    };
   }, []);
 
   const handleTestConnection = async () => {
@@ -61,15 +74,47 @@ export function SettingsView() {
   const dockerCmd = 'docker compose -f docker-compose.db.yml up -d';
 
   const copyToClipboard = async (text: string, type: 'url' | 'cmd') => {
-    try {
-      if (!navigator.clipboard?.writeText) return;
-      await navigator.clipboard.writeText(text);
-    } catch {
-      return;
+    const setStatus = type === 'url' ? setCopiedUrl : setCopiedCmd;
+    const requestId = (copyRequestIds.current[type] ?? 0) + 1;
+    copyRequestIds.current[type] = requestId;
+
+    if (copyResetTimers.current[type]) {
+      clearTimeout(copyResetTimers.current[type]);
     }
-    const setCopied = type === 'url' ? setCopiedUrl : setCopiedCmd;
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (!navigator.clipboard?.writeText) {
+        if (copyRequestIds.current[type] === requestId) {
+          setStatus('error');
+          copyResetTimers.current[type] = setTimeout(() => {
+            if (copyRequestIds.current[type] === requestId) {
+              setStatus('idle');
+              delete copyResetTimers.current[type];
+            }
+          }, 2000);
+        }
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      if (copyRequestIds.current[type] === requestId) {
+        setStatus('success');
+        copyResetTimers.current[type] = setTimeout(() => {
+          if (copyRequestIds.current[type] === requestId) {
+            setStatus('idle');
+            delete copyResetTimers.current[type];
+          }
+        }, 2000);
+      }
+    } catch {
+      if (copyRequestIds.current[type] === requestId) {
+        setStatus('error');
+        copyResetTimers.current[type] = setTimeout(() => {
+          if (copyRequestIds.current[type] === requestId) {
+            setStatus('idle');
+            delete copyResetTimers.current[type];
+          }
+        }, 2000);
+      }
+    }
   };
 
   return (
@@ -190,7 +235,7 @@ export function SettingsView() {
               onClick={() => copyToClipboard(dbUrl, 'url')}
             >
               <Copy size={14} />
-              <span>{copiedUrl ? '복사됨!' : 'URL 복사'}</span>
+              <span>{copiedUrl === 'success' ? '복사됨!' : copiedUrl === 'error' ? '복사 실패' : 'URL 복사'}</span>
             </button>
           </div>
         </div>
@@ -205,7 +250,7 @@ export function SettingsView() {
               onClick={() => copyToClipboard(dockerCmd, 'cmd')}
             >
               <Copy size={14} />
-              <span>{copiedCmd ? '복사됨!' : '명령어 복사'}</span>
+              <span>{copiedCmd === 'success' ? '복사됨!' : copiedCmd === 'error' ? '복사 실패' : '명령어 복사'}</span>
             </button>
           </div>
         </div>
