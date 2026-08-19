@@ -97,6 +97,7 @@ def create_api_router(
             workflow_store=workflow_store,
             run_store=run_store,
             workflow_executor=workflow_executor,
+            workflow_dispatcher=workflow_dispatcher,
         )
     )
     router.include_router(

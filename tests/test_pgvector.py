@@ -69,6 +69,13 @@ class PgVectorIntegrationTests(unittest.TestCase):
         self.assertEqual(hits[0][1]["cell_id"], "c1")
         self.assertEqual(hits[0][1]["sheet_name"], "IS")
 
+        direct_cells = self.store.fetch_cells_by_metadata(
+            ["B2"],
+            collection_name=index_id,
+        )
+        self.assertEqual(len(direct_cells), 1)
+        self.assertEqual(direct_cells[0]["cell_id"], "c1")
+
         # 3. Get Detail
         detail = self.store.get_index_detail(index_id, limit=5)
         self.assertEqual(detail["index_id"], index_id)

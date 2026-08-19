@@ -17,7 +17,7 @@ Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, PostgreSQ
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `answer_json` | `AnswerDTO` | yes | - | Reader 모듈로부터 생성된 초기 답변 및 질문·문서 계보 DTO |
-| `target_cell_ids` | `array<string> | null` | no | `null` | 직접 조회를 강제할 추가 셀 ID 목록 (선택 사항) |
+| `target_cell_ids` | `array<string> \| null` | no | `null` | 직접 조회를 강제할 추가 셀 ID 목록 (선택 사항) |
 
 ## Config DTO
 
@@ -55,11 +55,11 @@ Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, PostgreSQ
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `prompt_tokens` | `integer | null` | no | `null` | 입력 토큰 수 |
-| `completion_tokens` | `integer | null` | no | `null` | 출력 토큰 수 |
-| `cached_tokens` | `integer | null` | no | `null` | 캐시 적중 토큰 수 |
-| `reasoning_tokens` | `integer | null` | no | `null` | 추론 토큰 수 |
-| `total_tokens` | `integer | null` | no | `null` | 전체 토큰 수 |
+| `prompt_tokens` | `integer \| null` | no | `null` | 입력 토큰 수 |
+| `completion_tokens` | `integer \| null` | no | `null` | 출력 토큰 수 |
+| `cached_tokens` | `integer \| null` | no | `null` | 캐시 적중 토큰 수 |
+| `reasoning_tokens` | `integer \| null` | no | `null` | 추론 토큰 수 |
+| `total_tokens` | `integer \| null` | no | `null` | 전체 토큰 수 |
 
 ### `DirectCellDTO`
 
@@ -68,10 +68,10 @@ Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, PostgreSQ
 | `cell_id` | `string` | yes | - | 고유 셀 식별자 (예: IS:I16 또는 IS Cell I16) |
 | `sheet_name` | `string` | yes | - | 시트명 (예: Income_Statement) |
 | `cell_coord` | `string` | yes | - | 셀 좌표 (예: I16) |
-| `cell_value` | `string | null` | no | `null` | 원장 셀 값 |
+| `cell_value` | `string \| null` | no | `null` | 원장 셀 값 |
 | `row_header` | `array<string>` | no | - | 계층형 행 헤더 목록 |
 | `column_header` | `array<string>` | no | - | 계층형 열 헤더 목록 |
-| `company_name` | `string | null` | no | `null` | 기업명 |
+| `company_name` | `string \| null` | no | `null` | 기업명 |
 | `source_text` | `string` | yes | - | 청크 원문 텍스트 |
 
 ### `DocumentContextDTO`

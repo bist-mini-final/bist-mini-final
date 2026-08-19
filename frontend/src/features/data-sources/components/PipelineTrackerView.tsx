@@ -393,6 +393,11 @@ export function PipelineTrackerView({
                           <div className="ds-batch-progress__track">
                             <div
                               className="ds-batch-progress__fill"
+                              role="progressbar"
+                              aria-valuemin={0}
+                              aria-valuemax={mod.batchProgress.total}
+                              aria-valuenow={mod.batchProgress.completed}
+                              aria-label={`${mod.name} 완료 배치 수`}
                               style={{
                                 width: `${Math.min(
                                   100,

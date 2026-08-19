@@ -174,10 +174,16 @@ class RunStore:
         Returns:
         	List[WorkflowRun]: Loaded workflow run summaries, filtered when a workflow identifier is provided.
         """
-        runs = [
-            WorkflowRun.model_validate_json(path.read_text(encoding="utf-8"))
-            for path in sorted(self._store.directory.glob("*.summary.json"))
-        ]
+        runs: List[WorkflowRun] = []
+        for path in sorted(self._store.directory.glob("*.summary.json")):
+            try:
+                runs.append(
+                    WorkflowRun.model_validate_json(path.read_text(encoding="utf-8"))
+                )
+            except FileNotFoundError:
+                # A concurrent delete removes the summary before the full run.
+                # Treat it as absent from this snapshot rather than a server error.
+                continue
         if workflow_id is None:
             return runs
         return [run for run in runs if run.workflow_id == workflow_id]
@@ -185,14 +191,15 @@ class RunStore:
     def delete(self, run_id: str) -> bool:
         """Remove one full run and its compact summary."""
 
-        removed = self._store.delete(run_id)
         summary_path = self._store.directory / (
             f"{_validate_identifier(run_id)}.summary.json"
         )
+        removed = False
         with self._summary_lock:
             if summary_path.is_file():
                 summary_path.unlink()
                 removed = True
+        removed = self._store.delete(run_id) or removed
         return removed
 
     def clear(self) -> int:

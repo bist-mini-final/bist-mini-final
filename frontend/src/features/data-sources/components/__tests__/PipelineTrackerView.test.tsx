@@ -85,4 +85,21 @@ describe('PipelineTrackerView', () => {
     expect(screen.getByRole('button', { name: '중단 지점부터 다시 실행' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '작업 중단' })).not.toBeInTheDocument();
   });
+
+  it('shows the failure alert and resume action', () => {
+    const failed = pipeline('failed');
+    failed.error = '임베딩 요청이 실패했습니다.';
+    failed.modules[0].status = 'failed';
+
+    render(
+      <PipelineTrackerView
+        pipeline={failed}
+        onBack={vi.fn()}
+        onResume={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('임베딩 요청이 실패했습니다.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '실패 모듈부터 다시 실행' })).toBeInTheDocument();
+  });
 });

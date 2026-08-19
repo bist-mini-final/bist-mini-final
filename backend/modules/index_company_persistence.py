@@ -26,9 +26,9 @@ class IndexCompanyPersistenceInputDTO(ModuleDTO):
 
 
 class IndexCompanyPersistenceOutputDTO(ModuleDTO):
-    index_id: str
-    company_name: str
-    ticker: str = ""
+    index_id: str = Field(description="기업 메타데이터가 반영된 pgvector 인덱스 ID")
+    company_name: str = Field(description="인덱스와 셀 메타데이터에 저장된 기업 표시명")
+    ticker: str = Field(default="", description="추출된 티커 심볼 (없으면 빈 문자열)")
 
 
 _INDEX_COMPANY_DEFINITION = ModuleDefinition(
@@ -41,6 +41,7 @@ _INDEX_COMPANY_DEFINITION = ModuleDefinition(
     config_fields=[],
     raw_output=True,
     cacheable=False,
+    version="2",
 )
 
 

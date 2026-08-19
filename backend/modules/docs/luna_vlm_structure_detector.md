@@ -32,6 +32,7 @@
 | `max_output_tokens` | `integer` | no | `6000` | 시트별 최대 출력 토큰 |
 | `timeout_seconds` | `integer` | no | `240` | 시트별 API 요청 제한 시간(초) |
 | `validation_retries` | `integer` | no | `1` | 좌표 규칙 위반 응답의 교정 재시도 횟수 |
+| `max_concurrency` | `integer` | no | `4` | 동시에 실행할 시트별 VLM 요청 수 |
 | `system_prompt` | `string` | no | `<long default; see contract>` | 전체 시트 구조 식별 시스템 프롬프트 |
 | `user_prompt_template` | `string` | no | `<long default; see contract>` | sheet_name, sheet_range, sheet_context 변수를 지원하는 전체 시트 프롬프트 |
 
@@ -41,7 +42,9 @@
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
+| `sheet_names` | `array<string>` | no | - | 구조 분석 대상으로 선택된 표시 시트명 |
 | `tables` | `array<ClassifiedTableDTO>` | yes | - | - |
+| `failed_sheets` | `array<object<string, string>>` | no | - | 분석하지 못한 시트명과 실패 사유 |
 
 ## Referenced DTOs
 
@@ -98,6 +101,7 @@
     "max_output_tokens": 6000,
     "timeout_seconds": 240,
     "validation_retries": 1,
+    "max_concurrency": 4,
     "system_prompt": "<use system_prompt default from ConfigDTO>",
     "user_prompt_template": "<use user_prompt_template default from ConfigDTO>"
   }

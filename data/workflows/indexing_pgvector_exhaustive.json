@@ -20,7 +20,7 @@
         "config": {
           "variant_mode": "both",
           "deduplicate_header_values": true,
-          "max_documents": 2000000
+          "max_documents": 250000
         },
         "values": {},
         "ui": { "width": null, "height": null, "execution_stopped": false, "column_widths": {} }

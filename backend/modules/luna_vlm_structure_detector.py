@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import concurrent.futures
 from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple, cast
 
 logger = logging.getLogger(__name__)
-from typing import Any, Dict, List, Literal, Optional, Protocol, cast
 
 import openpyxl
 from pydantic import BaseModel, Field, model_validator
@@ -142,6 +143,12 @@ class LunaVlmStructureDetectorConfigDTO(ModuleConfigDTO):
     max_output_tokens: int = Field(default=6000, ge=1000, le=32000, description="시트별 최대 출력 토큰")
     timeout_seconds: int = Field(default=240, ge=30, le=900, description="시트별 API 요청 제한 시간(초)")
     validation_retries: int = Field(default=1, ge=0, le=2, description="좌표 규칙 위반 응답의 교정 재시도 횟수")
+    max_concurrency: int = Field(
+        default=4,
+        ge=1,
+        le=16,
+        description="동시에 실행할 시트별 VLM 요청 수",
+    )
     system_prompt: str = Field(default=LUNA_VLM_SYSTEM_PROMPT, min_length=1, description="전체 시트 구조 식별 시스템 프롬프트")
     user_prompt_template: str = Field(
         default=LUNA_VLM_USER_TEMPLATE,
@@ -170,7 +177,6 @@ class LunaVlmStructureDetectorExecutionDTO(
             "row_overlap",
             "column_overlap",
             "overview_max_edge",
-            "max_concurrency",
         ):
             migrated.pop(field_name, None)
         legacy_system_prompt = migrated.get("system_prompt")
@@ -245,6 +251,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
             "max_output_tokens",
             "timeout_seconds",
             "validation_retries",
+            "max_concurrency",
             "system_prompt",
             "user_prompt_template",
         ],
@@ -376,6 +383,8 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
             formula_workbook = openpyxl.load_workbook(workbook_path, data_only=False, **options)
             value_workbook = openpyxl.load_workbook(workbook_path, data_only=True, **options)
             outputs: List[Dict[str, Any]] = []
+            failed_sheets: List[Dict[str, str]] = []
+            analyzed_sheet_count = 0
             output_root = self.artifact_dir / current_hash[:16]
 
             # Phase 1: Render and extract geometry on the main thread (openpyxl is not thread-safe)
@@ -383,11 +392,13 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
             for sheet_name in settings.sheet_names:
                 if sheet_name not in formula_workbook.sheetnames:
                     logger.warning("[Luna VLM] Excel 시트를 찾을 수 없어 건너뜁니다: %s", sheet_name)
+                    failed_sheets.append({"sheet_name": sheet_name, "error": "시트를 찾을 수 없습니다"})
                     continue
                 formula_sheet = formula_workbook[sheet_name]
                 value_sheet = value_workbook[sheet_name]
                 if not worksheet_visible(formula_sheet) or not worksheet_visible(value_sheet):
                     logger.info("[Luna VLM] 숨겨진 시트 건너뜀: %s", sheet_name)
+                    failed_sheets.append({"sheet_name": sheet_name, "error": "숨겨진 시트입니다"})
                     continue
 
                 try:
@@ -412,6 +423,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                     visible_columns = [column for column, width in enumerate(layout.column_widths, start=1) if width > 0]
                     if not visible_rows or not visible_columns or not cells:
                         logger.warning("[Luna VLM] 시트 %s에 표시된 셀이 없어 건너뜁니다.", sheet_name)
+                        failed_sheets.append({"sheet_name": sheet_name, "error": "표시된 데이터 셀이 없습니다"})
                         continue
 
                     sheet_bounds = CellBounds(
@@ -432,11 +444,19 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                     })
                     print(f"[Luna VLM] 시트 '{sheet_name}' 사전 렌더링 완료 ({len(cells)}개 셀)", flush=True)
                 except Exception as prep_err:
-                    logger.error("[Luna VLM] 시트 '%s' 사전 렌더링 실패: %s", sheet_name, prep_err)
+                    logger.exception("[Luna VLM] 시트 '%s' 사전 렌더링 실패", sheet_name)
+                    failed_sheets.append({"sheet_name": sheet_name, "error": str(prep_err)})
                     continue
 
             # Phase 2: Parallel OpenAI Vision API calls (pure I/O, completely thread-safe)
-            import concurrent.futures
+            if not prepared_sheets:
+                reasons = "; ".join(
+                    f"{failure['sheet_name']}: {failure['error']}"
+                    for failure in failed_sheets
+                )
+                raise ModuleExecutionError(
+                    f"분석 가능한 시트가 없습니다. {reasons or '선택된 시트가 비어 있습니다'}"
+                )
 
             def _call_vlm(ctx: Dict[str, Any]) -> Tuple[Dict[str, Any], List[LocalVlmTableDecisionDTO]]:
                 """
@@ -461,13 +481,17 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                 print(f"[Luna VLM] 시트 '{ctx['sheet_name']}' OpenAI VLM 응답 완료 ({len(decisions)}개 표 감지)", flush=True)
                 return ctx, decisions
 
-            max_workers = min(4, len(prepared_sheets)) or 1
+            max_workers = min(settings.max_concurrency, len(prepared_sheets)) or 1
             print(f"[Luna VLM] {len(prepared_sheets)}개 시트 병렬 VLM 분석 시작 (스레드 {max_workers}개)...", flush=True)
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(_call_vlm, ctx) for ctx in prepared_sheets]
+                futures = {
+                    executor.submit(_call_vlm, ctx): ctx
+                    for ctx in prepared_sheets
+                }
                 for future in concurrent.futures.as_completed(futures):
                     try:
                         ctx, decisions = future.result()
+                        analyzed_sheet_count += 1
                         s_name = ctx["sheet_name"]
                         v_sheet = ctx["value_sheet"]
                         s_layout = ctx["layout"]
@@ -479,16 +503,31 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                                 v_sheet,
                                 s_layout,
                             )
-                            if isinstance(table_out, dict):
-                                table_out["sheet_name"] = s_name
-                            elif hasattr(table_out, "sheet_name"):
-                                setattr(table_out, "sheet_name", s_name)
+                            table_out["sheet_name"] = s_name
                             sheet_tables.append(table_out)
                         outputs.extend(sheet_tables)
                         print(f"[Luna VLM] 시트 '{s_name}' 테이블 {len(sheet_tables)}개 최종 조립 완료", flush=True)
                     except Exception as future_err:
-                        logger.error("[Luna VLM] 시트 분석 중 예외 발생: %s", future_err)
+                        failed_ctx = futures[future]
+                        failed_name = str(failed_ctx["sheet_name"])
+                        logger.exception("[Luna VLM] 시트 '%s' 분석 중 예외 발생", failed_name)
+                        failed_sheets.append({"sheet_name": failed_name, "error": str(future_err)})
                         print(f"[Luna VLM] 시트 분석 중 예외: {future_err}", flush=True)
+
+            self.report_progress(
+                {
+                    "phase": "sheet_analysis",
+                    "completed_sheets": analyzed_sheet_count,
+                    "failed_sheets": len(failed_sheets),
+                    "total_sheets": len(settings.sheet_names),
+                }
+            )
+            if analyzed_sheet_count == 0:
+                reasons = "; ".join(
+                    f"{failure['sheet_name']}: {failure['error']}"
+                    for failure in failed_sheets
+                )
+                raise ModuleExecutionError(f"모든 시트의 VLM 구조 분석이 실패했습니다. {reasons}")
         finally:
             if formula_workbook is not None:
                 formula_workbook.close()
@@ -498,5 +537,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
+            "sheet_names": settings.sheet_names,
             "tables": outputs,
+            "failed_sheets": failed_sheets,
         }

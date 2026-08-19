@@ -67,6 +67,7 @@ export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) selectFile(file);
+    event.target.value = '';
   };
 
   const handleStart = () => {
@@ -106,6 +107,15 @@ export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
               onDragOver={handleDrag}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label="인덱싱할 엑셀 파일 선택"
             >
               <input
                 ref={fileInputRef}

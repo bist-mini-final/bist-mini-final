@@ -111,6 +111,7 @@ class ModuleRegistry:
                 artifact_store=self.embedding_artifact_store,
                 db_manager=self.db_manager,
                 pgvector_store=self.pgvector_store,
+                processed_dir=processed_dir,
             ),
             PrebuiltIndexLoaderModule(
                 vector_index_store=self.vector_index_store,
@@ -143,7 +144,10 @@ class ModuleRegistry:
             OpenpyxlRegionDetectorModule(),
             CellTextSerializerModule(processed_dir=processed_dir),
             ExhaustiveCellTextSerializerModule(processed_dir=processed_dir),
-            CompanyEntityExtractorModule(processed_dir=processed_dir),
+            CompanyEntityExtractorModule(
+                processed_dir=processed_dir,
+                completion_client=completion_client,
+            ),
             SheetMetadataPersistenceModule(
                 db_manager=self.db_manager,
                 processed_dir=processed_dir,

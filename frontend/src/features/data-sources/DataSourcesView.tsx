@@ -15,6 +15,10 @@ import './data-sources.css';
 const ACTIVE_JOB_KEY = 'ds_active_ingestion_job_id';
 const PENDING_FILE_KEY = 'ds_pending_ingestion_file_name';
 
+function isServerRun(pipelineId?: string): boolean {
+  return Boolean(pipelineId?.startsWith('run-'));
+}
+
 /**
  * Collects the latest failed pipeline run for each file.
  *
@@ -133,10 +137,11 @@ export function DataSourcesView() {
       || deletingPipelineId === activePipelineRun.pipelineId
     ) return;
     const runId = activePipelineRun.pipelineId;
-    if (!runId.startsWith('run-')) return;
+    if (!isServerRun(runId)) return;
 
     let stopped = false;
     let requestInFlight = false;
+    let consecutiveFailures = 0;
     const controller = new AbortController();
 
     const refreshJob = async () => {
@@ -145,6 +150,8 @@ export function DataSourcesView() {
       try {
         const job = await dataSourceApi.getIngestionJob(runId, controller.signal);
         if (stopped) return;
+        consecutiveFailures = 0;
+        setError(null);
         const pipeline = pipelineFromIngestionJob(job);
         setActivePipelineRun(pipeline);
         if (pipeline.status === 'completed') {
@@ -159,7 +166,10 @@ export function DataSourcesView() {
         }
       } catch (err: any) {
         if (!stopped && err?.name !== 'AbortError') {
-          setError(err.message || '인덱싱 실행 상태를 조회하지 못했습니다.');
+          consecutiveFailures += 1;
+          if (consecutiveFailures === 3) {
+            setError(err.message || '인덱싱 실행 상태를 조회하지 못했습니다.');
+          }
         }
       } finally {
         requestInFlight = false;
@@ -215,10 +225,11 @@ export function DataSourcesView() {
   };
 
   const handleResumeActivePipeline = async () => {
-    if (!activePipelineRun?.pipelineId.startsWith('run-')) return;
+    const run = activePipelineRun;
+    if (!run || !isServerRun(run.pipelineId)) return;
     try {
       setError(null);
-      const job = await dataSourceApi.resumeIngestionJob(activePipelineRun.pipelineId);
+      const job = await dataSourceApi.resumeIngestionJob(run.pipelineId);
       const resumed = pipelineFromIngestionJob(job);
       const runningState: PipelineRunState = {
         ...resumed,
@@ -238,14 +249,16 @@ export function DataSourcesView() {
   };
 
   const handleCancelActivePipeline = async () => {
+    const run = activePipelineRun;
     if (
-      !activePipelineRun?.pipelineId.startsWith('run-')
-      || !['queued', 'running'].includes(activePipelineRun.status)
+      !run
+      || !isServerRun(run.pipelineId)
+      || !['queued', 'running'].includes(run.status)
     ) return;
     setIsCancellingPipeline(true);
     setError(null);
     try {
-      const job = await dataSourceApi.cancelIngestionJob(activePipelineRun.pipelineId);
+      const job = await dataSourceApi.cancelIngestionJob(run.pipelineId);
       const paused = pipelineFromIngestionJob(job);
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);
       setFailedRuns((existing) => existing.filter((run) => run.pipelineId !== job.job_id));
@@ -258,7 +271,7 @@ export function DataSourcesView() {
   };
 
   const handleDeletePipeline = async (run: PipelineRunState) => {
-    if (!run.pipelineId.startsWith('run-')) return;
+    if (!isServerRun(run.pipelineId)) return;
     if (!window.confirm(
       `인덱싱 작업 기록과 생성 중인 부분 컬렉션을 삭제하시겠습니까?\n\n${run.fileName}\n원본 Excel 파일은 삭제되지 않습니다.`
     )) return;
@@ -295,7 +308,7 @@ export function DataSourcesView() {
             fetchData();
           }}
           onResume={
-            ['failed', 'paused'].includes(activePipelineRun.status) && activePipelineRun.pipelineId.startsWith('run-')
+            ['failed', 'paused'].includes(activePipelineRun.status) && isServerRun(activePipelineRun.pipelineId)
               ? handleResumeActivePipeline
               : undefined
           }

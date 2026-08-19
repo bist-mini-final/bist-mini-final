@@ -116,4 +116,42 @@ describe('VectorIndexList', () => {
     expect(screen.getAllByText('sample.xlsx')).toHaveLength(1);
     expect(screen.queryByText('1,000개')).not.toBeInTheDocument();
   });
+
+  it('shows the persisted collection after its pipeline completes', () => {
+    const index: VectorIndexInfo = {
+      index_id: 'target-index',
+      file_name: 'completed.xlsx',
+      workbook_hash: 'hash-test',
+      model: 'text-embedding-3-small',
+      dimension: 1536,
+      document_count: 42,
+      created_at: '2026-08-18T10:00:00Z',
+    };
+    const completed: PipelineRunState = {
+      pipelineId: 'run-completed',
+      targetIndexId: 'target-index',
+      fileName: 'completed.xlsx',
+      model: 'text-embedding-3-small',
+      batchSize: 128,
+      status: 'completed',
+      currentStageIndex: 0,
+      progressPercent: 100,
+      elapsedSeconds: 3,
+      modules: [],
+    };
+
+    render(
+      <VectorIndexList
+        indexes={[index]}
+        activeRunningPipeline={completed}
+        onDetailClick={vi.fn()}
+        onSearchClick={vi.fn()}
+        onDeleteClick={vi.fn()}
+        onCreateClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('completed.xlsx')).toBeInTheDocument();
+    expect(screen.getByText('42개')).toBeInTheDocument();
+  });
 });

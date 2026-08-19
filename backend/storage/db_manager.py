@@ -130,14 +130,21 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def delete_source_file(self, file_id_or_hash: str) -> bool:
-        """Delete a source file and its cascading sheets from PostgreSQL."""
+    def delete_source_file(self, file_id_hash_or_name: str) -> bool:
+        """Delete a source file by ID, hash, or filename with cascading sheets."""
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "DELETE FROM source_files WHERE file_id = %s OR file_hash = %s;",
-                    (file_id_or_hash, file_id_or_hash),
+                    """
+                    DELETE FROM source_files
+                    WHERE file_id = %s OR file_hash = %s OR file_name = %s;
+                    """,
+                    (
+                        file_id_hash_or_name,
+                        file_id_hash_or_name,
+                        Path(file_id_hash_or_name).name,
+                    ),
                 )
                 deleted = cur.rowcount > 0
             conn.commit()
@@ -179,4 +186,3 @@ class DatabaseManager:
             conn.commit()
         finally:
             conn.close()
-

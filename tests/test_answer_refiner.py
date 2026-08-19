@@ -11,7 +11,43 @@ from backend.modules.answer_refiner import (
 )
 from backend.modules.reader import AnswerDTO, ApiUsageDTO
 from backend.modules.data_lineage import QueryContextDTO, DocumentContextDTO
-from backend.storage.pgvector_store import PgVectorStore
+from backend.llm.chat_completion import ChatCompletionResult
+
+
+class FakeCellStore:
+    def fetch_cells_by_metadata(self, cell_identifiers, workbook_hash=None, **_kwargs):
+        assert workbook_hash == "6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4"
+        return [
+            {
+                "cell_id": "IS Cell O17",
+                "sheet_name": "IS",
+                "cell_coord": "O17",
+                "cell_value": "709",
+                "row_header": ["Financial revenue"],
+                "column_header": ["2024"],
+                "source_text": "Financial revenue | 2024 | 709",
+            }
+        ]
+
+
+class FakeCompletionClient:
+    api_key = "test"
+
+    def complete_with_metadata(self, model, messages, response_format=None):
+        return ChatCompletionResult(
+            content=(
+                '{"refined_answer":"교정된 답변 [IS:O17]",'
+                '"refinement_summary":"직접 셀을 확인했습니다."}'
+            ),
+            usage={
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "cached_tokens": 0,
+                "reasoning_tokens": 0,
+                "total_tokens": 15,
+            },
+            latency_seconds=0.01,
+        )
 
 
 def test_excel_coordinate_utilities():
@@ -71,6 +107,17 @@ def test_candidate_cell_extraction_from_text():
     assert "Q16" in candidates
 
 
+def test_candidate_cell_extraction_ignores_year_and_quarter_tokens():
+    module = AnswerRefinerModule()
+    candidates = module._extract_candidate_cell_ids(
+        question="FY2025 EPS2024와 Q3 실적을 비교해줘",
+        initial_answer="근거는 [IS Cell O50]입니다.",
+        spatial_radius=0,
+    )
+
+    assert candidates == ["O50"]
+
+
 def test_answer_refiner_module_contract():
     """Verify module definition and schema compliance."""
     module = AnswerRefinerModule()
@@ -85,7 +132,7 @@ def test_answer_refiner_module_contract():
 
 def test_answer_refiner_execution_with_mock_data():
     """Verify end-to-end execution of AnswerRefinerModule."""
-    module = AnswerRefinerModule(pgvector_store=PgVectorStore())
+    module = AnswerRefinerModule(pgvector_store=FakeCellStore())
 
     mock_input = {
         "answer_json": {
@@ -123,3 +170,33 @@ def test_answer_refiner_execution_with_mock_data():
     assert isinstance(refined["refinement_summary"], str)
     assert isinstance(refined["direct_cells"], list)
     assert refined["latency_seconds"] >= 0.0
+
+
+def test_answer_refiner_uses_chat_completion_metadata_contract():
+    module = AnswerRefinerModule(
+        pgvector_store=FakeCellStore(),
+        completion_client=FakeCompletionClient(),
+    )
+    result = module.execute(
+        {
+            "answer_json": {
+                "query_context": {
+                    "question_id": "QUERY-TEST-1234",
+                    "question_text": "IBM의 금융부문 매출은 얼마야?",
+                },
+                "document_context": {
+                    "file_name": "SPG_Company_KeyStats_v4.xlsm",
+                    "workbook_hash": "6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4",
+                },
+                "model": "gpt-5.6-luna",
+                "answer": "709입니다 [IS Cell O17].",
+                "api_usage": {},
+                "latency_seconds": 0,
+                "estimated_cost_usd": 0,
+            },
+            "enable_auto_cell_discovery": False,
+        }
+    )["refined_answer_json"]
+
+    assert result["refined_answer"] == "교정된 답변 [IS:O17]"
+    assert result["api_usage"]["total_tokens"] == 15

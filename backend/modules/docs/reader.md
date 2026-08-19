@@ -51,11 +51,11 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `prompt_tokens` | `integer | null` | no | `null` | 입력 토큰 수 |
-| `completion_tokens` | `integer | null` | no | `null` | 출력 토큰 수 |
-| `cached_tokens` | `integer | null` | no | `null` | 캐시 적중 토큰 수 |
-| `reasoning_tokens` | `integer | null` | no | `null` | 추론 토큰 수 |
-| `total_tokens` | `integer | null` | no | `null` | 전체 토큰 수 |
+| `prompt_tokens` | `integer \| null` | no | `null` | 입력 토큰 수 |
+| `completion_tokens` | `integer \| null` | no | `null` | 출력 토큰 수 |
+| `cached_tokens` | `integer \| null` | no | `null` | 캐시 적중 토큰 수 |
+| `reasoning_tokens` | `integer \| null` | no | `null` | 추론 토큰 수 |
+| `total_tokens` | `integer \| null` | no | `null` | 전체 토큰 수 |
 
 ### `ContextDTO`
 

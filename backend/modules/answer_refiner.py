@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -14,6 +15,7 @@ from ..llm.chat_completion import (
     ChatCompletionError,
     ChatCompletionResult,
 )
+from ..llm.cost import calculate_openai_cost
 from ..storage.pgvector_store import PgVectorStore
 from .answer_refiner_presets import (
     CELL_EXTRACTOR_SYSTEM_PROMPT,
@@ -31,6 +33,10 @@ from .base import (
 )
 from .data_lineage import DocumentContextDTO, QueryContextDTO
 from .reader import AnswerDTO, ApiUsageDTO
+
+
+logger = logging.getLogger(__name__)
+_NON_CELL_PREFIXES = {"FY", "EPS"}
 
 
 def _col_to_num(col: str) -> int:
@@ -228,22 +234,44 @@ class AnswerRefinerModule(ExecutableModule):
         Returns:
         	List[str]: Unique cell identifiers found or generated from the supplied text and explicit identifiers.
         """
-        base_candidates: List[str] = list(explicit_cell_ids or [])
+        base_candidates: List[str] = []
+
+        def add_candidate(raw_value: str, *, explicit: bool = False) -> None:
+            match = re.search(r"([A-Z]{1,3})([1-9]\d{0,6})\b", raw_value.upper())
+            if match is None:
+                return
+            column, row_text = match.groups()
+            row = int(row_text)
+            # Unqualified financial tokens such as FY2025, EPS2024 and Q3 are
+            # substantially more common than cells with those spellings. Explicit
+            # ``Cell Q3``/``Sheet!Q3`` references are still accepted below.
+            if not explicit and (
+                column in _NON_CELL_PREFIXES
+                or 1900 <= row <= 2100
+                or (column == "Q" and row <= 4)
+            ):
+                return
+            candidate = f"{column}{row}"
+            if candidate not in base_candidates:
+                base_candidates.append(candidate)
+
+        for cell_id in explicit_cell_ids or []:
+            add_candidate(cell_id, explicit=True)
 
         # Heuristic 1: Regex matches for cell patterns like 'IS Cell O50', 'O50', 'Income_Statement!E16'
         text_corpus = f"{question}\n{initial_answer}"
-        pattern = r"\b(?:[A-Za-z0-9_]+[!:])?([A-Z]{1,3}\d{1,4})\b"
-        for m in re.findall(pattern, text_corpus):
-            cand = m.upper()
-            if cand not in base_candidates:
-                base_candidates.append(cand)
+        qualified_pattern = r"\b[A-Za-z_][A-Za-z0-9_ ]*[!:]\s*([A-Z]{1,3}[1-9]\d{0,6})\b"
+        for match in re.findall(qualified_pattern, text_corpus, flags=re.IGNORECASE):
+            add_candidate(match, explicit=True)
 
         # Heuristic 2: Match 'IS Cell I16' or 'Cell I16'
-        named_cell_pattern = r"(?:[A-Za-z0-9_]+\s+)?Cell\s+([A-Z]{1,3}\d{1,4})"
-        for m in re.findall(named_cell_pattern, text_corpus, flags=re.IGNORECASE):
-            cand = m.upper()
-            if cand not in base_candidates:
-                base_candidates.append(cand)
+        named_cell_pattern = r"(?:[A-Za-z0-9_]+\s+)?Cell\s+([A-Z]{1,3}[1-9]\d{0,6})"
+        for match in re.findall(named_cell_pattern, text_corpus, flags=re.IGNORECASE):
+            add_candidate(match, explicit=True)
+
+        standalone_pattern = r"(?<![A-Za-z0-9_])([A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
+        for match in re.findall(standalone_pattern, text_corpus):
+            add_candidate(match)
 
         # Perform Spatial Horizontal Timeline Expansion
         final_candidates: List[str] = []
@@ -292,7 +320,7 @@ class AnswerRefinerModule(ExecutableModule):
         # 2. LLM-assisted Auto Cell Discovery if enabled
         if parsed.enable_auto_cell_discovery and self.completion_client and len(target_cell_ids) < parsed.max_direct_cells:
             try:
-                extract_res = self.completion_client.complete(
+                extract_res = self.completion_client.complete_with_metadata(
                     messages=[
                         {"role": "system", "content": CELL_EXTRACTOR_SYSTEM_PROMPT},
                         {
@@ -301,8 +329,6 @@ class AnswerRefinerModule(ExecutableModule):
                         },
                     ],
                     model=parsed.model,
-                    temperature=0.0,
-                    max_tokens=200,
                 )
                 raw_json = extract_res.content.strip()
                 if raw_json.startswith("[") and raw_json.endswith("]"):
@@ -314,9 +340,11 @@ class AnswerRefinerModule(ExecutableModule):
                                 for n in self._expand_spatial_neighbors(clean_item, parsed.spatial_column_radius):
                                     if n not in target_cell_ids:
                                         target_cell_ids.append(n)
-            except Exception:
-                # Graceful fallback to regex & spatial expansion
-                pass
+            except Exception as error:  # noqa: BLE001 - deterministic regex fallback
+                logger.warning(
+                    "자동 셀 좌표 탐지 실패, 정규식 결과만 사용합니다: %s",
+                    error,
+                )
 
         # 3. Directly Fetch Cell Metadata from PostgreSQL
         fetched_raw_cells = self.pgvector_store.fetch_cells_by_metadata(
@@ -367,23 +395,26 @@ class AnswerRefinerModule(ExecutableModule):
 
         if self.completion_client:
             try:
-                res: ChatCompletionResult = self.completion_client.complete(
+                res: ChatCompletionResult = self.completion_client.complete_with_metadata(
                     messages=[
                         {"role": "system", "content": parsed.system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     model=parsed.model,
-                    temperature=0.2,
-                    max_tokens=1200,
                 )
                 api_usage = ApiUsageDTO(
-                    prompt_tokens=res.usage.prompt_tokens,
-                    completion_tokens=res.usage.completion_tokens,
-                    cached_tokens=res.usage.cached_tokens,
-                    reasoning_tokens=res.usage.reasoning_tokens,
-                    total_tokens=res.usage.total_tokens,
+                    prompt_tokens=res.usage.get("prompt_tokens", 0),
+                    completion_tokens=res.usage.get("completion_tokens", 0),
+                    cached_tokens=res.usage.get("cached_tokens", 0),
+                    reasoning_tokens=res.usage.get("reasoning_tokens", 0),
+                    total_tokens=res.usage.get("total_tokens", 0),
                 )
-                estimated_cost_usd = res.estimated_cost_usd
+                estimated_cost_usd = calculate_openai_cost(
+                    parsed.model,
+                    prompt_tokens=api_usage.prompt_tokens,
+                    completion_tokens=api_usage.completion_tokens,
+                    cached_tokens=api_usage.cached_tokens,
+                )
 
                 # Parse JSON output format
                 content = res.content.strip()

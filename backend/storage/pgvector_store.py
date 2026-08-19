@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import logging
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
@@ -17,6 +18,9 @@ from ..spreadsheets.langchain_document import (
     langchain_document_to_cell_item,
 )
 from .vector_store_factory import get_langchain_connection_string, get_vector_store
+
+
+logger = logging.getLogger(__name__)
 
 
 class PgVectorStoreError(RuntimeError):
@@ -287,6 +291,15 @@ class PgVectorStore:
         company_name = meta_dict.get("company_name", "")
 
         resolved_vectors = vectors if vectors is not None else vectors_or_items
+        usable_vectors = (
+            resolved_vectors
+            if isinstance(resolved_vectors, (list, tuple))
+            or (
+                hasattr(resolved_vectors, "__len__")
+                and not isinstance(resolved_vectors, (dict, str, bytes))
+            )
+            else None
+        )
 
         docs = cell_items_to_langchain_documents(
             items=raw_items,
@@ -301,7 +314,7 @@ class PgVectorStore:
             model_name=model_name,
             embedding_encoder=embedding_encoder,
             metadata=metadata,
-            vectors=resolved_vectors if isinstance(resolved_vectors, (list, tuple)) or hasattr(resolved_vectors, "__len__") and not isinstance(resolved_vectors, dict) else None,
+            vectors=usable_vectors,
             progress_callback=progress_callback,
         )
 
@@ -551,6 +564,24 @@ class PgVectorStore:
                         )
                         cur.execute(
                             """
+                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cell_id
+                            ON langchain_pg_embedding ((cmetadata->>'cell_id'));
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper
+                            ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
+                            ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
+                            """
+                        )
+                        cur.execute(
+                            """
                             CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
                             ON langchain_pg_embedding
                             USING gin (cmetadata jsonb_path_ops);
@@ -724,7 +755,11 @@ class PgVectorStore:
         Returns:
             List[Dict[str, Any]]: Normalized cell records containing identifiers, values, headers, source text, and company metadata. Returns an empty list when the input is empty or retrieval fails.
         """
-        if not cell_identifiers:
+        if not cell_identifiers or (not workbook_hash and not collection_name):
+            if cell_identifiers:
+                logger.warning(
+                    "직접 셀 메타데이터 조회를 거부했습니다: collection_name 또는 workbook_hash가 필요합니다"
+                )
             return []
 
         clean_ids = [cid.strip() for cid in cell_identifiers if cid and cid.strip()]
@@ -743,6 +778,8 @@ class PgVectorStore:
                     row = cur.fetchone()
                     if row:
                         col_uuid = row[0]
+                    elif not workbook_hash:
+                        return []
 
                 # We search matching cell_id, cell_coord, or cell_id ILIKE pattern
                 extracted_coords = []
@@ -753,7 +790,9 @@ class PgVectorStore:
                         if p_clean and p_clean[0].isalpha() and any(ch.isdigit() for ch in p_clean):
                             extracted_coords.append(p_clean.upper())
 
-                all_search_targets = list(set(clean_ids + extracted_coords))
+                all_search_targets = list(
+                    dict.fromkeys(item.upper() for item in clean_ids + extracted_coords)
+                )
 
                 query = """
                     SELECT 
@@ -774,7 +813,7 @@ class PgVectorStore:
                         OR UPPER(cmetadata->>'cell_coord') = ANY(%s)
                     )
                 """
-                params: List[Any] = [all_search_targets, all_search_targets, [t.upper() for t in all_search_targets]]
+                params: List[Any] = [clean_ids, all_search_targets, all_search_targets]
 
                 if col_uuid:
                     query += " AND collection_id = %s"
@@ -793,7 +832,7 @@ class PgVectorStore:
             results = []
             seen_coords = set()
             for r in rows:
-                _id, text, cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
+                _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
                 key = (sheet_name, cell_coord)
                 if key in seen_coords:
                     continue
@@ -822,6 +861,7 @@ class PgVectorStore:
                 })
             return results
         except Exception:
+            logger.exception("직접 셀 메타데이터 조회 실패")
             return []
         finally:
             conn.close()

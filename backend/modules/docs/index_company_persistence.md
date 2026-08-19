@@ -1,6 +1,6 @@
 # Index Company Persistence
 
-> Module type: `index_company_persistence` · Category: `Storage / DB` · Version: `1`
+> Module type: `index_company_persistence` · Category: `Storage / DB` · Version: `2`
 
 추출한 기업명을 pgvector 컬렉션과 청크 메타데이터에 반영합니다.
 
@@ -27,9 +27,9 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `index_id` | `string` | yes | - | - |
-| `company_name` | `string` | yes | - | - |
-| `ticker` | `string` | no | `""` | - |
+| `index_id` | `string` | yes | - | 기업 메타데이터가 반영된 pgvector 인덱스 ID |
+| `company_name` | `string` | yes | - | 인덱스와 셀 메타데이터에 저장된 기업 표시명 |
+| `ticker` | `string` | no | `""` | 추출된 티커 심볼 (없으면 빈 문자열) |
 
 ## Referenced DTOs
 

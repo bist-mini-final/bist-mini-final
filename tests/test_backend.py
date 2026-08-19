@@ -61,6 +61,7 @@ from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
 from backend.spreadsheets.exhaustive_tiling import build_exhaustive_tiles
+from backend.spreadsheets.sheet_renderer import _cell_text_and_color, _rgb_color
 from backend.workflows.executor import (
     DagExecutionCancelled,
     DagExecutionError,
@@ -375,6 +376,15 @@ class SimilarityTests(unittest.TestCase):
 
 
 class PgVectorStoreBatchingTests(unittest.TestCase):
+    def test_direct_cell_lookup_requires_workbook_or_collection_scope(self) -> None:
+        store = PgVectorStore("postgresql://unused")
+        with patch.object(
+            store,
+            "_raw_connection",
+            side_effect=AssertionError("database must not be queried"),
+        ):
+            self.assertEqual(store.fetch_cells_by_metadata(["A1"]), [])
+
     def test_precomputed_vectors_are_inserted_in_bounded_batches(self) -> None:
         from unittest.mock import MagicMock
 
@@ -411,6 +421,23 @@ class PgVectorStoreBatchingTests(unittest.TestCase):
         self.assertEqual(batch_sizes, [1000, 1000, 101])
         self.assertEqual(progress[-1]["completed_batches"], 3)
         self.assertEqual(progress[-1]["completed_items"], 2101)
+
+
+class SheetRendererFormattingTests(unittest.TestCase):
+    def test_hash_prefixed_rgb_string_is_preserved(self) -> None:
+        self.assertEqual(_rgb_color("#5b9bd5", "#000000"), "#5B9BD5")
+
+    def test_numeric_excel_date_is_rendered_as_a_date(self) -> None:
+        workbook = Workbook()
+        cell = workbook.active["A1"]
+        cell.value = 45292
+        cell.number_format = "yyyy-mm-dd"
+
+        rendered, _color = _cell_text_and_color(cell)
+
+        self.assertRegex(rendered, r"^\d{4}\.\d{2}\.\d{2}$")
+        self.assertNotEqual(rendered, "45292")
+        workbook.close()
 
 
 class ModularRagArchitectureTests(unittest.TestCase):
@@ -1200,6 +1227,7 @@ class ApiContractTests(unittest.TestCase):
                     "max_output_tokens",
                     "timeout_seconds",
                     "validation_retries",
+                    "max_concurrency",
                     "system_prompt",
                     "user_prompt_template",
                 },
@@ -1217,7 +1245,13 @@ class ApiContractTests(unittest.TestCase):
                 },
             ),
             "cell_text_serializer": (
-                {"file_name", "workbook_hash", "tables"},
+                {
+                    "file_name",
+                    "workbook_hash",
+                    "sheet_names",
+                    "tables",
+                    "failed_sheets",
+                },
                 {"variant_mode"},
             ),
             "exhaustive_cell_text_serializer": (
@@ -1990,7 +2024,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
             artifact_dir=self.artifact_dir,
         ).run({
             **selection,
-            # Legacy tiling settings are accepted and discarded when old workflows run.
+            # Legacy tiling settings are accepted; max_concurrency remains configurable.
             "tile_rows": 72,
             "tile_columns": 24,
             "row_overlap": 8,
@@ -2026,6 +2060,40 @@ class SpreadsheetModuleTests(unittest.TestCase):
         serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
         self.assertEqual(len(serialized["items"]), 12)
 
+    def test_luna_vlm_detector_reports_partial_sheet_failures(self) -> None:
+        class VisionClient:
+            def complete_structured(self, **_kwargs):
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"A1:C4","title_range":null,'
+                    '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
+                    '"data_range":"A2:C4"}]}'
+                )
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": "sample.xlsx"}
+        )
+        detector = LunaVlmStructureDetectorModule(
+            VisionClient(),
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        )
+
+        partial = detector.run({
+            **selection,
+            "sheet_names": ["Key Stats", "Missing Sheet"],
+        })
+
+        self.assertEqual(partial["sheet_names"], ["Key Stats", "Missing Sheet"])
+        self.assertEqual(
+            partial["failed_sheets"],
+            [{"sheet_name": "Missing Sheet", "error": "시트를 찾을 수 없습니다"}],
+        )
+        with self.assertRaisesRegex(ModuleExecutionError, "분석 가능한 시트가 없습니다"):
+            detector.run({
+                **selection,
+                "sheet_names": ["Missing Sheet"],
+            })
     def test_bfs_llm_detector_builds_title_regions_and_hierarchical_headers(self) -> None:
         workbook_path = self.processed_dir / "hierarchical.xlsx"
         workbook = Workbook()

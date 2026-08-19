@@ -429,23 +429,25 @@ def create_data_source_router(
         Returns:
             List[WorkflowRun]: Ingestion runs sorted by most recently updated.
         """
-        runs = [
+        summaries = [
             run
             for run in run_store.list()
             if run.workflow_id in INGESTION_WORKFLOW_IDS
         ]
         if file_name is not None:
             safe_file_name = Path(file_name).name
-            runs = [
-                run
-                for run in runs
+            runs: List[WorkflowRun] = []
+            for summary in summaries:
+                run = run_store.load(summary.id)
                 if any(
                     node.module_type == "processed_file_selector"
                     and run.runtime_inputs.get(node.id, {}).get("file_name")
                     == safe_file_name
                     for node in run.graph.nodes
-                )
-            ]
+                ):
+                    runs.append(run)
+        else:
+            runs = summaries
         return sorted(runs, key=lambda run: run.updated_at, reverse=True)
 
     # 0. Database Status
@@ -552,7 +554,7 @@ def create_data_source_router(
                     file_hash=file_hash,
                     file_type=dest_path.suffix.lstrip(".").lower() or "bin",
                     file_size=dest_path.stat().st_size,
-                    storage_path=f"data/source_files/{safe_filename}",
+                    storage_path=str(dest_path.resolve()),
                 )
             except Exception as error:
                 logger.warning(
@@ -575,6 +577,10 @@ def create_data_source_router(
                 workflow_dispatcher.submit(run.id)
                 ingestion_job = _job_payload(run)
             except Exception as err:
+                logger.exception(
+                    "업로드 후 자동 인덱싱 작업 생성 실패: %s",
+                    safe_filename,
+                )
                 ingest_error = str(err)
 
         uploaded = get_processed_file_info(
@@ -814,8 +820,8 @@ def create_data_source_router(
             HTTPException: With status 404 if the job does not exist, or 422 if the job is invalid.
         """
         try:
-            _load_ingestion_run(run_id)
-            workflow_dispatcher.ensure_submitted(run_id)
+            run = _load_ingestion_run(run_id)
+            workflow_dispatcher.ensure_submitted(run_id, run)
             return _job_payload(_load_ingestion_run(run_id))
         except FileNotFoundError as error:
             raise HTTPException(
@@ -840,9 +846,10 @@ def create_data_source_router(
             HTTPException: If no ingestion job produced the specified index.
         """
         for summary in _list_ingestion_runs():
-            writer_output = _node_output(summary, "pgvector_index_writer")
+            run = run_store.load(summary.id)
+            writer_output = _node_output(run, "pgvector_index_writer")
             if writer_output and writer_output.get("index_id") == index_id:
-                return _job_payload(run_store.load(summary.id))
+                return _job_payload(run)
         raise HTTPException(
             status_code=404,
             detail="해당 인덱스의 워크플로 실행 기록을 찾을 수 없습니다",
@@ -864,6 +871,11 @@ def create_data_source_router(
         """
         try:
             run = _load_ingestion_run(run_id)
+            if run.status == "completed":
+                raise HTTPException(
+                    status_code=409,
+                    detail="완료된 인덱싱 작업은 재개할 수 없습니다",
+                )
             if run.status == "failed":
                 workflow_dispatcher.submit(run_id, resume_failed=True)
             elif run.status in ("queued", "running", "paused"):

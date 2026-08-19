@@ -109,7 +109,7 @@ class SheetMetadataPersistenceModule(ExecutableModule):
             visible_sheets = (
                 structure.sheet_names
                 if isinstance(structure, WorkbookSelectionDTO)
-                else self.catalog.sheet_names(workbook_path)
+                else structure.sheet_names or self.catalog.sheet_names(workbook_path)
             )
         except (OSError, ValueError, WorkbookCatalogError) as error:
             raise ModuleExecutionError(str(error)) from error

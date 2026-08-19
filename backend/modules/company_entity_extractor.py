@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar, Dict, Optional
 
 from pydantic import Field
 
 from ..core.settings import PROCESSED_DATA_DIR
+from ..llm.chat_completion import ChatCompletionClient
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from .base import (
     ExecutableModule,
@@ -81,6 +81,7 @@ class CompanyEntityExtractorModule(ExecutableModule):
         self,
         catalog: WorkbookCatalog | None = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
+        completion_client: Optional[ChatCompletionClient] = None,
     ) -> None:
         """Initialize the extractor with a workbook catalog.
         
@@ -89,6 +90,7 @@ class CompanyEntityExtractorModule(ExecutableModule):
         	processed_dir (Path): Directory used to create the default workbook catalog.
         """
         self.catalog = catalog or WorkbookCatalog(processed_dir)
+        self.completion_client = completion_client or ChatCompletionClient()
 
     @staticmethod
     def _heuristic(file_name: str) -> Dict[str, Any]:
@@ -170,7 +172,7 @@ class CompanyEntityExtractorModule(ExecutableModule):
             raise ModuleExecutionError(str(error)) from error
 
         fallback = self._heuristic(payload.file_name)
-        if not os.getenv("OPENAI_API_KEY"):
+        if not getattr(self.completion_client, "api_key", None):
             return fallback
 
         try:
@@ -184,15 +186,14 @@ class CompanyEntityExtractorModule(ExecutableModule):
         if not sampled_lines:
             return fallback
 
+        sampled_text = "\n".join(sampled_lines)[:2500]
         context = (
             f"File Name: {payload.file_name}\n"
             f"Sheet Names: {payload.sheet_names}\n\n"
-            f"Top Cells Content:\n{chr(10).join(sampled_lines)[:2500]}"
+            f"Top Cells Content:\n{sampled_text}"
         )
         try:
-            from ..llm.chat_completion import ChatCompletionClient
-
-            response = ChatCompletionClient().complete_with_metadata(
+            response = self.completion_client.complete_with_metadata(
                 model=payload.model,
                 messages=[
                     {"role": "system", "content": COMPANY_EXTRACTION_SYSTEM_PROMPT},

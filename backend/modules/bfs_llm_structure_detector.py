@@ -466,5 +466,6 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
+            "sheet_names": settings.sheet_names,
             "tables": output_tables,
         }

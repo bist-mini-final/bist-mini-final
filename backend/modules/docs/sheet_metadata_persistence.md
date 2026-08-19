@@ -16,7 +16,7 @@ pgvector 적재 후 워크북 시트 크기와 감지 테이블을 DB에 저장�
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `structure_input` | `SpreadsheetStructureOutput | WorkbookSelectionDTO` | yes | - | 구조 감지 결과 또는 전수 직렬화용 워크북 선택 결과 |
+| `structure_input` | `SpreadsheetStructureOutput \| WorkbookSelectionDTO` | yes | - | 구조 감지 결과 또는 전수 직렬화용 워크북 선택 결과 |
 | `index_input` | `VectorIndexDTO` | yes | - | source_files 저장이 완료된 pgvector 인덱스 결과 |
 
 ## Config DTO
@@ -71,7 +71,9 @@ pgvector 적재 후 워크북 시트 크기와 감지 테이블을 DB에 저장�
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
+| `sheet_names` | `array<string>` | no | - | 구조 분석 대상으로 선택된 표시 시트명 |
 | `tables` | `array<ClassifiedTableDTO>` | yes | - | - |
+| `failed_sheets` | `array<object<string, string>>` | no | - | 분석하지 못한 시트명과 실패 사유 |
 
 ### `VectorIndexDTO`
 

@@ -114,7 +114,10 @@ export function VectorIndexList({
     && ['queued', 'running', 'paused'].includes(activeRunningPipeline.status);
   const isPipelinePaused = activeRunningPipeline?.status === 'paused';
   const hiddenIndexIds = new Set(
-    [activeRunningPipeline, ...failedRuns]
+    [
+      ...(isPipelineActive && activeRunningPipeline ? [activeRunningPipeline] : []),
+      ...failedRuns,
+    ]
       .filter((run): run is PipelineRunState => Boolean(run?.targetIndexId))
       .map((run) => run.targetIndexId!),
   );
@@ -213,7 +216,7 @@ export function VectorIndexList({
                   <td>
                     <span className="ds-badge ds-badge--blue">{activeRunningPipeline.model}</span>
                   </td>
-                  <td>3072D</td>
+                  <td style={{ color: '#94a3b8' }}>—</td>
                   <td>
                     <span style={{ color: isPipelinePaused ? '#b45309' : '#16a34a', fontWeight: 600 }}>
                       {activeRunningPipeline.modules[activeRunningPipeline.currentStageIndex]?.batchProgress

@@ -34,7 +34,9 @@ Docling 테이블 경계 안에서 헤더와 데이터 영역을 셀 서식으�
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
+| `sheet_names` | `array<string>` | no | - | 구조 분석 대상으로 선택된 표시 시트명 |
 | `tables` | `array<ClassifiedTableDTO>` | yes | - | - |
+| `failed_sheets` | `array<object<string, string>>` | no | - | 분석하지 못한 시트명과 실패 사유 |
 
 ## Referenced DTOs
 

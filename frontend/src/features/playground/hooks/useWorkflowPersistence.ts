@@ -46,6 +46,15 @@ function executionFingerprint(graph: WorkflowGraph): string {
   });
 }
 
+function executionRunMatchesRequest(
+  run: WorkflowRun,
+  graph: WorkflowGraph,
+  query: string,
+): boolean {
+  return executionFingerprint(run.graph) === executionFingerprint(graph)
+    && JSON.stringify(run.runtime_inputs) === JSON.stringify(runInputs(graph, query));
+}
+
 function executionRunCompatibleWithGraph(
   run: WorkflowRun,
   graph: WorkflowGraph
@@ -393,7 +402,7 @@ export function useWorkflowPersistence(
             latestRun.status === 'running' ||
             latestRun.status === 'paused' ||
             latestRun.status === 'failed') &&
-          executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
+          executionRunMatchesRequest(latestRun, currentExecutionGraph, query)
           ? latestRun
           : await createRun(query, controller.signal);
         applyRun(run);
@@ -442,7 +451,7 @@ export function useWorkflowPersistence(
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
         let run = latestRun &&
-          executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
+          executionRunMatchesRequest(latestRun, currentExecutionGraph, query)
           ? latestRun
           : null;
         if (!run || run.status === 'completed') {

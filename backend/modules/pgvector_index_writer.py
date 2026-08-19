@@ -1,8 +1,10 @@
+from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
 from pydantic import BaseModel, Field
 
 from ..embeddings.factory import EmbeddingEncoder
+from ..core.settings import PROCESSED_DATA_DIR
 from ..storage.db_manager import DatabaseManager
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.pgvector_store import PGVECTOR_INSERT_BATCH_SIZE, PgVectorStore
@@ -48,11 +50,13 @@ class PgVectorIndexWriterModule(ExecutableModule):
         db_manager: Optional[DatabaseManager] = None,
         pgvector_store: Optional[PgVectorStore] = None,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
+        processed_dir: Path = PROCESSED_DATA_DIR,
     ) -> None:
         self.artifact_store = artifact_store or EmbeddingArtifactStore()
         self.db_manager = db_manager or DatabaseManager()
         self.pgvector_store = pgvector_store or PgVectorStore()
         self.embedding_encoder = embedding_encoder
+        self.processed_dir = processed_dir.resolve()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         """
@@ -97,7 +101,9 @@ class PgVectorIndexWriterModule(ExecutableModule):
             file_hash=input_data.workbook_hash,
             file_size=0,
             file_type="excel",
-            storage_path=f"data/source_files/{input_data.file_name}",
+            storage_path=str(
+                (self.processed_dir / Path(input_data.file_name).name).resolve()
+            ),
         )
 
         # 2. Save embeddings into pgvector via PgVectorStore (LangChain collection & embeddings)

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageDraw, ImageFont
 from openpyxl.styles.numbers import is_date_format
+from openpyxl.utils.datetime import WINDOWS_EPOCH, from_excel
 
 from .table_geometry import SheetLayout, compute_sheet_layout
 
@@ -54,7 +55,7 @@ def _rgb_color(color: Any, default: str) -> str:
         return default
 
     # 1. Direct RGB or aRGB string
-    if getattr(color, "type", None) == "rgb" or (isinstance(color, str) and not color.startswith("#")):
+    if getattr(color, "type", None) == "rgb" or isinstance(color, str):
         value = str(getattr(color, "rgb", color)).lstrip("#")
         if len(value) == 8:
             value = value[2:]  # Strip Alpha channel
@@ -83,7 +84,7 @@ def _rgb_color(color: Any, default: str) -> str:
                 for channel in channels
             ]
             return "#" + "".join(f"{max(0, min(255, c)):02X}" for c in adjusted)
-        except Exception:
+        except ValueError:
             return base
 
     return default
@@ -146,7 +147,17 @@ def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
         isinstance(value, (int, float)) and is_date_format(num_fmt)
     ):
         if not isinstance(value, (date, datetime)):
-            return str(value), default_font_color
+            workbook = getattr(getattr(cell, "parent", None), "parent", None)
+            try:
+                converted = from_excel(
+                    value,
+                    epoch=getattr(workbook, "epoch", WINDOWS_EPOCH),
+                )
+            except (OverflowError, ValueError):
+                return str(value), default_font_color
+            if isinstance(converted, (date, datetime)):
+                return converted.strftime("%Y.%m.%d"), default_font_color
+            return str(converted), default_font_color
         return value.strftime("%Y.%m.%d"), default_font_color
 
     # Float & Integer formatting with [Red] and negative support
@@ -201,21 +212,34 @@ def _font(size: int, bold: bool, italic: bool = False) -> ImageFont.ImageFont:
     """
     style_candidates = {
         (False, False): (
+            "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+            "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
             "/System/Library/Fonts/Supplemental/Arial.ttf",
             "/Library/Fonts/Arial.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ),
         (True, False): (
+            "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+            "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
             "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
             "/Library/Fonts/Arial Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         ),
         (False, True): (
+            "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
             "/System/Library/Fonts/Supplemental/Arial Italic.ttf",
             "/Library/Fonts/Arial Italic.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
         ),
         (True, True): (
+            "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+            "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
             "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf",
             "/Library/Fonts/Arial Bold Italic.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",

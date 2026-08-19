@@ -78,10 +78,14 @@ class WorkflowRunDispatcher:
             )
             return True
 
-    def ensure_submitted(self, run_id: str) -> None:
+    def ensure_submitted(
+        self,
+        run_id: str,
+        run: Optional[WorkflowRun] = None,
+    ) -> None:
         """Resume a persisted non-terminal run when no worker currently owns it."""
 
-        run = self.run_store.load(run_id)
+        run = run or self.run_store.load(run_id)
         if run.status in ("queued", "running"):
             self.submit(run_id)
 
@@ -116,7 +120,10 @@ class WorkflowRunDispatcher:
                 pass
             except Exception:
                 # The persisted paused state from cancel_run remains canonical.
-                pass
+                logger.exception(
+                    "취소 후 백그라운드 실행 종료 확인에 실패했습니다: %s",
+                    run_id,
+                )
         return run
 
     def recover_pending(
@@ -157,9 +164,23 @@ class WorkflowRunDispatcher:
             future = self._futures.get(run_id)
             return future is not None and not future.done()
 
-    def shutdown(self) -> None:
-        """Stops the dispatcher and cancels futures that have not started running."""
-        self._pool.shutdown(wait=False, cancel_futures=True)
+    def shutdown(self, wait: bool = True) -> None:
+        """Cancel tracked runs and stop the worker pool before owned paths disappear."""
+
+        with self._lock:
+            active_run_ids = [
+                run_id
+                for run_id, future in self._futures.items()
+                if not future.done()
+            ]
+        for run_id in active_run_ids:
+            try:
+                self.cancel(run_id)
+            except FileNotFoundError:
+                continue
+            except Exception:
+                logger.exception("디스패처 종료 중 실행 취소 실패: %s", run_id)
+        self._pool.shutdown(wait=wait, cancel_futures=True)
 
     def _execute(self, run_id: str, resume_failed: bool) -> object:
         """

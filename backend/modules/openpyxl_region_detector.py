@@ -406,5 +406,8 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
+            "sheet_names": list(
+                dict.fromkeys(table.sheet_name for table in input_data.tables)
+            ),
             "tables": output_tables,
         }

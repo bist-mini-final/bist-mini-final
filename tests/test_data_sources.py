@@ -9,10 +9,18 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from backend.api.data_source_routes import create_data_source_router
+from backend.core.settings import WORKFLOW_DIR
+from backend.runtime.registry import ModuleRegistry
+from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
+from backend.workflows import ResultCache, RunStore, WorkflowExecutor, WorkflowRunDispatcher, WorkflowStore
+
+
+class NoApiCompletionClient:
+    api_key = None
 
 
 class FakeEmbeddingEncoder:
@@ -59,6 +67,30 @@ class DataSourceApiTests(unittest.TestCase):
         self.clean_test_indexes()
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
+        self.embedding_store = EmbeddingArtifactStore(self.embedding_artifact_dir)
+        self.vector_store = VectorIndexStore(self.vector_index_dir)
+        self.module_registry = ModuleRegistry(
+            AnswerCacheRepository(),
+            completion_client=NoApiCompletionClient(),
+            embedding_encoder=self.encoder,
+            embedding_artifact_store=self.embedding_store,
+            vector_index_store=self.vector_store,
+            pgvector_store=self.pg_store,
+            db_manager=self.db_mgr,
+            processed_dir=self.processed_dir,
+            spreadsheet_artifact_dir=self.spreadsheet_artifact_dir,
+        )
+        self.workflow_store = WorkflowStore(WORKFLOW_DIR)
+        self.run_store = RunStore(self.run_dir)
+        self.workflow_executor = WorkflowExecutor(
+            self.module_registry,
+            self.run_store,
+            ResultCache(self.cache_dir),
+        )
+        self.workflow_dispatcher = WorkflowRunDispatcher(
+            self.workflow_executor,
+            self.run_store,
+        )
         self.app = FastAPI()
         self.app.include_router(
             create_data_source_router(
@@ -70,6 +102,11 @@ class DataSourceApiTests(unittest.TestCase):
                 cache_dir=self.cache_dir,
                 embedding_encoder=self.encoder,
                 pgvector_store=self.pg_store,
+                module_registry=self.module_registry,
+                workflow_store=self.workflow_store,
+                run_store=self.run_store,
+                workflow_executor=self.workflow_executor,
+                workflow_dispatcher=self.workflow_dispatcher,
             ),
             prefix="/api",
         )
@@ -92,8 +129,30 @@ class DataSourceApiTests(unittest.TestCase):
                 conn.commit()
 
     def tearDown(self):
+        for run in self.run_store.list():
+            if run.status in {"queued", "running"}:
+                self.workflow_dispatcher.cancel(run.id)
+        self.workflow_dispatcher.shutdown(wait=True)
+        self.client.close()
         self.clean_test_indexes()
         self.temp_dir.cleanup()
+
+    def _await_job(self, run_id: str, timeout: float = 5.0) -> dict:
+        deadline = time.monotonic() + timeout
+        response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        while payload["status"] not in {"completed", "failed"}:
+            if time.monotonic() >= deadline:
+                self.fail(
+                    f"ingestion job {run_id} did not finish in {timeout}s "
+                    f"(last status={payload['status']})"
+                )
+            time.sleep(0.05)
+            response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+        return payload
 
     def test_list_files(self):
         response = self.client.get("/api/data-sources/files")
@@ -160,15 +219,7 @@ class DataSourceApiTests(unittest.TestCase):
         self.assertEqual(ingest_resp.status_code, 202)
         ingest_data = ingest_resp.json()
         run_id = ingest_data["job_id"]
-        deadline = time.monotonic() + 5
-        while (
-            ingest_data["status"] not in {"completed", "failed"}
-            and time.monotonic() < deadline
-        ):
-            time.sleep(0.05)
-            ingest_data = self.client.get(
-                f"/api/data-sources/ingestion-jobs/{run_id}"
-            ).json()
+        ingest_data = self._await_job(run_id)
 
         self.assertEqual(
             ingest_data["status"],
@@ -233,13 +284,7 @@ class DataSourceApiTests(unittest.TestCase):
         run_id = started["job_id"]
         self.assertTrue((self.run_dir / f"{run_id}.json").is_file())
 
-        deadline = time.monotonic() + 5
-        current = started
-        while current["status"] not in {"completed", "failed"} and time.monotonic() < deadline:
-            time.sleep(0.05)
-            response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
-            self.assertEqual(response.status_code, 200)
-            current = response.json()
+        current = self._await_job(run_id)
 
         self.assertEqual(current["status"], "completed", current.get("error"))
         self.assertIsNotNone(current["index"])
@@ -260,6 +305,10 @@ class DataSourceApiTests(unittest.TestCase):
         )
         self.assertEqual(history_response.status_code, 200)
         self.assertEqual(history_response.json()["job_id"], run_id)
+        resume_response = self.client.post(
+            f"/api/data-sources/ingestion-jobs/{run_id}/resume"
+        )
+        self.assertEqual(resume_response.status_code, 409)
         list_response = self.client.get(
             "/api/data-sources/ingestion-jobs",
             params={"file_name": "Test_Workbook.xlsx"},
