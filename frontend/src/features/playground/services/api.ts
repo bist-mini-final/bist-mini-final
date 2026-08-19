@@ -3,6 +3,7 @@ import type {
   ModuleType,
   BenchmarkCase,
   BenchmarkComparison,
+  BenchmarkJob,
   WorkflowDocument,
   WorkflowGraph,
   WorkflowRun,
@@ -173,11 +174,23 @@ export const pipelineApi = {
     return requestJson<{ workflows: WorkflowDocument[] }>('/api/workflows', signal);
   },
 
-  compareBenchmarks(workflowIds: string[], cases: BenchmarkCase[], useCache = false) {
+  compareBenchmarks(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only') {
     return postJson<BenchmarkComparison>('/api/benchmarks/compare', {
       workflow_ids: workflowIds,
       cases,
-      use_cache: useCache,
+      use_cache: cacheMode === 'all', cache_mode: cacheMode,
     });
+  },
+
+  startBenchmarkJob(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only') {
+    return postJson<{ id: string }>('/api/benchmarks/jobs', { workflow_ids: workflowIds, cases, use_cache: cacheMode === 'all', cache_mode: cacheMode });
+  },
+
+  getBenchmarkJob(jobId: string, signal?: AbortSignal) {
+    return requestJson<BenchmarkJob>(`/api/benchmarks/jobs/${encodeURIComponent(jobId)}`, signal);
+  },
+
+  cancelBenchmarkJob(jobId: string) {
+    return writeJson<{ id: string; status: string }>('DELETE', `/api/benchmarks/jobs/${encodeURIComponent(jobId)}`);
   },
 };

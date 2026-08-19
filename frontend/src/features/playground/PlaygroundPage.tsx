@@ -3,6 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { X } from 'lucide-react';
 import { Header } from './components/Header';
 import type { WorkflowOption } from './components/Header';
+import { BenchmarkPanel } from './components/BenchmarkPanel';
 import { PipelineCanvas } from './components/PipelineCanvas';
 import { ModulePalette } from './components/Sidebar/ModulePalette';
 import { usePipelineController } from './hooks/usePipelineController';
@@ -25,6 +26,7 @@ function PlaygroundWorkspace() {
   // Workflow list + active selection (default = "default" json)
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [activeWorkflowId, setActiveWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
+  const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
   const activeWorkflowName = useMemo(
     () => workflows.find((w) => w.id === activeWorkflowId)?.name ?? activeWorkflowId,
     [workflows, activeWorkflowId]
@@ -129,6 +131,71 @@ function PlaygroundWorkspace() {
     setActiveWorkflowId(id);
   };
 
+  const refreshWorkflows = async () => {
+    const { workflows: list } = await pipelineApi.listWorkflows();
+    const options = list.map((item) => ({ id: item.id, name: item.name }));
+    options.sort((a, b) => {
+      if (a.id === DEFAULT_WORKFLOW_ID) return -1;
+      if (b.id === DEFAULT_WORKFLOW_ID) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    setWorkflows(options);
+  };
+
+  const workflowIdFromName = (name: string) =>
+    name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+
+  const handleCreateWorkflow = () => {
+    const name = window.prompt('새 워크플로 이름을 입력하세요.', '새 워크플로');
+    if (!name?.trim()) return;
+    const baseId = workflowIdFromName(name) || 'workflow';
+    let id = baseId;
+    let suffix = 2;
+    while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
+
+    void pipelineApi.saveWorkflow(id, name.trim(), graph.exportGraph())
+      .then(async () => {
+        await refreshWorkflows();
+        handleSelectWorkflow(id);
+      })
+      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 만들지 못했습니다.'));
+  };
+
+  const handleDuplicateWorkflow = () => {
+    const source = activeWorkflowName;
+    const name = window.prompt('복제할 워크플로 이름을 입력하세요.', `${source} 복사본`);
+    if (!name?.trim()) return;
+    const baseId = workflowIdFromName(name) || 'workflow-copy';
+    let id = baseId;
+    let suffix = 2;
+    while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
+
+    void pipelineApi.saveWorkflow(id, name.trim(), graph.exportGraph())
+      .then(async () => {
+        await refreshWorkflows();
+        handleSelectWorkflow(id);
+      })
+      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 복제하지 못했습니다.'));
+  };
+
+  const handleRenameWorkflow = () => {
+    const name = window.prompt('워크플로 이름을 입력하세요.', activeWorkflowName);
+    if (!name?.trim() || name.trim() === activeWorkflowName) return;
+    void pipelineApi.saveWorkflow(activeWorkflowId, name.trim(), graph.exportGraph())
+      .then(() => refreshWorkflows())
+      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로 이름을 바꾸지 못했습니다.'));
+  };
+
+  const handleDeleteWorkflow = () => {
+    if (activeWorkflowId === DEFAULT_WORKFLOW_ID || !window.confirm(`'${activeWorkflowName}' 워크플로를 삭제할까요?`)) return;
+    void pipelineApi.deleteWorkflow(activeWorkflowId)
+      .then(async () => {
+        await refreshWorkflows();
+        handleSelectWorkflow(DEFAULT_WORKFLOW_ID);
+      })
+      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 삭제하지 못했습니다.'));
+  };
+
   const runMetrics = useMemo(() => {
     let totalElapsedMs = 0;
     let totalCostUsd = 0;
@@ -206,6 +273,7 @@ function PlaygroundWorkspace() {
           workflows={workflows}
           activeWorkflowId={activeWorkflowId}
           onSelectWorkflow={handleSelectWorkflow}
+          onOpenBenchmark={() => setIsBenchmarkOpen(true)}
         />
 
         {controller.errorMessage && (
@@ -248,8 +316,16 @@ function PlaygroundWorkspace() {
             runs={workflow.runs}
             isPaletteOpen={isPaletteOpen}
             onOpenPalette={() => setIsPaletteOpen(true)}
+            workflows={workflows}
+            activeWorkflowId={activeWorkflowId}
+            onSelectWorkflow={handleSelectWorkflow}
+            onCreateWorkflow={handleCreateWorkflow}
+            onDuplicateWorkflow={handleDuplicateWorkflow}
+            onRenameWorkflow={handleRenameWorkflow}
+            onDeleteWorkflow={handleDeleteWorkflow}
           />
         </main>
+        <BenchmarkPanel isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
       </div>
     </ModuleExecutionContext.Provider>
   );

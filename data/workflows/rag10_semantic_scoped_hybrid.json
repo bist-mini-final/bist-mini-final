@@ -1,57 +1,82 @@
 {
   "schema_version": 1,
-  "id": "rag3_llm_router_dense",
-  "name": "RAG_3_LLM_ROUTER_DENSE",
-  "updated_at": "2026-08-14T00:07:43.647766+00:00",
+  "id": "rag10_semantic_scoped_hybrid",
+  "name": "rag10_semantic_scoped_hybrid",
+  "updated_at": "2026-08-19T06:42:22.827597+00:00",
   "graph": {
     "nodes": [
       {
         "id": "query",
         "module_type": "query_input",
         "position": {
-          "x": 0.0,
-          "y": 0.0
+          "x": -56.83937124413994,
+          "y": -161.0448851917298
         },
         "config": {
           "threshold": 1
         },
         "values": {
-          "query": "IBM의 LTM 매출은 얼마야?"
+          "query": "IBM의 2025년 총자산에서 총부채를 뺀 순자산은 얼마이며, 총자산 대비 총부채 비중은 몇 %인가?"
         },
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "router",
-        "module_type": "llm_query_router",
+        "id": "semantic",
+        "module_type": "semantic_query_matcher",
         "position": {
-          "x": 340.0,
-          "y": -140.0
+          "x": 278.1480666825206,
+          "y": -173.29876977693223
         },
         "config": {
-          "model": "gpt-5.6-luna"
+          "model": "text-embedding-3-small",
+          "threshold": 0.74,
+          "top_k": 5,
+          "vote_margin": 0.05
         },
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "direct",
-        "module_type": "direct_query_decomposer",
+        "id": "adaptive",
+        "module_type": "adaptive_query_decomposer",
         "position": {
-          "x": 340.0,
-          "y": 100.0
+          "x": 271.02628506469387,
+          "y": 1.7726891510485565
+        },
+        "config": {
+          "model": "gpt-5.6-luna",
+          "preset": "luna_decomposer"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "subquery-inspector",
+        "module_type": "json_inspector",
+        "position": {
+          "x": 621.5293687773772,
+          "y": -220.7072454929679
         },
         "config": {},
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -60,8 +85,8 @@
         "id": "embed",
         "module_type": "embedder",
         "position": {
-          "x": 680.0,
-          "y": 100.0
+          "x": 273.49062175463007,
+          "y": 158.60225084486237
         },
         "config": {
           "model": "text-embedding-3-large"
@@ -69,6 +94,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -77,8 +103,8 @@
         "id": "index",
         "module_type": "prebuilt_index_loader",
         "position": {
-          "x": 680.0,
-          "y": 360.0
+          "x": 642.2133059017912,
+          "y": 287.26858036578915
         },
         "config": {},
         "values": {
@@ -86,6 +112,27 @@
         },
         "ui": {
           "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "bm25",
+        "module_type": "bm25_retriever",
+        "position": {
+          "x": 1060.0,
+          "y": -20.0
+        },
+        "config": {
+          "k1": 1.5,
+          "b": 0.75,
+          "top_k": 1000
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -94,15 +141,37 @@
         "id": "dense",
         "module_type": "semantic_scoped_dense_retriever",
         "position": {
-          "x": 1040.0,
-          "y": 100.0
+          "x": 1061.8946457081383,
+          "y": 152.7400773611011
         },
         "config": {
-          "top_k": 1000
+          "top_k": 1000,
+          "min_scope_confidence": 0.8
         },
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "rrf",
+        "module_type": "rrf_fusion",
+        "position": {
+          "x": 1420.0,
+          "y": 90.0
+        },
+        "config": {
+          "rrf_k": 60,
+          "top_k": 100,
+          "ratio_penalty": 0.4
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -111,8 +180,8 @@
         "id": "context",
         "module_type": "context",
         "position": {
-          "x": 1380.0,
-          "y": 100.0
+          "x": 1760.0,
+          "y": 90.0
         },
         "config": {
           "top_k": 100,
@@ -122,6 +191,7 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -130,8 +200,8 @@
         "id": "reader",
         "module_type": "reader",
         "position": {
-          "x": 1720.0,
-          "y": 100.0
+          "x": 2100.0,
+          "y": 90.0
         },
         "config": {
           "model": "gpt-5.6-luna",
@@ -140,21 +210,23 @@
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "custom-node-1786607099829-1",
+        "id": "final-inspector",
         "module_type": "json_inspector",
         "position": {
-          "x": 2238.391840566281,
-          "y": 150.28247861399547
+          "x": 2450.0,
+          "y": 90.0
         },
         "config": {},
         "values": {},
         "ui": {
           "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -162,27 +234,59 @@
     ],
     "edges": [
       {
-        "id": "q-router",
+        "id": "query-semantic",
         "source": "query",
-        "target": "router",
+        "target": "semantic",
         "source_output": "query_context",
         "target_input": "query_context",
         "source_branch": "generated"
       },
       {
-        "id": "q-direct",
+        "id": "query-adaptive",
         "source": "query",
-        "target": "direct",
+        "target": "adaptive",
         "source_output": "query_context",
         "target_input": "query_context",
         "source_branch": "generated"
       },
       {
-        "id": "direct-embed",
-        "source": "direct",
+        "id": "semantic-adaptive",
+        "source": "semantic",
+        "target": "adaptive",
+        "source_output": "semantic_match",
+        "target_input": "semantic_match",
+        "source_branch": null
+      },
+      {
+        "id": "adaptive-subquery-inspector",
+        "source": "adaptive",
+        "target": "subquery-inspector",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "subquery-inspector-embed",
+        "source": "subquery-inspector",
         "target": "embed",
         "source_output": "output",
         "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "subquery-inspector-bm25",
+        "source": "subquery-inspector",
+        "target": "bm25",
+        "source_output": "output",
+        "target_input": "query_input",
+        "source_branch": null
+      },
+      {
+        "id": "index-bm25",
+        "source": "index",
+        "target": "bm25",
+        "source_output": "document_output",
+        "target_input": "document_input",
         "source_branch": null
       },
       {
@@ -194,8 +298,8 @@
         "source_branch": null
       },
       {
-        "id": "router-dense",
-        "source": "router",
+        "id": "semantic-dense",
+        "source": "semantic",
         "target": "dense",
         "source_output": "semantic_match",
         "target_input": "semantic_match",
@@ -210,10 +314,26 @@
         "source_branch": null
       },
       {
-        "id": "dense-context",
+        "id": "bm25-rrf",
+        "source": "bm25",
+        "target": "rrf",
+        "source_output": "bm25_result",
+        "target_input": "bm25_result",
+        "source_branch": null
+      },
+      {
+        "id": "dense-rrf",
         "source": "dense",
-        "target": "context",
+        "target": "rrf",
         "source_output": "dense_result",
+        "target_input": "dense_result",
+        "source_branch": null
+      },
+      {
+        "id": "rrf-context",
+        "source": "rrf",
+        "target": "context",
+        "source_output": "retrieval_json",
         "target_input": "retrieval_json",
         "source_branch": null
       },
@@ -234,18 +354,18 @@
         "source_branch": null
       },
       {
-        "id": "edge-1786607101902-1",
+        "id": "reader-final-inspector",
         "source": "reader",
-        "target": "custom-node-1786607099829-1",
+        "target": "final-inspector",
         "source_output": "answer_json",
         "target_input": "input",
         "source_branch": null
       }
     ],
     "viewport": {
-      "x": 388.1330832858625,
-      "y": 153.2945573480526,
-      "zoom": 1.096968656323165
+      "x": 486.6011924488677,
+      "y": 522.8011641667335,
+      "zoom": 0.3031433133020798
     }
   }
 }

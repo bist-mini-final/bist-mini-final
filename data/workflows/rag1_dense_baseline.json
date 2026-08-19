@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rag1_dense_baseline",
-  "name": "rag1_dense_baseline",
+  "name": "RAG_1_DENSE_BASELINE",
   "updated_at": "2026-08-13T07:58:14.328260+00:00",
   "graph": {
     "nodes": [

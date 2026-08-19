@@ -1,0 +1,7175 @@
+[
+  {
+    "id": "gold-1",
+    "question": "IBM의 LTM 기준 시가총액과 TEV는 각각 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Market Capitalization | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-2",
+    "question": "IBM의 기준일 종가와 발행주식수는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Close Price | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Shares Outstanding | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-3",
+    "question": "2025년 LTM 기준 IBM의 총매출액, 매출총이익, 영업이익은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Gross Profit | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Operating Income | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-4",
+    "question": "2024-12-31 기준 희석 EPS와 DPS는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Diluted EPS | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-5",
+    "question": "IBM의 2025년 기준 현금 및 단기투자자산 총액은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash and Short-Term Investments | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-6",
+    "question": "IBM의 2025년 기준 총자산과 총부채는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Assets | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-7",
+    "question": "IBM의 2025년 영업활동 현금흐름과 자본지출은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-8",
+    "question": "IBM이 2025년 집행한 총 배당금 규모는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-9",
+    "question": "IBM의 최근 회계연도(FY0) 매출액은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-10",
+    "question": "IBM의 LTM 기준 EBITDA 마진은 몇 %인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-11",
+    "question": "IBM의 부채비율(Debt/Equity)은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Ratios"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-12",
+    "question": "IBM의 최근 분기 시가총액은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Capitalization"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Market Capitalization | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-13",
+    "question": "Bank of America의 최대주주(1위 Holder)는 누구인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Detailed_Ownership"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-14",
+    "question": "BAC의 기관투자자 지분율은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Summary"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-15",
+    "question": "BAC의 CEO는 누구인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Summary"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-19",
+    "question": "IBM의 LTM 시가총액은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Market Capitalization | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-20",
+    "question": "IBM의 LTM TEV는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-21",
+    "question": "IBM의 LTM 매출은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-22",
+    "question": "IBM의 LTM EBITDA는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-23",
+    "question": "IBM의 LTM 순이익은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Net Income | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-24",
+    "question": "IBM의 LTM 총자산은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Assets | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-25",
+    "question": "IBM의 LTM 장기부채는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Long-Term Debt | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-26",
+    "question": "IBM의 LTM 영업현금흐름은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-27",
+    "question": "IBM의 LTM CAPEX는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-28",
+    "question": "2021년부터 2025년까지 IBM의 매출액 CAGR 및 연도별 YoY는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2021 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2022 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2023 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-29",
+    "question": "IBM의 최근 4년간 Gross Margin, EBITDA Margin, EBIT Margin의 변화 추이는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2022 | Cell Value: ?",
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2023 | Cell Value: ?",
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-30",
+    "question": "IBM의 최근 5년간 장기부채와 단기부채의 변동 경향은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Long-Term Debt | Column Header: FY2021 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Debt Current | Column Header: FY2021 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-33",
+    "question": "IBM의 2024년 대비 2025년 매출과 영업이익은 얼마나 증가했나?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Operating Income | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-34",
+    "question": "IBM의 2024년과 2025년 Total Assets 및 Total Liabilities를 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-35",
+    "question": "IBM의 2024년 대비 2025년 영업현금흐름과 CapEx는 어떻게 변했나?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-36",
+    "question": "IBM의 2024년 대비 2025년 Diluted EPS와 DPS를 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-37",
+    "question": "IBM의 FY0 매출과 LTM 매출을 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-38",
+    "question": "IBM의 최근 3년 매출 추세를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-39",
+    "question": "IBM의 최근 3년 EBITDA 추세를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-40",
+    "question": "IBM의 최근 3년 순이익 추세를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Net Income | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-41",
+    "question": "IBM의 최근 3년 총자산 변화를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Assets | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-42",
+    "question": "IBM의 최근 3년 장기부채가 증가했는지 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Long-Term Debt | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-43",
+    "question": "IBM의 최근 3년 영업현금흐름 추세를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-44",
+    "question": "IBM의 최근 매출은 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 2,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-45",
+    "question": "IBM의 매출 성장률과 EBITDA 마진 추이를 같이 보여줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-46",
+    "question": "IBM의 자본구조와 밸류에이션 멀티플을 함께 정리해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Key_Stats",
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-53",
+    "question": "IBM의 LTM 매출, EBITDA, 순이익을 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: EBITDA | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Net Income | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-54",
+    "question": "IBM의 LTM 총자산과 총부채를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Assets | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-55",
+    "question": "IBM의 현금성 자산과 장기부채를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Long-Term Debt | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-56",
+    "question": "IBM의 영업현금흐름과 CAPEX를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-57",
+    "question": "IBM의 영업·투자·재무 현금흐름을 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-58",
+    "question": "IBM의 매출과 영업현금흐름을 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Income_Statement",
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-59",
+    "question": "IBM의 TEV와 시가총액 중 무엇이 더 커?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Market Capitalization | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-60",
+    "question": "IBM의 EBITDA와 영업현금흐름을 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Income_Statement",
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-61",
+    "question": "IBM의 총부채와 보통주 자본을 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-62",
+    "question": "IBM의 순이익과 영업현금흐름을 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Income_Statement",
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Net Income | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-63",
+    "question": "IBM의 현금성 자산과 장기부채를 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Long-Term Debt | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-64",
+    "question": "IBM의 매출과 TEV를 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 3,
+      "sheets": [
+        "Income_Statement",
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-65",
+    "question": "IBM의 2025년 ROE와 ROA는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Return on Equity | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Return on Assets | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-66",
+    "question": "IBM의 2025년 Cash Conversion Ratio는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement",
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-67",
+    "question": "Key Stats의 TEV가 총부채 및 현금 수치와 정합성을 이루는가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Key_Stats",
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-68",
+    "question": "IBM의 Net Debt/EBITDA와 유동비율은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Balance_Sheet",
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Current Ratio | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-69",
+    "question": "IBM의 FCF 대비 배당 및 자사주 매입 집행 비중은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Cash_Flow",
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-70",
+    "question": "IBM의 DSO 및 DIO의 추이는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-71",
+    "question": "IBM의 LTM 순부채성 금액을 TEV와 Market Cap 차이로 계산하면?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-72",
+    "question": "IBM의 2025년 매출총이익률과 영업이익률은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Gross Profit | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Operating Income | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-73",
+    "question": "IBM의 2025년 단순 잉여현금흐름은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-74",
+    "question": "IBM의 2025년 총자산 대비 총부채 비율은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Assets | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-75",
+    "question": "IBM의 TEV가 시가총액보다 얼마나 큰가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Market Capitalization | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-76",
+    "question": "IBM의 FY-1 대비 FY0 매출 성장률은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-77",
+    "question": "IBM의 최근 순이익 성장률은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Net Income | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-78",
+    "question": "IBM의 LTM 매출총이익률을 계산해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Gross Profit | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-79",
+    "question": "IBM의 LTM 영업이익률은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Operating Income | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-80",
+    "question": "IBM의 LTM 순이익률을 계산해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Net Income | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-81",
+    "question": "IBM의 LTM 유동비율은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Current Ratio | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-82",
+    "question": "IBM의 영업현금흐름과 CAPEX로 FCF를 계산해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-83",
+    "question": "IBM의 종가와 발행주식수로 시가총액을 계산해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Market Capitalization | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Close Price | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Shares Outstanding | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-84",
+    "question": "IBM의 TEV는 LTM 매출의 몇 배야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Key_Stats",
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-85",
+    "question": "IBM의 최근 3년 평균 매출은 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2023 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-86",
+    "question": "IBM의 장기부채가 현금성 자산보다 얼마나 큰가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 4,
+      "sheets": [
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Long-Term Debt | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-87",
+    "question": "IBM의 2022년 순이익이 급감했음에도 영업현금흐름이 유지된 원인은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 5,
+      "sheets": [
+        "Income_Statement",
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2022 | Cell Value: ?",
+        "Sheet: ? | Row Header: Net Income | Column Header: FY2022 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-88",
+    "question": "IBM의 총부채가 크게 변동한 배경은 차입금 발행인가, M&A/투자 지출 때문인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 5,
+      "sheets": [
+        "Balance_Sheet",
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-89",
+    "question": "IBM이 영업현금흐름을 초과하는 주주환원을 집행했는가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 5,
+      "sheets": [
+        "Cash_Flow",
+        "Balance_Sheet"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-90",
+    "question": "IBM의 CapEx와 PP&E 증가 및 이후 매출 성장 간에 시차가 존재하는가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 5,
+      "sheets": [
+        "Cash_Flow",
+        "Balance_Sheet",
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-91",
+    "question": "IBM의 현재 TEV/EBITDA 멀티플이 수익성과 성장 전망 대비 적정한가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 5,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-101",
+    "question": "IBM의 2025년 Actual과 2026~2028년 매출 및 EPS 성장 전망은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 6,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-102",
+    "question": "IBM의 FY2025 대비 NTM/FY2026~2028 TEV/EBITDA 멀티플 변화 전망은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 6,
+      "sheets": [
+        "Key_Stats"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: EBITDA | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-103",
+    "question": "최근 매출 성장 추세가 유지되면 IBM의 2026년 Total Revenue는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 6,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: FY2026 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-104",
+    "question": "현재 영업이익률이 유지될 때 IBM의 2026년 Operating Income은?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 6,
+      "sheets": [
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Operating Income | Column Header: FY2026 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-105",
+    "question": "영업현금흐름이 5% 증가하고 CapEx가 동일하면 IBM의 2026년 FCF는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 6,
+      "sheets": [
+        "Cash_Flow"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash from Ops. | Column Header: FY2026 | Cell Value: ?",
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2026 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "gold-106",
+    "question": "현재 TEV/Revenue 배수를 유지할 경우 IBM의 2026년 예상 TEV는?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 6,
+      "sheets": [
+        "Key_Stats",
+        "Income_Statement"
+      ]
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: FY2026 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0001",
+    "question": "IBM 매출 어떻게 변했어?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0002",
+    "question": "IBM의 이번 분기 매출은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0003",
+    "question": "IBM 작년 매출 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0004",
+    "question": "IBM 매출 트렌드 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0005",
+    "question": "매출 IBM 최근 5년간 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0006",
+    "question": "IBM 매출 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0007",
+    "question": "아이비엠 매출 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0008",
+    "question": "IBM의 최근 회계연도 매출은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0009",
+    "question": "IBM 매출액 트렌드 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0010",
+    "question": "IBM 매출액 좀 알려주실 수 있나요?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0011",
+    "question": "IBM의 작년 매출액은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0012",
+    "question": "아이비엠의 지난해 매출액 데이터 뽑아줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0013",
+    "question": "IBM 최근 5년간 매출액 추이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0014",
+    "question": "IBM 올해 매출액 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0015",
+    "question": "IBM LTM 기준 매출액 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0016",
+    "question": "IBM의 최근 12개월 매출액은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0017",
+    "question": "IBM 매출액 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0018",
+    "question": "아이비엠의 최근 총매출 데이터 뽑아줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0019",
+    "question": "IBM 이번 분기 총매출 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0020",
+    "question": "IBM 총매출 좀 알려주실 수 있나요?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0021",
+    "question": "IBM 총매출 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0022",
+    "question": "IBM 총매출 트렌드 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0023",
+    "question": "IBM 총매출 어떻게 변했어?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0024",
+    "question": "IBM FY0 총매출 추이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0025",
+    "question": "IBM 총매출이 궁금해",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0026",
+    "question": "아이비엠의 최근 revenue 데이터 뽑아줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0027",
+    "question": "revenue IBM 이번 분기 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0028",
+    "question": "IBM 작년 revenue 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0029",
+    "question": "아이비엠 revenue 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0030",
+    "question": "IBM revenue 트렌드 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0031",
+    "question": "IBM 올해 revenue 추이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0032",
+    "question": "IBM revenue 확인해줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0033",
+    "question": "revenue IBM 최근 12개월 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0034",
+    "question": "IBM revenue 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "q0035",
+    "question": "IBM의 최근 레버뉴은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0036",
+    "question": "IBM의 이번 분기 레버뉴은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0037",
+    "question": "IBM 작년 레버뉴 추이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0038",
+    "question": "IBM의 지난해 레버뉴은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0039",
+    "question": "IBM 레버뉴 확인해줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0040",
+    "question": "아이비엠의 LTM 기준 레버뉴 데이터 뽑아줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0041",
+    "question": "레버뉴 IBM 최근 12개월 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0042",
+    "question": "IBM FY0 레버뉴 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0043",
+    "question": "IBM 레버뉴 트렌드 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0044",
+    "question": "IBM 레버뉴이 궁금해",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "variant-q0045",
+    "question": "IBM 매출총이익 좀 알려주실 수 있나요?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0046",
+    "question": "IBM의 이번 분기 매출총이익은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0047",
+    "question": "IBM 작년 매출총이익 추이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0048",
+    "question": "IBM의 지난해 매출총이익은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0049",
+    "question": "매출총이익 IBM 올해 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0050",
+    "question": "IBM 매출총이익 어떻게 변했어?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0051",
+    "question": "아이비엠의 최근 12개월 매출총이익 데이터 뽑아줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0052",
+    "question": "IBM 매출총이익 확인해줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0053",
+    "question": "아이비엠의 최근 회계연도 매출총이익 데이터 뽑아줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0054",
+    "question": "IBM 매출총이익 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "q0055",
+    "question": "IBM gross profit 트렌드 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0056",
+    "question": "IBM의 이번 분기 gross profit은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0057",
+    "question": "IBM 작년 gross profit 얼마야?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0058",
+    "question": "IBM gross profit 어떻게 변했어?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0059",
+    "question": "IBM gross profit 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0060",
+    "question": "gross profit IBM 올해 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0061",
+    "question": "IBM의 LTM 기준 gross profit은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0062",
+    "question": "IBM의 FY0 gross profit은(는) 어떻게 돼?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0063",
+    "question": "IBM 최근 회계연도 gross profit 추이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0064",
+    "question": "gross profit IBM 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0065",
+    "question": "IBM 그로스 프로핏이 궁금해",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0066",
+    "question": "IBM 그로스 프로핏 어떻게 변했어?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0067",
+    "question": "IBM 그로스 프로핏 확인해줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0068",
+    "question": "아이비엠 그로스 프로핏 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0069",
+    "question": "IBM 그로스 프로핏 얼마임?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0070",
+    "question": "그로스 프로핏 IBM FY0 수치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "variant-q0071",
+    "question": "IBM 매출",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "q0072",
+    "question": "IBM 실적",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0073",
+    "question": "IBM 이익",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0074",
+    "question": "IBM 재무제표",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0075",
+    "question": "아이비엠 실적",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0076",
+    "question": "IBM 손익",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0077",
+    "question": "IBM 수익성 지표",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "variant-q0078",
+    "question": "IBM 매출 규모",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "q0079",
+    "question": "IBM 이익률",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0080",
+    "question": "IBM 최근 실적 요약해줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0081",
+    "question": "IBM 재무 하이라이트 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "variant-q0082",
+    "question": "IBM 매출이랑 순이익 같이 보여줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 23
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Net Income | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0083",
+    "question": "IBM EPS 추정치도 포함해서 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 4
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Diluted EPS | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0084",
+    "question": "IBM FY+1 매출 전망 어때?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "q0085",
+    "question": "IBM 향후 2년 실적 추정치 알려줘",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "category": "IBM 핵심 재무지표",
+      "file": "1번_KeyStats",
+      "sheet": "Key_Stats"
+    }
+  },
+  {
+    "id": "q0086",
+    "question": "IBM의 ROA은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0087",
+    "question": "아이비엠 ROA 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0088",
+    "question": "IBM ROA 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0089",
+    "question": "IBM 총자산이익률 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0090",
+    "question": "아이비엠 총자산이익률 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0091",
+    "question": "IBM 총자산이익률 몇 배야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0092",
+    "question": "IBM 재무비율 중에 ROE 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0093",
+    "question": "IBM ROE 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0094",
+    "question": "IBM ROE 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0095",
+    "question": "IBM 자기자본이익률 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0096",
+    "question": "IBM 자기자본이익률 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0097",
+    "question": "IBM 자기자본이익률 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0098",
+    "question": "IBM ROC 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0099",
+    "question": "IBM ROC 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0100",
+    "question": "IBM ROC 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0101",
+    "question": "IBM 재무비율 중에 ROCE 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0102",
+    "question": "IBM ROCE 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0103",
+    "question": "IBM의 ROCE은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0104",
+    "question": "IBM 유동비율 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0105",
+    "question": "IBM 유동비율 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0106",
+    "question": "IBM 당좌비율 몇 배야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0107",
+    "question": "IBM 재무비율 중에 당좌비율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0108",
+    "question": "아이비엠 부채비율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0109",
+    "question": "IBM 부채비율 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0110",
+    "question": "IBM Debt to Equity 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0111",
+    "question": "IBM Debt to Equity 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0112",
+    "question": "IBM D/E 비율 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0113",
+    "question": "IBM 재무비율 중에 D/E 비율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0114",
+    "question": "IBM 이자보상배율 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0115",
+    "question": "IBM 이자보상배율 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0116",
+    "question": "아이비엠 이자보상배율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0117",
+    "question": "IBM Interest Coverage 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0118",
+    "question": "IBM Interest Coverage 몇 배야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0119",
+    "question": "IBM의 Interest Coverage은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0120",
+    "question": "IBM 총자산회전율 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0121",
+    "question": "IBM의 총자산회전율은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0122",
+    "question": "아이비엠 총자산회전율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0123",
+    "question": "아이비엠 재고자산회전율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0124",
+    "question": "IBM 재무비율 중에 재고자산회전율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0125",
+    "question": "IBM의 재고자산회전율은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0126",
+    "question": "IBM 재무비율 중에 매출채권회전율 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0127",
+    "question": "IBM 매출채권회전율 몇 배야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0128",
+    "question": "IBM 매출채권회수기간 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0129",
+    "question": "IBM 매출채권회수기간 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0130",
+    "question": "IBM Debt/EBITDA 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0131",
+    "question": "IBM의 Debt/EBITDA은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0132",
+    "question": "IBM Debt/EBITDA 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0133",
+    "question": "IBM Net Debt/EBITDA 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0134",
+    "question": "IBM Net Debt/EBITDA 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0135",
+    "question": "IBM의 Net Debt/EBITDA은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0136",
+    "question": "IBM CAGR 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0137",
+    "question": "IBM 재무비율 중에 CAGR 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0138",
+    "question": "아이비엠 CAGR 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0139",
+    "question": "IBM 3년 CAGR 몇 배야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0140",
+    "question": "IBM 3년 CAGR 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0141",
+    "question": "IBM 3년 CAGR 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0142",
+    "question": "IBM 5년 CAGR 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0143",
+    "question": "아이비엠 5년 CAGR 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0144",
+    "question": "IBM의 2년 CAGR은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0145",
+    "question": "IBM 2년 CAGR 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0146",
+    "question": "IBM 2년 CAGR 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0147",
+    "question": "IBM 전년 대비 성장률 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0148",
+    "question": "아이비엠 전년 대비 성장률 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0149",
+    "question": "IBM 전년 대비 성장률 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0150",
+    "question": "아이비엠 YoY 성장률 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0151",
+    "question": "IBM YoY 성장률 몇 %야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0152",
+    "question": "IBM 수익성 지표 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0153",
+    "question": "IBM 수익성 지표 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0154",
+    "question": "IBM 수익성 지표 몇 배야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0155",
+    "question": "IBM 레버리지 비율 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0156",
+    "question": "IBM의 레버리지 비율은(는) 어떻게 돼?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0157",
+    "question": "IBM 레버리지 비율 어느 정도야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0158",
+    "question": "IBM 유동성 비율 최근 값이 궁금해",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0159",
+    "question": "IBM 유동성 비율 수치 확인해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0160",
+    "question": "IBM 유동성 비율 얼마야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0161",
+    "question": "IBM 부채비율이 어느 정도야? 위험한 수준이야?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0162",
+    "question": "IBM 이자보상배율로 봤을 때 이자 갚을 여력 있어?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0163",
+    "question": "IBM 수익성 지표들 종합해서 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0164",
+    "question": "IBM 유동성 위험은 없어?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0165",
+    "question": "IBM LONG-TERM SOLVENCY 섹션 지표 다 보여줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0166",
+    "question": "IBM PROFITABILITY 섹션 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0167",
+    "question": "IBM MARGIN ANALYSIS 섹션 지표 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0168",
+    "question": "IBM ASSET TURNOVER 관련 지표 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0169",
+    "question": "IBM 매출 5년 CAGR 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0170",
+    "question": "IBM ROE랑 ROA 같이 비교해줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0171",
+    "question": "아이비엠 재무 건전성 어때?",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0172",
+    "question": "IBM 자기자본이익률 최근 추이 알려줘",
+    "target": "get_ibm_financial_ratios",
+    "metadata": {
+      "category": "IBM 재무비율",
+      "file": "1번_KeyStats",
+      "sheet": "Ratios"
+    }
+  },
+  {
+    "id": "q0173",
+    "question": "IBM의 최근 시가총액은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0174",
+    "question": "IBM 이번 분기 시가총액 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0175",
+    "question": "IBM 지난 분기 시가총액 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0176",
+    "question": "IBM FQ0 기준 시가총액 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0177",
+    "question": "IBM 시가총액 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0178",
+    "question": "IBM 시가총액 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0179",
+    "question": "IBM 최근 시총 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0180",
+    "question": "IBM 이번 분기 시총 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0181",
+    "question": "IBM의 지난 분기 시총은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0182",
+    "question": "IBM의 FQ0 기준 시총은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0183",
+    "question": "IBM 시총 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0184",
+    "question": "IBM 시총 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0185",
+    "question": "IBM 최근 마켓캡 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0186",
+    "question": "IBM의 이번 분기 마켓캡은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0187",
+    "question": "아이비엠 마켓캡 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0188",
+    "question": "IBM FQ0 기준 마켓캡 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0189",
+    "question": "IBM 최근 6개 분기 마켓캡 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0190",
+    "question": "IBM 마켓캡 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0191",
+    "question": "IBM의 최근 Market Cap은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0192",
+    "question": "IBM 이번 분기 Market Cap 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0193",
+    "question": "IBM Market Cap 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0194",
+    "question": "IBM의 최근 6개 분기 Market Cap은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0195",
+    "question": "아이비엠 Market Capitalization 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0196",
+    "question": "IBM Market Capitalization 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0197",
+    "question": "IBM Market Capitalization 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0198",
+    "question": "IBM 최근 주가 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0199",
+    "question": "IBM 주가 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0200",
+    "question": "IBM 지난 분기 주가 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0201",
+    "question": "IBM의 FQ0 기준 주가은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0202",
+    "question": "IBM의 최근 6개 분기 주가은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0203",
+    "question": "IBM 주가 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0204",
+    "question": "아이비엠 종가 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0205",
+    "question": "IBM 이번 분기 종가 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0206",
+    "question": "IBM 지난 분기 종가 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0207",
+    "question": "IBM FQ0 기준 종가 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0208",
+    "question": "IBM의 최근 6개 분기 종가은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0209",
+    "question": "IBM 종가 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0210",
+    "question": "IBM의 최근 주식 가격은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0211",
+    "question": "IBM 이번 분기 주식 가격 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0212",
+    "question": "IBM 지난 분기 주식 가격 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0213",
+    "question": "IBM 주식 가격 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0214",
+    "question": "IBM 주식 가격 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0215",
+    "question": "IBM의 최근 stock price은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0216",
+    "question": "IBM 이번 분기 stock price 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0217",
+    "question": "IBM 지난 분기 stock price 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0218",
+    "question": "아이비엠 stock price 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0219",
+    "question": "IBM 최근 6개 분기 stock price 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0220",
+    "question": "IBM stock price 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0221",
+    "question": "IBM의 최근 발행주식수은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0222",
+    "question": "아이비엠 발행주식수 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0223",
+    "question": "IBM 발행주식수 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0224",
+    "question": "IBM 발행주식수 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0225",
+    "question": "IBM의 최근 6개 분기 발행주식수은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0226",
+    "question": "IBM 발행주식수 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0227",
+    "question": "IBM의 최근 유통주식수은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0228",
+    "question": "IBM 유통주식수 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0229",
+    "question": "IBM 지난 분기 유통주식수 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0230",
+    "question": "IBM FQ0 기준 유통주식수 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0231",
+    "question": "IBM 유통주식수 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0232",
+    "question": "IBM의 유통주식수은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0233",
+    "question": "IBM shares outstanding 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0234",
+    "question": "IBM의 지난 분기 shares outstanding은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0235",
+    "question": "IBM FQ0 기준 shares outstanding 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0236",
+    "question": "IBM 최근 6개 분기 shares outstanding 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0237",
+    "question": "IBM shares outstanding 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0238",
+    "question": "IBM TEV 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0239",
+    "question": "아이비엠 TEV 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0240",
+    "question": "IBM TEV 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0241",
+    "question": "IBM 최근 총기업가치 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0242",
+    "question": "IBM 총기업가치 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0243",
+    "question": "IBM 최근 6개 분기 총기업가치 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0244",
+    "question": "IBM 총기업가치 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0245",
+    "question": "IBM Enterprise Value 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0246",
+    "question": "IBM Enterprise Value 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0247",
+    "question": "아이비엠 Enterprise Value 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0248",
+    "question": "IBM FQ0 기준 Enterprise Value 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0249",
+    "question": "IBM의 최근 6개 분기 Enterprise Value은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0250",
+    "question": "IBM의 Enterprise Value은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0251",
+    "question": "IBM의 최근 기업가치은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0252",
+    "question": "IBM 이번 분기 기업가치 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0253",
+    "question": "IBM 기업가치 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0254",
+    "question": "IBM의 FQ0 기준 기업가치은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0255",
+    "question": "IBM의 기업가치은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0256",
+    "question": "아이비엠 현금성자산 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0257",
+    "question": "IBM 현금성자산 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0258",
+    "question": "IBM의 지난 분기 현금성자산은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0259",
+    "question": "IBM FQ0 기준 현금성자산 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0260",
+    "question": "IBM 현금성자산 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0261",
+    "question": "IBM 최근 총차입금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0262",
+    "question": "IBM 이번 분기 총차입금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0263",
+    "question": "IBM 총차입금 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0264",
+    "question": "IBM FQ0 기준 총차입금 확인해줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0265",
+    "question": "IBM 최근 6개 분기 총차입금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0266",
+    "question": "IBM 총차입금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0267",
+    "question": "IBM의 최근 총부채은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0268",
+    "question": "IBM의 이번 분기 총부채은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0269",
+    "question": "IBM 총부채 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0270",
+    "question": "IBM의 총부채은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0271",
+    "question": "IBM 총자본 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0272",
+    "question": "IBM 이번 분기 총자본 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0273",
+    "question": "IBM의 지난 분기 총자본은?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0274",
+    "question": "IBM 최근 6개 분기 총자본 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0275",
+    "question": "아이비엠 Total Capital 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0276",
+    "question": "IBM Total Capital 지금 얼마야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0277",
+    "question": "IBM Total Capital 추이 보여줘 (분기별)",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0278",
+    "question": "IBM 주식 몇 주나 발행돼있어?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0279",
+    "question": "IBM 시가총액 최근 6분기 추이 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0280",
+    "question": "IBM 기업가치(TEV)랑 시가총액 차이가 뭐야",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0281",
+    "question": "IBM 최근 주가 얼마인지 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0282",
+    "question": "아이비엠 시총 조 단위로 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0283",
+    "question": "IBM 부채 규모가 어느정도야?",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0284",
+    "question": "IBM 현금 보유량 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0285",
+    "question": "IBM 자본구조 상 총자본 규모 알려줘",
+    "target": "get_ibm_capitalization",
+    "metadata": {
+      "category": "IBM 자본화(시총/주가)",
+      "file": "1번_KeyStats",
+      "sheet": "Capitalization"
+    }
+  },
+  {
+    "id": "q0286",
+    "question": "BAC 최대주주 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0287",
+    "question": "Bank of America 최대주주 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0288",
+    "question": "BAC의 최대주주는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0289",
+    "question": "BofA 대주주 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0290",
+    "question": "뱅크오브아메리카 대주주가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0291",
+    "question": "BAC 대주주 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0292",
+    "question": "뱅크오브아메리카 1위 주주가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0293",
+    "question": "BAC 1위 주주 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0294",
+    "question": "Bank of America 1위 주주 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0295",
+    "question": "BAC의 1위 주주는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0296",
+    "question": "Bank of America 주요 주주 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0297",
+    "question": "BAC 주요 주주 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0298",
+    "question": "BAC의 주요 주주는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0299",
+    "question": "BAC 주요 주주 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0300",
+    "question": "BAC Top 주주 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0301",
+    "question": "Bank of America Top 주주 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0302",
+    "question": "BofA Top 주주 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0303",
+    "question": "Bank of America 주주 순위 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0304",
+    "question": "BAC 주주 순위 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0305",
+    "question": "뱅크오브아메리카 주주 순위가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0306",
+    "question": "BAC 주식 많이 가진 사람 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0307",
+    "question": "Bank of America 주식 많이 가진 사람 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0308",
+    "question": "BAC 주식 많이 가진 사람 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(holders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0309",
+    "question": "뱅크오브아메리카 펀드가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0310",
+    "question": "BAC 펀드 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0311",
+    "question": "Bank of America 펀드 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0312",
+    "question": "BAC의 어떤 펀드가 보유는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0313",
+    "question": "BAC 어떤 펀드가 보유 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0314",
+    "question": "뱅크오브아메리카 어떤 펀드가 보유가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0315",
+    "question": "BofA 어떤 펀드가 보유 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0316",
+    "question": "BAC 펀드 순위 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0317",
+    "question": "Bank of America 펀드 순위 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0318",
+    "question": "뱅크오브아메리카 펀드 순위가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0319",
+    "question": "Bank of America 펀드 보유 현황 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0320",
+    "question": "BAC 펀드 보유 현황 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0321",
+    "question": "BofA 펀드 보유율 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0322",
+    "question": "BAC의 펀드 보유율는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0323",
+    "question": "Bank of America 펀드 보유율 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0324",
+    "question": "Bank of America 투자 펀드 리스트 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0325",
+    "question": "BAC 투자 펀드 리스트 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0326",
+    "question": "뱅크오브아메리카 투자 펀드 리스트가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(funds)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0327",
+    "question": "BAC의 임원 지분는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0328",
+    "question": "BAC 임원 지분 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0329",
+    "question": "뱅크오브아메리카 임원 지분가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0330",
+    "question": "BAC 내부자 지분 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0331",
+    "question": "BofA 내부자 지분 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0332",
+    "question": "뱅크오브아메리카 내부자 지분가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0333",
+    "question": "BAC의 내부자 지분는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0334",
+    "question": "BAC의 경영진 보유 주식는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0335",
+    "question": "BAC 경영진 보유 주식 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0336",
+    "question": "BofA 경영진 보유 주식 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0337",
+    "question": "BAC insider 지분율 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0338",
+    "question": "BAC insider 지분율 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0339",
+    "question": "BofA insider 지분율 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0340",
+    "question": "Bank of America 임원들 주식 보유 현황 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0341",
+    "question": "BAC 임원들 주식 보유 현황 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(insiders)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0342",
+    "question": "Bank of America 기관투자자 순위 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0343",
+    "question": "뱅크오브아메리카 기관투자자 순위가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0344",
+    "question": "BAC 기관투자자 순위 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0345",
+    "question": "뱅크오브아메리카 기관 중 1위가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0346",
+    "question": "BAC 기관 중 1위 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0347",
+    "question": "BAC 기관 중 1위 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0348",
+    "question": "BAC 기관 보유 순위 Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0349",
+    "question": "뱅크오브아메리카 기관 보유 순위가 누구야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0350",
+    "question": "BofA 기관 보유 순위 리스트 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0351",
+    "question": "BAC 기관투자자 Top 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0352",
+    "question": "Bank of America 기관투자자 Top 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0353",
+    "question": "BAC의 기관투자자 Top는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0354",
+    "question": "BAC 기관투자자 Top Top 10 보여줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0355",
+    "question": "Bank of America institutional owner 순위 확인해줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0356",
+    "question": "BAC institutional owner 순위 지분율까지 같이 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0357",
+    "question": "BAC의 institutional owner 순위는 어떻게 돼?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트(institutions)",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0358",
+    "question": "BAC 최대주주가 몇 %나 가지고 있어?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0359",
+    "question": "뱅크오브아메리카 주식 제일 많이 가진 펀드가 어디야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0360",
+    "question": "BAC 임원들 지분 순위 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0361",
+    "question": "BAC 기관투자자 중에 가장 많이 보유한 곳이 어디야?",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0362",
+    "question": "BAC 주요 주주 30명 리스트 뽑아줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0363",
+    "question": "뱅크오브아메리카 지분 보유한 펀드들 목록 알려줘",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0364",
+    "question": "BAC 내부자 지분 순위가 궁금해",
+    "target": "get_bac_ownership_list",
+    "metadata": {
+      "category": "BAC 주주리스트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Detailed_Ownership"
+    }
+  },
+  {
+    "id": "q0365",
+    "question": "BAC CEO가 누구야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0366",
+    "question": "뱅크오브아메리카 CFO 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0367",
+    "question": "BAC COO는 누구야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0368",
+    "question": "BofA 경영진 명단 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0369",
+    "question": "BAC 주요 임원들 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0370",
+    "question": "뱅크오브아메리카 회사 소개해줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0371",
+    "question": "BAC 사업 개요 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0372",
+    "question": "BAC가 어떤 회사야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0373",
+    "question": "BAC 기관투자자 지분율은 몇 %야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0374",
+    "question": "뱅크오브아메리카 내부자 지분율 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0375",
+    "question": "BAC 유동주식(float) 비율 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0376",
+    "question": "BAC 기관투자자 수는 몇 개야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0377",
+    "question": "BAC 재무 하이라이트 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0378",
+    "question": "뱅크오브아메리카 최근 분기 매출 얼마야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0379",
+    "question": "BAC MRQ 순이익 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0380",
+    "question": "BAC MRY 기준 매출 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0381",
+    "question": "BAC ROAA 얼마야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0382",
+    "question": "BAC ROAE 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0383",
+    "question": "BAC EPS 얼마야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0384",
+    "question": "BAC 총자산 얼마야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0385",
+    "question": "BAC 총부채 규모 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0386",
+    "question": "BAC 자기자본 규모 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0387",
+    "question": "뱅크오브아메리카 CEO 나이랑 입사연도 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0388",
+    "question": "BAC 임원진 중에 누가 재무 담당이야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0389",
+    "question": "BAC 회사 설명 요약해줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0390",
+    "question": "BofA는 어떤 사업을 하는 회사야?",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0391",
+    "question": "BAC 기관투자자 지분 비율이랑 개인/내부자 비율 비교해줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0392",
+    "question": "뱅크오브아메리카 재무 요약 좀 보여줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0393",
+    "question": "BAC 최근 분기 순이익이랑 매출 같이 알려줘",
+    "target": "get_bac_company_profile",
+    "metadata": {
+      "category": "BAC 회사개요/경영진/재무하이라이트",
+      "file": "6번_OwnershipDetail",
+      "sheet": "Summary"
+    }
+  },
+  {
+    "id": "q0394",
+    "question": "비스텔리젼스 최근 매출액 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0395",
+    "question": "비스텔리젼스 올해 매출액 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0396",
+    "question": "비스텔리젼스 재무 상황 중 매출액 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0397",
+    "question": "비스텔리젼스 매출액 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0398",
+    "question": "비스텔리젼스 매출액 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0399",
+    "question": "비스텔리젼스 이번 분기 매출액 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0400",
+    "question": "비스텔리젼스 지난 분기 매출액 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0401",
+    "question": "비스텔리젼스의 최근 4개 분기 매출액은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0402",
+    "question": "비스텔리젼스 최근 매출 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0403",
+    "question": "비스텔리젼스 올해 매출 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0404",
+    "question": "비스텔리젼스 작년 매출 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0405",
+    "question": "비스텔리젼스 매출 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0406",
+    "question": "비스텔리젼스의 2025년 매출은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0407",
+    "question": "비스텔리젼스 매출 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0408",
+    "question": "비스텔리젼스의 매출은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0409",
+    "question": "비스텔리젼스 최근 영업이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0410",
+    "question": "비스텔리젼스 영업이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0411",
+    "question": "비스텔리젼스의 작년 영업이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0412",
+    "question": "비스텔리젼스 2024년 영업이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0413",
+    "question": "비스텔리젼스 2025년 영업이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0414",
+    "question": "비스텔리젼스 재무 상황 중 영업이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0415",
+    "question": "비스텔리젼스 영업이익 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0416",
+    "question": "비스텔리젼스 영업이익 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0417",
+    "question": "비스텔리젼스 당기순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0418",
+    "question": "비스텔리젼스 재무 상황 중 당기순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0419",
+    "question": "비스텔리젼스 작년 당기순이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0420",
+    "question": "비스텔리젼스 2024년 당기순이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0421",
+    "question": "비스텔리젼스 2025년 당기순이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0422",
+    "question": "비스텔리젼스 이번 분기 당기순이익 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0423",
+    "question": "비스텔리젼스 당기순이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0424",
+    "question": "비스텔리젼스 최근 순이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0425",
+    "question": "비스텔리젼스 순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0426",
+    "question": "비스텔리젼스 재무 상황 중 순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0427",
+    "question": "비스텔리젼스의 2024년 순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0428",
+    "question": "비스텔리젼스 2025년 순이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0429",
+    "question": "비스텔리젼스의 지난 분기 순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0430",
+    "question": "비스텔리젼스 최근 4개 분기 순이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0431",
+    "question": "비스텔리젼스 순이익 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0432",
+    "question": "비스텔리젼스 영업이익률 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0433",
+    "question": "비스텔리젼스 올해 영업이익률 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0434",
+    "question": "비스텔리젼스 작년 영업이익률 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0435",
+    "question": "비스텔리젼스 2025년 영업이익률 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0436",
+    "question": "비스텔리젼스 이번 분기 영업이익률 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0437",
+    "question": "비스텔리젼스 지난 분기 영업이익률 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0438",
+    "question": "비스텔리젼스 최근 4개 분기 영업이익률 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0439",
+    "question": "비스텔리젼스의 영업이익률은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0440",
+    "question": "콜드플레이 매출액 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0441",
+    "question": "콜드플레이 올해 매출액 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0442",
+    "question": "콜드플레이 재무 상황 중 매출액 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0443",
+    "question": "콜드플레이 매출액 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0444",
+    "question": "콜드플레이의 지난 분기 매출액은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0445",
+    "question": "콜드플레이 최근 4개 분기 매출액 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0446",
+    "question": "콜드플레이의 매출액은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0447",
+    "question": "콜드플레이 최근 매출 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0448",
+    "question": "콜드플레이 매출 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0449",
+    "question": "콜드플레이 재무 상황 중 매출 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0450",
+    "question": "콜드플레이 이번 분기 매출 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0451",
+    "question": "콜드플레이의 최근 4개 분기 매출은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0452",
+    "question": "콜드플레이 매출 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0453",
+    "question": "콜드플레이의 최근 영업이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0454",
+    "question": "콜드플레이 올해 영업이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0455",
+    "question": "콜드플레이 작년 영업이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0456",
+    "question": "콜드플레이 영업이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0457",
+    "question": "콜드플레이 재무 상황 중 영업이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0458",
+    "question": "콜드플레이 영업이익 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0459",
+    "question": "콜드플레이 최근 4개 분기 영업이익 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0460",
+    "question": "콜드플레이 최근 당기순이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0461",
+    "question": "콜드플레이의 올해 당기순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0462",
+    "question": "콜드플레이의 작년 당기순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0463",
+    "question": "콜드플레이 재무 상황 중 당기순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0464",
+    "question": "콜드플레이의 2025년 당기순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0465",
+    "question": "콜드플레이의 최근 4개 분기 당기순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0466",
+    "question": "콜드플레이 당기순이익 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0467",
+    "question": "콜드플레이 최근 순이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0468",
+    "question": "콜드플레이의 올해 순이익은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0469",
+    "question": "콜드플레이 작년 순이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0470",
+    "question": "콜드플레이 순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0471",
+    "question": "콜드플레이 재무 상황 중 순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0472",
+    "question": "콜드플레이 이번 분기 순이익 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0473",
+    "question": "콜드플레이 최근 4개 분기 순이익 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0474",
+    "question": "콜드플레이 최근 영업이익률 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0475",
+    "question": "콜드플레이 재무 상황 중 영업이익률 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0476",
+    "question": "콜드플레이의 작년 영업이익률은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0477",
+    "question": "콜드플레이 영업이익률 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0478",
+    "question": "콜드플레이의 2025년 영업이익률은(는) 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0479",
+    "question": "콜드플레이 지난 분기 영업이익률 얼마나 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0480",
+    "question": "콜드플레이 최근 4개 분기 영업이익률 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0481",
+    "question": "콜드플레이 영업이익률 확인해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0482",
+    "question": "비스텔리젼스 연간 재무실적 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0483",
+    "question": "콜드플레이 분기별 매출 추이 보여줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0484",
+    "question": "비스텔리젼스 2021년부터 2025년까지 매출 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0485",
+    "question": "콜드플레이 최근 영업이익률이 어떻게 돼?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0486",
+    "question": "비스텔리젼스랑 콜드플레이 매출 비교해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0487",
+    "question": "콜드플레이 작년 순이익 알려줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0488",
+    "question": "비스텔리젼스 최근 실적 요약해줘",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0489",
+    "question": "콜드플레이 올해 영업이익 얼마야?",
+    "target": "get_virtual_company_financials",
+    "metadata": {
+      "category": "가상기업 재무데이터",
+      "file": "가상기업파일",
+      "sheet": "연간재무/분기재무"
+    }
+  },
+  {
+    "id": "q0490",
+    "question": "비스텔리젼스 현재 임직원 수 몇 명이야?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0491",
+    "question": "비스텔리젼스 임직원 수 최신 기준 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0492",
+    "question": "비스텔리젼스 임직원 수 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0493",
+    "question": "비스텔리젼스 직원 수 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0494",
+    "question": "비스텔리젼스 직원 수 최신 기준 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0495",
+    "question": "비스텔리젼스의 직원 수은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0496",
+    "question": "비스텔리젼스의 총 인원은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0497",
+    "question": "비스텔리젼스 총 인원 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0498",
+    "question": "비스텔리젼스 현재 정규직 수 몇 명이야?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0499",
+    "question": "비스텔리젼스 인력 규모 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0500",
+    "question": "비스텔리젼스 정규직 수 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0501",
+    "question": "비스텔리젼스 계약직 수 최신 기준 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0502",
+    "question": "비스텔리젼스의 계약직 수은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0503",
+    "question": "비스텔리젼스 현재 인력 현황 몇 명이야?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0504",
+    "question": "비스텔리젼스의 인력 현황은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0505",
+    "question": "콜드플레이 인력 규모 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0506",
+    "question": "콜드플레이 직원 몇 명이나 있어?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0507",
+    "question": "콜드플레이 임직원 수 최신 기준 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0508",
+    "question": "콜드플레이의 직원 수은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0509",
+    "question": "콜드플레이 현재 총 인원 몇 명이야?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0510",
+    "question": "콜드플레이의 총 인원은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0511",
+    "question": "콜드플레이 정규직 수 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0512",
+    "question": "콜드플레이의 정규직 수은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0513",
+    "question": "콜드플레이 현재 계약직 수 몇 명이야?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0514",
+    "question": "콜드플레이 인력 현황 최신 기준 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0515",
+    "question": "콜드플레이의 인력 현황은(는) 어떻게 돼?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0516",
+    "question": "비스텔리젼스 정규직이랑 계약직 비율 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0517",
+    "question": "콜드플레이 최근 채용 추세 어때?",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0518",
+    "question": "비스텔리젼스 직원 수 변화 추이 보여줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0519",
+    "question": "콜드플레이 총 임직원 수 최신 기준으로 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "q0520",
+    "question": "비스텔리젼스 2026년 6월 기준 인력 현황 알려줘",
+    "target": "get_virtual_company_headcount",
+    "metadata": {
+      "category": "가상기업 인력현황",
+      "file": "가상기업파일",
+      "sheet": "인력현황"
+    }
+  },
+  {
+    "id": "variant-q0521",
+    "question": "2024-12-31 기준 IBM 희석 EPS와 DPS는 각각 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 4
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Diluted EPS | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0522",
+    "question": "2025년 IBM 현금 및 단기투자자산 총액은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Balance_Sheet"
+      ],
+      "plan_id": 5
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Cash and Short-Term Investments | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0523",
+    "question": "2025년 IBM 총자산과 총부채는 각각 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Balance_Sheet"
+      ],
+      "plan_id": 6
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Assets | Column Header: FY2025 | Cell Value: ?",
+        "Sheet: ? | Row Header: Total Liabilities | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0524",
+    "question": "2025년 IBM 영업현금흐름과 CAPEX는 각각 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Cash_Flow"
+      ],
+      "plan_id": 7
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Capital Expenditure | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0525",
+    "question": "2025년 IBM 총 배당금 지급액은 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Cash_Flow"
+      ],
+      "plan_id": 8
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: ? | Column Header: FY2025 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0526",
+    "question": "IBM LTM TEV는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Key_Stats"
+      ],
+      "plan_id": 20
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Enterprise Value | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0527",
+    "question": "IBM의 2024년과 2025년 매출을 비교해줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0528",
+    "question": "IBM의 2021년부터 2025년까지 매출 추이를 알려줘.",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 21
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Total Revenue | Column Header: LTM | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0529",
+    "question": "IBM FY2025 희석 EPS는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 4
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Diluted EPS | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0530",
+    "question": "IBM의 2026년 예상 희석 EPS는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 4
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Diluted EPS | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  },
+  {
+    "id": "variant-q0531",
+    "question": "IBM의 2028년 예상 희석 EPS는 얼마인가?",
+    "target": "get_ibm_key_financials",
+    "metadata": {
+      "query_type": 1,
+      "sheets": [
+        "Income_Statement"
+      ],
+      "plan_id": 4
+    },
+    "decomposition": {
+      "subqueries": [
+        "Sheet: ? | Row Header: Diluted EPS | Column Header: FY2024 | Cell Value: ?",
+        "Sheet: ? | Row Header: Dividends per Share | Column Header: FY2024 | Cell Value: ?"
+      ]
+    }
+  }
+]

@@ -11,8 +11,8 @@ from threading import Lock
 from typing import Dict, Sequence
 
 from .catalog import QueryExample, load_examples
-from ..embedding_factory import EmbeddingEncoder
-from ..embedding_artifacts import EmbeddingArtifactStore
+from ..embeddings.factory import EmbeddingEncoder
+from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..modules.base import ModuleExecutionError
 
 
@@ -32,6 +32,8 @@ class SemanticDecision:
     sheets: tuple[str, ...]
     matches: tuple[SemanticMatch, ...]
     reason: str
+    query_type: int | None = None
+    subqueries: tuple[str, ...] = ()
 
 
 def _cosine(left: Sequence[float], right: Sequence[float]) -> float:
@@ -145,4 +147,6 @@ class SemanticQueryMatcher:
         return SemanticDecision(
             target, top.similarity, sheets, tuple(matches),
             f"Top similarity {top.similarity:.3f}; nearby-example votes {votes}",
+            query_type=next((item.query_type for item in examples if item.example_id == top.example_id), None),
+            subqueries=next((item.subqueries for item in examples if item.example_id == top.example_id), ()),
         )

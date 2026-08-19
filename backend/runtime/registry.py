@@ -2,8 +2,12 @@ from typing import Any, Dict, List, Optional
 
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
-from ..modules.answer_cache_writer import AnswerCacheWriterModule
+from ..storage.answer_cache import AnswerCacheRepository
+from ..storage.embedding_artifacts import EmbeddingArtifactStore
+from ..storage.vector_index import VectorIndexStore
 from ..modules.base import ExecutableModule
+from ..modules.answer_cache_writer import AnswerCacheWriterModule
+from ..modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
 from ..modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from ..modules.bm25_retriever import Bm25RetrieverModule
 from ..modules.cell_text_embedder import CellTextEmbedderModule
@@ -11,29 +15,11 @@ from ..modules.cell_text_serializer import CellTextSerializerModule
 from ..modules.context_expander import ContextExpanderModule
 from ..modules.dataframe_source import DataframeSourceModule
 from ..modules.decomposer import DecomposerModule
+from ..modules.direct_query_decomposer import DirectQueryDecomposerModule
 from ..modules.dense_retriever import DenseRetrieverModule
 from ..modules.docling_table_detector import DoclingTableDetectorModule
 from ..modules.embedder import EmbedderModule
 from ..modules.exhaustive_cell_text_serializer import (
-from .answer_cache import AnswerCacheRepository
-from .chat_completion import ChatCompletionClient
-from .embedding_artifacts import EmbeddingArtifactStore
-from .vector_index_store import VectorIndexStore
-from .modules.base import ExecutableModule
-from .modules.answer_cache_writer import AnswerCacheWriterModule
-from .modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
-from .modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
-from .modules.context_expander import ContextExpanderModule
-from .modules.dataframe_source import DataframeSourceModule
-from .modules.bm25_retriever import Bm25RetrieverModule
-from .modules.cell_text_serializer import CellTextSerializerModule
-from .modules.cell_text_embedder import CellTextEmbedderModule
-from .modules.decomposer import DecomposerModule
-from .modules.direct_query_decomposer import DirectQueryDecomposerModule
-from .modules.dense_retriever import DenseRetrieverModule
-from .modules.embedder import EmbedderModule, EmbeddingEncoder
-from .modules.docling_table_detector import DoclingTableDetectorModule
-from .modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
 from ..modules.image_tile_source import ImageTileSourceModule
@@ -41,6 +27,7 @@ from ..modules.json_inspector import JsonInspectorModule
 from ..modules.json_transformer import JsonTransformerModule
 from ..modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
 from ..modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
+from ..modules.llm_query_router import LlmQueryRouterModule
 from ..modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
 from ..modules.prebuilt_index_loader import PrebuiltIndexLoaderModule
 from ..modules.processed_file_selector import ProcessedFileSelectorModule
@@ -48,13 +35,9 @@ from ..modules.qa_example_loader import QaExampleLoaderModule
 from ..modules.query_input import QueryInputModule
 from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
-from .modules.semantic_query_matcher import SemanticQueryMatcherModule
-from .modules.llm_query_router import LlmQueryRouterModule
-from .modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from ..modules.semantic_query_matcher import SemanticQueryMatcherModule
+from ..modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
 from ..modules.vector_index_writer import VectorIndexWriterModule
-from ..storage.answer_cache import AnswerCacheRepository
-from ..storage.embedding_artifacts import EmbeddingArtifactStore
-from ..storage.vector_index import VectorIndexStore
 
 
 _CONFIG_UNSET = object()

@@ -5,7 +5,7 @@ import { getExecutionNodeState, NodeShell } from '../FlowNode/NodeShell';
 interface SemanticScopedDenseRetrieverNodeData extends Record<string, unknown> {
   executionState?: string;
   executionOutput?: unknown;
-  config?: { top_k?: number };
+  config?: { top_k?: number; min_scope_confidence?: number };
 }
 
 function itemCount(output: unknown): number | null {
@@ -32,7 +32,7 @@ export const SemanticScopedDenseRetrieverNode = ({ data, selected }: SemanticSco
       bodyClassName="space-y-2.5"
     >
       <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-3 py-2.5 text-[10px] text-slate-600">
-        매칭 시트 범위에서 Dense 검색 · 불확실하면 전체 검색 · Top {data.config?.top_k ?? 1000}
+        정답셋 기반 계획 + 유사도 {data.config?.min_scope_confidence ?? 0.8} 이상일 때만 시트 범위 검색 · 그 외 전체 검색 · Top {data.config?.top_k ?? 1000}
       </div>
       {running && <div className="flex items-center gap-2 text-[10px] font-semibold text-teal-700"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Dense 검색 중</div>}
       {count !== null && <div className="text-[10px] text-teal-800">후보 <strong>{count}개</strong></div>}

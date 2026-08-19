@@ -167,6 +167,11 @@ export interface BenchmarkSummary {
   average_latency_seconds: number;
   average_tokens: number;
   average_cost_usd: number;
+  average_reused_tokens: number;
+  average_reused_cost_usd: number;
+  cache_hits: number;
+  node_runs: number;
+  llm_fallback_calls: number;
   errors: number;
   route_cases: number;
   route_accuracy: number | null;
@@ -181,6 +186,7 @@ export interface BenchmarkComparison {
   saved_at?: string;
   execution_mode: 'sequential_isolated';
   use_cache: boolean;
+  cache_mode?: 'off' | 'all' | 'index_only';
   summary: BenchmarkSummary[];
   results: Array<{
     workflow_id: string;
@@ -202,6 +208,44 @@ export interface BenchmarkComparison {
     } | null;
     error: string | null;
     timeline: Array<{ module_type: string; latency_seconds: number | null }>;
+  }>;
+}
+
+export interface BenchmarkJob {
+  id: string;
+  status: 'queued' | 'running' | 'cancelling' | 'completed' | 'cancelled' | 'failed';
+  completed: number;
+  total: number;
+  current: { workflow_id?: string; case_id?: string; question?: string; run_id?: string | null } | null;
+  active_run: BenchmarkRunSnapshot | null;
+  last_run: BenchmarkRunSnapshot | null;
+  logs: Array<{
+    at: string;
+    event: 'started' | 'running' | 'completed' | 'cancelling';
+    completed: number;
+    total: number;
+    workflow_id?: string;
+    case_id?: string;
+    question?: string;
+    run_id?: string | null;
+    error?: string | null;
+    run?: BenchmarkRunSnapshot | null;
+  }>;
+  result: BenchmarkComparison | null;
+  error: string | null;
+}
+
+export interface BenchmarkRunSnapshot {
+  id: string;
+  status: string;
+  nodes: Array<{
+    node_id: string;
+    module_type: string;
+    status: string;
+    elapsed_ms: number | null;
+    cache_hit: boolean;
+    error: string | null;
+    output_preview: string;
   }>;
 }
 

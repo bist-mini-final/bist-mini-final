@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rag6_semantic_router_dense",
-  "name": "rag6_semantic_router_dense",
+  "name": "RAG_6_SEMANTIC_ROUTER_DENSE",
   "updated_at": "2026-08-14T01:45:00.639490+00:00",
   "graph": {
     "nodes": [
@@ -146,6 +146,21 @@
           "execution_stopped": false,
           "column_widths": {}
         }
+      },
+      {
+        "id": "final-inspector",
+        "module_type": "json_inspector",
+        "position": {
+          "x": 2220,
+          "y": 213.19761609550778
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
       }
     ],
     "edges": [
@@ -219,6 +234,14 @@
         "target": "reader",
         "source_output": "context_json",
         "target_input": "context_json",
+        "source_branch": null
+      },
+      {
+        "id": "reader-final-inspector",
+        "source": "reader",
+        "target": "final-inspector",
+        "source_output": "answer_json",
+        "target_input": "input",
         "source_branch": null
       }
     ],

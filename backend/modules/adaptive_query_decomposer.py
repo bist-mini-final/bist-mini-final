@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..chat_completion import ChatCompletionClient
+from ..llm.chat_completion import ChatCompletionClient
 from .base import ExecutableModule, ModuleDefinition, ModuleInputDTO
 from .data_lineage import QueryContextDTO
 from .decomposer import DecomposerConfigDTO, DecomposerExecutionDTO, DecomposerModule, SubqueriesDTO
@@ -46,12 +46,19 @@ class AdaptiveQueryDecomposerModule(ExecutableModule):
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(AdaptiveQueryDecomposerExecutionDTO, payload)
-        if input_data.semantic_match.matched:
+        if input_data.semantic_match.matched and input_data.semantic_match.subqueries:
             return {
                 "query_context": QueryContextDTO(
                     question_id=input_data.query_context.question_id,
                     question_text=input_data.query_context.question_text,
                 ).model_dump(mode="json"),
+                "subqueries": input_data.semantic_match.subqueries,
+            }
+        if input_data.semantic_match.matched:
+            # Compatibility fallback for legacy route-only catalogs. New semantic
+            # plans always carry atomic subqueries and take the branch above.
+            return {
+                "query_context": input_data.query_context.model_dump(mode="json"),
                 "subqueries": [input_data.query_context.question_text],
             }
         # Match failure is the only path that reaches the LLM decomposer.

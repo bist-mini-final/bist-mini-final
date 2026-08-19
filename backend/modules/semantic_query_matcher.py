@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..embedding_factory import EmbeddingEncoder, get_embedding_encoder
-from ..openai_cost import calculate_openai_cost
+from ..embeddings.factory import EmbeddingEncoder, get_embedding_encoder
+from ..llm.cost import calculate_openai_cost
 from ..semantic_matching.matcher import SemanticQueryMatcher
 from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleInputDTO
 from .embedder import EMBEDDING_MODEL_OPTIONS
@@ -58,6 +58,8 @@ class SemanticQueryMatchOutput(ModuleDTO):
     sheets: List[str]
     reason: str
     matches: List[SemanticMatchItemDTO]
+    query_type: Optional[int] = None
+    subqueries: List[str] = Field(default_factory=list)
     metrics: RouterMetricsDTO = Field(default_factory=_legacy_router_metrics)
 
 
@@ -129,6 +131,8 @@ class SemanticQueryMatcherModule(ExecutableModule):
                     }
                     for match in decision.matches
                 ],
+                "query_type": decision.query_type,
+                "subqueries": list(decision.subqueries),
                 "metrics": {
                     "kind": "semantic",
                     "model": input_data.model,

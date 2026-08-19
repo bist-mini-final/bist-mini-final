@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from ..chat_completion import ChatCompletionClient, ChatCompletionError
+from ..llm.chat_completion import ChatCompletionClient, ChatCompletionError
 from ..semantic_matching.catalog import QueryExample, load_examples
 from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError, ModuleInputDTO
 from .semantic_query_matcher import (

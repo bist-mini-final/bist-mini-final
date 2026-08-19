@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from ..config import PROJECT_DIR
+from ..core.settings import PROJECT_DIR
 
 
-DEFAULT_CATALOG_PATH = PROJECT_DIR.parent.parent / "data" / "semantic_query_examples.json"
+DEFAULT_CATALOG_PATH = PROJECT_DIR / "data" / "semantic_query_plans.json"
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,8 @@ class QueryExample:
     question: str
     target: str
     sheets: tuple[str, ...]
+    query_type: int | None = None
+    subqueries: tuple[str, ...] = ()
 
 
 @lru_cache(maxsize=4)
@@ -42,13 +44,17 @@ def load_examples(path: str = str(DEFAULT_CATALOG_PATH)) -> tuple[QueryExample, 
         if not question or not target:
             continue
         metadata = raw.get("metadata") or {}
-        sheet = str(metadata.get("sheet") or "").strip()
+        raw_sheets = metadata.get("sheets") or ([metadata.get("sheet")] if metadata.get("sheet") else [])
+        sheets = tuple(str(sheet).strip() for sheet in raw_sheets if str(sheet).strip())
+        raw_plan = raw.get("decomposition") or {}
         examples.append(
             QueryExample(
                 example_id=str(raw.get("id") or ""),
                 question=question,
                 target=target,
-                sheets=(sheet,) if sheet else (),
+                sheets=sheets,
+                query_type=int(metadata["query_type"]) if metadata.get("query_type") else None,
+                subqueries=tuple(str(item) for item in raw_plan.get("subqueries", []) if str(item).strip()),
             )
         )
     if not examples:

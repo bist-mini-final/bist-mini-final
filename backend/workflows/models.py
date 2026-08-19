@@ -129,6 +129,7 @@ class WorkflowDocument(StrictModel):
 class WorkflowExecutionRequest(StrictModel):
     inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     use_cache: bool = True
+    cache_only_module_types: Optional[List[str]] = None
     inherit_from_run_id: Optional[str] = Field(
         default=None,
         description=(
@@ -177,5 +178,6 @@ class WorkflowRun(StrictModel):
     graph: WorkflowGraph
     runtime_inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     use_cache: bool = True
+    cache_only_module_types: Optional[List[str]] = None
     batches: List[RunBatchState]
     nodes: Dict[str, RunNodeState]

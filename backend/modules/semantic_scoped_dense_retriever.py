@@ -5,7 +5,7 @@ from typing import Any, Dict, List, cast
 
 from pydantic import BaseModel, Field
 
-from ..vector_index_store import VectorIndexStore
+from ..storage.vector_index import VectorIndexStore
 from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError, ModuleInputDTO
 from .dense_retriever import DenseRetrieverModule
 from .embedder import EmbeddingsDTO
@@ -26,6 +26,7 @@ class SemanticScopedDenseRetrieverInput(ModuleInputDTO):
 
 class SemanticScopedDenseRetrieverConfig(ModuleConfigDTO):
     top_k: int = Field(default=1000, gt=0, le=10000)
+    min_scope_confidence: float = Field(default=0.80, ge=0, le=1)
 
 
 class SemanticScopedDenseRetrieverExecution(SemanticScopedDenseRetrieverInput, SemanticScopedDenseRetrieverConfig):
@@ -37,12 +38,12 @@ class SemanticScopedDenseRetrieverModule(ExecutableModule):
         type="semantic_scoped_dense_retriever",
         label="Semantic-Scoped Dense Retriever",
         category="Logic",
-        description="시맨틱 매칭된 시트 안에서만 Dense 검색하고, 매칭이 불확실하면 기존처럼 전체 인덱스를 검색합니다.",
+        description="정답셋 기반 분해 계획이 있고 신뢰도가 충분할 때만 시트 범위로 Dense 검색하며, 그 외에는 전체 인덱스를 검색합니다.",
         inputs=["query_input", "index_input", "semantic_match"],
         outputs=["dense_result"],
-        config_fields=["top_k"],
+        config_fields=["top_k", "min_scope_confidence"],
         raw_output=True,
-        version="1",
+        version="2",
     )
     input_model = SemanticScopedDenseRetrieverInput
     config_model = SemanticScopedDenseRetrieverConfig
@@ -65,9 +66,17 @@ class SemanticScopedDenseRetrieverModule(ExecutableModule):
             raise ModuleExecutionError("Vector index metadata does not match the supplied index reference")
 
         match = input_data.semantic_match
+        # A legacy route-only match can have a wrong single-sheet label. Scope
+        # only structured gold-set plans that produced atomic subqueries, and
+        # only above the configured confidence floor.
         allowed_sheets = {
             _normalized_sheet_name(sheet) for sheet in match.sheets
-        } if match.matched and match.sheets else set()
+        } if (
+            match.matched
+            and match.confidence >= input_data.min_scope_confidence
+            and bool(match.subqueries)
+            and match.sheets
+        ) else set()
         # Searching the full flat index before applying a scope is deliberate:
         # a scope can have fewer documents than top_k, and an empty/renamed sheet
         # must never turn a confident route into an empty retrieval result.

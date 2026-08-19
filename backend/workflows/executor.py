@@ -249,6 +249,7 @@ class WorkflowExecutor:
             graph=workflow.graph.model_copy(deep=True),
             runtime_inputs=request.inputs,
             use_cache=request.use_cache,
+            cache_only_module_types=request.cache_only_module_types,
             batches=[
                 RunBatchState(index=index, node_ids=node_ids)
                 for index, node_ids in enumerate(batches)
@@ -570,7 +571,10 @@ class WorkflowExecutor:
         self.run_store.save(run)
 
         output: Any = None
-        if run.use_cache and module.definition.cacheable:
+        cache_enabled = run.use_cache and module.definition.cacheable and (
+            run.cache_only_module_types is None or node.module_type in run.cache_only_module_types
+        )
+        if cache_enabled:
             output = self.result_cache.get(cache_key)
             state.cache_hit = output is not None
         if output is None:
@@ -589,7 +593,7 @@ class WorkflowExecutor:
                     run.id,
                 )
             self._raise_if_cancelled(run.id)
-            if run.use_cache and module.definition.cacheable:
+            if cache_enabled:
                 self.result_cache.put(cache_key, output)
 
         branch_ports = set(module.definition.branch_outputs.values())
