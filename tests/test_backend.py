@@ -1395,9 +1395,8 @@ class ApiContractTests(unittest.TestCase):
                     "preset",
                     "system_prompt",
                     "user_prompt_template",
+                    "cell_extractor_prompt",
                     "max_direct_cells",
-                    "spatial_column_radius",
-                    "enable_auto_cell_discovery",
                 },
             ),
             "company_entity_extractor": (

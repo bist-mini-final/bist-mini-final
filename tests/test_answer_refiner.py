@@ -1,13 +1,11 @@
-"""Unit and integration tests for Direct Cell Answer Refiner Module."""
+"""Unit and integration tests for Direct Cell Answer Refiner Module (Pure LLM Spatial Reasoning)."""
 
 import pytest
 from backend.modules.answer_refiner import (
     AnswerRefinerModule,
     AnswerRefinerInputDTO,
     DirectCellDTO,
-    _col_to_num,
-    _num_to_col,
-    _split_cell_coord,
+    CellCandidateDTO,
 )
 from backend.modules.reader import AnswerDTO, ApiUsageDTO
 from backend.modules.data_lineage import QueryContextDTO, DocumentContextDTO
@@ -29,146 +27,117 @@ class FakeCellStore:
         self.cell_references = cell_references or []
         return [
             {
-                "cell_id": "IS Cell O17",
-                "sheet_name": "IS",
-                "cell_coord": "O17",
-                "cell_value": "709",
+                "cell_id": "IS Cell P17",
+                "sheet_name": "Income_Statement",
+                "cell_coord": "P17",
+                "cell_value": "750",
                 "row_header": ["Financial revenue"],
-                "column_header": ["2024"],
-                "source_text": "Financial revenue | 2024 | 709",
-            }
+                "column_header": ["2025"],
+                "source_text": "Financial revenue | 2025 | 750",
+            },
+            {
+                "cell_id": "BS Cell P33",
+                "sheet_name": "Balance_Sheet",
+                "cell_coord": "P33",
+                "cell_value": "1,600",
+                "row_header": ["Other current assets"],
+                "column_header": ["2025"],
+                "source_text": "Other current assets | 2025 | 1600",
+            },
         ]
 
 
-class FakeCompletionClient:
+class FakeReasoningCompletionClient:
     api_key = "test"
 
     def complete_with_metadata(self, model, messages, response_format=None):
+        # If extractor system prompt is called
+        system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+        if "spatial reasoning" in system_msg.lower() or "topology" in system_msg.lower():
+            # Returns inferred candidate cell coordinates based on 2D layout reasoning
+            return ChatCompletionResult(
+                content='["IS:P17", "BS:P33"]',
+                usage={
+                    "prompt_tokens": 50,
+                    "completion_tokens": 10,
+                    "cached_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 60,
+                },
+                latency_seconds=0.01,
+            )
+
+        # Refiner completion prompt
         return ChatCompletionResult(
             content=(
-                '{"refined_answer":"교정된 답변 [IS:O17]",'
-                '"refinement_summary":"직접 셀을 확인했습니다."}'
+                '{"refined_answer":"2025년 금융부문 매출은 750백만 달러 [Income_Statement:P17], '
+                '기타유동자산은 1,600백만 달러 [Balance_Sheet:P33]이며 차이는 850백만 달러입니다.",'
+                '"refinement_summary":"2025년 실적 셀(P17, P33)을 직접 조회하여 답변을 완성했습니다."}'
             ),
             usage={
-                "prompt_tokens": 10,
-                "completion_tokens": 5,
+                "prompt_tokens": 100,
+                "completion_tokens": 40,
                 "cached_tokens": 0,
                 "reasoning_tokens": 0,
-                "total_tokens": 15,
+                "total_tokens": 140,
             },
-            latency_seconds=0.01,
+            latency_seconds=0.02,
         )
 
 
-def test_excel_coordinate_utilities():
-    """Verify Excel column-to-number and spatial splitting utilities."""
-    assert _col_to_num("A") == 1
-    assert _col_to_num("O") == 15
-    assert _col_to_num("P") == 16
-    assert _col_to_num("Q") == 17
-    assert _col_to_num("AA") == 27
+def test_candidate_token_parsing():
+    """Verify parsing and normalization of candidate cell representations."""
+    sheet_codes = {"IS": "Income_Statement", "BS": "Balance_Sheet", "CF": "Cash_Flow"}
 
-    assert _num_to_col(1) == "A"
-    assert _num_to_col(15) == "O"
-    assert _num_to_col(16) == "P"
-    assert _num_to_col(17) == "Q"
+    # Dict candidate
+    cand1 = AnswerRefinerModule._parse_candidate_token(
+        {"cell_coord": "P50", "sheet_name": "IS"}, sheet_codes
+    )
+    assert cand1 is not None
+    assert cand1.cell_coord == "P50"
+    assert cand1.sheet_name == "Income_Statement"
 
-    assert _split_cell_coord("O50") == ("O", 50)
-    assert _split_cell_coord("IS:P16") is None
-    assert _split_cell_coord("Q16") == ("Q", 16)
+    # Qualified string candidates
+    cand2 = AnswerRefinerModule._parse_candidate_token("IS:O17", sheet_codes)
+    assert cand2 is not None
+    assert cand2.cell_coord == "O17"
+    assert cand2.sheet_name == "Income_Statement"
+
+    cand3 = AnswerRefinerModule._parse_candidate_token("Balance_Sheet!Q16", sheet_codes)
+    assert cand3 is not None
+    assert cand3.cell_coord == "Q16"
+    assert cand3.sheet_name == "Balance_Sheet"
+
+    # Standalone string candidate
+    cand4 = AnswerRefinerModule._parse_candidate_token("P50", sheet_codes)
+    assert cand4 is not None
+    assert cand4.cell_coord == "P50"
+    assert cand4.sheet_name is None
+
+    # Invalid token
+    assert AnswerRefinerModule._parse_candidate_token("", sheet_codes) is None
+    assert AnswerRefinerModule._parse_candidate_token(12345, sheet_codes) is None
 
 
-def test_spatial_neighbor_expansion():
-    """Verify that O50 expands to N50, P50, Q50, R50 for timeline continuity."""
-    module = AnswerRefinerModule()
-    neighbors = module._expand_spatial_neighbors("O50", radius=3)
-
-    assert "O50" in neighbors
-    assert "P50" in neighbors  # 2025
-    assert "Q50" in neighbors  # 2025 LTM
-    assert "R50" in neighbors  # 2026E
-    assert "N50" in neighbors  # 2023
-
-
-def test_base_candidates_precede_spatial_neighbors():
-    module = AnswerRefinerModule()
-
-    candidates = module._extract_candidate_cells(
-        question="",
-        initial_answer="",
-        explicit_cell_ids=["IS:O17", "BS:O33"],
-        spatial_radius=2,
+def test_llm_spatial_reasoning_candidate_inference():
+    """Verify that candidate cells are inferred via LLM spatial reasoning."""
+    module = AnswerRefinerModule(completion_client=FakeReasoningCompletionClient())
+    candidates = module._infer_candidate_cells(
+        question="2025년 금융부문 매출과 기타유동자산 실적을 알려줘",
+        initial_answer="2024년 금융부문 매출은 709 [IS Cell O17]이고 2025년 데이터는 누락되었습니다.",
+        explicit_cell_ids=["CF:O19"],
     )
 
-    assert [candidate.model_dump() for candidate in candidates[:2]] == [
-        {"cell_coord": "O17", "sheet_name": "Income_Statement"},
-        {"cell_coord": "O33", "sheet_name": "Balance_Sheet"},
-    ]
-    assert candidates[2].cell_coord == "P17"
+    coords = [c.cell_coord for c in candidates]
+    sheets = [c.sheet_name for c in candidates]
 
+    # Explicit cell should come first
+    assert coords[0] == "O19"
+    assert sheets[0] == "Cash_Flow"
 
-def test_candidate_cell_extraction_from_text():
-    """Verify regex and named cell pattern extraction."""
-    module = AnswerRefinerModule()
-    question = "IBM의 2025년 환율 관련 손익과 현금 및 현금성자산 차이는 얼마야?"
-    initial_answer = (
-        "2024년 기준 환율 관련 손익은 20백만 달러입니다 [IS Cell O50]. "
-        "현금 및 현금성자산은 13,947백만 달러입니다 [BS Cell O16]. "
-        "2025년 환율 손익은 NA이므로 계산할 수 없습니다."
-    )
-
-    candidates = module._extract_candidate_cells(
-        question=question,
-        initial_answer=initial_answer,
-        spatial_radius=2,
-    )
-    candidate_coords = [candidate.cell_coord for candidate in candidates]
-
-    # Base cells
-    assert "O50" in candidate_coords
-    assert "O16" in candidate_coords
-
-    # Expanded 2025/LTM cells
-    assert "P50" in candidate_coords
-    assert "Q50" in candidate_coords
-    assert "P16" in candidate_coords
-    assert "Q16" in candidate_coords
-
-
-def test_candidate_cell_extraction_ignores_year_and_quarter_tokens():
-    module = AnswerRefinerModule()
-    candidates = module._extract_candidate_cells(
-        question="FY2025 EPS2024와 Q3 실적을 비교해줘",
-        initial_answer="근거는 [IS Cell O50]입니다.",
-        spatial_radius=0,
-    )
-
-    assert [candidate.model_dump() for candidate in candidates] == [
-        {"cell_coord": "O50", "sheet_name": "Income_Statement"}
-    ]
-
-
-def test_candidate_cell_extraction_preserves_sheet_and_lowercase_coordinate():
-    module = AnswerRefinerModule()
-
-    qualified = module._extract_candidate_cells(
-        question="IS:o17과 BS Cell O17을 비교해줘",
-        initial_answer="",
-        spatial_radius=0,
-    )
-    standalone = module._extract_candidate_cells(
-        question="o50 값을 확인해줘",
-        initial_answer="",
-        spatial_radius=0,
-    )
-
-    assert [candidate.model_dump() for candidate in qualified] == [
-        {"cell_coord": "O17", "sheet_name": "Income_Statement"},
-        {"cell_coord": "O17", "sheet_name": "Balance_Sheet"},
-    ]
-    assert [candidate.model_dump() for candidate in standalone] == [
-        {"cell_coord": "O50", "sheet_name": None}
-    ]
+    # LLM inferred cells
+    assert "P17" in coords
+    assert "P33" in coords
 
 
 def test_answer_refiner_module_contract():
@@ -180,15 +149,16 @@ def test_answer_refiner_module_contract():
     assert contract["category"] == "Output"
     assert "answer_json" in contract["inputs"]
     assert "refined_answer_json" in contract["outputs"]
-    assert "spatial_column_radius" in contract["config_fields"]
+    assert "cell_extractor_prompt" in contract["config_fields"]
+    assert "max_direct_cells" in contract["config_fields"]
 
 
-def test_answer_refiner_execution_with_mock_data():
-    """Verify end-to-end execution of AnswerRefinerModule."""
+def test_answer_refiner_execution_with_llm_reasoning():
+    """Verify end-to-end execution of AnswerRefinerModule with pure LLM spatial reasoning."""
     store = FakeCellStore()
     module = AnswerRefinerModule(
         pgvector_store=store,
-        completion_client=FakeCompletionClient(),
+        completion_client=FakeReasoningCompletionClient(),
     )
 
     mock_input = {
@@ -211,7 +181,6 @@ def test_answer_refiner_execution_with_mock_data():
             "latency_seconds": 1.2,
             "estimated_cost_usd": 0.0001,
         },
-        "spatial_column_radius": 2,
         "max_direct_cells": 10,
     }
 
@@ -221,43 +190,10 @@ def test_answer_refiner_execution_with_mock_data():
     refined = result["refined_answer_json"]
 
     assert refined["query_context"]["question_id"] == "QUERY-TEST-1234"
-    assert refined["initial_answer"].startswith("2024년")
-    assert isinstance(refined["refined_answer"], str)
-    assert len(refined["refined_answer"]) > 0
-    assert isinstance(refined["refinement_summary"], str)
-    assert isinstance(refined["direct_cells"], list)
+    assert "2025년 금융부문 매출" in refined["refined_answer"]
+    assert len(refined["direct_cells"]) == 2
     assert refined["latency_seconds"] >= 0.0
     assert {reference["sheet_name"] for reference in store.cell_references} == {
         "Income_Statement",
         "Balance_Sheet",
     }
-
-
-def test_answer_refiner_uses_chat_completion_metadata_contract():
-    module = AnswerRefinerModule(
-        pgvector_store=FakeCellStore(),
-        completion_client=FakeCompletionClient(),
-    )
-    result = module.execute(
-        {
-            "answer_json": {
-                "query_context": {
-                    "question_id": "QUERY-TEST-1234",
-                    "question_text": "IBM의 금융부문 매출은 얼마야?",
-                },
-                "document_context": {
-                    "file_name": "SPG_Company_KeyStats_v4.xlsm",
-                    "workbook_hash": "6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4",
-                },
-                "model": "gpt-5.6-luna",
-                "answer": "709입니다 [IS Cell O17].",
-                "api_usage": {},
-                "latency_seconds": 0,
-                "estimated_cost_usd": 0,
-            },
-            "enable_auto_cell_discovery": False,
-        }
-    )["refined_answer_json"]
-
-    assert result["refined_answer"] == "교정된 답변 [IS:O17]"
-    assert result["api_usage"]["total_tokens"] == 15
