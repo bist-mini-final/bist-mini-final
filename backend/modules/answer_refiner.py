@@ -16,6 +16,7 @@ from ..llm.chat_completion import (
     ChatCompletionResult,
 )
 from ..llm.cost import calculate_openai_cost
+from ..spreadsheets.structured_cell_text import SHEET_CODE_MAP, canonical_sheet_name
 from ..storage.pgvector_store import PgVectorStore
 from .answer_refiner_presets import (
     CELL_EXTRACTOR_SYSTEM_PROMPT,
@@ -84,6 +85,13 @@ class DirectCellDTO(ModuleDTO):
     column_header: List[str] = Field(default_factory=list, description="계층형 열 헤더 목록")
     company_name: Optional[str] = Field(default=None, description="기업명")
     source_text: str = Field(description="청크 원문 텍스트")
+
+
+class CellCandidateDTO(ModuleDTO):
+    """A normalized cell coordinate with its optional referenced sheet."""
+
+    cell_coord: str = Field(pattern=r"^[A-Z]{1,3}[1-9]\d{0,6}$")
+    sheet_name: Optional[str] = None
 
 
 class AnswerRefinerInputDTO(ModuleInputDTO):
@@ -215,13 +223,13 @@ class AnswerRefinerModule(ExecutableModule):
 
         return expanded
 
-    def _extract_candidate_cell_ids(
+    def _extract_candidate_cells(
         self,
         question: str,
         initial_answer: str,
         explicit_cell_ids: Optional[List[str]] = None,
         spatial_radius: int = 3,
-    ) -> List[str]:
+    ) -> List[CellCandidateDTO]:
         """
         Extracts cell references from the question and initial answer, then adds nearby horizontal cell coordinates.
         
@@ -232,11 +240,26 @@ class AnswerRefinerModule(ExecutableModule):
         	spatial_radius (int): Number of neighboring columns to include around each candidate cell.
         
         Returns:
-        	List[str]: Unique cell identifiers found or generated from the supplied text and explicit identifiers.
+            List[CellCandidateDTO]: Unique cell coordinates and their optional sheet names.
         """
-        base_candidates: List[str] = []
+        base_candidates: List[CellCandidateDTO] = []
+        sheet_codes = {
+            code.upper(): sheet_name
+            for sheet_name, code in SHEET_CODE_MAP.items()
+        }
 
-        def add_candidate(raw_value: str, *, explicit: bool = False) -> None:
+        def normalized_sheet_name(value: Optional[str]) -> Optional[str]:
+            if value is None or not value.strip():
+                return None
+            stripped = value.strip()
+            return sheet_codes.get(stripped.upper(), canonical_sheet_name(stripped))
+
+        def add_candidate(
+            raw_value: str,
+            *,
+            explicit: bool = False,
+            sheet_name: Optional[str] = None,
+        ) -> None:
             match = re.search(r"([A-Z]{1,3})([1-9]\d{0,6})\b", raw_value.upper())
             if match is None:
                 return
@@ -251,35 +274,91 @@ class AnswerRefinerModule(ExecutableModule):
                 or (column == "Q" and row <= 4)
             ):
                 return
-            candidate = f"{column}{row}"
-            if candidate not in base_candidates:
-                base_candidates.append(candidate)
+            cell_coord = f"{column}{row}"
+            normalized_sheet = normalized_sheet_name(sheet_name)
+            if normalized_sheet is None:
+                if any(
+                    candidate.cell_coord == cell_coord and candidate.sheet_name is not None
+                    for candidate in base_candidates
+                ):
+                    return
+            else:
+                base_candidates[:] = [
+                    candidate
+                    for candidate in base_candidates
+                    if not (
+                        candidate.cell_coord == cell_coord
+                        and candidate.sheet_name is None
+                    )
+                ]
+            if not any(
+                candidate.cell_coord == cell_coord
+                and candidate.sheet_name == normalized_sheet
+                for candidate in base_candidates
+            ):
+                base_candidates.append(
+                    CellCandidateDTO(
+                        cell_coord=cell_coord,
+                        sheet_name=normalized_sheet,
+                    )
+                )
 
         for cell_id in explicit_cell_ids or []:
-            add_candidate(cell_id, explicit=True)
+            qualified = re.fullmatch(
+                r"\s*(?P<sheet>[A-Za-z_][A-Za-z0-9_ ]*?)\s*(?:[!:]|\s+Cell\s+)\s*"
+                r"(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})\s*",
+                cell_id,
+                flags=re.IGNORECASE,
+            )
+            if qualified:
+                add_candidate(
+                    qualified.group("coord"),
+                    explicit=True,
+                    sheet_name=qualified.group("sheet"),
+                )
+            else:
+                add_candidate(cell_id, explicit=True)
 
         # Heuristic 1: Regex matches for cell patterns like 'IS Cell O50', 'O50', 'Income_Statement!E16'
         text_corpus = f"{question}\n{initial_answer}"
-        qualified_pattern = r"\b[A-Za-z_][A-Za-z0-9_ ]*[!:]\s*([A-Z]{1,3}[1-9]\d{0,6})\b"
-        for match in re.findall(qualified_pattern, text_corpus, flags=re.IGNORECASE):
-            add_candidate(match, explicit=True)
+        qualified_pattern = (
+            r"\b(?P<sheet>[A-Za-z_][A-Za-z0-9_]*)\s*[!:]\s*"
+            r"(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
+        )
+        for match in re.finditer(qualified_pattern, text_corpus, flags=re.IGNORECASE):
+            add_candidate(
+                match.group("coord"),
+                explicit=True,
+                sheet_name=match.group("sheet"),
+            )
 
         # Heuristic 2: Match 'IS Cell I16' or 'Cell I16'
-        named_cell_pattern = r"(?:[A-Za-z0-9_]+\s+)?Cell\s+([A-Z]{1,3}[1-9]\d{0,6})"
-        for match in re.findall(named_cell_pattern, text_corpus, flags=re.IGNORECASE):
-            add_candidate(match, explicit=True)
+        named_cell_pattern = (
+            r"\b(?:(?P<sheet>IS|BS|CF|KS|[A-Za-z_]+_[A-Za-z0-9_]+)\s+)?"
+            r"Cell\s+(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
+        )
+        for match in re.finditer(named_cell_pattern, text_corpus, flags=re.IGNORECASE):
+            add_candidate(
+                match.group("coord"),
+                explicit=True,
+                sheet_name=match.group("sheet"),
+            )
 
         standalone_pattern = r"(?<![A-Za-z0-9_])([A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
-        for match in re.findall(standalone_pattern, text_corpus):
+        for match in re.findall(standalone_pattern, text_corpus, flags=re.IGNORECASE):
             add_candidate(match)
 
         # Perform Spatial Horizontal Timeline Expansion
-        final_candidates: List[str] = []
+        final_candidates: List[CellCandidateDTO] = []
         for cand in base_candidates:
-            neighbors = self._expand_spatial_neighbors(cand, spatial_radius)
-            for n in neighbors:
-                if n not in final_candidates:
-                    final_candidates.append(n)
+            neighbors = self._expand_spatial_neighbors(cand.cell_coord, spatial_radius)
+            for neighbor in neighbors:
+                candidate = CellCandidateDTO(
+                    cell_coord=neighbor,
+                    sheet_name=cand.sheet_name,
+                )
+                if candidate not in final_candidates:
+                    final_candidates.append(candidate)
 
         return final_candidates
 
@@ -310,7 +389,7 @@ class AnswerRefinerModule(ExecutableModule):
         workbook_hash = initial_dto.document_context.workbook_hash
 
         # 1. Identify Candidate Cell IDs and expand horizontal timeline neighbors
-        target_cell_ids = self._extract_candidate_cell_ids(
+        target_cells = self._extract_candidate_cells(
             question=question_text,
             initial_answer=initial_answer,
             explicit_cell_ids=parsed.target_cell_ids,
@@ -318,7 +397,7 @@ class AnswerRefinerModule(ExecutableModule):
         )
 
         # 2. LLM-assisted Auto Cell Discovery if enabled
-        if parsed.enable_auto_cell_discovery and self.completion_client and len(target_cell_ids) < parsed.max_direct_cells:
+        if parsed.enable_auto_cell_discovery and self.completion_client and len(target_cells) < parsed.max_direct_cells:
             try:
                 extract_res = self.completion_client.complete_with_metadata(
                     messages=[
@@ -336,10 +415,14 @@ class AnswerRefinerModule(ExecutableModule):
                     if isinstance(discovered, list):
                         for item in discovered:
                             if isinstance(item, str) and item.strip():
-                                clean_item = item.strip().upper()
-                                for n in self._expand_spatial_neighbors(clean_item, parsed.spatial_column_radius):
-                                    if n not in target_cell_ids:
-                                        target_cell_ids.append(n)
+                                discovered_cells = self._extract_candidate_cells(
+                                    question="",
+                                    initial_answer=item,
+                                    spatial_radius=parsed.spatial_column_radius,
+                                )
+                                for candidate in discovered_cells:
+                                    if candidate not in target_cells:
+                                        target_cells.append(candidate)
             except Exception as error:  # noqa: BLE001 - deterministic regex fallback
                 logger.warning(
                     "자동 셀 좌표 탐지 실패, 정규식 결과만 사용합니다: %s",
@@ -347,8 +430,13 @@ class AnswerRefinerModule(ExecutableModule):
                 )
 
         # 3. Directly Fetch Cell Metadata from PostgreSQL
+        limited_target_cells = target_cells[: parsed.max_direct_cells]
         fetched_raw_cells = self.pgvector_store.fetch_cells_by_metadata(
-            cell_identifiers=target_cell_ids[: parsed.max_direct_cells],
+            cell_identifiers=[candidate.cell_coord for candidate in limited_target_cells],
+            cell_references=[
+                candidate.model_dump(mode="json")
+                for candidate in limited_target_cells
+            ],
             workbook_hash=workbook_hash,
             limit=parsed.max_direct_cells,
         )

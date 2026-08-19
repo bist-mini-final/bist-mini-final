@@ -1,6 +1,6 @@
 # Docling Table Region Detector
 
-> Module type: `docling_table_detector` · Category: `Logic` · Version: `3`
+> Module type: `docling_table_detector` · Category: `Logic` · Version: `4`
 
 Excel 시트를 PNG로 렌더링하고 Docling으로 테이블 경계를 추출합니다.
 
@@ -33,6 +33,7 @@ Excel 시트를 PNG로 렌더링하고 Docling으로 테이블 경계를 추출�
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
+| `sheet_names` | `array<string>` | yes | - | - |
 | `tables` | `array<DoclingTableRegionDTO>` | yes | - | - |
 
 ## Referenced DTOs

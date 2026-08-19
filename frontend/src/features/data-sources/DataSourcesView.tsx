@@ -14,6 +14,17 @@ import './data-sources.css';
 
 const ACTIVE_JOB_KEY = 'ds_active_ingestion_job_id';
 const PENDING_FILE_KEY = 'ds_pending_ingestion_file_name';
+const RESTORABLE_JOB_STATUSES = new Set<IngestionJobResponse['status']>([
+  'queued',
+  'running',
+  'paused',
+]);
+
+export function findRestorableIngestionJob(
+  jobs: IngestionJobResponse[]
+): IngestionJobResponse | null {
+  return jobs.find((job) => RESTORABLE_JOB_STATUSES.has(job.status)) ?? null;
+}
 
 function isServerRun(pipelineId?: string): boolean {
   return Boolean(pipelineId?.startsWith('run-'));
@@ -93,10 +104,7 @@ export function DataSourcesView() {
     const restore = runId
       ? dataSourceApi.getIngestionJob(runId, controller.signal)
       : dataSourceApi.listIngestionJobs(pendingFileName || undefined, controller.signal)
-          .then((jobs) => {
-            if (pendingFileName) return jobs[0] ?? null;
-            return jobs.find((job) => ['queued', 'running', 'paused'].includes(job.status)) ?? null;
-          });
+          .then(findRestorableIngestionJob);
 
     restore
       .then((job) => {

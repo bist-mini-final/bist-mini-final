@@ -15,8 +15,18 @@ from backend.llm.chat_completion import ChatCompletionResult
 
 
 class FakeCellStore:
-    def fetch_cells_by_metadata(self, cell_identifiers, workbook_hash=None, **_kwargs):
+    def __init__(self):
+        self.cell_references = []
+
+    def fetch_cells_by_metadata(
+        self,
+        cell_identifiers,
+        workbook_hash=None,
+        cell_references=None,
+        **_kwargs,
+    ):
         assert workbook_hash == "6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4"
+        self.cell_references = cell_references or []
         return [
             {
                 "cell_id": "IS Cell O17",
@@ -90,32 +100,58 @@ def test_candidate_cell_extraction_from_text():
         "2025년 환율 손익은 NA이므로 계산할 수 없습니다."
     )
 
-    candidates = module._extract_candidate_cell_ids(
+    candidates = module._extract_candidate_cells(
         question=question,
         initial_answer=initial_answer,
         spatial_radius=2,
     )
+    candidate_coords = [candidate.cell_coord for candidate in candidates]
 
     # Base cells
-    assert "O50" in candidates
-    assert "O16" in candidates
+    assert "O50" in candidate_coords
+    assert "O16" in candidate_coords
 
     # Expanded 2025/LTM cells
-    assert "P50" in candidates
-    assert "Q50" in candidates
-    assert "P16" in candidates
-    assert "Q16" in candidates
+    assert "P50" in candidate_coords
+    assert "Q50" in candidate_coords
+    assert "P16" in candidate_coords
+    assert "Q16" in candidate_coords
 
 
 def test_candidate_cell_extraction_ignores_year_and_quarter_tokens():
     module = AnswerRefinerModule()
-    candidates = module._extract_candidate_cell_ids(
+    candidates = module._extract_candidate_cells(
         question="FY2025 EPS2024와 Q3 실적을 비교해줘",
         initial_answer="근거는 [IS Cell O50]입니다.",
         spatial_radius=0,
     )
 
-    assert candidates == ["O50"]
+    assert [candidate.model_dump() for candidate in candidates] == [
+        {"cell_coord": "O50", "sheet_name": "Income_Statement"}
+    ]
+
+
+def test_candidate_cell_extraction_preserves_sheet_and_lowercase_coordinate():
+    module = AnswerRefinerModule()
+
+    qualified = module._extract_candidate_cells(
+        question="IS:o17과 BS Cell O17을 비교해줘",
+        initial_answer="",
+        spatial_radius=0,
+    )
+    standalone = module._extract_candidate_cells(
+        question="o50 값을 확인해줘",
+        initial_answer="",
+        spatial_radius=0,
+    )
+
+    assert [candidate.model_dump() for candidate in qualified] == [
+        {"cell_coord": "O17", "sheet_name": "Income_Statement"},
+        {"cell_coord": "O17", "sheet_name": "Balance_Sheet"},
+    ]
+    assert [candidate.model_dump() for candidate in standalone] == [
+        {"cell_coord": "O50", "sheet_name": None}
+    ]
 
 
 def test_answer_refiner_module_contract():
@@ -132,7 +168,8 @@ def test_answer_refiner_module_contract():
 
 def test_answer_refiner_execution_with_mock_data():
     """Verify end-to-end execution of AnswerRefinerModule."""
-    module = AnswerRefinerModule(pgvector_store=FakeCellStore())
+    store = FakeCellStore()
+    module = AnswerRefinerModule(pgvector_store=store)
 
     mock_input = {
         "answer_json": {
@@ -170,6 +207,10 @@ def test_answer_refiner_execution_with_mock_data():
     assert isinstance(refined["refinement_summary"], str)
     assert isinstance(refined["direct_cells"], list)
     assert refined["latency_seconds"] >= 0.0
+    assert {reference["sheet_name"] for reference in store.cell_references} == {
+        "Income_Statement",
+        "Balance_Sheet",
+    }
 
 
 def test_answer_refiner_uses_chat_completion_metadata_contract():

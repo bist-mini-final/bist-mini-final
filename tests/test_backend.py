@@ -1,6 +1,7 @@
 import json
 import re
 import unittest
+import openpyxl
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
@@ -56,6 +57,7 @@ from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModul
 from backend.modules.processed_file_selector import ProcessedFileSelectorModule
 from backend.modules.reader import ReaderModule
 from backend.modules.rrf_fusion import RrfFusionModule
+from backend.modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from backend.modules.vector_index_writer import VectorIndexWriterModule
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
@@ -1084,7 +1086,7 @@ class ApiContractTests(unittest.TestCase):
         docling = self.client.get("/api/modules/docling_table_detector").json()
         self.assertEqual(
             set(docling["output_schema"]["properties"]),
-            {"file_name", "workbook_hash", "tables"},
+            {"file_name", "workbook_hash", "sheet_names", "tables"},
         )
         table_reference = docling["output_schema"]["properties"]["tables"]["items"]["$ref"]
         table_definition = table_reference.rsplit("/", 1)[-1]
@@ -1237,7 +1239,7 @@ class ApiContractTests(unittest.TestCase):
                 {"max_rows", "max_columns"},
             ),
             "openpyxl_region_detector": (
-                {"file_name", "workbook_hash", "tables"},
+                {"file_name", "workbook_hash", "sheet_names", "tables"},
                 {
                     "header_scan_rows",
                     "bold_ratio_threshold",
@@ -1670,6 +1672,83 @@ class SpreadsheetModuleTests(unittest.TestCase):
             "Sheet: Key_Stats | Row Header: Revenue | Column Header: LTM | Cell Value: 100",
         )
 
+    def test_selected_sheet_without_table_is_preserved_for_metadata(self) -> None:
+        workbook = openpyxl.load_workbook(self.workbook_path)
+        notes = workbook.create_sheet("Notes")
+        notes.append(["Narrative only"])
+        workbook.save(self.workbook_path)
+        workbook.close()
+
+        class FirstSheetOnlyExtractor:
+            def detect(self, image_path: Path):
+                if image_path.stem == "Notes":
+                    return []
+                with Image.open(image_path) as image:
+                    return [(0, 0, image.width, image.height)]
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": "sample.xlsx"}
+        )
+        detected = DoclingTableDetectorModule(
+            catalog=self.catalog,
+            extractor=FirstSheetOnlyExtractor(),
+            artifact_dir=self.artifact_dir,
+        ).run(selection)
+        classified = OpenpyxlRegionDetectorModule(catalog=self.catalog).run(detected)
+
+        self.assertEqual(detected["sheet_names"], ["Key Stats", "Notes"])
+        self.assertEqual(classified["sheet_names"], ["Key Stats", "Notes"])
+        self.assertEqual(
+            OpenpyxlRegionDetectorModule(catalog=self.catalog).run(
+                {
+                    "file_name": selection["file_name"],
+                    "workbook_hash": selection["workbook_hash"],
+                    "sheet_names": [],
+                    "tables": [],
+                }
+            )["sheet_names"],
+            ["Key Stats", "Notes"],
+        )
+
+        class CapturingDatabase:
+            def __init__(self):
+                self.sheets_info = []
+
+            def is_connected(self):
+                return True
+
+            def save_sheets(self, file_id, sheets_info):
+                self.file_id = file_id
+                self.sheets_info = sheets_info
+
+        database = CapturingDatabase()
+        persisted = SheetMetadataPersistenceModule(
+            db_manager=database,
+            catalog=self.catalog,
+        ).run(
+            {
+                "structure_input": classified,
+                "index_input": {
+                    "index_id": "a" * 64,
+                    "file_name": selection["file_name"],
+                    "workbook_hash": selection["workbook_hash"],
+                    "model": "text-embedding-3-large",
+                    "dimension": 3072,
+                    "document_count": 1,
+                },
+            }
+        )
+
+        self.assertEqual(persisted["sheets_saved"], 2)
+        self.assertEqual(
+            [detail["table_count"] for detail in persisted["sheet_details"]],
+            [1, 0],
+        )
+        self.assertEqual(
+            [sheet["sheet_name"] for sheet in database.sheets_info],
+            ["Key Stats", "Notes"],
+        )
+
     def test_selector_accepts_workbook_without_cached_sheet_dimensions(self) -> None:
         workbook_path = self.processed_dir / "dimensionless.xlsx"
         workbook = Workbook()
@@ -2094,6 +2173,52 @@ class SpreadsheetModuleTests(unittest.TestCase):
                 **selection,
                 "sheet_names": ["Missing Sheet"],
             })
+
+    def test_luna_vlm_detector_preserves_selected_sheet_order(self) -> None:
+        workbook = openpyxl.load_workbook(self.workbook_path)
+        second = workbook.copy_worksheet(workbook["Key Stats"])
+        second.title = "Second"
+        workbook.save(self.workbook_path)
+        workbook.close()
+
+        first_started = Event()
+        second_finished = Event()
+        completion_order = []
+
+        class ReverseCompletionVisionClient:
+            def complete_structured(self, **kwargs):
+                prompt = kwargs["user_prompt"]
+                if "Key Stats" in prompt:
+                    first_started.set()
+                    if not second_finished.wait(timeout=2):
+                        raise AssertionError("second sheet did not finish first")
+                    completion_order.append("Key Stats")
+                else:
+                    if not first_started.wait(timeout=2):
+                        raise AssertionError("first sheet did not start")
+                    completion_order.append("Second")
+                    second_finished.set()
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"A1:C4","title_range":null,'
+                    '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
+                    '"data_range":"A2:C4"}]}'
+                )
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": "sample.xlsx"}
+        )
+        structured = LunaVlmStructureDetectorModule(
+            ReverseCompletionVisionClient(),
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        ).run({**selection, "max_concurrency": 2})
+
+        self.assertEqual(completion_order, ["Second", "Key Stats"])
+        self.assertEqual(
+            [table["sheet_name"] for table in structured["tables"]],
+            ["Key Stats", "Second"],
+        )
     def test_bfs_llm_detector_builds_title_regions_and_hierarchical_headers(self) -> None:
         workbook_path = self.processed_dir / "hierarchical.xlsx"
         workbook = Workbook()
@@ -3009,12 +3134,10 @@ class OpenAIEmbeddingEncoderTest(unittest.TestCase):
 
     @patch("backend.embeddings.openai.urlopen")
     def test_openai_embedding_encode_success(self, mock_urlopen):
-        import io
-
         mock_response_data = json.dumps({
             "data": [
-                {"index": 0, "embedding": [3.0, 4.0]},
-                {"index": 1, "embedding": [1.0, 0.0]}
+                {"index": 1, "embedding": [1.0, 0.0]},
+                {"index": 0, "embedding": [3.0, 4.0]}
             ]
         }).encode("utf-8")
 
@@ -3040,6 +3163,36 @@ class OpenAIEmbeddingEncoderTest(unittest.TestCase):
         self.assertAlmostEqual(vectors[0][1], 0.8)
         self.assertAlmostEqual(vectors[1][0], 1.0)
         self.assertAlmostEqual(vectors[1][1], 0.0)
+
+    @patch("backend.embeddings.openai.urlopen")
+    def test_openai_embedding_rejects_malformed_batch_indices(self, mock_urlopen):
+        class MockHTTPResponse:
+            def __init__(self, indices):
+                self.payload = json.dumps({
+                    "data": [
+                        {"index": index, "embedding": [1.0, 0.0]}
+                        for index in indices
+                    ]
+                }).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def read(self):
+                return self.payload
+
+        encoder = OpenAIEmbeddingEncoder(
+            model_name="text-embedding-3-small",
+            api_key="test-key",
+        )
+        for indices in ([0, 0], [0], [0, 2]):
+            with self.subTest(indices=indices):
+                mock_urlopen.return_value = MockHTTPResponse(indices)
+                with self.assertRaisesRegex(ModuleExecutionError, "응답 인덱스"):
+                    encoder.encode(["query 1", "query 2"])
 
 
 class PrebuiltIndexLoaderModuleTest(unittest.TestCase):

@@ -742,6 +742,7 @@ class PgVectorStore:
         workbook_hash: Optional[str] = None,
         collection_name: Optional[str] = None,
         limit: int = 50,
+        cell_references: Optional[List[Dict[str, Optional[str]]]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch cell documents matching the provided identifiers, optionally filtered by workbook or collection.
@@ -751,6 +752,9 @@ class PgVectorStore:
             workbook_hash (Optional[str]): Restricts results to a workbook with this hash.
             collection_name (Optional[str]): Restricts results to this collection.
             limit (int): Maximum number of matching cells to return.
+            cell_references (Optional[List[Dict[str, Optional[str]]]]): Structured
+                coordinate filters whose optional ``sheet_name`` is matched together
+                with the coordinate.
         
         Returns:
             List[Dict[str, Any]]: Normalized cell records containing identifiers, values, headers, source text, and company metadata. Returns an empty list when the input is empty or retrieval fails.
@@ -781,7 +785,8 @@ class PgVectorStore:
                     elif not workbook_hash:
                         return []
 
-                # We search matching cell_id, cell_coord, or cell_id ILIKE pattern
+                # Legacy callers search matching cell IDs or coordinates. Structured
+                # references keep qualified sheet/coordinate pairs together.
                 extracted_coords = []
                 for cid in clean_ids:
                     parts = cid.replace(":", " ").replace("!", " ").split()
@@ -794,7 +799,49 @@ class PgVectorStore:
                     dict.fromkeys(item.upper() for item in clean_ids + extracted_coords)
                 )
 
-                query = """
+                where_clauses: List[str] = []
+                params: List[Any] = []
+                if cell_references is None:
+                    where_clauses.append(
+                        """(
+                            cmetadata->>'cell_id' = ANY(%s)
+                            OR cmetadata->>'cell_coord' = ANY(%s)
+                            OR UPPER(cmetadata->>'cell_coord') = ANY(%s)
+                        )"""
+                    )
+                    params.extend([clean_ids, all_search_targets, all_search_targets])
+                else:
+                    qualified_sheets: List[str] = []
+                    qualified_coords: List[str] = []
+                    unqualified_coords: List[str] = []
+                    for reference in cell_references:
+                        coord = str(reference.get("cell_coord") or "").strip().upper()
+                        if not coord:
+                            continue
+                        sheet_name = str(reference.get("sheet_name") or "").strip()
+                        if sheet_name:
+                            qualified_sheets.append(sheet_name.upper())
+                            qualified_coords.append(coord)
+                        else:
+                            unqualified_coords.append(coord)
+                    if unqualified_coords:
+                        where_clauses.append("UPPER(cmetadata->>'cell_coord') = ANY(%s)")
+                        params.append(list(dict.fromkeys(unqualified_coords)))
+                    if qualified_coords:
+                        where_clauses.append(
+                            """EXISTS (
+                                SELECT 1
+                                FROM unnest(%s::text[], %s::text[])
+                                    AS reference(sheet_name, cell_coord)
+                                WHERE UPPER(cmetadata->>'sheet_name') = reference.sheet_name
+                                  AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
+                            )"""
+                        )
+                        params.extend([qualified_sheets, qualified_coords])
+                    if not where_clauses:
+                        return []
+
+                query = f"""
                     SELECT 
                         id,
                         document,
@@ -807,13 +854,8 @@ class PgVectorStore:
                         cmetadata->'column_header' AS column_header,
                         cmetadata->>'company_name' AS company_name
                     FROM langchain_pg_embedding
-                    WHERE (
-                        cmetadata->>'cell_id' = ANY(%s)
-                        OR cmetadata->>'cell_coord' = ANY(%s)
-                        OR UPPER(cmetadata->>'cell_coord') = ANY(%s)
-                    )
+                    WHERE ({' OR '.join(where_clauses)})
                 """
-                params: List[Any] = [clean_ids, all_search_targets, all_search_targets]
 
                 if col_uuid:
                     query += " AND collection_id = %s"

@@ -138,15 +138,35 @@ class DatabaseManager:
                 cur.execute(
                     """
                     DELETE FROM source_files
-                    WHERE file_id = %s OR file_hash = %s OR file_name = %s;
+                    WHERE file_id = %s OR file_hash = %s;
                     """,
-                    (
-                        file_id_hash_or_name,
-                        file_id_hash_or_name,
-                        Path(file_id_hash_or_name).name,
-                    ),
+                    (file_id_hash_or_name, file_id_hash_or_name),
                 )
                 deleted = cur.rowcount > 0
+                if not deleted:
+                    safe_file_name = Path(file_id_hash_or_name).name
+                    cur.execute(
+                        """
+                        SELECT file_id
+                        FROM source_files
+                        WHERE file_name = %s
+                        ORDER BY created_at DESC
+                        LIMIT 2;
+                        """,
+                        (safe_file_name,),
+                    )
+                    matches = cur.fetchmany(2)
+                    if len(matches) > 1:
+                        raise ValueError(
+                            "동일한 파일명의 source_files 레코드가 여러 개입니다. "
+                            "file_id 또는 file_hash로 삭제하세요"
+                        )
+                    if matches:
+                        cur.execute(
+                            "DELETE FROM source_files WHERE file_id = %s;",
+                            (matches[0][0],),
+                        )
+                        deleted = cur.rowcount > 0
             conn.commit()
             return deleted
         finally:

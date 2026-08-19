@@ -153,8 +153,27 @@ class OpenAIEmbeddingEncoder:
                 usage_doc = document.get("usage") or {}
                 p_tokens = int(usage_doc.get("prompt_tokens") or len(batch_items) * 15)
                 t_tokens = int(usage_doc.get("total_tokens") or len(batch_items) * 15)
-                sorted_items = sorted(data_items, key=lambda item: item["index"])
-                batch_vectors = [item["embedding"] for item in sorted_items]
+                items_by_index: Dict[int, Dict[str, Any]] = {}
+                for item in data_items:
+                    item_index = item["index"]
+                    if (
+                        not isinstance(item_index, int)
+                        or isinstance(item_index, bool)
+                        or item_index in items_by_index
+                    ):
+                        raise ModuleExecutionError(
+                            "OpenAI Embeddings API 응답 인덱스가 올바르지 않습니다"
+                        )
+                    items_by_index[item_index] = item
+                expected_indices = set(range(len(batch_items)))
+                if set(items_by_index) != expected_indices:
+                    raise ModuleExecutionError(
+                        "OpenAI Embeddings API 응답 인덱스가 요청 범위와 일치하지 않습니다"
+                    )
+                batch_vectors = [
+                    items_by_index[index]["embedding"]
+                    for index in range(len(batch_items))
+                ]
                 return b_idx, batch_vectors, p_tokens, t_tokens
             except (KeyError, IndexError, TypeError) as error:
                 raise ModuleExecutionError("OpenAI Embeddings API 응답 포맷이 올바르지 않습니다") from error

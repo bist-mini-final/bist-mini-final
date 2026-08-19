@@ -1,6 +1,6 @@
 # OpenPyXL Table Region Classifier
 
-> Module type: `openpyxl_region_detector` · Category: `Logic` · Version: `3`
+> Module type: `openpyxl_region_detector` · Category: `Logic` · Version: `4`
 
 Docling 테이블 경계 안에서 헤더와 데이터 영역을 셀 서식으로 분류합니다.
 
@@ -18,6 +18,7 @@ Docling 테이블 경계 안에서 헤더와 데이터 영역을 셀 서식으�
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
+| `sheet_names` | `array<string>` | yes | - | - |
 | `tables` | `array<DoclingTableRegionDTO>` | yes | - | - |
 
 ## Config DTO
@@ -101,6 +102,7 @@ Docling 테이블 경계 안에서 헤더와 데이터 영역을 셀 서식으�
   "input": {
     "file_name": "example.xlsx",
     "workbook_hash": "<workbook_hash>",
+    "sheet_names": [],
     "tables": []
   },
   "config": {
