@@ -68,9 +68,10 @@ export function SettingsView() {
     }
   };
 
-  const dbUrl = `postgresql://<user>:<password>@${dbStatus?.host ?? 'localhost'}:${
-    dbStatus?.port ?? 5432
-  }/${dbStatus?.database ?? 'rag_flow'}`;
+  const dbHost = dbStatus?.host || 'localhost';
+  const dbPort = dbStatus?.port || 5432;
+  const dbName = dbStatus?.database || 'rag_flow';
+  const dbUrl = `postgresql://<user>:<password>@${dbHost}:${dbPort}/${dbName}`;
   const dockerCmd = 'docker compose -f docker-compose.db.yml up -d';
 
   const copyToClipboard = async (text: string, type: 'url' | 'cmd') => {
@@ -151,48 +152,46 @@ export function SettingsView() {
             onClick={handleTestConnection}
             disabled={isTesting}
           >
-            {isTesting ? <Loader2 size={14} className="ds-spin" /> : <RefreshCw size={14} />}
-            <span>연결 테스트</span>
+            {isTesting ? (
+              <Loader2 size={15} className="ds-spin" />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            <span>{isTesting ? '연결 테스트 중...' : '연결 다시 테스트'}</span>
           </button>
         </div>
 
         {/* Status Banner */}
-        <div
-          className={`settings-status-banner ${
-            dbStatus?.connected ? 'is-connected' : 'is-disconnected'
-          }`}
-        >
-          {dbStatus?.connected ? (
-            <>
-              <CheckCircle2 size={20} />
-              <div>
-                <strong>PostgreSQL pgvector 정상 연결됨</strong>
-                <p style={{ margin: 0, fontSize: '0.82rem' }}>
-                  PostgreSQL {dbStatus.postgres_version || '16'} (pgvector v{dbStatus.pgvector_version || '0.8.6'} · HNSW 인덱싱 가동 중)
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <ShieldAlert size={20} />
-              <div>
-                <strong>pgvector 데이터베이스에 연결할 수 없습니다</strong>
-                <p style={{ margin: 0, fontSize: '0.82rem' }}>
-                  터미널에서 <code>{dockerCmd}</code> 명령어를 실행해 컨테이너를 시작하세요.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
+        {dbStatus?.connected ? (
+          <div className="settings-status-banner settings-status-banner--success">
+            <CheckCircle2 size={18} className="text-emerald-600" />
+            <div>
+              <p className="font-semibold text-emerald-900">PostgreSQL pgvector 정상 연결됨</p>
+              <p className="text-xs text-emerald-700">
+                PostgreSQL {dbStatus.postgres_version || '16'} (pgvector v{dbStatus.pgvector_version || '0.8.0'}) 연동 활성화 상태입니다.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="settings-status-banner settings-status-banner--danger">
+            <ShieldAlert size={18} className="text-rose-600" />
+            <div>
+              <p className="font-semibold text-rose-900">pgvector 데이터베이스에 연결할 수 없습니다</p>
+              <p className="text-xs text-rose-700">
+                Docker 컨테이너가 실행 중인지 확인하거나 <code>docker compose -f docker-compose.db.yml up -d</code>로 데이터베이스를 시작하세요.
+              </p>
+            </div>
+          </div>
+        )}
 
-        {/* Metric Cards Grid */}
-        <div className="settings-grid-cards">
+        {/* Database Metric Cards */}
+        <div className="settings-grid">
           <div className="settings-card">
             <span className="settings-card__label">
               <Server size={14} /> 호스트 / 포트
             </span>
             <span className="settings-card__val">
-              {dbStatus?.host || 'localhost'}:{dbStatus?.port || 5432}
+              {dbHost}:{dbPort}
             </span>
           </div>
 
@@ -201,7 +200,7 @@ export function SettingsView() {
               <Database size={14} /> 데이터베이스명
             </span>
             <span className="settings-card__val">
-              {dbStatus?.database || 'rag_flow'}
+              {dbName}
             </span>
           </div>
 
@@ -263,51 +262,53 @@ export function SettingsView() {
             <Sparkles size={19} className="text-amber-500" />
             <div>
               <h3>RAG 파이프라인 & 캐시 임계값 설정</h3>
-              <span>질문 유사도 캐시 및 임베딩 모델 표준</span>
+              <span>스프레드시트 쿼리 분해 및 벡터 유사도 정책</span>
             </div>
           </div>
         </div>
 
-        <div className="settings-grid-cards">
-          <div className="settings-card">
-            <span className="settings-card__label">
-              <Zap size={14} /> 질문 캐시 유사도 임계값
-            </span>
-            <span className="settings-card__val" style={{ color: '#16a34a' }}>
-              0.95 (보수적 임계값)
-            </span>
-            <small style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              완전 유사한 질의에 대해서만 캐시 히트 적용
-            </small>
+        <div className="settings-config-table">
+          <div className="settings-config-row">
+            <div>
+              <p className="font-semibold text-slate-800">질문 분해 임베딩 모델</p>
+              <p className="text-xs text-slate-500">
+                단일 질문을 구조화된 서브 쿼리로 변환하고 임베딩 벡터를 생성합니다.
+              </p>
+            </div>
+            <span className="settings-badge font-mono">text-embedding-3-large</span>
           </div>
 
-          <div className="settings-card">
-            <span className="settings-card__label">
-              <Sparkles size={14} /> 표준 임베딩 모델
-            </span>
-            <span className="settings-card__val">
-              text-embedding-3-large
-            </span>
-            <small style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              3072차원 Cosine Distance 인덱싱
-            </small>
+          <div className="settings-config-row">
+            <div>
+              <p className="font-semibold text-slate-800">RAG 벡터 검색 유사도 캐시 임계값 (Threshold)</p>
+              <p className="text-xs text-slate-500">
+                높을수록 동일하거나 매우 유사한 질의에만 캐시를 재사용합니다.
+              </p>
+            </div>
+            <span className="settings-badge">0.95 (보수적 임계값)</span>
           </div>
 
-          <div className="settings-card">
-            <span className="settings-card__label">
-              <Layers size={14} /> 표 구조화 파이프라인
-            </span>
-            <span className="settings-card__val">
-              Luna VLM
-            </span>
-            <small style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              LunaVlmStructureDetectorModule 자동 파싱
-            </small>
+          <div className="settings-config-row">
+            <div>
+              <p className="font-semibold text-slate-800">Reciprocal Rank Fusion (RRF) 파라미터 (k)</p>
+              <p className="text-xs text-slate-500">
+                복수 컬렉션 검색 결과 순위 통합 시 사용하는 가중 상수 (기본값: 60)
+              </p>
+            </div>
+            <span className="settings-badge font-mono">k = 60</span>
+          </div>
+
+          <div className="settings-config-row">
+            <div>
+              <p className="font-semibold text-slate-800">LLM 추론 모델 (Structure Detector / Answer Refiner)</p>
+              <p className="text-xs text-slate-500">
+                BFS 영역 감지 및 셀 좌표 기반 응답 정제에 사용하는 모델
+              </p>
+            </div>
+            <span className="settings-badge font-mono">gpt-4o-mini</span>
           </div>
         </div>
       </section>
     </div>
   );
 }
-
-export default SettingsView;

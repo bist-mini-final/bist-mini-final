@@ -45,13 +45,13 @@ describe('SettingsView', () => {
     });
 
     expect(screen.getByText('localhost:5432')).toBeInTheDocument();
+    expect(
+      screen.getByText('postgresql://<user>:<password>@localhost:5432/rag_flow')
+    ).toBeInTheDocument();
     expect(screen.getByText('rag_flow')).toBeInTheDocument();
     expect(screen.getByText('2개')).toBeInTheDocument();
     expect(screen.getByText('1,024청크')).toBeInTheDocument();
     expect(screen.getByText('0.95 (보수적 임계값)')).toBeInTheDocument();
-    expect(
-      screen.getByText('postgresql://<user>:<password>@localhost:5432/rag_flow')
-    ).toBeInTheDocument();
   });
 
   it('renders custom host, port, and database in dbUrl', async () => {
@@ -116,7 +116,7 @@ describe('SettingsView', () => {
     });
   });
 
-  it('handles clipboard writeText rejection gracefully without showing copied state', async () => {
+  it('handles clipboard writeText rejection gracefully with failure feedback', async () => {
     const writeTextMock = vi.fn().mockRejectedValue(new Error('Permission denied'));
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: writeTextMock },

@@ -52,7 +52,7 @@ export const PgVectorIndexWriterNode = ({ data, selected }: PgVectorIndexWriterN
           <span className="flex items-center gap-1">
             <Server className="h-3.5 w-3.5 text-teal-700" /> PostgreSQL 16
           </span>
-          <span className="text-[10px] text-teal-700 font-mono">localhost:5432 / rag_flow</span>
+          <span className="text-[10px] text-teal-700 font-mono">PGVECTOR_URL 환경변수</span>
         </div>
         <div className="text-[10px] text-slate-600 leading-snug">
           6개 ERD 테이블(<code>source_files</code>, <code>sheets</code>, <code>document_chunks</code>, <code>vector_indexes</code>, <code>langchain_pg_collection</code>, <code>langchain_pg_embedding</code>)에 HNSW 코사인 벡터를 영구 적재합니다.
