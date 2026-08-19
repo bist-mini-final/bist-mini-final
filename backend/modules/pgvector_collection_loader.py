@@ -88,6 +88,7 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         matched_file_names: List[str] = []
         matched_hashes: List[str] = []
         matched_dimensions: set = set()
+        matched_models: set = set()
         model_name = "text-embedding-3-large"
         dimension = 3072
 
@@ -111,8 +112,16 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
             matched_hashes.append(matched.get("workbook_hash", cid))
 
             meta = self.pgvector_store.get_index_metadata(cid) or matched
-            if meta.get("model"):
-                model_name = meta["model"]
+            col_model = meta.get("model")
+            if col_model:
+                if matched_models and col_model not in matched_models:
+                    prev_model = next(iter(matched_models))
+                    raise ModuleExecutionError(
+                        f"선택된 pgvector 컬렉션들의 임베딩 모델이 일치하지 않습니다: {cid} (모델: {col_model}, 기존 모델: {prev_model})"
+                    )
+                matched_models.add(col_model)
+                model_name = col_model
+
             col_dim = meta.get("dimension")
             if col_dim is not None:
                 if matched_dimensions and col_dim not in matched_dimensions:
@@ -154,6 +163,7 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                                     "cell_id": cmeta.get("cell_id") or chunk_id,
                                     "sheet_name": cmeta.get("sheet_name", ""),
                                     "cell_coord": cmeta.get("cell_coord", ""),
+                                    "variant": cmeta.get("variant") or "header_only",
                                     "row_header": cmeta.get("row_header", []),
                                     "column_header": cmeta.get("column_header", []),
                                     "cell_value": str(cmeta.get("cell_value", "")),

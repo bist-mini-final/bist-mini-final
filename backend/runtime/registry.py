@@ -134,7 +134,11 @@ class ModuleRegistry:
             JsonTransformerModule(),
             JsonInspectorModule(),
             ProcessedFileSelectorModule(processed_dir=processed_dir),
-            BfsLlmStructureDetectorModule(completion_client),
+            BfsLlmStructureDetectorModule(
+                completion_client=completion_client,
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
             LocalVlmStructureDetectorModule(
                 processed_dir=processed_dir,
                 artifact_dir=spreadsheet_artifact_dir,

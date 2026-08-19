@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from typing import Any, Dict, List, Optional, Tuple, cast
 
@@ -104,11 +105,16 @@ class PgVectorRetrieverModule(ExecutableModule):
                     )
                     for offset, (doc, dist) in enumerate(results):
                         score = 1.0 - float(dist) if dist is not None else 0.5
-                        cell_id = (
+                        content_str = doc.page_content or ""
+                        content_hash = hashlib.sha256(content_str.encode("utf-8")).hexdigest()[:16]
+                        doc_id = getattr(doc, "id", None)
+                        persistent_id = (
                             doc.metadata.get("cell_id")
                             or doc.metadata.get("chunk_id")
-                            or f"{target_col}:unknown:{offset}"
+                            or doc.metadata.get("id")
+                            or (doc_id if isinstance(doc_id, str) and doc_id else None)
                         )
+                        cell_id = persistent_id or f"{target_col}:chunk:{content_hash}"
                         raw_doc = {
                             "cell_id": cell_id,
                             "text": doc.page_content,

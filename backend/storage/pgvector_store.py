@@ -811,7 +811,9 @@ class PgVectorStore:
                     fallback_error,
                     exc_info=True,
                 )
-                return []
+                raise PgVectorStoreError(
+                    f"PostgreSQL pgvector 유사도 검색 실패 ({collection_name}): {fallback_error}"
+                ) from fallback_error
         finally:
             conn.close()
 

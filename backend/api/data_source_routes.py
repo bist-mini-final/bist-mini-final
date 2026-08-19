@@ -440,8 +440,9 @@ def create_data_source_router(
             for summary in summaries:
                 if any(
                     node.module_type == "processed_file_selector"
-                    and summary.runtime_inputs.get(node.id, {}).get("file_name")
-                    == safe_file_name
+                    and Path(
+                        str(summary.runtime_inputs.get(node.id, {}).get("file_name", ""))
+                    ).name == safe_file_name
                     for node in summary.graph.nodes
                 ):
                     runs.append(run_store.load(summary.id))
