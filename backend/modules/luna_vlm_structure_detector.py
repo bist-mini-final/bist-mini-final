@@ -492,7 +492,6 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                 for future in concurrent.futures.as_completed(futures):
                     try:
                         ctx, decisions = future.result()
-                        analyzed_sheet_count += 1
                         s_name = ctx["sheet_name"]
                         v_sheet = ctx["value_sheet"]
                         s_layout = ctx["layout"]
@@ -507,6 +506,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                             table_out["sheet_name"] = s_name
                             sheet_tables.append(table_out)
                         tables_by_sheet[s_name] = sheet_tables
+                        analyzed_sheet_count += 1
                         print(f"[Luna VLM] 시트 '{s_name}' 테이블 {len(sheet_tables)}개 최종 조립 완료", flush=True)
                     except Exception as future_err:
                         failed_ctx = futures[future]

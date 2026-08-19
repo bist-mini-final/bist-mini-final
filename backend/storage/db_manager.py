@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,8 @@ import psycopg2
 import psycopg2.extras
 
 from ..core.settings import PGVECTOR_URL
+
+logger = logging.getLogger(__name__)
 
 DDL_INIT = """
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -72,10 +75,12 @@ class DatabaseManager:
     def is_connected(self) -> bool:
         try:
             conn = self._raw_connection()
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
-            conn.close()
-            return True
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                return True
+            finally:
+                conn.close()
         except Exception:
             return False
 
@@ -83,14 +88,16 @@ class DatabaseManager:
         """Create all required tables if they don't exist and migrate columns."""
         try:
             conn = self._raw_connection()
-            with conn.cursor() as cur:
-                cur.execute(DDL_INIT)
-                cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
-                cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
-            conn.commit()
-            conn.close()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(DDL_INIT)
+                    cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
+                    cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
+                conn.commit()
+            finally:
+                conn.close()
         except Exception:
-            pass
+            logger.warning("PostgreSQL 스키마 초기화에 실패했습니다", exc_info=True)
 
     def save_source_file(
         self,

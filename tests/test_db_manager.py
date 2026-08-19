@@ -18,7 +18,7 @@ class FakeCursor:
     def __exit__(self, *_args):
         return None
 
-    def execute(self, query, params):
+    def execute(self, query, params=None):
         normalized = " ".join(query.split())
         self.executions.append((normalized, params))
         if "WHERE file_id = %s OR file_hash = %s" in normalized:
@@ -85,3 +85,47 @@ def test_delete_source_file_keeps_direct_id_or_hash_deletion():
     assert len(cursor.executions) == 1
     assert "file_hash" in cursor.executions[0][0]
     assert connection.committed is True
+
+
+def test_is_connected_success_closes_connection():
+    cursor = FakeCursor()
+    database, connection = database_with(cursor)
+
+    assert database.is_connected() is True
+    assert connection.closed is True
+
+
+def test_is_connected_error_closes_connection():
+    class ErrorCursor(FakeCursor):
+        def execute(self, query, params=None):
+            raise RuntimeError("DB connection lost")
+
+    cursor = ErrorCursor()
+    database, connection = database_with(cursor)
+
+    assert database.is_connected() is False
+    assert connection.closed is True
+
+
+def test_ensure_schema_closes_connection_on_success():
+    cursor = FakeCursor()
+    database, connection = database_with(cursor)
+
+    database.ensure_schema()
+    assert connection.committed is True
+    assert connection.closed is True
+
+
+def test_ensure_schema_logs_and_closes_connection_on_error():
+    class ErrorCursor(FakeCursor):
+        def execute(self, query, params=None):
+            raise RuntimeError("Schema init error")
+
+    cursor = ErrorCursor()
+    database, connection = database_with(cursor)
+
+    database.ensure_schema()
+    assert connection.committed is False
+    assert connection.closed is True
+
+

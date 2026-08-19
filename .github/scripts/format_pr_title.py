@@ -19,7 +19,7 @@ def fetch_pr_commits(repo: str, pr_number: str, github_token: str) -> list[str]:
             "User-Agent": "PR-Title-Auto-Formatter",
         },
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         commits_data = json.loads(resp.read().decode("utf-8"))
 
     commit_messages = []
@@ -80,7 +80,7 @@ def generate_pr_title_with_llm(
     )
 
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             title = data["choices"][0]["message"]["content"].strip()
             # Clean any surrounding quotes or markdown
@@ -106,7 +106,7 @@ def update_pr_title(repo: str, pr_number: str, new_title: str, github_token: str
         },
         method="PATCH",
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         print(f"Successfully updated PR #{pr_number} title (HTTP {resp.status})")
 
 

@@ -438,14 +438,13 @@ def create_data_source_router(
             safe_file_name = Path(file_name).name
             runs: List[WorkflowRun] = []
             for summary in summaries:
-                run = run_store.load(summary.id)
                 if any(
                     node.module_type == "processed_file_selector"
-                    and run.runtime_inputs.get(node.id, {}).get("file_name")
+                    and summary.runtime_inputs.get(node.id, {}).get("file_name")
                     == safe_file_name
-                    for node in run.graph.nodes
+                    for node in summary.graph.nodes
                 ):
-                    runs.append(run)
+                    runs.append(run_store.load(summary.id))
         else:
             runs = summaries
         return sorted(runs, key=lambda run: run.updated_at, reverse=True)
@@ -846,9 +845,9 @@ def create_data_source_router(
             HTTPException: If no ingestion job produced the specified index.
         """
         for summary in _list_ingestion_runs():
-            run = run_store.load(summary.id)
-            writer_output = _node_output(run, "pgvector_index_writer")
+            writer_output = _node_output(summary, "pgvector_index_writer")
             if writer_output and writer_output.get("index_id") == index_id:
+                run = run_store.load(summary.id)
                 return _job_payload(run)
         raise HTTPException(
             status_code=404,

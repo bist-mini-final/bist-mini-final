@@ -70,13 +70,14 @@ class WorkflowRunDispatcher:
                 resume_failed,
             )
             self._futures[run_id] = future
-            future.add_done_callback(
-                lambda completed, active_run_id=run_id: self._forget(
-                    active_run_id,
-                    completed,
-                )
+
+        future.add_done_callback(
+            lambda completed, active_run_id=run_id: self._forget(
+                active_run_id,
+                completed,
             )
-            return True
+        )
+        return True
 
     def ensure_submitted(
         self,

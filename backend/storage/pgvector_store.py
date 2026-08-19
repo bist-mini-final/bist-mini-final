@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tup
 from urllib.parse import urlparse
 
 import psycopg2
+import psycopg2.extras
 from langchain_core.documents import Document
 
 from ..core.settings import PGVECTOR_URL
@@ -291,6 +292,11 @@ class PgVectorStore:
                 )
             conn.commit()
         except Exception:
+            logger.warning(
+                "langchain_pg_collection 메타데이터 직접 업데이트 실패: %s",
+                index_id,
+                exc_info=True,
+            )
             conn.rollback()
         finally:
             conn.close()
@@ -784,15 +790,27 @@ class PgVectorStore:
                 )
                 results.append((doc, float(dist) if dist is not None else 0.0))
             return results
-        except Exception:
+        except Exception as error:
+            logger.warning(
+                "직접 SQL 벡터 유사도 검색 실패 (%s): %s",
+                collection_name,
+                error,
+                exc_info=True,
+            )
             try:
                 store = get_vector_store(
                     collection_name=collection_name,
                     backend="pgvector",
                     database_url=self.database_url,
                 )
-                return store.similarity_search_by_vector_with_score(embedding, k=k)
-            except Exception:
+                return store.similarity_search_with_score_by_vector(embedding, k=k)
+            except Exception as fallback_error:
+                logger.warning(
+                    "폴백 PGVector 유사도 검색 실패 (%s): %s",
+                    collection_name,
+                    fallback_error,
+                    exc_info=True,
+                )
                 return []
         finally:
             conn.close()

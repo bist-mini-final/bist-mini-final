@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
@@ -14,6 +15,8 @@ from .cell_text_embedder import EmbeddedCellTextDocumentDTO
 from .embedder import EmbeddingsDTO
 from .prebuilt_index_loader import IndexOutputDTO
 from .retrieval_models import RankedSearchResultDTO
+
+logger = logging.getLogger(__name__)
 
 
 class PgVectorRetrieverInputDTO(ModuleInputDTO):
@@ -68,10 +71,20 @@ class PgVectorRetrieverModule(ExecutableModule):
         query_items = list(input_data.query_input.items.items())
 
         if not query_items:
-            return {"items": []}
+            return {
+                "query_context": input_data.query_input.query_context.model_dump(
+                    mode="json"
+                ),
+                "document_context": {
+                    "file_name": input_data.index_input.file_name,
+                    "workbook_hash": input_data.index_input.workbook_hash,
+                },
+                "items": [],
+            }
 
         # Query pgvector across all selected collections for each subquery
-        all_hits: List[Tuple[float, Dict[str, Any], str]] = []
+        all_hits: List[Tuple[float, Dict[str, Any], str, str]] = []
+        failures: List[str] = []
         for target_col in target_collections:
             for query_text, embedding_vector in query_items:
                 try:
@@ -80,24 +93,36 @@ class PgVectorRetrieverModule(ExecutableModule):
                         embedding=embedding_vector,
                         k=top_k,
                     )
-                    for doc, dist in results:
+                    for offset, (doc, dist) in enumerate(results):
                         score = 1.0 - float(dist) if dist is not None else 0.5
+                        cell_id = (
+                            doc.metadata.get("cell_id")
+                            or doc.metadata.get("chunk_id")
+                            or f"{target_col}:unknown:{offset}"
+                        )
                         raw_doc = {
-                            "cell_id": doc.metadata.get("cell_id") or doc.metadata.get("chunk_id", "unknown"),
+                            "cell_id": cell_id,
                             "text": doc.page_content,
                             "metadata": doc.metadata,
                         }
-                        all_hits.append((score, raw_doc, query_text))
+                        all_hits.append((score, raw_doc, query_text, target_col))
                 except Exception as err:
-                    if len(target_collections) == 1:
-                        raise ModuleExecutionError(f"PostgreSQL pgvector 유사도 검색 실패: {err}")
+                    logger.warning(
+                        "pgvector 컬렉션 검색 실패: %s (%s)", target_col, err
+                    )
+                    failures.append(f"{target_col}: {err}")
+
+        if failures and not all_hits:
+            raise ModuleExecutionError(
+                "PostgreSQL pgvector 유사도 검색 실패: " + "; ".join(failures)
+            )
 
         # Deduplicate and rank by score
-        best_by_cell: Dict[str, Tuple[float, Dict[str, Any], str]] = {}
-        for score, raw_doc, query_text in all_hits:
-            cell_id = raw_doc["cell_id"]
-            if cell_id not in best_by_cell or score > best_by_cell[cell_id][0]:
-                best_by_cell[cell_id] = (score, raw_doc, query_text)
+        best_by_cell: Dict[Tuple[str, str], Tuple[float, Dict[str, Any], str]] = {}
+        for score, raw_doc, query_text, target_col in all_hits:
+            dedup_key = (target_col, raw_doc["cell_id"])
+            if dedup_key not in best_by_cell or score > best_by_cell[dedup_key][0]:
+                best_by_cell[dedup_key] = (score, raw_doc, query_text)
 
         ranked = sorted(
             best_by_cell.values(),

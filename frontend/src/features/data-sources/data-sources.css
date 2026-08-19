@@ -112,41 +112,6 @@
   font-size: 0.72rem;
 }
 
-.ds-table-container {
-  overflow-x: auto;
-}
-
-.ds-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-  font-size: 0.78rem;
-}
-
-.ds-table th {
-  border-bottom: 1px solid #e6ebe8;
-  padding: 0.65rem 0.85rem;
-  color: #8a968f;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.ds-table td {
-  border-bottom: 1px solid #f0f4f1;
-  padding: 0.85rem 0.85rem;
-  color: #313e37;
-  vertical-align: middle;
-}
-
-.ds-table tr:last-child td {
-  border-bottom: none;
-}
-
-.ds-table tr:hover td {
-  background: #fbfdfc;
-}
 
 .ds-font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -1288,16 +1253,6 @@
   font-size: 0.74rem;
 }
 
-@media (max-width: 900px) {
-  .ds-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ds-index-meta-bar,
-  .ds-pipeline-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
 /* Full-Page Pipeline Tracker View */
 .ds-pipeline-tracker {
@@ -1534,3 +1489,15 @@
   color: #065f46;
   font-weight: 650;
 }
+
+@media (max-width: 900px) {
+  .ds-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ds-index-meta-bar,
+  .ds-pipeline-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

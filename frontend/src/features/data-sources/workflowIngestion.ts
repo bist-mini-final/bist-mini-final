@@ -97,9 +97,10 @@ function elapsedSeconds(run: WorkflowRun): number {
  * @param nodeId - The identifier of the module node
  * @returns The module's display state
  */
-function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState {
-  const node = run.graph.nodes.find((candidate) => candidate.id === nodeId)!;
+function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState | null {
+  const node = run.graph.nodes.find((candidate) => candidate.id === nodeId);
   const state = run.nodes[nodeId];
+  if (!node || !state) return null;
   const view = MODULE_VIEW[node.module_type] ?? {
     name: node.module_type,
     category: 'Module',
@@ -189,7 +190,9 @@ function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState {
 export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRunState {
   const run = job.run;
   const orderedNodeIds = run.batches.flatMap((batch) => batch.node_ids);
-  const modules = orderedNodeIds.map((nodeId) => moduleState(run, nodeId));
+  const modules = orderedNodeIds
+    .map((nodeId) => moduleState(run, nodeId))
+    .filter((module): module is ModuleStepState => module !== null);
   const currentStageIndex = Math.max(
     0,
     modules.findIndex((module) => module.status === 'running') >= 0

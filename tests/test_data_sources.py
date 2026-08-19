@@ -64,6 +64,9 @@ class DataSourceApiTests(unittest.TestCase):
 
         self.pg_store = PgVectorStore()
         self.db_mgr = DatabaseManager()
+        if not self.pg_store.is_connected() or not self.db_mgr.is_connected():
+            self.temp_dir.cleanup()
+            self.skipTest("pgvector database is not accessible")
         self.clean_test_indexes()
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
@@ -120,22 +123,27 @@ class DataSourceApiTests(unittest.TestCase):
         if hasattr(self, "db_mgr") and self.db_mgr.is_connected():
             with self.db_mgr._raw_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         DELETE FROM source_files 
-                        WHERE file_name ILIKE '%Test_Workbook%' 
-                           OR file_name ILIKE '%test_%' 
-                           OR file_name = 'uploaded_data.parquet';
-                    """)
+                        WHERE file_name = ANY(%s);
+                        """,
+                        (["Test_Workbook.xlsx", "uploaded_data.parquet"],),
+                    )
                 conn.commit()
 
     def tearDown(self):
-        for run in self.run_store.list():
-            if run.status in {"queued", "running"}:
-                self.workflow_dispatcher.cancel(run.id)
-        self.workflow_dispatcher.shutdown(wait=True)
-        self.client.close()
+        if hasattr(self, "run_store") and hasattr(self, "workflow_dispatcher"):
+            for run in self.run_store.list():
+                if run.status in {"queued", "running"}:
+                    self.workflow_dispatcher.cancel(run.id)
+        if hasattr(self, "workflow_dispatcher"):
+            self.workflow_dispatcher.shutdown(wait=True)
+        if hasattr(self, "client"):
+            self.client.close()
         self.clean_test_indexes()
-        self.temp_dir.cleanup()
+        if hasattr(self, "temp_dir"):
+            self.temp_dir.cleanup()
 
     def _await_job(self, run_id: str, timeout: float = 5.0) -> dict:
         deadline = time.monotonic() + timeout

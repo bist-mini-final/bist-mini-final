@@ -407,6 +407,28 @@ export function useWorkflowPersistence(
           : await createRun(query, controller.signal);
         applyRun(run);
         onBatch?.(run);
+        if (run.status === 'failed') {
+          const stableRun = run;
+          const runningRun = markNextBatchRunning(run);
+          stableRunRef.current = stableRun;
+          applyRun(runningRun);
+          onBatch?.(runningRun);
+          try {
+            run = await executeNextOrResume(run, controller.signal);
+          } catch (error) {
+            if (!controller.signal.aborted) {
+              applyRun(stableRun);
+              onBatch?.(stableRun);
+            }
+            throw error;
+          } finally {
+            if (executionController.current === controller) {
+              stableRunRef.current = null;
+            }
+          }
+          applyRun(run);
+          onBatch?.(run);
+        }
         while (run.status === 'queued' || run.status === 'running' || run.status === 'paused') {
           const stableRun = run;
           const runningRun = markNextBatchRunning(run);

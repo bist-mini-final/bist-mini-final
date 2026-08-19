@@ -50,18 +50,21 @@ export function SettingsView() {
     }
   };
 
-  const dbUrl = 'postgresql://rag_user:rag_password@localhost:5432/rag_flow';
+  const dbUrl = `postgresql://<user>:<password>@${dbStatus?.host ?? 'localhost'}:${
+    dbStatus?.port ?? 5432
+  }/${dbStatus?.database ?? 'rag_flow'}`;
   const dockerCmd = 'docker compose -f docker-compose.db.yml up -d';
 
-  const copyToClipboard = (text: string, type: 'url' | 'cmd') => {
-    navigator.clipboard.writeText(text);
-    if (type === 'url') {
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
-    } else {
-      setCopiedCmd(true);
-      setTimeout(() => setCopiedCmd(false), 2000);
+  const copyToClipboard = async (text: string, type: 'url' | 'cmd') => {
+    try {
+      if (!navigator.clipboard?.writeText) return;
+      await navigator.clipboard.writeText(text);
+    } catch {
+      return;
     }
+    const setCopied = type === 'url' ? setCopiedUrl : setCopiedCmd;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (

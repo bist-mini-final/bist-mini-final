@@ -70,6 +70,35 @@ class PgVectorMetadataQueryTests(unittest.TestCase):
         self.assertEqual(params[:2], (["INCOME_STATEMENT"], ["O17"]))
         self.assertEqual(params[2], "workbook-hash")
 
+    def test_cell_items_to_langchain_documents_preserves_variant(self):
+        from backend.spreadsheets.langchain_document import cell_items_to_langchain_documents
+        from backend.modules.cell_text_serializer import CellTextDocumentDTO
+
+        dto = CellTextDocumentDTO(
+            cell_id="cell-1",
+            sheet_name="Summary",
+            cell_coord="B2",
+            row_header=["Total"],
+            column_header=["2025"],
+            cell_value="100",
+            variant="header_with_value",
+            text="Total 2025: 100",
+        )
+        docs = cell_items_to_langchain_documents([dto], file_name="test.xlsx")
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0].metadata["variant"], "header_with_value")
+        self.assertEqual(docs[0].metadata["file_name"], "test.xlsx")
+
+        dict_item = {
+            "cell_id": "cell-2",
+            "sheet_name": "Summary",
+            "cell_coord": "B3",
+            "variant": "header_only",
+            "text": "Total 2025",
+        }
+        docs_dict = cell_items_to_langchain_documents([dict_item])
+        self.assertEqual(docs_dict[0].metadata["variant"], "header_only")
+
 
 class PgVectorIntegrationTests(unittest.TestCase):
     def setUp(self):
@@ -86,6 +115,8 @@ class PgVectorIntegrationTests(unittest.TestCase):
 
     def test_put_search_delete_with_langchain(self):
         index_id = "test_langchain_idx_999"
+        self.store.delete(index_id)
+        self.addCleanup(self.store.delete, index_id)
         meta = {
             "file_name": "TestFinancial.xlsx",
             "workbook_hash": "hash_abc",

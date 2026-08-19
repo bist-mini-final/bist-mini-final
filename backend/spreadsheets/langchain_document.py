@@ -34,6 +34,7 @@ def cell_items_to_langchain_documents(
             "row_header": doc_dict.get("row_header", []),
             "column_header": doc_dict.get("column_header", []),
             "cell_value": str(doc_dict.get("cell_value", "")),
+            "variant": doc_dict.get("variant", ""),
             "file_name": file_name,
             "workbook_hash": workbook_hash,
             "index_id": index_id,

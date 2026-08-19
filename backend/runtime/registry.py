@@ -135,13 +135,19 @@ class ModuleRegistry:
             JsonInspectorModule(),
             ProcessedFileSelectorModule(processed_dir=processed_dir),
             BfsLlmStructureDetectorModule(completion_client),
-            LocalVlmStructureDetectorModule(),
+            LocalVlmStructureDetectorModule(
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
             LunaVlmStructureDetectorModule(
                 processed_dir=processed_dir,
                 artifact_dir=spreadsheet_artifact_dir,
             ),
-            DoclingTableDetectorModule(),
-            OpenpyxlRegionDetectorModule(),
+            DoclingTableDetectorModule(
+                processed_dir=processed_dir,
+                artifact_dir=spreadsheet_artifact_dir,
+            ),
+            OpenpyxlRegionDetectorModule(processed_dir=processed_dir),
             CellTextSerializerModule(processed_dir=processed_dir),
             ExhaustiveCellTextSerializerModule(processed_dir=processed_dir),
             CompanyEntityExtractorModule(
