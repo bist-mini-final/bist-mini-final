@@ -28,6 +28,8 @@ export type ValueKind = 'amount' | 'percent';
 export type AmountScale = 'ones' | 'thousands' | 'millions' | 'billions';
 export type PeriodRange = '최근 3개' | '최근 5개' | '전체';
 export type CardSize = 'S' | 'M' | 'L';
+export type BiResizableGridBreakpoint = 'wide' | 'medium';
+export type CardMoveDirection = 'up' | 'down' | 'left' | 'right';
 export type CardState = 'ready' | 'partial' | 'missing' | 'ambiguous' | 'invalid';
 
 export interface BiCompany {
@@ -115,7 +117,25 @@ export interface BiDashboardSnapshot {
 
 export interface BiCardLayoutItem {
   readonly cardId: BiCardId;
+  readonly rowId: string;
   readonly size: CardSize;
+  readonly x: number;
+  readonly y: number;
+  readonly gridSizes: Readonly<Record<BiResizableGridBreakpoint, BiCardGridSize>>;
+}
+
+export interface BiCardRow {
+  readonly rowId: string;
+  readonly cardIds: readonly BiCardId[];
+}
+
+export type BiCardDropTarget =
+  | { readonly kind: 'row'; readonly rowId: string; readonly cardIndex: number }
+  | { readonly kind: 'new-row'; readonly beforeRowId: string | null; readonly rowId: string };
+
+export interface BiCardGridSize {
+  readonly w: number;
+  readonly h: number;
 }
 
 export type BiCardId =

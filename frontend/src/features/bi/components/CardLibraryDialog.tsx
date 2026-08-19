@@ -27,12 +27,12 @@ export function CardLibraryDialog({ hiddenCardIds, onRestore, onClose }: CardLib
       <div className="bi-dialog__header">
         <div>
           <span className="bi-dialog__eyebrow">CARD LIBRARY</span>
-          <h2 id="bi-card-library-title">숨긴 카드 복구</h2>
+          <h2 id="bi-card-library-title">카드 추가</h2>
         </div>
         <button type="button" aria-label="카드 목록 닫기" onClick={onClose}><X size={18} aria-hidden="true" /></button>
       </div>
       {hiddenCardIds.length === 0 ? (
-        <p className="bi-dialog__empty">숨긴 카드가 없습니다. 배치 편집에서 카드를 숨기면 이곳에서 복구할 수 있습니다.</p>
+        <p className="bi-dialog__empty">추가할 수 있는 카드가 없습니다. 숨긴 카드와 새로 등록된 카드는 이곳에 표시됩니다.</p>
       ) : (
         <ul className="bi-card-library">
           {hiddenCardIds.map((cardId) => {

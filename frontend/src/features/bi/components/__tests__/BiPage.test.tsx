@@ -10,7 +10,7 @@ describe('BiPage Component', () => {
   it('renders BI dashboard header, company tabs, and default cards', () => {
     render(<BiPage />);
 
-    expect(screen.getByText('기업 BI')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '기업 Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'BIST 데모 주식회사' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '그린랩스' })).toBeInTheDocument();
 
@@ -70,12 +70,12 @@ describe('BiPage Component', () => {
     const libraryBtn = screen.getByRole('button', { name: /카드 추가/i });
     expect(libraryBtn).toBeInTheDocument();
     fireEvent.click(libraryBtn);
-    expect(screen.getByText('숨긴 카드 복구')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '카드 추가' })).toBeInTheDocument();
 
     // Close library
     const closeLibraryBtn = screen.getByRole('button', { name: /카드 목록 닫기/i });
     fireEvent.click(closeLibraryBtn);
-    expect(screen.queryByText('숨긴 카드 복구')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '카드 추가' })).not.toBeInTheDocument();
 
     // Open reset layout dialog
     const resetBtn = screen.getByRole('button', { name: /기본 배치/i });

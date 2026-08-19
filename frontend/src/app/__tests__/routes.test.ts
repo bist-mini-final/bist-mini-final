@@ -8,7 +8,7 @@ describe('APP_ROUTES registry', () => {
     expect(paths).toContain('/playground');
     expect(paths).toContain('/data-sources');
     expect(paths).toContain('/evaluations');
-    expect(paths).toContain('/bi');
+    expect(paths).toContain('/dashboard');
     expect(paths).toContain('/settings');
   });
 
@@ -16,11 +16,11 @@ describe('APP_ROUTES registry', () => {
     const home = APP_ROUTES.find((r) => r.path === '/');
     const playground = APP_ROUTES.find((r) => r.path === '/playground');
     const dataSources = APP_ROUTES.find((r) => r.path === '/data-sources');
-    const bi = APP_ROUTES.find((r) => r.path === '/bi');
+    const dashboard = APP_ROUTES.find((r) => r.path === '/dashboard');
 
     expect(home?.status).toBe('ready');
     expect(playground?.status).toBe('ready');
     expect(dataSources?.status).toBe('ready');
-    expect(bi?.status).toBe('ready');
+    expect(dashboard?.status).toBe('ready');
   });
 });

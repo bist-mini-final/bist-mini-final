@@ -61,7 +61,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
     status: 'ready',
   },
   {
-    path: '/bi',
+    path: '/dashboard',
     label: 'BI 대시보드',
     shortLabel: 'BI',
     description: '기업 재무 지표 및 인터랙티브 시각화 대시보드',

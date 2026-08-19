@@ -19,6 +19,8 @@ export interface BiCardDefinition {
   readonly requiredMetrics: readonly MetricId[];
   readonly defaultSize: CardSize;
   readonly allowedSizes: readonly CardSize[];
+  readonly defaultWideSpan: number;
+  readonly defaultWideHeight: number;
 }
 
 export const CARD_REGISTRY = [
@@ -33,6 +35,8 @@ export const CARD_REGISTRY = [
     requiredMetrics: ['revenue', 'revenue_yoy_growth'],
     defaultSize: 'M',
     allowedSizes: ['S', 'M', 'L'],
+    defaultWideSpan: 5.8,
+    defaultWideHeight: 12,
   },
   {
     id: 'profitability',
@@ -45,6 +49,8 @@ export const CARD_REGISTRY = [
     requiredMetrics: ['operating_income', 'operating_margin', 'net_income', 'net_margin'],
     defaultSize: 'M',
     allowedSizes: ['S', 'M', 'L'],
+    defaultWideSpan: 5,
+    defaultWideHeight: 12,
   },
   {
     id: 'cash_flow',
@@ -57,6 +63,8 @@ export const CARD_REGISTRY = [
     requiredMetrics: ['operating_cash_flow', 'capital_expenditure', 'free_cash_flow'],
     defaultSize: 'M',
     allowedSizes: ['S', 'M', 'L'],
+    defaultWideSpan: 6.2,
+    defaultWideHeight: 12,
   },
   {
     id: 'stability',
@@ -69,6 +77,8 @@ export const CARD_REGISTRY = [
     requiredMetrics: ['cash_and_short_term_investments', 'total_debt', 'net_debt'],
     defaultSize: 'M',
     allowedSizes: ['S', 'M', 'L'],
+    defaultWideSpan: 8.2,
+    defaultWideHeight: 10.7,
   },
   {
     id: 'financial_scale',
@@ -81,15 +91,35 @@ export const CARD_REGISTRY = [
     requiredMetrics: ['total_assets', 'total_liabilities', 'total_equity'],
     defaultSize: 'L',
     allowedSizes: ['M', 'L'],
+    defaultWideSpan: 8.8,
+    defaultWideHeight: 10.7,
   },
 ] as const satisfies readonly BiCardDefinition[];
 
 export const CARD_IDS = CARD_REGISTRY.map((card) => card.id);
 
-export const DEFAULT_CARD_LAYOUT: readonly BiCardLayoutItem[] = CARD_REGISTRY.map((card) => ({
-  cardId: card.id,
-  size: card.defaultSize,
-}));
+export const DEFAULT_CARD_LAYOUT = [
+  {
+    cardId: 'revenue_growth', rowId: 'row-primary', size: 'M', x: 0, y: 0,
+    gridSizes: { wide: { w: 5.8, h: 12 }, medium: { w: 4, h: 12 } },
+  },
+  {
+    cardId: 'profitability', rowId: 'row-primary', size: 'M', x: 5.8, y: 0,
+    gridSizes: { wide: { w: 5, h: 12 }, medium: { w: 4, h: 12 } },
+  },
+  {
+    cardId: 'cash_flow', rowId: 'row-primary', size: 'M', x: 10.8, y: 0,
+    gridSizes: { wide: { w: 6.2, h: 12 }, medium: { w: 4, h: 12 } },
+  },
+  {
+    cardId: 'stability', rowId: 'row-secondary', size: 'M', x: 0, y: 12,
+    gridSizes: { wide: { w: 8.2, h: 10.7 }, medium: { w: 4, h: 12 } },
+  },
+  {
+    cardId: 'financial_scale', rowId: 'row-secondary', size: 'L', x: 8.2, y: 12,
+    gridSizes: { wide: { w: 8.8, h: 10.7 }, medium: { w: 8, h: 14 } },
+  },
+] as const satisfies readonly BiCardLayoutItem[];
 
 export function getCardDefinition(cardId: BiCardId): BiCardDefinition {
   const card = CARD_REGISTRY.find((candidate) => candidate.id === cardId);
