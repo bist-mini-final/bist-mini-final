@@ -44,11 +44,15 @@ export const PgVectorCollectionLoaderNode = ({
   >([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const savedIds = Array.isArray(data.values?.collection_names)
+  const rawSavedIds = Array.isArray(data.values?.collection_names)
     ? (data.values.collection_names as string[]).map((id) => id.trim()).filter(Boolean)
     : typeof data.values?.collection_name === 'string'
       ? data.values.collection_name.split(',').map((id) => id.trim()).filter(Boolean)
       : [];
+
+  // Normalize savedIds against availableCollections
+  const availableIds = new Set(availableCollections.map((c) => c.id));
+  const savedIds = rawSavedIds.filter((id) => availableIds.has(id));
   const hasSavedValue = savedIds.length > 0;
 
   // Selected collection IDs (array)

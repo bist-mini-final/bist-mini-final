@@ -741,20 +741,21 @@ class PgVectorStore:
     ) -> List[Tuple[Any, float]]:
         """
         Search a pgvector collection using an embedding vector.
-        
+
         Parameters:
             collection_name (str): Name of the collection to search.
             embedding (List[float]): Query embedding vector.
             k (int): Maximum number of results to return.
-        
+
         Returns:
             List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection does not exist.
-        
+
         Raises:
             PgVectorStoreError: If both direct SQL and fallback similarity searches fail.
         """
-        conn = self._raw_connection()
+        conn = None
         try:
+            conn = self._raw_connection()
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
@@ -790,6 +791,7 @@ class PgVectorStore:
                 doc = Document(
                     page_content=text,
                     metadata=cmeta or {},
+                    id=str(_id),
                 )
                 results.append((doc, float(dist) if dist is not None else 0.0))
             return results
@@ -818,7 +820,8 @@ class PgVectorStore:
                     f"PostgreSQL pgvector 유사도 검색 실패 ({collection_name}): {fallback_error}"
                 ) from fallback_error
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     def fetch_cells_by_metadata(
         self,

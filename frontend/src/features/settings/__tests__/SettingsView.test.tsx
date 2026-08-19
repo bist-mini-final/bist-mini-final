@@ -191,4 +191,69 @@ describe('SettingsView', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('handles out-of-order clipboard requests by showing latest request status', async () => {
+    let firstResolve: (() => void) | undefined;
+    let secondResolve: (() => void) | undefined;
+
+    const firstPromise = new Promise<void>((resolve) => {
+      firstResolve = resolve;
+    });
+    const secondPromise = new Promise<void>((resolve) => {
+      secondResolve = resolve;
+    });
+
+    let callCount = 0;
+    const writeTextMock = vi.fn(() => {
+      callCount++;
+      if (callCount === 1) {
+        return firstPromise;
+      }
+      return secondPromise;
+    });
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.mocked(dataSourceApi.getDbStatus).mockResolvedValue({
+      connected: true,
+      host: 'localhost',
+      port: 5432,
+      database: 'rag_flow',
+      total_indexes: 1,
+      total_chunks: 100,
+    });
+
+    render(<SettingsView />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PostgreSQL pgvector 정상 연결됨')).toBeInTheDocument();
+    });
+
+    const copyUrlBtn = screen.getByRole('button', { name: /URL 복사/i });
+
+    // Start first request (will resolve later)
+    fireEvent.click(copyUrlBtn);
+    expect(writeTextMock).toHaveBeenCalledTimes(1);
+
+    // Start second request immediately (will resolve first)
+    fireEvent.click(copyUrlBtn);
+    expect(writeTextMock).toHaveBeenCalledTimes(2);
+
+    // Resolve second request first
+    secondResolve!();
+    await waitFor(() => {
+      expect(screen.getByText('복사됨!')).toBeInTheDocument();
+    });
+
+    // Resolve first request (should not change status)
+    firstResolve!();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Status should still be '복사됨!' from the second request
+    expect(screen.getByText('복사됨!')).toBeInTheDocument();
+  });
 });

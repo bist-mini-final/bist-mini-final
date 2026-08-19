@@ -30,6 +30,7 @@ export function SettingsView() {
   const copyResetTimers = useRef<
     Partial<Record<'url' | 'cmd', ReturnType<typeof setTimeout>>>
   >({});
+  const copyRequestIds = useRef<Partial<Record<'url' | 'cmd', number>>>({});
 
   const fetchStatus = async () => {
     setIsLoading(true);
@@ -74,30 +75,45 @@ export function SettingsView() {
 
   const copyToClipboard = async (text: string, type: 'url' | 'cmd') => {
     const setStatus = type === 'url' ? setCopiedUrl : setCopiedCmd;
+    const requestId = (copyRequestIds.current[type] ?? 0) + 1;
+    copyRequestIds.current[type] = requestId;
+
     if (copyResetTimers.current[type]) {
       clearTimeout(copyResetTimers.current[type]);
     }
     try {
       if (!navigator.clipboard?.writeText) {
-        setStatus('error');
-        copyResetTimers.current[type] = setTimeout(() => {
-          setStatus('idle');
-          delete copyResetTimers.current[type];
-        }, 2000);
+        if (copyRequestIds.current[type] === requestId) {
+          setStatus('error');
+          copyResetTimers.current[type] = setTimeout(() => {
+            if (copyRequestIds.current[type] === requestId) {
+              setStatus('idle');
+              delete copyResetTimers.current[type];
+            }
+          }, 2000);
+        }
         return;
       }
       await navigator.clipboard.writeText(text);
-      setStatus('success');
-      copyResetTimers.current[type] = setTimeout(() => {
-        setStatus('idle');
-        delete copyResetTimers.current[type];
-      }, 2000);
+      if (copyRequestIds.current[type] === requestId) {
+        setStatus('success');
+        copyResetTimers.current[type] = setTimeout(() => {
+          if (copyRequestIds.current[type] === requestId) {
+            setStatus('idle');
+            delete copyResetTimers.current[type];
+          }
+        }, 2000);
+      }
     } catch {
-      setStatus('error');
-      copyResetTimers.current[type] = setTimeout(() => {
-        setStatus('idle');
-        delete copyResetTimers.current[type];
-      }, 2000);
+      if (copyRequestIds.current[type] === requestId) {
+        setStatus('error');
+        copyResetTimers.current[type] = setTimeout(() => {
+          if (copyRequestIds.current[type] === requestId) {
+            setStatus('idle');
+            delete copyResetTimers.current[type];
+          }
+        }, 2000);
+      }
     }
   };
 

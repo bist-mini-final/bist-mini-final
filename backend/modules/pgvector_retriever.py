@@ -111,11 +111,12 @@ class PgVectorRetrieverModule(ExecutableModule):
                         content_str = doc.page_content or ""
                         content_hash = hashlib.sha256(content_str.encode("utf-8")).hexdigest()[:16]
                         doc_id = getattr(doc, "id", None)
+                        row_id = doc_id if isinstance(doc_id, str) and doc_id else None
                         persistent_id = (
-                            doc.metadata.get("cell_id")
+                            row_id
+                            or doc.metadata.get("cell_id")
                             or doc.metadata.get("chunk_id")
                             or doc.metadata.get("id")
-                            or (doc_id if isinstance(doc_id, str) and doc_id else None)
                         )
                         cell_id = persistent_id or f"{target_col}:chunk:{content_hash}"
                         raw_doc = {

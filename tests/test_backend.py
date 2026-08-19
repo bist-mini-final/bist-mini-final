@@ -3599,7 +3599,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         mock_store.similarity_search_by_vector_with_score.assert_not_called()
 
     def test_pgvector_retriever_all_collections_fail(self) -> None:
-        from unittest.mock import patch
+        from unittest.mock import MagicMock, patch
         from backend.modules.base import ModuleExecutionError
         from backend.modules.data_lineage import QueryContextDTO
         from backend.modules.embedder import EmbeddingsDTO
@@ -3611,7 +3611,14 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         from backend.storage.pgvector_store import PgVectorStore
 
         store = PgVectorStore()
-        with patch.object(store, "_raw_connection", side_effect=RuntimeError("Direct SQL connection error")):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.execute.side_effect = RuntimeError("Direct SQL query error")
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch.object(store, "_raw_connection", return_value=mock_conn):
             with patch("backend.storage.pgvector_store.get_vector_store", side_effect=RuntimeError("Fallback LangChain error")):
                 retriever = PgVectorRetrieverModule(pgvector_store=store)
                 payload = PgVectorRetrieverExecutionDTO.model_construct(
@@ -3632,6 +3639,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
                 with self.assertRaises(ModuleExecutionError) as ctx:
                     retriever.execute(payload)
                 self.assertIn("PostgreSQL pgvector 유사도 검색 실패", str(ctx.exception))
+                mock_conn.close.assert_called()
 
     def test_pgvector_retriever_partial_collection_failure(self) -> None:
         from unittest.mock import MagicMock
@@ -3785,6 +3793,45 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         expected_ids = {f"single_col:chunk:{hash_a}", f"single_col:chunk:{hash_b}"}
         returned_ids = {item["cell_id"] for item in res["items"]}
         self.assertEqual(returned_ids, expected_ids)
+
+    def test_pgvector_retriever_identical_content_different_row_ids(self) -> None:
+        from unittest.mock import MagicMock
+        from langchain_core.documents import Document
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_a = Document(page_content="Identical Content", metadata={}, id="123")
+        doc_b = Document(page_content="Identical Content", metadata={}, id="456")
+
+        mock_store.similarity_search_by_vector_with_score.return_value = [
+            (doc_a, 0.1),
+            (doc_b, 0.1),
+        ]
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q1": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="test_col",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=10,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        returned_ids = {item["cell_id"] for item in res["items"]}
+        self.assertEqual(returned_ids, {"123", "456"})
 
     def test_pgvector_collection_loader_success(self) -> None:
         from unittest.mock import MagicMock
