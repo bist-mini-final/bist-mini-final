@@ -20,6 +20,8 @@ interface FixtureConfig {
   readonly snapshotId: string;
   readonly periodCount: number;
   readonly includeLtm: boolean;
+  readonly refreshStatus?: 'extracting' | 'failed';
+  readonly refreshMessage?: string;
   readonly statusOverrides?: Readonly<Partial<Record<MetricId, Exclude<MetricStatus, 'available'>>>>;
 }
 
@@ -121,7 +123,12 @@ function createDashboardFixture(config: FixtureConfig): BiDashboardSnapshot {
       catalogVersion: 'fixture-v1',
       formulaVersion: 'fixture-v1',
     },
-    refresh: { status: 'idle', jobId: null, startedAt: null, message: null },
+    refresh: {
+      status: config.refreshStatus ?? 'idle',
+      jobId: config.refreshStatus ? `fixture-job-${config.companyId}` : null,
+      startedAt: config.refreshStatus ? '2026-08-18T10:00:00+09:00' : null,
+      message: config.refreshMessage ?? null,
+    },
     periods,
     metrics,
     issues,
@@ -142,6 +149,8 @@ export const DASHBOARD_FIXTURES = [
     snapshotId: 'fixture-partial-002',
     periodCount: 2,
     includeLtm: false,
+    refreshStatus: 'extracting',
+    refreshMessage: '새 파일에서 지표를 추출하고 있습니다. 이전 부분 완료 스냅샷을 표시합니다.',
     statusOverrides: { capital_expenditure: 'missing', free_cash_flow: 'missing', net_debt: 'ambiguous' },
   }),
   createDashboardFixture({
@@ -150,6 +159,8 @@ export const DASHBOARD_FIXTURES = [
     snapshotId: 'fixture-stress-003',
     periodCount: 5,
     includeLtm: true,
+    refreshStatus: 'failed',
+    refreshMessage: '새 파일 처리에 실패해 검증된 이전 스냅샷을 유지합니다.',
     statusOverrides: { total_equity: 'invalid' },
   }),
 ] as const satisfies readonly BiDashboardSnapshot[];

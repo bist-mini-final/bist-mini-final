@@ -17,9 +17,9 @@ const plannedCards = [
     tone: 'amber',
   },
   {
-    path: '/bi',
-    title: 'BI',
-    description: 'BI 기능을 위한 독립 화면을 구성합니다.',
+    path: '/dashboard',
+    title: 'Dashboard',
+    description: '기업 재무 대시보드를 확인합니다.',
     icon: ChartNoAxesCombined,
     tone: 'violet',
   },

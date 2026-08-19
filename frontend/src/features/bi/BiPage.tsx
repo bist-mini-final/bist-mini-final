@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Landmark } from 'lucide-react';
 import { BiDashboardGrid } from './components/BiDashboardGrid';
 import { BiHeader } from './components/BiHeader';
+import { BiPageNotice } from './components/BiPageNotice';
 import { BiToolbar } from './components/BiToolbar';
 import { CardLibraryDialog } from './components/CardLibraryDialog';
 import { CompanyTabs } from './components/CompanyTabs';
@@ -12,7 +13,9 @@ import { DASHBOARD_FIXTURES } from './fixtures/dashboardFixtures';
 import { useBiLayout } from './hooks/useBiLayout';
 import { buildCardViewModel } from './selectors/cardViewModel';
 import type { BiCardId, PeriodRange } from './types';
+import 'react-grid-layout/css/styles.css';
 import './bi.css';
+import './bi-reference.css';
 
 const PERIOD_OPTIONS = ['최근 3개', '최근 5개', '전체'] as const satisfies readonly PeriodRange[];
 const COMPANY_TABS = DASHBOARD_FIXTURES.map((dashboard) => ({
@@ -44,6 +47,7 @@ export function BiPage() {
   return (
     <section className="bi-page" aria-labelledby="bi-page-title">
       <BiHeader dashboard={dashboard} periodLabel={selectedPeriod} />
+      <BiPageNotice refresh={dashboard.refresh} />
 
       <div className="bi-page__workspace">
         <div className="bi-company-section">
@@ -75,8 +79,9 @@ export function BiPage() {
           cards={layout.cards}
           periodRange={selectedPeriod}
           isEditing={isEditing}
+          canMoveCard={layout.canMoveCard}
           onMoveCard={layout.moveCard}
-          onResizeCard={layout.resizeCard}
+          onReplaceCards={layout.replaceCards}
           onHideCard={layout.hideCard}
           onShowEvidence={setEvidenceCardId}
         />
