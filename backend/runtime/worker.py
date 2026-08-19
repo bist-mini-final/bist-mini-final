@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import atexit
+import os
+import sys
 from multiprocessing import get_context
 from multiprocessing.process import BaseProcess
 from queue import Empty
 from threading import Lock
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
 
@@ -19,8 +21,32 @@ class ModuleWorkerError(RuntimeError):
     """Raised when an isolated module cannot return a valid result."""
 
 
+def _redirect_broken_standard_streams() -> None:
+    """Keep multiprocessing startup from failing on an orphaned output pipe."""
+
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            continue
+        try:
+            stream.flush()
+        except BrokenPipeError:
+            replacement = open(os.devnull, "w", encoding="utf-8")
+            try:
+                os.dup2(replacement.fileno(), stream.fileno())
+            except (AttributeError, OSError, ValueError):
+                setattr(sys, stream_name, replacement)
+            else:
+                replacement.close()
+
+
 def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
-    """Build process-local services once and execute JSON-compatible tasks."""
+    """
+    Initialize process-local services and execute tasks received from the worker queue.
+    
+    Parameters:
+        spec (Dict[str, str]): Paths used to configure storage and artifact services.
+    """
 
     from pathlib import Path
 
@@ -35,14 +61,26 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
             Path(spec["embedding_artifact_dir"])
         ),
         vector_index_store=VectorIndexStore(Path(spec["vector_index_dir"])),
+        processed_dir=Path(spec["processed_dir"]),
+        spreadsheet_artifact_dir=Path(spec["spreadsheet_artifact_dir"]),
     )
     while True:
         task = request_queue.get()
         if task is None:
             return
         task_id = task["task_id"]
+        module = None
         try:
             module = registry.get(task["module_type"])
+            module.set_progress_callback(
+                lambda progress: response_queue.put(
+                    {
+                        "task_id": task_id,
+                        "event": "progress",
+                        "progress": progress,
+                    }
+                )
+            )
             output = module.run(
                 task["input"],
                 task["config"],
@@ -67,6 +105,9 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
                     "error": str(error),
                 }
             )
+        finally:
+            if module is not None:
+                module.set_progress_callback(None)
 
 
 class CancellableModuleWorker:
@@ -90,7 +131,25 @@ class CancellableModuleWorker:
         input_payload: Any,
         config: Any,
         execution_id: str,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Any:
+        """
+        Execute a module in the isolated worker process.
+        
+        Parameters:
+            module_type (str): Type of module to execute.
+            input_payload (Any): Input data supplied to the module.
+            config (Any): Configuration supplied to the module.
+            execution_id (str): Identifier used to associate cancellation requests with this execution.
+            progress_callback (Optional[Callable[[Dict[str, Any]], None]]): Callback invoked with progress events reported by the module.
+        
+        Returns:
+            Any: The module's execution output.
+        
+        Raises:
+            ModuleWorkerError: If another task is active, the worker fails, or module execution reports an error.
+            ModuleWorkerCancelled: If the worker is replaced or execution is interrupted.
+        """
         task_id = uuid4().hex
         with self._state_lock:
             if self._active_task_id is not None:
@@ -128,6 +187,23 @@ class CancellableModuleWorker:
                     continue
 
                 if result.get("task_id") != task_id:
+                    continue
+                if result.get("event") == "progress":
+                    progress = result.get("progress")
+                    if progress_callback is not None and isinstance(progress, dict):
+                        try:
+                            progress_callback(dict(progress))
+                        except Exception as error:
+                            with self._state_lock:
+                                failed_process = (
+                                    self._detach_worker_locked()
+                                    if self._active_task_id == task_id
+                                    else None
+                                )
+                            self._terminate(failed_process)
+                            raise ModuleWorkerError(
+                                "진행률 콜백 처리에 실패했습니다"
+                            ) from error
                     continue
                 if result.get("ok") is True:
                     metadata = result.get("metadata")
@@ -172,6 +248,7 @@ class CancellableModuleWorker:
         if self._process is not None and self._process.is_alive():
             return
         self._detach_worker_locked()
+        _redirect_broken_standard_streams()
         self._request_queue = self._context.Queue()
         self._response_queue = self._context.Queue()
         self._process = self._context.Process(

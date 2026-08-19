@@ -16,7 +16,7 @@ PostgreSQL 16 pgvector DB에 적재된 다중 벡터 컬렉션을 로드하여 �
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `collection_name` | `string | null` | no | `"SPG_Company_KeyStats_v4.xlsm"` | 단일 컬렉션 선택 시 컬렉션 이름 또는 파일명 |
+| `collection_name` | `string \| null` | no | `"SPG_Company_KeyStats_v4.xlsm"` | 단일 컬렉션 선택 시 컬렉션 이름 또는 파일명 |
 | `collection_names` | `array<string>` | no | - | 다중 선택 시 로드할 PostgreSQL pgvector 컬렉션 ID 또는 파일명 목록 |
 
 ## Config DTO

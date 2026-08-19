@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "indexing_pgvector",
   "name": "indexing_pgvector",
-  "updated_at": "2026-08-18T02:41:01.069390+00:00",
+  "updated_at": "2026-08-18T13:16:25.661213+00:00",
   "graph": {
     "nodes": [
       {
@@ -39,7 +39,7 @@
           "max_output_tokens": 6000,
           "timeout_seconds": 240,
           "validation_retries": 1,
-          "system_prompt": "You identify every table and its internal regions in an Excel worksheet.\nHidden sheets, hidden rows, and hidden columns are intentionally absent and must never be inferred.\n\nYou receive exactly one high-detail image containing the complete visible worksheet. It is never a crop, tile, or preselected candidate region. Inspect the entire image globally before deciding table boundaries, including sparse areas and tables separated by blank rows or columns.\n\nThe image preserves the original worksheet style while populated cells are tinted and labeled by exact Excel coordinate. Colors are: text amber, number green, date blue, boolean purple, error red, unresolved formula gray. A magenta inner border marks a formula. Exact coordinate, type, value, formula, and merged-range facts for the complete sheet are supplied as text and are authoritative.\n\nCell-role guidance:\n- Ordinary descriptive text is strong structural evidence. Text-dominant rows above a numeric/date/formula matrix are usually titles or column headers, and text-dominant columns to its left are usually row headers. Prefer those header roles unless position, repetition, or surrounding layout clearly shows that the text belongs to the data matrix.\n- A text-typed cell is not automatically a header. Missing-value and status literals such as `NA`, `N/A`, `NM`, `N.M.`, `N/M`, `-`, `--`, `—`, `not available`, and `not meaningful` are data values when they occupy a data-matrix position. Keep them inside data_range and never widen a header range merely because these values are represented as text.\n- Free-form text may also be legitimate table data. Resolve ambiguous cells from spatial continuity, neighboring value roles, merged cells, repetition, and formatting; use the value type only as a strong hint.\n\nFinancial statement & table boundary guidance:\n- Financial worksheets (such as Income Statement, Balance Sheet, Cash Flow, Key Stats) typically contain multiple vertical sections (e.g. Revenue, Operating Expenses, Non-Operating Items, Tax, Supplemental Items, Ratios) that share the same top period/date column headers (e.g. Fiscal Year Ended, FY2014...FY2024, LTM, quarterly/annual dates).\n- You MUST treat all vertically stacked sections sharing the same column timeline as ONE SINGLE UNIFIED TABLE.\n- Do NOT split the worksheet into multiple small tables at blank rows, intermediate section headers, category divider titles, or summary rows.\n- The `column_header_range` must point to the top period/date header rows (e.g. row 3-4) and `data_range` must encompass all data rows down to the end of the sheet, so every data cell inherits its respective column header (period date).\n- Only emit multiple tables if there are genuinely independent side-by-side tables with different column structures.\n\nReturn every independent rectangular table in the worksheet. A table must contain data cells; do not emit decorations, isolated notes, or empty rectangles. Every returned coordinate must be inside sheet_range. Use:\n- excel_range: the complete visible table.\n- title_range: title rows above this table's data, or null.\n- column_header_range: every visible column-header level above the data, or null.\n- row_header_range: label columns left of the data, or null.\n- data_range: the complete value matrix.\n\nAll ranges use inclusive Excel coordinates and semantic regions must not overlap. For example, when row_header_range ends at D, data_range must start at E or later. Never repeat a row-header column inside data_range.\n\nUse the full-sheet context to keep one logical table whole instead of splitting it at image boundaries. Do not propose search candidates and do not omit a table because its location is uncertain. Return only JSON matching the supplied schema.",
+          "system_prompt": "You identify every table and its internal regions in an Excel worksheet.\nHidden sheets, hidden rows, and hidden columns are intentionally absent and must never be inferred.\n\nYou receive exactly one high-detail image containing the complete visible worksheet. It is never a crop, tile, or preselected candidate region. Inspect the entire image globally before deciding table boundaries, including sparse areas and tables separated by blank rows or columns.\n\nThe image preserves the original worksheet style while populated cells are tinted and labeled by exact Excel coordinate. Colors are: text amber, number green, date blue, boolean purple, error red, unresolved formula gray. A magenta inner border marks a formula. Exact coordinate, type, value, formula, and merged-range facts for the complete sheet are supplied as text and are authoritative.\n\nCell-role guidance:\n- Ordinary descriptive text is strong structural evidence. Text-dominant rows above a numeric/date/formula matrix are usually titles or column headers, and text-dominant columns to its left are usually row headers. Prefer those header roles unless position, repetition, or surrounding layout clearly shows that the text belongs to the data matrix.\n- A text-typed cell is not automatically a header. Missing-value and status literals such as `NA`, `N/A`, `NM`, `N.M.`, `N/M`, `-`, `--`, `—`, `not available`, and `not meaningful` are data values when they occupy a data-matrix position. Keep them inside data_range and never widen a header range merely because these values are represented as text.\n- Free-form text may also be legitimate table data. Resolve ambiguous cells from spatial continuity, neighboring value roles, merged cells, repetition, and formatting; use the value type only as a strong hint.\n\nTable boundary & multi-section guidance:\n- Vertically stacked sections that share the exact same top column headers and column timeline must be treated as ONE SINGLE UNIFIED TABLE. Do not split them at blank rows, intermediate subheadings, or subtotal rows when they share the same column header alignment.\n- Conversely, when vertical or horizontal blocks in a worksheet have DIFFERENT column structures, distinct header rows, differing column counts, or independent timeline semantics, you MUST split them into separate, independent rectangular tables.\n- A table's `column_header_range` must accurately cover only the columns relevant to its own `data_range`, and its `data_range` must strictly contain data cells that belong to those headers.\n\nReturn every independent rectangular table in the worksheet. A table must contain data cells; do not emit decorations, isolated notes, or empty rectangles. Every returned coordinate must be inside sheet_range. Use:\n- excel_range: the complete visible table.\n- title_range: title rows above this table's data, or null.\n- column_header_range: every visible column-header level above the data, or null.\n- row_header_range: label columns left of the data, or null.\n- data_range: the complete value matrix.\n\nAll ranges use inclusive Excel coordinates and semantic regions must not overlap. For example, when row_header_range ends at D, data_range must start at E or later. Never repeat a row-header column inside data_range.\n\nUse the full-sheet context to keep one logical table whole instead of splitting it at image boundaries. Do not propose search candidates and do not omit a table because its location is uncertain. Return only JSON matching the supplied schema.",
           "user_prompt_template": "Analyze the complete visible worksheet {sheet_name}.\nComplete visible sheet range: {sheet_range}\nThe compact tuple format is [excel_coord, value_type, value, optional_flags].\nExact full-sheet context:\n{sheet_context}"
         },
         "values": {},
@@ -75,7 +75,7 @@
         },
         "config": {
           "model": "text-embedding-3-large",
-          "batch_size": 256
+          "batch_size": 2048
         },
         "values": {},
         "ui": {
@@ -91,6 +91,56 @@
         "position": {
           "x": 2300.0,
           "y": 0.0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-pg-6-company",
+        "module_type": "company_entity_extractor",
+        "position": {
+          "x": 650.0,
+          "y": 500.0
+        },
+        "config": {
+          "model": "gpt-5.6-luna"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-pg-7-sheet-meta",
+        "module_type": "sheet_metadata_persistence",
+        "position": {
+          "x": 2850.0,
+          "y": 0.0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "idx-pg-8-company-meta",
+        "module_type": "index_company_persistence",
+        "position": {
+          "x": 2850.0,
+          "y": 500.0
         },
         "config": {},
         "values": {},
@@ -134,12 +184,52 @@
         "source_output": "output",
         "target_input": "input",
         "source_branch": null
+      },
+      {
+        "id": "edge-pg-1-6",
+        "source": "idx-pg-1-selector",
+        "target": "idx-pg-6-company",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-pg-2-7",
+        "source": "idx-pg-2-vlm",
+        "target": "idx-pg-7-sheet-meta",
+        "source_output": "output",
+        "target_input": "structure_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-pg-5-7",
+        "source": "idx-pg-5-writer",
+        "target": "idx-pg-7-sheet-meta",
+        "source_output": "index_output",
+        "target_input": "index_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-pg-5-8",
+        "source": "idx-pg-5-writer",
+        "target": "idx-pg-8-company-meta",
+        "source_output": "index_output",
+        "target_input": "index_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-pg-6-8",
+        "source": "idx-pg-6-company",
+        "target": "idx-pg-8-company-meta",
+        "source_output": "output",
+        "target_input": "company_input",
+        "source_branch": null
       }
     ],
     "viewport": {
-      "x": -2157.0226330560863,
-      "y": 365.37718620196017,
-      "zoom": 1.2362752609209564
+      "x": -192.93611135342735,
+      "y": 240.40557518852435,
+      "zoom": 0.5799787331515415
     }
   }
 }

@@ -55,6 +55,12 @@ class JsonModelStore:
         return document
 
     def list_documents(self) -> List[ModelType]:
+        """
+        Load all JSON documents from the store in filename order.
+        
+        Returns:
+            List[ModelType]: The validated documents found in the store.
+        """
         documents: List[ModelType] = []
         for path in sorted(self.directory.glob("*.json")):
             documents.append(
@@ -62,7 +68,30 @@ class JsonModelStore:
             )
         return documents
 
+    def delete(self, document_id: str) -> bool:
+        """
+        Delete the stored document with the specified identifier.
+        
+        Parameters:
+            document_id (str): Identifier of the document to delete.
+        
+        Returns:
+            bool: `True` if the document was deleted, `False` if it did not exist.
+        """
+        path = self._path(document_id)
+        with self._lock:
+            if not path.is_file():
+                return False
+            path.unlink()
+            return True
+
     def clear(self) -> int:
+        """
+        Remove all JSON files from the store.
+        
+        Returns:
+            int: The number of files removed.
+        """
         removed = 0
         with self._lock:
             for path in self.directory.glob("*.json"):
@@ -136,15 +165,49 @@ class RunStore:
         return self._store.load(run_id)
 
     def list(self, workflow_id: Optional[str] = None) -> List[WorkflowRun]:
-        runs = [
-            WorkflowRun.model_validate_json(path.read_text(encoding="utf-8"))
-            for path in sorted(self._store.directory.glob("*.summary.json"))
-        ]
+        """
+        List workflow run summaries, optionally filtered by workflow identifier.
+        
+        Parameters:
+        	workflow_id (Optional[str]): Identifier of the workflow whose runs should be included.
+        
+        Returns:
+        	List[WorkflowRun]: Loaded workflow run summaries, filtered when a workflow identifier is provided.
+        """
+        runs: List[WorkflowRun] = []
+        for path in sorted(self._store.directory.glob("*.summary.json")):
+            try:
+                runs.append(
+                    WorkflowRun.model_validate_json(path.read_text(encoding="utf-8"))
+                )
+            except FileNotFoundError:
+                # A concurrent delete removes the summary before the full run.
+                # Treat it as absent from this snapshot rather than a server error.
+                continue
         if workflow_id is None:
             return runs
         return [run for run in runs if run.workflow_id == workflow_id]
 
+    def delete(self, run_id: str) -> bool:
+        """Remove one full run and its compact summary."""
+
+        summary_path = self._store.directory / (
+            f"{_validate_identifier(run_id)}.summary.json"
+        )
+        removed = False
+        with self._summary_lock:
+            if summary_path.is_file():
+                summary_path.unlink()
+                removed = True
+        removed = self._store.delete(run_id) or removed
+        return removed
+
     def clear(self) -> int:
+        """Delete all stored workflow runs and their summary files.
+        
+        Returns:
+            int: The number of full workflow runs deleted.
+        """
         full_run_paths = [
             path
             for path in self._store.directory.glob("*.json")

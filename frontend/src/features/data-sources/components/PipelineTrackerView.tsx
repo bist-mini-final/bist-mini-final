@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
+  AlertCircle,
   Building2,
   CheckCircle2,
   ChevronDown,
@@ -15,39 +16,43 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Square,
+  Trash2,
   Zap,
 } from 'lucide-react';
-import type { ModuleStepState } from './ModulePipelineMonitor';
+import type { PipelineRunState } from '../pipelineTypes';
 import { SpreadsheetResultModal } from '../../playground/components/SpreadsheetResults/SpreadsheetResultModal';
-
-export interface PipelineRunState {
-  pipelineId: string;
-  fileName: string;
-  workbookHash?: string;
-  companyName?: string;
-  model: string;
-  batchSize: number;
-  status: 'running' | 'completed' | 'failed';
-  currentStageIndex: number;
-  progressPercent: number;
-  elapsedSeconds: number;
-  modules: ModuleStepState[];
-  chunkCount?: number;
-  totalTokens?: number;
-  costUsd?: number;
-  costKrw?: number;
-  error?: string | null;
-  isLiveUpload?: boolean;
-  lunaOutput?: any;
-}
 
 interface TrackerProps {
   pipeline: PipelineRunState;
   onBack: () => void;
-  onRefresh?: () => void;
+  onResume?: () => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+  isCancelling?: boolean;
+  isDeleting?: boolean;
 }
 
-export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
+/**
+ * Displays live pipeline progress, module details, execution metrics, and available pipeline controls.
+ *
+ * @param pipeline - The pipeline run state to monitor.
+ * @param onBack - Navigates back to the data source list.
+ * @param onResume - Resumes a paused or failed pipeline from its current point.
+ * @param onCancel - Stops a running or queued pipeline.
+ * @param onDelete - Deletes the pipeline run and its generated partial data.
+ * @param isCancelling - Indicates that pipeline cancellation is in progress.
+ * @param isDeleting - Indicates that pipeline deletion is in progress.
+ */
+export function PipelineTrackerView({
+  pipeline,
+  onBack,
+  onResume,
+  onCancel,
+  onDelete,
+  isCancelling = false,
+  isDeleting = false,
+}: TrackerProps) {
   const [openModuleIds, setOpenModuleIds] = useState<Record<string, boolean>>({
     [pipeline.modules[pipeline.currentStageIndex]?.id || '']: true,
   });
@@ -76,7 +81,12 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
   }, [pipeline.isLiveUpload, pipeline.status, autoReturnSeconds]);
 
   useEffect(() => {
-    if (autoReturnSeconds !== null && autoReturnSeconds > 0 && !isAutoReturnPaused) {
+    if (
+      autoReturnSeconds !== null
+      && autoReturnSeconds > 0
+      && !isAutoReturnPaused
+      && !isLunaInspectorOpen
+    ) {
       autoReturnTimerRef.current = setTimeout(() => {
         setAutoReturnSeconds((prev) => (prev !== null ? prev - 1 : null));
       }, 1000);
@@ -86,7 +96,7 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
     return () => {
       if (autoReturnTimerRef.current) clearTimeout(autoReturnTimerRef.current);
     };
-  }, [autoReturnSeconds, isAutoReturnPaused, onBack]);
+  }, [autoReturnSeconds, isAutoReturnPaused, isLunaInspectorOpen, onBack]);
 
   const toggleModule = (id: string) => {
     setOpenModuleIds((prev) => ({
@@ -96,7 +106,10 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
   };
 
   const isRunning = pipeline.status === 'running';
+  const isQueued = pipeline.status === 'queued';
+  const isPaused = pipeline.status === 'paused';
   const isCompleted = pipeline.status === 'completed';
+  const isFailed = pipeline.status === 'failed';
   const activeModule = pipeline.modules[pipeline.currentStageIndex];
 
   return (
@@ -126,15 +139,54 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                 실행 중 ({pipeline.elapsedSeconds.toFixed(1)}s)
               </span>
             )}
+            {isQueued && (
+              <span className="ds-module-status-badge ds-module-status-badge--waiting">
+                <Clock size={13} /> 서버 작업 큐 대기 중
+              </span>
+            )}
             {isCompleted && (
               <span className="ds-module-status-badge ds-module-status-badge--done">
                 <CheckCircle2 size={13} /> 적재 완료 ({pipeline.elapsedSeconds.toFixed(1)}s)
+              </span>
+            )}
+            {isPaused && (
+              <span className="ds-module-status-badge ds-module-status-badge--paused">
+                <Pause size={13} /> 사용자 중단
+              </span>
+            )}
+            {isFailed && (
+              <span className="ds-module-status-badge ds-module-status-badge--failed">
+                <AlertCircle size={13} /> 실행 실패
               </span>
             )}
           </div>
         </div>
 
         <div className="ds-pipeline-header__right">
+          {(isRunning || isQueued) && onCancel && (
+            <button
+              type="button"
+              className="ds-stop-ingestion-button"
+              onClick={onCancel}
+              disabled={isCancelling}
+              title="현재 모듈 실행을 중단하고 나중에 같은 지점부터 재개"
+            >
+              {isCancelling ? <Loader2 size={14} className="ds-spin" /> : <Square size={13} />}
+              <span>{isCancelling ? '중단 중...' : '작업 중단'}</span>
+            </button>
+          )}
+          {!isCompleted && onDelete && (
+            <button
+              type="button"
+              className="ds-delete-ingestion-button"
+              onClick={onDelete}
+              disabled={isDeleting || isCancelling}
+              title="실행 기록과 생성 중인 부분 컬렉션 삭제 (원본 Excel은 보존)"
+            >
+              {isDeleting ? <Loader2 size={14} className="ds-spin" /> : <Trash2 size={14} />}
+              <span>{isDeleting ? '삭제 중...' : '작업 삭제'}</span>
+            </button>
+          )}
           <button
             type="button"
             className="secondary-button"
@@ -146,6 +198,30 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
           </button>
         </div>
       </header>
+
+      {isFailed && (
+        <div className="ds-error-alert" style={{ margin: '0 0 0.8rem' }}>
+          <AlertCircle size={16} />
+          <span>{pipeline.error || '워크플로 모듈 실행 중 오류가 발생했습니다.'}</span>
+          {onResume && (
+            <button type="button" className="secondary-button" onClick={onResume}>
+              <RotateCcw size={13} /> 실패 모듈부터 다시 실행
+            </button>
+          )}
+        </div>
+      )}
+
+      {isPaused && (
+        <div className="ds-paused-alert" style={{ margin: '0 0 0.8rem' }}>
+          <Pause size={16} />
+          <span>사용자 요청으로 작업이 중단됐습니다. 완료된 모듈 결과는 보존됩니다.</span>
+          {onResume && (
+            <button type="button" className="secondary-button" onClick={onResume}>
+              <RotateCcw size={13} /> 중단 지점부터 다시 실행
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Auto-return countdown banner ONLY when it was a live upload */}
       {pipeline.isLiveUpload && isCompleted && autoReturnSeconds !== null && (
@@ -190,7 +266,11 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                 <span>
                   {activeModule && isRunning
                     ? `[모듈 ${pipeline.currentStageIndex + 1}/${pipeline.modules.length}] ${activeModule.name}`
-                    : '전체 모듈 파이프라인 완료'}
+                    : isQueued
+                      ? '서버 작업 큐에서 실행 대기 중'
+                    : isFailed
+                      ? `모듈 ${pipeline.currentStageIndex + 1}에서 실행 실패`
+                      : '전체 모듈 파이프라인 완료'}
                 </span>
               </span>
               <span style={{ fontWeight: 750, color: '#0f766e' }}>{pipeline.progressPercent}%</span>
@@ -208,13 +288,14 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
               const isModDone = mod.status === 'done';
               const isModRunning = mod.status === 'running';
               const isModWaiting = mod.status === 'waiting';
+              const isModFailed = mod.status === 'failed';
               const isLunaModule = mod.id === 'mod_vlm_detector' || mod.moduleType === 'luna_vlm_structure_detector';
 
               return (
                 <div
                   key={mod.id}
                   className={`ds-module-card ${
-                    isModDone ? 'is-done' : isModRunning ? 'is-running' : 'is-waiting'
+                    isModDone ? 'is-done' : isModRunning ? 'is-running' : isModFailed ? 'is-failed' : 'is-waiting'
                   }`}
                 >
                   {/* Card Header (Click to toggle) */}
@@ -229,6 +310,8 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                           <CheckCircle2 size={16} />
                         ) : isModRunning ? (
                           <Loader2 size={16} className="ds-spin" />
+                        ) : isModFailed ? (
+                          <AlertCircle size={16} />
                         ) : (
                           <Icon size={16} />
                         )}
@@ -243,7 +326,7 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
 
                     <div className="ds-module-card__right">
                       {/* Luna VLM Magnifying Glass Inspection Action */}
-                      {isLunaModule && (isModDone || isCompleted) && (
+                      {isLunaModule && (isModDone || isCompleted) && pipeline.lunaOutput && (
                         <button
                           type="button"
                           className="ds-action-btn ds-action-btn--primary"
@@ -278,6 +361,11 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                           <CheckCircle2 size={11} /> 완료 {mod.durationSeconds ? `(${mod.durationSeconds.toFixed(1)}s)` : ''}
                         </span>
                       )}
+                      {isModFailed && (
+                        <span className="ds-module-status-badge ds-module-status-badge--failed">
+                          <AlertCircle size={11} /> 실패
+                        </span>
+                      )}
 
                       <ChevronDown
                         size={16}
@@ -289,6 +377,37 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                   {/* Card Body (Detailed Sub-logs & Metadata) */}
                   {isOpen && (
                     <div className="ds-module-card__body">
+                      {mod.batchProgress && (
+                        <div className="ds-batch-progress" aria-label={`${mod.name} 배치 진행률`}>
+                          <div className="ds-batch-progress__label">
+                            <strong>
+                              {mod.batchProgress.completed}/{mod.batchProgress.total} 배치 완료
+                            </strong>
+                            {mod.batchProgress.totalItems !== undefined && (
+                              <span>
+                                문서 {(mod.batchProgress.completedItems ?? 0).toLocaleString()}
+                                /{mod.batchProgress.totalItems.toLocaleString()}개
+                              </span>
+                            )}
+                          </div>
+                          <div className="ds-batch-progress__track">
+                            <div
+                              className="ds-batch-progress__fill"
+                              role="progressbar"
+                              aria-valuemin={0}
+                              aria-valuemax={mod.batchProgress.total}
+                              aria-valuenow={mod.batchProgress.completed}
+                              aria-label={`${mod.name} 완료 배치 수`}
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (mod.batchProgress.completed / Math.max(1, mod.batchProgress.total)) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                       {mod.metaInfo && Object.keys(mod.metaInfo).length > 0 && (
                         <div className="ds-module-meta-row">
                           {Object.entries(mod.metaInfo).map(([k, v]) => (
@@ -314,6 +433,8 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
                                   ? 'is-done'
                                   : sub.status === 'running'
                                   ? 'is-running'
+                                  : sub.status === 'failed'
+                                  ? 'is-failed'
                                   : ''
                               }`}
                             >
@@ -413,120 +534,14 @@ export function PipelineTrackerView({ pipeline, onBack }: TrackerProps) {
       </div>
 
       {/* Luna VLM Structure Result Magnifying Glass Modal */}
-      {isLunaInspectorOpen && (
+      {isLunaInspectorOpen && pipeline.lunaOutput && (
         <SpreadsheetResultModal
           kind="luna_vlm"
           input={{
             file_name: pipeline.fileName,
-            sheet_names: ['Income_Statement', 'Key_Stats'],
+            sheet_names: pipeline.lunaOutput.sheet_names || [],
           }}
-          output={
-            pipeline.lunaOutput || {
-              file_name: pipeline.fileName,
-              workbook_hash: pipeline.workbookHash || '6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4',
-              sheet_names: ['Income_Statement', 'Key_Stats'],
-              tables: [
-                {
-                  sheet_name: 'Income_Statement',
-                  table_index: 1,
-                  excel_range: 'A1:U190',
-                  bbox_px: [0, 0, 1920, 1080],
-                  cell_bounds: {
-                    min_row: 1,
-                    max_row: 190,
-                    min_column: 1,
-                    max_column: 21,
-                  },
-                  regions: [
-                    {
-                      region_id: 'r_title',
-                      type: 'title',
-                      excel_range: 'A1:U2',
-                      bbox_px: [0, 0, 1920, 90],
-                      rows: [1, 2],
-                      columns: [1, 21],
-                    },
-                    {
-                      region_id: 'r_col_header',
-                      type: 'column_header',
-                      excel_range: 'C3:U4',
-                      bbox_px: [240, 90, 1920, 160],
-                      rows: [3, 4],
-                      columns: [3, 21],
-                    },
-                    {
-                      region_id: 'r_row_header',
-                      type: 'row_header',
-                      excel_range: 'A5:B190',
-                      bbox_px: [0, 160, 240, 1080],
-                      rows: [5, 190],
-                      columns: [1, 2],
-                    },
-                    {
-                      region_id: 'r_data',
-                      type: 'data',
-                      excel_range: 'C5:U190',
-                      bbox_px: [240, 160, 1920, 1080],
-                      rows: [5, 190],
-                      columns: [3, 21],
-                    },
-                  ],
-                  header_tree: [
-                    {
-                      name: 'Consolidated Statements of Operations',
-                      col_start: 1,
-                      col_end: 21,
-                      row_start: 1,
-                      row_end: 1,
-                      children: [
-                        {
-                          name: 'For the Years Ended December 31',
-                          col_start: 3,
-                          col_end: 21,
-                          row_start: 2,
-                          row_end: 3,
-                          children: [],
-                        },
-                      ],
-                    },
-                    {
-                      name: 'Total Revenues and Operating Items',
-                      col_start: 1,
-                      col_end: 2,
-                      row_start: 5,
-                      row_end: 190,
-                      children: [
-                        {
-                          name: 'Total Revenue',
-                          col_start: 1,
-                          col_end: 2,
-                          row_start: 10,
-                          row_end: 10,
-                          children: [],
-                        },
-                        {
-                          name: 'Operating Income (EBIT)',
-                          col_start: 1,
-                          col_end: 2,
-                          row_start: 45,
-                          row_end: 45,
-                          children: [],
-                        },
-                        {
-                          name: 'Net Income Attributable to Common Stockholders',
-                          col_start: 1,
-                          col_end: 2,
-                          row_start: 120,
-                          row_end: 120,
-                          children: [],
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            }
-          }
+          output={pipeline.lunaOutput}
           onClose={() => setIsLunaInspectorOpen(false)}
         />
       )}

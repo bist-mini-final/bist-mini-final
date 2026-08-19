@@ -25,7 +25,7 @@
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `model` | `string` | no | `"BAAI/bge-large-en-v1.5"` | Excel 셀 문서 임베딩에 사용할 Hugging Face 또는 OpenAI 모델 ID |
-| `batch_size` | `integer` | no | `64` | Excel 셀 문서를 한 번에 임베딩할 배치 크기 |
+| `batch_size` | `integer` | no | `2048` | Excel 셀 문서를 한 번에 임베딩할 배치 크기 |
 
 ## Output DTO
 
@@ -80,7 +80,7 @@
   },
   "config": {
     "model": "BAAI/bge-large-en-v1.5",
-    "batch_size": 64
+    "batch_size": 2048
   }
 }
 ```

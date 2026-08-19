@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  AlertCircle,
   Building2,
   Check,
   Clock,
@@ -8,6 +9,7 @@ import {
   Edit2,
   Eye,
   Layers,
+  Pause,
   RefreshCw,
   Search,
   Sparkles,
@@ -15,11 +17,18 @@ import {
   X,
 } from 'lucide-react';
 import type { VectorIndexInfo } from '../types';
+import type { PipelineRunState } from '../pipelineTypes';
 import { dataSourceApi } from '../services/dataSourceApi';
 
 interface VectorIndexListProps {
   indexes: VectorIndexInfo[];
   isLoading?: boolean;
+  activeRunningPipeline?: PipelineRunState | null;
+  failedRuns?: PipelineRunState[];
+  onResumePipeline?: () => void;
+  onViewFailedLog?: (run: PipelineRunState) => void;
+  onDeletePipeline?: (run: PipelineRunState) => void;
+  deletingPipelineId?: string | null;
   onRefresh?: () => void;
   onDetailClick: (indexId: string) => void;
   onSearchClick: (index: VectorIndexInfo) => void;
@@ -42,9 +51,25 @@ function formatDate(iso: string): string {
   }
 }
 
+/**
+ * Renders the pgvector collection list with indexing progress, failed runs, and collection actions.
+ *
+ * @param indexes - The available vector indexes to display
+ * @param isLoading - Whether index data is loading
+ * @param failedRuns - Pipeline runs that failed or were interrupted
+ * @param activeRunningPipeline - The currently queued, running, or paused pipeline
+ * @param onRefresh - Callback to refresh the collection list
+ * @param onCreateClick - Callback to start a new indexing operation
+ */
 export function VectorIndexList({
   indexes,
   isLoading,
+  activeRunningPipeline,
+  failedRuns = [],
+  onResumePipeline,
+  onViewFailedLog,
+  onDeletePipeline,
+  deletingPipelineId,
   onRefresh,
   onDetailClick,
   onSearchClick,
@@ -85,6 +110,23 @@ export function VectorIndexList({
     }
   };
 
+  const isPipelineActive = activeRunningPipeline
+    && ['queued', 'running', 'paused'].includes(activeRunningPipeline.status);
+  const isPipelinePaused = activeRunningPipeline?.status === 'paused';
+  const hiddenIndexIds = new Set(
+    [
+      ...(isPipelineActive && activeRunningPipeline ? [activeRunningPipeline] : []),
+      ...failedRuns,
+    ]
+      .filter((run): run is PipelineRunState => Boolean(run?.targetIndexId))
+      .map((run) => run.targetIndexId!),
+  );
+  const visibleIndexes = indexes.filter((index) => !hiddenIndexIds.has(index.index_id));
+  const hasContent =
+    visibleIndexes.length > 0 ||
+    failedRuns.length > 0 ||
+    isPipelineActive;
+
   return (
     <div className="ds-panel">
       <div className="ds-panel__header">
@@ -111,7 +153,7 @@ export function VectorIndexList({
         </div>
       </div>
 
-      {indexes.length === 0 ? (
+      {!hasContent ? (
         <div className="ds-empty-state">
           <Database size={44} />
           <h4>pgvector 데이터베이스에 등록된 컬렉션이 없습니다</h4>
@@ -133,11 +175,168 @@ export function VectorIndexList({
                 <th style={{ width: '130px' }}>저장된 청크 수</th>
                 <th style={{ width: '120px' }}>스토리지</th>
                 <th style={{ width: '130px' }}>생성일시</th>
-                <th className="ds-text-right" style={{ width: '270px' }}>작업</th>
+                <th className="ds-actions-col ds-text-right" style={{ width: '270px' }}>작업</th>
               </tr>
             </thead>
             <tbody>
-              {indexes.map((idx) => {
+              {/* ── Running pipeline row ── */}
+              {activeRunningPipeline && isPipelineActive && (
+                <tr style={{
+                  background: isPipelinePaused ? 'rgba(245, 158, 11, 0.08)' : 'rgba(34, 197, 94, 0.07)',
+                  borderLeft: `3px solid ${isPipelinePaused ? '#d97706' : '#16a34a'}`,
+                }}>
+                  <td className="ds-font-mono ds-id-cell" style={{ color: isPipelinePaused ? '#b45309' : '#16a34a', fontWeight: 600 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      {isPipelinePaused
+                        ? <Pause size={12} style={{ color: '#b45309' }} />
+                        : <RefreshCw size={12} className="ds-spin" style={{ color: '#16a34a' }} />}
+                      {isPipelinePaused
+                        ? '중단됨'
+                        : activeRunningPipeline.status === 'queued'
+                          ? '대기 중'
+                          : '인덱싱 중'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 650, color: '#0f172a' }}>{activeRunningPipeline.fileName}</div>
+                    <div style={{ fontSize: '11px', color: isPipelinePaused ? '#92400e' : '#166534', marginTop: '2px' }}>
+                      {isPipelinePaused
+                        ? '완료된 모듈 결과를 보존한 채 사용자 중단됨'
+                        : activeRunningPipeline.status === 'queued'
+                        ? '서버 작업 큐에서 실행 대기 중'
+                        : activeRunningPipeline.modules[activeRunningPipeline.currentStageIndex]?.name || '파이프라인 실행 중...'}
+                    </div>
+                  </td>
+                  <td>
+                    <span className="ds-badge ds-badge--gray" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      {isPipelinePaused ? <Pause size={11} /> : <Sparkles size={11} />}
+                      {isPipelinePaused ? '재개 가능' : '자동 분석 중'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="ds-badge ds-badge--blue">{activeRunningPipeline.model}</span>
+                  </td>
+                  <td style={{ color: '#94a3b8' }}>—</td>
+                  <td>
+                    <span style={{ color: isPipelinePaused ? '#b45309' : '#16a34a', fontWeight: 600 }}>
+                      {activeRunningPipeline.modules[activeRunningPipeline.currentStageIndex]?.batchProgress
+                        ? `${activeRunningPipeline.modules[activeRunningPipeline.currentStageIndex].batchProgress!.completed}/${activeRunningPipeline.modules[activeRunningPipeline.currentStageIndex].batchProgress!.total} 배치`
+                        : `${Math.round(activeRunningPipeline.progressPercent)}% (${activeRunningPipeline.currentStageIndex + 1}/${activeRunningPipeline.modules?.length ?? 5}단계)`}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="ds-badge ds-badge--green" style={{
+                      background: isPipelinePaused ? '#fef3c7' : '#dcfce7',
+                      color: isPipelinePaused ? '#92400e' : '#166534',
+                    }}>
+                      {isPipelinePaused
+                        ? '재개 대기'
+                        : activeRunningPipeline.status === 'queued'
+                          ? '배치 큐 대기'
+                          : 'pgvector 적재 중'}
+                    </span>
+                  </td>
+                  <td style={{ color: '#64748b', fontSize: '12px' }}>
+                    {Math.round(activeRunningPipeline.elapsedSeconds)}초 경과
+                  </td>
+                  <td className="ds-actions-col ds-text-right">
+                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="primary-button"
+                        style={{ padding: '0.35rem 0.65rem', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={onResumePipeline}
+                        title={isPipelinePaused ? '중단된 파이프라인 확인 및 재개' : '실시간 파이프라인 HUD 및 모듈 로그로 재진입'}
+                      >
+                        <Layers size={13} /> 진행상황 / 모듈 로그
+                      </button>
+                      {onDeletePipeline && (
+                        <button
+                          type="button"
+                          className="ds-delete-ingestion-button"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '11px' }}
+                          onClick={() => onDeletePipeline(activeRunningPipeline)}
+                          disabled={deletingPipelineId === activeRunningPipeline.pipelineId}
+                          title="작업과 생성 중인 부분 컬렉션 삭제"
+                        >
+                          {deletingPipelineId === activeRunningPipeline.pipelineId
+                            ? <RefreshCw size={12} className="ds-spin" />
+                            : <Trash2 size={12} />}
+                          작업 삭제
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {/* ── Failed / interrupted pipeline rows ── */}
+              {failedRuns.map((run) => {
+                const failedStageLabel = run.modules?.find((m) => (m.status as any) === 'failed' || m.status === 'running')?.name
+                  || run.modules?.[run.currentStageIndex]?.name
+                  || '알 수 없는 단계';
+                return (
+                  <tr key={run.pipelineId} style={{ background: 'rgba(239, 68, 68, 0.05)', borderLeft: '3px solid #dc2626' }}>
+                    <td className="ds-font-mono ds-id-cell" style={{ color: '#dc2626', fontWeight: 600 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <AlertCircle size={12} style={{ color: '#dc2626', flexShrink: 0 }} />
+                        실패
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 650, color: '#0f172a' }}>{run.fileName}</div>
+                      <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '2px', maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}                   title={run.error ?? undefined}>
+                        ⚠️ {run.error || '알 수 없는 오류'}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="ds-badge ds-badge--gray" style={{ background: '#fee2e2', color: '#991b1b' }}>
+                        실패 단계: {failedStageLabel.split('(')[0].trim()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="ds-badge ds-badge--blue">{run.model}</span>
+                    </td>
+                    <td style={{ color: '#94a3b8' }}>—</td>
+                    <td style={{ color: '#94a3b8', fontSize: '12px' }}>—</td>
+                    <td style={{ color: '#94a3b8', fontSize: '12px' }}>—</td>
+                    <td style={{ color: '#64748b', fontSize: '12px' }}>
+                      {Math.round(run.elapsedSeconds || 0)}초 경과
+                    </td>
+                    <td className="ds-actions-col ds-text-right">
+                      <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          style={{ padding: '0.3rem 0.55rem', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#dc2626', borderColor: '#fca5a5' }}
+                          onClick={() => onViewFailedLog?.(run)}
+                          title="실패 단계 및 모듈 로그 확인"
+                        >
+                          <Layers size={12} /> 실패 로그
+                        </button>
+                        {onDeletePipeline && (
+                          <button
+                            type="button"
+                            className="ds-delete-ingestion-button"
+                            style={{ padding: '0.3rem 0.5rem', fontSize: '11px' }}
+                            onClick={() => onDeletePipeline(run)}
+                            disabled={deletingPipelineId === run.pipelineId}
+                            title="실패 작업 기록과 부분 컬렉션 삭제"
+                          >
+                            {deletingPipelineId === run.pipelineId
+                              ? <RefreshCw size={12} className="ds-spin" />
+                              : <Trash2 size={12} />}
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* ── Successful index rows ── */}
+              {visibleIndexes.map((idx) => {
                 const isEditingThis = editingIndexId === idx.index_id;
                 const companyDisplay = idx.company_name || '';
 
@@ -238,7 +437,7 @@ export function VectorIndexList({
                         <Clock size={12} /> {formatDate(idx.created_at)}
                       </span>
                     </td>
-                    <td className="ds-text-right" style={{ whiteSpace: 'nowrap' }}>
+                    <td className="ds-actions-col ds-text-right" style={{ whiteSpace: 'nowrap' }}>
                       <div className="ds-actions-row">
                         <button
                           type="button"

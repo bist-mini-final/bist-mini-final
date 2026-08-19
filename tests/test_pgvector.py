@@ -13,6 +13,64 @@ class FakeEmbeddingEncoder:
         ]
 
 
+class CapturingCursor:
+    def __init__(self) -> None:
+        self.executions = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
+    def execute(self, query, params):
+        self.executions.append((" ".join(query.split()), params))
+
+    def fetchall(self):
+        return []
+
+
+class CapturingConnection:
+    def __init__(self, cursor) -> None:
+        self._cursor = cursor
+
+    def cursor(self):
+        return self._cursor
+
+    def close(self):
+        pass
+
+
+class PgVectorMetadataQueryTests(unittest.TestCase):
+    def test_qualified_cell_reference_pairs_sheet_and_coordinate(self):
+        cursor = CapturingCursor()
+        store = object.__new__(PgVectorStore)
+        store._raw_connection = lambda: CapturingConnection(cursor)
+
+        self.assertEqual(
+            store.fetch_cells_by_metadata(
+                ["O17"],
+                workbook_hash="workbook-hash",
+                cell_references=[
+                    {
+                        "sheet_name": "Income_Statement",
+                        "cell_coord": "O17",
+                    }
+                ],
+            ),
+            [],
+        )
+
+        query, params = cursor.executions[-1]
+        self.assertIn("UPPER(cmetadata->>'sheet_name') = reference.sheet_name", query)
+        self.assertIn("UPPER(cmetadata->>'cell_coord') = reference.cell_coord", query)
+        self.assertIn("ROW_NUMBER() OVER", query)
+        self.assertIn("WHERE cell_rank = 1", query)
+        self.assertIn("ORDER BY UPPER(sheet_name), UPPER(cell_coord), id LIMIT %s", query)
+        self.assertEqual(params[:2], (["INCOME_STATEMENT"], ["O17"]))
+        self.assertEqual(params[2], "workbook-hash")
+
+
 class PgVectorIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.store = PgVectorStore()
@@ -52,6 +110,24 @@ class PgVectorIntegrationTests(unittest.TestCase):
                     "column_header": ["2024"],
                     "cell_value": "120M",
                 },
+                {
+                    "cell_id": "c1",
+                    "sheet_name": "IS",
+                    "cell_coord": "B2",
+                    "text": "ZZZ alternate Gross Profit serialization",
+                    "row_header": ["Gross Profit alternate"],
+                    "column_header": ["2024"],
+                    "cell_value": "500M",
+                },
+                {
+                    "cell_id": "c3",
+                    "sheet_name": "BS",
+                    "cell_coord": "B2",
+                    "text": "Total Assets in 2024 is 900M",
+                    "row_header": ["Total Assets"],
+                    "column_header": ["2024"],
+                    "cell_value": "900M",
+                },
             ],
         }
 
@@ -69,10 +145,40 @@ class PgVectorIntegrationTests(unittest.TestCase):
         self.assertEqual(hits[0][1]["cell_id"], "c1")
         self.assertEqual(hits[0][1]["sheet_name"], "IS")
 
+        direct_cells = self.store.fetch_cells_by_metadata(
+            ["B2"],
+            collection_name=index_id,
+            cell_references=[{"sheet_name": "IS", "cell_coord": "B2"}],
+        )
+        self.assertEqual(len(direct_cells), 1)
+        self.assertEqual(direct_cells[0]["cell_id"], "c1")
+
+        balance_sheet_cells = self.store.fetch_cells_by_metadata(
+            ["B2"],
+            collection_name=index_id,
+            cell_references=[{"sheet_name": "BS", "cell_coord": "B2"}],
+        )
+        self.assertEqual(len(balance_sheet_cells), 1)
+        self.assertEqual(balance_sheet_cells[0]["cell_id"], "c3")
+
+        limited_cells = self.store.fetch_cells_by_metadata(
+            ["B2", "B3"],
+            collection_name=index_id,
+            cell_references=[
+                {"sheet_name": "IS", "cell_coord": "B2"},
+                {"sheet_name": "IS", "cell_coord": "B3"},
+            ],
+            limit=2,
+        )
+        self.assertEqual(
+            [(cell["sheet_name"], cell["cell_coord"]) for cell in limited_cells],
+            [("IS", "B2"), ("IS", "B3")],
+        )
+
         # 3. Get Detail
         detail = self.store.get_index_detail(index_id, limit=5)
         self.assertEqual(detail["index_id"], index_id)
-        self.assertEqual(detail["document_count"], 2)
+        self.assertEqual(detail["document_count"], 4)
 
         # 4. Delete
         deleted = self.store.delete(index_id)

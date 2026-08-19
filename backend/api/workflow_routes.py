@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
+from ..core.settings import CACHE_DIR, RUN_DIR, WORKFLOW_DIR
 from ..runtime.registry import ModuleRegistry
 from ..workflows import (
     DagExecutionCancelled,
@@ -11,6 +12,7 @@ from ..workflows import (
     RunStore,
     WorkflowExecutionRequest,
     WorkflowExecutor,
+    WorkflowRunDispatcher,
     WorkflowSaveRequest,
     WorkflowStore,
 )
@@ -18,18 +20,40 @@ from ..workflows import (
 
 def create_workflow_router(
     module_registry: ModuleRegistry,
-    workflow_dir: Path,
-    run_dir: Path,
-    cache_dir: Path,
+    workflow_dir: Optional[Path] = None,
+    run_dir: Optional[Path] = None,
+    cache_dir: Optional[Path] = None,
+    workflow_store: Optional[WorkflowStore] = None,
+    run_store: Optional[RunStore] = None,
+    workflow_executor: Optional[WorkflowExecutor] = None,
+    workflow_dispatcher: Optional[WorkflowRunDispatcher] = None,
 ) -> APIRouter:
+    """
+    Build a FastAPI router for workflow storage and run execution.
+    
+    Parameters:
+        module_registry (ModuleRegistry): Registry used to resolve workflow modules.
+        workflow_dir (Path): Directory containing workflow data.
+        run_dir (Path): Directory containing run data.
+        cache_dir (Path): Directory used for runtime cache data.
+        workflow_store (Optional[WorkflowStore]): Workflow store to use, or a default store when omitted.
+        run_store (Optional[RunStore]): Run store to use, or a default store when omitted.
+        workflow_executor (Optional[WorkflowExecutor]): Executor to use, or a default executor when omitted.
+    
+    Returns:
+        APIRouter: Configured router for workflow and run management.
+    """
     router = APIRouter(tags=["Workflows"])
-    workflow_store = WorkflowStore(workflow_dir)
-    run_store = RunStore(run_dir)
-    result_cache = ResultCache(cache_dir)
-    workflow_executor = WorkflowExecutor(
+    workflow_store = workflow_store or WorkflowStore(workflow_dir or WORKFLOW_DIR)
+    run_store = run_store or RunStore(run_dir or RUN_DIR)
+    workflow_executor = workflow_executor or WorkflowExecutor(
         module_registry,
         run_store,
-        result_cache,
+        ResultCache(cache_dir or CACHE_DIR),
+    )
+    workflow_dispatcher = workflow_dispatcher or WorkflowRunDispatcher(
+        workflow_executor,
+        run_store,
     )
 
     @router.delete("/cache")
@@ -161,7 +185,7 @@ def create_workflow_router(
     @router.post("/runs/{run_id}/cancel")
     def cancel_run(run_id: str):
         try:
-            return workflow_executor.cancel_run(run_id)
+            return workflow_dispatcher.cancel(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"

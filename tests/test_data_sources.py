@@ -1,16 +1,26 @@
-import json
+import os
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from backend.api.data_source_routes import create_data_source_router
+from backend.core.settings import WORKFLOW_DIR
+from backend.runtime.registry import ModuleRegistry
+from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
+from backend.workflows import ResultCache, RunStore, WorkflowExecutor, WorkflowRunDispatcher, WorkflowStore
+
+
+class NoApiCompletionClient:
+    api_key = None
 
 
 class FakeEmbeddingEncoder:
@@ -26,12 +36,17 @@ class FakeEmbeddingEncoder:
 
 class DataSourceApiTests(unittest.TestCase):
     def setUp(self):
+        """
+        Prepare isolated test fixtures, sample spreadsheet data, storage clients, and a FastAPI test client.
+        """
         self.temp_dir = TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
         self.processed_dir = self.root / "processed"
         self.vector_index_dir = self.root / "vector_db"
         self.embedding_artifact_dir = self.root / "artifacts"
         self.spreadsheet_artifact_dir = self.root / "spreadsheet_artifacts"
+        self.run_dir = self.root / "runs"
+        self.cache_dir = self.root / "cache"
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         self.vector_index_dir.mkdir(parents=True, exist_ok=True)
         self.embedding_artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -52,6 +67,30 @@ class DataSourceApiTests(unittest.TestCase):
         self.clean_test_indexes()
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
+        self.embedding_store = EmbeddingArtifactStore(self.embedding_artifact_dir)
+        self.vector_store = VectorIndexStore(self.vector_index_dir)
+        self.module_registry = ModuleRegistry(
+            AnswerCacheRepository(),
+            completion_client=NoApiCompletionClient(),
+            embedding_encoder=self.encoder,
+            embedding_artifact_store=self.embedding_store,
+            vector_index_store=self.vector_store,
+            pgvector_store=self.pg_store,
+            db_manager=self.db_mgr,
+            processed_dir=self.processed_dir,
+            spreadsheet_artifact_dir=self.spreadsheet_artifact_dir,
+        )
+        self.workflow_store = WorkflowStore(WORKFLOW_DIR)
+        self.run_store = RunStore(self.run_dir)
+        self.workflow_executor = WorkflowExecutor(
+            self.module_registry,
+            self.run_store,
+            ResultCache(self.cache_dir),
+        )
+        self.workflow_dispatcher = WorkflowRunDispatcher(
+            self.workflow_executor,
+            self.run_store,
+        )
         self.app = FastAPI()
         self.app.include_router(
             create_data_source_router(
@@ -59,8 +98,15 @@ class DataSourceApiTests(unittest.TestCase):
                 vector_index_dir=self.vector_index_dir,
                 embedding_artifact_dir=self.embedding_artifact_dir,
                 spreadsheet_artifact_dir=self.spreadsheet_artifact_dir,
+                run_dir=self.run_dir,
+                cache_dir=self.cache_dir,
                 embedding_encoder=self.encoder,
                 pgvector_store=self.pg_store,
+                module_registry=self.module_registry,
+                workflow_store=self.workflow_store,
+                run_store=self.run_store,
+                workflow_executor=self.workflow_executor,
+                workflow_dispatcher=self.workflow_dispatcher,
             ),
             prefix="/api",
         )
@@ -83,8 +129,30 @@ class DataSourceApiTests(unittest.TestCase):
                 conn.commit()
 
     def tearDown(self):
+        for run in self.run_store.list():
+            if run.status in {"queued", "running"}:
+                self.workflow_dispatcher.cancel(run.id)
+        self.workflow_dispatcher.shutdown(wait=True)
+        self.client.close()
         self.clean_test_indexes()
         self.temp_dir.cleanup()
+
+    def _await_job(self, run_id: str, timeout: float = 5.0) -> dict:
+        deadline = time.monotonic() + timeout
+        response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        while payload["status"] not in {"completed", "failed"}:
+            if time.monotonic() >= deadline:
+                self.fail(
+                    f"ingestion job {run_id} did not finish in {timeout}s "
+                    f"(last status={payload['status']})"
+                )
+            time.sleep(0.05)
+            response = self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+        return payload
 
     def test_list_files(self):
         response = self.client.get("/api/data-sources/files")
@@ -100,6 +168,20 @@ class DataSourceApiTests(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["sheet_name"], "KeyStats")
         self.assertGreater(len(data["preview_rows"]), 0)
+
+    def test_cancel_unknown_ingestion_job_returns_not_found(self):
+        response = self.client.post(
+            "/api/data-sources/ingestion-jobs/run-missing/cancel"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_unknown_ingestion_job_returns_not_found(self):
+        response = self.client.delete(
+            "/api/data-sources/ingestion-jobs/run-missing"
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_upload_download_and_delete_file(self):
         file_content = b"fake-parquet-content-12345"
@@ -120,21 +202,30 @@ class DataSourceApiTests(unittest.TestCase):
         self.assertEqual(del_resp.status_code, 200)
         self.assertFalse((self.processed_dir / "uploaded_data.parquet").exists())
 
+    @patch.dict(os.environ, {"OPENAI_API_KEY": ""})
     def test_ingest_excel_and_search(self):
-        # Ingest the test workbook
+        # Queue and poll the canonical workflow job.
         ingest_resp = self.client.post(
-            "/api/data-sources/ingest",
+            "/api/data-sources/ingestion-jobs",
             json={
                 "file_name": "Test_Workbook.xlsx",
                 "model": "text-embedding-3-large",
                 "variant_mode": "header_only",
+                "structure_mode": "exhaustive",
                 "sheet_names": ["KeyStats"],
                 "batch_size": 16,
             },
         )
-        self.assertEqual(ingest_resp.status_code, 200)
+        self.assertEqual(ingest_resp.status_code, 202)
         ingest_data = ingest_resp.json()
-        self.assertEqual(ingest_data["status"], "success")
+        run_id = ingest_data["job_id"]
+        ingest_data = self._await_job(run_id)
+
+        self.assertEqual(
+            ingest_data["status"],
+            "completed",
+            ingest_data.get("error"),
+        )
         index_id = ingest_data["index"]["index_id"]
         self.assertIsNotNone(index_id)
 
@@ -172,6 +263,69 @@ class DataSourceApiTests(unittest.TestCase):
         list_after = self.client.get("/api/data-sources/indexes").json()
         deleted_ids = [idx["index_id"] for idx in list_after["indexes"]]
         self.assertNotIn(index_id, deleted_ids)
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": ""})
+    def test_background_ingestion_job_is_persisted_and_pollable(self):
+        start_response = self.client.post(
+            "/api/data-sources/ingestion-jobs",
+            json={
+                "file_name": "Test_Workbook.xlsx",
+                "model": "text-embedding-3-large",
+                "variant_mode": "header_only",
+                "structure_mode": "exhaustive",
+                "sheet_names": ["KeyStats"],
+                "batch_size": 16,
+            },
+        )
+        self.assertEqual(start_response.status_code, 202)
+        started = start_response.json()
+        self.assertEqual(started["workflow_id"], "indexing_pgvector_exhaustive")
+        self.assertIn(started["status"], {"queued", "running", "completed"})
+        run_id = started["job_id"]
+        self.assertTrue((self.run_dir / f"{run_id}.json").is_file())
+
+        current = self._await_job(run_id)
+
+        self.assertEqual(current["status"], "completed", current.get("error"))
+        self.assertIsNotNone(current["index"])
+        self.assertGreater(current["index"]["document_count"], 0)
+        status_by_module = {
+            node["module_type"]: current["run"]["nodes"][node["id"]]["status"]
+            for node in current["run"]["graph"]["nodes"]
+        }
+        for module_type in (
+            "company_entity_extractor",
+            "sheet_metadata_persistence",
+            "index_company_persistence",
+        ):
+            self.assertEqual(status_by_module[module_type], "succeeded")
+        self.assertEqual(current["index"]["company_name"], "Test Workbook")
+        history_response = self.client.get(
+            f"/api/data-sources/ingestion-jobs/by-index/{current['index']['index_id']}"
+        )
+        self.assertEqual(history_response.status_code, 200)
+        self.assertEqual(history_response.json()["job_id"], run_id)
+        resume_response = self.client.post(
+            f"/api/data-sources/ingestion-jobs/{run_id}/resume"
+        )
+        self.assertEqual(resume_response.status_code, 409)
+        list_response = self.client.get(
+            "/api/data-sources/ingestion-jobs",
+            params={"file_name": "Test_Workbook.xlsx"},
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertIn(run_id, [job["job_id"] for job in list_response.json()["jobs"]])
+
+        delete_response = self.client.delete(
+            f"/api/data-sources/ingestion-jobs/{run_id}"
+        )
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["source_file_preserved"])
+        self.assertTrue(self.sample_file.is_file())
+        self.assertEqual(
+            self.client.get(f"/api/data-sources/ingestion-jobs/{run_id}").status_code,
+            404,
+        )
 
 
 if __name__ == "__main__":

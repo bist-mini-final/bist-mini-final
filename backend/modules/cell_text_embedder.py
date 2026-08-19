@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import time
 from typing import Any, Dict, List, Optional, cast
 
@@ -9,6 +10,8 @@ from ..core.cost_tracker import calculate_embedding_cost
 from ..embeddings.bge import DEFAULT_BGE_MODEL
 from ..embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
+
+logger = logging.getLogger(__name__)
 from .base import (
     ExecutableModule,
     ModuleConfigDTO,
@@ -35,9 +38,9 @@ class CellTextEmbedderConfigDTO(ModuleConfigDTO):
         },
     )
     batch_size: int = Field(
-        default=64,
+        default=2048,
         ge=1,
-        le=512,
+        le=2048,
         description="Excel 셀 문서를 한 번에 임베딩할 배치 크기",
     )
 
@@ -103,6 +106,22 @@ class CellTextEmbedderModule(ExecutableModule):
         )
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Embed cell documents and store their vectors as a content-addressed artifact.
+        
+        Parameters:
+            payload (BaseModel): Execution data containing the documents, workbook metadata,
+                embedding model, and batch size.
+        
+        Returns:
+            Dict[str, Any]: Embedding metadata, artifact information, usage and cost
+                estimates, and the input documents with embedding row indices.
+        
+        Raises:
+            ModuleExecutionError: If no documents are provided, the encoder returns an
+                incorrect number of vectors, or the vectors have inconsistent or zero
+                dimensions.
+        """
         input_data = cast(CellTextEmbedderExecutionDTO, payload)
         encoder = self._encoder_for(input_data.model)
         vectors: List[List[float]] = []
@@ -111,9 +130,22 @@ class CellTextEmbedderModule(ExecutableModule):
 
         start_perf = time.perf_counter()
         total_tokens = 0
+        total_items = len(input_data.items)
+        total_batches = max(1, (total_items + input_data.batch_size - 1) // input_data.batch_size)
+        self.report_progress(
+            {
+                "phase": "embedding_batches",
+                "completed_batches": 0,
+                "total_batches": total_batches,
+                "completed_items": 0,
+                "total_items": total_items,
+            }
+        )
 
-        for start in range(0, len(input_data.items), input_data.batch_size):
+        for batch_idx, start in enumerate(range(0, total_items, input_data.batch_size), start=1):
             batch = input_data.items[start : start + input_data.batch_size]
+            print(f"[CellTextEmbedder] 배치 {batch_idx}/{total_batches} ({len(batch)}개 문서) 임베딩 중...", flush=True)
+            logger.info("임베딩 배치 %d/%d 실행 중 (%d개 문서, 모델: %s)...", batch_idx, total_batches, len(batch), input_data.model)
             batch_vectors = encoder.encode([document.text for document in batch])
             if len(batch_vectors) != len(batch):
                 raise ModuleExecutionError(
@@ -128,6 +160,15 @@ class CellTextEmbedderModule(ExecutableModule):
             else:
                 # Estimate ~15 tokens per cell text for local models
                 total_tokens += sum(max(1, len(doc.text.split()) * 2) for doc in batch)
+            self.report_progress(
+                {
+                    "phase": "embedding_batches",
+                    "completed_batches": batch_idx,
+                    "total_batches": total_batches,
+                    "completed_items": min(start + len(batch), total_items),
+                    "total_items": total_items,
+                }
+            )
 
         duration_seconds = round(time.perf_counter() - start_perf, 3)
         cost_info = calculate_embedding_cost(input_data.model, total_tokens)

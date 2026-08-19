@@ -104,7 +104,7 @@ export interface WorkflowDocument {
   graph: WorkflowGraph;
 }
 
-export type RunStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed';
 export type RunNodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
 
 export interface RunNodeState {
@@ -125,6 +125,7 @@ export interface RunNodeState {
   elapsed_ms?: number | null;
   cost_usd?: number | null;
   usage?: Record<string, number> | null;
+  progress?: Record<string, unknown>;
 }
 
 export interface RunBatchState {

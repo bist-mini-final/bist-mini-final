@@ -1,14 +1,4 @@
-export type DataSourceFileType = 'excel' | 'parquet' | 'json' | 'other';
-
-export interface DataSourceFile {
-  file_name: string;
-  size_bytes: number;
-  updated_at: string;
-  file_type: DataSourceFileType;
-  sheet_names: string[];
-  workbook_hash: string;
-  associated_index_ids: string[];
-}
+import type { WorkflowRun } from '../../playground/types';
 
 export interface VectorIndexInfo {
   index_id: string;
@@ -71,13 +61,36 @@ export interface VectorIndexDetail {
   luna_output?: any;
 }
 
-export interface IngestRequest {
+export interface LunaInspectionOutput {
   file_name: string;
-  model: string;
-  variant_mode: 'header_only' | 'header_with_value' | 'both';
-  structure_mode?: 'auto' | 'luna_vlm' | 'exhaustive';
+  workbook_hash: string;
   sheet_names?: string[];
-  batch_size?: number;
+  tables?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface IngestionJobResponse {
+  job_id: string;
+  status: WorkflowRun['status'];
+  workflow_id: string;
+  run: WorkflowRun;
+  index: VectorIndexInfo & {
+    sheet_names?: string[];
+    tables?: any[];
+    luna_output?: LunaInspectionOutput;
+  } | null;
+  luna_output?: LunaInspectionOutput | null;
+  target_index_id?: string | null;
+  error?: string | null;
+  worker_active: boolean;
+}
+
+export interface DeleteIngestionJobResponse {
+  status: 'deleted';
+  job_id: string;
+  target_index_id?: string | null;
+  index_deleted: boolean;
+  source_file_preserved: boolean;
 }
 
 export interface SearchResultItem {
@@ -96,12 +109,4 @@ export interface SearchResponse {
   query: string;
   results: SearchResultItem[];
   total_results: number;
-}
-
-export interface SheetPreviewData {
-  file_name: string;
-  sheet_name: string;
-  available_sheets: string[];
-  total_sheets: number;
-  preview_rows: string[][];
 }
