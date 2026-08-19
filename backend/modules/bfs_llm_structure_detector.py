@@ -113,7 +113,7 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
             "user_prompt_template",
         ],
         raw_output=True,
-        version="3",
+        version="4",
     )
     input_model = BfsLlmStructureDetectorInputDTO
     config_model = BfsLlmStructureDetectorConfigDTO

@@ -15,6 +15,11 @@ import { dataSourceApi } from '../data-sources/services/dataSourceApi';
 import type { DbStatusInfo } from '../data-sources/types';
 import './settings.css';
 
+/**
+ * PostgreSQL/pgvector 인프라와 RAG 파이프라인 설정을 표시하고 관리하는 설정 화면을 렌더링합니다.
+ *
+ * @returns 데이터베이스 상태, 연결 정보, RAG 설정을 포함하는 설정 화면
+ */
 export function SettingsView() {
   const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,18 +55,21 @@ export function SettingsView() {
     }
   };
 
-  const dbUrl = 'postgresql://rag_user:rag_password@localhost:5432/rag_flow';
+  const dbUrl = `postgresql://<user>:<password>@${dbStatus?.host ?? 'localhost'}:${
+    dbStatus?.port ?? 5432
+  }/${dbStatus?.database ?? 'rag_flow'}`;
   const dockerCmd = 'docker compose -f docker-compose.db.yml up -d';
 
-  const copyToClipboard = (text: string, type: 'url' | 'cmd') => {
-    navigator.clipboard.writeText(text);
-    if (type === 'url') {
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
-    } else {
-      setCopiedCmd(true);
-      setTimeout(() => setCopiedCmd(false), 2000);
+  const copyToClipboard = async (text: string, type: 'url' | 'cmd') => {
+    try {
+      if (!navigator.clipboard?.writeText) return;
+      await navigator.clipboard.writeText(text);
+    } catch {
+      return;
     }
+    const setCopied = type === 'url' ? setCopiedUrl : setCopiedCmd;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (

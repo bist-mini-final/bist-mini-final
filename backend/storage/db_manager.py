@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,8 @@ import psycopg2
 import psycopg2.extras
 
 from ..core.settings import PGVECTOR_URL
+
+logger = logging.getLogger(__name__)
 
 DDL_INIT = """
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -70,27 +73,39 @@ class DatabaseManager:
         return psycopg2.connect(raw_url)
 
     def is_connected(self) -> bool:
+        """Check whether a connection to the database can be established and used.
+        
+        Returns:
+        	bool: `True` if the database connection succeeds, `False` otherwise.
+        """
         try:
             conn = self._raw_connection()
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
-            conn.close()
-            return True
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                return True
+            finally:
+                conn.close()
         except Exception:
             return False
 
     def ensure_schema(self) -> None:
-        """Create all required tables if they don't exist and migrate columns."""
+        """Create required database tables and remove obsolete columns.
+        
+        Initialization failures are logged and do not propagate.
+        """
         try:
             conn = self._raw_connection()
-            with conn.cursor() as cur:
-                cur.execute(DDL_INIT)
-                cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
-                cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
-            conn.commit()
-            conn.close()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(DDL_INIT)
+                    cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
+                    cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
+                conn.commit()
+            finally:
+                conn.close()
         except Exception:
-            pass
+            logger.warning("PostgreSQL 스키마 초기화에 실패했습니다", exc_info=True)
 
     def save_source_file(
         self,
@@ -102,7 +117,17 @@ class DatabaseManager:
         storage_path: str,
         **_ignored: Any,
     ) -> None:
-        """Upsert a source file record in PostgreSQL with storage_path."""
+        """
+        Insert a source file record or update the existing record with the same file ID.
+        
+        Parameters:
+            file_id (str): Unique identifier for the source file.
+            file_name (str): Name of the source file.
+            file_hash (str): Content hash of the source file.
+            file_type (str): Type of the source file.
+            file_size (int): Size of the source file.
+            storage_path (str): Path where the source file is stored.
+        """
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:

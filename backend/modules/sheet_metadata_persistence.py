@@ -131,6 +131,8 @@ class SheetMetadataPersistenceModule(ExecutableModule):
             try:
                 for sheet_name in workbook.sheetnames:
                     worksheet = workbook[sheet_name]
+                    if worksheet.max_row is None or worksheet.max_column is None:
+                        worksheet.calculate_dimension(force=True)
                     sheet_dimensions[sheet_name] = (
                         worksheet.max_row or 0,
                         worksheet.max_column or 0,
