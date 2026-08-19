@@ -95,7 +95,7 @@ function elapsedSeconds(run: WorkflowRun): number {
  *
  * @param run - The workflow execution containing the module node and runtime state
  * @param nodeId - The identifier of the module node
- * @returns The module's display state
+ * @returns The module's display state, or `null` when the node or its runtime state is unavailable
  */
 function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState | null {
   const node = run.graph.nodes.find((candidate) => candidate.id === nodeId);

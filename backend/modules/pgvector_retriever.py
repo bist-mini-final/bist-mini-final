@@ -62,6 +62,15 @@ class PgVectorRetrieverModule(ExecutableModule):
         self.pgvector_store = pgvector_store or PgVectorStore()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Searches selected pgvector collections for the configured query embeddings and returns ranked matching documents.
+        
+        Parameters:
+            payload (BaseModel): Execution data containing query embeddings, collection identifiers, retrieval configuration, and document context.
+        
+        Returns:
+            Dict[str, Any]: Query and document context with ranked matching items, or an empty item list when no query embeddings are provided.
+        """
         input_data = cast(PgVectorRetrieverExecutionDTO, payload)
         raw_col_name = input_data.index_input.index_id
         target_collections = [c.strip() for c in raw_col_name.split(",") if c.strip()]

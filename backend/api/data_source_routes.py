@@ -150,26 +150,26 @@ def create_data_source_router(
     workflow_dispatcher: Optional[WorkflowRunDispatcher] = None,
 ) -> APIRouter:
     """
-    Create the data-source API router and configure its file, vector-index, database, and ingestion workflow dependencies.
+    Create the data-source API router and configure file, vector-index, database, and ingestion workflow services.
     
     Parameters:
-        processed_dir (Path): Directory containing uploaded source files.
-        vector_index_dir (Path): Directory used for vector-index artifacts.
-        embedding_artifact_dir (Path): Directory containing embedding artifacts.
-        spreadsheet_artifact_dir (Path): Directory containing spreadsheet artifacts.
-        workflow_dir (Path): Directory containing workflow definitions.
-        run_dir (Path): Directory for persisted workflow runs.
-        cache_dir (Path): Directory for cached workflow results.
-        embedding_encoder (Optional[EmbeddingEncoder]): Encoder used for embedding operations.
-        pgvector_store (Optional[PgVectorStore]): Existing pgvector store to use.
-        module_registry (Optional[ModuleRegistry]): Existing module registry to use.
-        workflow_store (Optional[WorkflowStore]): Existing workflow store to use.
-        run_store (Optional[RunStore]): Existing workflow run store to use.
-        workflow_executor (Optional[WorkflowExecutor]): Existing workflow executor to use.
-        workflow_dispatcher (Optional[WorkflowRunDispatcher]): Existing workflow dispatcher to use.
+    	processed_dir (Path): Directory containing uploaded source files.
+    	vector_index_dir (Path): Directory for vector-index artifacts.
+    	embedding_artifact_dir (Path): Directory for embedding artifacts.
+    	spreadsheet_artifact_dir (Path): Directory for spreadsheet artifacts.
+    	workflow_dir (Path): Directory containing workflow definitions.
+    	run_dir (Path): Directory for persisted workflow runs.
+    	cache_dir (Path): Directory for cached workflow results.
+    	embedding_encoder (Optional[EmbeddingEncoder]): Embedding encoder to use.
+    	pgvector_store (Optional[PgVectorStore]): Existing pgvector store to use.
+    	module_registry (Optional[ModuleRegistry]): Existing module registry to use.
+    	workflow_store (Optional[WorkflowStore]): Existing workflow store to use.
+    	run_store (Optional[RunStore]): Existing workflow run store to use.
+    	workflow_executor (Optional[WorkflowExecutor]): Existing workflow executor to use.
+    	workflow_dispatcher (Optional[WorkflowRunDispatcher]): Existing workflow dispatcher to use.
     
     Returns:
-        APIRouter: Router exposing data-source, vector-index, database, and ingestion-job endpoints.
+    	APIRouter: Router exposing data-source, vector-index, database, and ingestion-job endpoints.
     """
     router = APIRouter(prefix="/data-sources", tags=["Data Sources"])
 

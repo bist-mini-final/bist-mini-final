@@ -356,13 +356,16 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         """
-        Analyzes the selected workbook and assembles detected table structures from its visible sheets.
+        Analyze the selected workbook's visible sheets and assemble detected table structures.
         
         Parameters:
-        	payload (BaseModel): Execution settings containing the workbook name, hash, sheet names, and detector configuration.
+        	payload (BaseModel): Execution settings containing the workbook name, expected hash, selected sheets, and detector configuration.
         
         Returns:
-        	Dict[str, Any]: A mapping containing the workbook filename, verified hash, and assembled table outputs.
+        	Dict[str, Any]: A mapping containing the workbook name, verified hash, selected sheet names, assembled tables, and per-sheet failures.
+        
+        Raises:
+        	ModuleExecutionError: If the workbook cannot be resolved, has changed since selection, no sheets can be analyzed, or all sheet analyses fail.
         """
         settings = cast(LunaVlmStructureDetectorExecutionDTO, payload)
         try:

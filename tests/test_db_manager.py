@@ -19,6 +19,13 @@ class FakeCursor:
         return None
 
     def execute(self, query, params=None):
+        """
+        Record a normalized query and update the simulated affected-row count.
+        
+        Parameters:
+        	query (str): The SQL query to record.
+        	params (object, optional): Parameters associated with the query.
+        """
         normalized = " ".join(query.split())
         self.executions.append((normalized, params))
         if "WHERE file_id = %s OR file_hash = %s" in normalized:
@@ -98,6 +105,11 @@ def test_is_connected_success_closes_connection():
 def test_is_connected_error_closes_connection():
     class ErrorCursor(FakeCursor):
         def execute(self, query, params=None):
+            """Simulate a database execution failure.
+            
+            Raises:
+                RuntimeError: Always, indicating that the database connection was lost.
+            """
             raise RuntimeError("DB connection lost")
 
     cursor = ErrorCursor()

@@ -50,14 +50,14 @@ class WorkflowRunDispatcher:
 
     def submit(self, run_id: str, *, resume_failed: bool = False) -> bool:
         """
-        Queue a workflow run if it does not already have an active execution.
+        Schedule a workflow run when it has no active execution.
         
         Parameters:
             run_id (str): Identifier of the workflow run.
-            resume_failed (bool): Whether to resume failed nodes when executing the run.
+            resume_failed (bool): Whether to resume failed workflow nodes.
         
         Returns:
-            bool: `true` if the run was newly scheduled, `false` if it already has an active execution.
+            bool: `True` if the run was scheduled, `False` if it already has an active execution.
         """
 
         with self._lock:

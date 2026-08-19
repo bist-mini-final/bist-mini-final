@@ -15,6 +15,11 @@ import { dataSourceApi } from '../data-sources/services/dataSourceApi';
 import type { DbStatusInfo } from '../data-sources/types';
 import './settings.css';
 
+/**
+ * PostgreSQL/pgvector 인프라와 RAG 파이프라인 설정을 표시하고 관리하는 설정 화면을 렌더링합니다.
+ *
+ * @returns 데이터베이스 상태, 연결 정보, RAG 설정을 포함하는 설정 화면
+ */
 export function SettingsView() {
   const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);

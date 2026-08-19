@@ -73,6 +73,11 @@ class DatabaseManager:
         return psycopg2.connect(raw_url)
 
     def is_connected(self) -> bool:
+        """Check whether a connection to the database can be established and used.
+        
+        Returns:
+        	bool: `True` if the database connection succeeds, `False` otherwise.
+        """
         try:
             conn = self._raw_connection()
             try:
@@ -85,7 +90,10 @@ class DatabaseManager:
             return False
 
     def ensure_schema(self) -> None:
-        """Create all required tables if they don't exist and migrate columns."""
+        """Create required database tables and remove obsolete columns.
+        
+        Initialization failures are logged and do not propagate.
+        """
         try:
             conn = self._raw_connection()
             try:
@@ -109,7 +117,17 @@ class DatabaseManager:
         storage_path: str,
         **_ignored: Any,
     ) -> None:
-        """Upsert a source file record in PostgreSQL with storage_path."""
+        """
+        Insert a source file record or update the existing record with the same file ID.
+        
+        Parameters:
+            file_id (str): Unique identifier for the source file.
+            file_name (str): Name of the source file.
+            file_hash (str): Content hash of the source file.
+            file_type (str): Type of the source file.
+            file_size (int): Size of the source file.
+            storage_path (str): Path where the source file is stored.
+        """
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:

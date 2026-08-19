@@ -3645,6 +3645,18 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         mock_doc.metadata = {"cell_id": "c1"}
 
         def side_effect(collection_name, **_kwargs):
+            """
+            Return a matching document for supported collections.
+            
+            Parameters:
+                collection_name (str): Collection to query.
+            
+            Returns:
+                list: A document-score pair for collections other than ``col_1``.
+            
+            Raises:
+                RuntimeError: If ``collection_name`` is ``col_1``.
+            """
             if collection_name == "col_1":
                 raise RuntimeError("col_1 error")
             return [(mock_doc, 0.2)]
@@ -3688,6 +3700,16 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         doc_col2.metadata = {}  # No cell_id or chunk_id
 
         def side_effect(collection_name, **_kwargs):
+            """
+            Provide a fixed document-score result for a collection lookup.
+            
+            Parameters:
+                collection_name (str): Collection name used to select the result set.
+                **_kwargs: Ignored lookup options.
+            
+            Returns:
+                list: A single document-score pair for the selected collection.
+            """
             if collection_name == "col_1":
                 return [(doc_col1, 0.1)]
             return [(doc_col2, 0.2)]
@@ -3792,6 +3814,14 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         ]
 
         def get_meta(cid):
+            """Return metadata for the specified embedding collection.
+            
+            Parameters:
+            	cid (str): Collection identifier.
+            
+            Returns:
+            	dict: Collection metadata containing the embedding model, vector dimension, and an empty item list.
+            """
             if cid == "col_1":
                 return {"model": "text-embedding-3-large", "dimension": 3072, "items": []}
             return {"model": "text-embedding-3-small", "dimension": 1536, "items": []}

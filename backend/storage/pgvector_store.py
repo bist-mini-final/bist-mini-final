@@ -157,19 +157,19 @@ class PgVectorStore:
         progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     ) -> None:
         """
-        Add documents to a pgvector collection, replacing any existing collection with the same identifier.
+        Store documents in a pgvector collection, replacing any existing collection with the same identifier.
         
         Parameters:
             index_id (str): Identifier of the collection to replace.
             documents (List[Document]): Documents to store.
-            model_name (str): Embedding model name used when embeddings are generated.
-            embedding_encoder (Optional[EmbeddingEncoder]): Encoder used to generate embeddings.
-            metadata (Optional[Dict[str, Any]]): Collection metadata.
-            vectors (Optional[Any]): Precomputed vectors corresponding to every document.
+            model_name (str): Embedding model to use when generating vectors.
+            embedding_encoder (Optional[EmbeddingEncoder]): Encoder for generating embeddings.
+            metadata (Optional[Dict[str, Any]]): Metadata to associate with the collection.
+            vectors (Optional[Any]): Precomputed vectors corresponding to all documents.
             progress_callback (Optional[Callable[[Dict[str, int]], None]]): Callback receiving batch and item progress.
         
         Raises:
-            PgVectorStoreError: If document insertion fails.
+            PgVectorStoreError: If inserting a document batch fails.
         """
         if not documents:
             return
@@ -745,10 +745,10 @@ class PgVectorStore:
         Parameters:
             collection_name (str): Name of the collection to search.
             embedding (List[float]): Query embedding vector.
-            k (int): Maximum number of results to retrieve.
+            k (int): Maximum number of results to return.
         
         Returns:
-            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection is unavailable or the search fails.
+            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if both the direct and fallback searches fail.
         """
         conn = self._raw_connection()
         try:

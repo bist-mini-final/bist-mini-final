@@ -16,7 +16,19 @@ def cell_items_to_langchain_documents(
     index_id: str = "",
     company_name: str = "",
 ) -> List[Document]:
-    """Convert raw cell DTOs or dicts into standard LangChain Document objects."""
+    """
+    Convert cell text records into LangChain `Document` objects with spreadsheet metadata.
+    
+    Parameters:
+        items (Sequence[CellTextDocumentDTO | Dict[str, Any]]): Cell text DTOs or mappings to convert.
+        file_name (str): Name of the source file.
+        workbook_hash (str): Hash identifying the source workbook.
+        index_id (str): Identifier for the associated index.
+        company_name (str): Default company name when a cell record does not provide one.
+    
+    Returns:
+        List[Document]: Documents containing cell text, identifiers, and spreadsheet metadata.
+    """
     documents: List[Document] = []
     for idx, doc in enumerate(items):
         if isinstance(doc, CellTextDocumentDTO):

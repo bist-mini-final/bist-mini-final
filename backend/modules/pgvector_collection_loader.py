@@ -54,6 +54,18 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         self.db_manager = db_manager or DatabaseManager()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Load selected pgvector collections and combine their documents and index metadata.
+        
+        Parameters:
+        	payload (BaseModel): Input containing one or more collection names, file names, or workbook hashes.
+        
+        Returns:
+        	Dict[str, Any]: Combined document and index outputs for the selected collections.
+        
+        Raises:
+        	ModuleExecutionError: If no collections are available, a requested collection cannot be found, selected collections have inconsistent embedding dimensions, or collection documents cannot be loaded.
+        """
         input_data = cast(PgVectorCollectionLoaderInputDTO, payload)
         
         # 1. Resolve target collection list (support multi-select and single-select)
