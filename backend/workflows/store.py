@@ -2,7 +2,9 @@ import hashlib
 import json
 from pathlib import Path
 from threading import Lock
+import time
 from typing import Any, Dict, List, Optional, Type, TypeVar
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -19,7 +21,43 @@ from .history import compact_history_value
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    """
+    Atomically write text to a file, retrying replacement after transient permission errors.
+    
+    Parameters:
+        path (Path): Destination file path.
+        content (str): Text to write.
+    """
+
+    temporary_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+    temporary_path.write_text(content, encoding="utf-8")
+    try:
+        for attempt in range(6):
+            try:
+                temporary_path.replace(path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
 def _validate_identifier(value: str) -> str:
+    """
+    Validate an identifier against the permitted identifier pattern.
+    
+    Parameters:
+        value (str): Identifier to validate.
+    
+    Returns:
+        str: The unchanged identifier when it is valid.
+    
+    Raises:
+        ValueError: If the identifier does not match the permitted pattern.
+    """
     import re
 
     if not re.fullmatch(IDENTIFIER_PATTERN, value):
@@ -46,12 +84,11 @@ class JsonModelStore:
         return self.model_type.model_validate_json(path.read_text(encoding="utf-8"))
 
     def write(self, document_id: str, document: ModelType) -> ModelType:
+        """Persist a model document under the specified identifier and return it."""
         path = self._path(document_id)
-        temporary_path = path.with_suffix(".json.tmp")
         serialized = document.model_dump_json(indent=2)
         with self._lock:
-            temporary_path.write_text(serialized + "\n", encoding="utf-8")
-            temporary_path.replace(path)
+            _atomic_write_text(path, serialized + "\n")
         return document
 
     def list_documents(self) -> List[ModelType]:
@@ -144,6 +181,15 @@ class RunStore:
         self._summary_lock = Lock()
 
     def save(self, run: WorkflowRun) -> WorkflowRun:
+        """
+        Persist a workflow run and its compact summary.
+        
+        Parameters:
+        	run (WorkflowRun): The workflow run to persist.
+        
+        Returns:
+        	WorkflowRun: The saved workflow run with its updated timestamp.
+        """
         run.updated_at = utc_now_iso()
         saved = self._store.write(run.id, run)
         summary = run.model_copy(deep=True)
@@ -152,16 +198,22 @@ class RunStore:
             state.input_payload = compact_history_value(state.input_payload)
             state.output = compact_history_value(state.output)
         summary_path = self._store.directory / f"{run.id}.summary.json"
-        temporary_path = summary_path.with_name(f"{summary_path.name}.tmp")
         with self._summary_lock:
-            temporary_path.write_text(
+            _atomic_write_text(
+                summary_path,
                 summary.model_dump_json(indent=2) + "\n",
-                encoding="utf-8",
             )
-            temporary_path.replace(summary_path)
         return saved
 
     def load(self, run_id: str) -> WorkflowRun:
+        """Load a complete workflow run by its identifier.
+        
+        Parameters:
+        	run_id (str): Identifier of the workflow run.
+        
+        Returns:
+        	WorkflowRun: The persisted workflow run.
+        """
         return self._store.load(run_id)
 
     def list(self, workflow_id: Optional[str] = None) -> List[WorkflowRun]:
@@ -246,17 +298,27 @@ class ResultCache:
         return value
 
     def put(self, cache_key: str, value: Any) -> None:
+        """Store a value in the result cache under the specified key.
+        
+        Parameters:
+        	cache_key (str): Content-addressed key for the cached value
+        	value (Any): JSON-serializable value to cache
+        """
         path = self.directory / f"{cache_key}.json"
-        temporary_path = path.with_suffix(".json.tmp")
         with self._lock:
-            temporary_path.write_text(
+            _atomic_write_text(
+                path,
                 json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2)
                 + "\n",
-                encoding="utf-8",
             )
-            temporary_path.replace(path)
 
     def clear(self) -> int:
+        """
+        Remove all JSON files from the store directory.
+        
+        Returns:
+        	int: The number of files removed.
+        """
         removed = 0
         with self._lock:
             for path in self.directory.glob("*.json"):
