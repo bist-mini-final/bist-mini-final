@@ -141,6 +141,14 @@ class PgVectorIntegrationTests(unittest.TestCase):
         self.assertEqual(len(direct_cells), 1)
         self.assertEqual(direct_cells[0]["cell_id"], "c1")
 
+        balance_sheet_cells = self.store.fetch_cells_by_metadata(
+            ["B2"],
+            collection_name=index_id,
+            cell_references=[{"sheet_name": "BS", "cell_coord": "B2"}],
+        )
+        self.assertEqual(len(balance_sheet_cells), 1)
+        self.assertEqual(balance_sheet_cells[0]["cell_id"], "c3")
+
         # 3. Get Detail
         detail = self.store.get_index_detail(index_id, limit=5)
         self.assertEqual(detail["index_id"], index_id)

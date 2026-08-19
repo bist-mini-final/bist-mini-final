@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import logging
+from numbers import Real
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
@@ -28,6 +29,36 @@ class PgVectorStoreError(RuntimeError):
 
 
 PGVECTOR_INSERT_BATCH_SIZE = 1000
+_CONCURRENT_OPTIMIZED_INDEX_NAMES = (
+    "idx_langchain_pg_embedding_cell_id",
+    "idx_langchain_pg_embedding_cell_coord_upper",
+    "idx_langchain_pg_embedding_workbook_hash",
+)
+
+
+def _is_numeric_vector_collection(candidate: Any) -> bool:
+    """Return whether a candidate is a non-empty sequence of numeric vectors."""
+    if isinstance(candidate, (dict, str, bytes)) or not hasattr(candidate, "__len__"):
+        return False
+    try:
+        vectors = list(candidate)
+    except TypeError:
+        return False
+    if not vectors:
+        return False
+    for vector in vectors:
+        if isinstance(vector, (dict, str, bytes)) or not hasattr(vector, "__len__"):
+            return False
+        try:
+            values = list(vector)
+        except TypeError:
+            return False
+        if not values or not all(
+            isinstance(value, Real) and not isinstance(value, bool)
+            for value in values
+        ):
+            return False
+    return True
 
 
 class PgVectorStore:
@@ -293,11 +324,7 @@ class PgVectorStore:
         resolved_vectors = vectors if vectors is not None else vectors_or_items
         usable_vectors = (
             resolved_vectors
-            if isinstance(resolved_vectors, (list, tuple))
-            or (
-                hasattr(resolved_vectors, "__len__")
-                and not isinstance(resolved_vectors, (dict, str, bytes))
-            )
+            if _is_numeric_vector_collection(resolved_vectors)
             else None
         )
 
@@ -546,51 +573,85 @@ class PgVectorStore:
 
     def ensure_optimized_indexes(self) -> None:
         """Create HNSW vector index and jsonb_path_ops GIN metadata index if they don't exist."""
+        conn = None
         try:
             conn = self._raw_connection()
             conn.autocommit = True
-            try:
-                with conn.cursor() as cur:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_embedding';"
+                )
+                if cur.fetchone()[0] > 0:
+                    self._drop_invalid_optimized_indexes(cur)
                     cur.execute(
-                        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_embedding';"
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw
+                        ON langchain_pg_embedding
+                        USING hnsw (embedding vector_cosine_ops);
+                        """
                     )
-                    if cur.fetchone()[0] > 0:
-                        cur.execute(
-                            """
-                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw
-                            ON langchain_pg_embedding
-                            USING hnsw (embedding vector_cosine_ops);
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cell_id
-                            ON langchain_pg_embedding ((cmetadata->>'cell_id'));
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper
-                            ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
-                            ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
-                            ON langchain_pg_embedding
-                            USING gin (cmetadata jsonb_path_ops);
-                            """
-                        )
-            finally:
+                    cur.execute(
+                        """
+                        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_id
+                        ON langchain_pg_embedding ((cmetadata->>'cell_id'));
+                        """
+                    )
+                    cur.execute(
+                        """
+                        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper
+                        ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));
+                        """
+                    )
+                    cur.execute(
+                        """
+                        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
+                        ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
+                        """
+                    )
+                    cur.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
+                        ON langchain_pg_embedding
+                        USING gin (cmetadata jsonb_path_ops);
+                        """
+                    )
+        except Exception as error:
+            logger.warning("pgvector 최적화 인덱스 생성 실패: %s", error)
+            if conn is not None:
+                try:
+                    with conn.cursor() as cur:
+                        self._drop_invalid_optimized_indexes(cur)
+                except Exception as cleanup_error:
+                    logger.error(
+                        "유효하지 않은 pgvector 최적화 인덱스 정리 실패: %s",
+                        cleanup_error,
+                    )
+        finally:
+            if conn is not None:
                 conn.close()
-        except Exception:
-            pass
+
+    @staticmethod
+    def _drop_invalid_optimized_indexes(cur: Any) -> None:
+        """Drop invalid concurrent indexes so a later setup can rebuild them."""
+        cur.execute(
+            """
+            SELECT index_class.relname
+            FROM pg_catalog.pg_index AS index_state
+            JOIN pg_catalog.pg_class AS index_class
+              ON index_class.oid = index_state.indexrelid
+            JOIN pg_catalog.pg_namespace AS index_namespace
+              ON index_namespace.oid = index_class.relnamespace
+            WHERE index_namespace.nspname = current_schema()
+              AND index_class.relname = ANY(%s)
+              AND NOT index_state.indisvalid;
+            """,
+            (list(_CONCURRENT_OPTIMIZED_INDEX_NAMES),),
+        )
+        invalid_index_names = [row[0] for row in cur.fetchall()]
+        for index_name in invalid_index_names:
+            if index_name not in _CONCURRENT_OPTIMIZED_INDEX_NAMES:
+                continue
+            cur.execute(f'DROP INDEX CONCURRENTLY IF EXISTS "{index_name}";')
 
     def delete(self, index_id: str) -> bool:
         """Delete a collection from pgvector."""

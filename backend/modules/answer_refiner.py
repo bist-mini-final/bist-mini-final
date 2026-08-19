@@ -350,6 +350,10 @@ class AnswerRefinerModule(ExecutableModule):
 
         # Perform Spatial Horizontal Timeline Expansion
         final_candidates: List[CellCandidateDTO] = []
+        for candidate in base_candidates:
+            if candidate not in final_candidates:
+                final_candidates.append(candidate)
+
         for cand in base_candidates:
             neighbors = self._expand_spatial_neighbors(cand.cell_coord, spatial_radius)
             for neighbor in neighbors:

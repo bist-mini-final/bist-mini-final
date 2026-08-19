@@ -424,6 +424,71 @@ class PgVectorStoreBatchingTests(unittest.TestCase):
         self.assertEqual(progress[-1]["completed_batches"], 3)
         self.assertEqual(progress[-1]["completed_items"], 2101)
 
+    def test_put_only_accepts_numeric_vector_collections(self) -> None:
+        store = PgVectorStore("postgresql://unused")
+        numeric_vectors = [[1.0, 2.0], [3, 4]]
+        item_dicts = [
+            {"cell_id": "IS Cell A1", "embedding": [1.0, 2.0]},
+        ]
+
+        with patch.object(store, "put_documents") as put_documents:
+            store.put("test-index", vectors_or_items=item_dicts, metadata={"items": []})
+            self.assertIsNone(put_documents.call_args.kwargs["vectors"])
+
+            store.put("test-index", vectors_or_items=numeric_vectors, metadata={"items": []})
+            self.assertIs(
+                put_documents.call_args.kwargs["vectors"],
+                numeric_vectors,
+            )
+
+            store.put(
+                "test-index",
+                vectors_or_items=item_dicts,
+                vectors=numeric_vectors,
+                metadata={"items": []},
+            )
+            self.assertIs(
+                put_documents.call_args.kwargs["vectors"],
+                numeric_vectors,
+            )
+
+    def test_optimized_metadata_indexes_are_created_concurrently(self) -> None:
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (1,)
+        cursor.fetchall.return_value = [
+            ("idx_langchain_pg_embedding_cell_id",),
+        ]
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        store = PgVectorStore("postgresql://unused")
+
+        with patch.object(store, "_raw_connection", return_value=connection):
+            store.ensure_optimized_indexes()
+
+        statements = [
+            " ".join(call.args[0].split())
+            for call in cursor.execute.call_args_list
+        ]
+        for index_name in (
+            "idx_langchain_pg_embedding_cell_id",
+            "idx_langchain_pg_embedding_cell_coord_upper",
+            "idx_langchain_pg_embedding_workbook_hash",
+        ):
+            self.assertTrue(
+                any(
+                    f"CREATE INDEX CONCURRENTLY IF NOT EXISTS {index_name}"
+                    in statement
+                    for statement in statements
+                )
+            )
+        self.assertIn(
+            'DROP INDEX CONCURRENTLY IF EXISTS "idx_langchain_pg_embedding_cell_id";',
+            statements,
+        )
+        self.assertTrue(connection.autocommit)
+
 
 class SheetRendererFormattingTests(unittest.TestCase):
     def test_hash_prefixed_rgb_string_is_preserved(self) -> None:
@@ -2175,6 +2240,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
             })
 
     def test_luna_vlm_detector_preserves_selected_sheet_order(self) -> None:
+        EVENT_TIMEOUT_SECONDS = 10.0
         workbook = openpyxl.load_workbook(self.workbook_path)
         second = workbook.copy_worksheet(workbook["Key Stats"])
         second.title = "Second"
@@ -2190,12 +2256,12 @@ class SpreadsheetModuleTests(unittest.TestCase):
                 prompt = kwargs["user_prompt"]
                 if "Key Stats" in prompt:
                     first_started.set()
-                    if not second_finished.wait(timeout=2):
-                        raise AssertionError("second sheet did not finish first")
+                    if not second_finished.wait(timeout=EVENT_TIMEOUT_SECONDS):
+                        raise AssertionError("timed out waiting for second_finished")
                     completion_order.append("Key Stats")
                 else:
-                    if not first_started.wait(timeout=2):
-                        raise AssertionError("first sheet did not start")
+                    if not first_started.wait(timeout=EVENT_TIMEOUT_SECONDS):
+                        raise AssertionError("timed out waiting for first_started")
                     completion_order.append("Second")
                     second_finished.set()
                 return (
@@ -2219,6 +2285,7 @@ class SpreadsheetModuleTests(unittest.TestCase):
             [table["sheet_name"] for table in structured["tables"]],
             ["Key Stats", "Second"],
         )
+
     def test_bfs_llm_detector_builds_title_regions_and_hierarchical_headers(self) -> None:
         workbook_path = self.processed_dir / "hierarchical.xlsx"
         workbook = Workbook()

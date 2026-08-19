@@ -90,6 +90,23 @@ def test_spatial_neighbor_expansion():
     assert "N50" in neighbors  # 2023
 
 
+def test_base_candidates_precede_spatial_neighbors():
+    module = AnswerRefinerModule()
+
+    candidates = module._extract_candidate_cells(
+        question="",
+        initial_answer="",
+        explicit_cell_ids=["IS:O17", "BS:O33"],
+        spatial_radius=2,
+    )
+
+    assert [candidate.model_dump() for candidate in candidates[:2]] == [
+        {"cell_coord": "O17", "sheet_name": "Income_Statement"},
+        {"cell_coord": "O33", "sheet_name": "Balance_Sheet"},
+    ]
+    assert candidates[2].cell_coord == "P17"
+
+
 def test_candidate_cell_extraction_from_text():
     """Verify regex and named cell pattern extraction."""
     module = AnswerRefinerModule()
