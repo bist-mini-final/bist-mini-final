@@ -191,7 +191,19 @@ class CancellableModuleWorker:
                 if result.get("event") == "progress":
                     progress = result.get("progress")
                     if progress_callback is not None and isinstance(progress, dict):
-                        progress_callback(dict(progress))
+                        try:
+                            progress_callback(dict(progress))
+                        except Exception as error:
+                            with self._state_lock:
+                                failed_process = (
+                                    self._detach_worker_locked()
+                                    if self._active_task_id == task_id
+                                    else None
+                                )
+                            self._terminate(failed_process)
+                            raise ModuleWorkerError(
+                                "진행률 콜백 처리에 실패했습니다"
+                            ) from error
                     continue
                 if result.get("ok") is True:
                     metadata = result.get("metadata")
