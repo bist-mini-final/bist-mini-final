@@ -79,17 +79,36 @@ class PooledConnectionWrapper:
         self._closed = False
 
     def close(self) -> None:
-        if not self._closed:
-            self._closed = True
+        if self._closed:
+            return
+        try:
             try:
                 if getattr(self._conn, "autocommit", False):
                     self._conn.autocommit = False
-            except Exception:
-                pass
+            except Exception as error:
+                logger.error(
+                    "커넥션 autocommit 복구 실패로 커넥션을 풀에 반환하지 않고 직접 닫습니다: %s",
+                    error,
+                )
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+                return
+
             try:
                 self._pool.putconn(self._conn)
-            except Exception:
-                pass
+            except Exception as error:
+                logger.error(
+                    "커넥션 풀 반환(putconn) 실패로 커넥션을 직접 닫습니다: %s",
+                    error,
+                )
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+        finally:
+            self._closed = True
 
     @property
     def closed(self) -> bool:
