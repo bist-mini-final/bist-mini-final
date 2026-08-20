@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..embeddings.factory import EmbeddingEncoder
 from ..core.settings import PROCESSED_DATA_DIR
@@ -13,8 +13,7 @@ from .base import (
     EmptyModuleConfigDTO,
     ExecutableModule,
     ModuleDefinition,
-    ModuleDTO,
-    ModuleExecutionError,
+    ModuleTaskPolicy,
 )
 from .cell_text_embedder import CellTextEmbeddingsDTO
 from .vector_index_writer import VectorIndexDTO
@@ -38,6 +37,13 @@ class PgVectorIndexWriterModule(ExecutableModule):
         raw_output=True,
         cacheable=False,
         version="1",
+        task=ModuleTaskPolicy(
+            retries=2,
+            retry_delay_seconds=3,
+            timeout_seconds=3600,
+            tags=["postgres", "storage"],
+            resource_profile="high-memory",
+        ),
     )
     input_model = PgVectorIndexWriterInputDTO
     config_model = EmptyModuleConfigDTO

@@ -3,11 +3,8 @@ uvicorn[standard]>=0.32.0
 pydantic>=2.10.0
 openpyxl>=3.1.0,<4.0.0
 Pillow>=10.0.0,<12.0.0
-pyobjc-core==11.1; sys_platform == "darwin" and python_version < "3.10"
-pyobjc-framework-Cocoa==11.1; sys_platform == "darwin" and python_version < "3.10"
-pyobjc-framework-Quartz==11.1; sys_platform == "darwin" and python_version < "3.10"
-pyobjc-framework-CoreML==11.1; sys_platform == "darwin" and python_version < "3.10"
-pyobjc-framework-Vision==11.1; sys_platform == "darwin" and python_version < "3.10"
+pandas>=2.0.0
+python-dotenv>=1.0.0
 docling==2.69.1
 torch>=2.2.0,<3.0.0
 transformers>=4.44.0,<5.0.0
@@ -22,3 +19,4 @@ langchain-postgres>=0.0.12
 sqlalchemy>=2.0.0
 pytest>=8.0.0
 httpx>=0.27.0
+prefect[docker]==3.8.3

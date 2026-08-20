@@ -24,6 +24,13 @@ describe('pipelineFromIngestionJob', () => {
         status: 'running',
         created_at: '2026-08-19T00:00:00Z',
         updated_at: '2026-08-19T00:00:01Z',
+        orchestration: {
+          backend: 'prefect',
+          deployment_name: 'excel-ingestion/excel-ingestion-docker',
+          external_run_id: 'prefect-flow-run-123',
+          submission_attempt: 1,
+          submitted_at: '2026-08-19T00:00:00Z',
+        },
         graph: {
           nodes: [
             { id: 'selector', module_type: 'processed_file_selector', position: { x: 0, y: 0 }, config: {} },
@@ -81,6 +88,20 @@ describe('pipelineFromIngestionJob', () => {
       total: 10,
       completedItems: 6144,
       totalItems: 20000,
+    });
+    expect(pipeline.modules[2].liveProgress).toMatchObject({
+      label: '임베딩 생성',
+      completed: 3,
+      total: 10,
+      unit: '배치',
+      percent: 30,
+    });
+    expect(pipeline.progressPercent).toBe(77);
+    expect(pipeline.scheduler).toEqual({
+      backend: 'prefect',
+      deploymentName: 'excel-ingestion/excel-ingestion-docker',
+      externalRunId: 'prefect-flow-run-123',
+      workerActive: true,
     });
     expect(pipeline.modules[2].sublogs[0].msg).toContain('3/10 배치 완료');
   });
@@ -141,4 +162,3 @@ describe('pipelineFromIngestionJob', () => {
     expect(pipeline.modules[0].id).toBe('valid-node');
   });
 });
-

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..embeddings.factory import EmbeddingEncoder
@@ -44,12 +44,10 @@ from ..storage.db_manager import DatabaseManager
 from ..storage.embedding_artifacts import EmbeddingArtifactStore
 from ..storage.pgvector_store import PgVectorStore
 from ..storage.vector_index import VectorIndexStore
+from .registry_base import BaseModuleRegistry
 
 
-_CONFIG_UNSET = object()
-
-
-class ModuleRegistry:
+class ModuleRegistry(BaseModuleRegistry):
     """Owns module discovery and independent execution by module type."""
 
     def __init__(
@@ -75,53 +73,58 @@ class ModuleRegistry:
         Raises:
             ValueError: If multiple modules declare the same type.
         """
-        self.repository = repository
-        self.embedding_artifact_store = (
+        embedding_artifacts = (
             embedding_artifact_store or EmbeddingArtifactStore()
         )
-        self.vector_index_store = vector_index_store or VectorIndexStore()
+        vector_indexes = vector_index_store or VectorIndexStore()
         self.pgvector_store = pgvector_store or PgVectorStore()
         self.db_manager = db_manager or DatabaseManager()
-        self.isolated_worker_spec: Optional[Dict[str, str]] = None
+        isolated_worker_spec: Optional[Dict[str, str]] = None
         if (
             completion_client is None
             and embedding_encoder is None
             and repository.path is not None
         ):
-            self.isolated_worker_spec = {
+            isolated_worker_spec = {
                 "answer_cache_path": str(repository.path),
-                "embedding_artifact_dir": str(self.embedding_artifact_store.directory),
-                "vector_index_dir": str(self.vector_index_store.directory),
+                "embedding_artifact_dir": str(embedding_artifacts.directory),
+                "vector_index_dir": str(vector_indexes.directory),
                 "processed_dir": str(processed_dir),
                 "spreadsheet_artifact_dir": str(spreadsheet_artifact_dir),
             }
+        super().__init__(
+            repository,
+            embedding_artifacts,
+            vector_indexes,
+            isolated_worker_spec=isolated_worker_spec,
+        )
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
             DecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
                 encoder=embedding_encoder,
-                artifact_store=self.embedding_artifact_store,
+                artifact_store=embedding_artifacts,
             ),
             VectorIndexWriterModule(
-                artifact_store=self.embedding_artifact_store,
-                index_store=self.vector_index_store,
+                artifact_store=embedding_artifacts,
+                index_store=vector_indexes,
             ),
             PgVectorIndexWriterModule(
-                artifact_store=self.embedding_artifact_store,
+                artifact_store=embedding_artifacts,
                 db_manager=self.db_manager,
                 pgvector_store=self.pgvector_store,
                 processed_dir=processed_dir,
             ),
             PrebuiltIndexLoaderModule(
-                vector_index_store=self.vector_index_store,
+                vector_index_store=vector_indexes,
             ),
             PgVectorCollectionLoaderModule(
                 pgvector_store=self.pgvector_store,
                 db_manager=self.db_manager,
             ),
             Bm25RetrieverModule(),
-            DenseRetrieverModule(self.vector_index_store),
+            DenseRetrieverModule(vector_indexes),
             PgVectorRetrieverModule(self.pgvector_store),
             RrfFusionModule(),
             ContextExpanderModule(),
@@ -167,43 +170,4 @@ class ModuleRegistry:
             ImageTileSourceModule(),
             QaExampleLoaderModule(),
         ]
-        self._modules: Dict[str, ExecutableModule] = {}
-        for module in modules:
-            module_type = module.definition.type
-            if module_type in self._modules:
-                raise ValueError(f"중복 모듈 type입니다: {module_type}")
-            self._modules[module_type] = module
-
-    def definitions(self) -> List[Dict[str, Any]]:
-        return [module.contract() for module in self._modules.values()]
-
-    def definition(self, module_type: str) -> Dict[str, Any]:
-        return self.get(module_type).contract()
-
-    def get(self, module_type: str) -> ExecutableModule:
-        try:
-            return self._modules[module_type]
-        except KeyError as error:
-            raise KeyError(f"지원하지 않는 모듈입니다: {module_type}") from error
-
-    def execute(
-        self,
-        module_type: str,
-        input_payload: Any,
-        config: Any = _CONFIG_UNSET,
-    ) -> Any:
-        """Execute one registered module through the public Input/Config boundary."""
-
-        module = self.get(module_type)
-        if config is _CONFIG_UNSET:
-            return module.run(input_payload)
-        return module.run(input_payload, config)
-
-    def clear_caches(self) -> Dict[str, int]:
-        """Clear domain caches owned by registered modules."""
-
-        return {
-            "answers_removed": self.repository.clear_cached_answers(),
-            "embedding_artifacts_removed": self.embedding_artifact_store.clear(),
-            "vector_indexes_removed": self.vector_index_store.clear(),
-        }
+        self.register(modules)

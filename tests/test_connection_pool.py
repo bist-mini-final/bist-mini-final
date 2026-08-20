@@ -1,6 +1,5 @@
 import logging
 from unittest.mock import MagicMock, PropertyMock
-import pytest
 
 from backend.storage.connection_pool import PooledConnectionWrapper
 

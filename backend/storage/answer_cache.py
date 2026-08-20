@@ -1,9 +1,42 @@
 """JSON-backed repository for cached question and answer pairs."""
 
+from contextlib import contextmanager
 import json
+import os
 from pathlib import Path
-from threading import Lock
-from typing import Any, Dict, List, Optional, Tuple
+from threading import RLock
+from typing import Any, Dict, Iterator, List, Optional, Tuple
+from uuid import uuid4
+
+
+@contextmanager
+def _exclusive_file_lock(path: Path) -> Iterator[None]:
+    """Take an advisory lock shared by local worker processes."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+b") as lock_file:
+        if os.name == "nt":
+            import msvcrt
+
+            lock_file.seek(0, os.SEEK_END)
+            if lock_file.tell() == 0:
+                lock_file.write(b"0")
+                lock_file.flush()
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 class AnswerCacheRepository:
@@ -11,7 +44,7 @@ class AnswerCacheRepository:
 
     def __init__(self, path: Optional[Path] = None) -> None:
         self.path = path
-        self._lock = Lock()
+        self._lock = RLock()
         self._questions: Dict[str, Dict[str, Any]] = {}
         self._answers: Dict[str, str] = {}
         self._load()
@@ -25,21 +58,23 @@ class AnswerCacheRepository:
         question_text: str,
         answer: str,
     ) -> None:
-        self._questions[question_id] = {
-            "id": question_id,
-            "question": question_text,
-        }
-        self._answers[question_id] = answer
-        self._persist()
+        with self._lock:
+            self._questions[question_id] = {
+                "id": question_id,
+                "question": question_text,
+            }
+            self._answers[question_id] = answer
+            self._persist()
 
     def clear_cached_answers(self) -> int:
-        removed = len(self._answers)
-        self._questions.clear()
-        self._answers.clear()
-        if self.path is not None:
-            with self._lock:
-                self.path.unlink(missing_ok=True)
-        return removed
+        with self._lock:
+            removed = len(self._answers)
+            self._questions.clear()
+            self._answers.clear()
+            if self.path is not None:
+                with _exclusive_file_lock(self.path.with_suffix(".lock")):
+                    self.path.unlink(missing_ok=True)
+            return removed
 
     def question_candidates(self) -> List[Tuple[str, str]]:
         return [
@@ -88,17 +123,54 @@ class AnswerCacheRepository:
         if self.path is None:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = self.path.with_suffix(".json.tmp")
-        document = {
-            "questions": self._questions,
-            "answers": {
-                question_id: {"luna_reader_answer": answer}
-                for question_id, answer in self._answers.items()
-            },
-        }
         with self._lock:
-            temporary_path.write_text(
-                json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            temporary_path.replace(self.path)
+            with _exclusive_file_lock(self.path.with_suffix(".lock")):
+                disk_questions: Dict[str, Dict[str, Any]] = {}
+                disk_answers: Dict[str, str] = {}
+                if self.path.is_file():
+                    stored = json.loads(self.path.read_text(encoding="utf-8"))
+                    if not isinstance(stored, dict):
+                        raise ValueError("답변 캐시 최상위 값은 객체여야 합니다")
+                    raw_questions = stored.get("questions", {})
+                    raw_answers = stored.get("answers", {})
+                    if isinstance(raw_questions, dict):
+                        disk_questions.update(raw_questions)
+                    if isinstance(raw_answers, dict):
+                        for question_id, answer_value in raw_answers.items():
+                            if isinstance(answer_value, str):
+                                disk_answers[question_id] = answer_value
+                            elif isinstance(answer_value, dict) and isinstance(
+                                answer_value.get("luna_reader_answer"), str
+                            ):
+                                disk_answers[question_id] = answer_value[
+                                    "luna_reader_answer"
+                                ]
+
+                disk_questions.update(self._questions)
+                disk_answers.update(self._answers)
+                self._questions = disk_questions
+                self._answers = disk_answers
+                document = {
+                    "questions": self._questions,
+                    "answers": {
+                        question_id: {"luna_reader_answer": answer}
+                        for question_id, answer in self._answers.items()
+                    },
+                }
+                temporary_path = self.path.with_name(
+                    f"{self.path.name}.{uuid4().hex}.tmp"
+                )
+                try:
+                    temporary_path.write_text(
+                        json.dumps(
+                            document,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            indent=2,
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                    temporary_path.replace(self.path)
+                finally:
+                    temporary_path.unlink(missing_ok=True)

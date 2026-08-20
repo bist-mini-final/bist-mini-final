@@ -4,8 +4,6 @@ import pytest
 from backend.modules.answer_refiner import (
     AnswerRefinerModule,
     AnswerRefinerInputDTO,
-    DirectCellDTO,
-    CellCandidateDTO,
 )
 from backend.modules.reader import AnswerDTO, ApiUsageDTO
 from backend.modules.data_lineage import QueryContextDTO, DocumentContextDTO

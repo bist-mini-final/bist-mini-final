@@ -3,6 +3,7 @@ from pathlib import Path
 from threading import Lock
 from typing import List
 import re
+from uuid import uuid4
 
 from ..core.settings import EMBEDDING_ARTIFACT_DIR
 from ..modules.base import ModuleExecutionError
@@ -28,14 +29,17 @@ class EmbeddingArtifactStore:
         path = self._path(artifact_id)
         if path.is_file():
             return
-        temporary_path = path.with_suffix(".f32.tmp")
+        temporary_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
         flattened = array("f", (value for vector in vectors for value in vector))
-        with self._lock:
-            if path.is_file():
-                return
+        try:
             with temporary_path.open("wb") as file:
                 flattened.tofile(file)
-            temporary_path.replace(path)
+            with self._lock:
+                if path.is_file():
+                    return
+                temporary_path.replace(path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
     def get(
         self,

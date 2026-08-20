@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Sequence, Tuple
+from uuid import uuid4
 
 from ..core.settings import VECTOR_INDEX_DIR
 from ..modules.base import ModuleExecutionError
@@ -87,13 +88,14 @@ class VectorIndexStore:
             "format": INDEX_FORMAT_VERSION,
             **metadata,
         }
-        temporary_index = index_path.with_suffix(".npy.tmp")
-        temporary_metadata = metadata_path.with_suffix(".json.tmp")
-        with self._lock:
-            if index_path.is_file() and metadata_path.is_file():
-                stored = self._validate_metadata(index_id, metadata_path)
-                self._assert_same_index(metadata, stored)
-                return
+        temporary_id = uuid4().hex
+        temporary_index = index_path.with_name(
+            f"{index_path.name}.{temporary_id}.tmp"
+        )
+        temporary_metadata = metadata_path.with_name(
+            f"{metadata_path.name}.{temporary_id}.tmp"
+        )
+        try:
             with temporary_index.open("wb") as file:
                 numpy.save(file, matrix, allow_pickle=False)
             temporary_metadata.write_text(
@@ -101,8 +103,16 @@ class VectorIndexStore:
                 + "\n",
                 encoding="utf-8",
             )
-            temporary_index.replace(index_path)
-            temporary_metadata.replace(metadata_path)
+            with self._lock:
+                if index_path.is_file() and metadata_path.is_file():
+                    stored = self._validate_metadata(index_id, metadata_path)
+                    self._assert_same_index(metadata, stored)
+                    return
+                temporary_index.replace(index_path)
+                temporary_metadata.replace(metadata_path)
+        finally:
+            temporary_index.unlink(missing_ok=True)
+            temporary_metadata.unlink(missing_ok=True)
 
     def metadata(self, index_id: str) -> Dict[str, Any]:
         index_path, metadata_path = self._paths(index_id)

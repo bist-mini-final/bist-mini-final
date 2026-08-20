@@ -262,5 +262,3 @@ export function PlaygroundView() {
     </ReactFlowProvider>
   );
 }
-
-export default PlaygroundView;

@@ -33,19 +33,22 @@ Documented ERD Schema:
 
 from __future__ import annotations
 
-import json
+from contextlib import contextmanager
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
+from typing import Any, Dict, Iterator, List, Optional
 
 import psycopg2.extras
 
 from ..core.settings import PGVECTOR_URL
-from .connection_pool import get_connection, get_pooled_raw_connection
+from .connection_pool import get_pooled_raw_connection
 
 logger = logging.getLogger(__name__)
+
+
+class WorkflowRunAlreadyClaimed(RuntimeError):
+    """Raised when another database-connected worker owns the same run."""
 
 DDL_INIT = """
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -86,9 +89,57 @@ CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
     cmetadata JSONB
 );
 
+CREATE TABLE IF NOT EXISTS workflow_runs (
+    run_id VARCHAR(64) PRIMARY KEY,
+    workflow_id VARCHAR(64) NOT NULL,
+    workflow_updated_at VARCHAR(64),
+    status VARCHAR(32) NOT NULL,
+    schema_version INT DEFAULT 1,
+    graph JSONB NOT NULL DEFAULT '{}',
+    runtime_inputs JSONB NOT NULL DEFAULT '{}',
+    use_cache BOOLEAN DEFAULT TRUE,
+    orchestration JSONB NOT NULL DEFAULT '{}',
+    batches JSONB NOT NULL DEFAULT '[]',
+    nodes JSONB NOT NULL DEFAULT '{}',
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+
+-- CREATE TABLE IF NOT EXISTS does not add columns to an existing installation.
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS orchestration JSONB NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS node_execution_logs (
+    log_id VARCHAR(128) PRIMARY KEY,
+    run_id VARCHAR(64) REFERENCES workflow_runs(run_id) ON DELETE CASCADE,
+    node_id VARCHAR(128) NOT NULL,
+    module_type VARCHAR(64) NOT NULL,
+    batch_index INT DEFAULT 0,
+    status VARCHAR(32) NOT NULL,
+    input_payload JSONB,
+    config_payload JSONB DEFAULT '{}',
+    output JSONB,
+    error TEXT,
+    cache_hit BOOLEAN DEFAULT FALSE,
+    outcome VARCHAR(32),
+    progress JSONB DEFAULT '{}',
+    elapsed_ms FLOAT,
+    cost_usd FLOAT,
+    usage JSONB,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_source_files_hash ON source_files(file_hash);
 CREATE INDEX IF NOT EXISTS idx_sheets_file_id ON sheets(file_id);
 CREATE INDEX IF NOT EXISTS idx_langchain_cmetadata_gin ON langchain_pg_embedding USING gin (cmetadata jsonb_path_ops);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_id ON workflow_runs(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_updated_at ON workflow_runs(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_node_logs_run_id ON node_execution_logs(run_id);
+CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
 """
 
 
@@ -119,6 +170,46 @@ class DatabaseManager:
         except Exception:
             return False
 
+    @contextmanager
+    def claim_workflow_run(self, run_id: str) -> Iterator[None]:
+        """Hold a PostgreSQL advisory lock for one worker's run lifetime.
+
+        The lock is released by PostgreSQL when the worker connection closes,
+        including process or container crashes, so it prevents duplicate work
+        without introducing a stale lease row.
+        """
+
+        conn = self._raw_connection()
+        acquired = False
+        try:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT pg_try_advisory_lock(hashtextextended(%s, 0));",
+                    (run_id,),
+                )
+                acquired = bool(cur.fetchone()[0])
+            if not acquired:
+                raise WorkflowRunAlreadyClaimed(
+                    f"다른 배치 워커가 이미 실행을 소유하고 있습니다: {run_id}"
+                )
+            yield
+        finally:
+            if acquired:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT pg_advisory_unlock(hashtextextended(%s, 0));",
+                            (run_id,),
+                        )
+                except Exception:
+                    logger.warning(
+                        "워크플로 실행 advisory lock 해제 실패: %s",
+                        run_id,
+                        exc_info=True,
+                    )
+            conn.close()
+
     def ensure_schema(self) -> bool:
         """Create required database tables according to DDL_INIT.
 
@@ -130,6 +221,17 @@ class DatabaseManager:
             conn = self._raw_connection()
             try:
                 with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'workflow_runs'
+                          AND column_name = 'orchestration';
+                        """
+                    )
+                    if cur.fetchone() is not None:
+                        conn.commit()
+                        return True
                     cur.execute(DDL_INIT)
                 conn.commit()
                 return True
@@ -292,6 +394,680 @@ class DatabaseManager:
                         ),
                     )
             conn.commit()
+        finally:
+            conn.close()
+
+    def save_workflow_run(self, run_dict_or_model: Any) -> None:
+        """Insert or update a workflow run and its node execution logs."""
+        if hasattr(run_dict_or_model, "model_dump"):
+            data = run_dict_or_model.model_dump(mode="json")
+        else:
+            data = dict(run_dict_or_model)
+
+        run_id = data.get("id") or data.get("run_id")
+        if not run_id:
+            raise ValueError("run_id is required to save workflow run")
+
+        workflow_id = data.get("workflow_id", "")
+        workflow_updated_at = data.get("workflow_updated_at", "")
+        status = data.get("status", "queued")
+        schema_version = data.get("schema_version", 1)
+        graph = data.get("graph", {})
+        runtime_inputs = data.get("runtime_inputs", {})
+        use_cache = bool(data.get("use_cache", True))
+        orchestration = data.get("orchestration", {})
+        batches = data.get("batches", [])
+        nodes = data.get("nodes", {})
+        created_at = data.get("created_at") or datetime.now(timezone.utc).isoformat()
+        updated_at = data.get("updated_at") or datetime.now(timezone.utc).isoformat()
+
+        failed_state = next(
+            (st for st in nodes.values() if isinstance(st, dict) and st.get("status") == "failed"),
+            None,
+        )
+        error_message = failed_state.get("error") if failed_state else None
+
+        completed_at = None
+        if status in ("completed", "failed"):
+            completed_at = updated_at
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO workflow_runs (
+                        run_id, workflow_id, workflow_updated_at, status, schema_version,
+                        graph, runtime_inputs, use_cache, orchestration, batches, nodes,
+                        error_message, created_at, updated_at, completed_at
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s
+                    )
+                    ON CONFLICT (run_id) DO UPDATE SET
+                        workflow_id = EXCLUDED.workflow_id,
+                        workflow_updated_at = EXCLUDED.workflow_updated_at,
+                        status = EXCLUDED.status,
+                        schema_version = EXCLUDED.schema_version,
+                        graph = EXCLUDED.graph,
+                        runtime_inputs = EXCLUDED.runtime_inputs,
+                        use_cache = EXCLUDED.use_cache,
+                        orchestration = EXCLUDED.orchestration,
+                        batches = EXCLUDED.batches,
+                        nodes = EXCLUDED.nodes,
+                        error_message = EXCLUDED.error_message,
+                        updated_at = EXCLUDED.updated_at,
+                        completed_at = EXCLUDED.completed_at;
+                    """,
+                    (
+                        run_id,
+                        workflow_id,
+                        workflow_updated_at,
+                        status,
+                        schema_version,
+                        psycopg2.extras.Json(graph),
+                        psycopg2.extras.Json(runtime_inputs),
+                        use_cache,
+                        psycopg2.extras.Json(orchestration),
+                        psycopg2.extras.Json(batches),
+                        psycopg2.extras.Json(nodes),
+                        error_message,
+                        created_at,
+                        updated_at,
+                        completed_at,
+                    ),
+                )
+
+                for node_id, node_state in nodes.items():
+                    if not isinstance(node_state, dict):
+                        continue
+                    log_id = f"{run_id}:{node_id}"
+                    module_type = node_state.get("module_type", "")
+                    node_status = node_state.get("status", "pending")
+                    input_payload = node_state.get("input_payload")
+                    config_payload = node_state.get("config_payload") or {}
+                    output = node_state.get("output")
+                    error = node_state.get("error")
+                    cache_hit = bool(node_state.get("cache_hit", False))
+                    outcome = node_state.get("outcome")
+                    progress = node_state.get("progress") or {}
+                    batch_index = node_state.get("batch_index", 0)
+                    elapsed_ms = node_state.get("elapsed_ms")
+                    cost_usd = node_state.get("cost_usd")
+                    usage = node_state.get("usage")
+                    started_at = node_state.get("started_at")
+                    node_completed_at = node_state.get("completed_at")
+
+                    cur.execute(
+                        """
+                        INSERT INTO node_execution_logs (
+                            log_id, run_id, node_id, module_type, batch_index,
+                            status, input_payload, config_payload, output, error,
+                            cache_hit, outcome, progress, elapsed_ms, cost_usd,
+                            usage, started_at, completed_at, created_at
+                        )
+                        VALUES (
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, NOW()
+                        )
+                        ON CONFLICT (log_id) DO UPDATE SET
+                            module_type = EXCLUDED.module_type,
+                            batch_index = EXCLUDED.batch_index,
+                            status = EXCLUDED.status,
+                            input_payload = EXCLUDED.input_payload,
+                            config_payload = EXCLUDED.config_payload,
+                            output = EXCLUDED.output,
+                            error = EXCLUDED.error,
+                            cache_hit = EXCLUDED.cache_hit,
+                            outcome = EXCLUDED.outcome,
+                            progress = EXCLUDED.progress,
+                            elapsed_ms = EXCLUDED.elapsed_ms,
+                            cost_usd = EXCLUDED.cost_usd,
+                            usage = EXCLUDED.usage,
+                            started_at = EXCLUDED.started_at,
+                            completed_at = EXCLUDED.completed_at;
+                        """,
+                        (
+                            log_id,
+                            run_id,
+                            node_id,
+                            module_type,
+                            batch_index,
+                            node_status,
+                            psycopg2.extras.Json(input_payload) if input_payload is not None else None,
+                            psycopg2.extras.Json(config_payload),
+                            psycopg2.extras.Json(output) if output is not None else None,
+                            error,
+                            cache_hit,
+                            outcome,
+                            psycopg2.extras.Json(progress),
+                            elapsed_ms,
+                            cost_usd,
+                            psycopg2.extras.Json(usage) if usage is not None else None,
+                            started_at,
+                            node_completed_at,
+                        ),
+                    )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_workflow_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Load a full workflow run from database by run_id."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT run_id, workflow_id, workflow_updated_at, status, schema_version,
+                           graph, runtime_inputs, use_cache, orchestration, batches, nodes,
+                           created_at, updated_at
+                    FROM workflow_runs
+                    WHERE run_id = %s;
+                    """,
+                    (run_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return {
+                    "id": row[0],
+                    "workflow_id": row[1],
+                    "workflow_updated_at": row[2] or "",
+                    "status": row[3],
+                    "schema_version": row[4] or 1,
+                    "graph": row[5] or {},
+                    "runtime_inputs": row[6] or {},
+                    "use_cache": bool(row[7]),
+                    "orchestration": row[8] or {},
+                    "batches": row[9] or [],
+                    "nodes": row[10] or {},
+                    "created_at": row[11].isoformat() if hasattr(row[11], "isoformat") else str(row[11]),
+                    "updated_at": row[12].isoformat() if hasattr(row[12], "isoformat") else str(row[12]),
+                }
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _workflow_run_summary_from_row(
+        row: Any,
+        nodes: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Build a product-facing run snapshot without loading large node payloads."""
+
+        status = row[3]
+        node_statuses = {
+            str(node.get("status")) for node in nodes.values() if node.get("status")
+        }
+        if status in ("queued", "running") and node_statuses:
+            if node_statuses <= {"succeeded", "skipped"}:
+                status = "completed"
+            elif "failed" in node_statuses:
+                status = "failed"
+        return {
+            "id": row[0],
+            "workflow_id": row[1],
+            "workflow_updated_at": row[2] or "",
+            "status": status,
+            "schema_version": row[4] or 1,
+            "graph": row[5] or {},
+            "runtime_inputs": row[6] or {},
+            "use_cache": bool(row[7]),
+            "orchestration": row[8] or {},
+            "batches": row[9] or [],
+            "nodes": nodes,
+            "created_at": (
+                row[10].isoformat()
+                if hasattr(row[10], "isoformat")
+                else str(row[10])
+            ),
+            "updated_at": (
+                row[11].isoformat()
+                if hasattr(row[11], "isoformat")
+                else str(row[11])
+            ),
+        }
+
+    @staticmethod
+    def _node_summary_from_row(row: Any) -> Dict[str, Any]:
+        """Convert a lightweight node_execution_logs projection to RunNodeState."""
+
+        return {
+            "node_id": row[1],
+            "module_type": row[2],
+            "batch_index": row[3] or 0,
+            "status": row[4],
+            "input_payload": None,
+            "config_payload": row[5] or {},
+            "output": row[6],
+            "error": row[7],
+            "cache_key": None,
+            "cache_hit": bool(row[8]),
+            "outcome": row[9],
+            "skip_reason": None,
+            "progress": row[10] or {},
+            "elapsed_ms": row[11],
+            "cost_usd": row[12],
+            "usage": row[13],
+            "started_at": (
+                row[14].isoformat()
+                if hasattr(row[14], "isoformat")
+                else str(row[14])
+                if row[14]
+                else None
+            ),
+            "completed_at": (
+                row[15].isoformat()
+                if hasattr(row[15], "isoformat")
+                else str(row[15])
+                if row[15]
+                else None
+            ),
+        }
+
+    def _get_workflow_node_summaries(
+        self,
+        conn: Any,
+        run_ids: List[str],
+    ) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Load statuses and compact result metadata, never document/vector arrays."""
+
+        if not run_ids:
+            return {}
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_id, node_id, module_type, batch_index, status,
+                       config_payload,
+                       CASE
+                           WHEN module_type IN (
+                               'processed_file_selector',
+                               'luna_vlm_structure_detector',
+                               'pgvector_index_writer',
+                               'company_entity_extractor',
+                               'sheet_metadata_persistence',
+                               'index_company_persistence'
+                           ) THEN output
+                           ELSE NULL
+                       END AS projected_output,
+                       error, cache_hit, outcome, progress, elapsed_ms,
+                       cost_usd, usage, started_at, completed_at
+                FROM node_execution_logs
+                WHERE run_id = ANY(%s)
+                ORDER BY run_id, batch_index ASC, created_at ASC;
+                """,
+                (run_ids,),
+            )
+            summaries: Dict[str, Dict[str, Dict[str, Any]]] = {
+                run_id: {} for run_id in run_ids
+            }
+            for row in cur.fetchall():
+                run_id = str(row[0])
+                node = self._node_summary_from_row(row)
+                summaries.setdefault(run_id, {})[node["node_id"]] = node
+            return summaries
+
+    def get_workflow_run_summary(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Load a polling-safe run snapshot without large node inputs or outputs."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT run_id, workflow_id, workflow_updated_at, status,
+                           schema_version, graph, runtime_inputs, use_cache,
+                           orchestration, batches, created_at, updated_at
+                    FROM workflow_runs
+                    WHERE run_id = %s;
+                    """,
+                    (run_id,),
+                )
+                row = cur.fetchone()
+            if not row:
+                return None
+            nodes_by_run = self._get_workflow_node_summaries(conn, [run_id])
+            return self._workflow_run_summary_from_row(
+                row,
+                nodes_by_run.get(run_id, {}),
+            )
+        finally:
+            conn.close()
+
+    def list_workflow_run_summaries(
+        self,
+        workflow_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List polling-safe run snapshots ordered by most recent update."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT run_id, workflow_id, workflow_updated_at, status,
+                           schema_version, graph, runtime_inputs, use_cache,
+                           orchestration, batches, created_at, updated_at
+                    FROM workflow_runs
+                """
+                if workflow_id is not None:
+                    cur.execute(
+                        query + " WHERE workflow_id = %s ORDER BY updated_at DESC;",
+                        (workflow_id,),
+                    )
+                else:
+                    cur.execute(query + " ORDER BY updated_at DESC;")
+                rows = cur.fetchall()
+            run_ids = [str(row[0]) for row in rows]
+            nodes_by_run = self._get_workflow_node_summaries(conn, run_ids)
+            return [
+                self._workflow_run_summary_from_row(
+                    row,
+                    nodes_by_run.get(str(row[0]), {}),
+                )
+                for row in rows
+            ]
+        finally:
+            conn.close()
+
+    def save_workflow_node_progress(
+        self,
+        run: Any,
+        node_id: str,
+    ) -> None:
+        """Persist one node's live status without retransmitting the full run JSON."""
+
+        if hasattr(run, "model_dump"):
+            run_id = getattr(run, "id", None)
+            run_status = getattr(run, "status", "running")
+            updated_at = getattr(run, "updated_at", None)
+            batches = [
+                batch.model_dump(mode="json")
+                if hasattr(batch, "model_dump")
+                else dict(batch)
+                for batch in getattr(run, "batches", [])
+            ]
+            raw_node = getattr(run, "nodes", {}).get(node_id)
+            node_state = (
+                raw_node.model_dump(mode="json")
+                if hasattr(raw_node, "model_dump")
+                else dict(raw_node)
+                if raw_node is not None
+                else None
+            )
+        else:
+            data = dict(run)
+            run_id = data.get("id") or data.get("run_id")
+            run_status = data.get("status", "running")
+            updated_at = data.get("updated_at")
+            batches = data.get("batches") or []
+            node_state = (data.get("nodes") or {}).get(node_id)
+        if not isinstance(node_state, dict):
+            raise ValueError(f"run에 progress 대상 노드가 없습니다: {node_id}")
+        if not run_id:
+            raise ValueError("run_id is required to save workflow progress")
+
+        updated_at = updated_at or datetime.now(timezone.utc).isoformat()
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
+                    SET status = %s, batches = %s, updated_at = %s
+                    WHERE run_id = %s;
+                    """,
+                    (
+                        run_status,
+                        psycopg2.extras.Json(batches),
+                        updated_at,
+                        run_id,
+                    ),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO node_execution_logs (
+                        log_id, run_id, node_id, module_type, batch_index,
+                        status, config_payload, error, cache_hit, outcome,
+                        progress, elapsed_ms, cost_usd, usage, started_at,
+                        completed_at, created_at
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, NOW()
+                    )
+                    ON CONFLICT (log_id) DO UPDATE SET
+                        status = EXCLUDED.status,
+                        config_payload = EXCLUDED.config_payload,
+                        error = EXCLUDED.error,
+                        cache_hit = EXCLUDED.cache_hit,
+                        outcome = EXCLUDED.outcome,
+                        progress = EXCLUDED.progress,
+                        elapsed_ms = EXCLUDED.elapsed_ms,
+                        cost_usd = EXCLUDED.cost_usd,
+                        usage = EXCLUDED.usage,
+                        started_at = EXCLUDED.started_at,
+                        completed_at = EXCLUDED.completed_at;
+                    """,
+                    (
+                        f"{run_id}:{node_id}",
+                        run_id,
+                        node_id,
+                        node_state.get("module_type", ""),
+                        node_state.get("batch_index", 0),
+                        node_state.get("status", "pending"),
+                        psycopg2.extras.Json(node_state.get("config_payload") or {}),
+                        node_state.get("error"),
+                        bool(node_state.get("cache_hit", False)),
+                        node_state.get("outcome"),
+                        psycopg2.extras.Json(node_state.get("progress") or {}),
+                        node_state.get("elapsed_ms"),
+                        node_state.get("cost_usd"),
+                        psycopg2.extras.Json(node_state.get("usage"))
+                        if node_state.get("usage") is not None
+                        else None,
+                        node_state.get("started_at"),
+                        node_state.get("completed_at"),
+                    ),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def list_workflow_runs(self, workflow_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List workflow runs from database, ordered by most recently updated."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                if workflow_id is not None:
+                    cur.execute(
+                        """
+                        SELECT run_id, workflow_id, workflow_updated_at, status, schema_version,
+                               graph, runtime_inputs, use_cache, orchestration, batches, nodes,
+                               created_at, updated_at
+                        FROM workflow_runs
+                        WHERE workflow_id = %s
+                        ORDER BY updated_at DESC;
+                        """,
+                        (workflow_id,),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT run_id, workflow_id, workflow_updated_at, status, schema_version,
+                               graph, runtime_inputs, use_cache, orchestration, batches, nodes,
+                               created_at, updated_at
+                        FROM workflow_runs
+                        ORDER BY updated_at DESC;
+                        """
+                    )
+                rows = cur.fetchall()
+                runs = []
+                for row in rows:
+                    runs.append({
+                        "id": row[0],
+                        "workflow_id": row[1],
+                        "workflow_updated_at": row[2] or "",
+                        "status": row[3],
+                        "schema_version": row[4] or 1,
+                        "graph": row[5] or {},
+                        "runtime_inputs": row[6] or {},
+                        "use_cache": bool(row[7]),
+                        "orchestration": row[8] or {},
+                        "batches": row[9] or [],
+                        "nodes": row[10] or {},
+                        "created_at": row[11].isoformat() if hasattr(row[11], "isoformat") else str(row[11]),
+                        "updated_at": row[12].isoformat() if hasattr(row[12], "isoformat") else str(row[12]),
+                    })
+                return runs
+        finally:
+            conn.close()
+
+    def list_pending_workflow_run_ids(
+        self,
+        workflow_ids: Optional[List[str]] = None,
+    ) -> List[str]:
+        """Return only IDs needed for startup recovery without loading node payloads."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                if workflow_ids is None:
+                    cur.execute(
+                        """
+                        SELECT run_id
+                        FROM workflow_runs
+                        WHERE status IN ('queued', 'running')
+                        ORDER BY created_at ASC;
+                        """
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT run_id
+                        FROM workflow_runs
+                        WHERE status IN ('queued', 'running')
+                          AND workflow_id = ANY(%s)
+                        ORDER BY created_at ASC;
+                        """,
+                        (workflow_ids,),
+                    )
+                return [str(row[0]) for row in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def list_pending_workflow_run_references(
+        self,
+        workflow_ids: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return lightweight recovery metadata without graph or node JSONB."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                if workflow_ids is None:
+                    cur.execute(
+                        """
+                        SELECT run_id, workflow_id, status, orchestration
+                        FROM workflow_runs
+                        WHERE status IN ('queued', 'running')
+                        ORDER BY created_at ASC;
+                        """
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT run_id, workflow_id, status, orchestration
+                        FROM workflow_runs
+                        WHERE status IN ('queued', 'running')
+                          AND workflow_id = ANY(%s)
+                        ORDER BY created_at ASC;
+                        """,
+                        (workflow_ids,),
+                    )
+                return [
+                    {
+                        "run_id": str(row[0]),
+                        "workflow_id": str(row[1]),
+                        "status": str(row[2]),
+                        "orchestration": row[3] or {},
+                    }
+                    for row in cur.fetchall()
+                ]
+        finally:
+            conn.close()
+
+    def delete_workflow_run(self, run_id: str) -> bool:
+        """Delete a workflow run and cascade-delete associated node logs."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM workflow_runs WHERE run_id = %s;", (run_id,))
+                deleted = cur.rowcount > 0
+            conn.commit()
+            return deleted
+        finally:
+            conn.close()
+
+    def clear_workflow_runs(self) -> int:
+        """Delete all workflow runs from database."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM workflow_runs;")
+                count = cur.rowcount
+            conn.commit()
+            return count
+        finally:
+            conn.close()
+
+    def get_node_execution_logs(self, run_id: str) -> List[Dict[str, Any]]:
+        """Get execution logs for all nodes of a given workflow run."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT log_id, run_id, node_id, module_type, batch_index,
+                           status, input_payload, config_payload, output, error,
+                           cache_hit, outcome, progress, elapsed_ms, cost_usd,
+                           usage, started_at, completed_at, created_at
+                    FROM node_execution_logs
+                    WHERE run_id = %s
+                    ORDER BY batch_index ASC, created_at ASC;
+                    """,
+                    (run_id,),
+                )
+                rows = cur.fetchall()
+                logs = []
+                for row in rows:
+                    logs.append({
+                        "log_id": row[0],
+                        "run_id": row[1],
+                        "node_id": row[2],
+                        "module_type": row[3],
+                        "batch_index": row[4],
+                        "status": row[5],
+                        "input_payload": row[6],
+                        "config_payload": row[7] or {},
+                        "output": row[8],
+                        "error": row[9],
+                        "cache_hit": bool(row[10]),
+                        "outcome": row[11],
+                        "progress": row[12] or {},
+                        "elapsed_ms": row[13],
+                        "cost_usd": row[14],
+                        "usage": row[15],
+                        "started_at": row[16].isoformat() if hasattr(row[16], "isoformat") else str(row[16]) if row[16] else None,
+                        "completed_at": row[17].isoformat() if hasattr(row[17], "isoformat") else str(row[17]) if row[17] else None,
+                        "created_at": row[18].isoformat() if hasattr(row[18], "isoformat") else str(row[18]),
+                    })
+                return logs
         finally:
             conn.close()
 

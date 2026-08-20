@@ -12,7 +12,7 @@ function normalizePathname(pathname: string): string {
   return pathname.replace(/\/+$/, '') || '/';
 }
 
-export function navigateTo(pathname: string, replace = false): void {
+function navigateTo(pathname: string, replace = false): void {
   const nextPath = normalizePathname(pathname);
   if (normalizePathname(window.location.pathname) === nextPath) return;
   window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);

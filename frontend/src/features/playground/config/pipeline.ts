@@ -3,7 +3,7 @@ import type { ModuleType } from '../types';
 
 export const INITIAL_QUERY = '';
 
-export const PIPELINE_STAGES = [
+const PIPELINE_STAGES = [
   { id: 'query', nodeType: 'queryNode', color: '#107c41', width: 320 },
   { id: 'decompose', nodeType: 'decomposerNode', color: '#7c3aed', width: 320 },
   { id: 'embedding', nodeType: 'embeddingNode', color: '#0891b2', width: 300 },

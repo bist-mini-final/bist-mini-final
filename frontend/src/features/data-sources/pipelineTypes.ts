@@ -21,6 +21,17 @@ export interface ModuleStepState {
     completedItems?: number;
     totalItems?: number;
   };
+  liveProgress?: {
+    phase: string;
+    label: string;
+    completed: number;
+    total: number;
+    unit: string;
+    percent: number;
+    completedItems?: number;
+    totalItems?: number;
+    currentItem?: string;
+  };
 }
 
 export interface PipelineRunState {
@@ -43,4 +54,10 @@ export interface PipelineRunState {
   error?: string | null;
   isLiveUpload?: boolean;
   lunaOutput?: LunaInspectionOutput;
+  scheduler?: {
+    backend: 'direct' | 'prefect';
+    deploymentName?: string;
+    externalRunId?: string;
+    workerActive: boolean;
+  };
 }

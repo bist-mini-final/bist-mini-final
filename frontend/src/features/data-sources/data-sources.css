@@ -745,6 +745,38 @@
   flex: none;
 }
 
+.ds-scheduler-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ds-scheduler-badge > span {
+  margin-left: 0.15rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid currentColor;
+  opacity: 0.8;
+}
+
+.ds-scheduler-badge > span.is-active {
+  color: #047857;
+}
+
+.ds-scheduler-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  color: #1d4ed8;
+  font-size: 0.76rem;
+}
+
+.ds-scheduler-value small {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.62rem;
+}
+
 @keyframes ds-pulse-glow {
   0% {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
@@ -1500,4 +1532,3 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-

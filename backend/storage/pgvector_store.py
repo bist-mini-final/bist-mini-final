@@ -17,8 +17,8 @@ from ..spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
     langchain_document_to_cell_item,
 )
-from .connection_pool import get_connection, get_pooled_raw_connection
-from .vector_store_factory import get_langchain_connection_string, get_vector_store
+from .connection_pool import get_pooled_raw_connection
+from .vector_store_factory import get_vector_store
 
 
 logger = logging.getLogger(__name__)

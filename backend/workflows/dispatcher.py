@@ -6,7 +6,7 @@ import atexit
 import logging
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor, TimeoutError
 from threading import Lock
-from typing import Collection, Dict, Optional
+from typing import Collection, Dict, Optional, Protocol
 
 from .executor import DagExecutionCancelled, WorkflowExecutor
 from .models import WorkflowRun, utc_now_iso
@@ -16,8 +16,34 @@ from .store import RunStore
 logger = logging.getLogger(__name__)
 
 
-class WorkflowRunDispatcher:
-    """Execute persisted runs independently from the originating HTTP request.
+class RunDispatcher(Protocol):
+    """Scheduling contract consumed by persistent job services."""
+
+    def submit(self, run_id: str, *, resume_failed: bool = False) -> bool:
+        ...
+
+    def ensure_submitted(
+        self,
+        run_id: str,
+        run: Optional[WorkflowRun] = None,
+    ) -> None:
+        ...
+
+    def cancel(self, run_id: str) -> WorkflowRun:
+        ...
+
+    def recover_pending(
+        self,
+        workflow_ids: Optional[Collection[str]] = None,
+    ) -> int:
+        ...
+
+    def is_active(self, run_id: str) -> bool:
+        ...
+
+
+class InteractiveWorkflowDispatcher:
+    """Execute Playground runs independently from the originating HTTP request.
 
     The run store remains the source of truth. The in-process queue only owns
     scheduling; interrupted queued/running runs can be submitted again after a
@@ -127,6 +153,26 @@ class WorkflowRunDispatcher:
                 )
         return run
 
+    def cancel_all(self) -> int:
+        """Cancel every run currently queued or owned by this dispatcher."""
+
+        with self._lock:
+            active_run_ids = [
+                run_id
+                for run_id, future in self._futures.items()
+                if not future.done()
+            ]
+        cancelled = 0
+        for run_id in active_run_ids:
+            try:
+                self.cancel(run_id)
+                cancelled += 1
+            except FileNotFoundError:
+                continue
+            except Exception:
+                logger.exception("일괄 작업 취소 실패: %s", run_id)
+        return cancelled
+
     def recover_pending(
         self,
         workflow_ids: Optional[Collection[str]] = None,
@@ -143,10 +189,8 @@ class WorkflowRunDispatcher:
 
         allowed_workflow_ids = set(workflow_ids) if workflow_ids is not None else None
         recovered = 0
-        for run in self.run_store.list():
+        for run in self.run_store.list_pending(workflow_ids):
             if allowed_workflow_ids is not None and run.workflow_id not in allowed_workflow_ids:
-                continue
-            if run.status not in ("queued", "running"):
                 continue
             if self.submit(run.id):
                 recovered += 1
@@ -168,19 +212,7 @@ class WorkflowRunDispatcher:
     def shutdown(self, wait: bool = True) -> None:
         """Cancel tracked runs and stop the worker pool before owned paths disappear."""
 
-        with self._lock:
-            active_run_ids = [
-                run_id
-                for run_id, future in self._futures.items()
-                if not future.done()
-            ]
-        for run_id in active_run_ids:
-            try:
-                self.cancel(run_id)
-            except FileNotFoundError:
-                continue
-            except Exception:
-                logger.exception("디스패처 종료 중 실행 취소 실패: %s", run_id)
+        self.cancel_all()
         self._pool.shutdown(wait=wait, cancel_futures=True)
 
     def _execute(self, run_id: str, resume_failed: bool) -> object:

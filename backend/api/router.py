@@ -1,11 +1,13 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 from fastapi import APIRouter
 
 from ..core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
+    PLAYGROUND_MAX_CONCURRENCY,
+    PREFECT_DEPLOYMENT_NAME,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
     VECTOR_INDEX_DIR,
@@ -13,19 +15,11 @@ from ..core.settings import (
 )
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
-from ..runtime.registry import ModuleRegistry
 from ..storage.answer_cache import AnswerCacheRepository
-from ..storage.db_manager import DatabaseManager
-from ..storage.embedding_artifacts import EmbeddingArtifactStore
-from ..storage.pgvector_store import PgVectorStore
-from ..storage.vector_index import VectorIndexStore
-from ..workflows import (
-    ResultCache,
-    RunStore,
-    WorkflowExecutor,
-    WorkflowRunDispatcher,
-    WorkflowStore,
-)
+from ..runtime.services import create_workflow_runtime_services
+from ..runtime.registry import ModuleRegistry
+from ..orchestration.prefect import PrefectIngestionDispatcher
+from ..workflows import InteractiveWorkflowDispatcher
 from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -62,28 +56,34 @@ def create_api_router(
     """
 
     router = APIRouter(prefix="/api")
-    pgvector_store = PgVectorStore()
-    db_manager = DatabaseManager()
-    module_registry = ModuleRegistry(
+    services = create_workflow_runtime_services(
         repository,
-        completion_client,
-        embedding_encoder,
-        embedding_artifact_store=EmbeddingArtifactStore(
-            embedding_artifact_dir
-        ),
-        vector_index_store=VectorIndexStore(vector_index_dir),
-        pgvector_store=pgvector_store,
-        db_manager=db_manager,
+        workflow_dir=workflow_dir,
+        run_dir=run_dir,
+        cache_dir=cache_dir,
+        embedding_artifact_dir=embedding_artifact_dir,
         spreadsheet_artifact_dir=spreadsheet_artifact_dir,
+        vector_index_dir=vector_index_dir,
+        completion_client=completion_client,
+        embedding_encoder=embedding_encoder,
     )
-    workflow_store = WorkflowStore(workflow_dir)
-    run_store = RunStore(run_dir)
-    workflow_executor = WorkflowExecutor(
-        module_registry,
-        run_store,
-        ResultCache(cache_dir),
+    # Playground execution remains interactive. Long-running Excel ingestion
+    # always goes through the independently deployed Prefect flow.
+    workflow_dispatcher = InteractiveWorkflowDispatcher(
+        services.workflow_executor,
+        services.run_store,
+        max_workers=PLAYGROUND_MAX_CONCURRENCY,
     )
-    workflow_dispatcher = WorkflowRunDispatcher(workflow_executor, run_store)
+    ingestion_dispatcher = PrefectIngestionDispatcher(
+        services.workflow_executor,
+        services.run_store,
+        PREFECT_DEPLOYMENT_NAME,
+    )
+    module_registry = cast(ModuleRegistry, services.module_registry)
+    workflow_store = services.workflow_store
+    run_store = services.run_store
+    workflow_executor = services.workflow_executor
+    pgvector_store = services.pgvector_store
     router.include_router(create_module_router(module_registry))
     router.include_router(
         create_spreadsheet_artifact_router(spreadsheet_artifact_dir)
@@ -110,7 +110,7 @@ def create_api_router(
             workflow_store=workflow_store,
             run_store=run_store,
             workflow_executor=workflow_executor,
-            workflow_dispatcher=workflow_dispatcher,
+            workflow_dispatcher=ingestion_dispatcher,
         )
     )
     return router

@@ -1,16 +1,11 @@
-"""Singleton psycopg2 connection pool for PostgreSQL/pgvector access.
-
-All DB operations in pgvector_store.py and db_manager.py should acquire
-connections via :func:`get_connection` instead of opening a new TCP socket
-on every call.
-"""
+"""Singleton psycopg2 connection pool for PostgreSQL/pgvector access."""
 
 from __future__ import annotations
 
 import logging
+import os
 import threading
-from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
 import psycopg2
 import psycopg2.extensions
@@ -18,8 +13,17 @@ import psycopg2.pool
 
 logger = logging.getLogger(__name__)
 
-_MIN_CONN = 2
-_MAX_CONN = 10
+
+def _pool_size(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except ValueError:
+        logger.warning("%s 값이 정수가 아니어서 기본값 %d을 사용합니다", name, default)
+        return default
+
+
+_MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 2)
+_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 10))
 
 _pool: Optional[psycopg2.pool.ThreadedConnectionPool] = None
 _pool_url: Optional[str] = None
@@ -126,7 +130,7 @@ class PooledConnectionWrapper:
     def __enter__(self) -> "PooledConnectionWrapper":
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         if exc_type is not None:
             try:
                 self._conn.rollback()
@@ -140,44 +144,3 @@ def get_pooled_raw_connection(database_url: str) -> PooledConnectionWrapper:
     pool = get_pool(database_url)
     conn = pool.getconn(timeout=5)
     return PooledConnectionWrapper(pool, conn)
-
-
-@contextmanager
-def get_connection(
-    database_url: str,
-) -> Generator[psycopg2.extensions.connection, None, None]:
-    """Context manager that borrows a connection from the pool and returns it
-    on exit.
-
-    * On exception: rolls back any open transaction, then returns to pool.
-    * ``autocommit`` is reset to ``False`` before the connection is returned,
-      so callers that set it (e.g. ``CREATE INDEX CONCURRENTLY``) do not
-      pollute pooled connections.
-    """
-    wrapper = get_pooled_raw_connection(database_url)
-    try:
-        yield wrapper._conn
-    except Exception:
-        try:
-            wrapper._conn.rollback()
-        except Exception:
-            pass
-        raise
-    finally:
-        wrapper.close()
-
-
-def close_pool() -> None:
-    """Close all pooled connections.  Intended for clean server shutdown."""
-    global _pool
-    if _pool is not None:
-        with _lock:
-            if _pool is not None:
-                try:
-                    _pool.closeall()
-                except Exception:
-                    logger.warning("Connection pool close failed", exc_info=True)
-                finally:
-                    _pool = None
-                    _pool_url = None
-                    logger.info("psycopg2 connection pool closed")

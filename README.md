@@ -6,49 +6,195 @@
 
 ## 목차
 
-1. [환경 설정](#환경-설정)
-2. [개발 서버 실행](#개발-서버-실행)
-3. [프로젝트 구조](#프로젝트-구조)
-4. [모듈 실행 계약](#모듈-실행-계약)
-5. [스프레드시트 파이프라인](#스프레드시트-파이프라인)
-6. [워크플로 저장 형식](#워크플로-저장-형식)
-7. [배치 DAG 실행과 상태 전달](#배치-dag-실행과-상태-전달)
-8. [API 레퍼런스](#api-레퍼런스)
-9. [개발 문서 관리](#개발-문서-관리)
+1. [새 환경 설치](#새-환경-설치)
+2. [선택 데이터 및 로컬 모델](#선택-데이터-및-로컬-모델)
+3. [개발 서버 실행](#개발-서버-실행)
+4. [운영·문제 해결 명령](#운영문제-해결-명령)
+5. [프로젝트 구조](#프로젝트-구조)
+6. [모듈 실행 계약](#모듈-실행-계약)
+7. [스프레드시트 파이프라인](#스프레드시트-파이프라인)
+8. [워크플로 저장 형식](#워크플로-저장-형식)
+9. [배치 DAG 실행과 상태 전달](#배치-dag-실행과-상태-전달)
+10. [API 레퍼런스](#api-레퍼런스)
+11. [개발 문서 관리](#개발-문서-관리)
 
 ---
 
-## 환경 설정
+## 새 환경 설치
+
+아래 절차는 빈 개발 머신에서 **Prefect를 단일 배치 스케줄러로 사용하고, Docker Work
+Pool이 Excel 적재 요청마다 일회성 컨테이너를 실행하는 권장 구성**을 설치한다. 명령은
+저장소 루트에서 실행한다. macOS와 Linux를 기준으로 하며 Windows는 저장소 루트의
+`setup.bat` 또는 WSL2를 사용할 수 있다.
+
+### 1. 필수 도구
+
+| 도구 | 권장 기준 | 용도 |
+|---|---:|---|
+| Git | 최신 안정 버전 | 소스 코드 관리 |
+| Python | 3.11 | API, Prefect client, 테스트 |
+| Node.js | 20 LTS 이상 | React 개발·빌드 |
+| Docker + Compose | Docker Desktop 또는 Docker Engine | DB·Prefect·일회성 Flow 컨테이너 |
+| Bash, curl | - | 배포 스크립트와 health check |
+
+Docker Desktop을 사용한다면 먼저 애플리케이션을 실행한다. 이미지 빌드와 여러 Job을
+동시에 실행할 수 있도록 Docker 메모리는 8GB 이상을 권장한다.
+
+설치 여부는 다음 명령으로 확인할 수 있다.
+
+```bash
+git --version
+python3.11 --version
+node --version
+docker version
+docker compose version
+curl --version
+```
+
+### 2. 저장소와 환경변수 준비
+
+```bash
+git clone <REPOSITORY_URL> bist-mini-final
+cd bist-mini-final
+cp .env.example .env
+```
+
+새 환경을 한 번에 구성하려면 `.env`의 키를 채운 뒤 다음 설치기를 사용할 수 있다. Python
+및 npm 의존성 설치와 모든 Docker 컨테이너 기동까지 포함한다.
+
+```bash
+# macOS / Linux / WSL2
+./setup.sh
+
+# Windows 터미널 또는 더블 클릭 (WSL2 + Docker Desktop 필요)
+setup.bat
+```
+
+`.env`에서 최소한 다음 값을 확인한다. 실제 키는 Git에 커밋하지 않는다.
+
+```dotenv
+OPENAI_API_KEY=<TEAM_OPENAI_API_KEY>
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# 로컬 docker-compose pgvector를 사용할 때의 기본값
+PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
+
+# Excel 적재는 항상 Prefect deployment에 제출
+PREFECT_API_URL=http://127.0.0.1:4200/api
+PREFECT_DEPLOYMENT_NAME=excel-ingestion/docker
+```
+
+`PGVECTOR_URL`에 원격 PostgreSQL을 지정할 수도 있다. 이 경우 Flow 컨테이너에서도 접근
+가능하도록 방화벽과 네트워크를 열어야 한다. `localhost` 주소는 로컬 배포 스크립트가
+Docker 네트워크의 `bist-pgvector:5432` 주소로 자동 변환한다. DB URL과 OpenAI 키는
+Prefect Secret Block에 암호화해 저장되며 Work Pool 템플릿에는 참조만 남는다.
+
+### 3. Python 의존성 설치
+
+Docker Job과 같은 Python 3.11을 권장한다. `uv`가 있으면 전역 wheel 캐시를 활용해
+초기 설치와 재설치가 더 빠르다.
+
+```bash
+# 권장: uv 사용
+uv venv --python 3.11 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
+source .venv/bin/activate
+```
+
+`uv`가 없다면 표준 `venv`와 pip를 사용한다.
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+`requirements.txt`에는 API 의존성뿐 아니라 로컬 work pool을 등록하는
+`prefect[docker]`도 포함된다.
+
+### 4. 프론트엔드 의존성 설치
+
+lock file과 동일한 버전을 설치하기 위해 새 환경에서는 `npm ci`를 사용한다.
+
+```bash
+cd frontend
+npm ci
+cd ..
+```
+
+### 5. 로컬 Prefect + Docker Work Pool 전체 구성
+
+다음 명령이 pgvector 실행, Prefect metadata DB·Server·Docker Worker 실행, Excel Flow
+이미지 빌드, Secret Block과 deployment 등록을 순서대로 수행한다.
+
+```bash
+./deploy/prefect/local.sh check
+./deploy/prefect/local.sh all
+```
+
+최초 설치는 base image 다운로드 때문에 시간이 걸릴 수 있다. 이후 실행은 Docker
+BuildKit의 apt·pip·레이어 캐시를 사용한다. requirements가 바뀌지 않으면 의존성 레이어를
+그대로 재사용하므로 일반 개발 중에는 `--no-cache`로 빌드하지 않는다.
+
+정상 설치되면 다음 리소스가 보인다.
+
+```bash
+./deploy/prefect/local.sh status
+docker compose -p bist-prefect -f deploy/prefect/docker-compose.yml ps
+```
+
+- `bist-prefect-db`, `bist-prefect-server`, `bist-prefect-worker`가 실행 중이어야 한다.
+- 실행 요청이 없으면 Excel Flow 컨테이너가 0개인 것이 정상이다.
+- Prefect deployment 동시성은 4이며 초과 요청은 `ENQUEUE`된다.
+
+### 6. 서버 실행
+
+설치 후에는 두 터미널을 사용한다. Prefect API/UI는 Compose가 이미
+`127.0.0.1:4200`에 바인딩하므로 포트 포워딩이 필요 없다.
+
+터미널 1 — FastAPI:
+
+```bash
+source .venv/bin/activate
+PREFECT_API_URL=http://127.0.0.1:4200/api \
+python -m uvicorn app:app --host 127.0.0.1 --port 8765 --reload
+```
+
+터미널 2 — React:
+
+```bash
+cd frontend
+npm run dev
+```
+
+접속 주소:
+
+| 화면 | 주소 |
+|---|---|
+| 애플리케이션 | `http://127.0.0.1:5173` |
+| FastAPI Swagger | `http://127.0.0.1:8765/docs` |
+| Prefect UI | `http://127.0.0.1:4200` |
+
+### 7. 설치 검증
+
+```bash
+curl --fail http://127.0.0.1:4200/api/health
+curl --fail http://127.0.0.1:8765/api/modules
+curl --fail http://127.0.0.1:8765/api/data-sources/db-status
+
+python -m pytest -q
+cd frontend && npm run build && npm test -- --run
+```
+
+Playground 또는 데이터 소스 페이지에서 Excel 적재를 실행하면 Prefect UI에 하나의
+Flow Run이 생성되고 일회성 Docker 컨테이너가 실행된다. 완료 후 컨테이너는 자동
+삭제되며 Playground의 각 모듈은 같은 이름의 Prefect Task로 표시된다.
 
 > [!NOTE]
 > `data/source_files/`, `data/runs/`, `data/cache/`, `data/vector_db/`, `data/artifacts/` 디렉터리는 `.gitkeep`을 통해 저장소에 포함되어 있으므로 별도로 디렉터리를 생성할 필요가 없습니다. 런타임 데이터 파일만 `.gitignore`에 의해 제외됩니다.
 
-### 1. Python 의존성 설치
-
-Python 3.10+ 권장. macOS 기본 Python 3.9 환경도 지원하나, Docling OCR 호환을 위해 `requirements.txt`가 PyObjC 11.1을 고정합니다.
-
-```bash
-# 1) 가상환경 생성 및 활성화
-python3 -m venv .venv
-source .venv/bin/activate  # Windows (CMD/PowerShell): .venv\Scripts\activate
-
-# 2) 의존성 설치
-pip install -r requirements.txt
-```
-
-`requirements.txt`에는 사전 구축 `.parquet` 인덱스를 읽기 위한 `pyarrow`가 포함되어 있습니다. 기존 가상환경을 사용 중이라면 의존성 변경 후 위 명령을 다시 실행하세요.
-
----
-
-### 2. 환경변수 설정
-
-팀 노션에서 `.env` 관련 설정 정보(`OPENAI_API_KEY` 등)를 확인하여 프로젝트 루트에 `.env` 파일을 생성합니다.
-
-```bash
-cp .env.example .env
-```
-
-`.env`를 열어 팀 노션에 안내된 값을 채웁니다.
+### 환경변수 레퍼런스
 
 | 변수 | 필수 | 설명 |
 |---|---|---|
@@ -56,13 +202,15 @@ cp .env.example .env
 | `OPENAI_BASE_URL` | ⬜ | 기본값 `https://api.openai.com/v1`. 호환 API 사용 시 변경 |
 | `PGVECTOR_URL` | ⬜ | 기본값 `postgresql://postgres:postgres@localhost:5432/rag_flow`. Docker pgvector 접속 URL |
 | `USE_PGVECTOR` | ⬜ | 기본값 `true`. pgvector DB 연결 및 자동 적재 활성화 여부 |
+| `PLAYGROUND_MAX_CONCURRENCY` | ⬜ | 대화형 Playground 백그라운드 실행 동시성. 기본값 `4` |
+| `PREFECT_API_URL` | ✅ | 로컬 Prefect API. 기본값 `http://127.0.0.1:4200/api` |
+| `PREFECT_DEPLOYMENT_NAME` | ✅ | 기본값 `excel-ingestion/docker` |
+| `PREFECT_FLOW_MEMORY_LIMIT` | ⬜ | Flow 컨테이너 메모리 제한. 예: `4g` |
 
 > [!IMPORTANT]
 > 기본 워크플로의 임베딩 모듈(`Embedder`, `Cell Text Embedder`)은 `text-embedding-3-large` (OpenAI API)를 기본값으로 사용합니다. `OPENAI_API_KEY`가 없으면 임베딩 단계를 실행할 수 없습니다.
 
----
-
-### 3. Docker pgvector 컨테이너 실행 (Vector DB)
+### pgvector만 별도로 실행하기
 
 벡터 DB 저장소로 **PostgreSQL 16 + pgvector (`vector v0.8.6`)** 컨테이너를 구동합니다. LangChain의 `langchain-postgres`를 통해 표준 포맷으로 인덱스를 적재 및 검색합니다.
 
@@ -77,13 +225,15 @@ docker compose -f docker-compose.db.yml ps
 docker compose -f docker-compose.db.yml logs -f pgvector
 ```
 
-- **설정 파일**: [`docker-compose.db.yml`](file:///Users/pileuszu/Repos/bist-mini-final/docker-compose.db.yml)
+- **설정 파일**: [`docker-compose.db.yml`](./docker-compose.db.yml)
 - **접속 주소**: `postgresql://postgres:postgres@localhost:5432/rag_flow`
 - **컨테이너 중지**: `docker compose -f docker-compose.db.yml down` (데이터는 `pgvector_data` 볼륨에 영속 보존)
 
 ---
 
-### 4. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
+## 선택 데이터 및 로컬 모델
+
+### 1. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
 
 > [!IMPORTANT]
 > 기본 워크플로(`Pre-built Vector Index Loader` 노드)는 사전 임베딩된 인덱스 파일을 로드합니다. 아래 파일을 구글 드라이브에서 받아 `data/source_files/`에 배치해야 파이프라인을 바로 실행할 수 있습니다.
@@ -112,7 +262,7 @@ python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output da
 
 ---
 
-### 5. Excel 파일 배치
+### 2. Excel 파일 배치
 
 팀 구글 드라이브에서 분석 대상 Excel 파일을 다운로드하여 `data/source_files/` 에 복사합니다.
 
@@ -126,14 +276,7 @@ data/source_files/
 > [!NOTE]
 > 사전 구축 인덱스(`prebuilt.parquet`)를 사용하는 기본 워크플로에서는 Excel 원본 파일 없이도 검색·답변 파이프라인을 실행할 수 있습니다. Loader는 이전 JSON 포맷도 호환합니다.
 
-### 6. 프론트엔드 의존성 설치
-
-```bash
-cd frontend
-npm install
-```
-
-### 7. (선택) 로컬 VLM 모델 설치
+### 3. 로컬 VLM 모델 설치
 
 Local VLM Structure Detector 노드를 사용하려면 Ollama와 모델이 필요합니다.
 
@@ -142,7 +285,7 @@ Local VLM Structure Detector 노드를 사용하려면 Ollama와 모델이 필�
 ollama pull qwen3-vl:4b-instruct
 ```
 
-### 8. (선택) 로컬 BGE 임베딩 모델 설치
+### 4. 로컬 BGE 임베딩 모델 설치
 
 `BAAI/bge-large-en-v1.5` 모델을 사용하려면 (OpenAI API 없이 로컬 임베딩을 원할 때) 최초 1회 모델을 다운로드해야 합니다.
 
@@ -159,38 +302,114 @@ python3 -c "from transformers import AutoModel, AutoTokenizer; AutoTokenizer.fro
 
 ## 개발 서버 실행
 
-데이터베이스, 프론트엔드, 백엔드를 순서대로 실행합니다.
+최초 설치를 마친 뒤에는 Docker Desktop을 시작하고 아래 상태를 먼저 확인한다.
 
 ```bash
-# 1. Vector DB (Docker pgvector 컨테이너) 백그라운드 실행
-docker compose -f docker-compose.db.yml up -d
-
-# 2. 터미널 1 — 프론트엔드 개발 서버 (Hot Reload)
-cd frontend
-npm run dev
-
-# 3. 터미널 2 — 백엔드 FastAPI 서버
-python3 -m uvicorn app:app --host 127.0.0.1 --port 8765
+./deploy/prefect/local.sh server
+./deploy/prefect/local.sh status
 ```
 
-브라우저에서 `http://localhost:5173` 을 열면 됩니다.
+Prefect 컨테이너가 준비되지 않았거나 Flow 이미지를 아직 만들지 않았다면 idempotent 설치
+명령을 다시 실행한다.
 
-### 프로덕션 빌드
+```bash
+./deploy/prefect/local.sh all
+```
+
+그 다음 [새 환경 설치의 서버 실행](#6-서버-실행)처럼 FastAPI와 프론트엔드를 각각
+실행한다. Excel 적재는 항상 Prefect deployment로 제출되므로 API는 다음 명령으로
+실행한다.
+
+```bash
+source .venv/bin/activate
+python -m uvicorn app:app --host 127.0.0.1 --port 8765 --reload
+```
+
+### 정적 프론트엔드 빌드
 
 ```bash
 cd frontend
-npm run build   # TypeScript 엄격 검사 후 dist/ 생성
+npm run build
 
 cd ..
-python3 -m uvicorn app:app --host 127.0.0.1 --port 8765
-# 빌드된 정적 파일을 http://localhost:8765 에서 제공
+python -m uvicorn app:app --host 127.0.0.1 --port 8765
 ```
+
+빌드된 SPA는 FastAPI의 `http://127.0.0.1:8765`에서 함께 제공된다.
 
 ### 테스트
 
 ```bash
-python3 -m unittest discover -s tests
+source .venv/bin/activate
+python -m pytest -q
+
+cd frontend
+npm run build
+npm test -- --run
 ```
+
+세부 실행 구조와 컴포넌트의 책임 범위는
+[배치 워커 실행 아키텍처](./docs/batch_execution_architecture.md)를 참고한다.
+
+---
+
+## 운영·문제 해결 명령
+
+### 상태와 로그
+
+```bash
+./deploy/prefect/local.sh status
+docker compose -f docker-compose.db.yml ps
+
+# Prefect server/worker와 Flow 출력 로그
+./deploy/prefect/local.sh logs
+
+# pgvector 로그
+docker compose -f docker-compose.db.yml logs --tail=200 pgvector
+```
+
+### 변경 종류별 재배포
+
+| 변경 | 명령 |
+|---|---|
+| API/프론트 코드만 변경 | 개발 서버 재시작 또는 hot reload |
+| Excel Job이 import하는 `backend/`·`jobs/` 코드 변경 | `./deploy/prefect/local.sh build` |
+| `.env`, secret, `prefect.yaml` 변경 | `./deploy/prefect/local.sh deploy` |
+| requirements 또는 여러 배포 요소 변경 | `./deploy/prefect/local.sh all` |
+
+Job 이미지 Dockerfile은 requirements를 소스보다 먼저 복사하고 BuildKit cache mount를
+사용한다. requirements가 그대로면 설치 레이어를 재사용하고, requirements가 바뀌어도
+다운로드한 wheel 캐시를 재사용한다.
+
+### 자주 발생하는 문제
+
+- **Prefect API 연결 실패**: `./deploy/prefect/local.sh status`와
+  `curl --fail http://127.0.0.1:4200/api/health`를 확인한다.
+- **요청은 queued인데 컨테이너가 생기지 않음**: API의
+  `PREFECT_DEPLOYMENT_NAME=excel-ingestion/docker`를
+  확인하고 `./deploy/prefect/local.sh logs`에서 Worker 상태를 조회한다.
+- **Job의 DB 연결 실패**: `docker compose ... ps`와 pgvector 로그를 확인한 뒤
+  `./deploy/prefect/local.sh deploy`로 Prefect Secret Block을 갱신한다.
+- **Excel 파일을 찾지 못함**: 파일이 저장소의 `data/source_files/` 아래 있는지 확인한다.
+  저장소를 다른 경로로 이동했다면 `./deploy/prefect/local.sh deploy`로 `data/` bind
+  mount 경로를 갱신한다.
+- **5432, 4200, 5173, 8765 포트 충돌**: 해당 프로세스를 종료하거나 `.env`와 실행
+  명령에서 사용 포트를 함께 변경한다. `PGVECTOR_PORT`를 바꾸면 `PGVECTOR_URL`도 같은
+  포트로 맞춘다.
+
+### 종료와 초기화
+
+```bash
+# Prefect control plane 중지. metadata volume은 유지
+./deploy/prefect/local.sh down
+
+# pgvector 컨테이너 중지. DB volume은 유지
+docker compose -f docker-compose.db.yml down
+```
+
+`local.sh down`은 Prefect 컨테이너만 제거하고 로컬 실행 이력이 담긴 named volume과
+pgvector 데이터는 남긴다. 데이터까지 완전히 초기화해야 할 때만 각 Compose 프로젝트에
+`down -v`를 사용한다.
 
 ---
 
@@ -205,7 +424,9 @@ python3 -m unittest discover -s tests
 | `app.py` | 애플리케이션 생성, 정적 프론트엔드 제공 |
 | `backend/core/settings.py` | 디렉터리 경로·환경 설정 상수 정의 |
 | `backend/api/` | 공유 서비스 조립과 Modules·Workflows·Artifact HTTP 라우터 |
+| `backend/data_sources/` | HTTP와 무관한 Excel 적재 job 생성·상태 조회 규칙 |
 | `backend/runtime/` | 모듈 등록소와 취소 가능한 격리 프로세스 실행기 |
+| `backend/runtime/services.py` | API와 외부 job이 공유하는 런타임 서비스 조립 |
 | `backend/modules/` | 프론트 노드와 1:1 대응하는 Python 실행 모듈 |
 | `backend/modules/data_lineage.py` | 질문·문서 계보를 보존하는 공통 DTO |
 | `backend/modules/docs/` | 등록된 25개 모듈의 자동 생성 사용 가이드 |
@@ -222,6 +443,11 @@ python3 -m unittest discover -s tests
 | `backend/workflows/store.py` | 워크플로·run·결과 캐시 원자적 저장 |
 | `backend/workflows/executor.py` | 포트 검증, 위상 배치, 순환 검출, 실행 재개 |
 | `backend/workflows/history.py` | run 노드 출력 이력 압축 |
+| `backend/workflows/dispatcher.py` | 대화형 Playground run의 백그라운드 실행 수명주기 |
+| `backend/orchestration/` | Playground DAG→Task 계획과 Prefect deployment dispatcher |
+| `jobs/excel_ingestion/` | 저장된 Excel 적재 run을 처리하는 Prefect Flow와 컨테이너 이미지 |
+| `deploy/prefect/` | 로컬 Prefect server·Docker work pool 배포 프로필 |
+| `prefect.yaml` | Excel 적재 deployment와 요청 동시성 정책 |
 
 `backend/` 바로 아래에는 패키지 표시용 `__init__.py`만 둡니다. 새 코드는 역할에 맞는 하위 패키지에 배치하고, 외부 API·워크플로 계층에서 모듈 구현 세부사항을 직접 소유하지 않습니다. 세부 의존 방향과 모듈 추가 규칙은 [Backend module architecture](./docs/backend_module_architecture.md)를 참고하세요.
 

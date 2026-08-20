@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -13,9 +13,11 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from ..data_sources import IngestionJobService, IngestionRequest as IngestRequestDTO
 from ..core.settings import (
     EMBEDDING_ARTIFACT_DIR,
     PGVECTOR_URL,
+    PREFECT_DEPLOYMENT_NAME,
     PROCESSED_DATA_DIR,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
@@ -41,19 +43,14 @@ from ..storage.answer_cache import AnswerCacheRepository
 from ..runtime.registry import ModuleRegistry
 from ..workflows import (
     DagExecutionError,
+    RunDispatcher,
     ResultCache,
     RunStore,
-    WorkflowExecutionRequest,
     WorkflowExecutor,
-    WorkflowRun,
-    WorkflowRunDispatcher,
     WorkflowStore,
 )
 
 
-INGESTION_WORKFLOW_IDS = frozenset(
-    {"indexing_pgvector", "indexing_pgvector_exhaustive"}
-)
 MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 logger = logging.getLogger(__name__)
 
@@ -101,27 +98,6 @@ def _is_allowed_database_host(host: Optional[str], port: Optional[int]) -> bool:
     return False
 
 
-def _public_error(value: Optional[str], limit: int = 2000) -> Optional[str]:
-    """
-    Sanitizes an error message for public responses.
-    
-    Parameters:
-        value (Optional[str]): The error message to sanitize.
-        limit (int): Maximum length of the returned message.
-    
-    Returns:
-        Optional[str]: The sanitized message, or `None` when `value` is `None`.
-    """
-    if value is None:
-        return None
-    message = value
-    for marker in ("\n[SQL:", " [SQL:"):
-        if marker in message:
-            message = message.split(marker, 1)[0].rstrip()
-            break
-    return message if len(message) <= limit else message[:limit].rstrip() + "…"
-
-
 def _sha256_file(path: Path) -> str:
     """Compute the SHA-256 digest of a file.
     
@@ -136,32 +112,6 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-class IngestRequestDTO(BaseModel):
-    file_name: str = Field(min_length=1, description="data/source_files/ 내 대상 Excel 파일명")
-    model: str = Field(
-        default="text-embedding-3-large",
-        description="임베딩 모델 (예: text-embedding-3-large, BAAI/bge-large-en-v1.5)",
-    )
-    variant_mode: Literal["header_only", "header_with_value", "both"] = Field(
-        default="both",
-        description="직렬화 형태 (header_only, header_with_value, both)",
-    )
-    structure_mode: Literal["auto", "luna_vlm", "exhaustive"] = Field(
-        default="auto",
-        description="구조화 모드 (auto: Luna VLM 감지 후 직렬화, luna_vlm: 강제 VLM, exhaustive: 전수 직렬화)",
-    )
-    sheet_names: Optional[List[str]] = Field(
-        default=None,
-        description="인덱싱할 시트 목록 (기본값: 모든 표시 시트)",
-    )
-    batch_size: int = Field(
-        default=2048,
-        ge=1,
-        le=2048,
-        description="임베딩 배치 크기",
-    )
 
 
 class SearchRequestDTO(BaseModel):
@@ -191,7 +141,7 @@ def create_data_source_router(
     workflow_store: Optional[WorkflowStore] = None,
     run_store: Optional[RunStore] = None,
     workflow_executor: Optional[WorkflowExecutor] = None,
-    workflow_dispatcher: Optional[WorkflowRunDispatcher] = None,
+    workflow_dispatcher: Optional[RunDispatcher] = None,
 ) -> APIRouter:
     """
     Create the data-source API router and configure file, vector-index, database, and ingestion workflow services.
@@ -210,7 +160,7 @@ def create_data_source_router(
     	workflow_store (Optional[WorkflowStore]): Existing workflow store to use.
     	run_store (Optional[RunStore]): Existing workflow run store to use.
     	workflow_executor (Optional[WorkflowExecutor]): Existing workflow executor to use.
-    	workflow_dispatcher (Optional[WorkflowRunDispatcher]): Existing workflow dispatcher to use.
+        workflow_dispatcher (Optional[RunDispatcher]): Scheduler used for ingestion runs.
     
     Returns:
     	APIRouter: Router exposing data-source, vector-index, database, and ingestion-job endpoints.
@@ -231,269 +181,30 @@ def create_data_source_router(
         spreadsheet_artifact_dir=spreadsheet_artifact_dir,
     )
     workflow_store = workflow_store or WorkflowStore(workflow_dir)
-    run_store = run_store or RunStore(run_dir)
+    run_store = run_store or RunStore(run_dir, db_manager=registry.db_manager)
     workflow_executor = workflow_executor or WorkflowExecutor(
         registry,
         run_store,
         ResultCache(cache_dir),
     )
-    workflow_dispatcher = workflow_dispatcher or WorkflowRunDispatcher(
-        workflow_executor,
+    if workflow_dispatcher is None:
+        from ..orchestration.prefect import PrefectIngestionDispatcher
+
+        workflow_dispatcher = PrefectIngestionDispatcher(
+            workflow_executor,
+            run_store,
+            PREFECT_DEPLOYMENT_NAME,
+        )
+    ingestion_jobs = IngestionJobService(
+        workflow_store,
         run_store,
+        workflow_executor,
+        workflow_dispatcher,
     )
-    recovered_jobs = workflow_dispatcher.recover_pending(INGESTION_WORKFLOW_IDS)
+    recovered_jobs = ingestion_jobs.recover_pending()
     if recovered_jobs:
         logger.info("미완료 인덱싱 작업 %d개를 서버 큐에 복구했습니다", recovered_jobs)
     db_manager = registry.db_manager
-
-    def _workflow_id_for(request: IngestRequestDTO) -> str:
-        """Selects the pgvector ingestion workflow for the requested structure mode.
-        
-        Parameters:
-        	request (IngestRequestDTO): Ingestion request containing the structure mode.
-        
-        Returns:
-        	str: The exhaustive pgvector workflow identifier for exhaustive mode; otherwise, the standard pgvector workflow identifier.
-        """
-        if request.structure_mode == "exhaustive":
-            return "indexing_pgvector_exhaustive"
-        return "indexing_pgvector"
-
-    def _create_ingestion_run(request: IngestRequestDTO) -> WorkflowRun:
-        """
-        Create a cached workflow run for the requested ingestion operation.
-        
-        Parameters:
-            request (IngestRequestDTO): Ingestion settings, including the source file,
-                optional sheets, embedding model, serialization mode, and batch size.
-        
-        Returns:
-            WorkflowRun: The newly created ingestion workflow run.
-        
-        Raises:
-            DagExecutionError: If the workflow lacks a processed file selector or
-                pgvector index writer.
-        """
-        workflow = workflow_store.load(_workflow_id_for(request))
-        runtime_inputs: Dict[str, Dict[str, Any]] = {}
-        config_overrides: Dict[str, Dict[str, Any]] = {}
-        has_writer = False
-
-        for node in workflow.graph.nodes:
-            if node.module_type == "processed_file_selector":
-                selector_input: Dict[str, Any] = {"file_name": request.file_name}
-                if request.sheet_names is not None:
-                    selector_input["sheet_names"] = request.sheet_names
-                runtime_inputs[node.id] = selector_input
-            elif node.module_type in {
-                "cell_text_serializer",
-                "exhaustive_cell_text_serializer",
-            }:
-                config_overrides[node.id] = {
-                    "variant_mode": request.variant_mode,
-                }
-            elif node.module_type == "cell_text_embedder":
-                config_overrides[node.id] = {
-                    "model": request.model,
-                    "batch_size": request.batch_size,
-                }
-            elif node.module_type == "pgvector_index_writer":
-                has_writer = True
-
-        if not runtime_inputs:
-            raise DagExecutionError(
-                "인덱싱 워크플로에 processed_file_selector 모듈이 없습니다"
-            )
-        if not has_writer:
-            raise DagExecutionError(
-                "인덱싱 워크플로에 pgvector_index_writer 모듈이 없습니다"
-            )
-
-        return workflow_executor.create_run(
-            workflow,
-            WorkflowExecutionRequest(
-                inputs=runtime_inputs,
-                config_overrides=config_overrides,
-                use_cache=True,
-            ),
-        )
-
-    def _node_output(run: WorkflowRun, module_type: str) -> Optional[Dict[str, Any]]:
-        """
-        Finds the dictionary output produced by the first node of the specified module type.
-        
-        Parameters:
-        	run (WorkflowRun): The workflow run containing the node outputs.
-        	module_type (str): The module type to locate.
-        
-        Returns:
-        	Optional[Dict[str, Any]]: The matching node's dictionary output, or `None` if no matching dictionary output exists.
-        """
-        for node in run.graph.nodes:
-            if node.module_type != module_type:
-                continue
-            output = run.nodes[node.id].output
-            if isinstance(output, dict):
-                return output
-        return None
-
-    def _target_index_id(run: WorkflowRun) -> Optional[str]:
-        """
-        Determine the vector index identifier associated with a workflow run.
-        
-        Parameters:
-        	run (WorkflowRun): The ingestion workflow run to inspect.
-        
-        Returns:
-        	Optional[str]: The target vector index identifier, or `None` when no identifier is available.
-        """
-        writer_output = _node_output(run, "pgvector_index_writer") or {}
-        if isinstance(writer_output.get("index_id"), str):
-            return writer_output["index_id"]
-        writer_node = next(
-            (
-                node
-                for node in run.graph.nodes
-                if node.module_type == "pgvector_index_writer"
-            ),
-            None,
-        )
-        if writer_node is not None:
-            target = run.nodes[writer_node.id].progress.get("target_index_id")
-            if isinstance(target, str):
-                return target
-        embedder_output = _node_output(run, "cell_text_embedder") or {}
-        artifact_id = embedder_output.get("artifact_id")
-        if isinstance(artifact_id, str):
-            return VectorIndexStore.index_id(artifact_id)
-        return None
-
-    def _job_payload(
-        run: WorkflowRun,
-        *,
-        include_index: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Build a sanitized public representation of an ingestion workflow run.
-        
-        Parameters:
-            run (WorkflowRun): Workflow run to represent.
-            include_index (bool): Whether to include details produced by the vector index writer.
-        
-        Returns:
-            Dict[str, Any]: Job payload containing run status, sanitized node state, structure output, index details when requested, target index identifier, error information, and worker activity.
-        """
-        selector_output = _node_output(run, "processed_file_selector") or {}
-        structure_output = _node_output(run, "luna_vlm_structure_detector")
-        luna_output = None
-        if structure_output is not None:
-            luna_output = {
-                **structure_output,
-                "file_name": structure_output.get("file_name")
-                or selector_output.get("file_name"),
-                "workbook_hash": structure_output.get("workbook_hash")
-                or selector_output.get("workbook_hash"),
-                "sheet_names": selector_output.get("sheet_names", []),
-            }
-
-        index = None
-        if include_index:
-            writer_output = _node_output(run, "pgvector_index_writer")
-            embedder_output = _node_output(run, "cell_text_embedder") or {}
-            company_output = _node_output(run, "company_entity_extractor") or {}
-            if writer_output is not None:
-                index = {
-                    **writer_output,
-                    "company_name": company_output.get("display_name")
-                    or company_output.get("company_name"),
-                    "ticker": company_output.get("ticker"),
-                    "duration_seconds": embedder_output.get("duration_seconds"),
-                    "total_tokens": embedder_output.get("total_tokens"),
-                    "estimated_cost_usd": embedder_output.get("estimated_cost_usd"),
-                    "estimated_cost_krw": embedder_output.get("estimated_cost_krw"),
-                    "batch_size": embedder_output.get("batch_size"),
-                    "sheet_names": selector_output.get("sheet_names", []),
-                    "tables": (structure_output or {}).get("tables", []),
-                    "luna_output": luna_output,
-                    "storage": "pgvector (LangChain)",
-                }
-        failed_state = next(
-            (state for state in run.nodes.values() if state.status == "failed"),
-            None,
-        )
-        run_summary = run.model_dump(mode="json")
-        for state in run_summary["nodes"].values():
-            state["input_payload"] = None
-            state["output"] = None
-            state["error"] = _public_error(state.get("error"))
-        return {
-            "job_id": run.id,
-            "status": run.status,
-            "workflow_id": run.workflow_id,
-            "run": run_summary,
-            "index": index,
-            # Structure inspection is a module result, not an index-writer
-            # result. Expose it as soon as Luna finishes so a long embedding
-            # batch does not leave the inspector with fabricated empty data.
-            "luna_output": luna_output,
-            "target_index_id": _target_index_id(run),
-            "error": _public_error(
-                failed_state.error if failed_state is not None else None
-            ),
-            "worker_active": workflow_dispatcher.is_active(run.id),
-        }
-
-    def _load_ingestion_run(run_id: str) -> WorkflowRun:
-        """
-        Load an ingestion workflow run by its identifier.
-        
-        Parameters:
-        	run_id (str): Identifier of the workflow run.
-        
-        Returns:
-        	WorkflowRun: The matching ingestion workflow run.
-        
-        Raises:
-        	FileNotFoundError: If the run does not exist or belongs to a different workflow.
-        """
-        run = run_store.load(run_id)
-        if run.workflow_id not in INGESTION_WORKFLOW_IDS:
-            raise FileNotFoundError(run_id)
-        return run
-
-    def _list_ingestion_runs(
-        file_name: Optional[str] = None,
-    ) -> List[WorkflowRun]:
-        """
-        List ingestion workflow runs, optionally filtered by source file name.
-        
-        Parameters:
-            file_name (Optional[str]): Source file name used to filter runs. Directory components are ignored.
-        
-        Returns:
-            List[WorkflowRun]: Ingestion runs sorted by most recently updated.
-        """
-        summaries = [
-            run
-            for run in run_store.list()
-            if run.workflow_id in INGESTION_WORKFLOW_IDS
-        ]
-        if file_name is not None:
-            safe_file_name = Path(file_name).name
-            runs: List[WorkflowRun] = []
-            for summary in summaries:
-                if any(
-                    node.module_type == "processed_file_selector"
-                    and Path(
-                        str(summary.runtime_inputs.get(node.id, {}).get("file_name", ""))
-                    ).name == safe_file_name
-                    for node in summary.graph.nodes
-                ):
-                    runs.append(run_store.load(summary.id))
-        else:
-            runs = summaries
-        return sorted(runs, key=lambda run: run.updated_at, reverse=True)
-
     # 0. Database Status
     @router.get("/db-status")
     def get_db_status() -> Dict[str, Any]:
@@ -669,15 +380,14 @@ def create_data_source_router(
         suffix = dest_path.suffix.lower()
         if auto_ingest and suffix in (".xlsx", ".xlsm"):
             try:
-                run = _create_ingestion_run(
+                run = ingestion_jobs.create_and_submit(
                     IngestRequestDTO(
                         file_name=safe_filename,
                         model=model,
                         batch_size=batch_size,
                     )
                 )
-                workflow_dispatcher.submit(run.id)
-                ingestion_job = _job_payload(run)
+                ingestion_job = ingestion_jobs.payload(run)
             except Exception as err:
                 logger.exception(
                     "업로드 후 자동 인덱싱 작업 생성 실패: %s",
@@ -871,11 +581,11 @@ def create_data_source_router(
         Returns:
             Dict[str, Any]: A mapping containing the selected jobs and the total number of matching jobs.
         """
-        candidates = _list_ingestion_runs(file_name)
+        candidates = ingestion_jobs.list(file_name)
         selected = candidates[:limit]
         return {
             "jobs": [
-                _job_payload(summary, include_index=False)
+                ingestion_jobs.payload(summary, include_index=False)
                 for summary in selected
             ],
             "total": len(candidates),
@@ -896,9 +606,8 @@ def create_data_source_router(
             HTTPException: If the ingestion workflow is missing or the request is invalid.
         """
         try:
-            run = _create_ingestion_run(request)
-            workflow_dispatcher.submit(run.id)
-            return _job_payload(run)
+            run = ingestion_jobs.create_and_submit(request)
+            return ingestion_jobs.payload(run)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404,
@@ -922,9 +631,9 @@ def create_data_source_router(
             HTTPException: With status 404 if the job does not exist, or 422 if the job is invalid.
         """
         try:
-            run = _load_ingestion_run(run_id)
-            workflow_dispatcher.ensure_submitted(run_id, run)
-            return _job_payload(_load_ingestion_run(run_id))
+            run = ingestion_jobs.load_status(run_id)
+            ingestion_jobs.ensure_submitted(run)
+            return ingestion_jobs.payload(run)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404,
@@ -947,15 +656,13 @@ def create_data_source_router(
         Raises:
             HTTPException: If no ingestion job produced the specified index.
         """
-        for summary in _list_ingestion_runs():
-            writer_output = _node_output(summary, "pgvector_index_writer")
-            if writer_output and writer_output.get("index_id") == index_id:
-                run = run_store.load(summary.id)
-                return _job_payload(run)
-        raise HTTPException(
-            status_code=404,
-            detail="해당 인덱스의 워크플로 실행 기록을 찾을 수 없습니다",
-        )
+        try:
+            return ingestion_jobs.payload(ingestion_jobs.find_by_index(index_id))
+        except FileNotFoundError as error:
+            raise HTTPException(
+                status_code=404,
+                detail="해당 인덱스의 워크플로 실행 기록을 찾을 수 없습니다",
+            ) from error
 
     @router.post("/ingestion-jobs/{run_id}/resume", status_code=202)
     def resume_ingestion_job(run_id: str) -> Dict[str, Any]:
@@ -972,17 +679,13 @@ def create_data_source_router(
             HTTPException: With status code 404 if the ingestion job does not exist.
         """
         try:
-            run = _load_ingestion_run(run_id)
+            run = ingestion_jobs.load(run_id)
             if run.status == "completed":
                 raise HTTPException(
                     status_code=409,
                     detail="완료된 인덱싱 작업은 재개할 수 없습니다",
                 )
-            if run.status == "failed":
-                workflow_dispatcher.submit(run_id, resume_failed=True)
-            elif run.status in ("queued", "running", "paused"):
-                workflow_dispatcher.submit(run_id)
-            return _job_payload(run_store.load(run_id))
+            return ingestion_jobs.payload(ingestion_jobs.resume(run_id))
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404,
@@ -1004,9 +707,7 @@ def create_data_source_router(
             HTTPException: If the ingestion job does not exist.
         """
         try:
-            _load_ingestion_run(run_id)
-            workflow_dispatcher.cancel(run_id)
-            return _job_payload(_load_ingestion_run(run_id))
+            return ingestion_jobs.payload(ingestion_jobs.cancel(run_id))
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404,
@@ -1027,11 +728,10 @@ def create_data_source_router(
         """
 
         try:
-            run = _load_ingestion_run(run_id)
+            run = ingestion_jobs.load(run_id)
             if run.status in ("queued", "running"):
-                workflow_dispatcher.cancel(run_id)
-                run = _load_ingestion_run(run_id)
-            target_index_id = _target_index_id(run)
+                run = ingestion_jobs.cancel(run_id)
+            target_index_id = ingestion_jobs.target_index_id(run)
             index_deleted = False
             if target_index_id:
                 try:

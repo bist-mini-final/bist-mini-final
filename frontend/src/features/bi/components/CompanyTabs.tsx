@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 
-export interface BiCompanyTab {
+interface BiCompanyTab {
   readonly id: string;
   readonly name: string;
 }

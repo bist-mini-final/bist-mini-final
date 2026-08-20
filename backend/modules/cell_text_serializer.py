@@ -21,7 +21,6 @@ from ..spreadsheets.structured_cell_text import (
 )
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from .base import (
-    EmptyModuleConfigDTO,
     ExecutableModule,
     ModuleConfigDTO,
     ModuleDefinition,
@@ -290,7 +289,16 @@ class CellTextSerializerModule(ExecutableModule):
             items: List[Dict[str, Any]] = []
             seen_cell_ids: set[str] = set()
             readers: Dict[str, WorksheetValueReader] = {}
-            for table in input_data.tables:
+            total_tables = len(input_data.tables)
+            self.report_progress(
+                {
+                    "phase": "serialization_tables",
+                    "completed_tables": 0,
+                    "total_tables": total_tables,
+                    "completed_items": 0,
+                }
+            )
+            for table_index, table in enumerate(input_data.tables, start=1):
                 if table.sheet_name not in workbook.sheetnames:
                     raise ModuleExecutionError(
                         f"Excel 시트를 찾을 수 없습니다: {table.sheet_name}"
@@ -311,6 +319,15 @@ class CellTextSerializerModule(ExecutableModule):
                         seen_cell_ids,
                         variant_mode=getattr(input_data, "variant_mode", "both"),
                     )
+                )
+                self.report_progress(
+                    {
+                        "phase": "serialization_tables",
+                        "completed_tables": table_index,
+                        "total_tables": total_tables,
+                        "completed_items": len(items),
+                        "current_sheet": table.sheet_name,
+                    }
                 )
         finally:
             if workbook is not None:
