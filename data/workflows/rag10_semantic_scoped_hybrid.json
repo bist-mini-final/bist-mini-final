@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "rag10_semantic_scoped_hybrid",
   "name": "rag10_semantic_scoped_pgvector_hybrid",
-  "updated_at": "2026-08-19T06:42:22.827597+00:00",
+  "updated_at": "2026-08-20T07:14:42.410849+00:00",
   "graph": {
     "nodes": [
       {
@@ -69,8 +69,8 @@
         "id": "subquery-inspector",
         "module_type": "json_inspector",
         "position": {
-          "x": 621.5293687773772,
-          "y": -220.7072454929679
+          "x": 705.8645265544553,
+          "y": -438.31277605357684
         },
         "config": {},
         "values": {},
@@ -103,14 +103,14 @@
         "id": "index",
         "module_type": "pgvector_collection_loader",
         "position": {
-          "x": 642.2133059017912,
-          "y": 287.26858036578915
+          "x": 406.90780395586955,
+          "y": 350.78024239544055
         },
         "config": {},
         "values": {
-          "collection_name": "SPG_Company_KeyStats_v3.xlsm",
+          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
           "collection_names": [
-            "SPG_Company_KeyStats_v3.xlsm"
+            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
           ]
         },
         "ui": {
@@ -124,8 +124,8 @@
         "id": "bm25",
         "module_type": "bm25_retriever",
         "position": {
-          "x": 1060.0,
-          "y": -20.0
+          "x": 763.0254767434792,
+          "y": 61.48976858788478
         },
         "config": {
           "k1": 1.5,
@@ -141,30 +141,11 @@
         }
       },
       {
-        "id": "dense",
-        "module_type": "semantic_scoped_pgvector_retriever",
-        "position": {
-          "x": 1061.8946457081383,
-          "y": 152.7400773611011
-        },
-        "config": {
-          "top_k": 1000,
-          "min_scope_confidence": 0.8
-        },
-        "values": {},
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
         "id": "rrf",
         "module_type": "rrf_fusion",
         "position": {
-          "x": 1420.0,
-          "y": 90.0
+          "x": 1177.8366505758672,
+          "y": 70.67184370810335
         },
         "config": {
           "rrf_k": 60,
@@ -183,8 +164,8 @@
         "id": "context",
         "module_type": "context",
         "position": {
-          "x": 1760.0,
-          "y": 90.0
+          "x": 1606.1301027354186,
+          "y": 95.49535347373507
         },
         "config": {
           "top_k": 100,
@@ -293,43 +274,11 @@
         "source_branch": null
       },
       {
-        "id": "embed-dense",
-        "source": "embed",
-        "target": "dense",
-        "source_output": "output",
-        "target_input": "query_input",
-        "source_branch": null
-      },
-      {
-        "id": "semantic-dense",
-        "source": "semantic",
-        "target": "dense",
-        "source_output": "semantic_match",
-        "target_input": "semantic_match",
-        "source_branch": null
-      },
-      {
-        "id": "index-dense",
-        "source": "index",
-        "target": "dense",
-        "source_output": "index_output",
-        "target_input": "index_input",
-        "source_branch": null
-      },
-      {
         "id": "bm25-rrf",
         "source": "bm25",
         "target": "rrf",
         "source_output": "bm25_result",
         "target_input": "bm25_result",
-        "source_branch": null
-      },
-      {
-        "id": "dense-rrf",
-        "source": "dense",
-        "target": "rrf",
-        "source_output": "dense_result",
-        "target_input": "dense_result",
         "source_branch": null
       },
       {
@@ -366,9 +315,9 @@
       }
     ],
     "viewport": {
-      "x": 486.6011924488677,
-      "y": 522.8011641667335,
-      "zoom": 0.3031433133020798
+      "x": 596.1832557703617,
+      "y": 355.69642465618006,
+      "zoom": 1.103271390096918
     }
   }
 }

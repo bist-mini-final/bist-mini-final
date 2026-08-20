@@ -3404,6 +3404,7 @@ body.spreadsheet-result-is-resizing * {
 .benchmark-run-actions .benchmark-run-button { margin-bottom: 0; }
 .benchmark-stop-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 112px; margin-top: 20px; border: 1px solid #fecaca; border-radius: 10px; background: #fff1f2; color: #be123c; font-weight: 700; cursor: pointer; }
 .benchmark-stop-button:disabled { color: #94a3b8; cursor: wait; }
+.benchmark-pause-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 112px; margin-top: 20px; border: 1px solid #fde68a; border-radius: 10px; background: #fffbeb; color: #a16207; font-weight: 700; cursor: pointer; }
 .benchmark-progress { margin-top: 18px; padding: 13px; border: 1px solid #bfdbfe; border-radius: 10px; background: #f8fbff; }
 .benchmark-progress__bar { height: 7px; overflow: hidden; border-radius: 99px; background: #dbeafe; }
 .benchmark-progress__bar i { display: block; height: 100%; border-radius: inherit; background: #2563eb; transition: width .25s ease; }

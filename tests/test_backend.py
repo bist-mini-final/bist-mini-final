@@ -427,8 +427,15 @@ class SemanticQueryMatcherTests(unittest.TestCase):
             }
             store.put(index_id, [[1.0, 0.0]], metadata)
             result = SemanticScopedDenseRetrieverModule(store).run({
-                "query_input": {"question_id": "q", "items": {"Revenue": [1.0, 0.0]}},
-                "index_input": {"index_id": index_id, "workbook_hash": "hash", "model": "test", "dimension": 2, "document_count": 1},
+                "query_input": {
+                    "query_context": {"question_id": "q", "question_text": "Revenue"},
+                    "items": {"Revenue": [1.0, 0.0]},
+                },
+                "index_input": {
+                    "index_id": index_id, "file_name": "test.xlsx",
+                    "workbook_hash": "hash", "model": "test",
+                    "dimension": 2, "document_count": 1,
+                },
                 "semantic_match": {"matched": True, "target": "financials", "confidence": 0.9, "sheets": ["Key_Stats"], "reason": "test", "matches": []},
             })
         self.assertEqual(result["items"][0]["cell_id"], "Other Cell A1")
@@ -439,13 +446,22 @@ class SemanticQueryMatcherTests(unittest.TestCase):
                 raise AssertionError("LLM must not be called for a confident match")
 
         result = AdaptiveQueryDecomposerModule(FailingCompletionClient()).run({
-            "question_text": "IBM revenue trend",
+            "query_context": {
+                "question_id": "q",
+                "question_text": "IBM 2025년 revenue",
+            },
             "semantic_match": {
-                "matched": True, "target": "financials", "confidence": 0.9,
+                "matched": True, "target": "get_ibm_key_financials", "confidence": 0.9,
                 "sheets": ["Key_Stats"], "reason": "test", "matches": [],
+                "subqueries": [
+                    "Sheet: Key_Stats | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+                ],
             },
         })
-        self.assertEqual(result["subqueries"], ["IBM revenue trend"])
+        self.assertIn(
+            "Sheet: Key_Stats | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?",
+            result["subqueries"],
+        )
 
 
 class PgVectorStoreBatchingTests(unittest.TestCase):

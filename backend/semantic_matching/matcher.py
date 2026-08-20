@@ -138,15 +138,29 @@ class SemanticQueryMatcher:
                 None, top.similarity, (), tuple(matches),
                 f"Top similarity {top.similarity:.3f} is below threshold {threshold:.3f}; use the full index",
             )
+        nearby_matches = tuple(
+            candidate
+            for candidate in matches
+            if candidate.similarity >= top.similarity - vote_margin
+        )
         votes: Dict[str, int] = {}
-        for candidate in matches:
-            if candidate.similarity >= top.similarity - vote_margin:
-                votes[candidate.target] = votes.get(candidate.target, 0) + 1
+        for candidate in nearby_matches:
+            votes[candidate.target] = votes.get(candidate.target, 0) + 1
         target = max(votes, key=lambda value: (votes[value], value == top.target))
-        sheets = tuple(sorted({sheet for match in matches if match.target == target for sheet in match.sheets}))
+        target_matches = tuple(
+            candidate for candidate in nearby_matches if candidate.target == target
+        )
+        representative = target_matches[0]
+        sheets = tuple(sorted({sheet for match in target_matches for sheet in match.sheets}))
+        representative_example = next(
+            item for item in examples if item.example_id == representative.example_id
+        )
         return SemanticDecision(
-            target, top.similarity, sheets, tuple(matches),
-            f"Top similarity {top.similarity:.3f}; nearby-example votes {votes}",
-            query_type=next((item.query_type for item in examples if item.example_id == top.example_id), None),
-            subqueries=next((item.subqueries for item in examples if item.example_id == top.example_id), ()),
+            target, representative.similarity, sheets, tuple(matches),
+            (
+                f"Top similarity {top.similarity:.3f}; selected-plan similarity "
+                f"{representative.similarity:.3f}; nearby-example votes {votes}"
+            ),
+            query_type=representative_example.query_type,
+            subqueries=representative_example.subqueries,
         )

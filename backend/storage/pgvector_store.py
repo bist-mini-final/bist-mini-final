@@ -71,7 +71,7 @@ class PgVectorStore:
     def _raw_connection(self) -> psycopg2.extensions.connection:
         # Normalize to psycopg2 url
         raw_url = self.database_url.replace("postgresql+psycopg://", "postgresql://")
-        return psycopg2.connect(raw_url)
+        return psycopg2.connect(raw_url, connect_timeout=5)
 
     def is_connected(self) -> bool:
         """Check if PostgreSQL + pgvector is reachable."""

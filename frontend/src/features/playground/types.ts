@@ -158,6 +158,14 @@ export interface BenchmarkCase {
   expected_terms?: string[];
   expected_target?: string;
   expected_sheets?: string[];
+  expected_abstain?: boolean;
+  expected_plan?: { metrics?: string[]; periods?: number[] };
+}
+
+export interface BenchmarkSet {
+  id: string;
+  name: string;
+  cases: BenchmarkCase[];
 }
 
 export interface BenchmarkSummary {
@@ -173,9 +181,27 @@ export interface BenchmarkSummary {
   cache_hits: number;
   node_runs: number;
   llm_fallback_calls: number;
+  plan_reuse_count?: number;
+  plan_reuse_coverage?: number | null;
+  plan_cases?: number;
+  plan_accuracy?: number | null;
+  plan_reuse_precision?: number | null;
+  unsafe_plan_reuse_count?: number;
+  sheet_cases?: number;
+  sheet_exact_accuracy?: number | null;
+  average_sheet_precision?: number | null;
+  average_sheet_recall?: number | null;
+  intermediate_cases?: number;
+  intermediate_accuracy?: number | null;
   errors: number;
   route_cases: number;
   route_accuracy: number | null;
+  route_attempts?: number;
+  route_abstentions?: number;
+  route_coverage?: number | null;
+  route_precision?: number | null;
+  abstention_cases?: number;
+  abstention_accuracy?: number | null;
   router_kind: string | null;
   average_router_latency_seconds: number | null;
   average_router_tokens: number | null;
@@ -186,6 +212,7 @@ export interface BenchmarkComparison {
   id?: string;
   saved_at?: string;
   execution_mode: 'sequential_isolated';
+  execution_scope?: 'full' | 'pre_retrieval';
   use_cache: boolean;
   cache_mode?: 'off' | 'all' | 'index_only';
   summary: BenchmarkSummary[];
@@ -197,7 +224,23 @@ export interface BenchmarkComparison {
     total_tokens: number;
     estimated_cost_usd: number;
     score: { scored: boolean; correct: boolean | null };
-    route_score: { correct: boolean; target_correct: boolean; sheets_correct: boolean } | null;
+    route_score: { correct: boolean; target_correct: boolean; sheets_correct: boolean; expected_abstain?: boolean } | null;
+    plan_score?: {
+      correct: boolean;
+      metrics_correct: boolean;
+      metric_precision?: number;
+      metric_recall?: number;
+      periods_correct: boolean;
+      source: string | null;
+    } | null;
+    sheet_score?: {
+      correct: boolean;
+      precision: number;
+      recall: number;
+      expected: string[];
+      actual: string[];
+    } | null;
+    intermediate_score?: { correct: boolean; checks: Record<string, boolean> } | null;
     router: {
       kind: string;
       target: string | null;
@@ -214,7 +257,7 @@ export interface BenchmarkComparison {
 
 export interface BenchmarkJob {
   id: string;
-  status: 'queued' | 'running' | 'cancelling' | 'completed' | 'cancelled' | 'failed';
+  status: 'queued' | 'running' | 'pausing' | 'paused' | 'cancelling' | 'completed' | 'cancelled' | 'failed';
   completed: number;
   total: number;
   current: { workflow_id?: string; case_id?: string; question?: string; run_id?: string | null } | null;
@@ -222,7 +265,7 @@ export interface BenchmarkJob {
   last_run: BenchmarkRunSnapshot | null;
   logs: Array<{
     at: string;
-    event: 'started' | 'running' | 'completed' | 'cancelling';
+    event: 'started' | 'running' | 'completed' | 'pausing' | 'paused' | 'resumed' | 'cancelling';
     completed: number;
     total: number;
     workflow_id?: string;

@@ -1,8 +1,8 @@
 # Adaptive Query Decomposer
 
-> Module type: `adaptive_query_decomposer` · Category: `Logic` · Version: `1`
+> Module type: `adaptive_query_decomposer` · Category: `Logic` · Version: `2`
 
-시맨틱 매칭 성공 시 원문 질문을 바로 검색하고, 실패 시에만 LLM으로 서브쿼리를 분해합니다.
+시맨틱 계획의 신뢰도와 질문 제약을 검증해 안전할 때만 재사용하고, 그 외에는 LLM으로 서브쿼리를 분해합니다.
 
 이 문서는 Pydantic DTO와 `ModuleDefinition`에서 자동 생성됩니다. 정확한 중첩 스키마는 Swagger 또는 `--contract` 명령으로 확인합니다.
 
@@ -27,6 +27,7 @@
 | `preset` | `string` | no | `"luna_decomposer"` | 적용할 프롬프트 프리셋 ID |
 | `system_prompt` | `string` | no | `<long default; see contract>` | 원자 단위 서브쿼리 생성 규칙을 정의하는 시스템 프롬프트 |
 | `user_prompt_template` | `string` | no | `"Korean Query: \"{question}\"\nJSON Output:"` | {question} 변수를 지원하는 사용자 프롬프트 템플릿 |
+| `plan_reuse_threshold` | `number` | no | `0.8` | 카탈로그 분해 계획을 재사용할 최소 시맨틱 신뢰도 |
 
 ## Output DTO
 
@@ -97,7 +98,8 @@
     "model": "gpt-5.6-luna",
     "preset": "luna_decomposer",
     "system_prompt": "<use system_prompt default from ConfigDTO>",
-    "user_prompt_template": "Korean Query: \"{question}\"\nJSON Output:"
+    "user_prompt_template": "Korean Query: \"{question}\"\nJSON Output:",
+    "plan_reuse_threshold": 0.8
   }
 }
 ```

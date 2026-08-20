@@ -2,6 +2,7 @@ import type {
   ModuleDefinition,
   ModuleType,
   BenchmarkCase,
+  BenchmarkSet,
   BenchmarkComparison,
   BenchmarkJob,
   WorkflowDocument,
@@ -174,16 +175,20 @@ export const pipelineApi = {
     return requestJson<{ workflows: WorkflowDocument[] }>('/api/workflows', signal);
   },
 
-  compareBenchmarks(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only') {
+  getBenchmarkSets(signal?: AbortSignal) {
+    return requestJson<{ benchmark_sets: BenchmarkSet[] }>('/api/benchmark-sets', signal);
+  },
+
+  compareBenchmarks(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only', executionScope: 'full' | 'pre_retrieval' = 'full') {
     return postJson<BenchmarkComparison>('/api/benchmarks/compare', {
       workflow_ids: workflowIds,
       cases,
-      use_cache: cacheMode === 'all', cache_mode: cacheMode,
+      use_cache: cacheMode === 'all', cache_mode: cacheMode, execution_scope: executionScope,
     });
   },
 
-  startBenchmarkJob(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only') {
-    return postJson<{ id: string }>('/api/benchmarks/jobs', { workflow_ids: workflowIds, cases, use_cache: cacheMode === 'all', cache_mode: cacheMode });
+  startBenchmarkJob(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only', executionScope: 'full' | 'pre_retrieval' = 'full') {
+    return postJson<{ id: string }>('/api/benchmarks/jobs', { workflow_ids: workflowIds, cases, use_cache: cacheMode === 'all', cache_mode: cacheMode, execution_scope: executionScope });
   },
 
   getBenchmarkJob(jobId: string, signal?: AbortSignal) {
@@ -192,5 +197,13 @@ export const pipelineApi = {
 
   cancelBenchmarkJob(jobId: string) {
     return writeJson<{ id: string; status: string }>('DELETE', `/api/benchmarks/jobs/${encodeURIComponent(jobId)}`);
+  },
+
+  pauseBenchmarkJob(jobId: string) {
+    return postJson<{ id: string; status: string }>(`/api/benchmarks/jobs/${encodeURIComponent(jobId)}/pause`);
+  },
+
+  resumeBenchmarkJob(jobId: string) {
+    return postJson<{ id: string; status: string }>(`/api/benchmarks/jobs/${encodeURIComponent(jobId)}/resume`);
   },
 };

@@ -3,6 +3,7 @@ import json
 import time
 from pathlib import Path
 from threading import Lock
+import time
 from typing import Any, Dict, List, Optional, Type, TypeVar
 from uuid import uuid4
 
@@ -90,6 +91,21 @@ class JsonModelStore:
         with self._lock:
             _atomic_write_text(path, serialized + "\n")
         return document
+
+    @staticmethod
+    def _replace_with_retry(temporary_path: Path, path: Path) -> None:
+        """Retry a short-lived Windows file lock held by a run-list reader."""
+
+        last_error: PermissionError | None = None
+        for _ in range(8):
+            try:
+                temporary_path.replace(path)
+                return
+            except PermissionError as error:
+                last_error = error
+                time.sleep(0.05)
+        if last_error is not None:
+            raise last_error
 
     def list_documents(self) -> List[ModelType]:
         """

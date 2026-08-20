@@ -64,13 +64,26 @@ CREATE INDEX IF NOT EXISTS idx_langchain_cmetadata_gin ON langchain_pg_embedding
 class DatabaseManager:
     """PostgreSQL full ERD database manager."""
 
-    def __init__(self, database_url: str = PGVECTOR_URL) -> None:
+    def __init__(
+        self,
+        database_url: str = PGVECTOR_URL,
+        *,
+        ensure_schema: bool = True,
+    ) -> None:
         self.database_url = database_url
-        self.ensure_schema()
+        if ensure_schema:
+            self.ensure_schema()
 
     def _raw_connection(self) -> psycopg2.extensions.connection:
         raw_url = self.database_url.replace("postgresql+psycopg://", "postgresql://")
-        return psycopg2.connect(raw_url)
+        # Startup must remain available when the optional remote pgvector
+        # service is offline. Without a bound, a TCP connection attempt can
+        # stall the entire FastAPI process before benchmark routes are ready.
+        return psycopg2.connect(
+            raw_url,
+            connect_timeout=5,
+            options="-c statement_timeout=5000",
+        )
 
     def is_connected(self) -> bool:
         """Check whether a connection to the database can be established and used.
