@@ -120,10 +120,8 @@ class SheetMetadataPersistenceModule(ExecutableModule):
         elif detected_tables:
             catalog_sheets = self.catalog.sheet_names(workbook_path)
             table_sheets = {t.sheet_name for t in detected_tables}
+            # Only include sheets that are both in tables and in catalog
             visible_sheets = [s for s in catalog_sheets if s in table_sheets]
-            for s in table_sheets:
-                if s not in visible_sheets:
-                    visible_sheets.append(s)
         else:
             raise ModuleExecutionError(
                 "저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다"
@@ -153,7 +151,11 @@ class SheetMetadataPersistenceModule(ExecutableModule):
 
         sheets_data: List[Dict[str, Any]] = []
         for sheet_index, sheet_name in enumerate(visible_sheets):
-            rows, columns = sheet_dimensions.get(sheet_name, (0, 0))
+            # Only include sheets that exist in workbook dimensions
+            if sheet_name not in sheet_dimensions:
+                logger.warning("Skipping sheet '%s' not found in workbook dimensions", sheet_name)
+                continue
+            rows, columns = sheet_dimensions[sheet_name]
             sheet_tables = [
                 table.model_dump(mode="json")
                 for table in detected_tables

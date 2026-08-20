@@ -118,7 +118,7 @@ python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output da
 
 - **기본 워크플로 사용 파일**: `SPG_Company_KeyStats_v3.xlsm`
 
-```
+```text
 data/source_files/
 └── SPG_Company_KeyStats_v3.xlsm   ← 구글 드라이브에서 다운로드 후 배치 (Excel 직접 파싱 파이프라인에만 필요)
 ```

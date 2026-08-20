@@ -310,15 +310,30 @@ class AnswerRefinerModule(ExecutableModule):
         initial_answer = initial_dto.answer
         workbook_hash = initial_dto.document_context.workbook_hash
 
-        # 1. Infer Target Cells via LLM Spatial Reasoning
-        target_cells, extractor_usage, extractor_cost = self._infer_candidate_cells(
-            question=question_text,
-            initial_answer=initial_answer,
-            explicit_cell_ids=parsed.target_cell_ids,
-            model=parsed.model,
-            extractor_prompt=parsed.cell_extractor_prompt,
-            max_cells=parsed.max_direct_cells,
-        )
+        # 1. Infer Target Cells via LLM Spatial Reasoning (skip if target_cell_ids already at max)
+        extractor_usage = ApiUsageDTO()
+        extractor_cost = 0.0
+        target_cells = []
+
+        if not parsed.target_cell_ids or len(parsed.target_cell_ids) < parsed.max_direct_cells:
+            target_cells, extractor_usage, extractor_cost = self._infer_candidate_cells(
+                question=question_text,
+                initial_answer=initial_answer,
+                explicit_cell_ids=parsed.target_cell_ids,
+                model=parsed.model,
+                extractor_prompt=parsed.cell_extractor_prompt,
+                max_cells=parsed.max_direct_cells,
+            )
+        elif parsed.target_cell_ids:
+            # Use explicit cells without inference
+            sheet_codes = {
+                code.upper(): sheet_name
+                for sheet_name, code in SHEET_CODE_MAP.items()
+            }
+            for cell_id in parsed.target_cell_ids[:parsed.max_direct_cells]:
+                cand = self._parse_candidate_token(cell_id, sheet_codes)
+                if cand:
+                    target_cells.append(cand)
 
         # 2. Directly Fetch Cell Metadata from PostgreSQL
         direct_cells: List[DirectCellDTO] = []
@@ -395,12 +410,13 @@ class AnswerRefinerModule(ExecutableModule):
                     completion_tokens=refiner_usage.completion_tokens,
                     cached_tokens=refiner_usage.cached_tokens,
                 )
+                # Normalize None values to 0 before summation
                 api_usage = ApiUsageDTO(
-                    prompt_tokens=extractor_usage.prompt_tokens + refiner_usage.prompt_tokens,
-                    completion_tokens=extractor_usage.completion_tokens + refiner_usage.completion_tokens,
-                    cached_tokens=extractor_usage.cached_tokens + refiner_usage.cached_tokens,
-                    reasoning_tokens=extractor_usage.reasoning_tokens + refiner_usage.reasoning_tokens,
-                    total_tokens=extractor_usage.total_tokens + refiner_usage.total_tokens,
+                    prompt_tokens=(extractor_usage.prompt_tokens or 0) + (refiner_usage.prompt_tokens or 0),
+                    completion_tokens=(extractor_usage.completion_tokens or 0) + (refiner_usage.completion_tokens or 0),
+                    cached_tokens=(extractor_usage.cached_tokens or 0) + (refiner_usage.cached_tokens or 0),
+                    reasoning_tokens=(extractor_usage.reasoning_tokens or 0) + (refiner_usage.reasoning_tokens or 0),
+                    total_tokens=(extractor_usage.total_tokens or 0) + (refiner_usage.total_tokens or 0),
                 )
                 estimated_cost_usd = extractor_cost + refiner_cost
 

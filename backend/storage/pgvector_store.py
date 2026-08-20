@@ -192,6 +192,16 @@ class PgVectorStore:
             "ticker": meta_dict.get("ticker", ""),
         }
 
+        # Validate vectors length BEFORE modifying the collection
+        total_items = len(documents)
+        use_precomputed_vectors = False
+        if vectors is not None:
+            if len(vectors) != total_items:
+                raise PgVectorStoreError(
+                    f"사전 계산된 벡터 개수({len(vectors)})가 문서 개수({total_items})와 일치하지 않습니다."
+                )
+            use_precomputed_vectors = True
+
         store = get_vector_store(
             collection_name=index_id,
             backend="pgvector",
@@ -232,14 +242,6 @@ class PgVectorStore:
         # SQLAlchemy expands each embedding row into several bind parameters.
         # Sending an entire large workbook at once crosses psycopg's 65,535
         # parameter protocol limit, so persist bounded batches explicitly.
-        total_items = len(documents)
-        use_precomputed_vectors = False
-        if vectors is not None:
-            if len(vectors) != total_items:
-                raise PgVectorStoreError(
-                    f"사전 계산된 벡터 개수({len(vectors)})가 문서 개수({total_items})와 일치하지 않습니다."
-                )
-            use_precomputed_vectors = True
 
         total_batches = max(
             1,

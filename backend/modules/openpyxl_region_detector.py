@@ -409,10 +409,8 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
             catalog_sheets = self.catalog.sheet_names(workbook_path)
             if input_data.tables:
                 table_sheets = {table.sheet_name for table in input_data.tables}
+                # Only include sheets that are both in tables and in catalog
                 selected_sheet_names = [s for s in catalog_sheets if s in table_sheets]
-                for s in table_sheets:
-                    if s not in selected_sheet_names:
-                        selected_sheet_names.append(s)
             else:
                 selected_sheet_names = catalog_sheets
 

@@ -170,7 +170,7 @@ erDiagram
 | `file_id` | `VARCHAR(64)` | `PRIMARY KEY` | 파일 고유 식별자 (SHA256 해시 또는 UUID) |
 | `file_name` | `VARCHAR(255)` | `NOT NULL` | 원본 파일명 (예: `SPG_Company_KeyStats_v4.xlsm`) |
 | `file_hash` | `VARCHAR(64)` | `NOT NULL` | 파일 무결성 검증용 SHA256 해시 |
-| `file_type` | `VARCHAR(32)` | `NOT NULL` | 확장자 (`xlsx`, `xlsm`, `csv`, `pdf` 등) |
+| `file_type` | `VARCHAR(32)` | `NOT NULL` | 확장자 (`xlsx`, `xlsm`, `csv`, `pdf`, `parquet` 등) |
 | `file_size` | `BIGINT` | `NOT NULL` | 파일 크기 (바이트 단위) |
 | `storage_path` | `VARCHAR(512)` | `NOT NULL` | 서버 파일시스템 저장 경로 (`data/source_files/...`) |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | 업로드 일시 |
@@ -198,7 +198,7 @@ erDiagram
 | :--- | :--- | :--- | :--- |
 | `uuid` | `UUID` | `PRIMARY KEY` | LangChain 컬렉션 고유 식별자 (`gen_random_uuid()`) |
 | `name` | `VARCHAR` | `UNIQUE NOT NULL` | 인덱스 고유 ID (예: `bf94446eb7...`) |
-| `cmetadata` | `JSON` | `DEFAULT NULL` | `file_name`, `workbook_hash`, `model`, `dimension`, `doc_count` 등 |
+| `cmetadata` | `JSON` | `DEFAULT NULL` | `file_name`, `workbook_hash`, `model`, `dimension`, `document_count` 등 |
 
 ---
 

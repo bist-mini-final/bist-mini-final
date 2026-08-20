@@ -286,3 +286,48 @@ def test_infer_candidate_cells_accepts_valid_empty_array():
     assert candidates == []
     assert usage.total_tokens == 22
     assert cost >= 0.0
+
+
+def test_skip_inference_when_target_cells_at_max():
+    """Verify that inference is skipped when target_cell_ids count >= max_direct_cells and usage summation succeeds."""
+    from unittest.mock import MagicMock
+
+    mock_pgvector = FakeCellStore()
+
+    # Mock completion client that should NOT be called
+    mock_client = MagicMock()
+    mock_client.complete_with_metadata.side_effect = Exception("Should not call LLM when skipping inference")
+
+    module = AnswerRefinerModule(completion_client=mock_client, pgvector_store=mock_pgvector)
+
+    # Initial answer DTO
+    initial_answer_dto = AnswerDTO(
+        query_context=QueryContextDTO(query_id="q1", question_text="질문 테스트"),
+        document_context=DocumentContextDTO(
+            workbook_hash="6f4a07f1f3023def767a68ffb8531c7f3867f3f622555aeef2d84d7390c6cae4"
+        ),
+        answer="초기 답변",
+        api_usage=ApiUsageDTO(total_tokens=100),
+        latency_seconds=0.5,
+    )
+
+    # Provide enough target_cell_ids to reach max_direct_cells
+    payload = AnswerRefinerInputDTO(
+        answer_json=initial_answer_dto,
+        target_cell_ids=["P17", "P33", "Q40"],
+    )
+
+    # Execute with max_direct_cells=3 (exactly matching target_cell_ids count)
+    result = module.execute(payload.model_dump() | {"max_direct_cells": 3})
+
+    # Verify execution succeeded without calling LLM inference
+    assert result is not None
+    assert "refined_answer_json" in result
+    refined = result["refined_answer_json"]
+
+    # Verify usage summation succeeded with None normalization
+    assert refined["api_usage"]["total_tokens"] >= 0
+    assert refined["api_usage"]["prompt_tokens"] >= 0
+
+    # Verify that direct cells were fetched from mock
+    assert len(refined["direct_cells"]) > 0

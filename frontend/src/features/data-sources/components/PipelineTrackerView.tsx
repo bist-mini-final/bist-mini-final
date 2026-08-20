@@ -306,6 +306,10 @@ export function PipelineTrackerView({
                     aria-expanded={isOpen}
                     onClick={() => toggleModule(mod.id)}
                     onKeyDown={(e) => {
+                      // Ignore keyboard events originating from the Luna button
+                      if ((e.target as HTMLElement).closest('.ds-action-btn')) {
+                        return;
+                      }
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         toggleModule(mod.id);

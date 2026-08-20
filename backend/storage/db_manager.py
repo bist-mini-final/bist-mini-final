@@ -119,10 +119,11 @@ class DatabaseManager:
         except Exception:
             return False
 
-    def ensure_schema(self) -> None:
+    def ensure_schema(self) -> bool:
         """Create required database tables according to DDL_INIT.
-        
-        Initialization failures are logged and do not propagate.
+
+        Returns:
+            bool: True if schema initialization succeeded, False otherwise.
         """
         try:
             conn = self._raw_connection()
@@ -130,13 +131,19 @@ class DatabaseManager:
                 with conn.cursor() as cur:
                     cur.execute(DDL_INIT)
                 conn.commit()
+                return True
             finally:
                 conn.close()
-        except Exception:
-            logger.warning("PostgreSQL 스키마 초기화에 실패했습니다", exc_info=True)
+        except Exception as err:
+            logger.warning("PostgreSQL 스키마 초기화에 실패했습니다: %s", err, exc_info=True)
+            return False
 
-    def run_migrations(self) -> None:
-        """Run destructive or legacy schema migrations (e.g. dropping obsolete columns)."""
+    def run_migrations(self) -> bool:
+        """Run destructive or legacy schema migrations (e.g. dropping obsolete columns).
+
+        Returns:
+            bool: True if migrations succeeded, False otherwise.
+        """
         try:
             conn = self._raw_connection()
             try:
@@ -144,10 +151,12 @@ class DatabaseManager:
                     cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
                     cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
                 conn.commit()
+                return True
             finally:
                 conn.close()
-        except Exception:
-            logger.warning("PostgreSQL 마이그레이션 실행에 실패했습니다", exc_info=True)
+        except Exception as err:
+            logger.warning("PostgreSQL 마이그레이션 실행에 실패했습니다: %s", err, exc_info=True)
+            return False
 
     def save_source_file(
         self,
@@ -278,6 +287,7 @@ class DatabaseManager:
 def main() -> None:
     """CLI entrypoint for initializing database schema or running migrations."""
     import argparse
+    import sys
 
     parser = argparse.ArgumentParser(description="Database schema management and migrations.")
     parser.add_argument("--init", action="store_true", help="Initialize ERD database tables.")
@@ -285,14 +295,25 @@ def main() -> None:
     args = parser.parse_args()
 
     manager = DatabaseManager()
+    exit_code = 0
+
     if args.init or not args.migrate:
         print("Ensuring database schema...")
-        manager.ensure_schema()
-        print("Schema initialized.")
+        if manager.ensure_schema():
+            print("Schema initialized.")
+        else:
+            print("Schema initialization failed.", file=sys.stderr)
+            exit_code = 1
+
     if args.migrate:
         print("Running database migrations...")
-        manager.run_migrations()
-        print("Migrations complete.")
+        if manager.run_migrations():
+            print("Migrations complete.")
+        else:
+            print("Migrations failed.", file=sys.stderr)
+            exit_code = 1
+
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

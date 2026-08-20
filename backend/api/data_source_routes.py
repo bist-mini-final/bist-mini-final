@@ -62,7 +62,6 @@ _ALLOWED_DB_HOSTS = frozenset(
         "localhost",
         "127.0.0.1",
         "::1",
-        "0.0.0.0",
         "postgres",
         "pgvector",
         "bist-pgvector",
@@ -70,18 +69,35 @@ _ALLOWED_DB_HOSTS = frozenset(
 )
 
 
-def _is_allowed_database_host(host: Optional[str]) -> bool:
+def _is_allowed_database_host(host: Optional[str], port: Optional[int]) -> bool:
     if not host:
         return False
     normalized = host.strip("[]").lower()
     if normalized in _ALLOWED_DB_HOSTS:
+        # Only allow port 5432 or the configured PGVECTOR_URL port
+        allowed_ports = {5432}
+        try:
+            configured_port = urlparse(PGVECTOR_URL).port
+            if configured_port:
+                allowed_ports.add(configured_port)
+        except Exception:
+            pass
+        if port is not None and port not in allowed_ports:
+            return False
         return True
     try:
         configured_host = urlparse(PGVECTOR_URL).hostname
         if configured_host and normalized == configured_host.strip("[]").lower():
+            # Also validate port for configured host
+            allowed_ports = {5432}
+            configured_port = urlparse(PGVECTOR_URL).port
+            if configured_port:
+                allowed_ports.add(configured_port)
+            if port is not None and port not in allowed_ports:
+                return False
             return True
-    except Exception:
-        pass
+    except Exception as err:
+        logger.warning("Failed to parse configured PGVECTOR_URL: %s", err)
     return False
 
 
@@ -490,11 +506,11 @@ def create_data_source_router(
         """Test a given pgvector database URL."""
         try:
             parsed = urlparse(req.database_url)
-        except Exception:
+        except Exception as parse_error:
             raise HTTPException(
                 status_code=400,
                 detail="유효하지 않은 데이터베이스 URL입니다.",
-            )
+            ) from parse_error
 
         scheme = (parsed.scheme or "").lower()
         if scheme not in ("postgresql", "postgresql+psycopg", "postgres"):
@@ -503,10 +519,22 @@ def create_data_source_router(
                 detail="PostgreSQL 데이터베이스 URL만 지원됩니다.",
             )
 
-        if not _is_allowed_database_host(parsed.hostname):
+        if not _is_allowed_database_host(parsed.hostname, parsed.port):
             raise HTTPException(
                 status_code=400,
                 detail="허용되지 않은 데이터베이스 호스트입니다.",
+            )
+
+        # Validate and store parsed values once
+        safe_host = parsed.hostname or "localhost"
+        safe_port = parsed.port or 5432
+        safe_database = parsed.path.lstrip("/") or "rag_flow"
+
+        # Validate port is in valid range
+        if not (1 <= safe_port <= 65535):
+            raise HTTPException(
+                status_code=400,
+                detail="유효하지 않은 포트 번호입니다.",
             )
 
         try:
@@ -515,9 +543,9 @@ def create_data_source_router(
             if not info.get("connected"):
                 return {
                     "connected": False,
-                    "host": parsed.hostname or "localhost",
-                    "port": parsed.port or 5432,
-                    "database": parsed.path.lstrip("/") or "rag_flow",
+                    "host": safe_host,
+                    "port": safe_port,
+                    "database": safe_database,
                     "framework": "LangChain",
                     "error": "데이터베이스 연결에 실패했습니다.",
                     "total_indexes": 0,
@@ -528,9 +556,9 @@ def create_data_source_router(
             logger.warning("Database connection test failed: %s", err)
             return {
                 "connected": False,
-                "host": parsed.hostname or "localhost",
-                "port": parsed.port or 5432,
-                "database": parsed.path.lstrip("/") or "rag_flow",
+                "host": safe_host,
+                "port": safe_port,
+                "database": safe_database,
                 "framework": "LangChain",
                 "error": "데이터베이스 연결에 실패했습니다.",
                 "total_indexes": 0,
