@@ -97,9 +97,13 @@ class DenseRetrieverModule(ExecutableModule):
             raise ModuleExecutionError(
                 "벡터 인덱스 참조 DTO와 저장된 인덱스 메타데이터가 일치하지 않습니다"
             )
+        from concurrent.futures import ThreadPoolExecutor
+
         query_items = list(input_data.query_input.items.items())
         ranked_items: List[Dict[str, Any]] = []
-        for query, query_vector in query_items:
+
+        def _search_single_dense(item: Tuple[str, Any]) -> List[Dict[str, Any]]:
+            query, query_vector = item
             hits = self.index_store.search(
                 input_data.index_input.index_id,
                 query_vector,
@@ -108,13 +112,16 @@ class DenseRetrieverModule(ExecutableModule):
                     input_data.top_k * 2,
                 ),
             )
-            ranked_items.extend(
-                self._rank_query(
-                    hits,
-                    query,
-                    input_data.top_k,
-                )
+            return self._rank_query(
+                hits,
+                query,
+                input_data.top_k,
             )
+
+        max_workers = min(8, max(1, len(query_items)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for chunk in executor.map(_search_single_dense, query_items):
+                ranked_items.extend(chunk)
 
         return {
             "query_context": input_data.query_input.query_context.model_dump(

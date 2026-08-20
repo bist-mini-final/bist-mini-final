@@ -95,41 +95,63 @@ class PgVectorRetrieverModule(ExecutableModule):
                 "items": [],
             }
 
-        # Query pgvector across all selected collections for each subquery
+        # Query pgvector across all selected collections for each subquery in parallel
+        from concurrent.futures import ThreadPoolExecutor
+
         all_hits: List[Tuple[float, Dict[str, Any], str, str]] = []
         failures: List[str] = []
-        for target_col in target_collections:
-            for query_text, embedding_vector in query_items:
-                try:
-                    results = self.pgvector_store.similarity_search_by_vector_with_score(
-                        collection_name=target_col,
-                        embedding=embedding_vector,
-                        k=top_k,
-                    )
-                    for offset, (doc, dist) in enumerate(results):
-                        score = 1.0 - float(dist) if dist is not None else 0.5
-                        content_str = doc.page_content or ""
-                        content_hash = hashlib.sha256(content_str.encode("utf-8")).hexdigest()[:16]
-                        doc_id = getattr(doc, "id", None)
-                        row_id = doc_id if isinstance(doc_id, str) and doc_id else None
-                        persistent_id = (
-                            row_id
-                            or doc.metadata.get("cell_id")
-                            or doc.metadata.get("chunk_id")
-                            or doc.metadata.get("id")
-                        )
-                        cell_id = persistent_id or f"{target_col}:chunk:{content_hash}"
-                        raw_doc = {
-                            "cell_id": cell_id,
-                            "text": doc.page_content,
-                            "metadata": doc.metadata,
-                        }
-                        all_hits.append((score, raw_doc, query_text, target_col))
-                except Exception as err:
-                    logger.warning(
-                        "pgvector 컬렉션 검색 실패: %s (%s)", target_col, err
-                    )
-                    failures.append(f"{target_col}: {err}")
+
+        tasks = [
+            (target_col, query_text, embedding_vector)
+            for target_col in target_collections
+            for query_text, embedding_vector in query_items
+        ]
+
+        def _search_single_subquery(
+            task: Tuple[str, str, Any]
+        ) -> Tuple[str, str, List[Any], Optional[Exception]]:
+            col, q_text, q_vec = task
+            try:
+                res = self.pgvector_store.similarity_search_by_vector_with_score(
+                    collection_name=col,
+                    embedding=q_vec,
+                    k=top_k,
+                )
+                return col, q_text, res, None
+            except Exception as err:
+                return col, q_text, [], err
+
+        max_workers = min(10, max(1, len(tasks)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_results = list(executor.map(_search_single_subquery, tasks))
+
+        for target_col, query_text, results, err in future_results:
+            if err is not None:
+                logger.warning(
+                    "pgvector 컬렉션 검색 실패: %s (%s)", target_col, err
+                )
+                failures.append(f"{target_col}: {err}")
+                continue
+
+            for offset, (doc, dist) in enumerate(results):
+                score = 1.0 - float(dist) if dist is not None else 0.5
+                content_str = doc.page_content or ""
+                content_hash = hashlib.sha256(content_str.encode("utf-8")).hexdigest()[:16]
+                doc_id = getattr(doc, "id", None)
+                row_id = doc_id if isinstance(doc_id, str) and doc_id else None
+                persistent_id = (
+                    row_id
+                    or doc.metadata.get("cell_id")
+                    or doc.metadata.get("chunk_id")
+                    or doc.metadata.get("id")
+                )
+                cell_id = persistent_id or f"{target_col}:chunk:{content_hash}"
+                raw_doc = {
+                    "cell_id": cell_id,
+                    "text": doc.page_content,
+                    "metadata": doc.metadata,
+                }
+                all_hits.append((score, raw_doc, query_text, target_col))
 
         if failures and not all_hits:
             raise ModuleExecutionError(
