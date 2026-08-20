@@ -139,40 +139,78 @@ class Bm25RetrieverModule(ExecutableModule):
                 "items": [],
             }
 
+        # 1. Corpus tokenization & document lengths
         corpus = [tokenize(document.text) for document in documents]
-        document_frequencies = [Counter(tokens) for tokens in corpus]
+        doc_lengths = [len(tokens) for tokens in corpus]
         document_count = len(corpus)
         average_document_length = (
-            sum(len(tokens) for tokens in corpus) / document_count
-        ) or 1.0
-        document_occurrences: Counter = Counter()
-        for frequencies in document_frequencies:
-            document_occurrences.update(frequencies.keys())
+            sum(doc_lengths) / document_count
+        ) if document_count > 0 else 1.0
+
+        # 2. Build Inverted Index: token -> list of (doc_index, term_frequency)
+        inverted_index: Dict[str, List[Tuple[int, int]]] = {}
+        for doc_idx, tokens in enumerate(corpus):
+            counts = Counter(tokens)
+            for token, freq in counts.items():
+                if token not in inverted_index:
+                    inverted_index[token] = []
+                inverted_index[token].append((doc_idx, freq))
+
+        # 3. Calculate IDF for all unique tokens in corpus
         inverse_document_frequencies = {
             token: math.log(
-                1.0 + (document_count - count + 0.5) / (count + 0.5)
+                1.0 + (document_count - len(postings) + 0.5) / (len(postings) + 0.5)
             )
-            for token, count in document_occurrences.items()
+            for token, postings in inverted_index.items()
         }
 
+        # 4. High-performance inverted index scoring per subquery
         ranked_items: List[Dict[str, Any]] = []
+        k1 = input_data.k1
+        b = input_data.b
+        top_k = input_data.top_k
+
         for query in input_data.query_input.subqueries:
-            query_scores = self._document_scores(
-                query,
-                corpus,
-                document_frequencies,
-                inverse_document_frequencies,
-                average_document_length,
-                input_data.k1,
-                input_data.b,
-            )
+            scores: Dict[int, float] = {}
+            for token in tokenize(query):
+                inv_freq = inverse_document_frequencies.get(token)
+                if inv_freq is None:
+                    continue
+                for doc_idx, freq in inverted_index.get(token, []):
+                    doc_len = doc_lengths[doc_idx]
+                    num = freq * (k1 + 1)
+                    denom = freq + k1 * (
+                        1 - b + b * doc_len / average_document_length
+                    )
+                    scores[doc_idx] = scores.get(doc_idx, 0.0) + (
+                        inv_freq * num / denom
+                    )
+
+            best_by_cell: Dict[str, Tuple[float, CellTextDocumentDTO, str]] = {}
+            for doc_idx, score in scores.items():
+                if score <= 0:
+                    continue
+                document = documents[doc_idx]
+                current = best_by_cell.get(document.cell_id)
+                if current is None or score > current[0]:
+                    best_by_cell[document.cell_id] = (score, document, query)
+
+            ranked = sorted(
+                best_by_cell.values(),
+                key=lambda item: (-item[0], item[1].cell_id),
+            )[:top_k]
+
             ranked_items.extend(
-                self._rank_query(
-                    documents,
-                    query_scores,
-                    query,
-                    input_data.top_k,
-                )
+                [
+                    {
+                        "rank": rank,
+                        "cell_id": document.cell_id,
+                        "score": round(score, 10),
+                        "text": document.text,
+                        "matched_subquery": query,
+                    }
+                    for rank, (score, document, _) in enumerate(ranked, start=1)
+                ]
             )
 
         return {
