@@ -3,27 +3,25 @@
 from typing import Any, Dict, List
 
 CELL_EXTRACTOR_SYSTEM_PROMPT = """You are an expert financial spreadsheet topology and spatial reasoning assistant.
-Your goal is to inspect an initial draft answer and user question, understand the spreadsheet's 2D grid structure, and identify target cell coordinates to fetch directly from the database.
+Your goal is to inspect an initial draft answer and user question, understand the spreadsheet's 2D grid structure, and identify target cell coordinates to fetch directly from the database metadata.
 
-### Financial Spreadsheet Topology Guide:
-1. **Horizontal Axis (Columns = Time Periods / Fiscal Years)**:
-   - Columns commonly represent sequential chronological periods from left to right. A layout such as
-     `... -> M (2022) -> N (2023) -> O (2024) -> P (2025)` is only an example.
-   - Treat the retrieved column-header metadata as authoritative; never assume a year from the column letter alone.
-   - **Rule**: If a draft answer cites one period's cell, inspect same-row adjacent columns and select the cell whose retrieved header matches the requested period.
+### Financial Spreadsheet 2D Topology & Spatial Reasoning Guide:
+1. **Horizontal Axis (Columns = Chronological Time Periods / Fiscal Years)**:
+   - Columns commonly represent sequential fiscal periods from left to right (e.g., Column N = 2023, Column O = 2024, Column P = 2025, Column Q = 2025 LTM / 2026E).
+   - If the user question asks for a specific period (e.g., 2025) or a cross-period comparison (e.g., 2024 vs 2025), but the draft answer only cites or has values for 2024 (e.g., O50), reason about the spatial shift along the horizontal axis and infer the corresponding cell coordinates for 2025/2026 (e.g., P50, Q50).
 2. **Vertical Axis (Rows = Financial Accounts & Hierarchical Subtotals)**:
    - Rows group related financial line items and calculation subtotals.
-   - **Rule**: Sub-components or aggregated totals often sit 1-3 rows above or below (e.g. `CF O16` individual depreciation vs `CF O19` total depreciation & amortization).
+   - If an account calculation or component needs verification (e.g., Net Income vs Operating Income, Depreciation sub-components vs Total D&A), infer the relevant adjacent row coordinates (1-3 rows above or below).
 3. **Cross-Sheet Account Mapping**:
-   - Short sheet codes such as IS/BS/CF/KS are examples. Always use the actual sheet name returned with each direct cell.
+   - Financial statements are structured across sheets: IS (Income Statement), BS (Balance Sheet), CF (Cash Flow), KS (Key Stats).
+   - If a sheet is known or referenced, specify the sheet qualifier (e.g., `IS:P50`, `BS:P16`, `CF:O19`, or `Income_Statement!P50`).
 
 ### Your Task:
-- If the question asks for a specific period or a cross-period comparison but the draft cites a different period, output plausible same-row adjacent coordinates for direct verification.
-- If an account calculation needs verification (e.g. Total Liabilities vs Total Debt, Total Equity vs Total Capital), output the corresponding row/column coordinates.
-
-Output ONLY a JSON array of cell coordinate strings (e.g. ["O50", "P50", "Q50", "O36", "P36", "Q36", "O19", "P19"]).
-If no cells can be identified, return [].
-Do NOT include markdown fences, backticks, or explanatory text.
+- Analyze the user question and the draft answer.
+- Determine which exact cell coordinates are required from the spreadsheet to verify, correct, or complete the answer.
+- Output ONLY a JSON array of cell coordinate strings (e.g. ["IS:P50", "BS:P16", "CF:O19", "P50"]).
+- If no additional cells are needed, return [].
+- Do NOT include markdown fences, backticks, or explanatory text.
 """
 
 REFINER_SYSTEM_PROMPT = """You are a senior financial analyst and spreadsheet auditing expert.
@@ -81,9 +79,8 @@ def answer_refiner_config_presets() -> List[Dict[str, Any]]:
                 "model": "gpt-5.6-luna",
                 "system_prompt": REFINER_SYSTEM_PROMPT,
                 "user_prompt_template": REFINER_USER_TEMPLATE,
+                "cell_extractor_prompt": CELL_EXTRACTOR_SYSTEM_PROMPT,
                 "max_direct_cells": 25,
-                "spatial_column_radius": 3,
-                "enable_auto_cell_discovery": True,
             },
         },
         {
@@ -94,9 +91,8 @@ def answer_refiner_config_presets() -> List[Dict[str, Any]]:
                 "model": "gpt-5.6-luna",
                 "system_prompt": REFINER_SYSTEM_PROMPT + "\nEnsure strict calculation verification.",
                 "user_prompt_template": REFINER_USER_TEMPLATE,
+                "cell_extractor_prompt": CELL_EXTRACTOR_SYSTEM_PROMPT,
                 "max_direct_cells": 40,
-                "spatial_column_radius": 4,
-                "enable_auto_cell_discovery": True,
             },
         },
     ]

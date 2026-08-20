@@ -20,7 +20,7 @@ from .base import (
 class ProcessedFileSelectorInputDTO(ModuleInputDTO):
     file_name: str = Field(
         min_length=1,
-        description="data/processed에서 선택할 Excel 파일명",
+        description="data/source_files에서 선택할 Excel 파일명",
     )
     sheet_names: Optional[List[str]] = Field(
         default=None,
@@ -29,7 +29,7 @@ class ProcessedFileSelectorInputDTO(ModuleInputDTO):
 
 
 class WorkbookSelectionDTO(ModuleDTO):
-    file_name: str = Field(description="선택된 processed Excel 파일명")
+    file_name: str = Field(description="선택된 source Excel 파일명")
     workbook_hash: str = Field(description="파일 변경을 식별하는 SHA-256")
     sheet_names: List[str] = Field(
         min_length=1,
@@ -42,7 +42,7 @@ class ProcessedFileSelectorModule(ExecutableModule):
         type="processed_file_selector",
         label="Processed Excel File Selector",
         category="Source",
-        description="data/processed의 Excel 파일 하나를 안전하게 선택합니다.",
+        description="data/source_files의 Excel 파일 하나를 안전하게 선택합니다.",
         inputs=[],
         outputs=["output"],
         config_fields=[],

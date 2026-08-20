@@ -51,6 +51,9 @@ data/source_files/*
 !data/source_files/.gitkeep
 data/sources/*
 !data/sources/.gitkeep
+data/virtual/
+data/virtual/*
+!data/virtual/.gitkeep
 data/workflows/workflow.json
 tmp/
 

@@ -1,9 +1,10 @@
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
 from ..storage.db_manager import DatabaseManager
 from ..storage.pgvector_store import PgVectorStore
+from ..storage.connection_pool import get_connection
 from .base import (
     EmptyModuleConfigDTO,
     ExecutableModule,
@@ -17,7 +18,7 @@ from .prebuilt_index_loader import DocumentOutputDTO, IndexOutputDTO, PrebuiltIn
 
 class PgVectorCollectionLoaderInputDTO(ModuleInputDTO):
     collection_name: Optional[str] = Field(
-        default="SPG_Company_KeyStats_v4.xlsm",
+        default=None,
         description="단일 컬렉션 선택 시 컬렉션 이름 또는 파일명",
     )
     collection_names: List[str] = Field(
@@ -92,6 +93,8 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         model_name = "text-embedding-3-large"
         dimension = 3072
 
+        targets_meta: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+
         for target in targets:
             matched = None
             for idx in indexes:
@@ -132,12 +135,15 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                 matched_dimensions.add(col_dim)
                 dimension = col_dim
 
+            targets_meta.append((matched, meta))
+
+        for matched, meta in targets_meta:
+            cid = matched["index_id"]
             items = meta.get("items") or []
             if not items:
                 # Load chunks directly from langchain_pg_embedding table
                 try:
-                    conn = self.db_manager._raw_connection()
-                    try:
+                    with get_connection(self.db_manager.database_url) as conn:
                         with conn.cursor() as cur:
                             cur.execute(
                                 """
@@ -170,8 +176,6 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                                     "text": text,
                                     "metadata": cmeta,
                                 })
-                    finally:
-                        conn.close()
                 except Exception as error:
                     raise ModuleExecutionError(
                         f"pgvector 컬렉션 문서를 읽지 못했습니다: {cid}"

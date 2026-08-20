@@ -1,4 +1,4 @@
-"""Independent module for refining Reader answers by querying direct spreadsheet cell metadata from PostgreSQL."""
+"""Independent module for refining Reader answers by querying direct spreadsheet cell metadata from PostgreSQL via pure LLM spatial reasoning."""
 
 from __future__ import annotations
 
@@ -35,43 +35,7 @@ from .base import (
 from .data_lineage import DocumentContextDTO, QueryContextDTO
 from .reader import AnswerDTO, ApiUsageDTO
 
-
 logger = logging.getLogger(__name__)
-_NON_CELL_PREFIXES = {"FY", "EPS"}
-
-
-def _col_to_num(col: str) -> int:
-    """Convert Excel column letters (e.g. 'A', 'O', 'AA') to 1-based number."""
-    num = 0
-    for ch in col.upper():
-        if 'A' <= ch <= 'Z':
-            num = num * 26 + (ord(ch) - ord('A') + 1)
-    return num
-
-
-def _num_to_col(num: int) -> str:
-    """Convert 1-based number to Excel column letters (e.g. 1 -> 'A', 15 -> 'O')."""
-    col = ""
-    while num > 0:
-        num, remainder = divmod(num - 1, 26)
-        col = chr(ord('A') + remainder) + col
-    return col
-
-
-def _split_cell_coord(coord: str) -> Optional[Tuple[str, int]]:
-    """
-    Parse a spreadsheet cell coordinate into its column label and row number.
-    
-    Parameters:
-        coord (str): Cell coordinate, such as ``"O50"``.
-    
-    Returns:
-        Optional[Tuple[str, int]]: An uppercase column label and row number, or ``None`` for an invalid coordinate.
-    """
-    match = re.match(r"^([A-Za-z]+)(\d+)$", coord.strip())
-    if match:
-        return match.group(1).upper(), int(match.group(2))
-    return None
 
 
 class DirectCellDTO(ModuleDTO):
@@ -115,21 +79,15 @@ class AnswerRefinerConfigDTO(ModuleConfigDTO):
         default=REFINER_USER_TEMPLATE,
         description="{question}, {initial_answer}, {direct_cells_text} 템플릿 변수를 포함하는 사용자 프롬프트",
     )
+    cell_extractor_prompt: str = Field(
+        default=CELL_EXTRACTOR_SYSTEM_PROMPT,
+        description="2D 스프레드시트 공간 위상 추론을 통한 타겟 셀 후보 추출 시스템 프롬프트",
+    )
     max_direct_cells: int = Field(
         default=25,
         ge=1,
         le=60,
         description="DB에서 직접 인출할 최대 셀 개수",
-    )
-    spatial_column_radius: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="발견된 셀 좌표 기준으로 좌우 인접 열(연도/타임라인)을 자동 확장할 반경 (예: O50 -> N50, P50, Q50, R50)",
-    )
-    enable_auto_cell_discovery: bool = Field(
-        default=True,
-        description="질문 및 초기 답변에서 필요한 셀 좌표를 자동 판별하여 추가 인출할지 여부",
     )
 
 
@@ -162,7 +120,7 @@ class AnswerRefinerModule(ExecutableModule):
         label="Direct Cell Answer Refiner",
         category="Output",
         description=(
-            "Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, "
+            "Reader 답변에서 추가 검증이 필요한 셀을 LLM 2D 공간 위상 추론으로 선별하고, "
             "PostgreSQL pgvector 메타데이터에서 해당 셀들을 직접 조회하여 답변을 보강 및 정밀 개선합니다."
         ),
         inputs=["answer_json"],
@@ -172,9 +130,8 @@ class AnswerRefinerModule(ExecutableModule):
             "preset",
             "system_prompt",
             "user_prompt_template",
+            "cell_extractor_prompt",
             "max_direct_cells",
-            "spatial_column_radius",
-            "enable_auto_cell_discovery",
         ],
         config_presets=answer_refiner_config_presets(),
         version="1",
@@ -193,191 +150,152 @@ class AnswerRefinerModule(ExecutableModule):
         self.completion_client = completion_client
         self.pgvector_store = pgvector_store or PgVectorStore()
 
-    def _expand_spatial_neighbors(self, coord: str, radius: int) -> List[str]:
+    @staticmethod
+    def _parse_candidate_token(
+        raw_token: Any,
+        sheet_codes: Dict[str, str],
+    ) -> Optional[CellCandidateDTO]:
         """
-        Expand a valid cell coordinate to neighboring columns within the specified radius.
+        Normalize a raw cell candidate token (dict or string) into a CellCandidateDTO.
         
-        Parameters:
-        	coord (str): Cell coordinate to expand.
-        	radius (int): Number of columns to include on each side.
-        
-        Returns:
-        	List[str]: The original coordinate followed by right- and left-side neighboring coordinates. Invalid coordinates or non-positive radii return the uppercased original coordinate.
+        Handles:
+            - Dict: {"cell_coord": "P50", "sheet_name": "IS"}
+            - Qualified strings: "IS:P50", "Income_Statement!P50", "IS Cell P50"
+            - Standalone strings: "P50"
         """
-        parsed = _split_cell_coord(coord)
-        if not parsed or radius <= 0:
-            return [coord.upper()]
+        if isinstance(raw_token, dict):
+            coord = raw_token.get("cell_coord") or raw_token.get("coord")
+            sheet = raw_token.get("sheet_name") or raw_token.get("sheet")
+            if not coord or not isinstance(coord, str):
+                return None
+            match = re.search(r"([A-Z]{1,3}[1-9]\d{0,6})", coord.upper())
+            if not match:
+                return None
+            clean_coord = match.group(1)
+            norm_sheet = None
+            if sheet and isinstance(sheet, str) and sheet.strip():
+                s = sheet.strip()
+                norm_sheet = sheet_codes.get(s.upper(), canonical_sheet_name(s))
+            return CellCandidateDTO(cell_coord=clean_coord, sheet_name=norm_sheet)
 
-        col_str, row_num = parsed
-        base_col_num = _col_to_num(col_str)
+        if not isinstance(raw_token, str) or not raw_token.strip():
+            return None
 
-        expanded = [coord.upper()]
-        # Expand horizontal columns (prioritize rightward timeline years, then leftward)
-        for offset in range(1, radius + 1):
-            right_col = _num_to_col(base_col_num + offset)
-            if right_col:
-                expanded.append(f"{right_col}{row_num}")
-            if base_col_num - offset > 0:
-                left_col = _num_to_col(base_col_num - offset)
-                expanded.append(f"{left_col}{row_num}")
+        token_str = raw_token.strip()
+        # Parse patterns like 'IS:P50', 'Income_Statement!P50', 'IS Cell P50', or 'P50'
+        qualified = re.search(
+            r"^(?:(?P<sheet>[A-Za-z_][A-Za-z0-9_ ]*?)\s*(?:[!:]|\s+Cell\s+))?\s*(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})$",
+            token_str,
+            flags=re.IGNORECASE,
+        )
+        if qualified:
+            clean_coord = qualified.group("coord").upper()
+            sheet_raw = qualified.group("sheet")
+            norm_sheet = None
+            if sheet_raw and sheet_raw.strip():
+                s = sheet_raw.strip()
+                norm_sheet = sheet_codes.get(s.upper(), canonical_sheet_name(s))
+            return CellCandidateDTO(cell_coord=clean_coord, sheet_name=norm_sheet)
 
-        return expanded
+        # Fallback coordinate search
+        match = re.search(r"([A-Z]{1,3}[1-9]\d{0,6})", token_str.upper())
+        if match:
+            return CellCandidateDTO(cell_coord=match.group(1), sheet_name=None)
 
-    def _extract_candidate_cells(
+        return None
+
+    def _infer_candidate_cells(
         self,
         question: str,
         initial_answer: str,
         explicit_cell_ids: Optional[List[str]] = None,
-        spatial_radius: int = 3,
-    ) -> List[CellCandidateDTO]:
+        model: str = "gpt-5.6-luna",
+        extractor_prompt: str = CELL_EXTRACTOR_SYSTEM_PROMPT,
+        max_cells: int = 25,
+    ) -> Tuple[List[CellCandidateDTO], ApiUsageDTO, float]:
         """
-        Extracts cell references from the question and initial answer, then adds nearby horizontal cell coordinates.
-        
-        Parameters:
-        	question (str): The question text to scan for cell references.
-        	initial_answer (str): The initial answer text to scan for cell references.
-        	explicit_cell_ids (Optional[List[str]]): Cell identifiers to include in the candidate set.
-        	spatial_radius (int): Number of neighboring columns to include around each candidate cell.
-        
-        Returns:
-            List[CellCandidateDTO]: Unique cell coordinates and their optional sheet names.
+        Uses LLM spatial & topological reasoning to infer candidate cell coordinates
+        required to verify, correct, or complete the initial answer.
         """
-        base_candidates: List[CellCandidateDTO] = []
+        candidates: List[CellCandidateDTO] = []
         sheet_codes = {
             code.upper(): sheet_name
             for sheet_name, code in SHEET_CODE_MAP.items()
         }
 
-        def normalized_sheet_name(value: Optional[str]) -> Optional[str]:
-            if value is None or not value.strip():
-                return None
-            stripped = value.strip()
-            return sheet_codes.get(stripped.upper(), canonical_sheet_name(stripped))
-
-        def add_candidate(
-            raw_value: str,
-            *,
-            explicit: bool = False,
-            sheet_name: Optional[str] = None,
-        ) -> None:
-            match = re.search(r"([A-Z]{1,3})([1-9]\d{0,6})\b", raw_value.upper())
-            if match is None:
-                return
-            column, row_text = match.groups()
-            row = int(row_text)
-            # Unqualified financial tokens such as FY2025, EPS2024 and Q3 are
-            # substantially more common than cells with those spellings. Explicit
-            # ``Cell Q3``/``Sheet!Q3`` references are still accepted below.
-            if not explicit and (
-                column in _NON_CELL_PREFIXES
-                or 1900 <= row <= 2100
-                or (column == "Q" and row <= 4)
-            ):
-                return
-            cell_coord = f"{column}{row}"
-            normalized_sheet = normalized_sheet_name(sheet_name)
-            if normalized_sheet is None:
-                if any(
-                    candidate.cell_coord == cell_coord and candidate.sheet_name is not None
-                    for candidate in base_candidates
-                ):
-                    return
-            else:
-                base_candidates[:] = [
-                    candidate
-                    for candidate in base_candidates
-                    if not (
-                        candidate.cell_coord == cell_coord
-                        and candidate.sheet_name is None
-                    )
-                ]
-            if not any(
-                candidate.cell_coord == cell_coord
-                and candidate.sheet_name == normalized_sheet
-                for candidate in base_candidates
-            ):
-                base_candidates.append(
-                    CellCandidateDTO(
-                        cell_coord=cell_coord,
-                        sheet_name=normalized_sheet,
-                    )
-                )
-
+        # 1. Add explicit cell IDs provided by caller/workflow
         for cell_id in explicit_cell_ids or []:
-            qualified = re.fullmatch(
-                r"\s*(?P<sheet>[A-Za-z_][A-Za-z0-9_ ]*?)\s*(?:[!:]|\s+Cell\s+)\s*"
-                r"(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})\s*",
-                cell_id,
-                flags=re.IGNORECASE,
-            )
-            if qualified:
-                add_candidate(
-                    qualified.group("coord"),
-                    explicit=True,
-                    sheet_name=qualified.group("sheet"),
+            cand = self._parse_candidate_token(cell_id, sheet_codes)
+            if cand and not any(
+                c.cell_coord == cand.cell_coord and c.sheet_name == cand.sheet_name
+                for c in candidates
+            ):
+                candidates.append(cand)
+
+        usage = ApiUsageDTO()
+        estimated_cost_usd = 0.0
+
+        # 2. Perform LLM 2D Spatial Topology Reasoning
+        if self.completion_client and len(candidates) < max_cells:
+            try:
+                res = self.completion_client.complete_with_metadata(
+                    messages=[
+                        {"role": "system", "content": extractor_prompt},
+                        {
+                            "role": "user",
+                            "content": f"User Question: {question}\nInitial Draft Answer: {initial_answer}",
+                        },
+                    ],
+                    model=model,
                 )
-            else:
-                add_candidate(cell_id, explicit=True)
+            except Exception as err:
+                raise ModuleExecutionError(f"LLM 셀 공간 위상 추론 호출 실패: {err}") from err
 
-        # Heuristic 1: Regex matches for cell patterns like 'IS Cell O50', 'O50', 'Income_Statement!E16'
-        text_corpus = f"{question}\n{initial_answer}"
-        qualified_pattern = (
-            r"\b(?P<sheet>[A-Za-z_][A-Za-z0-9_]*)\s*[!:]\s*"
-            r"(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
-        )
-        for match in re.finditer(qualified_pattern, text_corpus, flags=re.IGNORECASE):
-            add_candidate(
-                match.group("coord"),
-                explicit=True,
-                sheet_name=match.group("sheet"),
+            usage = ApiUsageDTO(
+                prompt_tokens=res.usage.get("prompt_tokens", 0),
+                completion_tokens=res.usage.get("completion_tokens", 0),
+                cached_tokens=res.usage.get("cached_tokens", 0),
+                reasoning_tokens=res.usage.get("reasoning_tokens", 0),
+                total_tokens=res.usage.get("total_tokens", 0),
             )
-
-        # Heuristic 2: Match 'IS Cell I16' or 'Cell I16'
-        named_cell_pattern = (
-            r"\b(?:(?P<sheet>IS|BS|CF|KS|[A-Za-z_]+_[A-Za-z0-9_]+)\s+)?"
-            r"Cell\s+(?P<coord>[A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
-        )
-        for match in re.finditer(named_cell_pattern, text_corpus, flags=re.IGNORECASE):
-            add_candidate(
-                match.group("coord"),
-                explicit=True,
-                sheet_name=match.group("sheet"),
+            estimated_cost_usd = calculate_openai_cost(
+                model,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+                cached_tokens=usage.cached_tokens,
             )
-
-        standalone_pattern = r"(?<![A-Za-z0-9_])([A-Z]{1,3}[1-9]\d{0,6})(?![A-Za-z0-9_])"
-        for match in re.findall(standalone_pattern, text_corpus, flags=re.IGNORECASE):
-            add_candidate(match)
-
-        # Perform Spatial Horizontal Timeline Expansion
-        final_candidates: List[CellCandidateDTO] = []
-        for candidate in base_candidates:
-            if candidate not in final_candidates:
-                final_candidates.append(candidate)
-
-        for cand in base_candidates:
-            neighbors = self._expand_spatial_neighbors(cand.cell_coord, spatial_radius)
-            for neighbor in neighbors:
-                candidate = CellCandidateDTO(
-                    cell_coord=neighbor,
-                    sheet_name=cand.sheet_name,
+            raw_text = res.content.strip()
+            json_match = re.search(r"\[[\s\S]*\]", raw_text)
+            if not json_match:
+                raise ModuleExecutionError(
+                    f"LLM 셀 공간 위상 추론 응답에서 JSON 배열을 찾을 수 없습니다: {raw_text[:200]}"
                 )
-                if candidate not in final_candidates:
-                    final_candidates.append(candidate)
+            try:
+                items = json.loads(json_match.group(0))
+            except Exception as json_err:
+                raise ModuleExecutionError(
+                    f"LLM 셀 공간 위상 추론 JSON 파싱 실패: {json_err}"
+                ) from json_err
 
-        return final_candidates
+            if not isinstance(items, list):
+                raise ModuleExecutionError(
+                    f"LLM 셀 공간 위상 추론 결과가 배열(list)이 아닙니다: {type(items).__name__}"
+                )
+
+            for item in items:
+                cand = self._parse_candidate_token(item, sheet_codes)
+                if cand and not any(
+                    c.cell_coord == cand.cell_coord and c.sheet_name == cand.sheet_name
+                    for c in candidates
+                ):
+                    candidates.append(cand)
+
+        return candidates[:max_cells], usage, estimated_cost_usd
 
     def execute(self, payload: Any) -> Dict[str, Any]:
         """
-        Refine an initial Reader answer using matching spreadsheet cell metadata and optional language-model processing.
-        
-        Parameters:
-            payload (Any): Answer-refinement input containing the initial answer, configuration, and optional target cell identifiers.
-        
-        Returns:
-            Dict[str, Any]: JSON-serializable refined answer data, including direct cells, refinement details, usage, latency, and estimated cost.
-        
-        Raises:
-            ModuleExecutionError: If the language-model refinement request fails.
+        Refine an initial Reader answer using direct spreadsheet cell metadata identified
+        via LLM spatial reasoning.
         """
         started_at = time.perf_counter()
         if isinstance(payload, AnswerRefinerExecutionDTO):
@@ -392,74 +310,59 @@ class AnswerRefinerModule(ExecutableModule):
         initial_answer = initial_dto.answer
         workbook_hash = initial_dto.document_context.workbook_hash
 
-        # 1. Identify Candidate Cell IDs and expand horizontal timeline neighbors
-        target_cells = self._extract_candidate_cells(
-            question=question_text,
-            initial_answer=initial_answer,
-            explicit_cell_ids=parsed.target_cell_ids,
-            spatial_radius=parsed.spatial_column_radius,
-        )
+        # 1. Infer Target Cells via LLM Spatial Reasoning (skip if target_cell_ids already at max)
+        extractor_usage = ApiUsageDTO()
+        extractor_cost = 0.0
+        target_cells = []
 
-        # 2. LLM-assisted Auto Cell Discovery if enabled
-        if parsed.enable_auto_cell_discovery and self.completion_client and len(target_cells) < parsed.max_direct_cells:
-            try:
-                extract_res = self.completion_client.complete_with_metadata(
-                    messages=[
-                        {"role": "system", "content": CELL_EXTRACTOR_SYSTEM_PROMPT},
-                        {
-                            "role": "user",
-                            "content": f"Question: {question_text}\nDraft Answer: {initial_answer}",
-                        },
-                    ],
-                    model=parsed.model,
-                )
-                raw_json = extract_res.content.strip()
-                if raw_json.startswith("[") and raw_json.endswith("]"):
-                    discovered = json.loads(raw_json)
-                    if isinstance(discovered, list):
-                        for item in discovered:
-                            if isinstance(item, str) and item.strip():
-                                discovered_cells = self._extract_candidate_cells(
-                                    question="",
-                                    initial_answer=item,
-                                    spatial_radius=parsed.spatial_column_radius,
-                                )
-                                for candidate in discovered_cells:
-                                    if candidate not in target_cells:
-                                        target_cells.append(candidate)
-            except Exception as error:  # noqa: BLE001 - deterministic regex fallback
-                logger.warning(
-                    "자동 셀 좌표 탐지 실패, 정규식 결과만 사용합니다: %s",
-                    error,
-                )
-
-        # 3. Directly Fetch Cell Metadata from PostgreSQL
-        limited_target_cells = target_cells[: parsed.max_direct_cells]
-        fetched_raw_cells = self.pgvector_store.fetch_cells_by_metadata(
-            cell_identifiers=[candidate.cell_coord for candidate in limited_target_cells],
-            cell_references=[
-                candidate.model_dump(mode="json")
-                for candidate in limited_target_cells
-            ],
-            workbook_hash=workbook_hash,
-            limit=parsed.max_direct_cells,
-        )
-
-        direct_cells = [
-            DirectCellDTO(
-                cell_id=c["cell_id"],
-                sheet_name=c["sheet_name"],
-                cell_coord=c["cell_coord"],
-                cell_value=c.get("cell_value"),
-                row_header=c.get("row_header", []),
-                column_header=c.get("column_header", []),
-                company_name=c.get("company_name"),
-                source_text=c.get("source_text", ""),
+        if not parsed.target_cell_ids or len(parsed.target_cell_ids) < parsed.max_direct_cells:
+            target_cells, extractor_usage, extractor_cost = self._infer_candidate_cells(
+                question=question_text,
+                initial_answer=initial_answer,
+                explicit_cell_ids=parsed.target_cell_ids,
+                model=parsed.model,
+                extractor_prompt=parsed.cell_extractor_prompt,
+                max_cells=parsed.max_direct_cells,
             )
-            for c in fetched_raw_cells
-        ]
+        elif parsed.target_cell_ids:
+            # Use explicit cells without inference
+            sheet_codes = {
+                code.upper(): sheet_name
+                for sheet_name, code in SHEET_CODE_MAP.items()
+            }
+            for cell_id in parsed.target_cell_ids[:parsed.max_direct_cells]:
+                cand = self._parse_candidate_token(cell_id, sheet_codes)
+                if cand:
+                    target_cells.append(cand)
 
-        # 4. Construct Direct Cells Text for Refinement Prompt
+        # 2. Directly Fetch Cell Metadata from PostgreSQL
+        direct_cells: List[DirectCellDTO] = []
+        if target_cells:
+            fetched_raw_cells = self.pgvector_store.fetch_cells_by_metadata(
+                cell_identifiers=[candidate.cell_coord for candidate in target_cells],
+                cell_references=[
+                    candidate.model_dump(mode="json")
+                    for candidate in target_cells
+                ],
+                workbook_hash=workbook_hash,
+                limit=parsed.max_direct_cells,
+            )
+
+            direct_cells = [
+                DirectCellDTO(
+                    cell_id=c["cell_id"],
+                    sheet_name=c["sheet_name"],
+                    cell_coord=c["cell_coord"],
+                    cell_value=c.get("cell_value"),
+                    row_header=c.get("row_header", []),
+                    column_header=c.get("column_header", []),
+                    company_name=c.get("company_name"),
+                    source_text=c.get("source_text", ""),
+                )
+                for c in fetched_raw_cells
+            ]
+
+        # 3. Construct Direct Cells Text for Refinement Prompt
         if direct_cells:
             cell_lines = []
             for dc in direct_cells:
@@ -473,7 +376,7 @@ class AnswerRefinerModule(ExecutableModule):
         else:
             direct_cells_text = "No additional direct cell metadata found in database matching identified coordinates."
 
-        # 5. Execute Refinement LLM Completion
+        # 4. Execute Refinement LLM Completion
         user_prompt = parsed.user_prompt_template.format(
             question=question_text,
             initial_answer=initial_answer,
@@ -482,8 +385,8 @@ class AnswerRefinerModule(ExecutableModule):
 
         refined_answer = initial_answer
         refinement_summary = "No modifications made."
-        api_usage = ApiUsageDTO()
-        estimated_cost_usd = 0.0
+        api_usage = extractor_usage
+        estimated_cost_usd = extractor_cost
 
         if self.completion_client:
             try:
@@ -494,19 +397,29 @@ class AnswerRefinerModule(ExecutableModule):
                     ],
                     model=parsed.model,
                 )
-                api_usage = ApiUsageDTO(
+                refiner_usage = ApiUsageDTO(
                     prompt_tokens=res.usage.get("prompt_tokens", 0),
                     completion_tokens=res.usage.get("completion_tokens", 0),
                     cached_tokens=res.usage.get("cached_tokens", 0),
                     reasoning_tokens=res.usage.get("reasoning_tokens", 0),
                     total_tokens=res.usage.get("total_tokens", 0),
                 )
-                estimated_cost_usd = calculate_openai_cost(
+                refiner_cost = calculate_openai_cost(
                     parsed.model,
-                    prompt_tokens=api_usage.prompt_tokens,
-                    completion_tokens=api_usage.completion_tokens,
-                    cached_tokens=api_usage.cached_tokens,
+                    prompt_tokens=refiner_usage.prompt_tokens,
+                    completion_tokens=refiner_usage.completion_tokens,
+                    cached_tokens=refiner_usage.cached_tokens,
                 )
+                # Normalize None values to 0 before summation; accumulate from initial answer too
+                initial_usage = initial_dto.api_usage
+                api_usage = ApiUsageDTO(
+                    prompt_tokens=(initial_usage.prompt_tokens or 0) + (extractor_usage.prompt_tokens or 0) + (refiner_usage.prompt_tokens or 0),
+                    completion_tokens=(initial_usage.completion_tokens or 0) + (extractor_usage.completion_tokens or 0) + (refiner_usage.completion_tokens or 0),
+                    cached_tokens=(initial_usage.cached_tokens or 0) + (extractor_usage.cached_tokens or 0) + (refiner_usage.cached_tokens or 0),
+                    reasoning_tokens=(initial_usage.reasoning_tokens or 0) + (extractor_usage.reasoning_tokens or 0) + (refiner_usage.reasoning_tokens or 0),
+                    total_tokens=(initial_usage.total_tokens or 0) + (extractor_usage.total_tokens or 0) + (refiner_usage.total_tokens or 0),
+                )
+                estimated_cost_usd = extractor_cost + refiner_cost
 
                 # Parse JSON output format
                 content = res.content.strip()

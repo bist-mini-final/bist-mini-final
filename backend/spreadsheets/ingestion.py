@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,8 @@ from ..embeddings.factory import EmbeddingEncoder
 from ..modules.base import ModuleExecutionError
 from ..storage.pgvector_store import PgVectorStore
 from .workbook_catalog import SUPPORTED_WORKBOOK_SUFFIXES, WorkbookCatalog
+
+logger = logging.getLogger(__name__)
 
 
 def get_processed_file_info(
@@ -264,12 +267,29 @@ def search_vector_index(
     if not store.is_connected():
         raise ModuleExecutionError("pgvector 데이터베이스에 연결할 수 없습니다")
 
-    model_name = "text-embedding-3-large"
     try:
         detail = store.get_index_detail(index_id, limit=1)
-        model_name = detail.get("model") or model_name
-    except Exception:
-        pass
+        model_name = detail.get("model")
+        if not model_name:
+            logger.warning(
+                "인덱스 '%s'의 메타데이터에서 임베딩 모델명을 확인할 수 없습니다.",
+                index_id,
+            )
+            raise ModuleExecutionError(
+                f"인덱스 '{index_id}'의 임베딩 모델명을 확인할 수 없습니다."
+            )
+    except ModuleExecutionError:
+        raise
+    except Exception as err:
+        logger.warning(
+            "인덱스 '%s'의 상세 정보 조회에 실패했습니다: %s",
+            index_id,
+            err,
+            exc_info=True,
+        )
+        raise ModuleExecutionError(
+            f"인덱스 '{index_id}'의 모델 정보를 확인할 수 없습니다: {err}"
+        ) from err
 
     hits = store.search(
         index_id,

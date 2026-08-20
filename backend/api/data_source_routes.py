@@ -6,6 +6,7 @@ import hashlib
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -56,6 +57,49 @@ INGESTION_WORKFLOW_IDS = frozenset(
 MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 logger = logging.getLogger(__name__)
 
+_ALLOWED_DB_HOSTS = frozenset(
+    {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "postgres",
+        "pgvector",
+        "bist-pgvector",
+    }
+)
+
+
+def _is_allowed_database_host(host: Optional[str], port: Optional[int]) -> bool:
+    if not host:
+        return False
+    normalized = host.strip("[]").lower()
+    if normalized in _ALLOWED_DB_HOSTS:
+        # Only allow port 5432 or the configured PGVECTOR_URL port
+        allowed_ports = {5432}
+        try:
+            configured_port = urlparse(PGVECTOR_URL).port
+            if configured_port:
+                allowed_ports.add(configured_port)
+        except Exception:
+            pass
+        if port is not None and port not in allowed_ports:
+            return False
+        return True
+    try:
+        configured_host = urlparse(PGVECTOR_URL).hostname
+        if configured_host and normalized == configured_host.strip("[]").lower():
+            # Also validate port for configured host
+            allowed_ports = {5432}
+            configured_port = urlparse(PGVECTOR_URL).port
+            if configured_port:
+                allowed_ports.add(configured_port)
+            if port is not None and port not in allowed_ports:
+                return False
+            return True
+    except Exception as err:
+        logger.warning("Failed to parse configured PGVECTOR_URL: %s", err)
+    return False
+
 
 def _public_error(value: Optional[str], limit: int = 2000) -> Optional[str]:
     """
@@ -95,7 +139,7 @@ def _sha256_file(path: Path) -> str:
 
 
 class IngestRequestDTO(BaseModel):
-    file_name: str = Field(min_length=1, description="data/processed/ 내 대상 Excel 파일명")
+    file_name: str = Field(min_length=1, description="data/source_files/ 내 대상 Excel 파일명")
     model: str = Field(
         default="text-embedding-3-large",
         description="임베딩 모델 (예: text-embedding-3-large, BAAI/bge-large-en-v1.5)",
@@ -460,13 +504,71 @@ def create_data_source_router(
     @router.post("/db-connect")
     def test_db_connect(req: DbConnectRequestDTO) -> Dict[str, Any]:
         """Test a given pgvector database URL."""
-        test_store = PgVectorStore(req.database_url)
-        return test_store.get_db_info()
+        try:
+            parsed = urlparse(req.database_url)
+        except Exception as parse_error:
+            raise HTTPException(
+                status_code=400,
+                detail="유효하지 않은 데이터베이스 URL입니다.",
+            ) from parse_error
+
+        scheme = (parsed.scheme or "").lower()
+        if scheme not in ("postgresql", "postgresql+psycopg", "postgres"):
+            raise HTTPException(
+                status_code=400,
+                detail="PostgreSQL 데이터베이스 URL만 지원됩니다.",
+            )
+
+        if not _is_allowed_database_host(parsed.hostname, parsed.port):
+            raise HTTPException(
+                status_code=400,
+                detail="허용되지 않은 데이터베이스 호스트입니다.",
+            )
+
+        # Validate and store parsed values once
+        safe_host = parsed.hostname or "localhost"
+        safe_port = parsed.port or 5432
+        safe_database = parsed.path.lstrip("/") or "rag_flow"
+
+        # Validate port is in valid range
+        if not (1 <= safe_port <= 65535):
+            raise HTTPException(
+                status_code=400,
+                detail="유효하지 않은 포트 번호입니다.",
+            )
+
+        try:
+            test_store = PgVectorStore(req.database_url)
+            info = test_store.get_db_info()
+            if not info.get("connected"):
+                return {
+                    "connected": False,
+                    "host": safe_host,
+                    "port": safe_port,
+                    "database": safe_database,
+                    "framework": "LangChain",
+                    "error": "데이터베이스 연결에 실패했습니다.",
+                    "total_indexes": 0,
+                    "total_chunks": 0,
+                }
+            return info
+        except Exception as err:
+            logger.warning("Database connection test failed: %s", err)
+            return {
+                "connected": False,
+                "host": safe_host,
+                "port": safe_port,
+                "database": safe_database,
+                "framework": "LangChain",
+                "error": "데이터베이스 연결에 실패했습니다.",
+                "total_indexes": 0,
+                "total_chunks": 0,
+            }
 
     # 1. List files
     @router.get("/files")
     def get_files() -> Dict[str, Any]:
-        """List all available raw files in data/processed/."""
+        """List all available raw files in data/source_files/."""
         files = list_processed_files(processed_dir, pg_store)
         return {"files": files, "total": len(files)}
 

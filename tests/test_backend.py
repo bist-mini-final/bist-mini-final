@@ -50,8 +50,11 @@ from backend.modules.local_vlm_structure_detector import (
     LocalVlmTableDecisionDTO,
 )
 from backend.spreadsheets.table_geometry import SheetLayout
-from backend.modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
-from backend.modules.luna_vlm_structure_detector import LUNA_SHEET_RESPONSE_SCHEMA
+from backend.modules.luna_vlm_structure_detector import (
+    LUNA_SHEET_RESPONSE_SCHEMA,
+    LUNA_VLM_SYSTEM_PROMPT,
+    LunaVlmStructureDetectorModule,
+)
 from backend.modules.base import ModuleExecutionError
 from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
 from backend.modules.processed_file_selector import ProcessedFileSelectorModule
@@ -62,6 +65,10 @@ from backend.modules.vector_index_writer import VectorIndexWriterModule
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
+from backend.spreadsheets.prompt_guidance import (
+    LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+    TEXT_CELL_ROLE_GUIDANCE,
+)
 from backend.spreadsheets.exhaustive_tiling import build_exhaustive_tiles
 from backend.spreadsheets.sheet_renderer import _cell_text_and_color, _rgb_color
 from backend.workflows.executor import (
@@ -316,6 +323,24 @@ class TableValidationReconciliationTests(unittest.TestCase):
         self.assertEqual(validated["column_header_range"].excel_range, "E6:P6")
         self.assertEqual(validated["data_range"].excel_range, "E7:P30")
 
+    def test_preserves_record_table_without_row_header(self):
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B21:I28",
+            title_range="B21:I21",
+            column_header_range="B22:I22",
+            row_header_range=None,
+            data_range="B23:I28",
+        )
+
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+
+        self.assertEqual(validated["title_range"].excel_range, "B21:I21")
+        self.assertEqual(validated["column_header_range"].excel_range, "B22:I22")
+        self.assertIsNone(validated["row_header_range"])
+        self.assertEqual(validated["data_range"].excel_range, "B23:I28")
+
 
 def sample_cell_documents():
     def item(cell_id, cell_coord, row_header, value):
@@ -504,6 +529,53 @@ class SheetRendererFormattingTests(unittest.TestCase):
 
         self.assertRegex(rendered, r"^\d{4}\.\d{2}\.\d{2}$")
         self.assertNotEqual(rendered, "45292")
+        workbook.close()
+
+    def test_percentage_format_precision(self) -> None:
+        workbook = Workbook()
+        ws = workbook.active
+
+        ws["A1"].value = 0.25
+        ws["A1"].number_format = "0%"
+        rendered, _ = _cell_text_and_color(ws["A1"])
+        self.assertEqual(rendered, "25%")
+
+        ws["A2"].value = 0.254
+        ws["A2"].number_format = "0.0%"
+        rendered, _ = _cell_text_and_color(ws["A2"])
+        self.assertEqual(rendered, "25.4%")
+
+        ws["A3"].value = 0.25
+        ws["A3"].number_format = "0.00%"
+        rendered, _ = _cell_text_and_color(ws["A3"])
+        self.assertEqual(rendered, "25.00%")
+        workbook.close()
+
+    def test_currency_and_accounting_trailing_zeroes(self) -> None:
+        workbook = Workbook()
+        ws = workbook.active
+
+        # Fixed decimal format (#,##0.00) must retain trailing zeroes
+        ws["A1"].value = 123.4
+        ws["A1"].number_format = "#,##0.00"
+        rendered, _ = _cell_text_and_color(ws["A1"])
+        self.assertEqual(rendered, "123.40")
+
+        ws["A2"].value = 123.0
+        ws["A2"].number_format = "#,##0.00"
+        rendered, _ = _cell_text_and_color(ws["A2"])
+        self.assertEqual(rendered, "123.00")
+
+        # Optional decimal format (0.##) should trim trailing zeroes
+        ws["A3"].value = 123.4
+        ws["A3"].number_format = "0.##"
+        rendered, _ = _cell_text_and_color(ws["A3"])
+        self.assertEqual(rendered, "123.4")
+
+        ws["A4"].value = 123.0
+        ws["A4"].number_format = "0.##"
+        rendered, _ = _cell_text_and_color(ws["A4"])
+        self.assertEqual(rendered, "123")
         workbook.close()
 
 
@@ -1395,9 +1467,8 @@ class ApiContractTests(unittest.TestCase):
                     "preset",
                     "system_prompt",
                     "user_prompt_template",
+                    "cell_extractor_prompt",
                     "max_direct_cells",
-                    "spatial_column_radius",
-                    "enable_auto_cell_discovery",
                 },
             ),
             "company_entity_extractor": (
@@ -2131,7 +2202,10 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertIn('A1', call["user_prompt"])
         self.assertIn('"text"', call["user_prompt"])
         self.assertIn('"number"', call["user_prompt"])
-        self.assertIn("Ordinary descriptive text is strong structural evidence", call["system_prompt"])
+        self.assertIn(
+            "Distinguish record tables from matrix/crosstab tables",
+            call["system_prompt"],
+        )
         self.assertIn("`NA`", call["system_prompt"])
         self.assertIn("Keep them inside data_range", call["system_prompt"])
         self.assertTrue(call["image_path"].is_file())
@@ -2203,6 +2277,10 @@ class SpreadsheetModuleTests(unittest.TestCase):
             artifact_dir=self.artifact_dir,
         ).run({
             **selection,
+            "system_prompt": LUNA_VLM_SYSTEM_PROMPT.replace(
+                TEXT_CELL_ROLE_GUIDANCE,
+                LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+            ),
             # Legacy tiling settings are accepted; max_concurrency remains configurable.
             "tile_rows": 72,
             "tile_columns": 24,
@@ -2218,7 +2296,18 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertIn('"sheet_range":"A1:C4"', call["user_prompt"])
         self.assertIn('"cell_tuple":["excel_coord"', call["user_prompt"])
         self.assertNotIn("tile", call["user_prompt"].lower())
-        self.assertIn("Ordinary descriptive text is strong structural evidence", call["system_prompt"])
+        self.assertIn(
+            "Distinguish record tables from matrix/crosstab tables",
+            call["system_prompt"],
+        )
+        self.assertIn(
+            "Set row_header_range to null",
+            call["system_prompt"],
+        )
+        self.assertNotIn(
+            "Prefer those header roles unless position",
+            call["system_prompt"],
+        )
         self.assertIn("`N/A`", call["system_prompt"])
         self.assertIn("Keep them inside data_range", call["system_prompt"])
         self.assertNotIn("candidate", call["user_prompt"].lower())
@@ -2238,6 +2327,100 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertEqual(regions["data"], "B2:C4")
         serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
         self.assertEqual(len(serialized["items"]), 12)
+
+    def test_luna_vlm_preserves_record_table_as_column_header_and_data(self) -> None:
+        workbook_path = self.processed_dir / "executives.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Summary"
+        sheet["B21"] = "TOP EXECUTIVES"
+        for coordinate, value in {
+            "B22": "NAME",
+            "C22": "ROLE",
+            "E22": "AGE",
+            "F22": "YEAR HIRED",
+            "G22": "EXPECTED TERMINATION YEAR",
+            "I22": "SALARY ($)",
+        }.items():
+            sheet[coordinate] = value
+            sheet[coordinate].font = Font(bold=True)
+        for coordinate, value in {
+            "B23": "Brian Thomas Moynihan",
+            "C23": "Chief Executive Officer",
+            "E23": 65,
+            "F23": 2010,
+            "G23": "NA",
+            "I23": "NA",
+            "B24": "Alastair M. Borthwick",
+            "C24": "Chief Financial Officer",
+            "E24": 56,
+            "F24": 2021,
+            "G24": "NA",
+            "I24": "NA",
+        }.items():
+            sheet[coordinate] = value
+        workbook.save(workbook_path)
+        workbook.close()
+
+        class RecordTableVisionClient:
+            def __init__(self):
+                self.calls = []
+
+            def complete_structured(self, **kwargs):
+                self.calls.append(kwargs)
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"B21:I24","title_range":"B21:I21",'
+                    '"column_header_range":"B22:I22","row_header_range":null,'
+                    '"data_range":"B23:I24"}]}'
+                )
+
+        client = RecordTableVisionClient()
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": workbook_path.name}
+        )
+        structured = LunaVlmStructureDetectorModule(
+            client,
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        ).run(selection)
+
+        self.assertIn(
+            "leading text columns as row headers",
+            client.calls[0]["system_prompt"],
+        )
+        table = structured["tables"][0]
+        regions = {
+            region["type"]: region["excel_range"]
+            for region in table["regions"]
+        }
+        self.assertEqual(
+            regions,
+            {
+                "title": "B21:I21",
+                "column_header": "B22:I22",
+                "data": "B23:I24",
+            },
+        )
+        self.assertNotIn("row_header", regions)
+        self.assertEqual(
+            {node["name"] for node in table["header_tree"]},
+            {
+                "NAME",
+                "ROLE",
+                "AGE",
+                "YEAR HIRED",
+                "EXPECTED TERMINATION YEAR",
+                "SALARY ($)",
+            },
+        )
+
+        serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
+        self.assertTrue(
+            {"B23", "C23", "E23", "F23", "G23", "I23"}.issubset(
+                {item["cell_coord"] for item in serialized["items"]}
+            )
+        )
 
     def test_luna_vlm_detector_reports_partial_sheet_failures(self) -> None:
         class VisionClient:
@@ -3859,6 +4042,31 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(len(res["document_output"]["items"]), 1)
         self.assertEqual(res["index_output"]["document_count"], 1)
 
+    def test_pgvector_collection_loader_empty_request_selects_first_index(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "first_col", "file_name": "first.xlsx", "workbook_hash": "hash_first"},
+            {"index_id": "second_col", "file_name": "second.xlsx", "workbook_hash": "hash_second"},
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [
+                {"cell_id": "c1", "sheet_name": "S1", "cell_coord": "A1", "text": "Header"}
+            ],
+        }
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO()
+        self.assertIsNone(payload.collection_name)
+        res = loader.execute(payload)
+        self.assertEqual(res["index_output"]["index_id"], "first_col")
+        self.assertEqual(res["index_output"]["file_name"], "first.xlsx")
+
     def test_pgvector_collection_loader_sql_reload_preserves_variant(self) -> None:
         from unittest.mock import MagicMock
         from backend.modules.pgvector_collection_loader import (
@@ -4004,6 +4212,142 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         with self.assertRaises(ModuleExecutionError) as ctx:
             loader.execute(payload)
         self.assertIn("선택된 pgvector 컬렉션들의 임베딩 모델이 일치하지 않습니다", str(ctx.exception))
+
+    def test_openpyxl_region_detector_derives_table_sheets_when_sheet_names_empty(self) -> None:
+        import openpyxl
+        from unittest.mock import MagicMock
+        from backend.modules.docling_table_detector import DoclingTableRegionDTO, TableCellBoundsDTO
+        from backend.modules.openpyxl_region_detector import (
+            OpenpyxlRegionDetectorExecutionDTO,
+            OpenpyxlRegionDetectorModule,
+        )
+
+        wb_path = self.processed_dir / "test_sheets.xlsx"
+        wb = openpyxl.Workbook()
+        ws1 = wb.active
+        ws1.title = "SheetA"
+        ws1["A1"] = "H1"
+        ws1["B2"] = "D1"
+        ws2 = wb.create_sheet(title="SheetB")
+        ws2["A1"] = "H2"
+        ws2["B2"] = "D2"
+        wb.save(wb_path)
+        wb.close()
+
+        mock_catalog = MagicMock()
+        mock_catalog.resolve.return_value = wb_path
+        mock_catalog.sha256.return_value = "dummy_hash"
+        mock_catalog.sheet_names.return_value = ["SheetA", "SheetB"]
+
+        module = OpenpyxlRegionDetectorModule(catalog=mock_catalog)
+        # Empty sheet_names but table for SheetB
+        payload = OpenpyxlRegionDetectorExecutionDTO(
+            file_name="test_sheets.xlsx",
+            workbook_hash="dummy_hash",
+            sheet_names=[],
+            tables=[
+                DoclingTableRegionDTO(
+                    sheet_name="SheetB",
+                    table_index=0,
+                    excel_range="A1:B2",
+                    bbox_px=[0, 0, 100, 100],
+                    cell_bounds=TableCellBoundsDTO(min_row=1, max_row=2, min_column=1, max_column=2),
+                )
+            ],
+        )
+        res = module.execute(payload)
+        # Should derive sheet_names as ["SheetB"] based on catalog order
+        self.assertEqual(res["sheet_names"], ["SheetB"])
+
+    def test_sheet_metadata_persistence_derives_table_sheets_or_rejects_empty(self) -> None:
+        import openpyxl
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.docling_table_detector import TableCellBoundsDTO
+        from backend.modules.sheet_metadata_persistence import (
+            SheetMetadataPersistenceInputDTO,
+            SheetMetadataPersistenceModule,
+        )
+        from backend.modules.spreadsheet_structure import (
+            ClassifiedRegionDTO,
+            ClassifiedTableDTO,
+            SpreadsheetStructureOutput,
+        )
+        from backend.modules.vector_index_writer import VectorIndexDTO
+
+        wb_path = self.processed_dir / "test_meta.xlsx"
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "SheetA"
+        ws["A1"] = "Data"
+        wb.save(wb_path)
+        wb.close()
+
+        mock_catalog = MagicMock()
+        mock_catalog.resolve.return_value = wb_path
+        mock_catalog.sheet_names.return_value = ["SheetA"]
+
+        mock_db = MagicMock()
+        mock_db.is_connected.return_value = True
+
+        module = SheetMetadataPersistenceModule(db_manager=mock_db, catalog=mock_catalog)
+
+        # 1. Structure with empty sheet_names and empty tables -> raises error
+        empty_structure = SpreadsheetStructureOutput(
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            sheet_names=[],
+            tables=[],
+        )
+        idx = VectorIndexDTO(
+            index_id="a" * 64,
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            model="text-embedding-3-large",
+            dimension=1536,
+            document_count=1,
+        )
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            module.execute(
+                SheetMetadataPersistenceInputDTO(
+                    structure_input=empty_structure,
+                    index_input=idx,
+                )
+            )
+        self.assertIn("저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다", str(ctx.exception))
+
+        # 2. Structure with empty sheet_names but table for SheetA -> derives SheetA
+        table_structure = SpreadsheetStructureOutput(
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            sheet_names=[],
+            tables=[
+                ClassifiedTableDTO(
+                    sheet_name="SheetA",
+                    table_index=0,
+                    excel_range="A1:B2",
+                    regions=[
+                        ClassifiedRegionDTO(
+                            region_id="r1",
+                            type="data",
+                            excel_range="A1:B2",
+                            bbox_px=(0.0, 0.0, 100.0, 100.0),
+                            rows=(1, 2),
+                            columns=(1, 2),
+                            parent_ids=[],
+                        )
+                    ],
+                )
+            ],
+        )
+        res = module.execute(
+            SheetMetadataPersistenceInputDTO(
+                structure_input=table_structure,
+                index_input=idx,
+            )
+        )
+        self.assertEqual(res["sheets_saved"], 1)
+        mock_db.save_sheets.assert_called_once()
 
 
 if __name__ == "__main__":

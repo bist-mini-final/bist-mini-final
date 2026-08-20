@@ -16,7 +16,7 @@ Excel 파일을 pandas DataFrame으로 읽어 시트별 스키마와 샘플을 �
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `file_name` | `string` | yes | - | data/processed에서 선택할 Excel 파일명 |
+| `file_name` | `string` | yes | - | data/source_files에서 선택할 Excel 파일명 |
 
 ## Config DTO
 

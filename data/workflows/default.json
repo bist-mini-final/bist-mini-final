@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-19T02:19:50.430411+00:00",
+  "updated_at": "2026-08-20T00:28:05.127259+00:00",
   "graph": {
     "nodes": [
       {
@@ -222,7 +222,10 @@
         },
         "config": {},
         "values": {
-          "collection_name": "SPG_Company_KeyStats_v4.xlsm"
+          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
+          "collection_names": [
+            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
+          ]
         },
         "ui": {
           "width": null,

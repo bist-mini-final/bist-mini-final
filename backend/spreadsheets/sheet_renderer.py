@@ -167,7 +167,7 @@ def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
         font_color = "#DC2626" if (is_negative and has_red_fmt) else default_font_color
 
         if "%" in num_fmt:
-            decimals = 2
+            decimals = 0
             if "." in num_fmt.split("%")[0]:
                 decimals = max(0, min(4, len(num_fmt.split("%")[0].split(".")[1])))
             rendered = f"{abs(value) * 100:.{decimals}f}%"
@@ -178,6 +178,7 @@ def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
         # Currency & Accounting
         has_parens = "(" in num_fmt or "_)" in num_fmt
         decimals = 2
+        fmt_after_dot = ""
         if "." in num_fmt:
             fmt_after_dot = num_fmt.split(".")[1].split(";")[0].split(")")[0]
             decimals = max(0, min(4, fmt_after_dot.count("0") + fmt_after_dot.count("#")))
@@ -186,7 +187,11 @@ def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
 
         abs_val = abs(value)
         if decimals > 0:
-            rendered = f"{abs_val:,.{decimals}f}".rstrip("0").rstrip(".") if "." in num_fmt and "#" in num_fmt else f"{abs_val:,.{decimals}f}"
+            rendered = (
+                f"{abs_val:,.{decimals}f}".rstrip("0").rstrip(".")
+                if "#" in fmt_after_dot
+                else f"{abs_val:,.{decimals}f}"
+            )
         else:
             rendered = f"{round(abs_val):,}"
 
