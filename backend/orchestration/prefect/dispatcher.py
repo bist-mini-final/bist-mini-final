@@ -81,6 +81,7 @@ class PrefectSdkDeploymentClient:
     async def _cancel(external_run_id: str) -> None:
         from prefect import get_client
         from prefect.client.schemas.objects import StateType
+        from prefect.client.schemas.responses import SetStateStatus
 
         flow_run_id = UUID(external_run_id)
         async with get_client() as client:
@@ -88,9 +89,13 @@ class PrefectSdkDeploymentClient:
             if flow_run.state is None:
                 raise RuntimeError(f"Prefect flow run 상태가 없습니다: {external_run_id}")
             state = flow_run.state.model_copy(
-                update={"name": "Cancelled", "type": StateType.CANCELLED}
+                update={"name": "Cancelling", "type": StateType.CANCELLING}
             )
-            await client.set_flow_run_state(flow_run_id, state, force=True)
+            result = await client.set_flow_run_state(flow_run_id, state, force=True)
+            if result.status != SetStateStatus.ACCEPT:
+                raise RuntimeError(
+                    f"Prefect 취소 상태 변경이 거부되었습니다: {result.status}"
+                )
 
 
 @dataclass
@@ -132,13 +137,15 @@ class PrefectIngestionDispatcher:
             resume_failed=resume_failed,
             submission_attempt=submission_attempt,
         )
-        run = self.run_store.load(run_id)
-        run.orchestration.backend = "prefect"
-        run.orchestration.deployment_name = self.deployment_name
-        run.orchestration.external_run_id = external_run_id
-        run.orchestration.submission_attempt = submission_attempt
-        run.orchestration.submitted_at = utc_now_iso()
-        self.run_store.save(run)
+        submitted_at = utc_now_iso()
+        self.run_store.update_orchestration(
+            run_id,
+            backend="prefect",
+            deployment_name=self.deployment_name,
+            external_run_id=external_run_id,
+            submission_attempt=submission_attempt,
+            submitted_at=submitted_at,
+        )
         return True
 
     def ensure_submitted(
@@ -174,6 +181,7 @@ class PrefectIngestionDispatcher:
     def recover_pending(
         self,
         workflow_ids: Optional[Collection[str]] = None,
+        max_recoveries: int = 100,
     ) -> int:
         allowed = set(workflow_ids) if workflow_ids is not None else None
         recovered = 0
@@ -202,6 +210,8 @@ class PrefectIngestionDispatcher:
                 logger.warning("Prefect 복구용 run 참조 조회 실패: %s", error)
             else:
                 for reference in references:
+                    if recovered >= max_recoveries:
+                        break
                     orchestration = reference["orchestration"]
                     if orchestration.get("external_run_id") is not None:
                         continue
@@ -217,6 +227,8 @@ class PrefectIngestionDispatcher:
                 return recovered
 
         for run in self.run_store.list_pending(allowed):
+            if recovered >= max_recoveries:
+                break
             if run.orchestration.external_run_id is not None:
                 continue
             try:

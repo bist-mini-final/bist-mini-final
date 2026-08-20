@@ -15,6 +15,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update \
     && apt-get install -y --no-install-recommends fonts-dejavu-core
 
+RUN groupadd -r appuser -g 1000 && \
+    useradd -r -u 1000 -g appuser appuser
+
 COPY jobs/excel_ingestion/requirements.txt ./requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     python -m pip install --upgrade pip \
@@ -33,7 +36,10 @@ RUN mkdir -p \
     /app/data/vector_db \
     /app/data/artifacts/embeddings \
     /app/data/artifacts/spreadsheets \
-    && python -m compileall -q /app/backend /app/jobs
+    && python -m compileall -q /app/backend /app/jobs \
+    && chown -R appuser:appuser /app/data
+
+USER appuser
 
 # Optional, deliberately non-default target for local BGE embeddings:
 # docker build --target local-models ...

@@ -258,6 +258,59 @@ class RunStore:
                 )
         return run
 
+    def update_orchestration(
+        self,
+        run_id: str,
+        backend: str,
+        deployment_name: str,
+        external_run_id: str,
+        submission_attempt: int,
+        submitted_at: str,
+    ) -> None:
+        """Atomically update orchestration metadata without loading/saving the entire run."""
+
+        if self.db_manager is not None:
+            try:
+                self.db_manager.update_workflow_orchestration(
+                    run_id,
+                    backend,
+                    deployment_name,
+                    external_run_id,
+                    submission_attempt,
+                    submitted_at,
+                )
+            except Exception as error:
+                logger.warning(
+                    "DB에 orchestration 메타데이터 저장 실패 (run_id=%s): %s",
+                    run_id,
+                    error,
+                )
+
+        # Also update the local summary for consistency
+        summary_path = self._store.directory / f"{_validate_identifier(run_id)}.summary.json"
+        if summary_path.is_file():
+            with self._summary_lock:
+                try:
+                    run = WorkflowRun.model_validate_json(
+                        summary_path.read_text(encoding="utf-8")
+                    )
+                    run.orchestration.backend = backend
+                    run.orchestration.deployment_name = deployment_name
+                    run.orchestration.external_run_id = external_run_id
+                    run.orchestration.submission_attempt = submission_attempt
+                    run.orchestration.submitted_at = submitted_at
+                    run.updated_at = utc_now_iso()
+                    _atomic_write_text(
+                        summary_path,
+                        run.model_dump_json(indent=2) + "\n",
+                    )
+                except Exception as error:
+                    logger.warning(
+                        "로컬 summary에 orchestration 저장 실패 (run_id=%s): %s",
+                        run_id,
+                        error,
+                    )
+
     def load(self, run_id: str) -> WorkflowRun:
         """Load a complete workflow run by its identifier.
         

@@ -179,7 +179,11 @@ class DatabaseManager:
         without introducing a stale lease row.
         """
 
-        conn = self._raw_connection()
+        import psycopg2
+        raw_url = getattr(self, "database_url", PGVECTOR_URL).replace(
+            "postgresql+psycopg://", "postgresql://"
+        )
+        conn = psycopg2.connect(raw_url)
         acquired = False
         try:
             conn.autocommit = True
@@ -208,7 +212,10 @@ class DatabaseManager:
                         run_id,
                         exc_info=True,
                     )
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def ensure_schema(self) -> bool:
         """Create required database tables according to DDL_INIT.
@@ -221,17 +228,6 @@ class DatabaseManager:
             conn = self._raw_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'workflow_runs'
-                          AND column_name = 'orchestration';
-                        """
-                    )
-                    if cur.fetchone() is not None:
-                        conn.commit()
-                        return True
                     cur.execute(DDL_INIT)
                 conn.commit()
                 return True
@@ -873,6 +869,56 @@ class DatabaseManager:
                         else None,
                         node_state.get("started_at"),
                         node_state.get("completed_at"),
+                    ),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def update_workflow_orchestration(
+        self,
+        run_id: str,
+        backend: str,
+        deployment_name: str,
+        external_run_id: str,
+        submission_attempt: int,
+        submitted_at: str,
+    ) -> None:
+        """Atomically update orchestration metadata without loading full run document."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
+                    SET orchestration = jsonb_set(
+                            jsonb_set(
+                                jsonb_set(
+                                    jsonb_set(
+                                        jsonb_set(
+                                            orchestration,
+                                            '{backend}', to_jsonb(%s::text)
+                                        ),
+                                        '{deployment_name}', to_jsonb(%s::text)
+                                    ),
+                                    '{external_run_id}', to_jsonb(%s::text)
+                                ),
+                                '{submission_attempt}', to_jsonb(%s::int)
+                            ),
+                            '{submitted_at}', to_jsonb(%s::text)
+                        ),
+                        updated_at = %s
+                    WHERE run_id = %s;
+                    """,
+                    (
+                        backend,
+                        deployment_name,
+                        external_run_id,
+                        submission_attempt,
+                        submitted_at,
+                        datetime.now(timezone.utc).isoformat(),
+                        run_id,
                     ),
                 )
             conn.commit()

@@ -5,7 +5,16 @@ container per Excel ingestion Flow Run, and every Playground module appears as
 a Prefect Task. Interactive Playground execution keeps its existing API path.
 
 ```bash
-uv pip install --python .venv/bin/python -r requirements.txt
+./setup.sh
+./deploy/prefect/local.sh all
+```
+
+Alternatively, if setup.sh is unavailable or you prefer manual setup:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ./deploy/prefect/local.sh all
 ```
 

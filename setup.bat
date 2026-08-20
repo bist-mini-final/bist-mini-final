@@ -14,7 +14,7 @@ if not defined BIST_WSL_PROJECT (
   exit /b 1
 )
 
-wsl.exe bash -lc "cd '%BIST_WSL_PROJECT%' && chmod +x setup.sh deploy/prefect/local.sh && ./setup.sh"
+wsl.exe --cd "%BIST_WSL_PROJECT%" bash -lc "chmod +x setup.sh deploy/prefect/local.sh && ./setup.sh"
 if errorlevel 1 exit /b %errorlevel%
 
 echo Setup completed successfully.

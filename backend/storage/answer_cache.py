@@ -17,13 +17,22 @@ def _exclusive_file_lock(path: Path) -> Iterator[None]:
     with path.open("a+b") as lock_file:
         if os.name == "nt":
             import msvcrt
+            import time
 
             lock_file.seek(0, os.SEEK_END)
             if lock_file.tell() == 0:
                 lock_file.write(b"0")
                 lock_file.flush()
             lock_file.seek(0)
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+
+            # Retry until lock is acquired instead of raising OSError
+            while True:
+                try:
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.1)
+
             try:
                 yield
             finally:
@@ -128,23 +137,31 @@ class AnswerCacheRepository:
                 disk_questions: Dict[str, Dict[str, Any]] = {}
                 disk_answers: Dict[str, str] = {}
                 if self.path.is_file():
-                    stored = json.loads(self.path.read_text(encoding="utf-8"))
-                    if not isinstance(stored, dict):
-                        raise ValueError("답변 캐시 최상위 값은 객체여야 합니다")
-                    raw_questions = stored.get("questions", {})
-                    raw_answers = stored.get("answers", {})
-                    if isinstance(raw_questions, dict):
-                        disk_questions.update(raw_questions)
-                    if isinstance(raw_answers, dict):
-                        for question_id, answer_value in raw_answers.items():
-                            if isinstance(answer_value, str):
-                                disk_answers[question_id] = answer_value
-                            elif isinstance(answer_value, dict) and isinstance(
-                                answer_value.get("luna_reader_answer"), str
-                            ):
-                                disk_answers[question_id] = answer_value[
-                                    "luna_reader_answer"
-                                ]
+                    try:
+                        stored = json.loads(self.path.read_text(encoding="utf-8"))
+                        if not isinstance(stored, dict):
+                            raise ValueError("답변 캐시 최상위 값은 객체여야 합니다")
+                        raw_questions = stored.get("questions", {})
+                        raw_answers = stored.get("answers", {})
+                        if isinstance(raw_questions, dict):
+                            disk_questions.update(raw_questions)
+                        if isinstance(raw_answers, dict):
+                            for question_id, answer_value in raw_answers.items():
+                                if isinstance(answer_value, str):
+                                    disk_answers[question_id] = answer_value
+                                elif isinstance(answer_value, dict) and isinstance(
+                                    answer_value.get("luna_reader_answer"), str
+                                ):
+                                    disk_answers[question_id] = answer_value[
+                                        "luna_reader_answer"
+                                    ]
+                    except (json.JSONDecodeError, UnicodeError) as error:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(
+                            "답변 캐시 파일 손상으로 디스크 상태를 무시합니다: %s",
+                            error,
+                        )
 
                 disk_questions.update(self._questions)
                 disk_answers.update(self._answers)

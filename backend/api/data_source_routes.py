@@ -201,9 +201,20 @@ def create_data_source_router(
         workflow_executor,
         workflow_dispatcher,
     )
-    recovered_jobs = ingestion_jobs.recover_pending()
-    if recovered_jobs:
-        logger.info("미완료 인덱싱 작업 %d개를 서버 큐에 복구했습니다", recovered_jobs)
+
+    # Schedule recovery in a background thread to avoid blocking router creation
+    import threading
+    def _recover_in_background():
+        try:
+            recovered_jobs = ingestion_jobs.recover_pending()
+            if recovered_jobs:
+                logger.info("미완료 인덱싱 작업 %d개를 서버 큐에 복구했습니다", recovered_jobs)
+        except Exception as error:
+            logger.warning("백그라운드 run 복구 실패: %s", error)
+
+    recovery_thread = threading.Thread(target=_recover_in_background, daemon=True)
+    recovery_thread.start()
+
     db_manager = registry.db_manager
     # 0. Database Status
     @router.get("/db-status")

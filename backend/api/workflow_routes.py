@@ -74,6 +74,14 @@ def create_workflow_router(
     @router.delete("/cache")
     def clear_runtime_cache():
         workflow_dispatcher.cancel_all()
+        import time
+        time.sleep(5)
+        for run in run_store.list():
+            if run.status in ("queued", "running"):
+                raise HTTPException(
+                    status_code=409,
+                    detail="실행 중인 워크플로가 완전히 중지될 때까지 캐시를 삭제할 수 없습니다",
+                )
         return workflow_executor.clear_runtime_cache()
 
     @router.get("/workflows")

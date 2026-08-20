@@ -93,7 +93,7 @@ def test_run_store_with_db_manager() -> None:
         )
 
         mock_db.get_workflow_run.return_value = run.model_dump(mode="json")
-        mock_db.list_workflow_runs.return_value = [run.model_dump(mode="json")]
+        mock_db.list_workflow_run_summaries.return_value = [run.model_dump(mode="json")]
         mock_db.delete_workflow_run.return_value = True
 
         store.save(run)
@@ -105,7 +105,7 @@ def test_run_store_with_db_manager() -> None:
 
         runs = store.list()
         assert len(runs) == 1
-        mock_db.list_workflow_runs.assert_called_with(None)
+        mock_db.list_workflow_run_summaries.assert_called_with(None)
 
         assert store.delete("run-db-1") is True
         mock_db.delete_workflow_run.assert_called_with("run-db-1")
