@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 
 import psycopg2
 import psycopg2.extensions
@@ -62,6 +62,67 @@ def get_pool(database_url: str) -> psycopg2.pool.ThreadedConnectionPool:
     return _pool
 
 
+class PooledConnectionWrapper:
+    """Wraps a psycopg2 connection checked out from ThreadedConnectionPool.
+
+    Calling .close() returns the connection back to the pool instead of destroying
+    the underlying TCP socket.
+    """
+
+    def __init__(
+        self,
+        pool: psycopg2.pool.ThreadedConnectionPool,
+        conn: psycopg2.extensions.connection,
+    ) -> None:
+        self._pool = pool
+        self._conn = conn
+        self._closed = False
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            try:
+                if getattr(self._conn, "autocommit", False):
+                    self._conn.autocommit = False
+            except Exception:
+                pass
+            try:
+                self._pool.putconn(self._conn)
+            except Exception:
+                pass
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._conn, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in ("_pool", "_conn", "_closed"):
+            super().__setattr__(name, value)
+        else:
+            setattr(self._conn, name, value)
+
+    def __enter__(self) -> "PooledConnectionWrapper":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if exc_type is not None:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+        self.close()
+
+
+def get_pooled_raw_connection(database_url: str) -> PooledConnectionWrapper:
+    """Borrow a connection from the process-wide pool and wrap it so .close() returns it to pool."""
+    pool = get_pool(database_url)
+    conn = pool.getconn()
+    return PooledConnectionWrapper(pool, conn)
+
+
 @contextmanager
 def get_connection(
     database_url: str,
@@ -74,24 +135,17 @@ def get_connection(
       so callers that set it (e.g. ``CREATE INDEX CONCURRENTLY``) do not
       pollute pooled connections.
     """
-    pool = get_pool(database_url)
-    conn = pool.getconn()
+    wrapper = get_pooled_raw_connection(database_url)
     try:
-        yield conn
+        yield wrapper._conn
     except Exception:
         try:
-            conn.rollback()
+            wrapper._conn.rollback()
         except Exception:
             pass
         raise
     finally:
-        # Always restore default state before returning to pool.
-        try:
-            if conn.autocommit:
-                conn.autocommit = False
-        except Exception:
-            pass
-        pool.putconn(conn)
+        wrapper.close()
 
 
 def close_pool() -> None:
