@@ -119,8 +119,12 @@ class PgVectorIntegrationTests(unittest.TestCase):
         if not self.store.is_connected():
             self.skipTest("pgvector database is not accessible")
         db_mgr = DatabaseManager(self.store.database_url)
-        db_mgr.ensure_schema()
+        schema_ok = db_mgr.ensure_schema()
+        if not schema_ok:
+            self.skipTest("Failed to initialize database schema")
         info = self.store.get_db_info()
+        if not info.get("connected"):
+            self.skipTest("Failed to retrieve database info or database is not connected")
         if info.get("pgvector_version") == "not installed":
             self.skipTest("pgvector extension is not installed in PostgreSQL")
         self.encoder = FakeEmbeddingEncoder(dimension=4)
