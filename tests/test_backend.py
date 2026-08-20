@@ -50,8 +50,11 @@ from backend.modules.local_vlm_structure_detector import (
     LocalVlmTableDecisionDTO,
 )
 from backend.spreadsheets.table_geometry import SheetLayout
-from backend.modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
-from backend.modules.luna_vlm_structure_detector import LUNA_SHEET_RESPONSE_SCHEMA
+from backend.modules.luna_vlm_structure_detector import (
+    LUNA_SHEET_RESPONSE_SCHEMA,
+    LUNA_VLM_SYSTEM_PROMPT,
+    LunaVlmStructureDetectorModule,
+)
 from backend.modules.base import ModuleExecutionError
 from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
 from backend.modules.processed_file_selector import ProcessedFileSelectorModule
@@ -62,6 +65,10 @@ from backend.modules.vector_index_writer import VectorIndexWriterModule
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
+from backend.spreadsheets.prompt_guidance import (
+    LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+    TEXT_CELL_ROLE_GUIDANCE,
+)
 from backend.spreadsheets.exhaustive_tiling import build_exhaustive_tiles
 from backend.spreadsheets.sheet_renderer import _cell_text_and_color, _rgb_color
 from backend.workflows.executor import (
@@ -315,6 +322,24 @@ class TableValidationReconciliationTests(unittest.TestCase):
         self.assertEqual(validated["title_range"].excel_range, "B5:P5")
         self.assertEqual(validated["column_header_range"].excel_range, "E6:P6")
         self.assertEqual(validated["data_range"].excel_range, "E7:P30")
+
+    def test_preserves_record_table_without_row_header(self):
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B21:I28",
+            title_range="B21:I21",
+            column_header_range="B22:I22",
+            row_header_range=None,
+            data_range="B23:I28",
+        )
+
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+
+        self.assertEqual(validated["title_range"].excel_range, "B21:I21")
+        self.assertEqual(validated["column_header_range"].excel_range, "B22:I22")
+        self.assertIsNone(validated["row_header_range"])
+        self.assertEqual(validated["data_range"].excel_range, "B23:I28")
 
 
 def sample_cell_documents():
@@ -2130,7 +2155,10 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertIn('A1', call["user_prompt"])
         self.assertIn('"text"', call["user_prompt"])
         self.assertIn('"number"', call["user_prompt"])
-        self.assertIn("Ordinary descriptive text is strong structural evidence", call["system_prompt"])
+        self.assertIn(
+            "Distinguish record tables from matrix/crosstab tables",
+            call["system_prompt"],
+        )
         self.assertIn("`NA`", call["system_prompt"])
         self.assertIn("Keep them inside data_range", call["system_prompt"])
         self.assertTrue(call["image_path"].is_file())
@@ -2202,6 +2230,10 @@ class SpreadsheetModuleTests(unittest.TestCase):
             artifact_dir=self.artifact_dir,
         ).run({
             **selection,
+            "system_prompt": LUNA_VLM_SYSTEM_PROMPT.replace(
+                TEXT_CELL_ROLE_GUIDANCE,
+                LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+            ),
             # Legacy tiling settings are accepted; max_concurrency remains configurable.
             "tile_rows": 72,
             "tile_columns": 24,
@@ -2217,7 +2249,18 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertIn('"sheet_range":"A1:C4"', call["user_prompt"])
         self.assertIn('"cell_tuple":["excel_coord"', call["user_prompt"])
         self.assertNotIn("tile", call["user_prompt"].lower())
-        self.assertIn("Ordinary descriptive text is strong structural evidence", call["system_prompt"])
+        self.assertIn(
+            "Distinguish record tables from matrix/crosstab tables",
+            call["system_prompt"],
+        )
+        self.assertIn(
+            "Set row_header_range to null",
+            call["system_prompt"],
+        )
+        self.assertNotIn(
+            "Prefer those header roles unless position",
+            call["system_prompt"],
+        )
         self.assertIn("`N/A`", call["system_prompt"])
         self.assertIn("Keep them inside data_range", call["system_prompt"])
         self.assertNotIn("candidate", call["user_prompt"].lower())
@@ -2237,6 +2280,100 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertEqual(regions["data"], "B2:C4")
         serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
         self.assertEqual(len(serialized["items"]), 12)
+
+    def test_luna_vlm_preserves_record_table_as_column_header_and_data(self) -> None:
+        workbook_path = self.processed_dir / "executives.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Summary"
+        sheet["B21"] = "TOP EXECUTIVES"
+        for coordinate, value in {
+            "B22": "NAME",
+            "C22": "ROLE",
+            "E22": "AGE",
+            "F22": "YEAR HIRED",
+            "G22": "EXPECTED TERMINATION YEAR",
+            "I22": "SALARY ($)",
+        }.items():
+            sheet[coordinate] = value
+            sheet[coordinate].font = Font(bold=True)
+        for coordinate, value in {
+            "B23": "Brian Thomas Moynihan",
+            "C23": "Chief Executive Officer",
+            "E23": 65,
+            "F23": 2010,
+            "G23": "NA",
+            "I23": "NA",
+            "B24": "Alastair M. Borthwick",
+            "C24": "Chief Financial Officer",
+            "E24": 56,
+            "F24": 2021,
+            "G24": "NA",
+            "I24": "NA",
+        }.items():
+            sheet[coordinate] = value
+        workbook.save(workbook_path)
+        workbook.close()
+
+        class RecordTableVisionClient:
+            def __init__(self):
+                self.calls = []
+
+            def complete_structured(self, **kwargs):
+                self.calls.append(kwargs)
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"B21:I24","title_range":"B21:I21",'
+                    '"column_header_range":"B22:I22","row_header_range":null,'
+                    '"data_range":"B23:I24"}]}'
+                )
+
+        client = RecordTableVisionClient()
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": workbook_path.name}
+        )
+        structured = LunaVlmStructureDetectorModule(
+            client,
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        ).run(selection)
+
+        self.assertIn(
+            "leading text columns as row headers",
+            client.calls[0]["system_prompt"],
+        )
+        table = structured["tables"][0]
+        regions = {
+            region["type"]: region["excel_range"]
+            for region in table["regions"]
+        }
+        self.assertEqual(
+            regions,
+            {
+                "title": "B21:I21",
+                "column_header": "B22:I22",
+                "data": "B23:I24",
+            },
+        )
+        self.assertNotIn("row_header", regions)
+        self.assertEqual(
+            {node["name"] for node in table["header_tree"]},
+            {
+                "NAME",
+                "ROLE",
+                "AGE",
+                "YEAR HIRED",
+                "EXPECTED TERMINATION YEAR",
+                "SALARY ($)",
+            },
+        )
+
+        serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
+        self.assertTrue(
+            {"B23", "C23", "E23", "F23", "G23", "I23"}.issubset(
+                {item["cell_coord"] for item in serialized["items"]}
+            )
+        )
 
     def test_luna_vlm_detector_reports_partial_sheet_failures(self) -> None:
         class VisionClient:
