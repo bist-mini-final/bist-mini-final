@@ -34,6 +34,8 @@ _CONCURRENT_OPTIMIZED_INDEX_NAMES = (
     "idx_langchain_pg_embedding_cell_coord_upper",
     "idx_langchain_pg_embedding_workbook_hash",
     "idx_langchain_pg_embedding_collection_id",
+    "idx_langchain_pg_embedding_hnsw_halfvec_3072",
+    "idx_langchain_pg_embedding_hnsw_halfvec_1536",
 )
 
 
@@ -657,6 +659,22 @@ class PgVectorStore:
                         )
                         cur.execute(
                             """
+                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_hnsw_halfvec_3072
+                            ON langchain_pg_embedding
+                            USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
+                            WHERE vector_dims(embedding) = 3072;
+                            """
+                        )
+                        cur.execute(
+                            """
+                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_hnsw_halfvec_1536
+                            ON langchain_pg_embedding
+                            USING hnsw ((embedding::halfvec(1536)) halfvec_cosine_ops)
+                            WHERE vector_dims(embedding) = 1536;
+                            """
+                        )
+                        cur.execute(
+                            """
                             CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
                             ON langchain_pg_embedding
                             USING gin (cmetadata jsonb_path_ops);
@@ -755,23 +773,46 @@ class PgVectorStore:
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         limit: int = 5,
     ) -> List[Tuple[float, Dict[str, Any]]]:
-        """Perform LangChain similarity search with score (Cosine distance)."""
-        store = get_vector_store(
-            collection_name=index_id,
-            backend="pgvector",
-            model_name=model_name,
-            embedding_encoder=embedding_encoder,
-            database_url=self.database_url,
-        )
-
-        hits = store.similarity_search_with_score(query_text, k=limit)
-        results = []
-        for doc, score in hits:
-            # LangChain cosine distance is distance (0 = identical, 1 = orthogonal, 2 = opposite)
-            similarity = max(0.0, 1.0 - float(score))
-            cell_item = langchain_document_to_cell_item(doc, score=similarity)
-            results.append((similarity, cell_item))
-        return results
+        """Perform similarity search with score (Cosine distance) using halfvec HNSW acceleration."""
+        try:
+            from .vector_store_factory import LangChainEmbeddingAdapter
+            adapter = LangChainEmbeddingAdapter(
+                model_name=model_name,
+                encoder=embedding_encoder,
+            )
+            query_vector = adapter.embed_query(query_text)
+            hits = self.similarity_search_by_vector_with_score(
+                collection_name=index_id,
+                embedding=query_vector,
+                k=limit,
+            )
+            results = []
+            for doc, score in hits:
+                similarity = max(0.0, 1.0 - float(score))
+                cell_item = langchain_document_to_cell_item(doc, score=similarity)
+                results.append((similarity, cell_item))
+            return results
+        except Exception as search_err:
+            logger.warning(
+                "직접 halfvec 유사도 검색 실패 (%s), LangChain 폴백 사용: %s",
+                index_id,
+                search_err,
+            )
+            store = get_vector_store(
+                collection_name=index_id,
+                backend="pgvector",
+                model_name=model_name,
+                embedding_encoder=embedding_encoder,
+                database_url=getattr(self, "database_url", PGVECTOR_URL),
+            )
+            hits = store.similarity_search_with_score(query_text, k=limit)
+            results = []
+            for doc, score in hits:
+                # LangChain cosine distance is distance (0 = identical, 1 = orthogonal, 2 = opposite)
+                similarity = max(0.0, 1.0 - float(score))
+                cell_item = langchain_document_to_cell_item(doc, score=similarity)
+                results.append((similarity, cell_item))
+            return results
 
     def similarity_search_by_vector_with_score(
         self,
@@ -780,7 +821,7 @@ class PgVectorStore:
         k: int = 10,
     ) -> List[Tuple[Any, float]]:
         """
-        Search a pgvector collection using an embedding vector.
+        Search a pgvector collection using an embedding vector with halfvec HNSW optimization.
 
         Parameters:
             collection_name (str): Name of the collection to search.
@@ -794,6 +835,8 @@ class PgVectorStore:
             PgVectorStoreError: If both direct SQL and fallback similarity searches fail.
         """
         conn = None
+        dim = len(embedding) if hasattr(embedding, "__len__") else 0
+        use_halfvec = dim in (1536, 3072)
         try:
             conn = self._raw_connection()
             with conn.cursor() as cur:
@@ -806,16 +849,28 @@ class PgVectorStore:
                     return []
                 col_uuid = row[0]
 
-                cur.execute(
-                    """
-                    SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
-                    FROM langchain_pg_embedding
-                    WHERE collection_id = %s
-                    ORDER BY embedding <=> %s::vector
-                    LIMIT %s;
-                    """,
-                    (embedding, col_uuid, embedding, k),
-                )
+                if use_halfvec:
+                    cur.execute(
+                        f"""
+                        SELECT id, document, cmetadata, ((embedding::halfvec({dim})) <=> %s::halfvec({dim})) AS distance
+                        FROM langchain_pg_embedding
+                        WHERE collection_id = %s AND vector_dims(embedding) = {dim}
+                        ORDER BY (embedding::halfvec({dim})) <=> %s::halfvec({dim})
+                        LIMIT %s;
+                        """,
+                        (embedding, col_uuid, embedding, k),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
+                        FROM langchain_pg_embedding
+                        WHERE collection_id = %s
+                        ORDER BY embedding <=> %s::vector
+                        LIMIT %s;
+                        """,
+                        (embedding, col_uuid, embedding, k),
+                    )
                 rows = cur.fetchall()
 
             from langchain_core.documents import Document
