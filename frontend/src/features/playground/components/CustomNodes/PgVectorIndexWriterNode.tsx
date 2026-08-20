@@ -55,7 +55,7 @@ export const PgVectorIndexWriterNode = ({ data, selected }: PgVectorIndexWriterN
           <span className="text-[10px] text-teal-700 font-mono">PGVECTOR_URL 환경변수</span>
         </div>
         <div className="text-[10px] text-slate-600 leading-snug">
-          6개 ERD 테이블(<code>source_files</code>, <code>sheets</code>, <code>document_chunks</code>, <code>vector_indexes</code>, <code>langchain_pg_collection</code>, <code>langchain_pg_embedding</code>)에 HNSW 코사인 벡터를 영구 적재합니다.
+          6개 ERD 테이블(<code>source_files</code>, <code>sheets</code>, <code>document_chunks</code>, <code>vector_indexes</code>, <code>langchain_pg_collection</code>, <code>langchain_pg_embedding</code>)에 IVFFlat 코사인 벡터를 영구 적재합니다.
         </div>
       </div>
 
@@ -69,7 +69,7 @@ export const PgVectorIndexWriterNode = ({ data, selected }: PgVectorIndexWriterN
           </div>
           {model && (
             <div className="text-[9px] text-slate-500 font-mono">
-              모델: {model} · HNSW Cosine Index
+              모델: {model} · IVFFlat Cosine Index
             </div>
           )}
           {indexId && (

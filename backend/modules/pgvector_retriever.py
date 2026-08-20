@@ -41,13 +41,13 @@ class PgVectorRetrieverExecutionDTO(PgVectorRetrieverInputDTO, PgVectorRetriever
 
 
 class PgVectorRetrieverModule(ExecutableModule):
-    """Executes similarity searches using PostgreSQL pgvector HNSW index."""
+    """Executes similarity searches using PostgreSQL pgvector IVFFlat index."""
 
     definition = ModuleDefinition(
         type="pgvector_retriever",
         label="PostgreSQL pgvector Retriever",
         category="Logic",
-        description="질의 임베딩으로 PostgreSQL 16 pgvector DB의 HNSW 코사인 인덱스를 실시간 검색합니다.",
+        description="질의 임베딩으로 PostgreSQL 16 pgvector DB의 IVFFlat 코사인 인덱스를 실시간 검색합니다.",
         inputs=["query_input", "index_input"],
         outputs=["dense_result"],
         config_fields=["top_k"],

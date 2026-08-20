@@ -132,7 +132,7 @@ export function VectorIndexList({
       <div className="ds-panel__header">
         <div>
           <h3>PostgreSQL pgvector 컬렉션 목록</h3>
-          <small>PostgreSQL 16 + pgvector에 적재된 LangChain 표준 벡터 컬렉션 (HNSW 코사인 유사도 인덱스)</small>
+          <small>PostgreSQL 16 + pgvector에 적재된 LangChain 표준 벡터 컬렉션 (IVFFlat 코사인 유사도 인덱스)</small>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {onRefresh && (
@@ -428,7 +428,7 @@ export function VectorIndexList({
                       </div>
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <span className="ds-badge ds-badge--green" title="PostgreSQL 16 pgvector HNSW">
+                      <span className="ds-badge ds-badge--green" title="PostgreSQL 16 pgvector IVFFlat">
                         pgvector (LangChain)
                       </span>
                     </td>
