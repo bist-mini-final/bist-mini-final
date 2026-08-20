@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -92,6 +92,8 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
         model_name = "text-embedding-3-large"
         dimension = 3072
 
+        targets_meta: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+
         for target in targets:
             matched = None
             for idx in indexes:
@@ -132,6 +134,10 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                 matched_dimensions.add(col_dim)
                 dimension = col_dim
 
+            targets_meta.append((matched, meta))
+
+        for matched, meta in targets_meta:
+            cid = matched["index_id"]
             items = meta.get("items") or []
             if not items:
                 # Load chunks directly from langchain_pg_embedding table

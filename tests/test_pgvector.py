@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from langchain_core.documents import Document
 
+from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_store import PgVectorStore, PgVectorStoreError
 
 
@@ -117,6 +118,11 @@ class PgVectorIntegrationTests(unittest.TestCase):
         self.store = PgVectorStore()
         if not self.store.is_connected():
             self.skipTest("pgvector database is not accessible")
+        db_mgr = DatabaseManager(self.store.database_url)
+        db_mgr.ensure_schema()
+        info = self.store.get_db_info()
+        if info.get("pgvector_version") == "not installed":
+            self.skipTest("pgvector extension is not installed in PostgreSQL")
         self.encoder = FakeEmbeddingEncoder(dimension=4)
 
     def test_db_info(self):

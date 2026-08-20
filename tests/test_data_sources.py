@@ -80,6 +80,11 @@ class DataSourceApiTests(unittest.TestCase):
         if not self.pg_store.is_connected() or not self.db_mgr.is_connected():
             self.temp_dir.cleanup()
             self.skipTest("pgvector database is not accessible")
+        self.db_mgr.ensure_schema()
+        info = self.pg_store.get_db_info()
+        if info.get("pgvector_version") == "not installed":
+            self.temp_dir.cleanup()
+            self.skipTest("pgvector extension is not installed in PostgreSQL")
         self.clean_test_indexes(self.test_id)
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
