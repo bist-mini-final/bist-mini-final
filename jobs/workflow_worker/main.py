@@ -22,7 +22,7 @@ from backend.runtime.services import (
     create_workflow_runtime_services,
 )
 from backend.storage.answer_cache import AnswerCacheRepository
-from backend.storage.db_manager import WorkflowRunAlreadyClaimed
+from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
 from backend.workflows.executor import DagExecutionCancelled
 
 logger = logging.getLogger(__name__)
@@ -117,24 +117,15 @@ def _heartbeat_loop(
             logger.warning("워크플로 lease heartbeat 실패", exc_info=True)
 
 
-def run_one(
+def _execute_claim(
+    services: WorkflowRuntimeServices,
+    claim: WorkflowRunLease,
     queue_name: str,
     worker_id: str,
-    *,
-    stale_after_seconds: int = 180,
-    heartbeat_seconds: float = 15,
-) -> Optional[str]:
-    """Claim and finish one item; return ``None`` when the queue is empty."""
-
-    services = runtime_services()
-    claim = services.db_manager.claim_next_workflow_run(
-        queue_name,
-        worker_id,
-        stale_after_seconds=stale_after_seconds,
-    )
-    if claim is None:
-        logger.info("claim 가능한 작업이 없어 종료합니다 (queue=%s)", queue_name)
-        return None
+    stale_after_seconds: int,
+    heartbeat_seconds: float,
+) -> str:
+    """Execute one selected lease generation while holding its advisory lock."""
 
     run_id = claim.run_id
     lease_token = claim.token
@@ -198,8 +189,6 @@ def run_one(
         logger.info("배치 run 취소 완료 (run=%s)", run_id)
         return run_id
     except WorkflowRunAlreadyClaimed:
-        # The original process still owns the advisory lock. Keep this lease
-        # recoverable instead of incorrectly making the product run terminal.
         raise
     except Exception as error:
         try:
@@ -212,6 +201,44 @@ def run_one(
         except Exception:
             logger.warning("치명적 worker 오류 상태 저장 실패", exc_info=True)
         raise
+
+
+def run_one(
+    queue_name: str,
+    worker_id: str,
+    *,
+    stale_after_seconds: int = 180,
+    heartbeat_seconds: float = 15,
+) -> Optional[str]:
+    """Claim and finish one item; skip candidates still owned by another worker."""
+
+    services = runtime_services()
+    excluded_run_ids: list[str] = []
+    while True:
+        claim = services.db_manager.claim_next_workflow_run(
+            queue_name,
+            worker_id,
+            stale_after_seconds=stale_after_seconds,
+            excluded_run_ids=tuple(excluded_run_ids),
+        )
+        if claim is None:
+            logger.info("claim 가능한 작업이 없어 종료합니다 (queue=%s)", queue_name)
+            return None
+        try:
+            return _execute_claim(
+                services,
+                claim,
+                queue_name,
+                worker_id,
+                stale_after_seconds,
+                heartbeat_seconds,
+            )
+        except WorkflowRunAlreadyClaimed:
+            excluded_run_ids.append(claim.run_id)
+            logger.info(
+                "advisory lock 사용 중인 후보를 건너뜁니다 (run=%s)",
+                claim.run_id,
+            )
 
 
 def main() -> int:

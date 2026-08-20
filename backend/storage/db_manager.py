@@ -38,7 +38,7 @@ from dataclasses import dataclass
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Collection, Dict, Iterator, List, Optional
 from uuid import uuid4
 
 import psycopg2.extras
@@ -1057,6 +1057,7 @@ class DatabaseManager:
         worker_id: str,
         *,
         stale_after_seconds: int = 180,
+        excluded_run_ids: Collection[str] = (),
     ) -> Optional[WorkflowRunLease]:
         """Select one claim candidate with ``FOR UPDATE SKIP LOCKED``.
 
@@ -1074,6 +1075,7 @@ class DatabaseManager:
                     SELECT run_id
                     FROM workflow_runs
                     WHERE queue_name = %s
+                      AND NOT (run_id = ANY(%s::varchar[]))
                       AND cancel_requested = FALSE
                       AND (
                           (status = 'queued' AND available_at <= NOW())
@@ -1096,6 +1098,7 @@ class DatabaseManager:
                     """,
                     (
                         queue_name,
+                        list(excluded_run_ids),
                         worker_id,
                         stale_after_seconds,
                         worker_id,

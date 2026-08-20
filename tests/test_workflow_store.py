@@ -124,6 +124,7 @@ def test_request_cancel_preserves_existing_external_run_id() -> None:
     mock_db = MagicMock()
     mock_db.is_connected.return_value = True
     mock_db.request_workflow_cancel.return_value = True
+    mock_db.get_workflow_run_summary.return_value = None
 
     with TemporaryDirectory() as temp_dir:
         store = RunStore(Path(temp_dir), db_manager=mock_db)
@@ -162,6 +163,7 @@ def test_enqueue_explicitly_clears_existing_external_run_id() -> None:
     mock_db = MagicMock()
     mock_db.is_connected.return_value = True
     mock_db.enqueue_workflow_run.return_value = True
+    mock_db.get_workflow_run_summary.return_value = None
 
     with TemporaryDirectory() as temp_dir:
         store = RunStore(Path(temp_dir), db_manager=mock_db)

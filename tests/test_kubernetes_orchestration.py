@@ -1,5 +1,6 @@
 """Execution-policy and Kubernetes queue orchestration tests."""
 
+import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
@@ -16,6 +17,7 @@ from backend.modules.base import (
 from backend.orchestration import compile_task_plan
 from backend.orchestration.kubernetes import KubernetesQueueDispatcher
 from backend.runtime.registry_base import BaseModuleRegistry
+from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
 from backend.workflows.executor import WorkflowExecutor
 from backend.workflows.models import (
     CanvasPosition,
@@ -28,7 +30,7 @@ from backend.workflows.models import (
     WorkflowRun,
 )
 from backend.workflows.store import ResultCache, RunStore
-from jobs.workflow_worker.main import execute_with_policy
+from jobs.workflow_worker.main import execute_with_policy, run_one
 
 
 class _ValueInputDTO(ModuleInputDTO):
@@ -286,7 +288,39 @@ def test_worker_applies_module_retry_policy() -> None:
     assert services.workflow_executor.execute_scheduled_node.call_count == 2
 
 
-def test_cancellation_lookup_failure_is_logged_without_masking_execution() -> None:
+def test_worker_skips_advisory_locked_candidate_and_claims_next(
+    monkeypatch,
+) -> None:
+    services = MagicMock()
+    locked = WorkflowRunLease("run-locked", "token-locked")
+    available = WorkflowRunLease("run-available", "token-available")
+    services.db_manager.claim_next_workflow_run.side_effect = [locked, available]
+    monkeypatch.setattr(
+        "jobs.workflow_worker.main.runtime_services",
+        lambda: services,
+    )
+
+    def execute_claim(_services, claim, *_args):
+        if claim is locked:
+            raise WorkflowRunAlreadyClaimed("locked")
+        return claim.run_id
+
+    monkeypatch.setattr(
+        "jobs.workflow_worker.main._execute_claim",
+        execute_claim,
+    )
+
+    assert run_one("excel-ingestion", "job-1") == "run-available"
+    first_call, second_call = (
+        services.db_manager.claim_next_workflow_run.call_args_list
+    )
+    assert first_call.kwargs["excluded_run_ids"] == ()
+    assert second_call.kwargs["excluded_run_ids"] == ("run-locked",)
+
+
+def test_cancellation_lookup_failure_is_logged_without_masking_execution(
+    caplog,
+) -> None:
     store = MagicMock()
     store.is_cancel_requested.side_effect = RuntimeError("database unavailable")
     executor = WorkflowExecutor(
@@ -295,4 +329,7 @@ def test_cancellation_lookup_failure_is_logged_without_masking_execution() -> No
         MagicMock(),
     )
 
-    executor._raise_if_cancelled("run-kubernetes-test")
+    with caplog.at_level(logging.WARNING, logger="backend.workflows.executor"):
+        executor._raise_if_cancelled("run-kubernetes-test")
+
+    assert "DB cancellation 상태 조회 실패" in caplog.text

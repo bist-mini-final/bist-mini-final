@@ -74,7 +74,12 @@ install_kubernetes_tools() {
     curl -fsSL \
       "https://github.com/k3d-io/k3d/releases/download/v${k3d_version}/checksums.txt" \
       -o "${temporary_dir}/k3d-checksums.txt"
-    k3d_checksum="$(awk -v file="_dist/${k3d_file}" '$2 == file {print $1; exit}' "${temporary_dir}/k3d-checksums.txt")"
+    k3d_checksum="$(awk -v file="${k3d_file}" '
+      length($2) >= length(file) && substr($2, length($2) - length(file) + 1) == file {
+        print $1
+        exit
+      }
+    ' "${temporary_dir}/k3d-checksums.txt")"
     verify_sha256 "${temporary_dir}/${k3d_file}" "${k3d_checksum}"
     cp "${temporary_dir}/${k3d_file}" "${tool_dir}/k3d"
     chmod +x "${tool_dir}/k3d"
@@ -85,7 +90,8 @@ install_kubernetes_tools() {
       "https://dl.k8s.io/release/v${kubectl_version}/bin/${os_name}/${tool_arch}/kubectl" \
       -o "${temporary_dir}/kubectl"
     kubectl_checksum="$(curl -fsSL \
-      "https://dl.k8s.io/release/v${kubectl_version}/bin/${os_name}/${tool_arch}/kubectl.sha256")"
+      "https://dl.k8s.io/release/v${kubectl_version}/bin/${os_name}/${tool_arch}/kubectl.sha256" \
+      | awk 'NF {print $1; exit}')"
     verify_sha256 "${temporary_dir}/kubectl" "${kubectl_checksum}"
     cp "${temporary_dir}/kubectl" "${tool_dir}/kubectl"
     chmod +x "${tool_dir}/kubectl"

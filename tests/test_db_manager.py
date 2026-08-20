@@ -246,6 +246,7 @@ def test_claim_next_workflow_run_uses_skip_locked_and_stable_job_identity():
     assert "heartbeat_at" in query
     assert params == (
         "excel-ingestion",
+        [],
         "excel-ingestion-job-abc",
         180,
         "excel-ingestion-job-abc",
