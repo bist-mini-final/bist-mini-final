@@ -76,7 +76,7 @@ from backend.workflows.executor import (
     DagExecutionError,
     WorkflowExecutor,
 )
-from backend.workflows.dispatcher import WorkflowRunDispatcher
+from backend.workflows.dispatcher import InteractiveWorkflowDispatcher
 from backend.workflows.models import (
     CanvasPosition,
     WorkflowEdge,
@@ -3068,7 +3068,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.cache,
             module_worker=worker,
         )
-        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(executor, self.run_store)
 
         try:
             self.assertTrue(dispatcher.submit(run.id))
@@ -3096,7 +3096,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.cache,
             module_worker=worker,
         )
-        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(executor, self.run_store)
 
         try:
             self.assertTrue(dispatcher.submit(active_run.id))
@@ -3123,7 +3123,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.cache,
             module_worker=worker,
         )
-        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(executor, self.run_store)
 
         try:
             self.assertTrue(dispatcher.submit(run.id))
@@ -3220,7 +3220,7 @@ class WorkflowExecutionTests(unittest.TestCase):
     def test_dispatcher_recovers_only_matching_pending_runs(self) -> None:
         workflow = self.save_workflow()
         run = self.executor.create_run(workflow, self.runtime_request())
-        dispatcher = WorkflowRunDispatcher(self.executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(self.executor, self.run_store)
         try:
             self.assertEqual(dispatcher.recover_pending({"other-flow"}), 0)
             self.assertEqual(dispatcher.recover_pending({workflow.id}), 1)
@@ -3397,6 +3397,25 @@ class WorkflowExecutionTests(unittest.TestCase):
         )
         self.assertEqual(create_response.status_code, 200)
         run_id = create_response.json()["id"]
+
+        batch_create_response = client.post(
+            "/api/workflows/indexing_pgvector/runs",
+            json=self.runtime_request().model_dump(),
+        )
+        self.assertEqual(batch_create_response.status_code, 409)
+        self.assertIn("Kubernetes", batch_create_response.json()["detail"])
+
+        self.assertIn(
+            client.post(
+                "/api/workflows/api-flow/execute",
+                json=self.runtime_request().model_dump(),
+            ).status_code,
+            {404, 405},
+        )
+        self.assertIn(
+            client.post(f"/api/runs/{run_id}/execute").status_code,
+            {404, 405},
+        )
 
         cancel_response = client.post(f"/api/runs/{run_id}/cancel")
         self.assertEqual(cancel_response.status_code, 200)
@@ -4263,7 +4282,6 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         import openpyxl
         from unittest.mock import MagicMock
         from backend.modules.base import ModuleExecutionError
-        from backend.modules.docling_table_detector import TableCellBoundsDTO
         from backend.modules.sheet_metadata_persistence import (
             SheetMetadataPersistenceInputDTO,
             SheetMetadataPersistenceModule,

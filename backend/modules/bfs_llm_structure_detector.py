@@ -18,7 +18,7 @@ from ..spreadsheets.grid_structure import (
 )
 from ..spreadsheets.prompt_guidance import TEXT_CELL_ROLE_GUIDANCE
 from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
-from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox, compute_sheet_layout
+from ..spreadsheets.table_geometry import CellBounds, cell_bounds_bbox
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from .docling_table_detector import _safe_name

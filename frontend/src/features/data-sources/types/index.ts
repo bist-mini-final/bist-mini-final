@@ -31,7 +31,7 @@ export interface DbStatusInfo {
   error?: string;
 }
 
-export interface SerializedSampleItem {
+interface SerializedSampleItem {
   cell_id: string;
   sheet_name: string;
   cell_coord: string;

@@ -110,5 +110,3 @@ export function BiPage() {
     </section>
   );
 }
-
-export default BiPage;

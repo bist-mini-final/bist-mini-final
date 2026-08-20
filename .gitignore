@@ -9,6 +9,7 @@ coverage.xml
 htmlcov/
 .venv/
 venv/
+.tools/
 
 # Local environment
 .env
@@ -62,8 +63,8 @@ tmp/
 .idea/
 .vscode/
 
-# Evaluation / Questions data & Scripts
+# Evaluation / Questions data
 data/notion_questions.json
 *notion_question*.json
-/scripts/
+data/eval/results/
 !/.github/scripts/

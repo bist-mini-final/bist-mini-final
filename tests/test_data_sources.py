@@ -21,7 +21,13 @@ from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
-from backend.workflows import ResultCache, RunStore, WorkflowExecutor, WorkflowRunDispatcher, WorkflowStore
+from backend.workflows import (
+    InteractiveWorkflowDispatcher,
+    ResultCache,
+    RunStore,
+    WorkflowExecutor,
+    WorkflowStore,
+)
 
 
 class NoApiCompletionClient:
@@ -108,7 +114,7 @@ class DataSourceApiTests(unittest.TestCase):
             self.run_store,
             ResultCache(self.cache_dir),
         )
-        self.workflow_dispatcher = WorkflowRunDispatcher(
+        self.workflow_dispatcher = InteractiveWorkflowDispatcher(
             self.workflow_executor,
             self.run_store,
         )
@@ -476,4 +482,3 @@ class DataSourceApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

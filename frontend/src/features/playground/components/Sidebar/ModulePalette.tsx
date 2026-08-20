@@ -146,7 +146,12 @@ export function ModulePalette({
                       <GripVertical className="module-card__grip" aria-hidden="true" />
                       <span className="module-card__icon"><Icon className="h-4 w-4" /></span>
                       <span className="module-card__content">
-                        <strong>{module.label}</strong>
+                        <span className="module-card__title-row">
+                          <strong>{module.label}</strong>
+                          {module.task?.enabled && (
+                            <span className="module-card__task-badge">BATCH TASK</span>
+                          )}
+                        </span>
                         <small>{module.description}</small>
                       </span>
                       <span className="module-card__add" aria-hidden="true"><Plus className="h-3 w-3" /></span>

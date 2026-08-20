@@ -12,7 +12,6 @@ from .base import (
     ModuleExecutionError,
     ModuleInputDTO,
 )
-from .cell_text_embedder import EmbeddedCellTextDocumentDTO
 from .embedder import EmbeddingsDTO
 from .prebuilt_index_loader import IndexOutputDTO
 from .retrieval_models import RankedSearchResultDTO

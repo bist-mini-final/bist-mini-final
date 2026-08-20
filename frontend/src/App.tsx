@@ -4,7 +4,7 @@ import { findRoute } from './app/routes';
 import { usePathname } from './app/router';
 import { NotFoundPage } from './pages/NotFoundPage';
 
-export function App() {
+function App() {
   const pathname = usePathname();
   const activeRoute = findRoute(pathname);
   const Page = activeRoute?.component;

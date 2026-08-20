@@ -10,7 +10,6 @@ data/qa_examples/ 아래의 JSON 파일에서 QA 예시 세트를 로드합니�
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field

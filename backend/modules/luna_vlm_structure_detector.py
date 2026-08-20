@@ -31,7 +31,14 @@ from ..spreadsheets.sheet_renderer import ExcelSheetRenderer
 from ..spreadsheets.table_fragment_merge import parse_excel_range
 from ..spreadsheets.table_geometry import CellBounds, SheetLayout
 from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from .base import (
+    ExecutableModule,
+    ModuleConfigDTO,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleTaskPolicy,
+)
 from .docling_table_detector import _safe_name
 from .local_vlm_structure_detector import (
     LocalVlmStructureDetectorModule,
@@ -268,6 +275,13 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
         ],
         raw_output=True,
         version="5",
+        task=ModuleTaskPolicy(
+            retries=2,
+            retry_delay_seconds=5,
+            timeout_seconds=1800,
+            tags=["external-api", "vlm"],
+            resource_profile="high-memory",
+        ),
     )
     input_model = LunaVlmStructureDetectorInputDTO
     config_model = LunaVlmStructureDetectorConfigDTO
@@ -497,6 +511,18 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
 
             max_workers = min(settings.max_concurrency, len(prepared_sheets)) or 1
             print(f"[Luna VLM] {len(prepared_sheets)}개 시트 병렬 VLM 분석 시작 (스레드 {max_workers}개)...", flush=True)
+            self.report_progress(
+                {
+                    "phase": "sheet_analysis",
+                    "completed_sheets": 0,
+                    "failed_sheets": len(failed_sheets),
+                    "total_sheets": len(settings.sheet_names),
+                    "active_sheets": [
+                        str(context["sheet_name"])
+                        for context in prepared_sheets
+                    ],
+                }
+            )
             tables_by_sheet: Dict[str, List[Dict[str, Any]]] = {}
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
@@ -528,6 +554,17 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
                         logger.exception("[Luna VLM] 시트 '%s' 분석 중 예외 발생", failed_name)
                         failed_sheets.append({"sheet_name": failed_name, "error": str(future_err)})
                         print(f"[Luna VLM] 시트 분석 중 예외: {future_err}", flush=True)
+                    finally:
+                        self.report_progress(
+                            {
+                                "phase": "sheet_analysis",
+                                "completed_sheets": analyzed_sheet_count,
+                                "failed_sheets": len(failed_sheets),
+                                "total_sheets": len(settings.sheet_names),
+                                "finished_sheets": analyzed_sheet_count
+                                + len(failed_sheets),
+                            }
+                        )
 
             outputs = [
                 table

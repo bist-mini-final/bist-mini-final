@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  CloudCog,
   Coins,
   Cpu,
   Database,
@@ -127,6 +128,19 @@ export function PipelineTrackerView({
           </nav>
           <div className="ds-pipeline-title-row">
             <h2>{pipeline.fileName}</h2>
+            {pipeline.scheduler?.backend === 'kubernetes' && (
+              <span className="ds-badge ds-badge--blue ds-scheduler-badge">
+                <CloudCog size={12} />
+                Kubernetes Job
+                <span className={pipeline.scheduler.workerActive ? 'is-active' : 'is-idle'}>
+                  {pipeline.scheduler.workerActive
+                    ? '작업 할당됨'
+                    : isQueued
+                      ? 'KEDA 큐 대기'
+                      : '작업 종료'}
+                </span>
+              </span>
+            )}
             {pipeline.companyName && (
               <span className="ds-company-badge" style={{ cursor: 'default' }}>
                 <Building2 size={12} style={{ color: '#166534' }} />
@@ -141,7 +155,7 @@ export function PipelineTrackerView({
             )}
             {isQueued && (
               <span className="ds-module-status-badge ds-module-status-badge--waiting">
-                <Clock size={13} /> 서버 작업 큐 대기 중
+                <Clock size={13} /> KEDA 배치 큐 대기 중
               </span>
             )}
             {isCompleted && (
@@ -290,6 +304,19 @@ export function PipelineTrackerView({
               const isModWaiting = mod.status === 'waiting';
               const isModFailed = mod.status === 'failed';
               const isLunaModule = mod.id === 'mod_vlm_detector' || mod.moduleType === 'luna_vlm_structure_detector';
+              const visibleProgress = mod.liveProgress || (mod.batchProgress ? {
+                phase: 'batch_processing',
+                label: '배치 처리',
+                completed: mod.batchProgress.completed,
+                total: mod.batchProgress.total,
+                unit: '배치',
+                percent: Math.min(
+                  100,
+                  (mod.batchProgress.completed / Math.max(1, mod.batchProgress.total)) * 100,
+                ),
+                completedItems: mod.batchProgress.completedItems,
+                totalItems: mod.batchProgress.totalItems,
+              } : undefined);
 
               return (
                 <div
@@ -367,6 +394,7 @@ export function PipelineTrackerView({
                       {isModRunning && (
                         <span className="ds-module-status-badge ds-module-status-badge--running">
                           <Loader2 size={11} className="ds-spin" /> 실행 중
+                          {visibleProgress ? ` ${Math.round(visibleProgress.percent)}%` : ''}
                         </span>
                       )}
                       {isModDone && (
@@ -390,17 +418,22 @@ export function PipelineTrackerView({
                   {/* Card Body (Detailed Sub-logs & Metadata) */}
                   {isOpen && (
                     <div className="ds-module-card__body">
-                      {mod.batchProgress && (
-                        <div className="ds-batch-progress" aria-label={`${mod.name} 배치 진행률`}>
+                      {visibleProgress && (
+                        <div className="ds-batch-progress" aria-label={`${mod.name} 진행률`}>
                           <div className="ds-batch-progress__label">
                             <strong>
-                              {mod.batchProgress.completed}/{mod.batchProgress.total} 배치 완료
+                              {visibleProgress.unit === '배치'
+                                ? `${visibleProgress.completed}/${visibleProgress.total} 배치 완료`
+                                : `${visibleProgress.label} ${visibleProgress.completed}/${visibleProgress.total} ${visibleProgress.unit}`}
                             </strong>
-                            {mod.batchProgress.totalItems !== undefined && (
+                            {visibleProgress.totalItems !== undefined && (
                               <span>
-                                문서 {(mod.batchProgress.completedItems ?? 0).toLocaleString()}
-                                /{mod.batchProgress.totalItems.toLocaleString()}개
+                                문서 {(visibleProgress.completedItems ?? 0).toLocaleString()}
+                                /{visibleProgress.totalItems.toLocaleString()}개
                               </span>
+                            )}
+                            {visibleProgress.currentItem && (
+                              <span>현재: {visibleProgress.currentItem}</span>
                             )}
                           </div>
                           <div className="ds-batch-progress__track">
@@ -408,14 +441,11 @@ export function PipelineTrackerView({
                               className="ds-batch-progress__fill"
                               role="progressbar"
                               aria-valuemin={0}
-                              aria-valuemax={mod.batchProgress.total}
-                              aria-valuenow={mod.batchProgress.completed}
-                              aria-label={`${mod.name} 완료 배치 수`}
+                              aria-valuemax={visibleProgress.total}
+                              aria-valuenow={visibleProgress.completed}
+                              aria-label={`${mod.name} 완료 ${visibleProgress.unit} 수`}
                               style={{
-                                width: `${Math.min(
-                                  100,
-                                  (mod.batchProgress.completed / Math.max(1, mod.batchProgress.total)) * 100,
-                                )}%`,
+                                width: `${visibleProgress.percent}%`,
                               }}
                             />
                           </div>
@@ -478,6 +508,27 @@ export function PipelineTrackerView({
           </div>
 
           <div>
+            <div className="ds-hud-metric-row">
+              <div className="ds-hud-metric-label">
+                <CloudCog size={14} />
+                <span>배치 실행 상태</span>
+              </div>
+              <div className="ds-hud-metric-value ds-scheduler-value">
+                {pipeline.scheduler?.backend === 'kubernetes'
+                  ? pipeline.scheduler.workerActive
+                    ? 'Kubernetes Job 실행 중'
+                    : isQueued
+                      ? 'KEDA 스케일링 대기'
+                      : 'Kubernetes Job 종료'
+                  : '대화형 실행'}
+                {pipeline.scheduler?.externalRunId && (
+                  <small title={pipeline.scheduler.externalRunId}>
+                    {pipeline.scheduler.externalRunId.slice(0, 18)}
+                  </small>
+                )}
+              </div>
+            </div>
+
             <div className="ds-hud-metric-row">
               <div className="ds-hud-metric-label">
                 <Clock size={14} />

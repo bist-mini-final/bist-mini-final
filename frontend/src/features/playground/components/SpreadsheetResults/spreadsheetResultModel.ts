@@ -1,14 +1,14 @@
 export type SpreadsheetInspectorKind = 'docling' | 'openpyxl' | 'bfs_llm' | 'local_vlm' | 'luna_vlm';
 export type SpreadsheetRegionKind = 'title' | 'column_header' | 'row_header' | 'data';
 
-export interface SpreadsheetCellBounds {
+interface SpreadsheetCellBounds {
   min_row: number;
   max_row: number;
   min_column: number;
   max_column: number;
 }
 
-export interface SpreadsheetResultRegion {
+interface SpreadsheetResultRegion {
   region_id: string;
   type: SpreadsheetRegionKind;
   excel_range: string;

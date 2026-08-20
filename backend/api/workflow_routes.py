@@ -4,15 +4,16 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from ..core.settings import CACHE_DIR, RUN_DIR, WORKFLOW_DIR
+from ..data_sources import INGESTION_WORKFLOW_IDS
 from ..runtime.registry import ModuleRegistry
 from ..workflows import (
     DagExecutionCancelled,
     DagExecutionError,
+    InteractiveWorkflowDispatcher,
     ResultCache,
     RunStore,
     WorkflowExecutionRequest,
     WorkflowExecutor,
-    WorkflowRunDispatcher,
     WorkflowSaveRequest,
     WorkflowStore,
 )
@@ -26,7 +27,7 @@ def create_workflow_router(
     workflow_store: Optional[WorkflowStore] = None,
     run_store: Optional[RunStore] = None,
     workflow_executor: Optional[WorkflowExecutor] = None,
-    workflow_dispatcher: Optional[WorkflowRunDispatcher] = None,
+    workflow_dispatcher: Optional[InteractiveWorkflowDispatcher] = None,
 ) -> APIRouter:
     """
     Build a FastAPI router for workflow storage and run execution.
@@ -45,19 +46,42 @@ def create_workflow_router(
     """
     router = APIRouter(tags=["Workflows"])
     workflow_store = workflow_store or WorkflowStore(workflow_dir or WORKFLOW_DIR)
-    run_store = run_store or RunStore(run_dir or RUN_DIR)
+    db_mgr = getattr(module_registry, "db_manager", None)
+    run_store = run_store or RunStore(run_dir or RUN_DIR, db_manager=db_mgr)
     workflow_executor = workflow_executor or WorkflowExecutor(
         module_registry,
         run_store,
         ResultCache(cache_dir or CACHE_DIR),
     )
-    workflow_dispatcher = workflow_dispatcher or WorkflowRunDispatcher(
+    workflow_dispatcher = workflow_dispatcher or InteractiveWorkflowDispatcher(
         workflow_executor,
         run_store,
     )
 
+    def require_interactive_workflow(workflow_id: str) -> None:
+        if workflow_id in INGESTION_WORKFLOW_IDS:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Excel 적재 워크플로는 Data Sources의 Kubernetes 작업 API로만 "
+                    "실행할 수 있습니다"
+                ),
+            )
+
+    def require_interactive_run(run_id: str) -> None:
+        require_interactive_workflow(run_store.load(run_id).workflow_id)
+
     @router.delete("/cache")
     def clear_runtime_cache():
+        workflow_dispatcher.cancel_all()
+        if any(
+            workflow_dispatcher.is_active(run.id)
+            for run in run_store.list()
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="실행 중인 워크플로가 완전히 중지될 때까지 캐시를 삭제할 수 없습니다",
+            )
         return workflow_executor.clear_runtime_cache()
 
     @router.get("/workflows")
@@ -88,30 +112,13 @@ def create_workflow_router(
         request: WorkflowExecutionRequest,
     ):
         try:
+            require_interactive_workflow(workflow_id)
             workflow = workflow_store.load(workflow_id)
             return workflow_executor.create_run(workflow, request)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"워크플로 {workflow_id}를 찾을 수 없습니다"
             ) from error
-        except (DagExecutionError, ValueError) as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-
-    @router.post("/workflows/{workflow_id}/execute")
-    def execute_workflow(
-        workflow_id: str,
-        request: WorkflowExecutionRequest,
-    ):
-        try:
-            workflow = workflow_store.load(workflow_id)
-            run = workflow_executor.create_run(workflow, request)
-            return workflow_executor.execute_all(run.id)
-        except FileNotFoundError as error:
-            raise HTTPException(
-                status_code=404, detail=f"워크플로 {workflow_id}를 찾을 수 없습니다"
-            ) from error
-        except DagExecutionCancelled as error:
-            raise HTTPException(status_code=409, detail=str(error)) from error
         except (DagExecutionError, ValueError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -133,6 +140,7 @@ def create_workflow_router(
     @router.post("/runs/{run_id}/execute-next")
     def execute_next_batch(run_id: str):
         try:
+            require_interactive_run(run_id)
             return workflow_executor.execute_next_batch(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
@@ -146,20 +154,8 @@ def create_workflow_router(
     @router.post("/runs/{run_id}/nodes/{node_id}/execute")
     def execute_single_node(run_id: str, node_id: str):
         try:
+            require_interactive_run(run_id)
             return workflow_executor.execute_node(run_id, node_id)
-        except FileNotFoundError as error:
-            raise HTTPException(
-                status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
-            ) from error
-        except DagExecutionCancelled as error:
-            raise HTTPException(status_code=409, detail=str(error)) from error
-        except DagExecutionError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-
-    @router.post("/runs/{run_id}/execute")
-    def execute_remaining_batches(run_id: str):
-        try:
-            return workflow_executor.execute_all(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
@@ -172,6 +168,7 @@ def create_workflow_router(
     @router.post("/runs/{run_id}/resume")
     def resume_run(run_id: str):
         try:
+            require_interactive_run(run_id)
             return workflow_executor.resume(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
@@ -185,6 +182,7 @@ def create_workflow_router(
     @router.post("/runs/{run_id}/cancel")
     def cancel_run(run_id: str):
         try:
+            require_interactive_run(run_id)
             return workflow_dispatcher.cancel(run_id)
         except FileNotFoundError as error:
             raise HTTPException(

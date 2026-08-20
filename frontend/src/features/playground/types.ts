@@ -1,7 +1,7 @@
 /** Backend-owned module identifier. Unknown types render with GenericModuleNode. */
 export type ModuleType = string;
 
-export type ExecutionBranch = 'generated' | 'cached' | 'failed';
+type ExecutionBranch = 'generated' | 'cached' | 'failed';
 export type OutputBranch = Exclude<ExecutionBranch, 'failed'>;
 
 export interface JsonSchema {
@@ -45,6 +45,15 @@ export interface ModuleDefinition {
   raw_output: boolean;
   version: string;
   cacheable: boolean;
+  task: {
+    engine: 'kubernetes';
+    enabled: boolean;
+    retries: number;
+    retry_delay_seconds: number;
+    timeout_seconds: number | null;
+    tags: string[];
+    resource_profile: 'interactive' | 'standard' | 'high-memory' | 'gpu';
+  };
   input_schema: JsonSchema;
   config_schema: JsonSchema;
   output_schema: JsonSchema;
@@ -58,7 +67,7 @@ export interface ModulePresentation {
   color: string;
 }
 
-export interface WorkflowPosition {
+interface WorkflowPosition {
   x: number;
   y: number;
 }
@@ -67,7 +76,7 @@ export interface WorkflowViewport extends WorkflowPosition {
   zoom: number;
 }
 
-export interface WorkflowNode {
+interface WorkflowNode {
   id: string;
   module_type: ModuleType;
   position: WorkflowPosition;
@@ -81,7 +90,7 @@ export interface WorkflowNode {
   };
 }
 
-export interface WorkflowEdge {
+interface WorkflowEdge {
   id: string;
   source: string;
   target: string;
@@ -104,10 +113,10 @@ export interface WorkflowDocument {
   graph: WorkflowGraph;
 }
 
-export type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed';
-export type RunNodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
+type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed';
+type RunNodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
 
-export interface RunNodeState {
+interface RunNodeState {
   node_id: string;
   module_type: ModuleType;
   batch_index: number;
@@ -128,7 +137,7 @@ export interface RunNodeState {
   progress?: Record<string, unknown>;
 }
 
-export interface RunBatchState {
+interface RunBatchState {
   index: number;
   node_ids: string[];
   status: 'pending' | 'running' | 'completed' | 'failed';
@@ -142,6 +151,13 @@ export interface WorkflowRun {
   workflow_id: string;
   workflow_updated_at: string;
   status: RunStatus;
+  orchestration?: {
+    backend: 'direct' | 'kubernetes';
+    deployment_name: string | null;
+    external_run_id: string | null;
+    submission_attempt: number;
+    submitted_at: string | null;
+  };
   created_at: string;
   updated_at: string;
   graph: WorkflowGraph;

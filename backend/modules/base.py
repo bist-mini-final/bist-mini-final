@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Type
+from typing import Any, Callable, ClassVar, Dict, List, Literal, Mapping, Optional, Type, cast
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -39,6 +39,28 @@ class ModuleConfigPreset(BaseModel):
     values: Dict[str, Any]
 
 
+class ModuleTaskPolicy(BaseModel):
+    """Portable execution policy exposed to the Playground task catalog.
+
+    The module contract owns these semantics. Kubernetes workers apply retry
+    and timeout options, while interactive execution calls the same module
+    directly without importing cluster-specific code.
+    """
+
+    engine: Literal["kubernetes"] = "kubernetes"
+    enabled: bool = True
+    retries: int = Field(default=0, ge=0, le=20)
+    retry_delay_seconds: float = Field(default=0, ge=0, le=3600)
+    timeout_seconds: Optional[float] = Field(default=None, gt=0, le=86400)
+    tags: List[str] = Field(default_factory=list)
+    resource_profile: Literal[
+        "interactive",
+        "standard",
+        "high-memory",
+        "gpu",
+    ] = "standard"
+
+
 class ModuleDefinition(BaseModel):
     """Public contract used by the frontend module palette."""
 
@@ -55,6 +77,7 @@ class ModuleDefinition(BaseModel):
     raw_output: bool = False
     version: str = "1"
     cacheable: bool = True
+    task: ModuleTaskPolicy = Field(default_factory=ModuleTaskPolicy)
 
 
 class ModuleExecutionError(ValueError):
@@ -326,7 +349,7 @@ class ExecutableModule(ABC):
         self,
         output: Any,
         cache_hit: bool,
-    ) -> str:
+    ) -> Literal["generated", "cached"]:
         """Resolve a control-flow branch from this module's declared output ports."""
 
         matching_branches = [
@@ -335,7 +358,7 @@ class ExecutableModule(ABC):
             if isinstance(output, Mapping) and port in output
         ]
         if len(matching_branches) == 1:
-            return matching_branches[0]
+            return cast(Literal["generated", "cached"], matching_branches[0])
         if self.definition.branch_outputs:
             raise ModuleExecutionError(
                 f"모듈 {self.definition.type}의 출력 분기를 결정할 수 없습니다"

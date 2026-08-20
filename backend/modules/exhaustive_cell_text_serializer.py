@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Sequence, cast
+from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, cast
 
 import openpyxl
 from openpyxl.cell.cell import MergedCell
@@ -234,9 +234,10 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
         cls,
         sheets: Sequence[SheetCells],
         input_data: ExhaustiveCellTextSerializerExecutionDTO,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> List[Dict[str, Any]]:
         documents: List[Dict[str, Any]] = []
-        for sheet in sheets:
+        for sheet_index, sheet in enumerate(sheets, start=1):
             canonical_name = canonical_sheet_name(sheet.sheet_name)
             code = sheet_code(sheet.sheet_name)
             for target in sheet.cells:
@@ -270,6 +271,8 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
                                     ),
                                 }
                             )
+            if progress_callback is not None:
+                progress_callback(sheet_index, len(documents))
         return documents
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
@@ -293,7 +296,15 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
                 keep_vba=workbook_path.suffix.lower() == ".xlsm",
             )
             sheets: List[SheetCells] = []
-            for sheet_name in input_data.sheet_names:
+            total_sheets = len(input_data.sheet_names)
+            self.report_progress(
+                {
+                    "phase": "workbook_scan",
+                    "completed_sheets": 0,
+                    "total_sheets": total_sheets,
+                }
+            )
+            for sheet_index, sheet_name in enumerate(input_data.sheet_names, start=1):
                 if sheet_name not in workbook.sheetnames:
                     raise ModuleExecutionError(
                         f"Excel 시트를 찾을 수 없습니다: {sheet_name}"
@@ -304,6 +315,14 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
                         f"숨겨진 Excel 시트는 직렬화할 수 없습니다: {sheet_name}"
                     )
                 sheets.append(self._read_sheet(worksheet))
+                self.report_progress(
+                    {
+                        "phase": "workbook_scan",
+                        "completed_sheets": sheet_index,
+                        "total_sheets": total_sheets,
+                        "current_sheet": sheet_name,
+                    }
+                )
 
             document_count = self._document_count(sheets, input_data)
             if document_count == 0:
@@ -314,7 +333,28 @@ class ExhaustiveCellTextSerializerModule(ExecutableModule):
                     f"{document_count:,}개 > {input_data.max_documents:,}개. "
                     "중복 헤더 값 병합을 켜거나 max_documents를 명시적으로 늘리세요"
                 )
-            items = self._documents(sheets, input_data)
+            self.report_progress(
+                {
+                    "phase": "document_generation",
+                    "completed_sheets": 0,
+                    "total_sheets": len(sheets),
+                    "completed_items": 0,
+                    "total_items": document_count,
+                }
+            )
+            items = self._documents(
+                sheets,
+                input_data,
+                progress_callback=lambda completed_sheets, completed_items: self.report_progress(
+                    {
+                        "phase": "document_generation",
+                        "completed_sheets": completed_sheets,
+                        "total_sheets": len(sheets),
+                        "completed_items": completed_items,
+                        "total_items": document_count,
+                    }
+                ),
+            )
         finally:
             if workbook is not None:
                 workbook.close()

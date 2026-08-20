@@ -637,6 +637,32 @@
   font-weight: 700;
 }
 
+.module-card__title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.module-card__title-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.module-card__task-badge {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--module-accent) 30%, #cbd5e1);
+  border-radius: 999px;
+  padding: 0.08rem 0.3rem;
+  background: color-mix(in srgb, var(--module-accent) 8%, white);
+  color: color-mix(in srgb, var(--module-accent) 80%, #334155);
+  font-size: 0.55rem;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  line-height: 1.2;
+}
+
 .module-card__content small {
   margin-top: 0.1rem;
   color: var(--text-muted);

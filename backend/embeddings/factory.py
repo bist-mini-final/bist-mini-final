@@ -1,12 +1,13 @@
 from typing import Dict, Optional, Protocol
 
-from .bge import BgeEncoder, DEFAULT_BGE_MODEL
+from .bge import BgeEncoder
 from .openai import OpenAIEmbeddingEncoder
 
 
 class EmbeddingEncoder(Protocol):
     def encode(self, queries: list[str]) -> list[list[float]]:
         """Return one numeric vector per query."""
+        ...
 
 
 def get_embedding_encoder(
