@@ -1,6 +1,6 @@
 # Luna Full-Sheet Structure Detector
 
-> Module type: `luna_vlm_structure_detector` · Category: `Logic` · Version: `4`
+> Module type: `luna_vlm_structure_detector` · Category: `Logic` · Version: `5`
 
 후보 영역이나 타일 분할 없이 표시된 시트 전체 이미지와 좌표 컨텍스트를 한 번에 분석합니다.
 

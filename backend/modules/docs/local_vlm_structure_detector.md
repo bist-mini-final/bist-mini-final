@@ -1,6 +1,6 @@
 # Local VLM Table Structure Detector
 
-> Module type: `local_vlm_structure_detector` · Category: `Logic` · Version: `4`
+> Module type: `local_vlm_structure_detector` · Category: `Logic` · Version: `5`
 
 셀 타입 오버레이 이미지와 좌표·타입·값 컨텍스트를 로컬 VLM에 함께 전달해 표와 계층 헤더 영역을 식별합니다.
 

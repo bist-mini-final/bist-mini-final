@@ -1,6 +1,6 @@
 # BFS + LLM Table Structure Detector
 
-> Module type: `bfs_llm_structure_detector` · Category: `Logic` · Version: `4`
+> Module type: `bfs_llm_structure_detector` · Category: `Logic` · Version: `5`
 
 셀 연결요소로 표를 분리하고 상단 행만 LLM으로 판단해 제목·계층 헤더·데이터 영역을 구성합니다.
 
