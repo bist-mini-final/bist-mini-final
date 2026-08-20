@@ -84,6 +84,18 @@ class DenseRetrieverModule(ExecutableModule):
         ]
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Execute dense retrieval queries and return ranked document matches with query and document context.
+        
+        Parameters:
+        	payload (BaseModel): Execution data containing query embeddings, index reference metadata, and retrieval configuration.
+        
+        Returns:
+        	Dict[str, Any]: A mapping containing query context, document context, and ranked retrieval items.
+        
+        Raises:
+        	ModuleExecutionError: If the supplied index metadata does not match the stored index metadata.
+        """
         input_data = cast(DenseRetrieverExecutionDTO, payload)
         metadata = self.index_store.metadata(input_data.index_input.index_id)
         expected_metadata = {
@@ -103,6 +115,15 @@ class DenseRetrieverModule(ExecutableModule):
         ranked_items: List[Dict[str, Any]] = []
 
         def _search_single_dense(item: Tuple[str, Any]) -> List[Dict[str, Any]]:
+            """
+            Searches the vector index for a query and ranks its matching documents.
+            
+            Parameters:
+                item (Tuple[str, Any]): The query text and its embedding vector.
+            
+            Returns:
+                List[Dict[str, Any]]: Ranked retrieval results for the query.
+            """
             query, query_vector = item
             hits = self.index_store.search(
                 input_data.index_input.index_id,

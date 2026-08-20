@@ -110,6 +110,15 @@ class PgVectorRetrieverModule(ExecutableModule):
         def _search_single_subquery(
             task: Tuple[str, str, Any]
         ) -> Tuple[str, str, List[Any], Optional[Exception]]:
+            """
+            Search one collection for a subquery embedding.
+            
+            Parameters:
+            	task (Tuple[str, str, Any]): Collection name, subquery text, and query embedding.
+            
+            Returns:
+            	Tuple[str, str, List[Any], Optional[Exception]]: The collection name, subquery text, search results, and any exception raised during the search.
+            """
             col, q_text, q_vec = task
             try:
                 res = self.pgvector_store.similarity_search_by_vector_with_score(
