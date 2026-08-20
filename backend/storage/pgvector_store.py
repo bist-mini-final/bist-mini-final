@@ -821,18 +821,18 @@ class PgVectorStore:
         k: int = 10,
     ) -> List[Tuple[Any, float]]:
         """
-        Search a pgvector collection using an embedding vector with halfvec HNSW optimization.
-
+        Search a collection for documents nearest to an embedding vector.
+        
         Parameters:
             collection_name (str): Name of the collection to search.
             embedding (List[float]): Query embedding vector.
             k (int): Maximum number of results to return.
-
+        
         Returns:
-            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list if the collection does not exist.
-
+            List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list when the collection does not exist.
+        
         Raises:
-            PgVectorStoreError: If both direct SQL and fallback similarity searches fail.
+            PgVectorStoreError: If both direct and fallback searches fail.
         """
         conn = None
         dim = len(embedding) if hasattr(embedding, "__len__") else 0

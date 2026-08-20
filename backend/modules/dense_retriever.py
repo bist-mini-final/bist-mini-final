@@ -84,6 +84,18 @@ class DenseRetrieverModule(ExecutableModule):
         ]
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
+        """
+        Execute dense retrieval queries and return ranked document matches with query and document context.
+        
+        Parameters:
+        	payload (BaseModel): Execution data containing query embeddings, index reference metadata, and retrieval configuration.
+        
+        Returns:
+        	Dict[str, Any]: A mapping containing query context, document context, and ranked retrieval items.
+        
+        Raises:
+        	ModuleExecutionError: If the supplied index metadata does not match the stored index metadata.
+        """
         input_data = cast(DenseRetrieverExecutionDTO, payload)
         metadata = self.index_store.metadata(input_data.index_input.index_id)
         expected_metadata = {
@@ -97,9 +109,22 @@ class DenseRetrieverModule(ExecutableModule):
             raise ModuleExecutionError(
                 "벡터 인덱스 참조 DTO와 저장된 인덱스 메타데이터가 일치하지 않습니다"
             )
+        from concurrent.futures import ThreadPoolExecutor
+
         query_items = list(input_data.query_input.items.items())
         ranked_items: List[Dict[str, Any]] = []
-        for query, query_vector in query_items:
+
+        def _search_single_dense(item: Tuple[str, Any]) -> List[Dict[str, Any]]:
+            """
+            Searches the vector index for a query and ranks its matching documents.
+            
+            Parameters:
+                item (Tuple[str, Any]): The query text and its embedding vector.
+            
+            Returns:
+                List[Dict[str, Any]]: Ranked retrieval results for the query.
+            """
+            query, query_vector = item
             hits = self.index_store.search(
                 input_data.index_input.index_id,
                 query_vector,
@@ -108,13 +133,16 @@ class DenseRetrieverModule(ExecutableModule):
                     input_data.top_k * 2,
                 ),
             )
-            ranked_items.extend(
-                self._rank_query(
-                    hits,
-                    query,
-                    input_data.top_k,
-                )
+            return self._rank_query(
+                hits,
+                query,
+                input_data.top_k,
             )
+
+        max_workers = min(8, max(1, len(query_items)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for chunk in executor.map(_search_single_dense, query_items):
+                ranked_items.extend(chunk)
 
         return {
             "query_context": input_data.query_input.query_context.model_dump(

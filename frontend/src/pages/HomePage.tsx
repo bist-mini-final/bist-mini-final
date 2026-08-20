@@ -25,6 +25,9 @@ const plannedCards = [
   },
 ] as const;
 
+/**
+ * Renders the workspace landing page with links to available and upcoming workspaces.
+ */
 export function HomePage() {
   return (
     <div className="home-page">

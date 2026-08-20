@@ -6,6 +6,12 @@ interface SummaryProps {
   dbStatus: DbStatusInfo | null;
 }
 
+/**
+ * Renders a summary of vector data sources, embedding usage, database status, and models.
+ *
+ * @param indexes - Vector data source indexes to summarize
+ * @param dbStatus - Current database connection and pgvector status
+ */
 export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
   const totalChunks = indexes.reduce((sum, idx) => sum + (idx.document_count || 0), 0);
   const models = Array.from(new Set(indexes.map((i) => i.model).filter(Boolean)));
