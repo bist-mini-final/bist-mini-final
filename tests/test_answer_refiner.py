@@ -341,8 +341,8 @@ def test_skip_inference_when_target_cells_at_max():
     refined = result["refined_answer_json"]
 
     # Verify usage summation succeeded with None normalization
-    assert refined["api_usage"]["total_tokens"] >= 0
+    assert refined["api_usage"]["total_tokens"] == 170
     assert refined["api_usage"]["prompt_tokens"] >= 0
 
-    # Verify that direct cells were fetched from mock
-    assert len(refined["direct_cells"]) > 0
+    # Verify that direct cells were fetched from mock with expected candidates
+    assert set(mock_pgvector.cell_references) == {"P17", "P33", "Q40"}
