@@ -3403,7 +3403,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             json=self.runtime_request().model_dump(),
         )
         self.assertEqual(batch_create_response.status_code, 409)
-        self.assertIn("Prefect", batch_create_response.json()["detail"])
+        self.assertIn("Kubernetes", batch_create_response.json()["detail"])
 
         self.assertIn(
             client.post(

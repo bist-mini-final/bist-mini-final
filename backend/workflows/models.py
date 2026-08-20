@@ -12,7 +12,7 @@ RunStatus = Literal["queued", "running", "paused", "completed", "failed"]
 BatchStatus = Literal["pending", "running", "completed", "failed"]
 OrchestratorBackend = Literal[
     "direct",
-    "prefect",
+    "kubernetes",
 ]
 
 
@@ -186,6 +186,15 @@ class RunOrchestrationState(StrictModel):
     external_run_id: Optional[str] = None
     submission_attempt: int = Field(default=0, ge=0)
     submitted_at: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_scheduler(cls, value: Any) -> Any:
+        """Keep old run-history files readable after removing the old scheduler."""
+
+        if isinstance(value, Mapping) and value.get("backend") == "prefect":
+            return {**value, "backend": "kubernetes"}
+        return value
 
 
 class WorkflowRun(StrictModel):

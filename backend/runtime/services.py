@@ -1,8 +1,8 @@
 """Shared construction of workflow runtime services.
 
-The API process and Prefect Flow must build the same module graph and storage
-adapters. Keeping that wiring here prevents the Flow image from drifting away
-from the HTTP application's execution behavior.
+The API process and Kubernetes Job worker build the same module graph and
+storage adapters. Keeping that wiring here prevents worker images from
+drifting away from the HTTP application's execution behavior.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from .registry_base import BaseModuleRegistry
 
 @dataclass(frozen=True)
 class WorkflowRuntimeServices:
-    """Services shared by workflow HTTP routes and Prefect Flows."""
+    """Services shared by workflow HTTP routes and Kubernetes workers."""
 
     pgvector_store: PgVectorStore
     db_manager: DatabaseManager
@@ -67,13 +67,13 @@ def create_workflow_runtime_services(
     database = db_manager or DatabaseManager()
     database_connected = database.is_connected()
     if require_database and not database_connected:
-        raise RuntimeError("Prefect Flow가 PostgreSQL 데이터베이스에 연결할 수 없습니다")
+        raise RuntimeError("Kubernetes 배치 워커가 PostgreSQL 데이터베이스에 연결할 수 없습니다")
     if database_connected and initialize_schema and not database.ensure_schema():
         raise RuntimeError("PostgreSQL 워크플로 스키마를 초기화할 수 없습니다")
 
     pg_store = pgvector_store or PgVectorStore(database.database_url)
     if registry_factory is None:
-        # Keep the full application registry out of the ingestion Flow's
+        # Keep the full application registry out of the ingestion worker's
         # import and startup path.
         from .registry import ModuleRegistry
 

@@ -6,8 +6,8 @@ from fastapi import APIRouter
 from ..core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
+    KUBERNETES_INGESTION_QUEUE,
     PLAYGROUND_MAX_CONCURRENCY,
-    PREFECT_DEPLOYMENT_NAME,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
     VECTOR_INDEX_DIR,
@@ -18,7 +18,7 @@ from ..llm.chat_completion import ChatCompletionClient
 from ..storage.answer_cache import AnswerCacheRepository
 from ..runtime.services import create_workflow_runtime_services
 from ..runtime.registry import ModuleRegistry
-from ..orchestration.prefect import PrefectIngestionDispatcher
+from ..orchestration.kubernetes import KubernetesQueueDispatcher
 from ..workflows import InteractiveWorkflowDispatcher
 from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router
@@ -68,16 +68,16 @@ def create_api_router(
         embedding_encoder=embedding_encoder,
     )
     # Playground execution remains interactive. Long-running Excel ingestion
-    # always goes through the independently deployed Prefect flow.
+    # is persisted to the PostgreSQL queue watched by KEDA.
     workflow_dispatcher = InteractiveWorkflowDispatcher(
         services.workflow_executor,
         services.run_store,
         max_workers=PLAYGROUND_MAX_CONCURRENCY,
     )
-    ingestion_dispatcher = PrefectIngestionDispatcher(
+    ingestion_dispatcher = KubernetesQueueDispatcher(
         services.workflow_executor,
         services.run_store,
-        PREFECT_DEPLOYMENT_NAME,
+        KUBERNETES_INGESTION_QUEUE,
     )
     module_registry = cast(ModuleRegistry, services.module_registry)
     workflow_store = services.workflow_store

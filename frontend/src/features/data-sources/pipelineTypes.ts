@@ -55,7 +55,7 @@ export interface PipelineRunState {
   isLiveUpload?: boolean;
   lunaOutput?: LunaInspectionOutput;
   scheduler?: {
-    backend: 'direct' | 'prefect';
+    backend: 'direct' | 'kubernetes';
     deploymentName?: string;
     externalRunId?: string;
     workerActive: boolean;

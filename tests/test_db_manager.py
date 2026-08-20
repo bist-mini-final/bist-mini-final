@@ -217,6 +217,85 @@ def test_claim_workflow_run_rejects_duplicate_owner():
     assert connection.closed is True
 
 
+def test_claim_next_workflow_run_uses_skip_locked_and_stable_job_identity():
+    class QueueCursor(FakeCursor):
+        def fetchone(self):
+            return ("run-queued",)
+
+    cursor = QueueCursor()
+    database, connection = database_with(cursor)
+
+    claimed = database.claim_next_workflow_run(
+        "excel-ingestion",
+        "excel-ingestion-job-abc",
+        stale_after_seconds=180,
+    )
+
+    assert claimed == "run-queued"
+    query, params = cursor.executions[0]
+    assert "FOR UPDATE SKIP LOCKED" in query
+    assert "heartbeat_at" in query
+    assert params == (
+        "excel-ingestion",
+        "excel-ingestion-job-abc",
+        180,
+        "excel-ingestion-job-abc",
+        "excel-ingestion-job-abc",
+        "excel-ingestion-job-abc",
+    )
+    assert connection.committed is True
+    assert connection.closed is True
+
+
+def test_enqueue_workflow_run_sets_kubernetes_queue_metadata():
+    class EnqueueCursor(FakeCursor):
+        def execute(self, query, params=None):
+            super().execute(query, params)
+            self.rowcount = 1
+
+    cursor = EnqueueCursor()
+    database, connection = database_with(cursor)
+
+    database.enqueue_workflow_run(
+        "run-queued",
+        "excel-ingestion",
+        submission_attempt=2,
+        submitted_at="2026-08-20T00:00:00+00:00",
+        priority=5,
+    )
+
+    query, params = cursor.executions[0]
+    assert "cancel_requested = FALSE" in query
+    assert "'backend', 'kubernetes'" in query
+    assert params == (
+        "excel-ingestion",
+        5,
+        "excel-ingestion",
+        2,
+        "2026-08-20T00:00:00+00:00",
+        "run-queued",
+    )
+    assert connection.committed is True
+
+
+def test_cancel_request_is_durable_across_api_and_worker_processes():
+    class CancelCursor(FakeCursor):
+        def execute(self, query, params=None):
+            super().execute(query, params)
+            self.rowcount = 1
+
+    cursor = CancelCursor()
+    database, connection = database_with(cursor)
+
+    assert database.request_workflow_cancel("run-active") is True
+
+    query, params = cursor.executions[0]
+    assert "cancel_requested = TRUE" in query
+    assert "THEN 'paused'" in query
+    assert params == ("run-active",)
+    assert connection.committed is True
+
+
 def test_pending_run_references_do_not_select_large_node_payloads():
     class ReferenceCursor(FakeCursor):
         def fetchall(self):
@@ -225,7 +304,7 @@ def test_pending_run_references_do_not_select_large_node_payloads():
                     "run-pending",
                     "indexing_pgvector",
                     "queued",
-                    {"backend": "prefect", "external_run_id": "flow-1"},
+                    {"backend": "kubernetes", "external_run_id": "job-1"},
                 )
             ]
 
@@ -270,7 +349,7 @@ def test_workflow_run_summary_uses_node_logs_without_large_payload_columns():
                 {"nodes": [], "edges": []},
                 {},
                 True,
-                {"backend": "prefect", "external_run_id": "flow-1"},
+                {"backend": "kubernetes", "external_run_id": "job-1"},
                 [],
                 "2026-08-20T00:00:00+00:00",
                 "2026-08-20T00:00:01+00:00",
@@ -332,7 +411,7 @@ def test_save_and_get_workflow_run():
                 self.stored_row = (
                     params[0], params[1], params[2], params[3], params[4],
                     {"nodes": [], "edges": []}, {}, params[7],
-                    {"backend": "prefect", "external_run_id": "prefect-run-1"},
+                    {"backend": "kubernetes", "external_run_id": "job-run-1"},
                     [], {"node-1": {"status": "succeeded"}},
                     "2026-08-20T00:00:00+00:00", "2026-08-20T00:00:00+00:00"
                 )
@@ -355,8 +434,8 @@ def test_save_and_get_workflow_run():
         "workflow_id": "indexing_pgvector",
         "status": "completed",
         "orchestration": {
-            "backend": "prefect",
-            "external_run_id": "prefect-run-1",
+            "backend": "kubernetes",
+            "external_run_id": "job-run-1",
         },
         "nodes": {
             "node-1": {
@@ -376,7 +455,7 @@ def test_save_and_get_workflow_run():
     assert loaded is not None
     assert loaded["id"] == "run-test-123"
     assert loaded["workflow_id"] == "indexing_pgvector"
-    assert loaded["orchestration"]["external_run_id"] == "prefect-run-1"
+    assert loaded["orchestration"]["external_run_id"] == "job-run-1"
 
     listed = database.list_workflow_runs("indexing_pgvector")
     assert len(listed) == 1

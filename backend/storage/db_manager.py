@@ -99,6 +99,14 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     runtime_inputs JSONB NOT NULL DEFAULT '{}',
     use_cache BOOLEAN DEFAULT TRUE,
     orchestration JSONB NOT NULL DEFAULT '{}',
+    queue_name VARCHAR(64),
+    worker_id VARCHAR(128),
+    priority INT NOT NULL DEFAULT 0,
+    attempt_count INT NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    claimed_at TIMESTAMPTZ,
+    heartbeat_at TIMESTAMPTZ,
+    cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
     batches JSONB NOT NULL DEFAULT '[]',
     nodes JSONB NOT NULL DEFAULT '{}',
     error_message TEXT,
@@ -109,6 +117,14 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
 
 -- CREATE TABLE IF NOT EXISTS does not add columns to an existing installation.
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS orchestration JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS queue_name VARCHAR(64);
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS worker_id VARCHAR(128);
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 0;
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS attempt_count INT NOT NULL DEFAULT 0;
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS cancel_requested BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS node_execution_logs (
     log_id VARCHAR(128) PRIMARY KEY,
@@ -138,6 +154,12 @@ CREATE INDEX IF NOT EXISTS idx_langchain_cmetadata_gin ON langchain_pg_embedding
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_id ON workflow_runs(workflow_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status);
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_updated_at ON workflow_runs(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_queue_claim
+    ON workflow_runs(queue_name, status, available_at, priority DESC, created_at)
+    WHERE cancel_requested = FALSE;
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_stale_lease
+    ON workflow_runs(queue_name, heartbeat_at)
+    WHERE status = 'running' AND cancel_requested = FALSE;
 CREATE INDEX IF NOT EXISTS idx_node_logs_run_id ON node_execution_logs(run_id);
 CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
 """
@@ -451,7 +473,12 @@ class DatabaseManager:
                     ON CONFLICT (run_id) DO UPDATE SET
                         workflow_id = EXCLUDED.workflow_id,
                         workflow_updated_at = EXCLUDED.workflow_updated_at,
-                        status = EXCLUDED.status,
+                        status = CASE
+                            WHEN workflow_runs.cancel_requested
+                                 AND EXCLUDED.status IN ('queued', 'running')
+                            THEN 'paused'
+                            ELSE EXCLUDED.status
+                        END,
                         schema_version = EXCLUDED.schema_version,
                         graph = EXCLUDED.graph,
                         runtime_inputs = EXCLUDED.runtime_inputs,
@@ -819,10 +846,21 @@ class DatabaseManager:
                 cur.execute(
                     """
                     UPDATE workflow_runs
-                    SET status = %s, batches = %s, updated_at = %s
+                    SET status = CASE
+                            WHEN cancel_requested AND %s IN ('queued', 'running')
+                            THEN 'paused'
+                            ELSE %s
+                        END,
+                        batches = %s,
+                        updated_at = %s,
+                        heartbeat_at = CASE
+                            WHEN worker_id IS NOT NULL THEN NOW()
+                            ELSE heartbeat_at
+                        END
                     WHERE run_id = %s;
                     """,
                     (
+                        run_status,
                         run_status,
                         psycopg2.extras.Json(batches),
                         updated_at,
@@ -881,16 +919,16 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def update_workflow_orchestration(
+    def enqueue_workflow_run(
         self,
         run_id: str,
-        backend: str,
-        deployment_name: str,
-        external_run_id: str,
+        queue_name: str,
+        *,
         submission_attempt: int,
         submitted_at: str,
+        priority: int = 0,
     ) -> None:
-        """Atomically update orchestration metadata without loading full run document."""
+        """Place one persisted run on the durable Kubernetes work queue."""
 
         conn = self._raw_connection()
         try:
@@ -898,36 +936,243 @@ class DatabaseManager:
                 cur.execute(
                     """
                     UPDATE workflow_runs
-                    SET orchestration = jsonb_set(
-                            jsonb_set(
-                                jsonb_set(
-                                    jsonb_set(
-                                        jsonb_set(
-                                            orchestration,
-                                            '{backend}', to_jsonb(%s::text)
-                                        ),
-                                        '{deployment_name}', to_jsonb(%s::text)
-                                    ),
-                                    '{external_run_id}', to_jsonb(%s::text)
-                                ),
-                                '{submission_attempt}', to_jsonb(%s::int)
-                            ),
-                            '{submitted_at}', to_jsonb(%s::text)
+                    SET status = 'queued',
+                        queue_name = %s,
+                        worker_id = NULL,
+                        priority = %s,
+                        available_at = NOW(),
+                        claimed_at = NULL,
+                        heartbeat_at = NULL,
+                        cancel_requested = FALSE,
+                        orchestration = jsonb_build_object(
+                            'backend', 'kubernetes',
+                            'deployment_name', %s::text,
+                            'external_run_id', NULL,
+                            'submission_attempt', %s::int,
+                            'submitted_at', %s::text
                         ),
-                        updated_at = %s
+                        updated_at = NOW(),
+                        completed_at = NULL
                     WHERE run_id = %s;
                     """,
                     (
-                        backend,
-                        deployment_name,
-                        external_run_id,
+                        queue_name,
+                        priority,
+                        queue_name,
                         submission_attempt,
                         submitted_at,
-                        datetime.now(timezone.utc).isoformat(),
                         run_id,
                     ),
                 )
+                if cur.rowcount != 1:
+                    raise FileNotFoundError(run_id)
             conn.commit()
+        finally:
+            conn.close()
+
+    def claim_next_workflow_run(
+        self,
+        queue_name: str,
+        worker_id: str,
+        *,
+        stale_after_seconds: int = 180,
+    ) -> Optional[str]:
+        """Atomically claim one queue item with ``FOR UPDATE SKIP LOCKED``.
+
+        A Kubernetes Job name is used as the stable worker identity. A
+        restarted pod from the same Job can therefore reacquire its own run;
+        another Job may recover a run only after its heartbeat lease expires.
+        """
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    WITH candidate AS (
+                        SELECT run_id
+                        FROM workflow_runs
+                        WHERE queue_name = %s
+                          AND cancel_requested = FALSE
+                          AND (
+                              (status = 'queued' AND available_at <= NOW())
+                              OR (
+                                  status = 'running'
+                                  AND (
+                                      worker_id = %s
+                                      OR heartbeat_at IS NULL
+                                      OR heartbeat_at < NOW() - (%s * INTERVAL '1 second')
+                                  )
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN worker_id = %s THEN 0 ELSE 1 END,
+                            priority DESC,
+                            available_at ASC,
+                            created_at ASC
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+                    )
+                    UPDATE workflow_runs AS run
+                    SET status = 'running',
+                        worker_id = %s,
+                        claimed_at = NOW(),
+                        heartbeat_at = NOW(),
+                        attempt_count = attempt_count + 1,
+                        orchestration = jsonb_set(
+                            jsonb_set(
+                                orchestration,
+                                '{backend}',
+                                to_jsonb('kubernetes'::text)
+                            ),
+                            '{external_run_id}',
+                            to_jsonb(%s::text)
+                        ),
+                        updated_at = NOW()
+                    FROM candidate
+                    WHERE run.run_id = candidate.run_id
+                    RETURNING run.run_id;
+                    """,
+                    (
+                        queue_name,
+                        worker_id,
+                        stale_after_seconds,
+                        worker_id,
+                        worker_id,
+                        worker_id,
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+            return str(row[0]) if row else None
+        finally:
+            conn.close()
+
+    def heartbeat_workflow_run(self, run_id: str, worker_id: str) -> bool:
+        """Renew the lease only while the caller still owns a running item."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
+                    SET heartbeat_at = NOW(), updated_at = NOW()
+                    WHERE run_id = %s
+                      AND worker_id = %s
+                      AND status = 'running'
+                      AND cancel_requested = FALSE;
+                    """,
+                    (run_id, worker_id),
+                )
+                renewed = cur.rowcount == 1
+            conn.commit()
+            return renewed
+        finally:
+            conn.close()
+
+    def fail_workflow_run_claim(
+        self,
+        run_id: str,
+        worker_id: str,
+        error_message: str,
+    ) -> bool:
+        """Make a fatal worker/bootstrap error terminal for its owned run."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
+                    SET status = 'failed',
+                        error_message = %s,
+                        updated_at = NOW(),
+                        completed_at = NOW()
+                    WHERE run_id = %s
+                      AND worker_id = %s
+                      AND status = 'running';
+                    """,
+                    (error_message[:2000], run_id, worker_id),
+                )
+                failed = cur.rowcount == 1
+            conn.commit()
+            return failed
+        finally:
+            conn.close()
+
+    def request_workflow_cancel(self, run_id: str) -> bool:
+        """Persist a cross-process cancellation request for an active queue item."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
+                    SET cancel_requested = TRUE,
+                        status = CASE
+                            WHEN status IN ('queued', 'running') THEN 'paused'
+                            ELSE status
+                        END,
+                        updated_at = NOW()
+                    WHERE run_id = %s;
+                    """,
+                    (run_id,),
+                )
+                requested = cur.rowcount == 1
+            conn.commit()
+            return requested
+        finally:
+            conn.close()
+
+    def is_workflow_cancel_requested(self, run_id: str) -> bool:
+        """Return whether an API process asked the external worker to stop."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT cancel_requested FROM workflow_runs WHERE run_id = %s;",
+                    (run_id,),
+                )
+                row = cur.fetchone()
+                return bool(row and row[0])
+        finally:
+            conn.close()
+
+    def queue_depth(
+        self,
+        queue_name: str,
+        *,
+        stale_after_seconds: int = 180,
+    ) -> int:
+        """Return the same claimable count used by the KEDA PostgreSQL scaler."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM workflow_runs
+                    WHERE queue_name = %s
+                      AND cancel_requested = FALSE
+                      AND (
+                          (status = 'queued' AND available_at <= NOW())
+                          OR (
+                              status = 'running'
+                              AND (
+                                  heartbeat_at IS NULL
+                                  OR heartbeat_at < NOW() - (%s * INTERVAL '1 second')
+                              )
+                          )
+                      );
+                    """,
+                    (queue_name, stale_after_seconds),
+                )
+                row = cur.fetchone()
+                return int(row[0]) if row else 0
         finally:
             conn.close()
 

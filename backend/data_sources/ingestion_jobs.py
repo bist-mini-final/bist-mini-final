@@ -155,7 +155,9 @@ class IngestionJobService:
     def create_and_submit(self, request: IngestionRequest) -> WorkflowRun:
         run = self.create_run(request)
         self.workflow_dispatcher.submit(run.id)
-        return run
+        # Return the queue-aware snapshot so the first HTTP response already
+        # renders KEDA waiting state instead of the pre-submit direct default.
+        return self.run_store.load_summary(run.id)
 
     @staticmethod
     def node_output(
@@ -243,8 +245,8 @@ class IngestionJobService:
             state["error"] = _public_error(state.get("error"))
         worker_active = (
             run.orchestration.external_run_id is not None
-            and run.status in ("queued", "running")
-            if run.orchestration.backend == "prefect"
+            and run.status == "running"
+            if run.orchestration.backend == "kubernetes"
             else self.workflow_dispatcher.is_active(run.id)
         )
         return {

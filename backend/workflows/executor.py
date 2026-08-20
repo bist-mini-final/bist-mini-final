@@ -318,8 +318,8 @@ class WorkflowExecutor:
     def execute_scheduled_node(self, run_id: str, node_id: str) -> WorkflowRun:
         """Execute one orchestration-owned node without invalidating descendants.
 
-        Prefect compiles each persisted Playground node into a task and calls
-        this method only after its upstream task runs have completed.  The
+        A batch worker compiles each persisted Playground node into a task and
+        calls this only after its upstream tasks have completed. The
         existing run document remains the product-facing source of truth.
         """
 
@@ -344,7 +344,7 @@ class WorkflowExecutor:
         if state.status in ("succeeded", "skipped"):
             return run
         if state.status in ("failed", "running"):
-            # A Prefect retry or a restarted flow owns this invocation now.
+            # A worker retry or a restarted Job owns this invocation now.
             self._reset_node_state(state)
 
         batch = run.batches[state.batch_index]
@@ -380,7 +380,7 @@ class WorkflowExecutor:
             state.completed_at = utc_now_iso()
             self._refresh_run_status(run)
             self.run_store.save(run)
-            # Prefect owns retry/failure policy, so preserve the exception.
+            # The batch worker owns retry/failure policy, so preserve it.
             raise
 
         self._refresh_run_status(run)
@@ -735,6 +735,7 @@ class WorkflowExecutor:
             """Persist throttled live progress independently from large outputs."""
 
             nonlocal last_progress_persisted_at, last_progress_phase
+            self._raise_if_cancelled(run.id)
             compact_progress = compact_history_value(progress)
             state.progress = compact_progress
             now = time.monotonic()
@@ -925,6 +926,15 @@ class WorkflowExecutor:
     def _raise_if_cancelled(self, run_id: str) -> None:
         with self._cancellation_lock:
             cancelled = run_id in self._cancelled_run_ids
+        if not cancelled:
+            try:
+                cancelled = self.run_store.is_cancel_requested(run_id)
+            except Exception:
+                logger.warning(
+                    "DB cancellation 상태 조회 실패 (run_id=%s)",
+                    run_id,
+                    exc_info=True,
+                )
         if cancelled:
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다")
 

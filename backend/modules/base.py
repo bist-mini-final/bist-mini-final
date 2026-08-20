@@ -42,12 +42,12 @@ class ModuleConfigPreset(BaseModel):
 class ModuleTaskPolicy(BaseModel):
     """Portable execution policy exposed to the Playground task catalog.
 
-    The module contract owns these semantics.  Prefect adapters translate the
-    policy into Task options, while interactive execution can call the same
-    module directly without importing Prefect.
+    The module contract owns these semantics. Kubernetes workers apply retry
+    and timeout options, while interactive execution calls the same module
+    directly without importing cluster-specific code.
     """
 
-    engine: Literal["prefect"] = "prefect"
+    engine: Literal["kubernetes"] = "kubernetes"
     enabled: bool = True
     retries: int = Field(default=0, ge=0, le=20)
     retry_delay_seconds: float = Field(default=0, ge=0, le=3600)

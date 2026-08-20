@@ -25,9 +25,9 @@ describe('pipelineFromIngestionJob', () => {
         created_at: '2026-08-19T00:00:00Z',
         updated_at: '2026-08-19T00:00:01Z',
         orchestration: {
-          backend: 'prefect',
-          deployment_name: 'excel-ingestion/excel-ingestion-docker',
-          external_run_id: 'prefect-flow-run-123',
+          backend: 'kubernetes',
+          deployment_name: 'excel-ingestion',
+          external_run_id: 'excel-ingestion-abc12',
           submission_attempt: 1,
           submitted_at: '2026-08-19T00:00:00Z',
         },
@@ -98,9 +98,9 @@ describe('pipelineFromIngestionJob', () => {
     });
     expect(pipeline.progressPercent).toBe(77);
     expect(pipeline.scheduler).toEqual({
-      backend: 'prefect',
-      deploymentName: 'excel-ingestion/excel-ingestion-docker',
-      externalRunId: 'prefect-flow-run-123',
+      backend: 'kubernetes',
+      deploymentName: 'excel-ingestion',
+      externalRunId: 'excel-ingestion-abc12',
       workerActive: true,
     });
     expect(pipeline.modules[2].sublogs[0].msg).toContain('3/10 배치 완료');

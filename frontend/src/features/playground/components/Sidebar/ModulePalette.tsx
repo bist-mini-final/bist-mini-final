@@ -149,7 +149,7 @@ export function ModulePalette({
                         <span className="module-card__title-row">
                           <strong>{module.label}</strong>
                           {module.task?.enabled && (
-                            <span className="module-card__task-badge">PREFECT TASK</span>
+                            <span className="module-card__task-badge">BATCH TASK</span>
                           )}
                         </span>
                         <small>{module.description}</small>

@@ -13,22 +13,20 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r appuser -g 1000 && \
-    useradd -r -u 1000 -g appuser appuser
+RUN groupadd -r appuser -g 1000 \
+    && useradd -r -u 1000 -g appuser appuser
 
-COPY jobs/excel_ingestion/requirements.txt ./requirements.txt
+COPY jobs/workflow_worker/requirements.txt ./requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     python -m pip install --upgrade pip \
     && python -m pip install -r requirements.txt
 
 COPY backend ./backend
 COPY jobs/__init__.py ./jobs/__init__.py
-COPY jobs/excel_ingestion/__init__.py \
-     jobs/excel_ingestion/prefect_flow.py \
-     ./jobs/excel_ingestion/
-COPY prefect.yaml ./prefect.yaml
+COPY jobs/workflow_worker ./jobs/workflow_worker
 RUN mkdir -p \
     /app/data/runs \
     /app/data/cache \
@@ -41,15 +39,17 @@ RUN mkdir -p \
 
 USER appuser
 
-# Optional, deliberately non-default target for local BGE embeddings:
-# docker build --target local-models ...
+ENTRYPOINT ["python", "-m", "jobs.workflow_worker.main"]
+
+# Optional CPU-only local embedding target. The default OpenAI-backed image is
+# deliberately lean so cold starts and k3d imports stay fast.
 FROM base AS local-models
+USER root
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     python -m pip install \
         --index-url https://download.pytorch.org/whl/cpu \
         "torch>=2.2.0,<3.0.0" \
     && python -m pip install "transformers>=4.44.0,<5.0.0"
+USER appuser
 
-# Prefect's Docker worker supplies the flow-run command. Keep the lean
-# OpenAI-backed image as both the named deployment target and the default.
-FROM base AS prefect-runtime
+FROM base AS runtime

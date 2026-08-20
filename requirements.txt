@@ -19,4 +19,3 @@ langchain-postgres>=0.0.12
 sqlalchemy>=2.0.0
 pytest>=8.0.0
 httpx>=0.27.0
-prefect[docker]==3.8.3

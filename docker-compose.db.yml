@@ -11,9 +11,6 @@ services:
       - "127.0.0.1:${PGVECTOR_PORT:-5432}:5432"
     volumes:
       - pgvector_data:/var/lib/postgresql/data
-    networks:
-      - default
-      - batch
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_flow}"]
       interval: 5s
@@ -23,8 +20,3 @@ services:
 volumes:
   pgvector_data:
     driver: local
-
-networks:
-  batch:
-    name: bist-batch
-    driver: bridge

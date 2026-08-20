@@ -35,6 +35,7 @@ def _service():
     executor = MagicMock()
     run = SimpleNamespace(id="run-ingestion")
     executor.create_run.return_value = run
+    run_store.load_summary.return_value = run
     dispatcher = MagicMock()
     service = IngestionJobService(
         workflow_store,
@@ -75,6 +76,7 @@ def test_create_and_submit_builds_persisted_excel_ingestion_request() -> None:
         },
     }
     dispatcher.submit.assert_called_once_with("run-ingestion")
+    service.run_store.load_summary.assert_called_once_with("run-ingestion")
 
 
 def test_exhaustive_mode_selects_exhaustive_workflow() -> None:

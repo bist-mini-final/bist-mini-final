@@ -63,7 +63,7 @@ def create_workflow_router(
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    "Excel 적재 워크플로는 Data Sources의 Prefect 작업 API로만 "
+                    "Excel 적재 워크플로는 Data Sources의 Kubernetes 작업 API로만 "
                     "실행할 수 있습니다"
                 ),
             )

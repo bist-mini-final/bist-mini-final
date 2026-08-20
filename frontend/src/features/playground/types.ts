@@ -46,7 +46,7 @@ export interface ModuleDefinition {
   version: string;
   cacheable: boolean;
   task: {
-    engine: 'prefect';
+    engine: 'kubernetes';
     enabled: boolean;
     retries: number;
     retry_delay_seconds: number;
@@ -152,7 +152,7 @@ export interface WorkflowRun {
   workflow_updated_at: string;
   status: RunStatus;
   orchestration?: {
-    backend: 'direct' | 'prefect';
+    backend: 'direct' | 'kubernetes';
     deployment_name: string | null;
     external_run_id: string | null;
     submission_attempt: number;

@@ -128,12 +128,16 @@ export function PipelineTrackerView({
           </nav>
           <div className="ds-pipeline-title-row">
             <h2>{pipeline.fileName}</h2>
-            {pipeline.scheduler?.backend === 'prefect' && (
+            {pipeline.scheduler?.backend === 'kubernetes' && (
               <span className="ds-badge ds-badge--blue ds-scheduler-badge">
                 <CloudCog size={12} />
-                Prefect Docker
+                Kubernetes Job
                 <span className={pipeline.scheduler.workerActive ? 'is-active' : 'is-idle'}>
-                  {pipeline.scheduler.workerActive ? '작업 할당됨' : '작업 종료'}
+                  {pipeline.scheduler.workerActive
+                    ? '작업 할당됨'
+                    : isQueued
+                      ? 'KEDA 큐 대기'
+                      : '작업 종료'}
                 </span>
               </span>
             )}
@@ -151,7 +155,7 @@ export function PipelineTrackerView({
             )}
             {isQueued && (
               <span className="ds-module-status-badge ds-module-status-badge--waiting">
-                <Clock size={13} /> 서버 작업 큐 대기 중
+                <Clock size={13} /> KEDA 배치 큐 대기 중
               </span>
             )}
             {isCompleted && (
@@ -510,12 +514,16 @@ export function PipelineTrackerView({
                 <span>배치 실행 상태</span>
               </div>
               <div className="ds-hud-metric-value ds-scheduler-value">
-                {pipeline.scheduler?.backend === 'prefect'
-                  ? pipeline.scheduler.workerActive ? 'Prefect 실행 중' : 'Prefect 실행 종료'
+                {pipeline.scheduler?.backend === 'kubernetes'
+                  ? pipeline.scheduler.workerActive
+                    ? 'Kubernetes Job 실행 중'
+                    : isQueued
+                      ? 'KEDA 스케일링 대기'
+                      : 'Kubernetes Job 종료'
                   : '대화형 실행'}
                 {pipeline.scheduler?.externalRunId && (
                   <small title={pipeline.scheduler.externalRunId}>
-                    {pipeline.scheduler.externalRunId.slice(0, 8)}
+                    {pipeline.scheduler.externalRunId.slice(0, 18)}
                   </small>
                 )}
               </div>

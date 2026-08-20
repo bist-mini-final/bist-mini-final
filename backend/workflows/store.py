@@ -258,58 +258,98 @@ class RunStore:
                 )
         return run
 
-    def update_orchestration(
+    def enqueue(
         self,
         run_id: str,
-        backend: str,
-        deployment_name: str,
-        external_run_id: str,
+        queue_name: str,
+        *,
         submission_attempt: int,
         submitted_at: str,
+        priority: int = 0,
     ) -> None:
-        """Atomically update orchestration metadata without loading/saving the entire run."""
+        """Persist queue metadata without rewriting the full run payload."""
 
-        if self.db_manager is not None:
+        if self.db_manager is None:
+            raise RuntimeError(
+                "Kubernetes 배치 큐에는 PostgreSQL 연결이 필요합니다"
+            )
+        self.db_manager.enqueue_workflow_run(
+            run_id,
+            queue_name,
+            submission_attempt=submission_attempt,
+            submitted_at=submitted_at,
+            priority=priority,
+        )
+        self._update_local_summary_state(
+            run_id,
+            status="queued",
+            backend="kubernetes",
+            deployment_name=queue_name,
+            external_run_id=None,
+            submission_attempt=submission_attempt,
+            submitted_at=submitted_at,
+        )
+
+    def request_cancel(self, run_id: str) -> bool:
+        """Persist cancellation so API and worker processes share one signal."""
+
+        if self.db_manager is None:
+            return False
+        requested = self.db_manager.request_workflow_cancel(run_id)
+        if requested:
+            self._update_local_summary_state(run_id, status="paused")
+        return requested
+
+    def is_cancel_requested(self, run_id: str) -> bool:
+        """Check the durable cross-process cancellation flag."""
+
+        if self.db_manager is None:
+            return False
+        return bool(self.db_manager.is_workflow_cancel_requested(run_id))
+
+    def _update_local_summary_state(
+        self,
+        run_id: str,
+        *,
+        status: Optional[str] = None,
+        backend: Optional[str] = None,
+        deployment_name: Optional[str] = None,
+        external_run_id: Optional[str] = None,
+        submission_attempt: Optional[int] = None,
+        submitted_at: Optional[str] = None,
+    ) -> None:
+        summary_path = self._store.directory / (
+            f"{_validate_identifier(run_id)}.summary.json"
+        )
+        if not summary_path.is_file():
+            return
+        with self._summary_lock:
             try:
-                self.db_manager.update_workflow_orchestration(
-                    run_id,
-                    backend,
-                    deployment_name,
-                    external_run_id,
-                    submission_attempt,
-                    submitted_at,
+                run = WorkflowRun.model_validate_json(
+                    summary_path.read_text(encoding="utf-8")
+                )
+                if status is not None:
+                    run.status = status
+                if backend is not None:
+                    run.orchestration.backend = backend
+                if deployment_name is not None:
+                    run.orchestration.deployment_name = deployment_name
+                run.orchestration.external_run_id = external_run_id
+                if submission_attempt is not None:
+                    run.orchestration.submission_attempt = submission_attempt
+                if submitted_at is not None:
+                    run.orchestration.submitted_at = submitted_at
+                run.updated_at = utc_now_iso()
+                _atomic_write_text(
+                    summary_path,
+                    run.model_dump_json(indent=2) + "\n",
                 )
             except Exception as error:
                 logger.warning(
-                    "DB에 orchestration 메타데이터 저장 실패 (run_id=%s): %s",
+                    "로컬 run summary 상태 갱신 실패 (run_id=%s): %s",
                     run_id,
                     error,
                 )
-
-        # Also update the local summary for consistency
-        summary_path = self._store.directory / f"{_validate_identifier(run_id)}.summary.json"
-        if summary_path.is_file():
-            with self._summary_lock:
-                try:
-                    run = WorkflowRun.model_validate_json(
-                        summary_path.read_text(encoding="utf-8")
-                    )
-                    run.orchestration.backend = backend
-                    run.orchestration.deployment_name = deployment_name
-                    run.orchestration.external_run_id = external_run_id
-                    run.orchestration.submission_attempt = submission_attempt
-                    run.orchestration.submitted_at = submitted_at
-                    run.updated_at = utc_now_iso()
-                    _atomic_write_text(
-                        summary_path,
-                        run.model_dump_json(indent=2) + "\n",
-                    )
-                except Exception as error:
-                    logger.warning(
-                        "로컬 summary에 orchestration 저장 실패 (run_id=%s): %s",
-                        run_id,
-                        error,
-                    )
 
     def load(self, run_id: str) -> WorkflowRun:
         """Load a complete workflow run by its identifier.

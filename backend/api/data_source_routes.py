@@ -16,8 +16,8 @@ from pydantic import BaseModel, Field
 from ..data_sources import IngestionJobService, IngestionRequest as IngestRequestDTO
 from ..core.settings import (
     EMBEDDING_ARTIFACT_DIR,
+    KUBERNETES_INGESTION_QUEUE,
     PGVECTOR_URL,
-    PREFECT_DEPLOYMENT_NAME,
     PROCESSED_DATA_DIR,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
@@ -188,12 +188,12 @@ def create_data_source_router(
         ResultCache(cache_dir),
     )
     if workflow_dispatcher is None:
-        from ..orchestration.prefect import PrefectIngestionDispatcher
+        from ..orchestration.kubernetes import KubernetesQueueDispatcher
 
-        workflow_dispatcher = PrefectIngestionDispatcher(
+        workflow_dispatcher = KubernetesQueueDispatcher(
             workflow_executor,
             run_store,
-            PREFECT_DEPLOYMENT_NAME,
+            KUBERNETES_INGESTION_QUEUE,
         )
     ingestion_jobs = IngestionJobService(
         workflow_store,
@@ -626,6 +626,8 @@ def create_data_source_router(
             ) from error
         except (DagExecutionError, ValueError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @router.get("/ingestion-jobs/{run_id}")
     def get_ingestion_job(run_id: str) -> Dict[str, Any]:
@@ -652,6 +654,8 @@ def create_data_source_router(
             ) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @router.get("/ingestion-jobs/by-index/{index_id}")
     def get_ingestion_job_by_index(index_id: str) -> Dict[str, Any]:
@@ -702,6 +706,8 @@ def create_data_source_router(
                 status_code=404,
                 detail="인덱싱 작업을 찾을 수 없습니다",
             ) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @router.post("/ingestion-jobs/{run_id}/cancel")
     def cancel_ingestion_job(run_id: str) -> Dict[str, Any]:
@@ -724,6 +730,8 @@ def create_data_source_router(
                 status_code=404,
                 detail="인덱싱 작업을 찾을 수 없습니다",
             ) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @router.delete("/ingestion-jobs/{run_id}")
     def delete_ingestion_job(run_id: str) -> Dict[str, Any]:

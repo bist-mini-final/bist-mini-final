@@ -30,10 +30,9 @@ PLAYGROUND_MAX_CONCURRENCY = _positive_int_environment(
     "PLAYGROUND_MAX_CONCURRENCY",
     4,
 )
-PREFECT_FLOW_MEMORY_LIMIT = os.getenv("PREFECT_FLOW_MEMORY_LIMIT") or None
-PREFECT_DEPLOYMENT_NAME = os.getenv(
-    "PREFECT_DEPLOYMENT_NAME",
-    "excel-ingestion/docker",
+KUBERNETES_INGESTION_QUEUE = os.getenv(
+    "KUBERNETES_INGESTION_QUEUE",
+    "excel-ingestion",
 )
 
 # PostgreSQL + pgvector Configuration

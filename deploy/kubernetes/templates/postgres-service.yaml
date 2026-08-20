@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bist-pgvector
+  namespace: bist-batch
+  labels:
+    app.kubernetes.io/name: pgvector
+    app.kubernetes.io/part-of: bist-mini
+spec:
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: bist-pgvector-local
+  namespace: bist-batch
+  labels:
+    kubernetes.io/service-name: bist-pgvector
+    app.kubernetes.io/part-of: bist-mini
+addressType: IPv4
+ports:
+  - name: postgres
+    protocol: TCP
+    port: 5432
+endpoints:
+  - addresses:
+      - __DATABASE_ENDPOINT__

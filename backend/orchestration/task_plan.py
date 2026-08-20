@@ -12,7 +12,7 @@ from ..workflows.models import WorkflowRun
 
 @dataclass(frozen=True)
 class CompiledTaskNode:
-    """One module invocation and the upstream tasks Prefect must await."""
+    """One module invocation and the upstream tasks a worker must await."""
 
     node_id: str
     module_type: str
@@ -41,7 +41,7 @@ def compile_task_plan(
             policy = module.definition.task
             if not policy.enabled:
                 raise ValueError(
-                    f"Prefect batch 실행이 비활성화된 모듈입니다: {node.module_type}"
+                    f"배치 실행이 비활성화된 모듈입니다: {node.module_type}"
                 )
             compiled.append(
                 CompiledTaskNode(
