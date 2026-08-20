@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from ..storage.db_manager import DatabaseManager
 from ..storage.pgvector_store import PgVectorStore
+from ..storage.connection_pool import get_connection
 from .base import (
     EmptyModuleConfigDTO,
     ExecutableModule,
@@ -142,8 +143,7 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
             if not items:
                 # Load chunks directly from langchain_pg_embedding table
                 try:
-                    conn = self.db_manager._raw_connection()
-                    try:
+                    with get_connection(self.db_manager.database_url) as conn:
                         with conn.cursor() as cur:
                             cur.execute(
                                 """
@@ -176,8 +176,6 @@ class PgVectorCollectionLoaderModule(ExecutableModule):
                                     "text": text,
                                     "metadata": cmeta,
                                 })
-                    finally:
-                        conn.close()
                 except Exception as error:
                     raise ModuleExecutionError(
                         f"pgvector 컬렉션 문서를 읽지 못했습니다: {cid}"

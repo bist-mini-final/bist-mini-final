@@ -40,10 +40,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import psycopg2
 import psycopg2.extras
 
 from ..core.settings import PGVECTOR_URL
+from .connection_pool import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +98,6 @@ class DatabaseManager:
     def __init__(self, database_url: str = PGVECTOR_URL) -> None:
         self.database_url = database_url
 
-    def _raw_connection(self) -> psycopg2.extensions.connection:
-        raw_url = self.database_url.replace("postgresql+psycopg://", "postgresql://")
-        return psycopg2.connect(raw_url)
-
     def is_connected(self) -> bool:
         """Check whether a connection to the database can be established and used.
         
@@ -109,13 +105,10 @@ class DatabaseManager:
         	bool: `True` if the database connection succeeds, `False` otherwise.
         """
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1;")
-                return True
-            finally:
-                conn.close()
+            return True
         except Exception:
             return False
 
@@ -126,14 +119,11 @@ class DatabaseManager:
             bool: True if schema initialization succeeded, False otherwise.
         """
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(DDL_INIT)
                 conn.commit()
-                return True
-            finally:
-                conn.close()
+            return True
         except Exception as err:
             logger.warning("PostgreSQL 스키마 초기화에 실패했습니다: %s", err, exc_info=True)
             return False
@@ -145,15 +135,12 @@ class DatabaseManager:
             bool: True if migrations succeeded, False otherwise.
         """
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
                     cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
                 conn.commit()
-                return True
-            finally:
-                conn.close()
+            return True
         except Exception as err:
             logger.warning("PostgreSQL 마이그레이션 실행에 실패했습니다: %s", err, exc_info=True)
             return False
@@ -179,8 +166,7 @@ class DatabaseManager:
             file_size (int): Size of the source file.
             storage_path (str): Path where the source file is stored.
         """
-        conn = self._raw_connection()
-        try:
+        with get_connection(self.database_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -203,55 +189,52 @@ class DatabaseManager:
                     ),
                 )
             conn.commit()
-        finally:
-            conn.close()
 
     def delete_source_file(self, file_id_hash_or_name: str) -> bool:
         """Delete a source file by ID, hash, or filename with cascading sheets."""
-        conn = self._raw_connection()
         try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    DELETE FROM source_files
-                    WHERE file_id = %s OR file_hash = %s;
-                    """,
-                    (file_id_hash_or_name, file_id_hash_or_name),
-                )
-                deleted = cur.rowcount > 0
-                if not deleted:
-                    safe_file_name = Path(file_id_hash_or_name).name
+            with get_connection(self.database_url) as conn:
+                with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT file_id
-                        FROM source_files
-                        WHERE file_name = %s
-                        ORDER BY created_at DESC
-                        LIMIT 2;
+                        DELETE FROM source_files
+                        WHERE file_id = %s OR file_hash = %s;
                         """,
-                        (safe_file_name,),
+                        (file_id_hash_or_name, file_id_hash_or_name),
                     )
-                    matches = cur.fetchmany(2)
-                    if len(matches) > 1:
-                        raise ValueError(
-                            "동일한 파일명의 source_files 레코드가 여러 개입니다. "
-                            "file_id 또는 file_hash로 삭제하세요"
-                        )
-                    if matches:
+                    deleted = cur.rowcount > 0
+                    if not deleted:
+                        safe_file_name = Path(file_id_hash_or_name).name
                         cur.execute(
-                            "DELETE FROM source_files WHERE file_id = %s;",
-                            (matches[0][0],),
+                            """
+                            SELECT file_id
+                            FROM source_files
+                            WHERE file_name = %s
+                            ORDER BY created_at DESC
+                            LIMIT 2;
+                            """,
+                            (safe_file_name,),
                         )
-                        deleted = cur.rowcount > 0
-            conn.commit()
-            return deleted
-        finally:
-            conn.close()
+                        matches = cur.fetchmany(2)
+                        if len(matches) > 1:
+                            raise ValueError(
+                                "동일한 파일명의 source_files 레코드가 여러 개입니다. "
+                                "file_id 또는 file_hash로 삭제하세요"
+                            )
+                        if matches:
+                            cur.execute(
+                                "DELETE FROM source_files WHERE file_id = %s;",
+                                (matches[0][0],),
+                            )
+                            deleted = cur.rowcount > 0
+                conn.commit()
+                return deleted
+        except Exception:
+            raise
 
     def save_sheets(self, file_id: str, sheets_info: List[Dict[str, Any]]) -> None:
         """Insert or replace sheet records for a source file."""
-        conn = self._raw_connection()
-        try:
+        with get_connection(self.database_url) as conn:
             with conn.cursor() as cur:
                 for s in sheets_info:
                     sheet_name = s.get("sheet_name", "Sheet1")
@@ -280,8 +263,6 @@ class DatabaseManager:
                         ),
                     )
             conn.commit()
-        finally:
-            conn.close()
 
 
 def main() -> None:

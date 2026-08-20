@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from datetime import datetime, timezone
 import logging
 from numbers import Real
-from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-import psycopg2
 import psycopg2.extras
 from langchain_core.documents import Document
 
@@ -19,6 +17,7 @@ from ..spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
     langchain_document_to_cell_item,
 )
+from .connection_pool import get_connection
 from .vector_store_factory import get_langchain_connection_string, get_vector_store
 
 
@@ -68,21 +67,13 @@ class PgVectorStore:
     def __init__(self, database_url: str = PGVECTOR_URL) -> None:
         self.database_url = database_url
 
-    def _raw_connection(self) -> psycopg2.extensions.connection:
-        # Normalize to psycopg2 url
-        raw_url = self.database_url.replace("postgresql+psycopg://", "postgresql://")
-        return psycopg2.connect(raw_url)
-
     def is_connected(self) -> bool:
         """Check if PostgreSQL + pgvector is reachable."""
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1;")
-                return True
-            finally:
-                conn.close()
+            return True
         except Exception:
             return False
 
@@ -95,8 +86,7 @@ class PgVectorStore:
         db_name = parsed.path.lstrip("/") or "rag_flow"
 
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT version();")
                     pg_version = cur.fetchone()[0]
@@ -120,8 +110,6 @@ class PgVectorStore:
                         total_indexes = cur.fetchone()[0]
                         cur.execute("SELECT COUNT(*) FROM langchain_pg_embedding;")
                         total_chunks = cur.fetchone()[0]
-            finally:
-                conn.close()
 
             return {
                 "connected": True,
@@ -305,27 +293,24 @@ class PgVectorStore:
             ) from error
 
         # Also execute direct update for guarantee
-        conn = self._raw_connection()
         try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE langchain_pg_collection
-                    SET cmetadata = %s
-                    WHERE name = %s;
-                    """,
-                    (psycopg2.extras.Json(clean_meta), index_id),
-                )
-            conn.commit()
+            with get_connection(self.database_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE langchain_pg_collection
+                        SET cmetadata = %s
+                        WHERE name = %s;
+                        """,
+                        (psycopg2.extras.Json(clean_meta), index_id),
+                    )
+                conn.commit()
         except Exception:
             logger.warning(
                 "langchain_pg_collection 메타데이터 직접 업데이트 실패: %s",
                 index_id,
                 exc_info=True,
             )
-            conn.rollback()
-        finally:
-            conn.close()
 
         self.ensure_optimized_indexes()
 
@@ -384,8 +369,7 @@ class PgVectorStore:
         Returns:
             List[Dict[str, Any]]: Collection summaries with metadata and document counts.
         """
-        conn = self._raw_connection()
-        try:
+        with get_connection(self.database_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_collection';"
@@ -403,37 +387,35 @@ class PgVectorStore:
                 )
                 rows = cur.fetchall()
 
-            results = []
-            for r in rows:
-                name = r[0]
-                meta = r[1] or {}
-                if isinstance(meta, str):
-                    import json
-                    try:
-                        meta = json.loads(meta)
-                    except Exception:
-                        meta = {}
-                count = r[2]
-                results.append({
-                    "index_id": name,
-                    "file_name": meta.get("file_name", "unknown"),
-                    "workbook_hash": meta.get("workbook_hash", ""),
-                    "company_name": meta.get("company_name", ""),
-                    "ticker": meta.get("ticker", ""),
-                    "model": meta.get("model", "text-embedding-3-large"),
-                    "dimension": meta.get("dimension", 3072),
-                    "document_count": count,
-                    "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
-                    "storage": "pgvector (LangChain)",
-                    "duration_seconds": meta.get("duration_seconds"),
-                    "total_tokens": meta.get("total_tokens"),
-                    "estimated_cost_usd": meta.get("estimated_cost_usd"),
-                    "estimated_cost_krw": meta.get("estimated_cost_krw"),
-                    "batch_size": meta.get("batch_size"),
-                })
-            return results
-        finally:
-            conn.close()
+        results = []
+        for r in rows:
+            name = r[0]
+            meta = r[1] or {}
+            if isinstance(meta, str):
+                import json
+                try:
+                    meta = json.loads(meta)
+                except Exception:
+                    meta = {}
+            count = r[2]
+            results.append({
+                "index_id": name,
+                "file_name": meta.get("file_name", "unknown"),
+                "workbook_hash": meta.get("workbook_hash", ""),
+                "company_name": meta.get("company_name", ""),
+                "ticker": meta.get("ticker", ""),
+                "model": meta.get("model", "text-embedding-3-large"),
+                "dimension": meta.get("dimension", 3072),
+                "document_count": count,
+                "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                "storage": "pgvector (LangChain)",
+                "duration_seconds": meta.get("duration_seconds"),
+                "total_tokens": meta.get("total_tokens"),
+                "estimated_cost_usd": meta.get("estimated_cost_usd"),
+                "estimated_cost_krw": meta.get("estimated_cost_krw"),
+                "batch_size": meta.get("batch_size"),
+            })
+        return results
 
     def get_index_metadata(self, index_id: str) -> Dict[str, Any]:
         """Retrieve metadata dictionary for a pgvector collection."""
@@ -444,8 +426,7 @@ class PgVectorStore:
 
     def get_index_detail(self, index_id: str, limit: int = 15) -> Dict[str, Any]:
         """Retrieve collection detail and sample document chunks."""
-        conn = self._raw_connection()
-        try:
+        with get_connection(self.database_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -494,173 +475,167 @@ class PgVectorStore:
                         if s_row[1] and isinstance(s_row[1], list):
                             detected_tables_list.extend(s_row[1])
 
-            sample_items = []
-            for c in chunk_rows:
-                text = c[0]
-                cmeta = c[1] or {}
-                if isinstance(cmeta, str):
-                    import json
-                    try:
-                        cmeta = json.loads(cmeta)
-                    except Exception:
-                        cmeta = {}
-                sample_items.append({
-                    "cell_id": cmeta.get("cell_id", ""),
-                    "sheet_name": cmeta.get("sheet_name", ""),
-                    "cell_coord": cmeta.get("cell_coord", ""),
-                    "row_header": cmeta.get("row_header", []),
-                    "column_header": cmeta.get("column_header", []),
-                    "cell_value": cmeta.get("cell_value", ""),
-                    "text": text,
-                })
+        sample_items = []
+        for c in chunk_rows:
+            text = c[0]
+            cmeta = c[1] or {}
+            if isinstance(cmeta, str):
+                import json
+                try:
+                    cmeta = json.loads(cmeta)
+                except Exception:
+                    cmeta = {}
+            sample_items.append({
+                "cell_id": cmeta.get("cell_id", ""),
+                "sheet_name": cmeta.get("sheet_name", ""),
+                "cell_coord": cmeta.get("cell_coord", ""),
+                "row_header": cmeta.get("row_header", []),
+                "column_header": cmeta.get("column_header", []),
+                "cell_value": cmeta.get("cell_value", ""),
+                "text": text,
+            })
 
-            luna_output = None
-            if detected_tables_list:
-                luna_output = {
-                    "file_name": meta.get("file_name", ""),
-                    "workbook_hash": meta.get("workbook_hash", ""),
-                    "sheet_names": sheet_names_list,
-                    "tables": detected_tables_list,
-                }
-
-            return {
-                "index_id": index_id,
+        luna_output = None
+        if detected_tables_list:
+            luna_output = {
                 "file_name": meta.get("file_name", ""),
                 "workbook_hash": meta.get("workbook_hash", ""),
-                "company_name": meta.get("company_name", ""),
-                "ticker": meta.get("ticker", ""),
-                "model": meta.get("model", ""),
-                "dimension": meta.get("dimension", 3072),
-                "document_count": row[3],
-                "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
-                "storage": "pgvector (LangChain)",
-                "duration_seconds": meta.get("duration_seconds"),
-                "total_tokens": meta.get("total_tokens"),
-                "estimated_cost_usd": meta.get("estimated_cost_usd"),
-                "estimated_cost_krw": meta.get("estimated_cost_krw"),
-                "batch_size": meta.get("batch_size"),
-                "sample_items": sample_items,
                 "sheet_names": sheet_names_list,
                 "tables": detected_tables_list,
-                "luna_output": luna_output,
             }
-        finally:
-            conn.close()
+
+        return {
+            "index_id": index_id,
+            "file_name": meta.get("file_name", ""),
+            "workbook_hash": meta.get("workbook_hash", ""),
+            "company_name": meta.get("company_name", ""),
+            "ticker": meta.get("ticker", ""),
+            "model": meta.get("model", ""),
+            "dimension": meta.get("dimension", 3072),
+            "document_count": row[3],
+            "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
+            "storage": "pgvector (LangChain)",
+            "duration_seconds": meta.get("duration_seconds"),
+            "total_tokens": meta.get("total_tokens"),
+            "estimated_cost_usd": meta.get("estimated_cost_usd"),
+            "estimated_cost_krw": meta.get("estimated_cost_krw"),
+            "batch_size": meta.get("batch_size"),
+            "sample_items": sample_items,
+            "sheet_names": sheet_names_list,
+            "tables": detected_tables_list,
+            "luna_output": luna_output,
+        }
 
     def update_index_company(self, index_id: str, company_name: str) -> Dict[str, Any]:
         """Update company_name in collection metadata and cascade to all chunks and DB tables."""
-        conn = self._raw_connection()
         try:
-            with conn.cursor() as cur:
-                # 1. Update langchain_pg_collection (cmetadata is column type json)
-                cur.execute(
-                    """
-                    UPDATE langchain_pg_collection
-                    SET cmetadata = jsonb_set(
-                        COALESCE(cmetadata::jsonb, '{}'::jsonb),
-                        '{company_name}',
-                        to_jsonb(%s::text)
-                    )::json
-                    WHERE name = %s
-                    RETURNING uuid, cmetadata;
-                    """,
-                    (company_name, index_id),
-                )
-                row = cur.fetchone()
-                if not row:
-                    raise PgVectorStoreError(f"pgvector 컬렉션을 찾을 수 없습니다: {index_id}")
-
-                collection_uuid = row[0]
-                col_meta = row[1] or {}
-                if isinstance(col_meta, str):
-                    import json
-                    try:
-                        col_meta = json.loads(col_meta)
-                    except Exception:
-                        col_meta = {}
-                workbook_hash = col_meta.get("workbook_hash", "")
-
-                # 2. Update langchain_pg_embedding (cascade to all chunks in this collection)
-                cur.execute(
-                    """
-                    UPDATE langchain_pg_embedding
-                    SET cmetadata = jsonb_set(
-                        COALESCE(cmetadata, '{}'::jsonb),
-                        '{company_name}',
-                        to_jsonb(%s::text)
+            with get_connection(self.database_url) as conn:
+                with conn.cursor() as cur:
+                    # 1. Update langchain_pg_collection (cmetadata is column type json)
+                    cur.execute(
+                        """
+                        UPDATE langchain_pg_collection
+                        SET cmetadata = jsonb_set(
+                            COALESCE(cmetadata::jsonb, '{}'::jsonb),
+                            '{company_name}',
+                            to_jsonb(%s::text)
+                        )::json
+                        WHERE name = %s
+                        RETURNING uuid, cmetadata;
+                        """,
+                        (company_name, index_id),
                     )
-                    WHERE collection_id = %s;
-                    """,
-                    (company_name, collection_uuid),
-                )
+                    row = cur.fetchone()
+                    if not row:
+                        raise PgVectorStoreError(f"pgvector 콐렉션을 찾을 수 없습니다: {index_id}")
 
-            conn.commit()
+                    collection_uuid = row[0]
+                    col_meta = row[1] or {}
+                    if isinstance(col_meta, str):
+                        import json
+                        try:
+                            col_meta = json.loads(col_meta)
+                        except Exception:
+                            col_meta = {}
+
+                    # 2. Update langchain_pg_embedding (cascade to all chunks in this collection)
+                    cur.execute(
+                        """
+                        UPDATE langchain_pg_embedding
+                        SET cmetadata = jsonb_set(
+                            COALESCE(cmetadata, '{}'::jsonb),
+                            '{company_name}',
+                            to_jsonb(%s::text)
+                        )
+                        WHERE collection_id = %s;
+                        """,
+                        (company_name, collection_uuid),
+                    )
+
+                conn.commit()
+        except PgVectorStoreError:
+            raise
         except Exception as err:
-            conn.rollback()
             raise PgVectorStoreError(f"기업명 수정 실패: {err}") from err
-        finally:
-            conn.close()
 
         return self.get_index_detail(index_id)
 
     def ensure_optimized_indexes(self) -> None:
         """Create HNSW vector index and jsonb_path_ops GIN metadata index if they don't exist."""
-        conn = None
         try:
-            conn = self._raw_connection()
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_embedding';"
-                )
-                if cur.fetchone()[0] > 0:
-                    self._drop_invalid_optimized_indexes(cur)
-                    cur.execute(
-                        """
-                        CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw
-                        ON langchain_pg_embedding
-                        USING hnsw (embedding vector_cosine_ops);
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_id
-                        ON langchain_pg_embedding ((cmetadata->>'cell_id'));
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper
-                        ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
-                        ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
-                        """
-                    )
-                    cur.execute(
-                        """
-                        CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
-                        ON langchain_pg_embedding
-                        USING gin (cmetadata jsonb_path_ops);
-                        """
-                    )
-        except Exception as error:
-            logger.warning("pgvector 최적화 인덱스 생성 실패: %s", error)
-            if conn is not None:
+            with get_connection(self.database_url) as conn:
+                conn.autocommit = True
                 try:
                     with conn.cursor() as cur:
-                        self._drop_invalid_optimized_indexes(cur)
-                except Exception as cleanup_error:
-                    logger.error(
-                        "유효하지 않은 pgvector 최적화 인덱스 정리 실패: %s",
-                        cleanup_error,
-                    )
-        finally:
-            if conn is not None:
-                conn.close()
+                        cur.execute(
+                            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_embedding';"
+                        )
+                        if cur.fetchone()[0] > 0:
+                            self._drop_invalid_optimized_indexes(cur)
+                            cur.execute(
+                                """
+                                CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw
+                                ON langchain_pg_embedding
+                                USING hnsw (embedding vector_cosine_ops);
+                                """
+                            )
+                            cur.execute(
+                                """
+                                CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_id
+                                ON langchain_pg_embedding ((cmetadata->>'cell_id'));
+                                """
+                            )
+                            cur.execute(
+                                """
+                                CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper
+                                ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));
+                                """
+                            )
+                            cur.execute(
+                                """
+                                CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
+                                ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
+                                """
+                            )
+                            cur.execute(
+                                """
+                                CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
+                                ON langchain_pg_embedding
+                                USING gin (cmetadata jsonb_path_ops);
+                                """
+                            )
+                except Exception as error:
+                    logger.warning("pgvector 최적화 인덱스 생성 실패: %s", error)
+                    try:
+                        with conn.cursor() as cur:
+                            self._drop_invalid_optimized_indexes(cur)
+                    except Exception as cleanup_error:
+                        logger.error(
+                            "유효하지 않은 pgvector 최적화 인덱스 정리 실패: %s",
+                            cleanup_error,
+                        )
+        except Exception as pool_error:
+            logger.warning("ensure_optimized_indexes: 연결 풀 오류: %s", pool_error)
 
     @staticmethod
     def _drop_invalid_optimized_indexes(cur: Any) -> None:
@@ -688,8 +663,7 @@ class PgVectorStore:
     def delete(self, index_id: str) -> bool:
         """Delete a collection from pgvector."""
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         "DELETE FROM langchain_pg_collection WHERE name = %s RETURNING name;",
@@ -698,11 +672,6 @@ class PgVectorStore:
                     deleted = cur.fetchone() is not None
                 conn.commit()
                 return deleted
-            except Exception:
-                conn.rollback()
-                return False
-            finally:
-                conn.close()
         except Exception:
             return False
 
@@ -711,8 +680,7 @@ class PgVectorStore:
         if not workbook_hash:
             return 0
         try:
-            conn = self._raw_connection()
-            try:
+            with get_connection(self.database_url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
@@ -725,11 +693,6 @@ class PgVectorStore:
                     deleted_rows = cur.fetchall()
                 conn.commit()
                 return len(deleted_rows)
-            except Exception:
-                conn.rollback()
-                return 0
-            finally:
-                conn.close()
         except Exception:
             return 0
 
@@ -781,28 +744,28 @@ class PgVectorStore:
         """
         conn = None
         try:
-            conn = self._raw_connection()
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
-                    (collection_name,),
-                )
-                row = cur.fetchone()
-                if not row:
-                    return []
-                col_uuid = row[0]
+            with get_connection(self.database_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
+                        (collection_name,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return []
+                    col_uuid = row[0]
 
-                cur.execute(
-                    """
-                    SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
-                    FROM langchain_pg_embedding
-                    WHERE collection_id = %s
-                    ORDER BY embedding <=> %s::vector
-                    LIMIT %s;
-                    """,
-                    (embedding, col_uuid, embedding, k),
-                )
-                rows = cur.fetchall()
+                    cur.execute(
+                        """
+                        SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
+                        FROM langchain_pg_embedding
+                        WHERE collection_id = %s
+                        ORDER BY embedding <=> %s::vector
+                        LIMIT %s;
+                        """,
+                        (embedding, col_uuid, embedding, k),
+                    )
+                    rows = cur.fetchall()
 
             from langchain_core.documents import Document
             results = []
@@ -845,9 +808,6 @@ class PgVectorStore:
                 raise PgVectorStoreError(
                     f"PostgreSQL pgvector 유사도 검색 실패 ({collection_name}): {fallback_error}"
                 ) from fallback_error
-        finally:
-            if conn is not None:
-                conn.close()
 
     def fetch_cells_by_metadata(
         self,
@@ -883,8 +843,7 @@ class PgVectorStore:
         if not clean_ids:
             return []
 
-        conn = self._raw_connection()
-        try:
+        with get_connection(self.database_url) as conn:
             with conn.cursor() as cur:
                 col_uuid = None
                 if collection_name:
@@ -1013,37 +972,36 @@ class PgVectorStore:
                 """
                 params.append(limit)
 
-                cur.execute(query, tuple(params))
-                rows = cur.fetchall()
+                try:
+                    cur.execute(query, tuple(params))
+                    rows = cur.fetchall()
+                except Exception:
+                    logger.exception("직접 셀 메타데이터 조회 실패")
+                    return []
 
-            import json
-            results = []
-            for r in rows:
-                _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
-                if isinstance(row_header, str):
-                    try:
-                        row_header = json.loads(row_header)
-                    except Exception:
-                        pass
-                if isinstance(col_header, str):
-                    try:
-                        col_header = json.loads(col_header)
-                    except Exception:
-                        pass
+        import json
+        results = []
+        for r in rows:
+            _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
+            if isinstance(row_header, str):
+                try:
+                    row_header = json.loads(row_header)
+                except Exception:
+                    pass
+            if isinstance(col_header, str):
+                try:
+                    col_header = json.loads(col_header)
+                except Exception:
+                    pass
 
-                results.append({
-                    "cell_id": cell_id or f"{sheet_name}:{cell_coord}",
-                    "cell_coord": cell_coord,
-                    "sheet_name": sheet_name,
-                    "cell_value": cell_value,
-                    "row_header": row_header if isinstance(row_header, list) else ([row_header] if row_header else []),
-                    "column_header": col_header if isinstance(col_header, list) else ([col_header] if col_header else []),
-                    "company_name": company_name,
-                    "source_text": text,
-                })
-            return results
-        except Exception:
-            logger.exception("직접 셀 메타데이터 조회 실패")
-            return []
-        finally:
-            conn.close()
+            results.append({
+                "cell_id": cell_id or f"{sheet_name}:{cell_coord}",
+                "cell_coord": cell_coord,
+                "sheet_name": sheet_name,
+                "cell_value": cell_value,
+                "row_header": row_header if isinstance(row_header, list) else ([row_header] if row_header else []),
+                "column_header": col_header if isinstance(col_header, list) else ([col_header] if col_header else []),
+                "company_name": company_name,
+                "source_text": text,
+            })
+        return results

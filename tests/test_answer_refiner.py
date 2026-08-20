@@ -201,10 +201,13 @@ def test_answer_refiner_execution_with_llm_reasoning():
         "Income_Statement",
         "Balance_Sheet",
     }
-    # Accumulated usage from extractor (50+10=60) + refiner (100+40=140) = 200 total tokens
-    assert refined["api_usage"]["prompt_tokens"] == 150
-    assert refined["api_usage"]["completion_tokens"] == 50
-    assert refined["api_usage"]["total_tokens"] == 200
+    # Accumulated usage: initial (prompt=100, comp=50, total=150)
+    #                  + extractor (prompt=50, comp=10, total=60)
+    #                  + refiner (prompt=100, comp=40, total=140)
+    #                  = prompt=250, completion=100, total=350
+    assert refined["api_usage"]["prompt_tokens"] == 250
+    assert refined["api_usage"]["completion_tokens"] == 100
+    assert refined["api_usage"]["total_tokens"] == 350
     assert refined["estimated_cost_usd"] > 0.0
 
 
@@ -345,4 +348,5 @@ def test_skip_inference_when_target_cells_at_max():
     assert refined["api_usage"]["prompt_tokens"] >= 0
 
     # Verify that direct cells were fetched from mock with expected candidates
-    assert set(mock_pgvector.cell_references) == {"P17", "P33", "Q40"}
+    ref_coords = {r["cell_coord"] if isinstance(r, dict) else r for r in mock_pgvector.cell_references}
+    assert ref_coords == {"P17", "P33", "Q40"}

@@ -410,13 +410,14 @@ class AnswerRefinerModule(ExecutableModule):
                     completion_tokens=refiner_usage.completion_tokens,
                     cached_tokens=refiner_usage.cached_tokens,
                 )
-                # Normalize None values to 0 before summation
+                # Normalize None values to 0 before summation; accumulate from initial answer too
+                initial_usage = initial_dto.api_usage
                 api_usage = ApiUsageDTO(
-                    prompt_tokens=(extractor_usage.prompt_tokens or 0) + (refiner_usage.prompt_tokens or 0),
-                    completion_tokens=(extractor_usage.completion_tokens or 0) + (refiner_usage.completion_tokens or 0),
-                    cached_tokens=(extractor_usage.cached_tokens or 0) + (refiner_usage.cached_tokens or 0),
-                    reasoning_tokens=(extractor_usage.reasoning_tokens or 0) + (refiner_usage.reasoning_tokens or 0),
-                    total_tokens=(extractor_usage.total_tokens or 0) + (refiner_usage.total_tokens or 0),
+                    prompt_tokens=(initial_usage.prompt_tokens or 0) + (extractor_usage.prompt_tokens or 0) + (refiner_usage.prompt_tokens or 0),
+                    completion_tokens=(initial_usage.completion_tokens or 0) + (extractor_usage.completion_tokens or 0) + (refiner_usage.completion_tokens or 0),
+                    cached_tokens=(initial_usage.cached_tokens or 0) + (extractor_usage.cached_tokens or 0) + (refiner_usage.cached_tokens or 0),
+                    reasoning_tokens=(initial_usage.reasoning_tokens or 0) + (extractor_usage.reasoning_tokens or 0) + (refiner_usage.reasoning_tokens or 0),
+                    total_tokens=(initial_usage.total_tokens or 0) + (extractor_usage.total_tokens or 0) + (refiner_usage.total_tokens or 0),
                 )
                 estimated_cost_usd = extractor_cost + refiner_cost
 
