@@ -3,7 +3,7 @@ DataFrame Source
 ────────────────
 코드 실행 기반 RAG(Code Execution RAG) 시연용 Source 모듈.
 
-data/processed/ 아래의 Excel 파일을 pandas DataFrame으로 읽어
+data/source_files/ 아래의 Excel 파일을 pandas DataFrame으로 읽어
 시트별 메타데이터와 스키마(컬럼명 / 데이터 타입 / 샘플 행)를 출력합니다.
 LLM Code Agent가 pandas 코드 생성 시 참조할 DataFrame 컨텍스트를 제공합니다.
 """
@@ -30,7 +30,7 @@ from .base import (
 class DataframeSourceInputDTO(ModuleInputDTO):
     file_name: str = Field(
         min_length=1,
-        description="data/processed에서 선택할 Excel 파일명",
+        description="data/source_files에서 선택할 Excel 파일명",
     )
 
 

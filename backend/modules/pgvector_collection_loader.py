@@ -17,7 +17,7 @@ from .prebuilt_index_loader import DocumentOutputDTO, IndexOutputDTO, PrebuiltIn
 
 class PgVectorCollectionLoaderInputDTO(ModuleInputDTO):
     collection_name: Optional[str] = Field(
-        default="SPG_Company_KeyStats_v4.xlsm",
+        default=None,
         description="단일 컬렉션 선택 시 컬렉션 이름 또는 파일명",
     )
     collection_names: List[str] = Field(

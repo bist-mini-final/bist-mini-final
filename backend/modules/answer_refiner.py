@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
@@ -212,7 +212,7 @@ class AnswerRefinerModule(ExecutableModule):
         model: str = "gpt-5.6-luna",
         extractor_prompt: str = CELL_EXTRACTOR_SYSTEM_PROMPT,
         max_cells: int = 25,
-    ) -> List[CellCandidateDTO]:
+    ) -> Tuple[List[CellCandidateDTO], ApiUsageDTO, float]:
         """
         Uses LLM spatial & topological reasoning to infer candidate cell coordinates
         required to verify, correct, or complete the initial answer.
@@ -232,6 +232,9 @@ class AnswerRefinerModule(ExecutableModule):
             ):
                 candidates.append(cand)
 
+        usage = ApiUsageDTO()
+        estimated_cost_usd = 0.0
+
         # 2. Perform LLM 2D Spatial Topology Reasoning
         if self.completion_client and len(candidates) < max_cells:
             try:
@@ -245,22 +248,49 @@ class AnswerRefinerModule(ExecutableModule):
                     ],
                     model=model,
                 )
-                raw_text = res.content.strip()
-                json_match = re.search(r"\[[\s\S]*\]", raw_text)
-                if json_match:
-                    items = json.loads(json_match.group(0))
-                    if isinstance(items, list):
-                        for item in items:
-                            cand = self._parse_candidate_token(item, sheet_codes)
-                            if cand and not any(
-                                c.cell_coord == cand.cell_coord and c.sheet_name == cand.sheet_name
-                                for c in candidates
-                            ):
-                                candidates.append(cand)
             except Exception as err:
-                logger.warning("LLM 셀 공간 위상 추론 실패: %s", err)
+                raise ModuleExecutionError(f"LLM 셀 공간 위상 추론 호출 실패: {err}") from err
 
-        return candidates[:max_cells]
+            usage = ApiUsageDTO(
+                prompt_tokens=res.usage.get("prompt_tokens", 0),
+                completion_tokens=res.usage.get("completion_tokens", 0),
+                cached_tokens=res.usage.get("cached_tokens", 0),
+                reasoning_tokens=res.usage.get("reasoning_tokens", 0),
+                total_tokens=res.usage.get("total_tokens", 0),
+            )
+            estimated_cost_usd = calculate_openai_cost(
+                model,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+                cached_tokens=usage.cached_tokens,
+            )
+            raw_text = res.content.strip()
+            json_match = re.search(r"\[[\s\S]*\]", raw_text)
+            if not json_match:
+                raise ModuleExecutionError(
+                    f"LLM 셀 공간 위상 추론 응답에서 JSON 배열을 찾을 수 없습니다: {raw_text[:200]}"
+                )
+            try:
+                items = json.loads(json_match.group(0))
+            except Exception as json_err:
+                raise ModuleExecutionError(
+                    f"LLM 셀 공간 위상 추론 JSON 파싱 실패: {json_err}"
+                ) from json_err
+
+            if not isinstance(items, list):
+                raise ModuleExecutionError(
+                    f"LLM 셀 공간 위상 추론 결과가 배열(list)이 아닙니다: {type(items).__name__}"
+                )
+
+            for item in items:
+                cand = self._parse_candidate_token(item, sheet_codes)
+                if cand and not any(
+                    c.cell_coord == cand.cell_coord and c.sheet_name == cand.sheet_name
+                    for c in candidates
+                ):
+                    candidates.append(cand)
+
+        return candidates[:max_cells], usage, estimated_cost_usd
 
     def execute(self, payload: Any) -> Dict[str, Any]:
         """
@@ -281,7 +311,7 @@ class AnswerRefinerModule(ExecutableModule):
         workbook_hash = initial_dto.document_context.workbook_hash
 
         # 1. Infer Target Cells via LLM Spatial Reasoning
-        target_cells = self._infer_candidate_cells(
+        target_cells, extractor_usage, extractor_cost = self._infer_candidate_cells(
             question=question_text,
             initial_answer=initial_answer,
             explicit_cell_ids=parsed.target_cell_ids,
@@ -340,8 +370,8 @@ class AnswerRefinerModule(ExecutableModule):
 
         refined_answer = initial_answer
         refinement_summary = "No modifications made."
-        api_usage = ApiUsageDTO()
-        estimated_cost_usd = 0.0
+        api_usage = extractor_usage
+        estimated_cost_usd = extractor_cost
 
         if self.completion_client:
             try:
@@ -352,19 +382,27 @@ class AnswerRefinerModule(ExecutableModule):
                     ],
                     model=parsed.model,
                 )
-                api_usage = ApiUsageDTO(
+                refiner_usage = ApiUsageDTO(
                     prompt_tokens=res.usage.get("prompt_tokens", 0),
                     completion_tokens=res.usage.get("completion_tokens", 0),
                     cached_tokens=res.usage.get("cached_tokens", 0),
                     reasoning_tokens=res.usage.get("reasoning_tokens", 0),
                     total_tokens=res.usage.get("total_tokens", 0),
                 )
-                estimated_cost_usd = calculate_openai_cost(
+                refiner_cost = calculate_openai_cost(
                     parsed.model,
-                    prompt_tokens=api_usage.prompt_tokens,
-                    completion_tokens=api_usage.completion_tokens,
-                    cached_tokens=api_usage.cached_tokens,
+                    prompt_tokens=refiner_usage.prompt_tokens,
+                    completion_tokens=refiner_usage.completion_tokens,
+                    cached_tokens=refiner_usage.cached_tokens,
                 )
+                api_usage = ApiUsageDTO(
+                    prompt_tokens=extractor_usage.prompt_tokens + refiner_usage.prompt_tokens,
+                    completion_tokens=extractor_usage.completion_tokens + refiner_usage.completion_tokens,
+                    cached_tokens=extractor_usage.cached_tokens + refiner_usage.cached_tokens,
+                    reasoning_tokens=extractor_usage.reasoning_tokens + refiner_usage.reasoning_tokens,
+                    total_tokens=extractor_usage.total_tokens + refiner_usage.total_tokens,
+                )
+                estimated_cost_usd = extractor_cost + refiner_cost
 
                 # Parse JSON output format
                 content = res.content.strip()

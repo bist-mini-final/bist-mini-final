@@ -405,8 +405,16 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
                 workbook.close()
 
         selected_sheet_names = list(input_data.sheet_names)
-        if not selected_sheet_names and not input_data.tables:
-            selected_sheet_names = self.catalog.sheet_names(workbook_path)
+        if not selected_sheet_names:
+            catalog_sheets = self.catalog.sheet_names(workbook_path)
+            if input_data.tables:
+                table_sheets = {table.sheet_name for table in input_data.tables}
+                selected_sheet_names = [s for s in catalog_sheets if s in table_sheets]
+                for s in table_sheets:
+                    if s not in selected_sheet_names:
+                        selected_sheet_names.append(s)
+            else:
+                selected_sheet_names = catalog_sheets
 
         return {
             "file_name": workbook_path.name,

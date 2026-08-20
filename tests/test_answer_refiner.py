@@ -122,7 +122,7 @@ def test_candidate_token_parsing():
 def test_llm_spatial_reasoning_candidate_inference():
     """Verify that candidate cells are inferred via LLM spatial reasoning."""
     module = AnswerRefinerModule(completion_client=FakeReasoningCompletionClient())
-    candidates = module._infer_candidate_cells(
+    candidates, usage, cost = module._infer_candidate_cells(
         question="2025년 금융부문 매출과 기타유동자산 실적을 알려줘",
         initial_answer="2024년 금융부문 매출은 709 [IS Cell O17]이고 2025년 데이터는 누락되었습니다.",
         explicit_cell_ids=["CF:O19"],
@@ -138,6 +138,10 @@ def test_llm_spatial_reasoning_candidate_inference():
     # LLM inferred cells
     assert "P17" in coords
     assert "P33" in coords
+    assert usage.total_tokens == 60
+    assert usage.prompt_tokens == 50
+    assert usage.completion_tokens == 10
+    assert cost >= 0.0
 
 
 def test_answer_refiner_module_contract():
@@ -197,3 +201,88 @@ def test_answer_refiner_execution_with_llm_reasoning():
         "Income_Statement",
         "Balance_Sheet",
     }
+    # Accumulated usage from extractor (50+10=60) + refiner (100+40=140) = 200 total tokens
+    assert refined["api_usage"]["prompt_tokens"] == 150
+    assert refined["api_usage"]["completion_tokens"] == 50
+    assert refined["api_usage"]["total_tokens"] == 200
+    assert refined["estimated_cost_usd"] > 0.0
+
+
+def test_infer_candidate_cells_raises_on_llm_failure():
+    """Verify that LLM completion errors in candidate inference raise ModuleExecutionError."""
+    from unittest.mock import MagicMock
+    from backend.modules.base import ModuleExecutionError
+
+    mock_client = MagicMock()
+    mock_client.complete_with_metadata.side_effect = RuntimeError("API rate limit exceeded")
+
+    module = AnswerRefinerModule(completion_client=mock_client)
+    with pytest.raises(ModuleExecutionError, match="LLM 셀 공간 위상 추론 호출 실패"):
+        module._infer_candidate_cells(
+            question="테스트 질문",
+            initial_answer="테스트 답변",
+        )
+
+
+def test_infer_candidate_cells_raises_on_invalid_or_non_array_json():
+    """Verify that non-array or invalid JSON responses raise ModuleExecutionError."""
+    from unittest.mock import MagicMock
+    from backend.modules.base import ModuleExecutionError
+
+    # Non-array JSON (dict instead of list)
+    mock_client = MagicMock()
+    mock_client.complete_with_metadata.return_value = ChatCompletionResult(
+        content='{"cell": "P17"}',
+        usage={"total_tokens": 10},
+        latency_seconds=0.01,
+    )
+    module = AnswerRefinerModule(completion_client=mock_client)
+    with pytest.raises(ModuleExecutionError, match="JSON 배열을 찾을 수 없습니다|결과가 배열"):
+        module._infer_candidate_cells(
+            question="테스트 질문",
+            initial_answer="테스트 답변",
+        )
+
+    # Missing brackets
+    mock_client.complete_with_metadata.return_value = ChatCompletionResult(
+        content='[ "P17", broken without closing bracket',
+        usage={"total_tokens": 10},
+        latency_seconds=0.01,
+    )
+    with pytest.raises(ModuleExecutionError, match="JSON 배열을 찾을 수 없습니다"):
+        module._infer_candidate_cells(
+            question="테스트 질문",
+            initial_answer="테스트 답변",
+        )
+
+    # Malformed JSON syntax within brackets
+    mock_client.complete_with_metadata.return_value = ChatCompletionResult(
+        content='[ "P17", broken ]',
+        usage={"total_tokens": 10},
+        latency_seconds=0.01,
+    )
+    with pytest.raises(ModuleExecutionError, match="JSON 파싱 실패"):
+        module._infer_candidate_cells(
+            question="테스트 질문",
+            initial_answer="테스트 답변",
+        )
+
+
+def test_infer_candidate_cells_accepts_valid_empty_array():
+    """Verify that a valid empty array response is accepted as zero candidates."""
+    from unittest.mock import MagicMock
+
+    mock_client = MagicMock()
+    mock_client.complete_with_metadata.return_value = ChatCompletionResult(
+        content='[]',
+        usage={"prompt_tokens": 20, "completion_tokens": 2, "total_tokens": 22},
+        latency_seconds=0.01,
+    )
+    module = AnswerRefinerModule(completion_client=mock_client)
+    candidates, usage, cost = module._infer_candidate_cells(
+        question="테스트 질문",
+        initial_answer="테스트 답변",
+    )
+    assert candidates == []
+    assert usage.total_tokens == 22
+    assert cost >= 0.0

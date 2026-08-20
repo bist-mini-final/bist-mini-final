@@ -531,6 +531,53 @@ class SheetRendererFormattingTests(unittest.TestCase):
         self.assertNotEqual(rendered, "45292")
         workbook.close()
 
+    def test_percentage_format_precision(self) -> None:
+        workbook = Workbook()
+        ws = workbook.active
+
+        ws["A1"].value = 0.25
+        ws["A1"].number_format = "0%"
+        rendered, _ = _cell_text_and_color(ws["A1"])
+        self.assertEqual(rendered, "25%")
+
+        ws["A2"].value = 0.254
+        ws["A2"].number_format = "0.0%"
+        rendered, _ = _cell_text_and_color(ws["A2"])
+        self.assertEqual(rendered, "25.4%")
+
+        ws["A3"].value = 0.25
+        ws["A3"].number_format = "0.00%"
+        rendered, _ = _cell_text_and_color(ws["A3"])
+        self.assertEqual(rendered, "25.00%")
+        workbook.close()
+
+    def test_currency_and_accounting_trailing_zeroes(self) -> None:
+        workbook = Workbook()
+        ws = workbook.active
+
+        # Fixed decimal format (#,##0.00) must retain trailing zeroes
+        ws["A1"].value = 123.4
+        ws["A1"].number_format = "#,##0.00"
+        rendered, _ = _cell_text_and_color(ws["A1"])
+        self.assertEqual(rendered, "123.40")
+
+        ws["A2"].value = 123.0
+        ws["A2"].number_format = "#,##0.00"
+        rendered, _ = _cell_text_and_color(ws["A2"])
+        self.assertEqual(rendered, "123.00")
+
+        # Optional decimal format (0.##) should trim trailing zeroes
+        ws["A3"].value = 123.4
+        ws["A3"].number_format = "0.##"
+        rendered, _ = _cell_text_and_color(ws["A3"])
+        self.assertEqual(rendered, "123.4")
+
+        ws["A4"].value = 123.0
+        ws["A4"].number_format = "0.##"
+        rendered, _ = _cell_text_and_color(ws["A4"])
+        self.assertEqual(rendered, "123")
+        workbook.close()
+
 
 class ModularRagArchitectureTests(unittest.TestCase):
     def test_rrf_fuses_ranks_within_the_same_subquery(self) -> None:
@@ -3995,6 +4042,31 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(len(res["document_output"]["items"]), 1)
         self.assertEqual(res["index_output"]["document_count"], 1)
 
+    def test_pgvector_collection_loader_empty_request_selects_first_index(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "first_col", "file_name": "first.xlsx", "workbook_hash": "hash_first"},
+            {"index_id": "second_col", "file_name": "second.xlsx", "workbook_hash": "hash_second"},
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [
+                {"cell_id": "c1", "sheet_name": "S1", "cell_coord": "A1", "text": "Header"}
+            ],
+        }
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO()
+        self.assertIsNone(payload.collection_name)
+        res = loader.execute(payload)
+        self.assertEqual(res["index_output"]["index_id"], "first_col")
+        self.assertEqual(res["index_output"]["file_name"], "first.xlsx")
+
     def test_pgvector_collection_loader_sql_reload_preserves_variant(self) -> None:
         from unittest.mock import MagicMock
         from backend.modules.pgvector_collection_loader import (
@@ -4140,6 +4212,142 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         with self.assertRaises(ModuleExecutionError) as ctx:
             loader.execute(payload)
         self.assertIn("선택된 pgvector 컬렉션들의 임베딩 모델이 일치하지 않습니다", str(ctx.exception))
+
+    def test_openpyxl_region_detector_derives_table_sheets_when_sheet_names_empty(self) -> None:
+        import openpyxl
+        from unittest.mock import MagicMock
+        from backend.modules.docling_table_detector import DoclingTableRegionDTO, TableCellBoundsDTO
+        from backend.modules.openpyxl_region_detector import (
+            OpenpyxlRegionDetectorExecutionDTO,
+            OpenpyxlRegionDetectorModule,
+        )
+
+        wb_path = self.processed_dir / "test_sheets.xlsx"
+        wb = openpyxl.Workbook()
+        ws1 = wb.active
+        ws1.title = "SheetA"
+        ws1["A1"] = "H1"
+        ws1["B2"] = "D1"
+        ws2 = wb.create_sheet(title="SheetB")
+        ws2["A1"] = "H2"
+        ws2["B2"] = "D2"
+        wb.save(wb_path)
+        wb.close()
+
+        mock_catalog = MagicMock()
+        mock_catalog.resolve.return_value = wb_path
+        mock_catalog.sha256.return_value = "dummy_hash"
+        mock_catalog.sheet_names.return_value = ["SheetA", "SheetB"]
+
+        module = OpenpyxlRegionDetectorModule(catalog=mock_catalog)
+        # Empty sheet_names but table for SheetB
+        payload = OpenpyxlRegionDetectorExecutionDTO(
+            file_name="test_sheets.xlsx",
+            workbook_hash="dummy_hash",
+            sheet_names=[],
+            tables=[
+                DoclingTableRegionDTO(
+                    sheet_name="SheetB",
+                    table_index=0,
+                    excel_range="A1:B2",
+                    bbox_px=[0, 0, 100, 100],
+                    cell_bounds=TableCellBoundsDTO(min_row=1, max_row=2, min_column=1, max_column=2),
+                )
+            ],
+        )
+        res = module.execute(payload)
+        # Should derive sheet_names as ["SheetB"] based on catalog order
+        self.assertEqual(res["sheet_names"], ["SheetB"])
+
+    def test_sheet_metadata_persistence_derives_table_sheets_or_rejects_empty(self) -> None:
+        import openpyxl
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.docling_table_detector import TableCellBoundsDTO
+        from backend.modules.sheet_metadata_persistence import (
+            SheetMetadataPersistenceInputDTO,
+            SheetMetadataPersistenceModule,
+        )
+        from backend.modules.spreadsheet_structure import (
+            ClassifiedRegionDTO,
+            ClassifiedTableDTO,
+            SpreadsheetStructureOutput,
+        )
+        from backend.modules.vector_index_writer import VectorIndexDTO
+
+        wb_path = self.processed_dir / "test_meta.xlsx"
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "SheetA"
+        ws["A1"] = "Data"
+        wb.save(wb_path)
+        wb.close()
+
+        mock_catalog = MagicMock()
+        mock_catalog.resolve.return_value = wb_path
+        mock_catalog.sheet_names.return_value = ["SheetA"]
+
+        mock_db = MagicMock()
+        mock_db.is_connected.return_value = True
+
+        module = SheetMetadataPersistenceModule(db_manager=mock_db, catalog=mock_catalog)
+
+        # 1. Structure with empty sheet_names and empty tables -> raises error
+        empty_structure = SpreadsheetStructureOutput(
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            sheet_names=[],
+            tables=[],
+        )
+        idx = VectorIndexDTO(
+            index_id="a" * 64,
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            model="text-embedding-3-large",
+            dimension=1536,
+            document_count=1,
+        )
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            module.execute(
+                SheetMetadataPersistenceInputDTO(
+                    structure_input=empty_structure,
+                    index_input=idx,
+                )
+            )
+        self.assertIn("저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다", str(ctx.exception))
+
+        # 2. Structure with empty sheet_names but table for SheetA -> derives SheetA
+        table_structure = SpreadsheetStructureOutput(
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            sheet_names=[],
+            tables=[
+                ClassifiedTableDTO(
+                    sheet_name="SheetA",
+                    table_index=0,
+                    excel_range="A1:B2",
+                    regions=[
+                        ClassifiedRegionDTO(
+                            region_id="r1",
+                            type="data",
+                            excel_range="A1:B2",
+                            bbox_px=(0.0, 0.0, 100.0, 100.0),
+                            rows=(1, 2),
+                            columns=(1, 2),
+                            parent_ids=[],
+                        )
+                    ],
+                )
+            ],
+        )
+        res = module.execute(
+            SheetMetadataPersistenceInputDTO(
+                structure_input=table_structure,
+                index_input=idx,
+            )
+        )
+        self.assertEqual(res["sheets_saved"], 1)
+        mock_db.save_sheets.assert_called_once()
 
 
 if __name__ == "__main__":

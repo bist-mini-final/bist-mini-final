@@ -1,5 +1,10 @@
 import unittest
-from backend.storage.pgvector_store import PgVectorStore
+from urllib.parse import urlparse
+from unittest.mock import MagicMock, patch
+
+from langchain_core.documents import Document
+
+from backend.storage.pgvector_store import PgVectorStore, PgVectorStoreError
 
 
 class FakeEmbeddingEncoder:
@@ -98,6 +103,13 @@ class PgVectorMetadataQueryTests(unittest.TestCase):
         }
         docs_dict = cell_items_to_langchain_documents([dict_item])
         self.assertEqual(docs_dict[0].metadata["variant"], "header_only")
+        self.assertEqual(docs_dict[0].id, "cell-2#0")
+
+        docs_with_index = cell_items_to_langchain_documents([dto], file_name="test.xlsx", index_id="idx_123")
+        self.assertEqual(docs_with_index[0].id, "idx_123:cell-1#0")
+
+        docs_with_hash = cell_items_to_langchain_documents([dto], file_name="test.xlsx", workbook_hash="hash_abc")
+        self.assertEqual(docs_with_hash[0].id, "hash_abc:cell-1#0")
 
 
 class PgVectorIntegrationTests(unittest.TestCase):
@@ -110,7 +122,8 @@ class PgVectorIntegrationTests(unittest.TestCase):
     def test_db_info(self):
         info = self.store.get_db_info()
         self.assertTrue(info["connected"])
-        self.assertEqual(info["port"], 5432)
+        expected_port = urlparse(self.store.database_url).port or 5432
+        self.assertEqual(info["port"], expected_port)
         self.assertIn("0.8", info["pgvector_version"])
 
     def test_put_search_delete_with_langchain(self):
@@ -214,6 +227,79 @@ class PgVectorIntegrationTests(unittest.TestCase):
         # 4. Delete
         deleted = self.store.delete(index_id)
         self.assertTrue(deleted)
+
+    @patch("backend.storage.pgvector_store.get_vector_store")
+    def test_put_documents_propagates_delete_collection_failure(self, mock_get_store):
+        mock_store = MagicMock()
+        mock_store.delete_collection.side_effect = RuntimeError("DB delete lock timeout")
+        mock_get_store.return_value = mock_store
+
+        test_docs = [Document(page_content="test", metadata={"cell_id": "c1"})]
+        with self.assertRaises(PgVectorStoreError) as ctx:
+            self.store.put_documents("test_index", test_docs)
+
+        self.assertIn("삭제 실패", str(ctx.exception))
+        self.assertIn("DB delete lock timeout", str(ctx.exception))
+        mock_store.create_collection.assert_not_called()
+        mock_store.add_documents.assert_not_called()
+
+    @patch("backend.storage.pgvector_store.get_vector_store")
+    def test_put_documents_propagates_create_collection_failure(self, mock_get_store):
+        mock_store = MagicMock()
+        mock_store.delete_collection.return_value = None
+        mock_store.create_collection.side_effect = RuntimeError("DB create collection error")
+        mock_get_store.return_value = mock_store
+
+        test_docs = [Document(page_content="test", metadata={"cell_id": "c1"})]
+        with self.assertRaises(PgVectorStoreError) as ctx:
+            self.store.put_documents("test_index", test_docs)
+
+        self.assertIn("생성 실패", str(ctx.exception))
+        self.assertIn("DB create collection error", str(ctx.exception))
+        mock_store.add_documents.assert_not_called()
+
+    @patch("backend.storage.pgvector_store.get_vector_store")
+    def test_put_documents_raises_on_vector_count_mismatch(self, mock_get_store):
+        mock_store = MagicMock()
+        mock_store.delete_collection.return_value = None
+        mock_store.create_collection.return_value = None
+        mock_get_store.return_value = mock_store
+
+        test_docs = [
+            Document(page_content="doc1", metadata={"cell_id": "c1"}),
+            Document(page_content="doc2", metadata={"cell_id": "c2"}),
+        ]
+        # Provided 1 vector for 2 documents -> mismatch!
+        vectors = [[0.1, 0.2, 0.3]]
+
+        with self.assertRaises(PgVectorStoreError) as ctx:
+            self.store.put_documents("test_index", test_docs, vectors=vectors)
+
+        self.assertIn("사전 계산된 벡터 개수(1)가 문서 개수(2)와 일치하지 않습니다", str(ctx.exception))
+        mock_store.add_documents.assert_not_called()
+        mock_store.add_embeddings.assert_not_called()
+
+    @patch("backend.storage.pgvector_store.get_vector_store")
+    def test_put_documents_uses_precomputed_vectors_when_matching(self, mock_get_store):
+        mock_store = MagicMock()
+        mock_store.delete_collection.return_value = None
+        mock_store.create_collection.return_value = None
+        mock_get_store.return_value = mock_store
+
+        test_docs = [
+            Document(page_content="doc1", metadata={"cell_id": "c1"}),
+            Document(page_content="doc2", metadata={"cell_id": "c2"}),
+        ]
+        vectors = [[0.1, 0.2], [0.3, 0.4]]
+
+        with patch.object(self.store, "_raw_connection") as mock_conn, \
+             patch.object(self.store, "ensure_optimized_indexes"):
+            mock_cursor = MagicMock()
+            mock_conn.return_value.cursor.return_value.__enter__.return_value = mock_cursor
+            self.store.put_documents("test_index", test_docs, vectors=vectors)
+
+        mock_store.add_embeddings.assert_called_once()
+        mock_store.add_documents.assert_not_called()
 
 
 if __name__ == "__main__":

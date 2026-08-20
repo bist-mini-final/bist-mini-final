@@ -301,7 +301,16 @@ export function PipelineTrackerView({
                   {/* Card Header (Click to toggle) */}
                   <div
                     className="ds-module-card__header"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isOpen}
                     onClick={() => toggleModule(mod.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleModule(mod.id);
+                      }
+                    }}
                     title="클릭하여 모듈 세부 로그 및 파라미터 확인"
                   >
                     <div className="ds-module-card__left">

@@ -21,7 +21,7 @@
 ## 환경 설정
 
 > [!NOTE]
-> `data/processed/`, `data/runs/`, `data/cache/`, `data/vector_db/`, `data/artifacts/` 디렉터리는 `.gitkeep`을 통해 저장소에 포함되어 있으므로 별도로 디렉터리를 생성할 필요가 없습니다. 런타임 데이터 파일만 `.gitignore`에 의해 제외됩니다.
+> `data/source_files/`, `data/runs/`, `data/cache/`, `data/vector_db/`, `data/artifacts/` 디렉터리는 `.gitkeep`을 통해 저장소에 포함되어 있으므로 별도로 디렉터리를 생성할 필요가 없습니다. 런타임 데이터 파일만 `.gitignore`에 의해 제외됩니다.
 
 ### 1. Python 의존성 설치
 
@@ -86,7 +86,7 @@ docker compose -f docker-compose.db.yml logs -f pgvector
 ### 4. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
 
 > [!IMPORTANT]
-> 기본 워크플로(`Pre-built Vector Index Loader` 노드)는 사전 임베딩된 인덱스 파일을 로드합니다. 아래 파일을 구글 드라이브에서 받아 `data/processed/`에 배치해야 파이프라인을 바로 실행할 수 있습니다.
+> 기본 워크플로(`Pre-built Vector Index Loader` 노드)는 사전 임베딩된 인덱스 파일을 로드합니다. 아래 파일을 구글 드라이브에서 받아 `data/source_files/`에 배치해야 파이프라인을 바로 실행할 수 있습니다.
 
 **구글 드라이브에서 다운로드할 파일:**
 
@@ -95,7 +95,7 @@ docker compose -f docker-compose.db.yml logs -f pgvector
 | `SPG_Company_KeyStats_v3_prebuilt.parquet` | Key Stats 시트 사전 임베딩 인덱스 |
 
 ```
-data/processed/
+data/source_files/
 └── SPG_Company_KeyStats_v3_prebuilt.parquet   ← 구글 드라이브에서 다운로드 후 배치
 ```
 
@@ -107,19 +107,19 @@ data/processed/
 기존 Excel 파일에서 처음부터 인덱스를 생성하려면 `cell_text_embedder` → `vector_index_writer` 파이프라인을 실행한 뒤 아래 명령으로 export합니다.
 
 ```bash
-python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output data/processed/SPG_Company_KeyStats_v3_prebuilt.json
+python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output data/source_files/SPG_Company_KeyStats_v3_prebuilt.json
 ```
 
 ---
 
 ### 5. Excel 파일 배치
 
-팀 구글 드라이브에서 분석 대상 Excel 파일을 다운로드하여 `data/processed/` 에 복사합니다.
+팀 구글 드라이브에서 분석 대상 Excel 파일을 다운로드하여 `data/source_files/` 에 복사합니다.
 
 - **기본 워크플로 사용 파일**: `SPG_Company_KeyStats_v3.xlsm`
 
 ```
-data/processed/
+data/source_files/
 └── SPG_Company_KeyStats_v3.xlsm   ← 구글 드라이브에서 다운로드 후 배치 (Excel 직접 파싱 파이프라인에만 필요)
 ```
 
@@ -245,7 +245,7 @@ python3 -m unittest discover -s tests
 
 | 경로 | 내용 |
 |---|---|
-| `data/processed/` | 입력 Excel 파일 |
+| `data/source_files/` | 입력 Excel 파일 및 사전 구축 인덱스 |
 | `data/runs/` | 실행별 입력·출력·상태 |
 | `data/cache/` | 모듈 타입·버전·입력 기반 결과 캐시 |
 | `data/vector_db/` | 문서 벡터 인덱스·메타데이터 |
@@ -375,7 +375,7 @@ flowchart LR
 
 ### 공통 규칙
 
-- `data/processed/` 내부 파일만 선택할 수 있습니다.
+- `data/source_files/` 내부 파일만 선택할 수 있습니다.
 - 숨김 시트, 숨김 행·열, 높이·너비 0인 행·열, 그룹으로 접힌 열은 전체 애플리케이션에서 존재하지 않는 데이터로 취급합니다. 어느 모듈도 해당 셀 값을 읽거나 중간 DTO·캐시에 포함하지 않습니다.
 
 ### 인덱싱 DAG 예시

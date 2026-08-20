@@ -1,4 +1,35 @@
-"""Database Manager for full ERD persistence in PostgreSQL (source_files, sheets, document_chunks, vector_indexes)."""
+"""Database Manager for full ERD persistence in PostgreSQL.
+
+Documented ERD Schema:
+- source_files:
+    - file_id (VARCHAR(64), PK): Unique identifier or content hash
+    - file_name (VARCHAR(255), NOT NULL): Original name of the source file
+    - file_hash (VARCHAR(64), NOT NULL): Content SHA-256 hash
+    - file_type (VARCHAR(32), NOT NULL): File extension/format (e.g., excel, parquet, json)
+    - file_size (BIGINT, NOT NULL): Size in bytes
+    - storage_path (VARCHAR(512), NOT NULL): Path to stored file
+    - created_at (TIMESTAMPTZ, DEFAULT NOW()): Record creation timestamp
+- sheets:
+    - sheet_id (VARCHAR(128), PK): Composite identifier ({file_id}:{sheet_name})
+    - file_id (VARCHAR(64), FK -> source_files.file_id): Parent file ID
+    - sheet_name (VARCHAR(128), NOT NULL): Sheet name
+    - sheet_index (INT, NOT NULL): Index order of the sheet
+    - is_visible (BOOLEAN, DEFAULT TRUE): Sheet visibility flag
+    - row_count (INT, DEFAULT 0): Total rows in sheet
+    - column_count (INT, DEFAULT 0): Total columns in sheet
+    - detected_tables (JSONB, DEFAULT '[]'): Detected table boundary metadata
+    - parsed_at (TIMESTAMPTZ, DEFAULT NOW()): Parsing timestamp
+- langchain_pg_collection:
+    - uuid (UUID, PK): Unique identifier for pgvector collection
+    - name (VARCHAR, UNIQUE NOT NULL): Collection/Index name
+    - cmetadata (JSON): Collection metadata
+- langchain_pg_embedding:
+    - id (VARCHAR, PK): Chunk embedding ID (UUID or scoped composite ID)
+    - collection_id (UUID, FK -> langchain_pg_collection.uuid): Parent collection
+    - embedding (vector): Dynamic embedding vector representation (HNSW indexable)
+    - document (VARCHAR): Document chunk text content
+    - cmetadata (JSONB): Chunk metadata (cell coordinates, headers, etc.)
+"""
 
 from __future__ import annotations
 
@@ -42,9 +73,9 @@ CREATE TABLE IF NOT EXISTS sheets (
 );
 
 CREATE TABLE IF NOT EXISTS langchain_pg_collection (
-    name VARCHAR PRIMARY KEY,
-    cmetadata JSON,
-    uuid UUID UNIQUE DEFAULT gen_random_uuid()
+    uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR NOT NULL UNIQUE,
+    cmetadata JSON
 );
 
 CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
@@ -66,7 +97,6 @@ class DatabaseManager:
 
     def __init__(self, database_url: str = PGVECTOR_URL) -> None:
         self.database_url = database_url
-        self.ensure_schema()
 
     def _raw_connection(self) -> psycopg2.extensions.connection:
         raw_url = self.database_url.replace("postgresql+psycopg://", "postgresql://")
@@ -90,7 +120,7 @@ class DatabaseManager:
             return False
 
     def ensure_schema(self) -> None:
-        """Create required database tables and remove obsolete columns.
+        """Create required database tables according to DDL_INIT.
         
         Initialization failures are logged and do not propagate.
         """
@@ -99,13 +129,25 @@ class DatabaseManager:
             try:
                 with conn.cursor() as cur:
                     cur.execute(DDL_INIT)
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception:
+            logger.warning("PostgreSQL 스키마 초기화에 실패했습니다", exc_info=True)
+
+    def run_migrations(self) -> None:
+        """Run destructive or legacy schema migrations (e.g. dropping obsolete columns)."""
+        try:
+            conn = self._raw_connection()
+            try:
+                with conn.cursor() as cur:
                     cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS file_content;")
                     cur.execute("ALTER TABLE source_files DROP COLUMN IF EXISTS metadata;")
                 conn.commit()
             finally:
                 conn.close()
         except Exception:
-            logger.warning("PostgreSQL 스키마 초기화에 실패했습니다", exc_info=True)
+            logger.warning("PostgreSQL 마이그레이션 실행에 실패했습니다", exc_info=True)
 
     def save_source_file(
         self,
@@ -231,3 +273,27 @@ class DatabaseManager:
             conn.commit()
         finally:
             conn.close()
+
+
+def main() -> None:
+    """CLI entrypoint for initializing database schema or running migrations."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Database schema management and migrations.")
+    parser.add_argument("--init", action="store_true", help="Initialize ERD database tables.")
+    parser.add_argument("--migrate", action="store_true", help="Run destructive/legacy database migrations.")
+    args = parser.parse_args()
+
+    manager = DatabaseManager()
+    if args.init or not args.migrate:
+        print("Ensuring database schema...")
+        manager.ensure_schema()
+        print("Schema initialized.")
+    if args.migrate:
+        print("Running database migrations...")
+        manager.run_migrations()
+        print("Migrations complete.")
+
+
+if __name__ == "__main__":
+    main()

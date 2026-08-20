@@ -204,19 +204,43 @@ class PgVectorStore:
         # Pre-delete existing collection to replace clean
         try:
             store.delete_collection()
-        except Exception:
-            pass
+        except Exception as delete_error:
+            logger.error(
+                "기존 pgvector 컬렉션('%s') 삭제 실패: %s",
+                index_id,
+                delete_error,
+                exc_info=True,
+            )
+            raise PgVectorStoreError(
+                f"기존 pgvector 컬렉션('{index_id}') 삭제 실패: {delete_error}"
+            ) from delete_error
 
         # Ensure collection is created with metadata
         try:
             store.create_collection()
-        except Exception:
-            pass
+        except Exception as create_error:
+            logger.error(
+                "pgvector 컬렉션('%s') 생성 실패: %s",
+                index_id,
+                create_error,
+                exc_info=True,
+            )
+            raise PgVectorStoreError(
+                f"pgvector 컬렉션('{index_id}') 생성 실패: {create_error}"
+            ) from create_error
 
         # SQLAlchemy expands each embedding row into several bind parameters.
         # Sending an entire large workbook at once crosses psycopg's 65,535
         # parameter protocol limit, so persist bounded batches explicitly.
         total_items = len(documents)
+        use_precomputed_vectors = False
+        if vectors is not None:
+            if len(vectors) != total_items:
+                raise PgVectorStoreError(
+                    f"사전 계산된 벡터 개수({len(vectors)})가 문서 개수({total_items})와 일치하지 않습니다."
+                )
+            use_precomputed_vectors = True
+
         total_batches = max(
             1,
             (total_items + PGVECTOR_INSERT_BATCH_SIZE - 1)
@@ -238,7 +262,7 @@ class PgVectorStore:
             ):
                 stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
                 document_batch = documents[start:stop]
-                if vectors is not None and len(vectors) == total_items:
+                if use_precomputed_vectors:
                     vector_batch = vectors[start:stop]
                     texts = [doc.page_content for doc in document_batch]
                     metadatas = [doc.metadata for doc in document_batch]

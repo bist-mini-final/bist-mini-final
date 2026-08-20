@@ -49,7 +49,7 @@ def get_vector_store(
             collection_metadata=collection_metadata,
             distance_strategy=distance_strategy,
             use_jsonb=True,
-            create_extension=True,
+            create_extension=False,
         )
 
     raise ValueError(f"지원하지 않는 Vector DB 백엔드입니다: {backend}")

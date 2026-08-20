@@ -51,10 +51,9 @@ erDiagram
         varchar file_id PK "UUID / SHA256"
         varchar file_name "원본 파일명 (예: SPG_Company_KeyStats_v3.xlsm)"
         varchar file_hash "SHA256 해시"
-        varchar file_type "xlsx, xlsm, csv, pdf 등"
+        varchar file_type "xlsx, xlsm, csv, pdf, parquet 등"
         bigint file_size "바이트 크기"
         varchar storage_path "로컬 저장 경로"
-        jsonb metadata "작성자, 생성일 등 엑셀 메타"
         timestamp created_at "업로드 일시"
     }
 
@@ -78,14 +77,14 @@ erDiagram
     LANGCHAIN_PG_COLLECTION {
         uuid uuid PK "LangChain 컬렉션 고유 UUID"
         varchar name UK "인덱스 식별자 (Index ID, 예: 64자 해시)"
-        jsonb cmetadata "모델명, 차원수, 원본 파일명, 해시 메타데이터"
+        json cmetadata "모델명, 차원수, 원본 파일명, 해시 메타데이터"
     }
 
     LANGCHAIN_PG_EMBEDDING {
-        uuid id PK "청크 고유 UUID (LangChain 자동 발급)"
+        varchar id PK "청크 고유 식별자 (UUID 또는 인덱스/해시 복합 ID)"
         uuid collection_id FK "LANGCHAIN_PG_COLLECTION.uuid"
-        text document "직렬화된 셀 텍스트 (Page Content)"
-        vector embedding "임베딩 벡터 (HNSW 인덱스 적용)"
+        varchar document "직렬화된 셀 텍스트 (Page Content)"
+        vector embedding "임베딩 벡터 (동적 차원 지원, HNSW 인덱스 적용)"
         jsonb cmetadata "cell_id, sheet_name, cell_coord, row_header, column_header, cell_value"
     }
 
@@ -197,9 +196,9 @@ erDiagram
 *LangChain 공식 `langchain-postgres` 테이블*
 | 컬럼명 | 데이터 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `uuid` | `UUID` | `PRIMARY KEY` | LangChain 컬렉션 고유 식별자 |
+| `uuid` | `UUID` | `PRIMARY KEY` | LangChain 컬렉션 고유 식별자 (`gen_random_uuid()`) |
 | `name` | `VARCHAR` | `UNIQUE NOT NULL` | 인덱스 고유 ID (예: `bf94446eb7...`) |
-| `cmetadata` | `JSONB` | `DEFAULT '{}'` | `file_name`, `workbook_hash`, `model`, `dimension`, `doc_count` 등 |
+| `cmetadata` | `JSON` | `DEFAULT NULL` | `file_name`, `workbook_hash`, `model`, `dimension`, `doc_count` 등 |
 
 ---
 
@@ -207,11 +206,11 @@ erDiagram
 *LangChain 공식 `langchain-postgres` 100% 호환 테이블*
 | 컬럼명 | 데이터 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `id` | `UUID` | `PRIMARY KEY` | 청크 고유 UUID (LangChain 자동 발급) |
+| `id` | `VARCHAR` | `PRIMARY KEY` | 청크 고유 식별자 (UUID 문자열 또는 인덱스/해시 접두 복합 ID) |
 | `collection_id` | `UUID` | `FOREIGN KEY` | `langchain_pg_collection.uuid` 참조 (`ON DELETE CASCADE`) |
-| `document` | `TEXT` | `NOT NULL` | 직렬화된 셀 텍스트 (`[SHEET] ... [COL] ... [ROW] ... [VALUE] ...`) |
-| `embedding` | `VECTOR` | `NOT NULL` | 고차원 임베딩 벡터 (동적 차원 지원: 1536 / 3072 등) |
-| `cmetadata` | `JSONB` | `NOT NULL` | `cell_id`, `sheet_name`, `cell_coord`, `row_header`, `column_header`, `cell_value` |
+| `document` | `VARCHAR` | `NULLABLE` | 직렬화된 셀 텍스트 (`[SHEET] ... [COL] ... [ROW] ... [VALUE] ...`) |
+| `embedding` | `VECTOR` | `NULLABLE` | 고차원 임베딩 벡터 (동적 차원 지원: 1536 / 3072 등, HNSW 인덱스 적용) |
+| `cmetadata` | `JSONB` | `DEFAULT NULL` | `cell_id`, `sheet_name`, `cell_coord`, `row_header`, `column_header`, `cell_value` |
 
 #### 최적화 인덱스 DDL
 ```sql
