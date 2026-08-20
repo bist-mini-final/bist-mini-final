@@ -101,12 +101,17 @@ def _heartbeat_loop(
     services: WorkflowRuntimeServices,
     run_id: str,
     worker_id: str,
+    lease_token: str,
     stop: Event,
     interval_seconds: float,
 ) -> None:
     while not stop.wait(interval_seconds):
         try:
-            if not services.db_manager.heartbeat_workflow_run(run_id, worker_id):
+            if not services.db_manager.heartbeat_workflow_run(
+                run_id,
+                worker_id,
+                lease_token,
+            ):
                 return
         except Exception:
             logger.warning("워크플로 lease heartbeat 실패", exc_info=True)
@@ -122,48 +127,73 @@ def run_one(
     """Claim and finish one item; return ``None`` when the queue is empty."""
 
     services = runtime_services()
-    run_id = services.db_manager.claim_next_workflow_run(
+    claim = services.db_manager.claim_next_workflow_run(
         queue_name,
         worker_id,
         stale_after_seconds=stale_after_seconds,
     )
-    if run_id is None:
+    if claim is None:
         logger.info("claim 가능한 작업이 없어 종료합니다 (queue=%s)", queue_name)
         return None
 
-    stop = Event()
-    heartbeat = Thread(
-        target=_heartbeat_loop,
-        args=(services, run_id, worker_id, stop, heartbeat_seconds),
-        name="workflow-lease-heartbeat",
-        daemon=True,
-    )
-    heartbeat.start()
+    run_id = claim.run_id
+    lease_token = claim.token
     try:
-        with services.db_manager.claim_workflow_run(run_id):
-            run = services.run_store.load(run_id)
-            if run.workflow_id not in INGESTION_WORKFLOW_IDS:
-                raise ValueError(
-                    f"이 큐가 처리할 수 없는 workflow입니다: {run.workflow_id}"
+        with services.db_manager.claim_workflow_run(
+            run_id,
+            queue_name=queue_name,
+            worker_id=worker_id,
+            lease_token=lease_token,
+            stale_after_seconds=stale_after_seconds,
+        ):
+            with services.run_store.workflow_lease(run_id, lease_token):
+                stop = Event()
+                heartbeat = Thread(
+                    target=_heartbeat_loop,
+                    args=(
+                        services,
+                        run_id,
+                        worker_id,
+                        lease_token,
+                        stop,
+                        heartbeat_seconds,
+                    ),
+                    name="workflow-lease-heartbeat",
+                    daemon=True,
                 )
-            plan = compile_task_plan(run, services.module_registry)
-            for planned in plan:
-                policy = planned.policy
-                execute_with_policy(
-                    services,
-                    run_id,
-                    planned.node_id,
-                    policy.retries,
-                    policy.retry_delay_seconds,
-                    policy.timeout_seconds,
-                )
-            completed = services.run_store.load(run_id)
-            if completed.status != "completed":
-                raise RuntimeError(
-                    f"배치 run이 완료되지 않았습니다: {completed.status}"
-                )
-            logger.info("배치 run 완료 (run=%s, modules=%d)", run_id, len(plan))
-            return run_id
+                heartbeat.start()
+                try:
+                    run = services.run_store.load(run_id)
+                    if run.workflow_id not in INGESTION_WORKFLOW_IDS:
+                        raise ValueError(
+                            "이 큐가 처리할 수 없는 workflow입니다: "
+                            f"{run.workflow_id}"
+                        )
+                    plan = compile_task_plan(run, services.module_registry)
+                    for planned in plan:
+                        policy = planned.policy
+                        execute_with_policy(
+                            services,
+                            run_id,
+                            planned.node_id,
+                            policy.retries,
+                            policy.retry_delay_seconds,
+                            policy.timeout_seconds,
+                        )
+                    completed = services.run_store.load(run_id)
+                    if completed.status != "completed":
+                        raise RuntimeError(
+                            f"배치 run이 완료되지 않았습니다: {completed.status}"
+                        )
+                    logger.info(
+                        "배치 run 완료 (run=%s, modules=%d)",
+                        run_id,
+                        len(plan),
+                    )
+                    return run_id
+                finally:
+                    stop.set()
+                    heartbeat.join(timeout=heartbeat_seconds + 1)
     except DagExecutionCancelled:
         logger.info("배치 run 취소 완료 (run=%s)", run_id)
         return run_id
@@ -176,14 +206,12 @@ def run_one(
             services.db_manager.fail_workflow_run_claim(
                 run_id,
                 worker_id,
+                lease_token,
                 str(error),
             )
         except Exception:
             logger.warning("치명적 worker 오류 상태 저장 실패", exc_info=True)
         raise
-    finally:
-        stop.set()
-        heartbeat.join(timeout=heartbeat_seconds + 1)
 
 
 def main() -> int:

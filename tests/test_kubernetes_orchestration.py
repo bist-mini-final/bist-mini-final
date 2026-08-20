@@ -284,3 +284,15 @@ def test_worker_applies_module_retry_policy() -> None:
     )
 
     assert services.workflow_executor.execute_scheduled_node.call_count == 2
+
+
+def test_cancellation_lookup_failure_is_logged_without_masking_execution() -> None:
+    store = MagicMock()
+    store.is_cancel_requested.side_effect = RuntimeError("database unavailable")
+    executor = WorkflowExecutor(
+        _Registry(),
+        store,
+        MagicMock(),
+    )
+
+    executor._raise_if_cancelled("run-kubernetes-test")

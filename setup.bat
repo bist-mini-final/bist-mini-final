@@ -8,6 +8,16 @@ if errorlevel 1 (
   exit /b 1
 )
 
+set "BIST_WSL_DEFAULT_VERSION="
+for /f "tokens=1,2,3,4" %%A in ('wsl.exe -l -v 2^>nul') do (
+  if "%%A"=="*" set "BIST_WSL_DEFAULT_VERSION=%%D"
+)
+if not "%BIST_WSL_DEFAULT_VERSION%"=="2" (
+  echo WSL2 is required. Install WSL2 and Docker Desktop, then run setup.bat again.
+  exit /b 1
+)
+
+set "BIST_WSL_PROJECT="
 for /f "usebackq delims=" %%I in (`wsl.exe wslpath -a "%CD%"`) do set "BIST_WSL_PROJECT=%%I"
 if not defined BIST_WSL_PROJECT (
   echo Failed to resolve the repository path in WSL2.

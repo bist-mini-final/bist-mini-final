@@ -16,6 +16,26 @@ require_command docker
 require_command node
 require_command npm
 
+verify_sha256() {
+  local file_path="$1" expected="$2" actual
+  if [[ ! "${expected}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    echo "유효하지 않은 SHA-256 체크섬입니다: ${file_path}" >&2
+    exit 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "${file_path}" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "${file_path}" | awk '{print $1}')"
+  else
+    echo "SHA-256 검증 도구(sha256sum 또는 shasum)가 필요합니다." >&2
+    exit 1
+  fi
+  if [[ "${actual}" != "${expected}" ]]; then
+    echo "다운로드 체크섬 검증에 실패했습니다: ${file_path}" >&2
+    exit 1
+  fi
+}
+
 install_kubernetes_tools() {
   if command -v k3d >/dev/null 2>&1 \
     && command -v kubectl >/dev/null 2>&1 \
@@ -25,6 +45,10 @@ install_kubernetes_tools() {
   require_command curl
   require_command tar
   local os_name machine_arch tool_arch tool_dir temporary_dir
+  local k3d_version kubectl_version helm_version
+  k3d_version="5.9.0"
+  kubectl_version="1.35.0"
+  helm_version="3.21.4"
   os_name="$(uname -s | tr '[:upper:]' '[:lower:]')"
   machine_arch="$(uname -m)"
   case "${machine_arch}" in
@@ -42,21 +66,39 @@ install_kubernetes_tools() {
   trap 'rm -r "${temporary_dir}"' EXIT
 
   if ! command -v k3d >/dev/null 2>&1; then
+    local k3d_file k3d_checksum
+    k3d_file="k3d-${os_name}-${tool_arch}"
     curl -fsSL \
-      "https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-${os_name}-${tool_arch}" \
-      -o "${tool_dir}/k3d"
+      "https://github.com/k3d-io/k3d/releases/download/v${k3d_version}/${k3d_file}" \
+      -o "${temporary_dir}/${k3d_file}"
+    curl -fsSL \
+      "https://github.com/k3d-io/k3d/releases/download/v${k3d_version}/checksums.txt" \
+      -o "${temporary_dir}/k3d-checksums.txt"
+    k3d_checksum="$(awk -v file="_dist/${k3d_file}" '$2 == file {print $1; exit}' "${temporary_dir}/k3d-checksums.txt")"
+    verify_sha256 "${temporary_dir}/${k3d_file}" "${k3d_checksum}"
+    cp "${temporary_dir}/${k3d_file}" "${tool_dir}/k3d"
     chmod +x "${tool_dir}/k3d"
   fi
   if ! command -v kubectl >/dev/null 2>&1; then
+    local kubectl_checksum
     curl -fsSL \
-      "https://dl.k8s.io/release/v1.35.0/bin/${os_name}/${tool_arch}/kubectl" \
-      -o "${tool_dir}/kubectl"
+      "https://dl.k8s.io/release/v${kubectl_version}/bin/${os_name}/${tool_arch}/kubectl" \
+      -o "${temporary_dir}/kubectl"
+    kubectl_checksum="$(curl -fsSL \
+      "https://dl.k8s.io/release/v${kubectl_version}/bin/${os_name}/${tool_arch}/kubectl.sha256")"
+    verify_sha256 "${temporary_dir}/kubectl" "${kubectl_checksum}"
+    cp "${temporary_dir}/kubectl" "${tool_dir}/kubectl"
     chmod +x "${tool_dir}/kubectl"
   fi
   if ! command -v helm >/dev/null 2>&1; then
+    local helm_archive helm_checksum
+    helm_archive="helm-v${helm_version}-${os_name}-${tool_arch}.tar.gz"
     curl -fsSL \
-      "https://get.helm.sh/helm-v3.21.4-${os_name}-${tool_arch}.tar.gz" \
+      "https://get.helm.sh/${helm_archive}" \
       -o "${temporary_dir}/helm.tar.gz"
+    helm_checksum="$(curl -fsSL \
+      "https://get.helm.sh/${helm_archive}.sha256sum" | awk '{print $1}')"
+    verify_sha256 "${temporary_dir}/helm.tar.gz" "${helm_checksum}"
     tar -xzf "${temporary_dir}/helm.tar.gz" -C "${temporary_dir}"
     cp "${temporary_dir}/${os_name}-${tool_arch}/helm" "${tool_dir}/helm"
     chmod +x "${tool_dir}/helm"
@@ -100,7 +142,7 @@ fi
   npm ci
 )
 
-./deploy/kubernetes/local.sh all
+"${PROJECT_ROOT}/deploy/kubernetes/local.sh" all
 
 echo "설치 완료: k3d/KEDA 배치 클러스터가 준비되었습니다."
 echo "상태 확인: ./deploy/kubernetes/local.sh status"

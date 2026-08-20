@@ -34,10 +34,12 @@ Documented ERD Schema:
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
+from uuid import uuid4
 
 import psycopg2.extras
 
@@ -49,6 +51,18 @@ logger = logging.getLogger(__name__)
 
 class WorkflowRunAlreadyClaimed(RuntimeError):
     """Raised when another database-connected worker owns the same run."""
+
+
+class WorkflowLeaseLost(RuntimeError):
+    """Raised when a worker tries to persist with an obsolete lease token."""
+
+
+@dataclass(frozen=True)
+class WorkflowRunLease:
+    """A single claim generation shared by every worker persistence operation."""
+
+    run_id: str
+    token: str
 
 DDL_INIT = """
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -101,6 +115,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     orchestration JSONB NOT NULL DEFAULT '{}',
     queue_name VARCHAR(64),
     worker_id VARCHAR(128),
+    lease_token VARCHAR(64),
     priority INT NOT NULL DEFAULT 0,
     attempt_count INT NOT NULL DEFAULT 0,
     available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -119,6 +134,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS orchestration JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS queue_name VARCHAR(64);
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS worker_id VARCHAR(128);
+ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS lease_token VARCHAR(64);
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 0;
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS attempt_count INT NOT NULL DEFAULT 0;
 ALTER TABLE workflow_runs ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
@@ -203,7 +219,15 @@ class DatabaseManager:
             return False
 
     @contextmanager
-    def claim_workflow_run(self, run_id: str) -> Iterator[None]:
+    def claim_workflow_run(
+        self,
+        run_id: str,
+        *,
+        queue_name: Optional[str] = None,
+        worker_id: Optional[str] = None,
+        lease_token: Optional[str] = None,
+        stale_after_seconds: int = 180,
+    ) -> Iterator[None]:
         """Hold a PostgreSQL advisory lock for one worker's run lifetime.
 
         The lock is released by PostgreSQL when the worker connection closes,
@@ -222,9 +246,30 @@ class DatabaseManager:
                 )
                 acquired = bool(cur.fetchone()[0])
             if not acquired:
+                if worker_id is not None and lease_token is not None:
+                    self.release_workflow_run_claim(
+                        run_id,
+                        worker_id,
+                        lease_token,
+                    )
                 raise WorkflowRunAlreadyClaimed(
                     f"다른 배치 워커가 이미 실행을 소유하고 있습니다: {run_id}"
                 )
+            if queue_name is not None:
+                if worker_id is None or lease_token is None:
+                    raise ValueError(
+                        "queue claim에는 worker_id와 lease_token이 필요합니다"
+                    )
+                if not self.finalize_workflow_run_claim(
+                    run_id,
+                    queue_name,
+                    worker_id,
+                    lease_token,
+                    stale_after_seconds=stale_after_seconds,
+                ):
+                    raise WorkflowRunAlreadyClaimed(
+                        f"작업 후보의 lease가 이미 변경되었습니다: {run_id}"
+                    )
             yield
         finally:
             if acquired:
@@ -421,7 +466,12 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def save_workflow_run(self, run_dict_or_model: Any) -> None:
+    def save_workflow_run(
+        self,
+        run_dict_or_model: Any,
+        *,
+        lease_token: Optional[str] = None,
+    ) -> None:
         """Insert or update a workflow run and its node execution logs."""
         if hasattr(run_dict_or_model, "model_dump"):
             data = run_dict_or_model.model_dump(mode="json")
@@ -458,6 +508,20 @@ class DatabaseManager:
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
+                if lease_token is not None:
+                    cur.execute(
+                        """
+                        SELECT 1
+                        FROM workflow_runs
+                        WHERE run_id = %s AND lease_token = %s
+                        FOR UPDATE;
+                        """,
+                        (run_id, lease_token),
+                    )
+                    if cur.fetchone() is None:
+                        raise WorkflowLeaseLost(
+                            f"워크플로 lease 소유권을 잃었습니다: {run_id}"
+                        )
                 cur.execute(
                     """
                     INSERT INTO workflow_runs (
@@ -806,6 +870,8 @@ class DatabaseManager:
         self,
         run: Any,
         node_id: str,
+        *,
+        lease_token: Optional[str] = None,
     ) -> None:
         """Persist one node's live status without retransmitting the full run JSON."""
 
@@ -857,7 +923,8 @@ class DatabaseManager:
                             WHEN worker_id IS NOT NULL THEN NOW()
                             ELSE heartbeat_at
                         END
-                    WHERE run_id = %s;
+                    WHERE run_id = %s
+                      AND lease_token IS NOT DISTINCT FROM %s;
                     """,
                     (
                         run_status,
@@ -865,8 +932,13 @@ class DatabaseManager:
                         psycopg2.extras.Json(batches),
                         updated_at,
                         run_id,
+                        lease_token,
                     ),
                 )
+                if cur.rowcount != 1:
+                    raise WorkflowLeaseLost(
+                        f"워크플로 lease 소유권을 잃었습니다: {run_id}"
+                    )
                 cur.execute(
                     """
                     INSERT INTO node_execution_logs (
@@ -927,7 +999,7 @@ class DatabaseManager:
         submission_attempt: int,
         submitted_at: str,
         priority: int = 0,
-    ) -> None:
+    ) -> bool:
         """Place one persisted run on the durable Kubernetes work queue."""
 
         conn = self._raw_connection()
@@ -939,11 +1011,11 @@ class DatabaseManager:
                     SET status = 'queued',
                         queue_name = %s,
                         worker_id = NULL,
+                        lease_token = NULL,
                         priority = %s,
                         available_at = NOW(),
                         claimed_at = NULL,
                         heartbeat_at = NULL,
-                        cancel_requested = FALSE,
                         orchestration = jsonb_build_object(
                             'backend', 'kubernetes',
                             'deployment_name', %s::text,
@@ -953,7 +1025,8 @@ class DatabaseManager:
                         ),
                         updated_at = NOW(),
                         completed_at = NULL
-                    WHERE run_id = %s;
+                    WHERE run_id = %s
+                      AND cancel_requested = FALSE;
                     """,
                     (
                         queue_name,
@@ -964,9 +1037,17 @@ class DatabaseManager:
                         run_id,
                     ),
                 )
-                if cur.rowcount != 1:
-                    raise FileNotFoundError(run_id)
+                enqueued = cur.rowcount == 1
+                if not enqueued:
+                    cur.execute(
+                        "SELECT cancel_requested FROM workflow_runs WHERE run_id = %s;",
+                        (run_id,),
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        raise FileNotFoundError(run_id)
             conn.commit()
+            return enqueued
         finally:
             conn.close()
 
@@ -976,12 +1057,13 @@ class DatabaseManager:
         worker_id: str,
         *,
         stale_after_seconds: int = 180,
-    ) -> Optional[str]:
-        """Atomically claim one queue item with ``FOR UPDATE SKIP LOCKED``.
+    ) -> Optional[WorkflowRunLease]:
+        """Select one claim candidate with ``FOR UPDATE SKIP LOCKED``.
 
-        A Kubernetes Job name is used as the stable worker identity. A
-        restarted pod from the same Job can therefore reacquire its own run;
-        another Job may recover a run only after its heartbeat lease expires.
+        The returned token is not persisted here. The caller must acquire the
+        run's advisory lock and pass this same generation to
+        :meth:`claim_workflow_run`, which then finalizes the lease. This keeps
+        a stale but still-running advisory-lock owner from being overwritten.
         """
 
         conn = self._raw_connection()
@@ -989,33 +1071,62 @@ class DatabaseManager:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    WITH candidate AS (
-                        SELECT run_id
-                        FROM workflow_runs
-                        WHERE queue_name = %s
-                          AND cancel_requested = FALSE
-                          AND (
-                              (status = 'queued' AND available_at <= NOW())
-                              OR (
-                                  status = 'running'
-                                  AND (
-                                      worker_id = %s
-                                      OR heartbeat_at IS NULL
-                                      OR heartbeat_at < NOW() - (%s * INTERVAL '1 second')
-                                  )
+                    SELECT run_id
+                    FROM workflow_runs
+                    WHERE queue_name = %s
+                      AND cancel_requested = FALSE
+                      AND (
+                          (status = 'queued' AND available_at <= NOW())
+                          OR (
+                              status = 'running'
+                              AND (
+                                  worker_id = %s
+                                  OR heartbeat_at IS NULL
+                                  OR heartbeat_at < NOW() - (%s * INTERVAL '1 second')
                               )
                           )
-                        ORDER BY
-                            CASE WHEN worker_id = %s THEN 0 ELSE 1 END,
-                            priority DESC,
-                            available_at ASC,
-                            created_at ASC
-                        LIMIT 1
-                        FOR UPDATE SKIP LOCKED
-                    )
-                    UPDATE workflow_runs AS run
+                      )
+                    ORDER BY
+                        CASE WHEN worker_id = %s THEN 0 ELSE 1 END,
+                        priority DESC,
+                        available_at ASC,
+                        created_at ASC
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED;
+                    """,
+                    (
+                        queue_name,
+                        worker_id,
+                        stale_after_seconds,
+                        worker_id,
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+            return WorkflowRunLease(str(row[0]), uuid4().hex) if row else None
+        finally:
+            conn.close()
+
+    def finalize_workflow_run_claim(
+        self,
+        run_id: str,
+        queue_name: str,
+        worker_id: str,
+        lease_token: str,
+        *,
+        stale_after_seconds: int = 180,
+    ) -> bool:
+        """Finalize a candidate only after its advisory lock is held."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
                     SET status = 'running',
                         worker_id = %s,
+                        lease_token = %s,
                         claimed_at = NOW(),
                         heartbeat_at = NOW(),
                         attempt_count = attempt_count + 1,
@@ -1029,26 +1140,82 @@ class DatabaseManager:
                             to_jsonb(%s::text)
                         ),
                         updated_at = NOW()
-                    FROM candidate
-                    WHERE run.run_id = candidate.run_id
-                    RETURNING run.run_id;
+                    WHERE run_id = %s
+                      AND queue_name = %s
+                      AND cancel_requested = FALSE
+                      AND (
+                          (status = 'queued' AND available_at <= NOW())
+                          OR (
+                              status = 'running'
+                              AND (
+                                  worker_id = %s
+                                  OR heartbeat_at IS NULL
+                                  OR heartbeat_at < NOW() - (%s * INTERVAL '1 second')
+                              )
+                          )
+                      );
                     """,
                     (
+                        worker_id,
+                        lease_token,
+                        worker_id,
+                        run_id,
                         queue_name,
                         worker_id,
                         stale_after_seconds,
-                        worker_id,
-                        worker_id,
-                        worker_id,
                     ),
                 )
-                row = cur.fetchone()
+                finalized = cur.rowcount == 1
             conn.commit()
-            return str(row[0]) if row else None
+            return finalized
         finally:
             conn.close()
 
-    def heartbeat_workflow_run(self, run_id: str, worker_id: str) -> bool:
+    def release_workflow_run_claim(
+        self,
+        run_id: str,
+        worker_id: str,
+        lease_token: str,
+    ) -> bool:
+        """Conditionally roll back only the caller's unowned lease generation."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE workflow_runs
+                    SET status = 'queued',
+                        worker_id = NULL,
+                        lease_token = NULL,
+                        claimed_at = NULL,
+                        heartbeat_at = NULL,
+                        available_at = NOW(),
+                        orchestration = jsonb_set(
+                            orchestration,
+                            '{external_run_id}',
+                            'null'::jsonb
+                        ),
+                        updated_at = NOW()
+                    WHERE run_id = %s
+                      AND worker_id = %s
+                      AND lease_token = %s
+                      AND status = 'running';
+                    """,
+                    (run_id, worker_id, lease_token),
+                )
+                released = cur.rowcount == 1
+            conn.commit()
+            return released
+        finally:
+            conn.close()
+
+    def heartbeat_workflow_run(
+        self,
+        run_id: str,
+        worker_id: str,
+        lease_token: str,
+    ) -> bool:
         """Renew the lease only while the caller still owns a running item."""
 
         conn = self._raw_connection()
@@ -1060,10 +1227,11 @@ class DatabaseManager:
                     SET heartbeat_at = NOW(), updated_at = NOW()
                     WHERE run_id = %s
                       AND worker_id = %s
+                      AND lease_token = %s
                       AND status = 'running'
                       AND cancel_requested = FALSE;
                     """,
-                    (run_id, worker_id),
+                    (run_id, worker_id, lease_token),
                 )
                 renewed = cur.rowcount == 1
             conn.commit()
@@ -1075,6 +1243,7 @@ class DatabaseManager:
         self,
         run_id: str,
         worker_id: str,
+        lease_token: str,
         error_message: str,
     ) -> bool:
         """Make a fatal worker/bootstrap error terminal for its owned run."""
@@ -1091,9 +1260,10 @@ class DatabaseManager:
                         completed_at = NOW()
                     WHERE run_id = %s
                       AND worker_id = %s
+                      AND lease_token = %s
                       AND status = 'running';
                     """,
-                    (error_message[:2000], run_id, worker_id),
+                    (error_message[:2000], run_id, worker_id, lease_token),
                 )
                 failed = cur.rowcount == 1
             conn.commit()

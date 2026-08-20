@@ -21,7 +21,7 @@ metadata:
   labels:
     kubernetes.io/service-name: bist-pgvector
     app.kubernetes.io/part-of: bist-mini
-addressType: IPv4
+addressType: __ADDRESS_TYPE__
 ports:
   - name: postgres
     protocol: TCP

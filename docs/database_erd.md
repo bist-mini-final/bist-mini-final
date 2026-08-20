@@ -251,6 +251,7 @@ USING gin (cmetadata jsonb_path_ops);
 | `orchestration` | `JSONB` | `DEFAULT '{}'` | Kubernetes queue/Job 공개 식별 정보 |
 | `queue_name` | `VARCHAR(64)` | `NULLABLE` | KEDA ScaledJob이 감시하는 논리 큐 |
 | `worker_id` | `VARCHAR(128)` | `NULLABLE` | run을 claim한 Kubernetes Job 이름 |
+| `lease_token` | `VARCHAR(64)` | `NULLABLE` | 현재 worker claim 세대를 식별하는 불투명 토큰 |
 | `priority` | `INT` | `DEFAULT 0` | 높은 값 우선 claim |
 | `attempt_count` | `INT` | `DEFAULT 0` | 원자적 claim 횟수 |
 | `available_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | retry/backoff 후 claim 가능 시각 |

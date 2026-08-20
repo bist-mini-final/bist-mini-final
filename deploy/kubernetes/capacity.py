@@ -9,6 +9,27 @@ import math
 import subprocess
 
 
+def positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
+
+
+def non_negative_float(value: str) -> float:
+    parsed = float(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be greater than or equal to 0")
+    return parsed
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
+
+
 def docker_capacity() -> tuple[float, float]:
     output = subprocess.check_output(
         ["docker", "info", "--format", "{{json .}}"],
@@ -39,11 +60,19 @@ def recommended_concurrency(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cpu-per-job", type=float, default=1.0)
-    parser.add_argument("--memory-per-job-gib", type=float, default=2.0)
-    parser.add_argument("--reserve-cpu", type=float, default=1.0)
-    parser.add_argument("--reserve-memory-gib", type=float, default=2.0)
-    parser.add_argument("--hard-cap", type=int, default=10)
+    parser.add_argument("--cpu-per-job", type=positive_float, default=1.0)
+    parser.add_argument(
+        "--memory-per-job-gib",
+        type=positive_float,
+        default=2.0,
+    )
+    parser.add_argument("--reserve-cpu", type=non_negative_float, default=1.0)
+    parser.add_argument(
+        "--reserve-memory-gib",
+        type=non_negative_float,
+        default=2.0,
+    )
+    parser.add_argument("--hard-cap", type=positive_int, default=10)
     parser.add_argument("--details", action="store_true")
     args = parser.parse_args()
     cpus, memory_gib = docker_capacity()

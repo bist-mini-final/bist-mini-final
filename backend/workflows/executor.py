@@ -1,4 +1,5 @@
 from collections import defaultdict
+import logging
 from threading import Lock, RLock
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
 from uuid import uuid4
@@ -24,6 +25,9 @@ from .models import (
 )
 from .history import compact_history_value
 from .store import ResultCache, RunStore
+
+
+logger = logging.getLogger(__name__)
 
 
 class DagExecutionError(ValueError):

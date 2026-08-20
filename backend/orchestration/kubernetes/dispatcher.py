@@ -37,13 +37,13 @@ class KubernetesQueueDispatcher:
             run = self.run_store.load_summary(run_id)
 
         submission_attempt = run.orchestration.submission_attempt + 1
-        self.run_store.enqueue(
+        enqueued = self.run_store.enqueue(
             run_id,
             self.queue_name,
             submission_attempt=submission_attempt,
             submitted_at=utc_now_iso(),
         )
-        return True
+        return enqueued
 
     def ensure_submitted(
         self,

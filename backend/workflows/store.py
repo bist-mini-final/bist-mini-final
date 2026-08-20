@@ -1,10 +1,12 @@
 import hashlib
 import json
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from threading import Lock
 import time
-from typing import Any, Collection, Generic, List, Optional, Type, TypeVar
+from typing import Any, Collection, Generic, Iterator, List, Optional, Type, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -20,6 +22,7 @@ from .history import compact_history_value
 
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
+_EXTERNAL_RUN_ID_UNSET = object()
 
 
 def _atomic_write_text(path: Path, content: str) -> None:
@@ -183,12 +186,30 @@ class RunStore:
     def __init__(self, directory: Path, db_manager: Optional[Any] = None) -> None:
         self._store = JsonModelStore(directory, WorkflowRun)
         self._summary_lock = Lock()
+        self._lease_context: ContextVar[Optional[tuple[str, str]]] = ContextVar(
+            f"workflow_lease_{id(self)}",
+            default=None,
+        )
         self.db_manager = (
             db_manager
             if db_manager is not None
             and getattr(db_manager, "is_connected", lambda: False)()
             else None
         )
+
+    @contextmanager
+    def workflow_lease(self, run_id: str, lease_token: str) -> Iterator[None]:
+        """Bind one DB lease generation to persistence in this execution context."""
+
+        context_token = self._lease_context.set((run_id, lease_token))
+        try:
+            yield
+        finally:
+            self._lease_context.reset(context_token)
+
+    def _lease_token_for(self, run_id: str) -> Optional[str]:
+        active = self._lease_context.get()
+        return active[1] if active is not None and active[0] == run_id else None
 
     def _summary(self, run: WorkflowRun) -> WorkflowRun:
         """Create a compact run copy without deep-copying large node outputs."""
@@ -232,9 +253,12 @@ class RunStore:
         	WorkflowRun: The saved workflow run with its updated timestamp.
         """
         run.updated_at = utc_now_iso()
+        lease_token = self._lease_token_for(run.id)
+        if self.db_manager is not None and lease_token is not None:
+            self.db_manager.save_workflow_run(run, lease_token=lease_token)
         saved = self._store.write(run.id, run)
         self._write_summary(run)
-        if self.db_manager is not None:
+        if self.db_manager is not None and lease_token is None:
             try:
                 self.db_manager.save_workflow_run(run)
             except Exception as error:
@@ -245,8 +269,15 @@ class RunStore:
         """Persist live node progress without rewriting large full-run payloads."""
 
         run.updated_at = utc_now_iso()
+        lease_token = self._lease_token_for(run.id)
+        if self.db_manager is not None and lease_token is not None:
+            self.db_manager.save_workflow_node_progress(
+                run,
+                node_id,
+                lease_token=lease_token,
+            )
         self._write_summary(run)
-        if self.db_manager is not None:
+        if self.db_manager is not None and lease_token is None:
             try:
                 self.db_manager.save_workflow_node_progress(run, node_id)
             except Exception as error:
@@ -266,20 +297,22 @@ class RunStore:
         submission_attempt: int,
         submitted_at: str,
         priority: int = 0,
-    ) -> None:
+    ) -> bool:
         """Persist queue metadata without rewriting the full run payload."""
 
         if self.db_manager is None:
             raise RuntimeError(
                 "Kubernetes 배치 큐에는 PostgreSQL 연결이 필요합니다"
             )
-        self.db_manager.enqueue_workflow_run(
+        enqueued = self.db_manager.enqueue_workflow_run(
             run_id,
             queue_name,
             submission_attempt=submission_attempt,
             submitted_at=submitted_at,
             priority=priority,
         )
+        if enqueued is False:
+            return False
         self._update_local_summary_state(
             run_id,
             status="queued",
@@ -289,6 +322,7 @@ class RunStore:
             submission_attempt=submission_attempt,
             submitted_at=submitted_at,
         )
+        return True
 
     def request_cancel(self, run_id: str) -> bool:
         """Persist cancellation so API and worker processes share one signal."""
@@ -314,7 +348,7 @@ class RunStore:
         status: Optional[str] = None,
         backend: Optional[str] = None,
         deployment_name: Optional[str] = None,
-        external_run_id: Optional[str] = None,
+        external_run_id: Any = _EXTERNAL_RUN_ID_UNSET,
         submission_attempt: Optional[int] = None,
         submitted_at: Optional[str] = None,
     ) -> None:
@@ -334,7 +368,8 @@ class RunStore:
                     run.orchestration.backend = backend
                 if deployment_name is not None:
                     run.orchestration.deployment_name = deployment_name
-                run.orchestration.external_run_id = external_run_id
+                if external_run_id is not _EXTERNAL_RUN_ID_UNSET:
+                    run.orchestration.external_run_id = external_run_id
                 if submission_attempt is not None:
                     run.orchestration.submission_attempt = submission_attempt
                 if submitted_at is not None:

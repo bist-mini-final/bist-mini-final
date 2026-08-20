@@ -111,6 +111,86 @@ def test_run_store_with_db_manager() -> None:
         mock_db.delete_workflow_run.assert_called_with("run-db-1")
 
 
+def test_request_cancel_preserves_existing_external_run_id() -> None:
+    from unittest.mock import MagicMock
+
+    from backend.workflows.models import (
+        RunOrchestrationState,
+        WorkflowGraph,
+        WorkflowRun,
+    )
+    from backend.workflows.store import RunStore
+
+    mock_db = MagicMock()
+    mock_db.is_connected.return_value = True
+    mock_db.request_workflow_cancel.return_value = True
+
+    with TemporaryDirectory() as temp_dir:
+        store = RunStore(Path(temp_dir), db_manager=mock_db)
+        run = WorkflowRun(
+            id="run-cancel-external-id",
+            workflow_id="test_wf",
+            workflow_updated_at="2026-08-21T00:00:00+00:00",
+            status="running",
+            graph=WorkflowGraph(nodes=[], edges=[]),
+            batches=[],
+            nodes={},
+            orchestration=RunOrchestrationState(
+                backend="kubernetes",
+                external_run_id="excel-ingestion-job-123",
+            ),
+        )
+        store.save(run)
+
+        assert store.request_cancel(run.id) is True
+        cancelled = store.load_summary(run.id)
+
+    assert cancelled.status == "paused"
+    assert cancelled.orchestration.external_run_id == "excel-ingestion-job-123"
+
+
+def test_enqueue_explicitly_clears_existing_external_run_id() -> None:
+    from unittest.mock import MagicMock
+
+    from backend.workflows.models import (
+        RunOrchestrationState,
+        WorkflowGraph,
+        WorkflowRun,
+    )
+    from backend.workflows.store import RunStore
+
+    mock_db = MagicMock()
+    mock_db.is_connected.return_value = True
+    mock_db.enqueue_workflow_run.return_value = True
+
+    with TemporaryDirectory() as temp_dir:
+        store = RunStore(Path(temp_dir), db_manager=mock_db)
+        run = WorkflowRun(
+            id="run-requeue-external-id",
+            workflow_id="test_wf",
+            workflow_updated_at="2026-08-21T00:00:00+00:00",
+            status="paused",
+            graph=WorkflowGraph(nodes=[], edges=[]),
+            batches=[],
+            nodes={},
+            orchestration=RunOrchestrationState(
+                backend="kubernetes",
+                external_run_id="old-job-id",
+            ),
+        )
+        store.save(run)
+
+        assert store.enqueue(
+            run.id,
+            "excel-ingestion",
+            submission_attempt=2,
+            submitted_at="2026-08-21T00:00:00+00:00",
+        )
+        requeued = store.load_summary(run.id)
+
+    assert requeued.orchestration.external_run_id is None
+
+
 def test_list_summaries_merges_database_and_local_history() -> None:
     from unittest.mock import MagicMock
 

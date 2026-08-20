@@ -1,8 +1,15 @@
 """Focused tests for source-file deletion resolution."""
 
+from uuid import uuid4
+
 import pytest
 
-from backend.storage.db_manager import DatabaseManager, WorkflowRunAlreadyClaimed
+from backend.core.settings import PGVECTOR_URL
+from backend.storage.db_manager import (
+    DatabaseManager,
+    WorkflowLeaseLost,
+    WorkflowRunAlreadyClaimed,
+)
 
 
 class FakeCursor:
@@ -231,7 +238,9 @@ def test_claim_next_workflow_run_uses_skip_locked_and_stable_job_identity():
         stale_after_seconds=180,
     )
 
-    assert claimed == "run-queued"
+    assert claimed is not None
+    assert claimed.run_id == "run-queued"
+    assert len(claimed.token) == 32
     query, params = cursor.executions[0]
     assert "FOR UPDATE SKIP LOCKED" in query
     assert "heartbeat_at" in query
@@ -239,8 +248,6 @@ def test_claim_next_workflow_run_uses_skip_locked_and_stable_job_identity():
         "excel-ingestion",
         "excel-ingestion-job-abc",
         180,
-        "excel-ingestion-job-abc",
-        "excel-ingestion-job-abc",
         "excel-ingestion-job-abc",
     )
     assert connection.committed is True
@@ -256,16 +263,17 @@ def test_enqueue_workflow_run_sets_kubernetes_queue_metadata():
     cursor = EnqueueCursor()
     database, connection = database_with(cursor)
 
-    database.enqueue_workflow_run(
+    assert database.enqueue_workflow_run(
         "run-queued",
         "excel-ingestion",
         submission_attempt=2,
         submitted_at="2026-08-20T00:00:00+00:00",
         priority=5,
-    )
+    ) is True
 
     query, params = cursor.executions[0]
-    assert "cancel_requested = FALSE" in query
+    assert "WHERE run_id = %s AND cancel_requested = FALSE" in query
+    assert "cancel_requested = FALSE," not in query
     assert "'backend', 'kubernetes'" in query
     assert params == (
         "excel-ingestion",
@@ -276,6 +284,137 @@ def test_enqueue_workflow_run_sets_kubernetes_queue_metadata():
         "run-queued",
     )
     assert connection.committed is True
+
+
+def test_enqueue_workflow_run_preserves_existing_cancellation():
+    class CancelledEnqueueCursor(FakeCursor):
+        def __init__(self):
+            super().__init__()
+            self.cancel_lookup = False
+
+        def execute(self, query, params=None):
+            super().execute(query, params)
+            self.cancel_lookup = query.lstrip().startswith(
+                "SELECT cancel_requested"
+            )
+            self.rowcount = 0
+
+        def fetchone(self):
+            return (True,) if self.cancel_lookup else None
+
+    cursor = CancelledEnqueueCursor()
+    database, connection = database_with(cursor)
+
+    enqueued = database.enqueue_workflow_run(
+        "run-cancelled",
+        "excel-ingestion",
+        submission_attempt=2,
+        submitted_at="2026-08-20T00:00:00+00:00",
+    )
+
+    assert enqueued is False
+    update_query = cursor.executions[0][0]
+    assert "WHERE run_id = %s AND cancel_requested = FALSE" in update_query
+    assert "cancel_requested = FALSE," not in update_query
+    assert connection.committed is True
+
+
+def test_stale_recovery_keeps_lease_while_existing_advisory_owner_runs():
+    database = DatabaseManager(PGVECTOR_URL)
+    if not database.is_connected():
+        pytest.skip("PostgreSQL integration database is unavailable")
+    if not database.ensure_schema():
+        pytest.skip("PostgreSQL integration schema is unavailable")
+
+    run_id = f"lease-integration-{uuid4().hex}"
+    queue_name = "lease-integration"
+    run = {
+        "id": run_id,
+        "workflow_id": "lease-integration",
+        "status": "queued",
+        "orchestration": {},
+        "batches": [],
+        "nodes": {
+            "node-1": {
+                "node_id": "node-1",
+                "module_type": "test",
+                "status": "running",
+                "progress": {"completed_items": 0, "total_items": 1},
+            }
+        },
+    }
+    try:
+        database.save_workflow_run(run)
+        assert database.enqueue_workflow_run(
+            run_id,
+            queue_name,
+            submission_attempt=1,
+            submitted_at="2026-08-21T00:00:00+00:00",
+        )
+        original = database.claim_next_workflow_run(queue_name, "worker-old")
+        assert original is not None
+
+        with database.claim_workflow_run(
+            run_id,
+            queue_name=queue_name,
+            worker_id="worker-old",
+            lease_token=original.token,
+        ):
+            conn = database._raw_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE workflow_runs
+                        SET heartbeat_at = NOW() - INTERVAL '10 minutes'
+                        WHERE run_id = %s;
+                        """,
+                        (run_id,),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+
+            recovery = database.claim_next_workflow_run(
+                queue_name,
+                "worker-recovery",
+                stale_after_seconds=1,
+            )
+            assert recovery is not None
+            with pytest.raises(WorkflowRunAlreadyClaimed):
+                with database.claim_workflow_run(
+                    run_id,
+                    queue_name=queue_name,
+                    worker_id="worker-recovery",
+                    lease_token=recovery.token,
+                    stale_after_seconds=1,
+                ):
+                    pass
+
+            with pytest.raises(WorkflowLeaseLost):
+                database.save_workflow_node_progress(
+                    run,
+                    "node-1",
+                    lease_token=recovery.token,
+                )
+
+            conn = database._raw_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT worker_id, lease_token
+                        FROM workflow_runs
+                        WHERE run_id = %s;
+                        """,
+                        (run_id,),
+                    )
+                    owner = cur.fetchone()
+            finally:
+                conn.close()
+            assert owner == ("worker-old", original.token)
+    finally:
+        database.delete_workflow_run(run_id)
 
 
 def test_cancel_request_is_durable_across_api_and_worker_processes():
