@@ -854,7 +854,7 @@ class PgVectorStore:
                         f"""
                         SELECT id, document, cmetadata, ((embedding::halfvec({dim})) <=> %s::halfvec({dim})) AS distance
                         FROM langchain_pg_embedding
-                        WHERE collection_id = %s
+                        WHERE collection_id = %s AND vector_dims(embedding) = {dim}
                         ORDER BY (embedding::halfvec({dim})) <=> %s::halfvec({dim})
                         LIMIT %s;
                         """,
