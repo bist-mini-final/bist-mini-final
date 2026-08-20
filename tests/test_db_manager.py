@@ -62,6 +62,7 @@ def database_with(cursor):
     database = DatabaseManager("postgresql://mock:5432/mock")
     connection = FakeConnection(cursor)
     database._raw_connection = lambda: connection
+    database._advisory_lock_connection = lambda: connection
     return database, connection
 
 

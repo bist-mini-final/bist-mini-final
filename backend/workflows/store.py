@@ -327,7 +327,31 @@ class RunStore:
                     return WorkflowRun.model_validate(data)
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 로드 실패 (run_id=%s): %s", run_id, error)
-        return self._store.load(run_id)
+        run = self._store.load(run_id)
+        # Lightweight orchestration updates intentionally avoid rewriting a
+        # potentially very large full-run JSON file. Overlay the newer summary
+        # metadata when a file-only store later loads that full document.
+        summary_path = self._store.directory / (
+            f"{_validate_identifier(run_id)}.summary.json"
+        )
+        if summary_path.is_file():
+            try:
+                summary = WorkflowRun.model_validate_json(
+                    summary_path.read_text(encoding="utf-8")
+                )
+                summary_attempt = summary.orchestration.submission_attempt
+                run_attempt = run.orchestration.submission_attempt
+                if summary_attempt > run_attempt or (
+                    summary_attempt == run_attempt
+                    and summary.updated_at >= run.updated_at
+                ):
+                    run.orchestration = summary.orchestration.model_copy(deep=True)
+                    run.updated_at = max(run.updated_at, summary.updated_at)
+            except (FileNotFoundError, ValueError):
+                # A concurrent writer can replace the summary between the
+                # existence check and read. The full run remains usable.
+                pass
+        return run
 
     def load_summary(self, run_id: str) -> WorkflowRun:
         """Load a compact run snapshot optimized for status polling."""
@@ -399,34 +423,7 @@ class RunStore:
         Returns:
         	List[WorkflowRun]: Loaded workflow run summaries, filtered when a workflow identifier is provided.
         """
-        if self.db_manager is not None:
-            try:
-                records = self.db_manager.list_workflow_runs(workflow_id)
-                runs: List[WorkflowRun] = []
-                for rec in records:
-                    summary = WorkflowRun.model_validate(rec)
-                    summary.runtime_inputs = compact_history_value(summary.runtime_inputs)
-                    for state in summary.nodes.values():
-                        state.input_payload = compact_history_value(state.input_payload)
-                        state.output = compact_history_value(state.output)
-                    runs.append(summary)
-                return runs
-            except Exception as error:
-                logger.warning("DB에서 WorkflowRun 목록 조회 실패: %s", error)
-
-        runs: List[WorkflowRun] = []
-        for path in sorted(self._store.directory.glob("*.summary.json")):
-            try:
-                runs.append(
-                    WorkflowRun.model_validate_json(path.read_text(encoding="utf-8"))
-                )
-            except FileNotFoundError:
-                # A concurrent delete removes the summary before the full run.
-                # Treat it as absent from this snapshot rather than a server error.
-                continue
-        if workflow_id is None:
-            return runs
-        return [run for run in runs if run.workflow_id == workflow_id]
+        return self.list_summaries(workflow_id)
 
     def list_pending(
         self,

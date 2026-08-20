@@ -153,6 +153,16 @@ class DatabaseManager:
         raw_url = getattr(self, "database_url", PGVECTOR_URL).replace("postgresql+psycopg://", "postgresql://")
         return get_pooled_raw_connection(raw_url)
 
+    def _advisory_lock_connection(self) -> Any:
+        """Open a dedicated session whose close guarantees advisory-lock release."""
+
+        import psycopg2
+
+        raw_url = getattr(self, "database_url", PGVECTOR_URL).replace(
+            "postgresql+psycopg://", "postgresql://"
+        )
+        return psycopg2.connect(raw_url)
+
     def is_connected(self) -> bool:
         """Check whether a connection to the database can be established and used.
         
@@ -179,11 +189,7 @@ class DatabaseManager:
         without introducing a stale lease row.
         """
 
-        import psycopg2
-        raw_url = getattr(self, "database_url", PGVECTOR_URL).replace(
-            "postgresql+psycopg://", "postgresql://"
-        )
-        conn = psycopg2.connect(raw_url)
+        conn = self._advisory_lock_connection()
         acquired = False
         try:
             conn.autocommit = True

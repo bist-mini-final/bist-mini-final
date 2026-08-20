@@ -120,7 +120,9 @@ class PrefectIngestionDispatcher:
         self.client = client or PrefectSdkDeploymentClient()
 
     def submit(self, run_id: str, *, resume_failed: bool = False) -> bool:
-        run = self.run_store.load(run_id)
+        # Submission decisions need only compact status/orchestration metadata;
+        # loading a full Excel-ingestion run can deserialize hundreds of MB.
+        run = self.run_store.load_summary(run_id)
         if run.status == "completed":
             return False
         if (
