@@ -33,6 +33,7 @@ _CONCURRENT_OPTIMIZED_INDEX_NAMES = (
     "idx_langchain_pg_embedding_cell_id",
     "idx_langchain_pg_embedding_cell_coord_upper",
     "idx_langchain_pg_embedding_workbook_hash",
+    "idx_langchain_pg_embedding_collection_id",
 )
 
 
@@ -379,10 +380,13 @@ class PgVectorStore:
 
                 cur.execute(
                     """
-                    SELECT c.name, c.cmetadata, COUNT(e.id) AS chunk_count
+                    SELECT c.name, c.cmetadata, COALESCE(e.chunk_count, 0) AS chunk_count
                     FROM langchain_pg_collection c
-                    LEFT JOIN langchain_pg_embedding e ON c.uuid = e.collection_id
-                    GROUP BY c.name, c.uuid, c.cmetadata::text;
+                    LEFT JOIN (
+                        SELECT collection_id, COUNT(*) AS chunk_count
+                        FROM langchain_pg_embedding
+                        GROUP BY collection_id
+                    ) e ON c.uuid = e.collection_id;
                     """
                 )
                 rows = cur.fetchall()
@@ -615,6 +619,12 @@ class PgVectorStore:
                                 """
                                 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
                                 ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
+                                """
+                            )
+                            cur.execute(
+                                """
+                                CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_collection_id
+                                ON langchain_pg_embedding (collection_id);
                                 """
                             )
                             cur.execute(
