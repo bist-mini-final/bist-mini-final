@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rag9_semantic_entry_hybrid",
-  "name": "rag9_semantic_entry_hybrid",
+  "name": "rag9_semantic_entry_pgvector_hybrid",
   "updated_at": "2026-08-18T08:35:16.858360+00:00",
   "graph": {
     "nodes": [
@@ -101,14 +101,17 @@
       },
       {
         "id": "index",
-        "module_type": "prebuilt_index_loader",
+        "module_type": "pgvector_collection_loader",
         "position": {
           "x": 700.0,
           "y": 400.0
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
+          "collection_name": "SPG_Company_KeyStats_v3.xlsm",
+          "collection_names": [
+            "SPG_Company_KeyStats_v3.xlsm"
+          ]
         },
         "ui": {
           "width": null,
@@ -139,7 +142,7 @@
       },
       {
         "id": "dense",
-        "module_type": "dense_retriever",
+        "module_type": "pgvector_retriever",
         "position": {
           "x": 1060.0,
           "y": 210.0

@@ -46,6 +46,7 @@ export const MODULE_NODE_TYPES: Partial<Record<ModuleType, string>> = {
   pgvector_index_writer: 'pgvector_index_writer',
   pgvector_collection_loader: 'pgvector_collection_loader',
   pgvector_retriever: 'pgvector_retriever',
+  semantic_scoped_pgvector_retriever: 'semantic_scoped_pgvector_retriever',
 };
 
 export const NODE_MODULE_TYPES: Record<string, ModuleType> = Object.fromEntries(
@@ -66,6 +67,7 @@ export const NODE_COLORS: Record<string, string> = {
   pgvector_index_writer: '#0f766e',
   pgvector_collection_loader: '#0f766e',
   pgvector_retriever: '#0f766e',
+  semantic_scoped_pgvector_retriever: '#0f766e',
   bm25_retriever: PIPELINE_STAGES[3].color,
   dense_retriever: PIPELINE_STAGES[4].color,
   rrf_fusion: PIPELINE_STAGES[5].color,

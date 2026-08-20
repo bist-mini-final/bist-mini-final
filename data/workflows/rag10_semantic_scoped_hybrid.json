@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rag10_semantic_scoped_hybrid",
-  "name": "rag10_semantic_scoped_hybrid",
+  "name": "rag10_semantic_scoped_pgvector_hybrid",
   "updated_at": "2026-08-19T06:42:22.827597+00:00",
   "graph": {
     "nodes": [
@@ -101,14 +101,17 @@
       },
       {
         "id": "index",
-        "module_type": "prebuilt_index_loader",
+        "module_type": "pgvector_collection_loader",
         "position": {
           "x": 642.2133059017912,
           "y": 287.26858036578915
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.json"
+          "collection_name": "SPG_Company_KeyStats_v3.xlsm",
+          "collection_names": [
+            "SPG_Company_KeyStats_v3.xlsm"
+          ]
         },
         "ui": {
           "width": null,
@@ -139,7 +142,7 @@
       },
       {
         "id": "dense",
-        "module_type": "semantic_scoped_dense_retriever",
+        "module_type": "semantic_scoped_pgvector_retriever",
         "position": {
           "x": 1061.8946457081383,
           "y": 152.7400773611011

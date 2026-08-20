@@ -738,6 +738,7 @@ class PgVectorStore:
         collection_name: str,
         embedding: List[float],
         k: int = 10,
+        sheet_names: Optional[List[str]] = None,
     ) -> List[Tuple[Any, float]]:
         """
         Search a pgvector collection using an embedding vector.
@@ -766,16 +767,20 @@ class PgVectorStore:
                     return []
                 col_uuid = row[0]
 
-                cur.execute(
-                    """
+                query = """
                     SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
                     FROM langchain_pg_embedding
                     WHERE collection_id = %s
-                    ORDER BY embedding <=> %s::vector
-                    LIMIT %s;
-                    """,
-                    (embedding, col_uuid, embedding, k),
-                )
+                """
+                parameters: List[Any] = [embedding, col_uuid]
+                if sheet_names:
+                    normalized_sheets = [str(name).strip().lower() for name in sheet_names if str(name).strip()]
+                    if normalized_sheets:
+                        query += " AND LOWER(COALESCE(cmetadata->>'sheet_name', '')) = ANY(%s)"
+                        parameters.append(normalized_sheets)
+                query += " ORDER BY embedding <=> %s::vector LIMIT %s;"
+                parameters.extend([embedding, k])
+                cur.execute(query, parameters)
                 rows = cur.fetchall()
 
             from langchain_core.documents import Document

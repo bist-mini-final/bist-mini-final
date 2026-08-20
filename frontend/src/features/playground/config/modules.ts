@@ -36,6 +36,7 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   pgvector_index_writer: { icon: 'Database', color: '#0f766e' },
   pgvector_collection_loader: { icon: 'Database', color: '#0f766e' },
   pgvector_retriever: { icon: 'Search', color: '#0f766e' },
+  semantic_scoped_pgvector_retriever: { icon: 'SearchCheck', color: '#0f766e' },
   dataframe_source: { icon: 'TableProperties', color: '#2563eb' },
   image_tile_source: { icon: 'Layers', color: '#7c3aed' },
   qa_example_loader: { icon: 'MessageSquare', color: '#d97706' },

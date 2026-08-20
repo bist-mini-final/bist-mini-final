@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "default",
-  "name": "default",
-  "updated_at": "2026-08-19T02:19:50.430411+00:00",
+  "name": "default_pgvector_baseline",
+  "updated_at": "2026-08-20T00:11:53.875223+00:00",
   "graph": {
     "nodes": [
       {
@@ -82,14 +82,17 @@
       },
       {
         "id": "custom-node-1786497475934-2",
-        "module_type": "prebuilt_index_loader",
+        "module_type": "pgvector_collection_loader",
         "position": {
           "x": 2280.2284406188487,
           "y": 368.9830133686907
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
+          "collection_name": "c7a251b495523abde099db8c3fed37bcb23f5abc502d16c3635e21f37820ff08",
+          "collection_names": [
+            "c7a251b495523abde099db8c3fed37bcb23f5abc502d16c3635e21f37820ff08"
+          ]
         },
         "ui": {
           "width": null,
@@ -120,7 +123,7 @@
       },
       {
         "id": "custom-node-1786497551832-5",
-        "module_type": "dense_retriever",
+        "module_type": "pgvector_retriever",
         "position": {
           "x": 3038.6349662377042,
           "y": 285.62668906454
@@ -209,24 +212,6 @@
         "ui": {
           "width": 881.0,
           "height": 1315.0,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "custom-node-1787020430289-1",
-        "module_type": "pgvector_collection_loader",
-        "position": {
-          "x": 2478.2880582893004,
-          "y": 433.354939451034
-        },
-        "config": {},
-        "values": {
-          "collection_name": "SPG_Company_KeyStats_v4.xlsm"
-        },
-        "ui": {
-          "width": null,
-          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -339,9 +324,9 @@
       }
     ],
     "viewport": {
-      "x": -1053.976105234979,
-      "y": 295.9299251820323,
-      "zoom": 0.5494544933718556
+      "x": -91.61789131449052,
+      "y": 418.42778427533625,
+      "zoom": 0.6062866266041596
     }
   }
 }

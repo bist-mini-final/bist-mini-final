@@ -45,6 +45,7 @@ from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
 from ..modules.semantic_query_matcher import SemanticQueryMatcherModule
 from ..modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from ..modules.semantic_scoped_pgvector_retriever import SemanticScopedPgVectorRetrieverModule
 from ..modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from ..modules.vector_index_writer import VectorIndexWriterModule
 from ..storage.answer_cache import AnswerCacheRepository
@@ -137,6 +138,7 @@ class ModuleRegistry:
             SemanticQueryMatcherModule(encoder=embedding_encoder),
             LlmQueryRouterModule(completion_client=completion_client),
             SemanticScopedDenseRetrieverModule(self.vector_index_store),
+            SemanticScopedPgVectorRetrieverModule(self.pgvector_store),
             ContextExpanderModule(),
             ReaderModule(completion_client),
             AnswerRefinerModule(

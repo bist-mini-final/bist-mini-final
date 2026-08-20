@@ -24,7 +24,12 @@ function PlaygroundWorkspace() {
   const controller = usePipelineController();
 
   // Workflow list + active selection (default = "default" json)
-  const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
+  // Keep the canonical baseline selectable even while the workflow-list API is
+  // starting up or temporarily unavailable. Previously an API failure left the
+  // list empty, which also hid the selector entirely.
+  const [workflows, setWorkflows] = useState<WorkflowOption[]>([
+    { id: DEFAULT_WORKFLOW_ID, name: DEFAULT_WORKFLOW_ID },
+  ]);
   const [activeWorkflowId, setActiveWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
   const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
   const activeWorkflowName = useMemo(
@@ -36,7 +41,7 @@ function PlaygroundWorkspace() {
   useEffect(() => {
     const controller = new AbortController();
     pipelineApi.listWorkflows(controller.signal).then(({ workflows: list }) => {
-      const options: WorkflowOption[] = list.map((wf) => ({ id: wf.id, name: wf.id }));
+      const options: WorkflowOption[] = list.map((wf) => ({ id: wf.id, name: wf.name }));
       // Ensure "default" is always first in the list
       options.sort((a, b) => {
         if (a.id === DEFAULT_WORKFLOW_ID) return -1;
@@ -44,7 +49,10 @@ function PlaygroundWorkspace() {
         return a.name.localeCompare(b.name);
       });
       setWorkflows(options);
-    }).catch(() => undefined);
+    }).catch(() => {
+      // The default option above remains available; a later refresh will add
+      // the saved RAG workflows as soon as the backend is reachable.
+    });
     return () => controller.abort();
   }, []);
 

@@ -255,7 +255,7 @@ def _execute_comparison(
                 run = workflow_executor.create_run(workflow, WorkflowExecutionRequest(
                     inputs={query_node_id: {"query": case.question}},
                     use_cache=cache_mode != "off",
-                    cache_only_module_types=["prebuilt_index_loader"] if cache_mode == "index_only" else None,
+                    cache_only_module_types=["prebuilt_index_loader", "pgvector_collection_loader"] if cache_mode == "index_only" else None,
                 ))
                 if on_progress:
                     on_progress({"event": "running", "completed": completed, "total": total, "case_index": case_index, "case_id": case.id, "question": case.question, "workflow_id": workflow_id, "run_id": run.id})
