@@ -850,10 +850,6 @@ class PgVectorStore:
                 col_uuid = row[0]
 
                 if use_halfvec:
-                    try:
-                        cur.execute("SET ivfflat.probes = 20;")
-                    except Exception:
-                        pass
                     cur.execute(
                         f"""
                         SELECT id, document, cmetadata, ((embedding::halfvec({dim})) <=> %s::halfvec({dim})) AS distance

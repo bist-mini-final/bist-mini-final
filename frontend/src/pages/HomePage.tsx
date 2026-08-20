@@ -105,7 +105,7 @@ export function HomePage() {
                       <Database size={13} style={{ color: '#4f46e5' }} />
                       <span>pgvector DB</span>
                     </div>
-                    <span className="ds-preview-card__badge">IVFFlat</span>
+                    <span className="ds-preview-card__badge">HNSW</span>
                   </div>
                   <div className="ds-preview-card__items">
                     <span style={{ color: '#2563eb', fontWeight: 700 }}>sim: 0.985 (Match)</span>

@@ -2,7 +2,7 @@
 
 > Module type: `pgvector_retriever` · Category: `Logic` · Version: `1`
 
-질의 임베딩으로 PostgreSQL 16 pgvector DB의 IVFFlat 코사인 인덱스를 실시간 검색합니다.
+질의 임베딩으로 PostgreSQL 16 pgvector DB의 HNSW 코사인 인덱스를 실시간 검색합니다.
 
 이 문서는 Pydantic DTO와 `ModuleDefinition`에서 자동 생성됩니다. 정확한 중첩 스키마는 Swagger 또는 `--contract` 명령으로 확인합니다.
 

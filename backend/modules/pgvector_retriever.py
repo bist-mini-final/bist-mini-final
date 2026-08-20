@@ -41,13 +41,13 @@ class PgVectorRetrieverExecutionDTO(PgVectorRetrieverInputDTO, PgVectorRetriever
 
 
 class PgVectorRetrieverModule(ExecutableModule):
-    """Executes similarity searches using PostgreSQL pgvector IVFFlat index."""
+    """Executes similarity searches using PostgreSQL pgvector HNSW index."""
 
     definition = ModuleDefinition(
         type="pgvector_retriever",
         label="PostgreSQL pgvector Retriever",
         category="Logic",
-        description="질의 임베딩으로 PostgreSQL 16 pgvector DB의 IVFFlat 코사인 인덱스를 실시간 검색합니다.",
+        description="질의 임베딩으로 PostgreSQL 16 pgvector DB의 HNSW 코사인 인덱스를 실시간 검색합니다.",
         inputs=["query_input", "index_input"],
         outputs=["dense_result"],
         config_fields=["top_k"],
@@ -130,7 +130,7 @@ class PgVectorRetrieverModule(ExecutableModule):
             except Exception as err:
                 return col, q_text, [], err
 
-        max_workers = min(10, max(1, len(tasks)))
+        max_workers = min(5, max(1, len(tasks)))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_results = list(executor.map(_search_single_subquery, tasks))
 

@@ -138,7 +138,7 @@ class PooledConnectionWrapper:
 def get_pooled_raw_connection(database_url: str) -> PooledConnectionWrapper:
     """Borrow a connection from the process-wide pool and wrap it so .close() returns it to pool."""
     pool = get_pool(database_url)
-    conn = pool.getconn()
+    conn = pool.getconn(timeout=5)
     return PooledConnectionWrapper(pool, conn)
 
 

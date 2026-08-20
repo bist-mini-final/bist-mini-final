@@ -43,7 +43,7 @@ export const PgVectorRetrieverNode = ({ data, selected }: PgVectorRetrieverNodeP
       <div className="rounded-lg border border-teal-100 bg-teal-50/70 p-2.5 text-xs text-teal-900 space-y-2">
         <div className="flex items-center justify-between">
           <span className="font-semibold flex items-center gap-1.5">
-            <Database className="h-3.5 w-3.5 text-teal-700" /> IVFFlat 코사인 인덱스 검색
+            <Database className="h-3.5 w-3.5 text-teal-700" /> HNSW 코사인 인덱스 검색
           </span>
           <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold text-teal-800">
             pgvector 0.8.6
@@ -69,7 +69,7 @@ export const PgVectorRetrieverNode = ({ data, selected }: PgVectorRetrieverNodeP
       {hitCount !== null && (
         <div className="rounded-lg border border-teal-200 bg-teal-50/40 p-2 text-[10px] flex items-center justify-between text-teal-900 font-semibold">
           <span className="flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3 text-teal-600" /> IVFFlat 검색 완료
+            <CheckCircle2 className="h-3 w-3 text-teal-600" /> HNSW 검색 완료
           </span>
           <span>{hitCount}개 후보 검색됨</span>
         </div>
