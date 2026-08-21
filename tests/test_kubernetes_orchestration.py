@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 
 from modules.common.base_module import (
+    BaseModule,
     EmptyModuleConfigDTO,
-    ExecutableModule,
     ModuleDefinition,
     ModuleInputDTO,
     ModuleTaskPolicy,
@@ -41,7 +41,7 @@ class _ValueOutputDTO(BaseModel):
     value: int
 
 
-class _SourceModule(ExecutableModule):
+class _SourceModule(BaseModule):
     definition = ModuleDefinition(
         type="source",
         label="Source",
@@ -53,11 +53,9 @@ class _SourceModule(ExecutableModule):
     )
     input_model = _ValueInputDTO
     config_model = EmptyModuleConfigDTO
-    execution_model = _ValueInputDTO
     output_model = _ValueOutputDTO
 
-    def execute(self, payload: BaseModel):
-        assert isinstance(payload, _ValueInputDTO)
+    def execute(self, payload: _ValueInputDTO) -> dict[str, int]:
         self.report_progress(
             {
                 "phase": "test_items",
@@ -68,7 +66,7 @@ class _SourceModule(ExecutableModule):
         return {"value": payload.value}
 
 
-class _DoubleModule(ExecutableModule):
+class _DoubleModule(BaseModule):
     definition = ModuleDefinition(
         type="double",
         label="Double",

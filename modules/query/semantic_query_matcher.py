@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from backend.providers.embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from backend.providers.llm.cost import calculate_openai_cost
 from backend.semantic_matching.matcher import SemanticQueryMatcher
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleInputDTO, QueryContextDTO
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleInputDTO, QueryContextDTO
 from modules.common.config import (
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_SEMANTIC_THRESHOLD,
@@ -77,7 +77,7 @@ class SemanticQueryMatcherWorkflowOutput(ModuleDTO):
     semantic_match: SemanticQueryMatchOutput
 
 
-class SemanticQueryMatcherModule(ExecutableModule):
+class SemanticQueryMatcherModule(BaseModule):
     definition = ModuleDefinition(
         type="semantic_query_matcher",
         label="Semantic Query Matcher",

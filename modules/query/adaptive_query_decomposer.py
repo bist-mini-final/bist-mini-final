@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, cast
 from pydantic import BaseModel, Field
 
 from backend.providers.llm.chat_completion import ChatCompletionClient
-from modules.common.base_module import ExecutableModule, ModuleDefinition, ModuleInputDTO, QueryContextDTO
+from modules.common.base_module import BaseModule, ModuleDefinition, ModuleInputDTO, QueryContextDTO
 from backend.semantic_matching.plan_validation import validate_plan_reuse
 from modules.query.decomposer import DecomposerConfigDTO, DecomposerExecutionDTO, DecomposerModule, SubqueriesDTO
 from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
@@ -35,7 +35,7 @@ class AdaptiveQueryDecomposerExecutionDTO(AdaptiveQueryDecomposerInput, Adaptive
     """Runtime input combining graph values with the decomposer settings."""
 
 
-class AdaptiveQueryDecomposerModule(ExecutableModule):
+class AdaptiveQueryDecomposerModule(BaseModule):
     """Avoid the decomposition call when the example-query route is confident."""
 
     definition = ModuleDefinition(

@@ -119,10 +119,10 @@ class ModuleExecutionError(ValueError):
     """Raised when module execution fails during computation."""
 
 
-class ExecutableModule(ABC):
-    """Abstract Base Class for all RAG pipeline modules.
+class BaseModule(ABC):
+    """Abstract Base Class for all RAG and spreadsheet pipeline modules.
 
-    Enforces strict Input, Config, Execution, and Output DTO layers.
+    Enforces strict Input, Config, and Output DTO layers.
     """
 
     definition: ClassVar[ModuleDefinition]
@@ -283,5 +283,5 @@ class ExecutableModule(ABC):
         """Execute the module with an already validated input model."""
 
 
-# Canonical alias for Pythonic naming
-BaseModule = ExecutableModule
+# Backwards compatibility alias
+ExecutableModule = BaseModule

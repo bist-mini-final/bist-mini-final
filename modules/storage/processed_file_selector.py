@@ -9,7 +9,7 @@ from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
     EmptyModuleConfigDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleDefinition,
     ModuleExecutionError,
     ModuleInputDTO,
@@ -37,7 +37,7 @@ class WorkbookSelectionDTO(ModuleDTO):
     )
 
 
-class ProcessedFileSelectorModule(ExecutableModule):
+class ProcessedFileSelectorModule(BaseModule):
     definition = ModuleDefinition(
         type="processed_file_selector",
         label="Processed Excel File Selector",

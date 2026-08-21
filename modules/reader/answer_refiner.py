@@ -108,7 +108,7 @@ def answer_refiner_config_presets() -> List[Dict[str, Any]]:
     ]
 from modules.common.base_module import (
     DocumentContextDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -202,7 +202,7 @@ class AnswerRefinerOutput(ModuleDTO):
     refined_answer_json: RefinedAnswerDTO = Field(description="최종 개선된 답변 출력 포트")
 
 
-class AnswerRefinerModule(ExecutableModule):
+class AnswerRefinerModule(BaseModule):
     definition = ModuleDefinition(
         type="answer_refiner",
         label="Direct Cell Answer Refiner",

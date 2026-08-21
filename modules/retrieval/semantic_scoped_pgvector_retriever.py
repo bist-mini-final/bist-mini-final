@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from pydantic import BaseModel, Field
 
 from backend.storage.pgvector_store import PgVectorStore
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError, ModuleInputDTO
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError, ModuleInputDTO
 from modules.embedding.embedder import EmbeddingsDTO
 from modules.storage.pgvector_collection_loader import IndexOutputDTO
 from modules.retrieval.retrieval_models import RankedSearchResultDTO
@@ -37,7 +37,7 @@ class SemanticScopedPgVectorRetrieverExecution(
     """Runtime union of pgvector retrieval inputs and scope policy."""
 
 
-class SemanticScopedPgVectorRetrieverModule(ExecutableModule):
+class SemanticScopedPgVectorRetrieverModule(BaseModule):
     """Use SQL sheet filtering only for structured, confident semantic plans."""
 
     definition = ModuleDefinition(

@@ -10,7 +10,7 @@ from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PGVECTOR_INSERT_BATCH_SIZE, PgVectorStore
 from modules.common.base_module import (
     EmptyModuleConfigDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleDefinition,
     ModuleDTO,
     ModuleTaskPolicy,
@@ -34,7 +34,7 @@ class PgVectorIndexWriterInputDTO(CellTextEmbeddingsDTO):
     """Input payload for pgvector writer."""
 
 
-class PgVectorIndexWriterModule(ExecutableModule):
+class PgVectorIndexWriterModule(BaseModule):
     """Directly persists vectors and metadata into PostgreSQL pgvector ERD tables."""
 
     definition = ModuleDefinition(

@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -72,7 +72,7 @@ class DataframeSourceOutput(ModuleDTO):
     )
 
 
-class DataframeSourceModule(ExecutableModule):
+class DataframeSourceModule(BaseModule):
     definition = ModuleDefinition(
         type="dataframe_source",
         label="DataFrame Source (Code RAG)",

@@ -21,7 +21,7 @@ from backend.storage.spreadsheets.structured_cell_text import (
 )
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -73,7 +73,7 @@ class CellTextSerializerOutput(ModuleDTO):
     items: List[CellTextDocumentDTO]
 
 
-class CellTextSerializerModule(ExecutableModule):
+class CellTextSerializerModule(BaseModule):
     definition = ModuleDefinition(
         type="cell_text_serializer",
         label="Structured Cell Text Serializer",

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from backend.providers.llm.chat_completion import ChatCompletionClient, ChatCompletionError
 from backend.semantic_matching.catalog import QueryExample, load_examples
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError, ModuleInputDTO, QueryContextDTO
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError, ModuleInputDTO, QueryContextDTO
 from modules.query.semantic_query_matcher import (
     RouterMetricsDTO,
     SemanticMatchItemDTO,
@@ -56,7 +56,7 @@ def _catalog_prompt(examples: tuple[QueryExample, ...]) -> str:
     )
 
 
-class LlmQueryRouterModule(ExecutableModule):
+class LlmQueryRouterModule(BaseModule):
     definition = ModuleDefinition(
         type="llm_query_router",
         label="LLM Query Router",

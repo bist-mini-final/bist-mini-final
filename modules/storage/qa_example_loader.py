@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.settings import PROJECT_DIR
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -100,7 +100,7 @@ class QaExampleLoaderOutput(ModuleDTO):
     source: str = Field(description="로드 소스 ('builtin' / 파일명)")
 
 
-class QaExampleLoaderModule(ExecutableModule):
+class QaExampleLoaderModule(BaseModule):
     definition = ModuleDefinition(
         type="qa_example_loader",
         label="QA Example Bank Loader",

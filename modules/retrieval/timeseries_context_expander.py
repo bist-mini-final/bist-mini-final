@@ -9,7 +9,7 @@ from typing import Any, DefaultDict, Dict, List, Optional, Set, Tuple, cast
 from pydantic import BaseModel, Field
 
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -65,7 +65,7 @@ class TimeseriesContextExpanderExecutionDTO(
     """Execution DTO for TimeseriesContextExpanderModule."""
 
 
-class TimeseriesContextExpanderModule(ExecutableModule):
+class TimeseriesContextExpanderModule(BaseModule):
     definition = ModuleDefinition(
         type="timeseries_context_expander",
         label="Time-Series Full-Row Context Expander",

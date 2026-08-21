@@ -12,7 +12,7 @@ from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
     EmptyModuleConfigDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleDefinition,
     ModuleDTO,
     ModuleExecutionError,
@@ -54,7 +54,7 @@ _SHEET_META_DEFINITION = ModuleDefinition(
 )
 
 
-class SheetMetadataPersistenceModule(ExecutableModule):
+class SheetMetadataPersistenceModule(BaseModule):
     """Persist sheet dimensions and detected table metadata."""
 
     definition: ClassVar[ModuleDefinition] = _SHEET_META_DEFINITION

@@ -16,7 +16,7 @@ from backend.providers.llm.chat_completion import (
     ChatCompletionResult,
 )
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -165,7 +165,7 @@ class FinancialFormulaCalculatorOutputDTO(BaseModel):
     formula_result: Optional[Dict[str, Any]] = None
 
 
-class FinancialFormulaCalculatorModule(ExecutableModule):
+class FinancialFormulaCalculatorModule(BaseModule):
     definition = ModuleDefinition(
         type="financial_formula_calculator",
         label="Financial Formula Calculator",

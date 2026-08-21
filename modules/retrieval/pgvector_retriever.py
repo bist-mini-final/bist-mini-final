@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -39,7 +39,7 @@ class PgVectorRetrieverExecutionDTO(PgVectorRetrieverInputDTO, PgVectorRetriever
     """Internal union of search inputs and retrieval policy."""
 
 
-class PgVectorRetrieverModule(ExecutableModule):
+class PgVectorRetrieverModule(BaseModule):
     """Executes similarity searches using PostgreSQL pgvector HNSW index."""
 
     definition = ModuleDefinition(

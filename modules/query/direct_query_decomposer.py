@@ -9,7 +9,7 @@ from typing import Any, Dict, cast
 
 from pydantic import BaseModel, Field
 
-from modules.common.base_module import EmptyModuleConfigDTO, ExecutableModule, ModuleDefinition, ModuleInputDTO, QueryContextDTO
+from modules.common.base_module import EmptyModuleConfigDTO, BaseModule, ModuleDefinition, ModuleInputDTO, QueryContextDTO
 from modules.query.decomposer import SubqueriesDTO
 
 
@@ -17,7 +17,7 @@ class DirectQueryDecomposerInput(ModuleInputDTO):
     query_context: QueryContextDTO
 
 
-class DirectQueryDecomposerModule(ExecutableModule):
+class DirectQueryDecomposerModule(BaseModule):
     definition = ModuleDefinition(
         type="direct_query_decomposer",
         label="Direct Query Baseline",

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -52,7 +52,7 @@ def _clean_tsquery_term(text: str) -> str:
     return " ".join(tokens) if tokens else text.strip()
 
 
-class PostgresNativeKeywordRetrieverModule(ExecutableModule):
+class PostgresNativeKeywordRetrieverModule(BaseModule):
     """Executes high-speed keyword searches using PostgreSQL GIN index and tsvector ranking."""
 
     definition = ModuleDefinition(

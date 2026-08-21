@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Optional
 
-from modules.common.base_module import ExecutableModule
+from modules.common.base_module import BaseModule
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 
@@ -25,9 +25,9 @@ class BaseModuleRegistry:
         self.repository = repository
         self.embedding_artifact_store = embedding_artifact_store or EmbeddingArtifactStore()
         self.isolated_worker_spec = isolated_worker_spec
-        self._modules: Dict[str, ExecutableModule] = {}
+        self._modules: Dict[str, BaseModule] = {}
 
-    def register(self, modules: Iterable[ExecutableModule]) -> None:
+    def register(self, modules: Iterable[BaseModule]) -> None:
         for module in modules:
             module_type = module.definition.type
             if module_type in self._modules:
@@ -40,7 +40,7 @@ class BaseModuleRegistry:
     def definition(self, module_type: str) -> Dict[str, Any]:
         return self.get(module_type).contract()
 
-    def get(self, module_type: str) -> ExecutableModule:
+    def get(self, module_type: str) -> BaseModule:
         try:
             return self._modules[module_type]
         except KeyError as error:

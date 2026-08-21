@@ -6,7 +6,7 @@ from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
 from modules.retrieval.adaptive_rrf_fusion import AdaptiveRrfFusionModule
 from modules.reader.answer_refiner import AnswerRefinerModule
-from modules.common.base_module import ExecutableModule
+from modules.common.base_module import BaseModule
 from modules.structure.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from modules.embedding.cell_text_embedder import CellTextEmbedderModule
 from modules.structure.cell_text_serializer import CellTextSerializerModule
@@ -94,7 +94,7 @@ class ModuleRegistry(BaseModuleRegistry):
             embedding_artifacts,
             isolated_worker_spec=isolated_worker_spec,
         )
-        modules: List[ExecutableModule] = [
+        modules: List[BaseModule] = [
             QueryInputModule(repository=self.repository),
             DecomposerModule(completion_client=completion_client),
             AdaptiveQueryDecomposerModule(completion_client=completion_client),

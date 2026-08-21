@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -80,7 +80,7 @@ class ImageTileSourceOutput(ModuleDTO):
     )
 
 
-class ImageTileSourceModule(ExecutableModule):
+class ImageTileSourceModule(BaseModule):
     definition = ModuleDefinition(
         type="image_tile_source",
         label="Image Tile Source (PixelRAG)",

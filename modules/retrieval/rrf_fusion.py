@@ -3,7 +3,7 @@ from typing import Any, Dict, Tuple, cast
 from pydantic import BaseModel, Field
 
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -64,7 +64,7 @@ class RrfFusionExecutionDTO(RrfFusionInputDTO, RrfFusionConfigDTO):
     """Internal union of ranked results and fusion policy."""
 
 
-class RrfFusionModule(ExecutableModule):
+class RrfFusionModule(BaseModule):
     definition = ModuleDefinition(
         type="rrf_fusion",
         label="RRF Fusion",

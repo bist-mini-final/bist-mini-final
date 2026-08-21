@@ -13,7 +13,7 @@ from backend.core.settings import PROCESSED_DATA_DIR
 from backend.providers.llm.chat_completion import ChatCompletionClient
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -68,7 +68,7 @@ _COMPANY_ENTITY_DEFINITION = ModuleDefinition(
 )
 
 
-class CompanyEntityExtractorModule(ExecutableModule):
+class CompanyEntityExtractorModule(BaseModule):
     """Extract company metadata with an LLM and deterministic fallback."""
 
     definition: ClassVar[ModuleDefinition] = _COMPANY_ENTITY_DEFINITION

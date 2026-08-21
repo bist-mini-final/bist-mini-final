@@ -9,7 +9,7 @@ from pydantic import Field
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
     EmptyModuleConfigDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleDefinition,
     ModuleDTO,
     ModuleExecutionError,
@@ -45,7 +45,7 @@ _INDEX_COMPANY_DEFINITION = ModuleDefinition(
 )
 
 
-class IndexCompanyPersistenceModule(ExecutableModule):
+class IndexCompanyPersistenceModule(BaseModule):
     """Persist company metadata only after both upstream branches complete."""
 
     definition: ClassVar[ModuleDefinition] = _INDEX_COMPANY_DEFINITION

@@ -20,7 +20,7 @@ from backend.storage.spreadsheets.prompt_guidance import TEXT_CELL_ROLE_GUIDANCE
 from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
 from backend.storage.spreadsheets.table_geometry import CellBounds, cell_bounds_bbox
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from modules.structure.docling_table_detector import _safe_name
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
 from modules.structure.spreadsheet_structure import SpreadsheetStructureOutput
@@ -146,7 +146,7 @@ def _strip_code_fence(value: str) -> str:
     return "\n".join(lines).strip()
 
 
-class BfsLlmStructureDetectorModule(ExecutableModule):
+class BfsLlmStructureDetectorModule(BaseModule):
     definition = ModuleDefinition(
         type="bfs_llm_structure_detector",
         label="BFS + LLM Table Structure Detector",

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -64,7 +64,7 @@ class MultiCompanyCollectionLoaderOutputDTO(BaseModel):
     loaded_companies: List[str]
 
 
-class MultiCompanyCollectionLoaderModule(ExecutableModule):
+class MultiCompanyCollectionLoaderModule(BaseModule):
     definition = ModuleDefinition(
         type="multi_company_collection_loader",
         label="Multi-Company Collection Loader",

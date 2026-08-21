@@ -33,7 +33,7 @@ from backend.storage.spreadsheets.table_fragment_merge import parse_excel_range
 from backend.storage.spreadsheets.table_geometry import CellBounds, SheetLayout, cell_bounds_bbox
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -390,7 +390,7 @@ def _validated_sheet_decision(
     return table
 
 
-class LunaVlmStructureDetectorModule(ExecutableModule):
+class LunaVlmStructureDetectorModule(BaseModule):
     definition = ModuleDefinition(
         type="luna_vlm_structure_detector",
         label="Luna Full-Sheet Structure Detector",

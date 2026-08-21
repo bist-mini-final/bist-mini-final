@@ -6,7 +6,7 @@ from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
     EmptyModuleConfigDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleDefinition,
     ModuleDTO,
     ModuleExecutionError,
@@ -45,7 +45,7 @@ class PgVectorCollectionLoaderInputDTO(ModuleInputDTO):
     )
 
 
-class PgVectorCollectionLoaderModule(ExecutableModule):
+class PgVectorCollectionLoaderModule(BaseModule):
     """Loads registered vector collections directly from PostgreSQL pgvector."""
 
     definition = ModuleDefinition(

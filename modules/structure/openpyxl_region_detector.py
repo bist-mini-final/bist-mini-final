@@ -12,7 +12,7 @@ from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility, wo
 from backend.storage.spreadsheets.table_geometry import CellBounds, cell_bounds_bbox, compute_sheet_layout
 from backend.storage.spreadsheets.grid_structure import build_column_header_tree
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError, ModuleInputDTO
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError, ModuleInputDTO
 from modules.structure.docling_table_detector import DoclingTableRegionDTO
 from modules.structure.spreadsheet_structure import (
     SpreadsheetStructureOutput,
@@ -65,7 +65,7 @@ class OpenpyxlRegionDetectorOutput(SpreadsheetStructureOutput):
     pass
 
 
-class OpenpyxlRegionDetectorModule(ExecutableModule):
+class OpenpyxlRegionDetectorModule(BaseModule):
     definition = ModuleDefinition(
         type="openpyxl_region_detector",
         label="OpenPyXL Table Region Classifier",

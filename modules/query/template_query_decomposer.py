@@ -19,7 +19,7 @@ from modules.query.adaptive_query_decomposer import (
     AdaptiveQueryDecomposerInput,
     AdaptiveQueryDecomposerModule,
 )
-from modules.common.base_module import ExecutableModule, ModuleDefinition, QueryContextDTO
+from modules.common.base_module import BaseModule, ModuleDefinition, QueryContextDTO
 from modules.query.decomposer import SubqueriesDTO
 from modules.query.subquery_format import augment_subqueries, serialize_structured_query
 
@@ -120,7 +120,7 @@ class TemplateQueryDecomposerExecutionDTO(AdaptiveQueryDecomposerInput, Adaptive
     """Runtime input for deterministic templates followed by adaptive fallback."""
 
 
-class TemplateQueryDecomposerModule(ExecutableModule):
+class TemplateQueryDecomposerModule(BaseModule):
     definition = ModuleDefinition(
         type="template_query_decomposer",
         label="Template Query Decomposer",

@@ -6,7 +6,7 @@ from backend.core.settings import SIMILARITY_THRESHOLD
 from backend.storage.answer_cache import AnswerCacheRepository
 from modules.common.config import DEFAULT_QUERY_INPUT_THRESHOLD
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -64,7 +64,7 @@ class QueryInputOutput(RootModel[Union[CachedAnswerOutput, QueryContextOutput]])
     """Exactly one branch DTO is returned per execution."""
 
 
-class QueryInputModule(ExecutableModule):
+class QueryInputModule(BaseModule):
     definition = ModuleDefinition(
         type="query_input",
         label="Query Input & Search",

@@ -16,7 +16,7 @@ from backend.storage.spreadsheets.table_geometry import (
     cell_bounds_bbox,
 )
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleExecutionError
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
 
 
@@ -99,7 +99,7 @@ def _annotate_tables(
     Image.alpha_composite(image, overlay).convert("RGB").save(output_path, format="PNG")
 
 
-class DoclingTableDetectorModule(ExecutableModule):
+class DoclingTableDetectorModule(BaseModule):
     definition = ModuleDefinition(
         type="docling_table_detector",
         label="Docling Table Region Detector",

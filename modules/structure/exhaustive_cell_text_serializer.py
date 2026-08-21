@@ -18,7 +18,7 @@ from backend.storage.spreadsheets.structured_cell_text import (
     sheet_code,
 )
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
-from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError
+from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError
 from modules.structure.cell_text_serializer import CellTextSerializerOutput
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
 
@@ -79,7 +79,7 @@ class SheetCells:
     columns: Dict[int, Sequence[PopulatedCell]]
 
 
-class ExhaustiveCellTextSerializerModule(ExecutableModule):
+class ExhaustiveCellTextSerializerModule(BaseModule):
     """Serialize every distinct left × above header combination without a model."""
 
     definition = ModuleDefinition(

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from modules.common.base_module import ExecutableModule
+from modules.common.base_module import BaseModule
 
 
 MODULE_DOCS_DIR = Path(__file__).resolve().parents[1] / "modules" / "docs"
@@ -106,7 +106,7 @@ def _placeholder(name: str, schema: Mapping[str, Any]) -> Any:
     return {}
 
 
-def _request_example(module: ExecutableModule) -> dict[str, Any]:
+def _request_example(module: BaseModule) -> dict[str, Any]:
     input_schema = module.input_model.model_json_schema()
     config_schema = module.config_model.model_json_schema()
     if module.definition.raw_input:
@@ -143,7 +143,7 @@ def _referenced_dto_sections(*schemas: Mapping[str, Any]) -> str:
     )
 
 
-def render_module_markdown(module: ExecutableModule) -> str:
+def render_module_markdown(module: BaseModule) -> str:
     """Render one module guide directly from its executable contract."""
 
     definition = module.definition
@@ -209,7 +209,7 @@ HTTP에서는 `POST /api/modules/{definition.type}/execute`를 사용합니다. 
 """
 
 
-def write_module_guides(modules: Iterable[ExecutableModule]) -> list[Path]:
+def write_module_guides(modules: Iterable[BaseModule]) -> list[Path]:
     """Write deterministic per-module Markdown files and their index."""
 
     MODULE_DOCS_DIR.mkdir(parents=True, exist_ok=True)

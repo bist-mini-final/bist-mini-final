@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -92,7 +92,7 @@ def _parse_cell_id_coords(cell_id: str) -> Tuple[str, str, Optional[int], Option
     return company, sheet, row_idx, col_idx
 
 
-class PgContextExpanderModule(ExecutableModule):
+class PgContextExpanderModule(BaseModule):
     """Directly queries PostgreSQL on-demand for full-row timeseries and header context."""
 
     definition = ModuleDefinition(

@@ -13,7 +13,7 @@ from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 
 logger = logging.getLogger(__name__)
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -82,7 +82,7 @@ class CellTextEmbeddingsDTO(ModuleDTO):
     batch_size: Optional[int] = None
 
 
-class CellTextEmbedderModule(ExecutableModule):
+class CellTextEmbedderModule(BaseModule):
     definition = ModuleDefinition(
         type="cell_text_embedder",
         label="Cell Text Embedder",

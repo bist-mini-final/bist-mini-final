@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from modules.common.base_module import (
     DocumentContextDTO,
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -82,7 +82,7 @@ class ContextExpanderOutput(ModuleDTO):
     )
 
 
-class ContextExpanderModule(ExecutableModule):
+class ContextExpanderModule(BaseModule):
     definition = ModuleDefinition(
         type="context",
         label="Context Expander",

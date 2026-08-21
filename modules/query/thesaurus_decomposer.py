@@ -15,7 +15,7 @@ from backend.providers.llm.chat_completion import (
 )
 from backend.providers.llm.cost import calculate_openai_cost
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -69,7 +69,7 @@ class ThesaurusDecomposerExecutionDTO(
     """Execution DTO for Thesaurus-augmented Decomposer."""
 
 
-class ThesaurusDecomposerModule(ExecutableModule):
+class ThesaurusDecomposerModule(BaseModule):
     definition = ModuleDefinition(
         type="thesaurus_decomposer",
         label="Thesaurus Financial Decomposer",

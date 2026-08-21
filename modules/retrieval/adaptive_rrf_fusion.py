@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Tuple, cast
 from pydantic import BaseModel, Field
 
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleExecutionError,
@@ -75,7 +75,7 @@ class AdaptiveRrfFusionExecutionDTO(
     """Execution DTO for Adaptive RRF Fusion."""
 
 
-class AdaptiveRrfFusionModule(ExecutableModule):
+class AdaptiveRrfFusionModule(BaseModule):
     definition = ModuleDefinition(
         type="adaptive_rrf_fusion",
         label="Adaptive RRF Fusion",
