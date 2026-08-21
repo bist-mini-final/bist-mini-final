@@ -29,7 +29,7 @@ check_tools() {
     exit 1
   fi
   if [[ ! -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
-    echo ".venv가 없습니다. 먼저 ./setup.sh를 실행하세요." >&2
+    echo ".venv가 없습니다. 먼저 .venv를 생성하고 의존성을 설치하세요 (예: uv venv && uv pip install -r backend/requirements.txt)" >&2
     exit 1
   fi
 }
