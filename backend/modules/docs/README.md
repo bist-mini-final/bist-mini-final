@@ -58,4 +58,5 @@ python -m backend.tools.generate_module_docs
 | `semantic_scoped_dense_retriever` | Logic | [Semantic-Scoped Dense Retriever](./semantic_scoped_dense_retriever.md) |
 | `semantic_scoped_pgvector_retriever` | Logic | [Semantic-Scoped pgvector Retriever](./semantic_scoped_pgvector_retriever.md) |
 | `sheet_metadata_persistence` | Storage / DB | [Sheet Metadata Persistence](./sheet_metadata_persistence.md) |
+| `template_query_decomposer` | Logic | [Template Query Decomposer](./template_query_decomposer.md) |
 | `vector_index_writer` | Transform | [Vector Index Writer](./vector_index_writer.md) |

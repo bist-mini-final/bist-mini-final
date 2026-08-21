@@ -11,6 +11,7 @@ from ..modules.base import ExecutableModule
 from ..modules.answer_refiner import AnswerRefinerModule
 from ..modules.answer_cache_writer import AnswerCacheWriterModule
 from ..modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from ..modules.template_query_decomposer import TemplateQueryDecomposerModule
 from ..modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from ..modules.bm25_retriever import Bm25RetrieverModule
 from ..modules.cell_text_embedder import CellTextEmbedderModule
@@ -109,6 +110,7 @@ class ModuleRegistry:
             DirectQueryDecomposerModule(),
             DecomposerModule(completion_client=completion_client),
             AdaptiveQueryDecomposerModule(completion_client=completion_client),
+            TemplateQueryDecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
                 encoder=embedding_encoder,

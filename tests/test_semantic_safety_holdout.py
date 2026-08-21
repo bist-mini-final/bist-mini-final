@@ -45,10 +45,9 @@ class SemanticSafetyHoldoutTests(unittest.TestCase):
                 "get_bac_ownership_list",
                 "get_bac_company_profile",
                 "get_virtual_company_financials",
-                "get_virtual_company_headcount",
             },
         )
-        self.assertEqual(sum(case.expected_abstain for case in self.cases), 6)
+        self.assertEqual(sum(case.expected_abstain for case in self.cases), 8)
         self.assertEqual(sum(case.expected_plan is not None for case in self.cases), 12)
 
     def test_fast_core_set_can_be_scored_before_retrieval(self) -> None:

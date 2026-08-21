@@ -57,6 +57,7 @@ PRE_RETRIEVAL_MODULE_TYPES = {
     "llm_query_router",
     "decomposer",
     "adaptive_query_decomposer",
+    "template_query_decomposer",
     "direct_query_decomposer",
 }
 
@@ -75,7 +76,7 @@ def _workflow_for_scope(
     ]
     node_ids = {node.id for node in nodes}
     if not any(
-        node.module_type in {"decomposer", "adaptive_query_decomposer", "direct_query_decomposer"}
+        node.module_type in {"decomposer", "adaptive_query_decomposer", "template_query_decomposer", "direct_query_decomposer"}
         for node in nodes
     ):
         raise ValueError(f"{workflow.id} has no decomposition node for pre-retrieval evaluation")
@@ -153,7 +154,7 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
         # confidence, a missing plan, or a constraint mismatch. Usage is the
         # authoritative signal for new runs; the matched flag keeps old saved
         # runs interpretable.
-        if state.module_type == "adaptive_query_decomposer" and isinstance(state.input_payload, dict):
+        if state.module_type in {"adaptive_query_decomposer", "template_query_decomposer"} and isinstance(state.input_payload, dict):
             semantic_match = state.input_payload.get("semantic_match")
             used_llm = state.usage is not None or (
                 isinstance(semantic_match, dict)
@@ -169,7 +170,11 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
                 "source": (
                     "cache_unknown" if state.cache_hit
                     else "llm_fallback" if used_llm
-                    else "semantic_reuse"
+                    else (
+                        "template_reuse"
+                        if state.module_type == "template_query_decomposer"
+                        else "semantic_reuse"
+                    )
                 ),
                 "subqueries": list(raw_subqueries) if isinstance(raw_subqueries, list) else [],
             }

@@ -18,11 +18,13 @@ const WORKFLOW_HINTS: Record<string, string> = {
   default: 'pgvector 기준선: LLM 분해 + BM25/Dense RRF',
   rag9_semantic_entry_hybrid: 'pgvector: 앞단 시맨틱 라우팅 + Adaptive 분해',
   rag10_semantic_scoped_hybrid: 'pgvector: 정답셋 기반 분해 + 조건부 시트 범위 Dense 검색',
+  rag11_template_slot_hybrid: 'pgvector: 지표·기간 슬롯 템플릿 + 안전 LLM 폴백',
 };
 const BENCHMARK_WORKFLOW_IDS = new Set([
   'default',
   'rag9_semantic_entry_hybrid',
   'rag10_semantic_scoped_hybrid',
+  'rag11_template_slot_hybrid',
 ]);
 const DEFAULT_QUESTIONS_TEXT = DEFAULT_CASES.map((item) => item.question).join('\n');
 const normalizeQuestion = (question: string) => question.trim().replace(/\s+/g, ' ');

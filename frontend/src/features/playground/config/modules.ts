@@ -8,6 +8,7 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   direct_query_decomposer: { icon: 'ArrowRight', color: '#475569' },
   decomposer: { icon: 'GitBranch', color: '#7c3aed' },
   adaptive_query_decomposer: { icon: 'GitBranch', color: '#6d28d9' },
+  template_query_decomposer: { icon: 'FileCode', color: '#4f46e5' },
   embedder: { icon: 'Cpu', color: '#0891b2' },
   cell_text_embedder: { icon: 'Binary', color: '#0f766e' },
   vector_index_writer: { icon: 'Database', color: '#0f766e' },

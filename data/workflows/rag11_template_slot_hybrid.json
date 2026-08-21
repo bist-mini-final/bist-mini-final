@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "rag11_template_slot_hybrid",
+  "name": "rag11_template_slot_pgvector_hybrid",
+  "updated_at": "2026-08-21T00:00:00+00:00",
+  "graph": {
+    "nodes": [
+      {"id":"query","module_type":"query_input","position":{"x":0,"y":0},"config":{"threshold":1},"values":{"query":"IBM의 2023년 총매출은 얼마인가요?"},"ui":{}},
+      {"id":"semantic","module_type":"semantic_query_matcher","position":{"x":320,"y":-140},"config":{"model":"text-embedding-3-small","threshold":0.74,"top_k":5,"vote_margin":0.05},"values":{},"ui":{}},
+      {"id":"template","module_type":"template_query_decomposer","position":{"x":320,"y":80},"config":{"model":"gpt-5.6-luna","preset":"luna_decomposer","plan_reuse_threshold":0.8},"values":{},"ui":{}},
+      {"id":"subquery-inspector","module_type":"json_inspector","position":{"x":690,"y":-160},"config":{},"values":{},"ui":{}},
+      {"id":"embed","module_type":"embedder","position":{"x":700,"y":80},"config":{"model":"text-embedding-3-large"},"values":{},"ui":{}},
+      {"id":"index","module_type":"pgvector_collection_loader","position":{"x":700,"y":310},"config":{},"values":{"collection_name":"7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87","collection_names":["7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"]},"ui":{}},
+      {"id":"bm25","module_type":"bm25_retriever","position":{"x":1060,"y":60},"config":{"k1":1.5,"b":0.75,"top_k":1000},"values":{},"ui":{}},
+      {"id":"rrf","module_type":"rrf_fusion","position":{"x":1410,"y":70},"config":{"rrf_k":60,"top_k":100,"ratio_penalty":0.4},"values":{},"ui":{}},
+      {"id":"context","module_type":"context","position":{"x":1740,"y":90},"config":{"top_k":100,"adjacent_radius":3,"max_blocks":500},"values":{},"ui":{}},
+      {"id":"reader","module_type":"reader","position":{"x":2090,"y":90},"config":{"model":"gpt-5.6-luna","preset":"luna_reader"},"values":{},"ui":{}},
+      {"id":"final-inspector","module_type":"json_inspector","position":{"x":2420,"y":90},"config":{},"values":{},"ui":{}}
+    ],
+    "edges": [
+      {"id":"query-semantic","source":"query","target":"semantic","source_output":"query_context","target_input":"query_context","source_branch":"generated"},
+      {"id":"query-template","source":"query","target":"template","source_output":"query_context","target_input":"query_context","source_branch":"generated"},
+      {"id":"semantic-template","source":"semantic","target":"template","source_output":"semantic_match","target_input":"semantic_match","source_branch":null},
+      {"id":"template-inspector","source":"template","target":"subquery-inspector","source_output":"output","target_input":"input","source_branch":null},
+      {"id":"inspector-embed","source":"subquery-inspector","target":"embed","source_output":"output","target_input":"input","source_branch":null},
+      {"id":"inspector-bm25","source":"subquery-inspector","target":"bm25","source_output":"output","target_input":"query_input","source_branch":null},
+      {"id":"index-bm25","source":"index","target":"bm25","source_output":"document_output","target_input":"document_input","source_branch":null},
+      {"id":"bm25-rrf","source":"bm25","target":"rrf","source_output":"bm25_result","target_input":"bm25_result","source_branch":null},
+      {"id":"rrf-context","source":"rrf","target":"context","source_output":"retrieval_json","target_input":"retrieval_json","source_branch":null},
+      {"id":"index-context","source":"index","target":"context","source_output":"document_output","target_input":"document_input","source_branch":null},
+      {"id":"context-reader","source":"context","target":"reader","source_output":"context_json","target_input":"context_json","source_branch":null},
+      {"id":"reader-inspector","source":"reader","target":"final-inspector","source_output":"answer_json","target_input":"input","source_branch":null}
+    ],
+    "viewport": {"x": 550, "y": 330, "zoom": 1}
+  }
+}
