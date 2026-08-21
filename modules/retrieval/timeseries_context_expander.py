@@ -116,7 +116,7 @@ class TimeseriesContextExpanderModule(BaseModule):
         else:
             cfg = config or TimeseriesContextExpanderConfigDTO()
         documents = input_data.document_input.items
-        candidates = input_data.retrieval_json.items[: input_data.top_k]
+        candidates = input_data.retrieval_json.items[: cfg.top_k]
 
         q_context = input_data.retrieval_json.query_context
         doc_context = input_data.retrieval_json.document_context
@@ -144,7 +144,7 @@ class TimeseriesContextExpanderModule(BaseModule):
 
         matched_count = 0
 
-        if input_data.expand_full_row:
+        if cfg.expand_full_row:
             expanded_rows: List[Tuple[str, int]] = []
             seen_rows: Set[Tuple[str, int]] = set()
 
@@ -155,7 +155,7 @@ class TimeseriesContextExpanderModule(BaseModule):
                 matched_count += 1
                 candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
 
-                for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
+                for offset in range(-cfg.adjacent_radius, cfg.adjacent_radius + 1):
                     row_key = (document.sheet_name, candidate_row + offset)
                     if row_key in rows and row_key not in seen_rows:
                         seen_rows.add(row_key)
@@ -170,7 +170,7 @@ class TimeseriesContextExpanderModule(BaseModule):
                     row_headers.get((sheet_name, row), []),
                     rows[(sheet_name, row)],
                 )
-                for sheet_name, row in expanded_rows[: input_data.max_blocks]
+                for sheet_name, row in expanded_rows[: cfg.max_blocks]
             ]
         else:
             # Expand only candidate individual cells (or adjacent cells within radius)
@@ -182,7 +182,7 @@ class TimeseriesContextExpanderModule(BaseModule):
                     continue
                 matched_count += 1
                 candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
-                for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
+                for offset in range(-cfg.adjacent_radius, cfg.adjacent_radius + 1):
                     row_key = (document.sheet_name, candidate_row + offset)
                     for d in rows.get(row_key, []):
                         if d.cell_id not in seen_cells:
@@ -191,7 +191,7 @@ class TimeseriesContextExpanderModule(BaseModule):
                                 f"[Sheet: {d.sheet_name}] {' > '.join(d.row_header)} | "
                                 f"{' > '.join(d.column_header)}: {d.cell_value or d.text} (Cell {d.cell_coord})"
                             )
-                if len(context_blocks) >= input_data.max_blocks:
+                if len(context_blocks) >= cfg.max_blocks:
                     break
 
             if matched_count == 0:
@@ -207,7 +207,7 @@ class TimeseriesContextExpanderModule(BaseModule):
                 "query_context": q_context.model_dump(mode="json"),
                 "document_context": doc_context.model_dump(mode="json"),
                 "top_k_used": matched_count,
-                "adjacent_radius": input_data.adjacent_radius,
+                "adjacent_radius": cfg.adjacent_radius,
                 "context_characters": len(context_text),
                 "context_blocks": context_blocks,
                 "block_count": len(context_blocks),

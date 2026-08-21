@@ -18,6 +18,18 @@ from backend.providers.llm.chat_completion import (
 from backend.providers.llm.cost import calculate_openai_cost
 from backend.storage.spreadsheets.structured_cell_text import SHEET_CODE_MAP, canonical_sheet_name
 from backend.storage.pgvector_store import PgVectorStore
+from modules.common.base_module import (
+    DocumentContextDTO,
+    BaseModule,
+    ModuleConfigDTO,
+    ModuleConfigPreset,
+    ModuleDefinition,
+    ModuleDTO,
+    ModuleExecutionError,
+    ModuleInputDTO,
+    QueryContextDTO,
+)
+from modules.reader.reader import AnswerDTO, ApiUsageDTO
 CELL_EXTRACTOR_SYSTEM_PROMPT = """You are an expert spreadsheet topology and 2D spatial reasoning assistant.
 Your goal is to inspect an initial draft answer and user question, understand the spreadsheet's 2D grid structure, and identify target cell coordinates to fetch directly from the database metadata.
 
@@ -79,12 +91,12 @@ Based on the direct cell evidence above, provide your refined response in the fo
 """
 
 
-def answer_refiner_config_presets() -> List[Dict[str, Any]]:
+def answer_refiner_config_presets() -> List[ModuleConfigPreset]:
     return [
-        {
-            "id": "luna_cell_refiner",
-            "label": "Direct Cell Refiner (Default)",
-            "values": {
+        ModuleConfigPreset(
+            id="luna_cell_refiner",
+            label="Direct Cell Refiner (Default)",
+            values={
                 "preset": "luna_cell_refiner",
                 "model": "gpt-5.6-luna",
                 "system_prompt": REFINER_SYSTEM_PROMPT,
@@ -92,11 +104,11 @@ def answer_refiner_config_presets() -> List[Dict[str, Any]]:
                 "cell_extractor_prompt": CELL_EXTRACTOR_SYSTEM_PROMPT,
                 "max_direct_cells": 25,
             },
-        },
-        {
-            "id": "strict_cell_verification",
-            "label": "Strict Cell Audit & Correction",
-            "values": {
+        ),
+        ModuleConfigPreset(
+            id="strict_cell_verification",
+            label="Strict Cell Audit & Correction",
+            values={
                 "preset": "strict_cell_verification",
                 "model": "gpt-5.6-luna",
                 "system_prompt": REFINER_SYSTEM_PROMPT + "\nEnsure strict calculation verification.",
@@ -104,19 +116,8 @@ def answer_refiner_config_presets() -> List[Dict[str, Any]]:
                 "cell_extractor_prompt": CELL_EXTRACTOR_SYSTEM_PROMPT,
                 "max_direct_cells": 40,
             },
-        },
+        ),
     ]
-from modules.common.base_module import (
-    DocumentContextDTO,
-    BaseModule,
-    ModuleConfigDTO,
-    ModuleDefinition,
-    ModuleDTO,
-    ModuleExecutionError,
-    ModuleInputDTO,
-    QueryContextDTO,
-)
-from modules.reader.reader import AnswerDTO, ApiUsageDTO
 
 logger = logging.getLogger(__name__)
 
@@ -348,9 +349,9 @@ class AnswerRefinerModule(BaseModule):
             )
             estimated_cost_usd = calculate_openai_cost(
                 model,
-                prompt_tokens=usage.prompt_tokens,
-                completion_tokens=usage.completion_tokens,
-                cached_tokens=usage.cached_tokens,
+                prompt_tokens=usage.prompt_tokens or 0,
+                completion_tokens=usage.completion_tokens or 0,
+                cached_tokens=usage.cached_tokens or 0,
             )
             raw_text = res.content.strip()
             json_match = re.search(r"\[[\s\S]*\]", raw_text)
@@ -502,9 +503,9 @@ class AnswerRefinerModule(BaseModule):
                 )
                 refiner_cost = calculate_openai_cost(
                     cfg.model,
-                    prompt_tokens=refiner_usage.prompt_tokens,
-                    completion_tokens=refiner_usage.completion_tokens,
-                    cached_tokens=refiner_usage.cached_tokens,
+                    prompt_tokens=refiner_usage.prompt_tokens or 0,
+                    completion_tokens=refiner_usage.completion_tokens or 0,
+                    cached_tokens=refiner_usage.cached_tokens or 0,
                 )
                 # Normalize None values to 0 before summation; accumulate from initial answer too
                 initial_usage = initial_dto.api_usage

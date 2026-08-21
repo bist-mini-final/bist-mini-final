@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Annotated, Any, Dict, List, Optional, Union
+from typing import Optional, Annotated, Any, Dict, List, Union, cast
 
 from pydantic import Field, model_validator
 
@@ -40,10 +40,13 @@ class EmbedderConfigDTO(ModuleConfigDTO):
         default=DEFAULT_EMBEDDING_MODEL,
         min_length=1,
         description="서브쿼리 임베딩에 사용할 3072차원 OpenAI 모델 ID",
-        json_schema_extra={
-            "enum": EMBEDDING_MODEL_OPTIONS,
-            "options": EMBEDDING_MODEL_OPTIONS,
-        },
+        json_schema_extra=cast(
+            Any,
+            {
+                "enum": list(EMBEDDING_MODEL_OPTIONS),
+                "options": list(EMBEDDING_MODEL_OPTIONS),
+            },
+        ),
     )
 
 

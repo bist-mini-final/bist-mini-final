@@ -27,7 +27,7 @@ class SemanticQueryMatcherInput(ModuleInputDTO):
 class SemanticQueryMatcherConfig(ModuleConfigDTO):
     model: str = Field(
         default=DEFAULT_EMBEDDING_MODEL,
-        json_schema_extra={"enum": EMBEDDING_MODEL_OPTIONS},
+        json_schema_extra=cast(Any, {"enum": list(EMBEDDING_MODEL_OPTIONS), "options": list(EMBEDDING_MODEL_OPTIONS)}),
     )
     threshold: float = Field(default=DEFAULT_SEMANTIC_THRESHOLD, ge=0, le=1)
     top_k: int = Field(default=DEFAULT_SEMANTIC_TOP_K, ge=1, le=20)
@@ -109,24 +109,24 @@ class SemanticQueryMatcherModule(BaseModule):
             cfg = input_data
         else:
             cfg = config or SemanticQueryMatcherConfig()
-        matcher = self._matchers.get(input_data.model)
+        matcher = self._matchers.get(cfg.model)
         if matcher is None:
             matcher = SemanticQueryMatcher(
-                get_embedding_encoder(input_data.model, override_encoder=self.encoder)
+                get_embedding_encoder(cfg.model, override_encoder=self.encoder)
             )
-            self._matchers[input_data.model] = matcher
+            self._matchers[cfg.model] = matcher
         started_at = time.perf_counter()
         decision = matcher.route(
-            input_data.query_context.question_text, input_data.model, input_data.threshold,
-            input_data.top_k, input_data.vote_margin,
+            input_data.query_context.question_text, cfg.model, cfg.threshold,
+            cfg.top_k, cfg.vote_margin,
         )
         usage = getattr(matcher.encoder, "last_usage", None)
         if not isinstance(usage, dict):
             usage = {}
         self.last_usage = usage or None
-        self.last_model = input_data.model
+        self.last_model = cfg.model
         estimated_cost = calculate_openai_cost(
-            model_name=input_data.model,
+            model_name=cfg.model,
             prompt_tokens=int(usage.get("prompt_tokens", 0) or 0),
             completion_tokens=0,
             cached_tokens=0,
@@ -152,7 +152,7 @@ class SemanticQueryMatcherModule(BaseModule):
                 "subqueries": list(decision.subqueries),
                 "metrics": {
                     "kind": "semantic",
-                    "model": input_data.model,
+                    "model": cfg.model,
                     "latency_seconds": round(time.perf_counter() - started_at, 3),
                     "api_usage": usage,
                     "estimated_cost_usd": round(estimated_cost, 8),

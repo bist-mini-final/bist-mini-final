@@ -103,12 +103,13 @@ def normalize_structured_query(value: object) -> str:
         "key statistics": "Key_Stats",
         "key_stats": "Key_Stats",
     }
-    sheet = sheet_aliases.get(sheet.lower(), sheet)
+    raw_sheet = fields.get("sheet", UNKNOWN_FIELD) or UNKNOWN_FIELD
+    sheet = sheet_aliases.get(raw_sheet.lower(), raw_sheet) or UNKNOWN_FIELD
     return serialize_structured_query(
         sheet=sheet,
-        row_header=fields.get("row header", UNKNOWN_FIELD),
-        column_header=fields.get("column header", UNKNOWN_FIELD),
-        cell_value=fields.get("cell value", UNKNOWN_FIELD),
+        row_header=fields.get("row header", UNKNOWN_FIELD) or UNKNOWN_FIELD,
+        column_header=fields.get("column header", UNKNOWN_FIELD) or UNKNOWN_FIELD,
+        cell_value=fields.get("cell value", UNKNOWN_FIELD) or UNKNOWN_FIELD,
     )
 
 

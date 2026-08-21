@@ -125,7 +125,8 @@ class ChatCompletionClient:
                         raise ChatCompletionError(f"LLM API 호출 재시도 예산 초과: {error}") from error
                     time.sleep(sleep_time)
                     continue
-                raise ChatCompletionError(f"LLM API 호출 또는 응답 해석에 실패했습니다: {error}") from error
+        if not isinstance(document, dict):
+            raise ChatCompletionError("LLM API 응답이 비어 있거나 올바르지 않습니다")
         try:
             content = document["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:

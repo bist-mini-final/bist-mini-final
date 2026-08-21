@@ -180,7 +180,7 @@ class ReaderModule(BaseModule):
             None,
         )
         if callable(complete_with_metadata):
-            return complete_with_metadata(model, messages)
+            return cast(ChatCompletionResult, complete_with_metadata(model, messages))
         started_at = time.perf_counter()
         content = self.completion_client.complete(model, messages)
         return ChatCompletionResult(

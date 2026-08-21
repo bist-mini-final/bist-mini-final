@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -6,13 +8,15 @@ from contextvars import ContextVar
 from pathlib import Path
 from threading import Lock
 import time
-from typing import Any, Collection, Generic, Iterator, List, Optional, Type, TypeVar
+from typing import Any, Collection, Dict, Generic, Iterator, List, Mapping, Optional, Type, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel
 
 from .models import (
     IDENTIFIER_PATTERN,
+    OrchestratorBackend,
+    RunStatus,
     WorkflowDocument,
     WorkflowRun,
     WorkflowSaveRequest,
@@ -154,13 +158,6 @@ class JsonModelStore(Generic[ModelType]):
                 path.unlink()
                 removed += 1
         return removed
-
-    def delete(self, document_id: str) -> None:
-        path = self._path(document_id)
-        if not path.is_file():
-            raise FileNotFoundError(path)
-        with self._lock:
-            path.unlink()
 
 
 class WorkflowStore:
@@ -392,8 +389,8 @@ class RunStore:
         self,
         run_id: str,
         *,
-        status: Optional[str] = None,
-        backend: Optional[str] = None,
+        status: Optional[RunStatus] = None,
+        backend: Optional[OrchestratorBackend] = None,
         deployment_name: Optional[str] = None,
         external_run_id: Any = _EXTERNAL_RUN_ID_UNSET,
         submission_attempt: Optional[int] = None,

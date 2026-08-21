@@ -103,7 +103,7 @@ class PgVectorIndexWriterModule(BaseModule):
             input_data.dimension,
         )
 
-        collection_name = VectorIndexStore.index_id(input_data.artifact_id)
+        collection_name = PgVectorStore.index_id(input_data.artifact_id)
         items_dict = [item.model_dump(mode="json") for item in input_data.items]
         self.report_progress(
             {

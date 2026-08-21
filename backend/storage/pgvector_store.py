@@ -67,6 +67,11 @@ def _is_numeric_vector_collection(candidate: Any) -> bool:
 class PgVectorStore:
     """Manages vector indexes in PostgreSQL using LangChain PGVector."""
 
+    @staticmethod
+    def index_id(artifact_id: str) -> str:
+        """Derive standard pgvector collection index identifier from an artifact ID."""
+        return f"idx_{artifact_id}"
+
     def __init__(self, database_url: str = PGVECTOR_URL) -> None:
         self.database_url = database_url
 
@@ -258,6 +263,7 @@ class PgVectorStore:
                     "total_items": total_items,
                 }
             )
+        batch_index = 0
         try:
             for batch_index, start in enumerate(
                 range(0, total_items, PGVECTOR_INSERT_BATCH_SIZE),
@@ -265,7 +271,7 @@ class PgVectorStore:
             ):
                 stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
                 document_batch = documents[start:stop]
-                if use_precomputed_vectors:
+                if use_precomputed_vectors and vectors is not None:
                     vector_batch = vectors[start:stop]
                     texts = [doc.page_content for doc in document_batch]
                     metadatas = [doc.metadata for doc in document_batch]

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, RootModel, field_validator
 
 from backend.core.settings import SIMILARITY_THRESHOLD
 from backend.storage.answer_cache import AnswerCacheRepository
+from backend.storage.retrieval.similarity import rank_candidates
 from modules.common.config import DEFAULT_QUERY_INPUT_THRESHOLD
 from modules.common.base_module import (
     BaseModule,

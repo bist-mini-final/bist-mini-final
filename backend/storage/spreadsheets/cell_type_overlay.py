@@ -9,7 +9,7 @@ from .cell_semantics import CELL_TYPE_COLORS
 from .table_geometry import SheetLayout
 
 
-def _font() -> ImageFont.ImageFont:
+def _font() -> Any:
     for path in (
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",

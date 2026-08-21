@@ -109,10 +109,11 @@ class MultiCompanyCollectionLoaderModule(BaseModule):
                 target_cols.append(col_id)
 
         # 2. Only auto-resolve from query when no explicit company or collection was specified
-        if not target_cols and not target_companies and input_data.auto_resolve_from_query and input_data.query_context:
+        if not target_cols and not target_companies and cfg.auto_resolve_from_query and input_data.query_context:
             q_text = input_data.query_context.question_text
+            default_list = [cfg.fallback_company] if cfg.fallback_company else None
             resolved_companies = resolve_company_names(
-                q_text, default=[input_data.fallback_company]
+                q_text, default=default_list
             )
             for comp in resolved_companies:
                 if comp not in target_companies:
@@ -122,12 +123,12 @@ class MultiCompanyCollectionLoaderModule(BaseModule):
                     target_cols.append(col_id)
 
         # 3. Fallback if still empty
-        if not target_cols and input_data.fallback_company:
-            fallback_col = KNOWN_COMPANY_COLLECTIONS.get(input_data.fallback_company)
+        if not target_cols and cfg.fallback_company:
+            fallback_col = KNOWN_COMPANY_COLLECTIONS.get(cfg.fallback_company)
             if fallback_col:
                 target_cols.append(fallback_col)
-                if input_data.fallback_company not in target_companies:
-                    target_companies.append(input_data.fallback_company)
+                if cfg.fallback_company not in target_companies:
+                    target_companies.append(cfg.fallback_company)
 
         col_str = ",".join(target_cols)
         fn_str = ", ".join(f"{c}.xlsm" for c in target_companies)

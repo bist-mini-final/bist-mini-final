@@ -10,7 +10,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -131,8 +131,8 @@ def evaluate_sample(q_item: Dict[str, Any]):
     
     # Refiner 실행 (데모 스토어 및 클라이언트 주입)
     refiner = AnswerRefinerModule(
-        pgvector_store=DemoCellStore(),
-        completion_client=DemoRefinerCompletionClient(),
+        pgvector_store=cast(Any, DemoCellStore()),
+        completion_client=cast(Any, DemoRefinerCompletionClient()),
     )
     refiner_res = refiner.run(
         input_payload=reader_res,

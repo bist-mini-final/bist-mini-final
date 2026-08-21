@@ -263,9 +263,9 @@ def _bounds(value: str, field_name: str) -> CellBounds:
         min_column, min_row, max_column, max_row = range_boundaries(value)
     except (TypeError, ValueError) as error:
         raise ModuleExecutionError(f"VLM {field_name} 범위가 올바르지 않습니다: {value}") from error
-    if None in (min_column, min_row, max_column, max_row):
+    if min_column is None or min_row is None or max_column is None or max_row is None:
         raise ModuleExecutionError(f"VLM {field_name}은 셀 사각형 범위여야 합니다: {value}")
-    return CellBounds(int(min_row), int(max_row), int(min_column), int(max_column))
+    return CellBounds(min_row, max_row, min_column, max_column)
 
 
 def _contains(outer: CellBounds, inner: CellBounds) -> bool:
@@ -743,7 +743,14 @@ class LunaVlmStructureDetectorModule(BaseModule):
         Raises:
         	ModuleExecutionError: If the workbook cannot be resolved, has changed since selection, no sheets can be analyzed, or all sheet analyses fail.
         """
-        settings = cast(LunaVlmStructureDetectorExecutionDTO, payload)
+        if isinstance(input_data, LunaVlmStructureDetectorExecutionDTO):
+            settings = input_data
+        else:
+            cfg = config or LunaVlmStructureDetectorConfigDTO()
+            settings = LunaVlmStructureDetectorExecutionDTO(
+                **input_data.model_dump(),
+                **cfg.model_dump(),
+            )
         try:
             workbook_path = self.catalog.resolve(settings.file_name)
             current_hash = self.catalog.sha256(workbook_path)

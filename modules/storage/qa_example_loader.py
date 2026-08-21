@@ -161,7 +161,7 @@ class QaExampleLoaderModule(BaseModule):
                     f"QA 예시 파일 파싱 오류: {err}"
                 ) from err
 
-        if input_data.include_builtin or not input_data.file_name:
+        if cfg.include_builtin or not input_data.file_name:
             examples.extend(BUILTIN_EXAMPLES)
 
         items = []

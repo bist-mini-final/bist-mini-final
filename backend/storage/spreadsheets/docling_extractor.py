@@ -7,6 +7,7 @@ from typing import List, Protocol, Sequence
 class TableExtractor(Protocol):
     def detect(self, image_path: Path) -> List[Sequence[float]]:
         """Return table bounding boxes in image pixel coordinates."""
+        ...
 
 
 class DoclingTableExtractor:
@@ -24,10 +25,10 @@ class DoclingTableExtractor:
         os.environ.setdefault("USE_TF", "0")
         os.environ.setdefault("USE_FLAX", "0")
         from docling.backend.image_backend import ImageDocumentBackend
+        from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.document_converter import (
             DocumentConverter,
-            InputFormat,
             PdfFormatOption,
         )
 
@@ -67,9 +68,11 @@ class DoclingTableExtractor:
             page_index = provenance.page_no - 1
             page_width = float(image_width)
             page_height = float(image_height)
-            if 0 <= page_index < len(pages) and pages[page_index].size is not None:
-                page_width = float(pages[page_index].size.width)
-                page_height = float(pages[page_index].size.height)
+            if 0 <= page_index < len(pages):
+                page_size = getattr(pages[page_index], "size", None)
+                if page_size is not None and hasattr(page_size, "width") and hasattr(page_size, "height"):
+                    page_width = float(page_size.width)
+                    page_height = float(page_size.height)
             x1 = float(bbox.l) / page_width * image_width
             y1 = (page_height - float(bbox.t)) / page_height * image_height
             x2 = float(bbox.r) / page_width * image_width

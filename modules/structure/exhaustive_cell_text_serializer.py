@@ -74,9 +74,9 @@ class PopulatedCell:
 @dataclass(frozen=True)
 class SheetCells:
     sheet_name: str
-    cells: Sequence[PopulatedCell]
-    rows: Dict[int, Sequence[PopulatedCell]]
-    columns: Dict[int, Sequence[PopulatedCell]]
+    cells: List[PopulatedCell]
+    rows: Dict[int, List[PopulatedCell]]
+    columns: Dict[int, List[PopulatedCell]]
 
 
 class ExhaustiveCellTextSerializerModule(BaseModule):
@@ -280,16 +280,20 @@ class ExhaustiveCellTextSerializerModule(BaseModule):
         input_data: ExhaustiveCellTextSerializerInputDTO,
         config: Optional[ExhaustiveCellTextSerializerConfigDTO] = None,
     ) -> Dict[str, Any]:
-        if config is None and isinstance(input_data, ExhaustiveCellTextSerializerExecutionDTO):
-            cfg = input_data
+        if isinstance(input_data, ExhaustiveCellTextSerializerExecutionDTO):
+            settings = input_data
         else:
             cfg = config or ExhaustiveCellTextSerializerConfigDTO()
+            settings = ExhaustiveCellTextSerializerExecutionDTO(
+                **input_data.model_dump(),
+                **cfg.model_dump(),
+            )
         try:
-            workbook_path = self.catalog.resolve(input_data.file_name)
+            workbook_path = self.catalog.resolve(settings.file_name)
             current_hash = self.catalog.sha256(workbook_path)
         except (OSError, ValueError, WorkbookCatalogError) as error:
             raise ModuleExecutionError(str(error)) from error
-        if current_hash != input_data.workbook_hash:
+        if current_hash != settings.workbook_hash:
             raise ModuleExecutionError(
                 "파일 선택 이후 Excel 파일이 변경되었습니다. 앞 모듈부터 다시 실행하세요"
             )
@@ -303,7 +307,7 @@ class ExhaustiveCellTextSerializerModule(BaseModule):
                 keep_vba=workbook_path.suffix.lower() == ".xlsm",
             )
             sheets: List[SheetCells] = []
-            total_sheets = len(input_data.sheet_names)
+            total_sheets = len(settings.sheet_names)
             self.report_progress(
                 {
                     "phase": "workbook_scan",
@@ -311,7 +315,7 @@ class ExhaustiveCellTextSerializerModule(BaseModule):
                     "total_sheets": total_sheets,
                 }
             )
-            for sheet_index, sheet_name in enumerate(input_data.sheet_names, start=1):
+            for sheet_index, sheet_name in enumerate(settings.sheet_names, start=1):
                 if sheet_name not in workbook.sheetnames:
                     raise ModuleExecutionError(
                         f"Excel 시트를 찾을 수 없습니다: {sheet_name}"
@@ -331,13 +335,13 @@ class ExhaustiveCellTextSerializerModule(BaseModule):
                     }
                 )
 
-            document_count = self._document_count(sheets, input_data)
+            document_count = self._document_count(sheets, settings)
             if document_count == 0:
                 raise ModuleExecutionError("직렬화할 표시 값 셀이 없습니다")
-            if document_count > input_data.max_documents:
+            if document_count > settings.max_documents:
                 raise ModuleExecutionError(
                     "전체 헤더 조합 문서가 안전 한도를 초과합니다: "
-                    f"{document_count:,}개 > {input_data.max_documents:,}개. "
+                    f"{document_count:,}개 > {settings.max_documents:,}개. "
                     "중복 헤더 값 병합을 켜거나 max_documents를 명시적으로 늘리세요"
                 )
             self.report_progress(
@@ -351,7 +355,7 @@ class ExhaustiveCellTextSerializerModule(BaseModule):
             )
             items = self._documents(
                 sheets,
-                input_data,
+                settings,
                 progress_callback=lambda completed_sheets, completed_items: self.report_progress(
                     {
                         "phase": "document_generation",

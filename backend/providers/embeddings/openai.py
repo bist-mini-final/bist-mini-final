@@ -148,8 +148,11 @@ class OpenAIEmbeddingEncoder:
                         continue
                     raise ModuleExecutionError(f"OpenAI Embeddings API 호출 또는 응답 해석에 실패했습니다: {error}") from error
 
+            if not isinstance(document, dict):
+                raise ModuleExecutionError("OpenAI Embeddings API 응답이 비어 있거나 올바르지 않습니다")
+
             try:
-                data_items = document["data"]
+                data_items = document.get("data", [])
                 usage_doc = document.get("usage") or {}
                 p_tokens = int(usage_doc.get("prompt_tokens") or len(batch_items) * 15)
                 t_tokens = int(usage_doc.get("total_tokens") or len(batch_items) * 15)

@@ -58,6 +58,8 @@ class BgeEncoder:
             return []
         with self._lock:
             self._load()
+            if self._tokenizer is None or self._model is None:
+                raise ModuleExecutionError("BGE 모델 로드에 실패했습니다")
             try:
                 import torch
 

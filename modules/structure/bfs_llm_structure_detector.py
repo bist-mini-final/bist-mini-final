@@ -286,7 +286,14 @@ class BfsLlmStructureDetectorModule(BaseModule):
         input_data: BfsLlmStructureDetectorInputDTO,
         config: Optional[BfsLlmStructureDetectorConfigDTO] = None,
     ) -> Dict[str, Any]:
-        settings = cast(BfsLlmStructureDetectorExecutionDTO, payload)
+        if isinstance(input_data, BfsLlmStructureDetectorExecutionDTO):
+            settings = input_data
+        else:
+            cfg = config or BfsLlmStructureDetectorConfigDTO()
+            settings = BfsLlmStructureDetectorExecutionDTO(
+                **input_data.model_dump(),
+                **cfg.model_dump(),
+            )
         try:
             workbook_path = self.catalog.resolve(settings.file_name)
             current_hash = self.catalog.sha256(workbook_path)

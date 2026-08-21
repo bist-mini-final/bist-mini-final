@@ -893,7 +893,7 @@ class DatabaseManager:
             raw_node = getattr(run, "nodes", {}).get(node_id)
             node_state = (
                 raw_node.model_dump(mode="json")
-                if hasattr(raw_node, "model_dump")
+                if raw_node is not None and hasattr(raw_node, "model_dump")
                 else dict(raw_node)
                 if raw_node is not None
                 else None

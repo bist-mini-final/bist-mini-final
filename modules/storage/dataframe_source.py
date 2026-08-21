@@ -137,16 +137,17 @@ class DataframeSourceModule(BaseModule):
             raise ModuleExecutionError(f"Excel 파일 로드 실패: {err}") from err
 
         sheets_out: List[Dict[str, Any]] = []
-        target_sheets = all_sheets[: input_data.max_sheets]
+        target_sheets = all_sheets[: cfg.max_sheets]
 
         for sheet_name in target_sheets:
             try:
-                df = xl.parse(sheet_name, header=0)
+                parsed_df = xl.parse(sheet_name, header=0)
+                df: pd.DataFrame = parsed_df if isinstance(parsed_df, pd.DataFrame) else pd.DataFrame(parsed_df)
                 # Drop completely empty columns/rows
                 df = df.dropna(how="all", axis=1).dropna(how="all", axis=0)
                 columns = [str(c) for c in df.columns.tolist()]
                 dtypes = {str(k): str(v) for k, v in df.dtypes.to_dict().items()}
-                sample_df = df.head(input_data.sample_rows)
+                sample_df = df.head(cfg.sample_rows)
                 sample = [
                     {str(k): (None if pd.isna(v) else v)
                      for k, v in row.items()}

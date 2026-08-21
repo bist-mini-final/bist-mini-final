@@ -39,10 +39,13 @@ class CellTextEmbedderConfigDTO(ModuleConfigDTO):
         default=DEFAULT_EMBEDDING_MODEL,
         min_length=1,
         description="Excel 셀 문서 임베딩에 사용할 OpenAI 3072차원 모델 ID",
-        json_schema_extra={
-            "enum": EMBEDDING_MODEL_OPTIONS,
-            "options": EMBEDDING_MODEL_OPTIONS,
-        },
+        json_schema_extra=cast(
+            Any,
+            {
+                "enum": list(EMBEDDING_MODEL_OPTIONS),
+                "options": list(EMBEDDING_MODEL_OPTIONS),
+            },
+        ),
     )
     batch_size: int = Field(
         default=DEFAULT_CELL_EMBEDDING_BATCH_SIZE,
@@ -149,7 +152,7 @@ class CellTextEmbedderModule(BaseModule):
             cfg = input_data
         else:
             cfg = config or CellTextEmbedderConfigDTO()
-        encoder = self._encoder_for(input_data.model)
+        encoder = self._encoder_for(cfg.model)
         vectors: List[List[float]] = []
         if not input_data.items:
             raise ModuleExecutionError("임베딩할 Excel 셀 문서가 없습니다")
@@ -157,7 +160,7 @@ class CellTextEmbedderModule(BaseModule):
         start_perf = time.perf_counter()
         total_tokens = 0
         total_items = len(input_data.items)
-        total_batches = max(1, (total_items + input_data.batch_size - 1) // input_data.batch_size)
+        total_batches = max(1, (total_items + cfg.batch_size - 1) // cfg.batch_size)
         self.report_progress(
             {
                 "phase": "embedding_batches",
@@ -168,10 +171,10 @@ class CellTextEmbedderModule(BaseModule):
             }
         )
 
-        for batch_idx, start in enumerate(range(0, total_items, input_data.batch_size), start=1):
-            batch = input_data.items[start : start + input_data.batch_size]
+        for batch_idx, start in enumerate(range(0, total_items, cfg.batch_size), start=1):
+            batch = input_data.items[start : start + cfg.batch_size]
             print(f"[CellTextEmbedder] 배치 {batch_idx}/{total_batches} ({len(batch)}개 문서) 임베딩 중...", flush=True)
-            logger.info("임베딩 배치 %d/%d 실행 중 (%d개 문서, 모델: %s)...", batch_idx, total_batches, len(batch), input_data.model)
+            logger.info("임베딩 배치 %d/%d 실행 중 (%d개 문서, 모델: %s)...", batch_idx, total_batches, len(batch), cfg.model)
             batch_vectors = encoder.encode([document.text for document in batch])
             if len(batch_vectors) != len(batch):
                 raise ModuleExecutionError(
@@ -197,7 +200,7 @@ class CellTextEmbedderModule(BaseModule):
             )
 
         duration_seconds = round(time.perf_counter() - start_perf, 3)
-        cost_info = calculate_embedding_cost(input_data.model, total_tokens)
+        cost_info = calculate_embedding_cost(cfg.model, total_tokens)
 
         dimensions = {len(vector) for vector in vectors}
         if len(dimensions) != 1 or not dimensions or 0 in dimensions:
@@ -206,7 +209,7 @@ class CellTextEmbedderModule(BaseModule):
         artifact_payload = json.dumps(
             {
                 "workbook_hash": input_data.workbook_hash,
-                "model": input_data.model,
+                "model": cfg.model,
                 "texts": [document.text for document in input_data.items],
             },
             ensure_ascii=False,
@@ -219,14 +222,14 @@ class CellTextEmbedderModule(BaseModule):
         return {
             "file_name": input_data.file_name,
             "workbook_hash": input_data.workbook_hash,
-            "model": input_data.model,
+            "model": cfg.model,
             "artifact_id": artifact_id,
             "dimension": dimension,
             "duration_seconds": duration_seconds,
             "total_tokens": total_tokens,
             "estimated_cost_usd": cost_info["cost_usd"],
             "estimated_cost_krw": cost_info["cost_krw"],
-            "batch_size": input_data.batch_size,
+            "batch_size": cfg.batch_size,
             "items": [
                 {
                     **document.model_dump(),

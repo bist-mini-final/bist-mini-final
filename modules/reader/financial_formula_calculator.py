@@ -194,29 +194,29 @@ class FinancialFormulaCalculatorModule(BaseModule):
             cfg = input_data
         else:
             cfg = config or FinancialFormulaCalculatorConfigDTO()
-        if not input_data.enabled:
-            res = {
+        if not cfg.enabled:
+            result_dict: Dict[str, Any] = {
                 "is_calculation_required": False,
                 "calculated_metrics": [],
                 "summary_text": "Formula calculator disabled.",
             }
-            res["formula_result"] = dict(res)
-            return res
+            result_dict["formula_result"] = dict(result_dict)
+            return result_dict
 
         q_text = input_data.context_json.query_context.question_text
-        keywords = input_data.calc_keywords
+        keywords = cfg.calc_keywords
 
         if not any(kw.lower() in q_text.lower() for kw in keywords):
-            res = {
+            result_dict = {
                 "is_calculation_required": False,
                 "calculated_metrics": [],
                 "summary_text": "No calculation keywords detected.",
             }
-            res["formula_result"] = dict(res)
-            return res
+            result_dict["formula_result"] = dict(result_dict)
+            return result_dict
 
         blocks = input_data.context_json.context_blocks
-        limit = input_data.max_context_blocks
+        limit = cfg.max_context_blocks
         context_preview = "\n\n".join(blocks[:limit])
 
         messages = [
@@ -229,30 +229,30 @@ class FinancialFormulaCalculatorModule(BaseModule):
 
         client = self.completion_client
         try:
-            res: ChatCompletionResult = client.complete_with_metadata(
-                model=input_data.model,
+            comp_res: ChatCompletionResult = client.complete_with_metadata(
+                model=cfg.model,
                 messages=messages,
                 response_format={"type": "json_object"},
             )
-            parsed = json.loads(res.content)
+            parsed = json.loads(comp_res.content)
         except Exception as e:
             logger.warning("Formula calculator 파싱 실패: %s", e)
-            res = {
+            result_dict = {
                 "is_calculation_required": False,
                 "calculated_metrics": [],
                 "summary_text": f"Parsing failed: {e}",
             }
-            res["formula_result"] = dict(res)
-            return res
+            result_dict["formula_result"] = dict(result_dict)
+            return result_dict
 
         if not parsed.get("is_calculation_required"):
-            res = {
+            result_dict = {
                 "is_calculation_required": False,
                 "calculated_metrics": [],
                 "summary_text": "LLM determined no calculation required.",
             }
-            res["formula_result"] = dict(res)
-            return res
+            result_dict["formula_result"] = dict(result_dict)
+            return result_dict
 
         calculated_metrics: List[Dict[str, Any]] = []
         summary_lines = ["[정밀 재무 계산 결과]"]

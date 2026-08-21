@@ -202,7 +202,7 @@ def _cell_text_and_color(cell: Any) -> Tuple[str, str]:
     return str(value).strip(), default_font_color
 
 
-def _font(size: int, bold: bool, italic: bool = False) -> ImageFont.ImageFont:
+def _font(size: int, bold: bool, italic: bool = False) -> Any:
     """
     Select a font matching the requested size and text styles.
     
@@ -212,12 +212,11 @@ def _font(size: int, bold: bool, italic: bool = False) -> ImageFont.ImageFont:
         italic (bool): Whether to use italic styling.
     
     Returns:
-        ImageFont.ImageFont: The matching system font, or PIL's default font when no candidate is available.
+        Any: The matching system font, or PIL's default font when no candidate is available.
     """
     style_candidates = {
         (False, False): (
             "/System/Library/Fonts/AppleSDGothicNeo.ttc",
-            "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
             "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -261,16 +260,16 @@ def _font(size: int, bold: bool, italic: bool = False) -> ImageFont.ImageFont:
 def _text_size(
     draw: ImageDraw.ImageDraw,
     text: str,
-    font: ImageFont.ImageFont,
+    font: Any,
 ) -> Tuple[int, int]:
     box = draw.multiline_textbbox((0, 0), text, font=font, spacing=1)
-    return box[2] - box[0], box[3] - box[1]
+    return int(round(box[2] - box[0])), int(round(box[3] - box[1]))
 
 
 def _wrap_text(
     draw: ImageDraw.ImageDraw,
     text: str,
-    font: ImageFont.ImageFont,
+    font: Any,
     max_width: float,
 ) -> str:
     if not text or max_width <= 4:

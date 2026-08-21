@@ -150,7 +150,9 @@ def bbox_to_cell_bounds(
     return CellBounds(min_row, max_row, min_column, max_column)
 
 
-def cell_bounds_bbox(bounds: CellBounds, layout: SheetLayout) -> Tuple[float, ...]:
+def cell_bounds_bbox(
+    bounds: CellBounds, layout: SheetLayout
+) -> Tuple[float, float, float, float]:
     return (
         layout.x_offsets[bounds.min_column - 1],
         layout.y_offsets[bounds.min_row - 1],

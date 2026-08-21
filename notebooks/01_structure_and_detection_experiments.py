@@ -10,6 +10,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any, Dict, Optional, List, cast
 
 # Set root directory for imports
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +38,8 @@ target_file = excel_files[0] if excel_files else None
 # ## 2. 파일 선택 및 시트 메타데이터 추출 (ProcessedFileSelector)
 
 # %%
+selected_file: Optional[Dict[str, Any]] = None
+docling_result: Optional[Dict[str, Any]] = None
 file_selector = ProcessedFileSelectorModule(processed_dir=source_dir)
 if target_file:
     print(f"\n--- 파일 메타데이터 추출: {target_file.name} ---")

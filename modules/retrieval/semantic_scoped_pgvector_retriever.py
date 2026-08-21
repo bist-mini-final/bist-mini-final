@@ -98,7 +98,7 @@ class SemanticScopedPgVectorRetrieverModule(BaseModule):
         match = input_data.semantic_match
         allowed_sheets = list(match.sheets) if (
             match.matched
-            and match.confidence >= input_data.min_scope_confidence
+            and match.confidence >= cfg.min_scope_confidence
             and match.subqueries
             and match.sheets
         ) else []
@@ -113,14 +113,14 @@ class SemanticScopedPgVectorRetrieverModule(BaseModule):
                     results = self.pgvector_store.similarity_search_by_vector_with_score(
                         collection_name=collection,
                         embedding=vector,
-                        k=input_data.top_k,
+                        k=cfg.top_k,
                         sheet_names=allowed_sheets or None,
                     )
                     if allowed_sheets and not results:
                         results = self.pgvector_store.similarity_search_by_vector_with_score(
                             collection_name=collection,
                             embedding=vector,
-                            k=input_data.top_k,
+                            k=cfg.top_k,
                         )
                     all_hits.extend(
                         self._candidate(collection, query, doc, distance)
@@ -138,7 +138,7 @@ class SemanticScopedPgVectorRetrieverModule(BaseModule):
             key = (collection, doc["cell_id"])
             if key not in best or score > best[key][0]:
                 best[key] = (score, doc, query)
-        ranked = sorted(best.values(), key=lambda item: (-item[0], item[1]["cell_id"]))[:input_data.top_k]
+        ranked = sorted(best.values(), key=lambda item: (-item[0], item[1]["cell_id"]))[:cfg.top_k]
         return {
             "query_context": input_data.query_input.query_context.model_dump(mode="json"),
             "document_context": {

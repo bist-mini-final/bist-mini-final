@@ -21,9 +21,9 @@ class TableFragment:
 
 def parse_excel_range(value: str) -> CellBounds:
     min_column, min_row, max_column, max_row = range_boundaries(value)
-    if None in (min_column, min_row, max_column, max_row):
+    if min_column is None or min_row is None or max_column is None or max_row is None:
         raise ValueError(f"셀 사각형 범위가 아닙니다: {value}")
-    return CellBounds(int(min_row), int(max_row), int(min_column), int(max_column))
+    return CellBounds(min_row, max_row, min_column, max_column)
 
 
 def _union(bounds: Sequence[CellBounds]) -> CellBounds:

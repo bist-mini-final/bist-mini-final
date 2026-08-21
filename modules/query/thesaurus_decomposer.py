@@ -117,11 +117,11 @@ class ThesaurusDecomposerModule(BaseModule):
 
         client = self.completion_client or ChatCompletionClient()
 
-        preset_data = DECOMPOSER_PRESETS.get(input_data.preset, {})
-        system_prompt = input_data.system_prompt or preset_data.get(
+        preset_data = DECOMPOSER_PRESETS.get(cfg.preset, {})
+        system_prompt = cfg.system_prompt or preset_data.get(
             "system_prompt", LUNA_SYSTEM_PROMPT
         )
-        user_template = input_data.user_prompt_template or preset_data.get(
+        user_template = cfg.user_prompt_template or preset_data.get(
             "user_prompt_template", LUNA_USER_TEMPLATE
         )
 
@@ -139,7 +139,7 @@ class ThesaurusDecomposerModule(BaseModule):
 
         try:
             result: ChatCompletionResult = client.complete_with_metadata(
-                model=input_data.model,
+                model=cfg.model,
                 messages=messages,
             )
         except ChatCompletionError as e:
@@ -171,7 +171,7 @@ class ThesaurusDecomposerModule(BaseModule):
             subqueries = list(dict.fromkeys([m.strip() for m in matches if m.strip()]))
 
         self.last_usage = getattr(result, "usage", {}) or {}
-        self.last_model = input_data.model
+        self.last_model = cfg.model
         self.last_latency = getattr(result, "latency_seconds", 0.0)
 
         return {

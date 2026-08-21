@@ -142,7 +142,7 @@ class ImageTileSourceModule(BaseModule):
             sheets_to_process = sheet_names
 
         tiles: List[Dict[str, Any]] = []
-        tile_h = input_data.tile_height_px
+        tile_h = cfg.tile_height_px
         stem = path.stem
 
         # Generate tile metadata (actual rendering is a preprocessing step)
@@ -154,7 +154,7 @@ class ImageTileSourceModule(BaseModule):
             total_height_px = ESTIMATED_ROWS_PER_SHEET * PIXELS_PER_ROW
             tile_index = 0
             y = 0
-            while y < total_height_px and len(tiles) < input_data.max_tiles:
+            while y < total_height_px and len(tiles) < cfg.max_tiles:
                 tile_id = f"{sheet}_row{tile_index:04d}"
                 rel_path = f"{stem}/{sheet}/tile_{tile_index:04d}.webp"
                 abs_path = self.artifact_dir / rel_path

@@ -65,7 +65,10 @@ def plan_id_for_variant(question: str) -> int | None:
 
 def main() -> None:
     spec = importlib.util.spec_from_file_location("goldset", GOLDSET)
-    module = importlib.util.module_from_spec(spec); assert spec and spec.loader; spec.loader.exec_module(module)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Failed to load goldset spec")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     cases = {case.case_id: case for case in module.GOLD_CASES}
     rows = [{"id": f"gold-{case.case_id}", "question": case.question, "target": "get_ibm_key_financials",
              "metadata": {"query_type": case.query_type, "sheets": [SHEET[s] for s in case.sheets]},

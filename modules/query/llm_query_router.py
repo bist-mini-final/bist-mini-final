@@ -94,7 +94,7 @@ class LlmQueryRouterModule(BaseModule):
         started = time.perf_counter()
         try:
             result = self.completion_client.complete_with_metadata(
-                input_data.model,
+                cfg.model,
                 [
                     {"role": "system", "content": _catalog_prompt(examples)},
                     {"role": "user", "content": input_data.query_context.question_text},
@@ -117,12 +117,12 @@ class LlmQueryRouterModule(BaseModule):
             "matched": target is not None,
             "target": target,
             "confidence": 1.0 if target else 0.0,
-            "sheets": valid_sheets.get(target, []),
+            "sheets": valid_sheets.get(target, []) if target is not None else [],
             "reason": reason,
             "matches": [],
             "metrics": {
                 "kind": "llm",
-                "model": input_data.model,
+                "model": cfg.model,
                 "latency_seconds": round(result.latency_seconds or time.perf_counter() - started, 3),
                 "api_usage": usage,
                 "estimated_cost_usd": round(estimated_cost, 6),

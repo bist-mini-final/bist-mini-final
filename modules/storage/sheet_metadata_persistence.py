@@ -99,8 +99,8 @@ class SheetMetadataPersistenceModule(BaseModule):
         """
         from backend.storage.db_manager import DatabaseManager
 
-        structure = payload.structure_input
-        index = payload.index_input
+        structure = input_data.structure_input
+        index = input_data.index_input
         if structure.workbook_hash != index.workbook_hash:
             raise ModuleExecutionError("구조 분석과 인덱스의 workbook_hash가 다릅니다")
 
@@ -143,7 +143,7 @@ class SheetMetadataPersistenceModule(BaseModule):
                 for sheet_name in workbook.sheetnames:
                     worksheet = workbook[sheet_name]
                     if worksheet.max_row is None or worksheet.max_column is None:
-                        worksheet.calculate_dimension(force=True)
+                        worksheet.calculate_dimension()
                     sheet_dimensions[sheet_name] = (
                         worksheet.max_row or 0,
                         worksheet.max_column or 0,

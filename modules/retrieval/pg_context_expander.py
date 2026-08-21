@@ -123,7 +123,7 @@ class PgContextExpanderModule(BaseModule):
             cfg = input_data
         else:
             cfg = config or PgContextExpanderConfigDTO()
-        retrieval_items = input_data.retrieval_json.items[: input_data.top_k]
+        retrieval_items = input_data.retrieval_json.items[: cfg.top_k]
         query_context_dict = input_data.retrieval_json.query_context.model_dump(mode="json")
         doc_context_dict = input_data.retrieval_json.document_context.model_dump(mode="json")
 
@@ -150,7 +150,7 @@ class PgContextExpanderModule(BaseModule):
         for candidate in retrieval_items:
             company, sheet, r_idx, _ = _parse_cell_id_coords(candidate.cell_id)
             if sheet and r_idx is not None:
-                radius = input_data.adjacent_radius
+                radius = cfg.adjacent_radius
                 for r in range(max(1, r_idx - radius), r_idx + radius + 1):
                     target_rows_by_sheet[sheet].add(r)
 
@@ -199,7 +199,7 @@ class PgContextExpanderModule(BaseModule):
                                 if c["meta"].get("cell_value") is not None
                             )
                             block = f"[{sheet} 행 {r_i}] {header_str} | {values_summary}"
-                            if block not in seen_blocks and len(context_blocks) < input_data.max_blocks:
+                            if block not in seen_blocks and len(context_blocks) < cfg.max_blocks:
                                 seen_blocks.add(block)
                                 context_blocks.append(block)
 
@@ -208,7 +208,7 @@ class PgContextExpanderModule(BaseModule):
             finally:
                 conn.close()
 
-        final_blocks = context_blocks[: input_data.max_blocks]
+        final_blocks = context_blocks[: cfg.max_blocks]
         if not final_blocks:
             final_blocks = ["No relevant context found."]
         total_chars = sum(len(b) for b in final_blocks)
@@ -216,8 +216,8 @@ class PgContextExpanderModule(BaseModule):
         context_dto = ContextDTO(
             query_context=input_data.retrieval_json.query_context,
             document_context=input_data.retrieval_json.document_context,
-            top_k_used=max(1, min(len(retrieval_items), input_data.top_k)),
-            adjacent_radius=input_data.adjacent_radius,
+            top_k_used=max(1, min(len(retrieval_items), cfg.top_k)),
+            adjacent_radius=cfg.adjacent_radius,
             context_characters=total_chars,
             context_blocks=final_blocks,
             block_count=len(final_blocks),
@@ -227,8 +227,8 @@ class PgContextExpanderModule(BaseModule):
             "context_json": context_dto,
             "query_context": query_context_dict,
             "document_context": doc_context_dict,
-            "top_k_used": max(1, min(len(retrieval_items), input_data.top_k)),
-            "adjacent_radius": input_data.adjacent_radius,
+            "top_k_used": max(1, min(len(retrieval_items), cfg.top_k)),
+            "adjacent_radius": cfg.adjacent_radius,
             "context_characters": total_chars,
             "context_blocks": final_blocks,
             "block_count": len(final_blocks),

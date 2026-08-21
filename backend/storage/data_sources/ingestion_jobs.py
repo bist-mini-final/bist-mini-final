@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from backend.storage.pgvector_store import PgVectorStore
 from backend.engine.workflows import (
     DagExecutionError,
     RunDispatcher,
@@ -190,7 +191,7 @@ class IngestionJobService:
         embedder_output = self.node_output(run, "cell_text_embedder") or {}
         artifact_id = embedder_output.get("artifact_id")
         if isinstance(artifact_id, str):
-            return VectorIndexStore.index_id(artifact_id)
+            return PgVectorStore.index_id(artifact_id)
         return None
 
     def payload(

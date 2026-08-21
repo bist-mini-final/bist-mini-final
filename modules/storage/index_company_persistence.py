@@ -75,19 +75,19 @@ class IndexCompanyPersistenceModule(BaseModule):
         Raises:
             ModuleExecutionError: If no company name is available or the index update fails.
         """
-        company = payload.company_input
+        company = input_data.company_input
         company_name = company.display_name or company.company_name
         if not company_name:
             raise ModuleExecutionError("저장할 기업명이 없습니다")
         try:
             self.pgvector_store.update_index_company(
-                payload.index_input.index_id,
+                input_data.index_input.index_id,
                 company_name,
             )
         except Exception as error:
             raise ModuleExecutionError(f"인덱스 기업명 저장 실패: {error}") from error
         return {
-            "index_id": payload.index_input.index_id,
+            "index_id": input_data.index_input.index_id,
             "company_name": company_name,
             "ticker": company.ticker,
         }

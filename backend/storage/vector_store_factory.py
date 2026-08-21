@@ -65,7 +65,7 @@ def get_vector_store(
     collection_metadata: Optional[Dict[str, Any]] = None,
     database_url: str = PGVECTOR_URL,
     distance_strategy: DistanceStrategy = DistanceStrategy.COSINE,
-) -> VectorStore:
+) -> PGVector:
     """Return a standard LangChain VectorStore instance for the given backend.
 
     When *backend* is ``"pgvector"`` a cached SQLAlchemy :class:`Engine` is

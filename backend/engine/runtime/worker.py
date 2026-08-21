@@ -161,6 +161,8 @@ class CancellableModuleWorker:
             process = self._process
             request_queue = self._request_queue
             response_queue = self._response_queue
+            if request_queue is None or response_queue is None:
+                raise ModuleWorkerError("워커 프로세스 큐가 초기화되지 않았습니다")
             self._active_task_id = task_id
             self._active_execution_id = execution_id
             self.last_metadata = {}

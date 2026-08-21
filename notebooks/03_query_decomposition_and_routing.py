@@ -11,6 +11,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any, Dict, Optional, List, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -67,7 +68,7 @@ sample_queries = [
 ]
 
 USE_LIVE_API = os.environ.get("USE_LIVE_API", "0") == "1"
-client = None if USE_LIVE_API else DemoCompletionClient()
+client = None if USE_LIVE_API else cast(Any, DemoCompletionClient())
 decomposer = DecomposerModule(completion_client=client)
 
 print(f"\n--- LLM Query Decomposer 실행 결과 (모드: {'Live API' if USE_LIVE_API else 'Demo/Offline'}) ---")

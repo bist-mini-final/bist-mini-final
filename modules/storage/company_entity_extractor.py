@@ -152,13 +152,15 @@ class CompanyEntityExtractorModule(BaseModule):
 
     def execute(
         self,
-        payload: CompanyEntityExtractorExecutionDTO,
+        input_data: CompanyEntityExtractorInputDTO,
+        config: Optional[CompanyEntityExtractorConfigDTO] = None,
     ) -> Dict[str, Any]:
         """
         Extract company metadata from the selected workbook.
         
         Parameters:
-        	payload (CompanyEntityExtractorExecutionDTO): Workbook selection and model configuration used for extraction.
+        	input_data (CompanyEntityExtractorInputDTO): Workbook selection data.
+            config (Optional[CompanyEntityExtractorConfigDTO]): Model configuration used for extraction.
         
         Returns:
         	Dict[str, Any]: Extracted company name, ticker, display name, confidence, and source. Uses filename-based metadata when workbook sampling or LLM extraction is unavailable or fails.
@@ -166,19 +168,28 @@ class CompanyEntityExtractorModule(BaseModule):
         Raises:
         	ModuleExecutionError: If the workbook cannot be resolved from the catalog.
         """
+        if isinstance(input_data, CompanyEntityExtractorExecutionDTO):
+            settings = input_data
+        else:
+            cfg = config or CompanyEntityExtractorConfigDTO()
+            settings = CompanyEntityExtractorExecutionDTO(
+                **input_data.model_dump(),
+                **cfg.model_dump(),
+            )
+
         try:
-            workbook_path = self.catalog.resolve(payload.file_name)
+            workbook_path = self.catalog.resolve(settings.file_name)
         except (OSError, ValueError, WorkbookCatalogError) as error:
             raise ModuleExecutionError(str(error)) from error
 
-        fallback = self._heuristic(payload.file_name)
+        fallback = self._heuristic(settings.file_name)
         if not getattr(self.completion_client, "api_key", None):
             return fallback
 
         try:
             sampled_lines = self._sample_workbook(
                 workbook_path,
-                payload.sheet_names,
+                settings.sheet_names,
             )
         except Exception as error:
             logger.warning("기업 엔티티 셀 샘플링 실패: %s", error)
@@ -188,13 +199,13 @@ class CompanyEntityExtractorModule(BaseModule):
 
         sampled_text = "\n".join(sampled_lines)[:2500]
         context = (
-            f"File Name: {payload.file_name}\n"
-            f"Sheet Names: {payload.sheet_names}\n\n"
+            f"File Name: {settings.file_name}\n"
+            f"Sheet Names: {settings.sheet_names}\n\n"
             f"Top Cells Content:\n{sampled_text}"
         )
         try:
             response = self.completion_client.complete_with_metadata(
-                model=payload.model,
+                model=settings.model,
                 messages=[
                     {"role": "system", "content": COMPANY_EXTRACTION_SYSTEM_PROMPT},
                     {"role": "user", "content": context},

@@ -88,7 +88,7 @@ class WorkbookCatalog:
                 # In openpyxl read-only mode that leaves max_row/max_column unset
                 # until the bounds are calculated from the sheet data.
                 if sheet.max_row is None or sheet.max_column is None:
-                    sheet.calculate_dimension(force=True)
+                    sheet.calculate_dimension()
 
                 if sheet.max_row and sheet.max_column:
                     sheet_names.append(sheet.title)

@@ -160,9 +160,8 @@ class OpenAIResponsesVisionClient:
                 if attempt < retries - 1:
                     time.sleep(1.0 * (2 ** attempt))
                     continue
-                raise OpenAIResponsesVisionError(
-                    f"OpenAI Responses API 호출 또는 응답 해석에 실패했습니다: {error}"
-                ) from error
+        if not isinstance(document, dict):
+            raise OpenAIResponsesVisionError("OpenAI Responses API 응답이 비어 있거나 올바르지 않습니다")
 
         if document.get("status") == "incomplete":
             reason = (document.get("incomplete_details") or {}).get("reason")

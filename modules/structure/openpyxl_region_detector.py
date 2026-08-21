@@ -117,7 +117,7 @@ class OpenpyxlRegionDetectorModule(BaseModule):
         table_index: int,
         bounds: CellBounds,
         layout,
-        settings: OpenpyxlRegionDetectorExecutionDTO,
+        settings: OpenpyxlRegionDetectorConfigDTO,
     ) -> Dict[str, Any]:
         visibility = WorksheetVisibility.from_worksheet(worksheet)
         visible_rows = [

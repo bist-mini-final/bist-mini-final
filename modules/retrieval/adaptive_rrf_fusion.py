@@ -110,7 +110,7 @@ class AdaptiveRrfFusionModule(BaseModule):
         # Determine branch weights based on intent
         w_bm25 = 1.0
         w_dense = 1.0
-        if input_data.adaptive_weighting and q_context.question_text:
+        if cfg.adaptive_weighting and q_context.question_text:
             intent = _detect_query_intent(q_context.question_text)
             if intent == "exact_metric_lookup":
                 w_bm25 = 1.4
@@ -147,7 +147,7 @@ class AdaptiveRrfFusionModule(BaseModule):
             for key, rank in branch_ranks.items():
                 scores_by_query_cell[key] = scores_by_query_cell.get(
                     key, 0.0
-                ) + (weight / (input_data.rrf_k + rank))
+                ) + (weight / (cfg.rrf_k + rank))
 
         best_by_cell: Dict[str, Tuple[float, RankedSearchCandidateDTO]] = {}
         for key, score in scores_by_query_cell.items():
@@ -160,7 +160,7 @@ class AdaptiveRrfFusionModule(BaseModule):
         ranked = sorted(
             best_by_cell.values(),
             key=lambda item: (-item[0], item[1].cell_id),
-        )[: input_data.top_k]
+        )[: cfg.top_k]
 
         return {
             "query_context": q_context.model_dump(mode="json"),
