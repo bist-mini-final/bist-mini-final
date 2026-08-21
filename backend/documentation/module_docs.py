@@ -53,8 +53,9 @@ def _dto_table(schema: Mapping[str, Any]) -> str:
         field = raw_field if isinstance(raw_field, Mapping) else {}
         default = _inline(field["default"]) if "default" in field else "-"
         description = str(field.get("description", "-")).replace("|", "\\|")
+        type_name = _schema_type(field).replace("|", "\\|")
         rows.append(
-            f"| `{name}` | `{_schema_type(field)}` | "
+            f"| `{name}` | `{type_name}` | "
             f"{'yes' if name in required else 'no'} | {default} | {description} |"
         )
     return "\n".join(rows)

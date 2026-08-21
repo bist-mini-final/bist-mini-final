@@ -16,7 +16,7 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `file_name` | `string` | no | `"SPG_Company_KeyStats_v3_prebuilt.parquet"` | data/processed 또는 data/vector_db에 공유된 사전 구축 인덱스 (.parquet / .json) 파일명 |
+| `file_name` | `string` | no | `"SPG_Company_KeyStats_v3_prebuilt.parquet"` | data/source_files 또는 data/vector_db에 공유된 사전 구축 인덱스 (.parquet / .json) 파일명 |
 
 ## Config DTO
 

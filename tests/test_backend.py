@@ -1,17 +1,21 @@
 import json
+import re
 import unittest
+import openpyxl
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
 from time import monotonic
 from urllib.error import URLError
 from unittest.mock import patch
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from PIL import Image
+from langchain_core.documents import Document
 from pydantic import ValidationError
 
 from app import app
@@ -26,6 +30,7 @@ from backend.runtime.registry import ModuleRegistry
 from backend.runtime.worker import ModuleWorkerCancelled
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
 from backend.vision.openai_responses import OpenAIResponsesVisionClient
 from backend.api.spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -45,23 +50,37 @@ from backend.modules.local_vlm_structure_detector import (
     LocalVlmTableDecisionDTO,
 )
 from backend.spreadsheets.table_geometry import SheetLayout
-from backend.modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
-from backend.modules.luna_vlm_structure_detector import LUNA_SHEET_RESPONSE_SCHEMA
+from backend.modules.luna_vlm_structure_detector import (
+    LUNA_SHEET_RESPONSE_SCHEMA,
+    LUNA_VLM_SYSTEM_PROMPT,
+    LunaVlmStructureDetectorModule,
+)
 from backend.modules.base import ModuleExecutionError
 from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
 from backend.modules.processed_file_selector import ProcessedFileSelectorModule
 from backend.modules.reader import ReaderModule
 from backend.modules.rrf_fusion import RrfFusionModule
+from backend.modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from backend.modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from backend.semantic_matching.catalog import QueryExample
+from backend.semantic_matching.matcher import SemanticQueryMatcher
+from backend.modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from backend.modules.vector_index_writer import VectorIndexWriterModule
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
 from backend.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
+from backend.spreadsheets.prompt_guidance import (
+    LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+    TEXT_CELL_ROLE_GUIDANCE,
+)
 from backend.spreadsheets.exhaustive_tiling import build_exhaustive_tiles
+from backend.spreadsheets.sheet_renderer import _cell_text_and_color, _rgb_color
 from backend.workflows.executor import (
     DagExecutionCancelled,
     DagExecutionError,
     WorkflowExecutor,
 )
+from backend.workflows.dispatcher import WorkflowRunDispatcher
 from backend.workflows.models import (
     CanvasPosition,
     WorkflowEdge,
@@ -94,7 +113,26 @@ class BlockingModuleWorker:
         self.terminated = Event()
         self.execution_id = None
 
-    def execute(self, module_type, input_payload, config, execution_id):
+    def execute(
+        self,
+        module_type,
+        input_payload,
+        config,
+        execution_id,
+        progress_callback=None,
+    ):
+        """Waits for termination of the test worker, then raises a cancellation error.
+        
+        Parameters:
+            module_type: The module type being executed.
+            input_payload: The module's input data.
+            config: The module configuration.
+            execution_id: Identifier for the current execution.
+            progress_callback: Optional callback for reporting progress.
+        
+        Raises:
+            ModuleWorkerCancelled: Always raised after the worker is terminated or the wait times out.
+        """
         self.execution_id = execution_id
         self.started.set()
         self.terminated.wait(timeout=5)
@@ -289,6 +327,24 @@ class TableValidationReconciliationTests(unittest.TestCase):
         self.assertEqual(validated["column_header_range"].excel_range, "E6:P6")
         self.assertEqual(validated["data_range"].excel_range, "E7:P30")
 
+    def test_preserves_record_table_without_row_header(self):
+        decision = LocalVlmTableDecisionDTO(
+            excel_range="B21:I28",
+            title_range="B21:I21",
+            column_header_range="B22:I22",
+            row_header_range=None,
+            data_range="B23:I28",
+        )
+
+        validated = LocalVlmStructureDetectorModule._validate_table(
+            decision, self.layout, self.visibility
+        )
+
+        self.assertEqual(validated["title_range"].excel_range, "B21:I21")
+        self.assertEqual(validated["column_header_range"].excel_range, "B22:I22")
+        self.assertIsNone(validated["row_header_range"])
+        self.assertEqual(validated["data_range"].excel_range, "B23:I28")
+
 
 def sample_cell_documents():
     def item(cell_id, cell_coord, row_header, value):
@@ -350,9 +406,279 @@ class SimilarityTests(unittest.TestCase):
         self.assertEqual(matches[0].question_id, "Q2")
 
 
+class SemanticQueryMatcherTests(unittest.TestCase):
+    class KeywordEncoder:
+        def encode(self, queries):
+            return [
+                [1.0, 0.0] if "revenue" in query.lower() else [0.0, 1.0]
+                for query in queries
+            ]
+
+    def test_route_votes_for_nearby_examples_and_returns_sheet_scope(self) -> None:
+        matcher = SemanticQueryMatcher(self.KeywordEncoder(), examples=(
+            QueryExample("q1", "revenue trend", "financials", ("Key_Stats",)),
+            QueryExample("q2", "revenue growth", "financials", ("Key_Stats",)),
+            QueryExample("q3", "employee count", "headcount", ("Employees",)),
+        ))
+
+        decision = matcher.route("revenue this year", "test", 0.74, 3, 0.05)
+
+        self.assertEqual(decision.target, "financials")
+        self.assertEqual(decision.sheets, ("Key_Stats",))
+        self.assertEqual(len(decision.matches), 3)
+
+    def test_route_falls_back_below_confidence_threshold(self) -> None:
+        matcher = SemanticQueryMatcher(self.KeywordEncoder(), examples=(
+            QueryExample("q1", "employee count", "headcount", ("Employees",)),
+        ))
+
+        decision = matcher.route("revenue this year", "test", 0.74, 1, 0.05)
+
+        self.assertIsNone(decision.target)
+        self.assertEqual(decision.sheets, ())
+
+    def test_scoped_dense_retriever_falls_back_when_no_matching_sheet_exists(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = VectorIndexStore(Path(directory))
+            index_id = "a" * 64
+            metadata = {
+                "workbook_hash": "hash", "model": "test", "dimension": 2,
+                "document_count": 1, "items": [{
+                    "cell_id": "Other Cell A1", "sheet_name": "Other", "cell_coord": "A1",
+                    "row_header": ["Revenue"], "column_header": ["LTM"],
+                    "cell_value": "100", "variant": "header_with_value", "text": "Revenue",
+                    "embedding_index": 0,
+                }],
+            }
+            store.put(index_id, [[1.0, 0.0]], metadata)
+            result = SemanticScopedDenseRetrieverModule(store).run({
+                "query_input": {
+                    "query_context": {"question_id": "q", "question_text": "Revenue"},
+                    "items": {"Revenue": [1.0, 0.0]},
+                },
+                "index_input": {
+                    "index_id": index_id, "file_name": "test.xlsx",
+                    "workbook_hash": "hash", "model": "test",
+                    "dimension": 2, "document_count": 1,
+                },
+                "semantic_match": {"matched": True, "target": "financials", "confidence": 0.9, "sheets": ["Key_Stats"], "reason": "test", "matches": []},
+            })
+        self.assertEqual(result["items"][0]["cell_id"], "Other Cell A1")
+
+    def test_adaptive_decomposer_skips_llm_when_semantic_match_succeeds(self) -> None:
+        class FailingCompletionClient:
+            def complete(self, model, messages):
+                raise AssertionError("LLM must not be called for a confident match")
+
+        result = AdaptiveQueryDecomposerModule(FailingCompletionClient()).run({
+            "query_context": {
+                "question_id": "q",
+                "question_text": "IBM 2025년 revenue",
+            },
+            "semantic_match": {
+                "matched": True, "target": "get_ibm_key_financials", "confidence": 0.9,
+                "sheets": ["Key_Stats"], "reason": "test", "matches": [],
+                "subqueries": [
+                    "Sheet: Key_Stats | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+                ],
+            },
+        })
+        self.assertIn(
+            "Sheet: Key_Stats | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?",
+            result["subqueries"],
+        )
+
+
+class PgVectorStoreBatchingTests(unittest.TestCase):
+    def test_direct_cell_lookup_requires_workbook_or_collection_scope(self) -> None:
+        store = PgVectorStore("postgresql://unused")
+        with patch.object(
+            store,
+            "_raw_connection",
+            side_effect=AssertionError("database must not be queried"),
+        ):
+            self.assertEqual(store.fetch_cells_by_metadata(["A1"]), [])
+
+    def test_precomputed_vectors_are_inserted_in_bounded_batches(self) -> None:
+        from unittest.mock import MagicMock
+
+        langchain_store = MagicMock()
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = MagicMock()
+        store = PgVectorStore("postgresql://unused")
+        documents = [
+            Document(page_content=f"cell-{index}", metadata={"index": index})
+            for index in range(2101)
+        ]
+        vectors = [[float(index), 1.0] for index in range(2101)]
+        progress = []
+
+        with (
+            patch(
+                "backend.storage.pgvector_store.get_vector_store",
+                return_value=langchain_store,
+            ),
+            patch.object(store, "_raw_connection", return_value=connection),
+            patch.object(store, "ensure_optimized_indexes"),
+        ):
+            store.put_documents(
+                "test-index",
+                documents,
+                vectors=vectors,
+                progress_callback=progress.append,
+            )
+
+        batch_sizes = [
+            len(call.kwargs["texts"])
+            for call in langchain_store.add_embeddings.call_args_list
+        ]
+        self.assertEqual(batch_sizes, [1000, 1000, 101])
+        self.assertEqual(progress[-1]["completed_batches"], 3)
+        self.assertEqual(progress[-1]["completed_items"], 2101)
+
+    def test_put_only_accepts_numeric_vector_collections(self) -> None:
+        store = PgVectorStore("postgresql://unused")
+        numeric_vectors = [[1.0, 2.0], [3, 4]]
+        item_dicts = [
+            {"cell_id": "IS Cell A1", "embedding": [1.0, 2.0]},
+        ]
+
+        with patch.object(store, "put_documents") as put_documents:
+            store.put("test-index", vectors_or_items=item_dicts, metadata={"items": []})
+            self.assertIsNone(put_documents.call_args.kwargs["vectors"])
+
+            store.put("test-index", vectors_or_items=numeric_vectors, metadata={"items": []})
+            self.assertIs(
+                put_documents.call_args.kwargs["vectors"],
+                numeric_vectors,
+            )
+
+            store.put(
+                "test-index",
+                vectors_or_items=item_dicts,
+                vectors=numeric_vectors,
+                metadata={"items": []},
+            )
+            self.assertIs(
+                put_documents.call_args.kwargs["vectors"],
+                numeric_vectors,
+            )
+
+    def test_optimized_metadata_indexes_are_created_concurrently(self) -> None:
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (1,)
+        cursor.fetchall.return_value = [
+            ("idx_langchain_pg_embedding_cell_id",),
+        ]
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        store = PgVectorStore("postgresql://unused")
+
+        with patch.object(store, "_raw_connection", return_value=connection):
+            store.ensure_optimized_indexes()
+
+        statements = [
+            " ".join(call.args[0].split())
+            for call in cursor.execute.call_args_list
+        ]
+        for index_name in (
+            "idx_langchain_pg_embedding_cell_id",
+            "idx_langchain_pg_embedding_cell_coord_upper",
+            "idx_langchain_pg_embedding_workbook_hash",
+        ):
+            self.assertTrue(
+                any(
+                    f"CREATE INDEX CONCURRENTLY IF NOT EXISTS {index_name}"
+                    in statement
+                    for statement in statements
+                )
+            )
+        self.assertIn(
+            'DROP INDEX CONCURRENTLY IF EXISTS "idx_langchain_pg_embedding_cell_id";',
+            statements,
+        )
+        self.assertTrue(connection.autocommit)
+
+
+class SheetRendererFormattingTests(unittest.TestCase):
+    def test_hash_prefixed_rgb_string_is_preserved(self) -> None:
+        self.assertEqual(_rgb_color("#5b9bd5", "#000000"), "#5B9BD5")
+
+    def test_numeric_excel_date_is_rendered_as_a_date(self) -> None:
+        workbook = Workbook()
+        cell = workbook.active["A1"]
+        cell.value = 45292
+        cell.number_format = "yyyy-mm-dd"
+
+        rendered, _color = _cell_text_and_color(cell)
+
+        self.assertRegex(rendered, r"^\d{4}\.\d{2}\.\d{2}$")
+        self.assertNotEqual(rendered, "45292")
+        workbook.close()
+
+    def test_percentage_format_precision(self) -> None:
+        workbook = Workbook()
+        ws = workbook.active
+
+        ws["A1"].value = 0.25
+        ws["A1"].number_format = "0%"
+        rendered, _ = _cell_text_and_color(ws["A1"])
+        self.assertEqual(rendered, "25%")
+
+        ws["A2"].value = 0.254
+        ws["A2"].number_format = "0.0%"
+        rendered, _ = _cell_text_and_color(ws["A2"])
+        self.assertEqual(rendered, "25.4%")
+
+        ws["A3"].value = 0.25
+        ws["A3"].number_format = "0.00%"
+        rendered, _ = _cell_text_and_color(ws["A3"])
+        self.assertEqual(rendered, "25.00%")
+        workbook.close()
+
+    def test_currency_and_accounting_trailing_zeroes(self) -> None:
+        workbook = Workbook()
+        ws = workbook.active
+
+        # Fixed decimal format (#,##0.00) must retain trailing zeroes
+        ws["A1"].value = 123.4
+        ws["A1"].number_format = "#,##0.00"
+        rendered, _ = _cell_text_and_color(ws["A1"])
+        self.assertEqual(rendered, "123.40")
+
+        ws["A2"].value = 123.0
+        ws["A2"].number_format = "#,##0.00"
+        rendered, _ = _cell_text_and_color(ws["A2"])
+        self.assertEqual(rendered, "123.00")
+
+        # Optional decimal format (0.##) should trim trailing zeroes
+        ws["A3"].value = 123.4
+        ws["A3"].number_format = "0.##"
+        rendered, _ = _cell_text_and_color(ws["A3"])
+        self.assertEqual(rendered, "123.4")
+
+        ws["A4"].value = 123.0
+        ws["A4"].number_format = "0.##"
+        rendered, _ = _cell_text_and_color(ws["A4"])
+        self.assertEqual(rendered, "123")
+        workbook.close()
+
+
 class ModularRagArchitectureTests(unittest.TestCase):
     def test_rrf_fuses_ranks_within_the_same_subquery(self) -> None:
         def candidate(rank, cell_id, subquery):
+            """Create a ranked candidate record for a matched cell and subquery.
+            
+            Parameters:
+            	rank (int): The candidate's ranking position.
+            	cell_id: The identifier of the matched cell.
+            	subquery: The subquery associated with the match.
+            
+            Returns:
+            	dict: A candidate record containing the rank, reciprocal-rank score, cell text, and matched subquery.
+            """
             return {
                 "rank": rank,
                 "cell_id": cell_id,
@@ -474,6 +800,22 @@ class ModularRagArchitectureTests(unittest.TestCase):
                 all("embedding" not in item for item in output["items"])
             )
 
+    def test_cell_document_embedding_reports_completed_batches(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            module = CellTextEmbedderModule(
+                StubEmbeddingEncoder(),
+                EmbeddingArtifactStore(Path(temporary_directory)),
+            )
+            progress = []
+            module.set_progress_callback(progress.append)
+
+            module.run(sample_cell_documents(), {"batch_size": 1})
+
+            self.assertEqual(progress[0]["completed_batches"], 0)
+            self.assertEqual(progress[-1]["completed_batches"], 3)
+            self.assertEqual(progress[-1]["total_batches"], 3)
+            self.assertEqual(progress[-1]["completed_items"], 3)
+
     def test_vector_index_persists_and_dense_retriever_uses_only_its_reference(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -540,20 +882,27 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 25)
+        self.assertEqual(len(definitions), 32)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
                 "query_input",
                 "decomposer",
+                "adaptive_query_decomposer",
                 "embedder",
                 "cell_text_embedder",
                 "vector_index_writer",
+                "pgvector_index_writer",
+                "pgvector_collection_loader",
+                "pgvector_retriever",
                 "bm25_retriever",
                 "dense_retriever",
                 "rrf_fusion",
+                "semantic_query_matcher",
+                "semantic_scoped_dense_retriever",
                 "context",
                 "reader",
+                "answer_refiner",
                 "answer_cache_writer",
                 "json_transformer",
                 "json_inspector",
@@ -565,6 +914,9 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "openpyxl_region_detector",
                 "cell_text_serializer",
                 "exhaustive_cell_text_serializer",
+                "company_entity_extractor",
+                "sheet_metadata_persistence",
+                "index_company_persistence",
                 "prebuilt_index_loader",
                 "dataframe_source",
                 "image_tile_source",
@@ -688,6 +1040,11 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "artifact_id",
                 "dimension",
                 "items",
+                "duration_seconds",
+                "total_tokens",
+                "estimated_cost_usd",
+                "estimated_cost_krw",
+                "batch_size",
             },
         )
         self.assertEqual(
@@ -792,7 +1149,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 25)
+        self.assertEqual(len(modules), 32)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -921,6 +1278,11 @@ class ApiContractTests(unittest.TestCase):
                 "artifact_id",
                 "dimension",
                 "items",
+                "duration_seconds",
+                "total_tokens",
+                "estimated_cost_usd",
+                "estimated_cost_krw",
+                "batch_size",
             },
         )
 
@@ -962,7 +1324,7 @@ class ApiContractTests(unittest.TestCase):
         docling = self.client.get("/api/modules/docling_table_detector").json()
         self.assertEqual(
             set(docling["output_schema"]["properties"]),
-            {"file_name", "workbook_hash", "tables"},
+            {"file_name", "workbook_hash", "sheet_names", "tables"},
         )
         table_reference = docling["output_schema"]["properties"]["tables"]["items"]["$ref"]
         table_definition = table_reference.rsplit("/", 1)[-1]
@@ -1034,7 +1396,19 @@ class ApiContractTests(unittest.TestCase):
                 {"model", "batch_size"},
             ),
             "vector_index_writer": (
-                {"file_name", "workbook_hash", "model", "artifact_id", "dimension", "items"},
+                {
+                    "file_name",
+                    "workbook_hash",
+                    "model",
+                    "artifact_id",
+                    "dimension",
+                    "items",
+                    "duration_seconds",
+                    "total_tokens",
+                    "estimated_cost_usd",
+                    "estimated_cost_krw",
+                    "batch_size",
+                },
                 set(),
             ),
             "prebuilt_index_loader": ({"file_name"}, set()),
@@ -1064,7 +1438,7 @@ class ApiContractTests(unittest.TestCase):
             ),
             "json_transformer": ({"any_json"}, {"mappings"}),
             "json_inspector": (set(), set()),
-            "processed_file_selector": ({"file_name"}, set()),
+            "processed_file_selector": ({"file_name", "sheet_names"}, set()),
             "bfs_llm_structure_detector": (
                 {"file_name", "workbook_hash", "sheet_names"},
                 {
@@ -1105,6 +1479,7 @@ class ApiContractTests(unittest.TestCase):
                     "max_output_tokens",
                     "timeout_seconds",
                     "validation_retries",
+                    "max_concurrency",
                     "system_prompt",
                     "user_prompt_template",
                 },
@@ -1114,7 +1489,7 @@ class ApiContractTests(unittest.TestCase):
                 {"max_rows", "max_columns"},
             ),
             "openpyxl_region_detector": (
-                {"file_name", "workbook_hash", "tables"},
+                {"file_name", "workbook_hash", "sheet_names", "tables"},
                 {
                     "header_scan_rows",
                     "bold_ratio_threshold",
@@ -1122,8 +1497,14 @@ class ApiContractTests(unittest.TestCase):
                 },
             ),
             "cell_text_serializer": (
-                {"file_name", "workbook_hash", "tables"},
-                set(),
+                {
+                    "file_name",
+                    "workbook_hash",
+                    "sheet_names",
+                    "tables",
+                    "failed_sheets",
+                },
+                {"variant_mode"},
             ),
             "exhaustive_cell_text_serializer": (
                 {"file_name", "workbook_hash", "sheet_names"},
@@ -1144,6 +1525,53 @@ class ApiContractTests(unittest.TestCase):
             "qa_example_loader": (
                 {"file_name"},
                 {"include_builtin"},
+            ),
+            "pgvector_index_writer": (
+                {
+                    "file_name",
+                    "workbook_hash",
+                    "model",
+                    "artifact_id",
+                    "dimension",
+                    "items",
+                    "duration_seconds",
+                    "total_tokens",
+                    "estimated_cost_usd",
+                    "estimated_cost_krw",
+                    "batch_size",
+                },
+                set(),
+            ),
+            "pgvector_collection_loader": (
+                {"collection_name", "collection_names"},
+                set(),
+            ),
+            "pgvector_retriever": (
+                {"query_input", "index_input"},
+                {"top_k"},
+            ),
+            "answer_refiner": (
+                {"answer_json", "target_cell_ids"},
+                {
+                    "model",
+                    "preset",
+                    "system_prompt",
+                    "user_prompt_template",
+                    "cell_extractor_prompt",
+                    "max_direct_cells",
+                },
+            ),
+            "company_entity_extractor": (
+                {"file_name", "workbook_hash", "sheet_names"},
+                {"model"},
+            ),
+            "sheet_metadata_persistence": (
+                {"structure_input", "index_input"},
+                set(),
+            ),
+            "index_company_persistence": (
+                {"index_input", "company_input"},
+                set(),
             ),
         }
 
@@ -1505,6 +1933,115 @@ class SpreadsheetModuleTests(unittest.TestCase):
             "Sheet: Key_Stats | Row Header: Revenue | Column Header: LTM | Cell Value: 100",
         )
 
+    def test_selected_sheet_without_table_is_preserved_for_metadata(self) -> None:
+        workbook = openpyxl.load_workbook(self.workbook_path)
+        notes = workbook.create_sheet("Notes")
+        notes.append(["Narrative only"])
+        workbook.save(self.workbook_path)
+        workbook.close()
+
+        class FirstSheetOnlyExtractor:
+            def detect(self, image_path: Path):
+                if image_path.stem == "Notes":
+                    return []
+                with Image.open(image_path) as image:
+                    return [(0, 0, image.width, image.height)]
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": "sample.xlsx"}
+        )
+        detected = DoclingTableDetectorModule(
+            catalog=self.catalog,
+            extractor=FirstSheetOnlyExtractor(),
+            artifact_dir=self.artifact_dir,
+        ).run(selection)
+        classified = OpenpyxlRegionDetectorModule(catalog=self.catalog).run(detected)
+
+        self.assertEqual(detected["sheet_names"], ["Key Stats", "Notes"])
+        self.assertEqual(classified["sheet_names"], ["Key Stats", "Notes"])
+        self.assertEqual(
+            OpenpyxlRegionDetectorModule(catalog=self.catalog).run(
+                {
+                    "file_name": selection["file_name"],
+                    "workbook_hash": selection["workbook_hash"],
+                    "sheet_names": [],
+                    "tables": [],
+                }
+            )["sheet_names"],
+            ["Key Stats", "Notes"],
+        )
+
+        class CapturingDatabase:
+            def __init__(self):
+                self.sheets_info = []
+
+            def is_connected(self):
+                return True
+
+            def save_sheets(self, file_id, sheets_info):
+                self.file_id = file_id
+                self.sheets_info = sheets_info
+
+        database = CapturingDatabase()
+        persisted = SheetMetadataPersistenceModule(
+            db_manager=database,
+            catalog=self.catalog,
+        ).run(
+            {
+                "structure_input": classified,
+                "index_input": {
+                    "index_id": "a" * 64,
+                    "file_name": selection["file_name"],
+                    "workbook_hash": selection["workbook_hash"],
+                    "model": "text-embedding-3-large",
+                    "dimension": 3072,
+                    "document_count": 1,
+                },
+            }
+        )
+
+        self.assertEqual(persisted["sheets_saved"], 2)
+        self.assertEqual(
+            [detail["table_count"] for detail in persisted["sheet_details"]],
+            [1, 0],
+        )
+        self.assertEqual(
+            [sheet["sheet_name"] for sheet in database.sheets_info],
+            ["Key Stats", "Notes"],
+        )
+
+    def test_selector_accepts_workbook_without_cached_sheet_dimensions(self) -> None:
+        workbook_path = self.processed_dir / "dimensionless.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "KeyStats"
+        sheet.append(["Metric", "FY2025"])
+        sheet.append(["Revenue", 135])
+        workbook.save(workbook_path)
+        workbook.close()
+
+        with ZipFile(workbook_path, "r") as archive:
+            entries = {
+                info.filename: archive.read(info.filename)
+                for info in archive.infolist()
+            }
+        sheet_path = "xl/worksheets/sheet1.xml"
+        entries[sheet_path] = re.sub(
+            rb"<dimension\s+ref=\"[^\"]+\"\s*/>",
+            b"",
+            entries[sheet_path],
+            count=1,
+        )
+        with ZipFile(workbook_path, "w", ZIP_DEFLATED) as archive:
+            for filename, content in entries.items():
+                archive.writestr(filename, content)
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": workbook_path.name}
+        )
+
+        self.assertEqual(selection["sheet_names"], ["KeyStats"])
+
     def test_exhaustive_serializer_embeds_every_left_above_combination(self) -> None:
         workbook_path = self.processed_dir / "cartesian.xlsx"
         workbook = Workbook()
@@ -1755,7 +2292,10 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertIn('A1', call["user_prompt"])
         self.assertIn('"text"', call["user_prompt"])
         self.assertIn('"number"', call["user_prompt"])
-        self.assertIn("Ordinary descriptive text is strong structural evidence", call["system_prompt"])
+        self.assertIn(
+            "Distinguish record tables from matrix/crosstab tables",
+            call["system_prompt"],
+        )
         self.assertIn("`NA`", call["system_prompt"])
         self.assertIn("Keep them inside data_range", call["system_prompt"])
         self.assertTrue(call["image_path"].is_file())
@@ -1827,7 +2367,11 @@ class SpreadsheetModuleTests(unittest.TestCase):
             artifact_dir=self.artifact_dir,
         ).run({
             **selection,
-            # Legacy tiling settings are accepted and discarded when old workflows run.
+            "system_prompt": LUNA_VLM_SYSTEM_PROMPT.replace(
+                TEXT_CELL_ROLE_GUIDANCE,
+                LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+            ),
+            # Legacy tiling settings are accepted; max_concurrency remains configurable.
             "tile_rows": 72,
             "tile_columns": 24,
             "row_overlap": 8,
@@ -1842,7 +2386,18 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertIn('"sheet_range":"A1:C4"', call["user_prompt"])
         self.assertIn('"cell_tuple":["excel_coord"', call["user_prompt"])
         self.assertNotIn("tile", call["user_prompt"].lower())
-        self.assertIn("Ordinary descriptive text is strong structural evidence", call["system_prompt"])
+        self.assertIn(
+            "Distinguish record tables from matrix/crosstab tables",
+            call["system_prompt"],
+        )
+        self.assertIn(
+            "Set row_header_range to null",
+            call["system_prompt"],
+        )
+        self.assertNotIn(
+            "Prefer those header roles unless position",
+            call["system_prompt"],
+        )
         self.assertIn("`N/A`", call["system_prompt"])
         self.assertIn("Keep them inside data_range", call["system_prompt"])
         self.assertNotIn("candidate", call["user_prompt"].lower())
@@ -1862,6 +2417,182 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertEqual(regions["data"], "B2:C4")
         serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
         self.assertEqual(len(serialized["items"]), 12)
+
+    def test_luna_vlm_preserves_record_table_as_column_header_and_data(self) -> None:
+        workbook_path = self.processed_dir / "executives.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Summary"
+        sheet["B21"] = "TOP EXECUTIVES"
+        for coordinate, value in {
+            "B22": "NAME",
+            "C22": "ROLE",
+            "E22": "AGE",
+            "F22": "YEAR HIRED",
+            "G22": "EXPECTED TERMINATION YEAR",
+            "I22": "SALARY ($)",
+        }.items():
+            sheet[coordinate] = value
+            sheet[coordinate].font = Font(bold=True)
+        for coordinate, value in {
+            "B23": "Brian Thomas Moynihan",
+            "C23": "Chief Executive Officer",
+            "E23": 65,
+            "F23": 2010,
+            "G23": "NA",
+            "I23": "NA",
+            "B24": "Alastair M. Borthwick",
+            "C24": "Chief Financial Officer",
+            "E24": 56,
+            "F24": 2021,
+            "G24": "NA",
+            "I24": "NA",
+        }.items():
+            sheet[coordinate] = value
+        workbook.save(workbook_path)
+        workbook.close()
+
+        class RecordTableVisionClient:
+            def __init__(self):
+                self.calls = []
+
+            def complete_structured(self, **kwargs):
+                self.calls.append(kwargs)
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"B21:I24","title_range":"B21:I21",'
+                    '"column_header_range":"B22:I22","row_header_range":null,'
+                    '"data_range":"B23:I24"}]}'
+                )
+
+        client = RecordTableVisionClient()
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": workbook_path.name}
+        )
+        structured = LunaVlmStructureDetectorModule(
+            client,
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        ).run(selection)
+
+        self.assertIn(
+            "leading text columns as row headers",
+            client.calls[0]["system_prompt"],
+        )
+        table = structured["tables"][0]
+        regions = {
+            region["type"]: region["excel_range"]
+            for region in table["regions"]
+        }
+        self.assertEqual(
+            regions,
+            {
+                "title": "B21:I21",
+                "column_header": "B22:I22",
+                "data": "B23:I24",
+            },
+        )
+        self.assertNotIn("row_header", regions)
+        self.assertEqual(
+            {node["name"] for node in table["header_tree"]},
+            {
+                "NAME",
+                "ROLE",
+                "AGE",
+                "YEAR HIRED",
+                "EXPECTED TERMINATION YEAR",
+                "SALARY ($)",
+            },
+        )
+
+        serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
+        self.assertTrue(
+            {"B23", "C23", "E23", "F23", "G23", "I23"}.issubset(
+                {item["cell_coord"] for item in serialized["items"]}
+            )
+        )
+
+    def test_luna_vlm_detector_reports_partial_sheet_failures(self) -> None:
+        class VisionClient:
+            def complete_structured(self, **_kwargs):
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"A1:C4","title_range":null,'
+                    '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
+                    '"data_range":"A2:C4"}]}'
+                )
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": "sample.xlsx"}
+        )
+        detector = LunaVlmStructureDetectorModule(
+            VisionClient(),
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        )
+
+        partial = detector.run({
+            **selection,
+            "sheet_names": ["Key Stats", "Missing Sheet"],
+        })
+
+        self.assertEqual(partial["sheet_names"], ["Key Stats", "Missing Sheet"])
+        self.assertEqual(
+            partial["failed_sheets"],
+            [{"sheet_name": "Missing Sheet", "error": "시트를 찾을 수 없습니다"}],
+        )
+        with self.assertRaisesRegex(ModuleExecutionError, "분석 가능한 시트가 없습니다"):
+            detector.run({
+                **selection,
+                "sheet_names": ["Missing Sheet"],
+            })
+
+    def test_luna_vlm_detector_preserves_selected_sheet_order(self) -> None:
+        EVENT_TIMEOUT_SECONDS = 10.0
+        workbook = openpyxl.load_workbook(self.workbook_path)
+        second = workbook.copy_worksheet(workbook["Key Stats"])
+        second.title = "Second"
+        workbook.save(self.workbook_path)
+        workbook.close()
+
+        first_started = Event()
+        second_finished = Event()
+        completion_order = []
+
+        class ReverseCompletionVisionClient:
+            def complete_structured(self, **kwargs):
+                prompt = kwargs["user_prompt"]
+                if "Key Stats" in prompt:
+                    first_started.set()
+                    if not second_finished.wait(timeout=EVENT_TIMEOUT_SECONDS):
+                        raise AssertionError("timed out waiting for second_finished")
+                    completion_order.append("Key Stats")
+                else:
+                    if not first_started.wait(timeout=EVENT_TIMEOUT_SECONDS):
+                        raise AssertionError("timed out waiting for first_started")
+                    completion_order.append("Second")
+                    second_finished.set()
+                return (
+                    '{"tables":[{'
+                    '"excel_range":"A1:C4","title_range":null,'
+                    '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
+                    '"data_range":"A2:C4"}]}'
+                )
+
+        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
+            {"file_name": "sample.xlsx"}
+        )
+        structured = LunaVlmStructureDetectorModule(
+            ReverseCompletionVisionClient(),
+            catalog=self.catalog,
+            artifact_dir=self.artifact_dir,
+        ).run({**selection, "max_concurrency": 2})
+
+        self.assertEqual(completion_order, ["Second", "Key Stats"])
+        self.assertEqual(
+            [table["sheet_name"] for table in structured["tables"]],
+            ["Key Stats", "Second"],
+        )
 
     def test_bfs_llm_detector_builds_title_regions_and_hierarchical_headers(self) -> None:
         workbook_path = self.processed_dir / "hierarchical.xlsx"
@@ -2191,6 +2922,18 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertEqual(listed_output["embedding"]["length"], len(vector))
         self.assertEqual(self.run_store.load(run.id).nodes["query"].output["embedding"], vector)
 
+    def test_run_store_delete_removes_full_state_and_summary(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        run_dir = Path(self.temporary_directory.name) / "runs"
+
+        self.assertTrue(self.run_store.delete(run.id))
+
+        self.assertFalse((run_dir / f"{run.id}.json").exists())
+        self.assertFalse((run_dir / f"{run.id}.summary.json").exists())
+        with self.assertRaises(FileNotFoundError):
+            self.run_store.load(run.id)
+
     def test_graph_fixture_matches_registered_modules(self) -> None:
         graph = self.graph()
         batches = self.executor.validate_graph(graph)
@@ -2269,6 +3012,29 @@ class WorkflowExecutionTests(unittest.TestCase):
                     inputs={"query": {"query": "질문", "threshold": 0.1}}
                 ),
             )
+
+    def test_run_config_override_is_validated_and_kept_in_run_snapshot(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(
+            workflow,
+            WorkflowExecutionRequest(
+                inputs=self.runtime_request().inputs,
+                config_overrides={"query": {"threshold": 0.25}},
+            ),
+        )
+
+        run_query = next(node for node in run.graph.nodes if node.id == "query")
+        saved_query = next(
+            node for node in workflow.graph.nodes if node.id == "query"
+        )
+        self.assertEqual(run_query.config["threshold"], 0.25)
+        self.assertEqual(saved_query.config["threshold"], 0.99)
+
+        after_query = self.executor.execute_next_batch(run.id)
+        self.assertEqual(
+            after_query.nodes["query"].config_payload["threshold"],
+            0.25,
+        )
 
     def test_rrf_is_skipped_when_one_required_input_is_missing(self) -> None:
         graph = self.graph()
@@ -2378,9 +3144,98 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertLess(elapsed, 1)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], DagExecutionCancelled)
-        self.assertEqual(cancelled.status, "queued")
+        self.assertEqual(cancelled.status, "paused")
         self.assertEqual(cancelled.nodes["query"].status, "pending")
         self.assertIsNone(cancelled.nodes["query"].output)
+
+    def test_dispatcher_keeps_user_cancelled_run_paused(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        worker = BlockingModuleWorker()
+        executor = WorkflowExecutor(
+            self.registry,
+            self.run_store,
+            self.cache,
+            module_worker=worker,
+        )
+        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+
+        try:
+            self.assertTrue(dispatcher.submit(run.id))
+            self.assertTrue(worker.started.wait(timeout=1))
+
+            cancelled = dispatcher.cancel(run.id)
+            deadline = monotonic() + 1
+            while dispatcher.is_active(run.id) and monotonic() < deadline:
+                Event().wait(0.01)
+
+            self.assertFalse(dispatcher.is_active(run.id))
+            self.assertEqual(cancelled.status, "paused")
+            self.assertEqual(self.run_store.load(run.id).status, "paused")
+        finally:
+            dispatcher.shutdown()
+
+    def test_dispatcher_cancels_queued_run_without_waiting_for_active_run(self) -> None:
+        workflow = self.save_workflow()
+        active_run = self.executor.create_run(workflow, self.runtime_request())
+        queued_run = self.executor.create_run(workflow, self.runtime_request())
+        worker = BlockingModuleWorker()
+        executor = WorkflowExecutor(
+            self.registry,
+            self.run_store,
+            self.cache,
+            module_worker=worker,
+        )
+        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+
+        try:
+            self.assertTrue(dispatcher.submit(active_run.id))
+            self.assertTrue(worker.started.wait(timeout=1))
+            self.assertTrue(dispatcher.submit(queued_run.id))
+
+            started_at = monotonic()
+            cancelled = dispatcher.cancel(queued_run.id)
+
+            self.assertLess(monotonic() - started_at, 1)
+            self.assertEqual(cancelled.status, "paused")
+            self.assertFalse(dispatcher.is_active(queued_run.id))
+        finally:
+            dispatcher.cancel(active_run.id)
+            dispatcher.shutdown()
+
+    def test_dispatcher_submit_duplicate_rejection_and_done_callback_cleanup(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        worker = BlockingModuleWorker()
+        executor = WorkflowExecutor(
+            self.registry,
+            self.run_store,
+            self.cache,
+            module_worker=worker,
+        )
+        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+
+        try:
+            self.assertTrue(dispatcher.submit(run.id))
+            self.assertTrue(worker.started.wait(timeout=1))
+
+            # Duplicate submit while running is rejected
+            self.assertFalse(dispatcher.submit(run.id))
+            self.assertTrue(dispatcher.is_active(run.id))
+
+            # Cancel run to let worker complete
+            dispatcher.cancel(run.id)
+            deadline = monotonic() + 2
+            while dispatcher.is_active(run.id) and monotonic() < deadline:
+                Event().wait(0.01)
+
+            # Once finished, future tracking should be cleaned up via _forget
+            self.assertFalse(dispatcher.is_active(run.id))
+            with dispatcher._lock:
+                self.assertNotIn(run.id, dispatcher._futures)
+        finally:
+            dispatcher.shutdown()
+
 
     def test_cache_clear_terminates_active_module_before_removing_runs(self) -> None:
         workflow = self.save_workflow()
@@ -2451,6 +3306,24 @@ class WorkflowExecutionTests(unittest.TestCase):
         self.assertEqual(completed.nodes["decompose"].output, upstream_output)
         self.assertEqual(completed.nodes["reader"].status, "succeeded")
         self.assertIn("answer_json", completed.nodes["reader"].output)
+
+    def test_dispatcher_recovers_only_matching_pending_runs(self) -> None:
+        workflow = self.save_workflow()
+        run = self.executor.create_run(workflow, self.runtime_request())
+        dispatcher = WorkflowRunDispatcher(self.executor, self.run_store)
+        try:
+            self.assertEqual(dispatcher.recover_pending({"other-flow"}), 0)
+            self.assertEqual(dispatcher.recover_pending({workflow.id}), 1)
+            self.assertEqual(dispatcher.recover_pending({workflow.id}), 0)
+
+            deadline = monotonic() + 5
+            current = self.run_store.load(run.id)
+            while current.status not in {"completed", "failed"} and monotonic() < deadline:
+                Event().wait(0.02)
+                current = self.run_store.load(run.id)
+            self.assertEqual(current.status, "completed")
+        finally:
+            dispatcher.shutdown()
 
     def test_same_inputs_reuse_cached_module_outputs(self) -> None:
         graph = WorkflowGraph(
@@ -2617,7 +3490,7 @@ class WorkflowExecutionTests(unittest.TestCase):
 
         cancel_response = client.post(f"/api/runs/{run_id}/cancel")
         self.assertEqual(cancel_response.status_code, 200)
-        self.assertEqual(cancel_response.json()["status"], "queued")
+        self.assertEqual(cancel_response.json()["status"], "paused")
 
         next_response = client.post(f"/api/runs/{run_id}/execute-next")
         self.assertEqual(next_response.status_code, 200)
@@ -2670,12 +3543,10 @@ class OpenAIEmbeddingEncoderTest(unittest.TestCase):
 
     @patch("backend.embeddings.openai.urlopen")
     def test_openai_embedding_encode_success(self, mock_urlopen):
-        import io
-
         mock_response_data = json.dumps({
             "data": [
-                {"index": 0, "embedding": [3.0, 4.0]},
-                {"index": 1, "embedding": [1.0, 0.0]}
+                {"index": 1, "embedding": [1.0, 0.0]},
+                {"index": 0, "embedding": [3.0, 4.0]}
             ]
         }).encode("utf-8")
 
@@ -2701,6 +3572,36 @@ class OpenAIEmbeddingEncoderTest(unittest.TestCase):
         self.assertAlmostEqual(vectors[0][1], 0.8)
         self.assertAlmostEqual(vectors[1][0], 1.0)
         self.assertAlmostEqual(vectors[1][1], 0.0)
+
+    @patch("backend.embeddings.openai.urlopen")
+    def test_openai_embedding_rejects_malformed_batch_indices(self, mock_urlopen):
+        class MockHTTPResponse:
+            def __init__(self, indices):
+                self.payload = json.dumps({
+                    "data": [
+                        {"index": index, "embedding": [1.0, 0.0]}
+                        for index in indices
+                    ]
+                }).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def read(self):
+                return self.payload
+
+        encoder = OpenAIEmbeddingEncoder(
+            model_name="text-embedding-3-small",
+            api_key="test-key",
+        )
+        for indices in ([0, 0], [0], [0, 2]):
+            with self.subTest(indices=indices):
+                mock_urlopen.return_value = MockHTTPResponse(indices)
+                with self.assertRaisesRegex(ModuleExecutionError, "응답 인덱스"):
+                    encoder.encode(["query 1", "query 2"])
 
 
 class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
@@ -2898,6 +3799,645 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(unified[0].title_range, "A1:K2")
         self.assertEqual(unified[0].row_header_range, "A5:A100")
         self.assertEqual(unified[0].data_range, "B5:K100")
+
+    def test_pgvector_retriever_execution(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        mock_store = MagicMock()
+        mock_doc = MagicMock()
+        mock_doc.page_content = "Total Revenue in 2024 is 500M"
+        mock_doc.metadata = {"cell_id": "c1", "sheet_name": "IS"}
+        mock_store.similarity_search_by_vector_with_score.return_value = [(mock_doc, 0.1)]
+
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO(
+            query_input={
+                "query_context": {"question_id": "q1", "question_text": "Revenue query"},
+                "items": {"Revenue query": [0.1, 0.2]},
+            },
+            index_input={
+                "index_id": "col_1",
+                "file_name": "dataset.xlsm",
+                "workbook_hash": "hash_1",
+                "model": "text-embedding-3-large",
+                "dimension": 2,
+                "document_count": 10,
+            },
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertIn("query_context", res)
+        self.assertIn("document_context", res)
+        self.assertEqual(res["document_context"]["file_name"], "dataset.xlsm")
+        self.assertEqual(len(res["items"]), 1)
+        self.assertEqual(res["items"][0]["cell_id"], "c1")
+        self.assertAlmostEqual(res["items"][0]["score"], 0.9)
+
+    def test_pgvector_retriever_empty_query_items(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Empty query"),
+                items={},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="col_1",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertIn("query_context", res)
+        self.assertEqual(res["query_context"]["question_id"], "q1")
+        self.assertIn("document_context", res)
+        self.assertEqual(res["document_context"]["file_name"], "dataset.xlsm")
+        self.assertEqual(res["document_context"]["workbook_hash"], "hash_1")
+        self.assertEqual(res["items"], [])
+        mock_store.similarity_search_by_vector_with_score.assert_not_called()
+
+    def test_pgvector_retriever_all_collections_fail(self) -> None:
+        from unittest.mock import MagicMock, patch
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from backend.storage.pgvector_store import PgVectorStore
+
+        store = PgVectorStore()
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.execute.side_effect = RuntimeError("Direct SQL query error")
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch.object(store, "_raw_connection", return_value=mock_conn):
+            with patch("backend.storage.pgvector_store.get_vector_store", side_effect=RuntimeError("Fallback LangChain error")):
+                retriever = PgVectorRetrieverModule(pgvector_store=store)
+                payload = PgVectorRetrieverExecutionDTO.model_construct(
+                    query_input=EmbeddingsDTO.model_construct(
+                        query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                        items={"q": [0.1, 0.2]},
+                    ),
+                    index_input=IndexOutputDTO.model_construct(
+                        index_id="col_1,col_2",
+                        file_name="dataset.xlsm",
+                        workbook_hash="hash_1",
+                        model="text-embedding-3-large",
+                        dimension=2,
+                        document_count=10,
+                    ),
+                    top_k=5,
+                )
+                with self.assertRaises(ModuleExecutionError) as ctx:
+                    retriever.execute(payload)
+                self.assertIn("PostgreSQL pgvector 유사도 검색 실패", str(ctx.exception))
+                mock_conn.close.assert_called()
+
+    def test_pgvector_retriever_partial_collection_failure(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        mock_doc = MagicMock()
+        mock_doc.page_content = "Total Revenue 2024"
+        mock_doc.metadata = {"cell_id": "c1"}
+
+        def side_effect(collection_name, **_kwargs):
+            """
+            Return a matching document for supported collections.
+            
+            Parameters:
+                collection_name (str): Collection to query.
+            
+            Returns:
+                list: A document-score pair for collections other than ``col_1``.
+            
+            Raises:
+                RuntimeError: If ``collection_name`` is ``col_1``.
+            """
+            if collection_name == "col_1":
+                raise RuntimeError("col_1 error")
+            return [(mock_doc, 0.2)]
+
+        mock_store.similarity_search_by_vector_with_score.side_effect = side_effect
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="col_1,col_2",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 1)
+        self.assertEqual(res["items"][0]["cell_id"], "c1")
+
+    def test_pgvector_retriever_multi_collection_dedup_and_fallback_ids(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_col1 = MagicMock()
+        doc_col1.page_content = "Doc 1"
+        doc_col1.metadata = {}  # No cell_id or chunk_id
+        doc_col2 = MagicMock()
+        doc_col2.page_content = "Doc 2"
+        doc_col2.metadata = {}  # No cell_id or chunk_id
+
+        def side_effect(collection_name, **_kwargs):
+            """
+            Provide a fixed document-score result for a collection lookup.
+            
+            Parameters:
+                collection_name (str): Collection name used to select the result set.
+                **_kwargs: Ignored lookup options.
+            
+            Returns:
+                list: A single document-score pair for the selected collection.
+            """
+            if collection_name == "col_1":
+                return [(doc_col1, 0.1)]
+            return [(doc_col2, 0.2)]
+
+        mock_store.similarity_search_by_vector_with_score.side_effect = side_effect
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="col_1,col_2",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        cell_ids = [item["cell_id"] for item in res["items"]]
+        self.assertTrue(any(cid.startswith("col_1:chunk:") for cid in cell_ids))
+        self.assertTrue(any(cid.startswith("col_2:chunk:") for cid in cell_ids))
+
+    def test_pgvector_retriever_anonymous_documents_multi_subquery(self) -> None:
+        import hashlib
+        from unittest.mock import MagicMock
+        from langchain_core.documents import Document
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_a = Document(page_content="Alpha Unique Text")
+        doc_b = Document(page_content="Beta Unique Text")
+
+        # Return doc_a for subquery "q1" (score 0.8) and doc_b for subquery "q2" (score 0.9)
+        def side_effect(embedding, **_kwargs):
+            if embedding == [0.1, 0.1]:
+                return [(doc_a, 0.2)]  # score = 0.8
+            return [(doc_b, 0.1)]  # score = 0.9
+
+        mock_store.similarity_search_by_vector_with_score.side_effect = side_effect
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q1": [0.1, 0.1], "q2": [0.2, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="single_col",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=5,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        hash_a = hashlib.sha256(b"Alpha Unique Text").hexdigest()[:16]
+        hash_b = hashlib.sha256(b"Beta Unique Text").hexdigest()[:16]
+        expected_ids = {f"single_col:chunk:{hash_a}", f"single_col:chunk:{hash_b}"}
+        returned_ids = {item["cell_id"] for item in res["items"]}
+        self.assertEqual(returned_ids, expected_ids)
+
+    def test_pgvector_retriever_identical_content_different_row_ids(self) -> None:
+        from unittest.mock import MagicMock
+        from langchain_core.documents import Document
+        from backend.modules.data_lineage import QueryContextDTO
+        from backend.modules.embedder import EmbeddingsDTO
+        from backend.modules.pgvector_retriever import (
+            PgVectorRetrieverExecutionDTO,
+            PgVectorRetrieverModule,
+        )
+        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        mock_store = MagicMock()
+        doc_a = Document(page_content="Identical Content", metadata={}, id="123")
+        doc_b = Document(page_content="Identical Content", metadata={}, id="456")
+
+        mock_store.similarity_search_by_vector_with_score.return_value = [
+            (doc_a, 0.1),
+            (doc_b, 0.1),
+        ]
+        retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
+        payload = PgVectorRetrieverExecutionDTO.model_construct(
+            query_input=EmbeddingsDTO.model_construct(
+                query_context=QueryContextDTO(question_id="q1", question_text="Query"),
+                items={"q1": [0.1, 0.2]},
+            ),
+            index_input=IndexOutputDTO.model_construct(
+                index_id="test_col",
+                file_name="dataset.xlsm",
+                workbook_hash="hash_1",
+                model="text-embedding-3-large",
+                dimension=2,
+                document_count=10,
+            ),
+            top_k=10,
+        )
+        res = retriever.execute(payload)
+        self.assertEqual(len(res["items"]), 2)
+        returned_ids = {item["cell_id"] for item in res["items"]}
+        self.assertEqual(returned_ids, {"123", "456"})
+
+    def test_pgvector_collection_loader_success(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [
+                {"cell_id": "c1", "sheet_name": "S1", "cell_coord": "A1", "text": "Header"}
+            ],
+        }
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="col_1")
+        res = loader.execute(payload)
+        self.assertIn("document_output", res)
+        self.assertIn("index_output", res)
+        self.assertEqual(res["document_output"]["file_name"], "data.xlsx")
+        self.assertEqual(len(res["document_output"]["items"]), 1)
+        self.assertEqual(res["index_output"]["document_count"], 1)
+
+    def test_pgvector_collection_loader_empty_request_selects_first_index(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "first_col", "file_name": "first.xlsx", "workbook_hash": "hash_first"},
+            {"index_id": "second_col", "file_name": "second.xlsx", "workbook_hash": "hash_second"},
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [
+                {"cell_id": "c1", "sheet_name": "S1", "cell_coord": "A1", "text": "Header"}
+            ],
+        }
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO()
+        self.assertIsNone(payload.collection_name)
+        res = loader.execute(payload)
+        self.assertEqual(res["index_output"]["index_id"], "first_col")
+        self.assertEqual(res["index_output"]["file_name"], "first.xlsx")
+
+    def test_pgvector_collection_loader_sql_reload_preserves_variant(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        mock_store.get_index_metadata.return_value = {
+            "model": "text-embedding-3-large",
+            "dimension": 3072,
+            "items": [],
+        }
+        mock_db = MagicMock()
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_cur.fetchall.return_value = [
+            (
+                "chunk_1",
+                "Header Text",
+                {
+                    "cell_id": "c1",
+                    "sheet_name": "Sheet1",
+                    "cell_coord": "B2",
+                    "variant": "header_with_value",
+                    "cell_value": "100",
+                },
+            )
+        ]
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_db._raw_connection.return_value = mock_conn
+
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store, db_manager=mock_db)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="col_1")
+        res = loader.execute(payload)
+        items = res["document_output"]["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["cell_id"], "c1")
+        self.assertEqual(items[0]["variant"], "header_with_value")
+
+    def test_pgvector_collection_loader_missing_target(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="non_existent")
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("요청한 pgvector 컬렉션을 찾을 수 없습니다", str(ctx.exception))
+
+    def test_pgvector_collection_loader_db_error(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data.xlsx", "workbook_hash": "hash_1"}
+        ]
+        mock_store.get_index_metadata.return_value = None
+        mock_db = MagicMock()
+        mock_db._raw_connection.side_effect = RuntimeError("DB connection failed")
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store, db_manager=mock_db)
+        payload = PgVectorCollectionLoaderInputDTO(collection_name="col_1")
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("pgvector 컬렉션 문서를 읽지 못했습니다", str(ctx.exception))
+
+    def test_pgvector_collection_loader_dimension_mismatch(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data1.xlsx", "workbook_hash": "hash_1"},
+            {"index_id": "col_2", "file_name": "data2.xlsx", "workbook_hash": "hash_2"},
+        ]
+
+        def get_meta(cid):
+            """Return metadata for the specified embedding collection.
+            
+            Parameters:
+            	cid (str): Collection identifier.
+            
+            Returns:
+            	dict: Collection metadata containing the embedding model, vector dimension, and an empty item list.
+            """
+            if cid == "col_1":
+                return {"model": "text-embedding-3-large", "dimension": 3072, "items": []}
+            return {"model": "text-embedding-3-large", "dimension": 1536, "items": []}
+
+        mock_store.get_index_metadata.side_effect = get_meta
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_names=["col_1", "col_2"])
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("선택된 pgvector 컬렉션들의 임베딩 차원이 일치하지 않습니다", str(ctx.exception))
+
+    def test_pgvector_collection_loader_model_mismatch(self) -> None:
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.pgvector_collection_loader import (
+            PgVectorCollectionLoaderInputDTO,
+            PgVectorCollectionLoaderModule,
+        )
+        mock_store = MagicMock()
+        mock_store.list_indexes.return_value = [
+            {"index_id": "col_1", "file_name": "data1.xlsx", "workbook_hash": "hash_1"},
+            {"index_id": "col_2", "file_name": "data2.xlsx", "workbook_hash": "hash_2"},
+        ]
+
+        def get_meta(cid):
+            """
+            Return embedding metadata for the specified collection identifier.
+            
+            Parameters:
+            	cid (str): Collection identifier used to select the embedding metadata.
+            
+            Returns:
+            	dict: A metadata dictionary containing the embedding model, dimension, and an empty item list.
+            """
+            if cid == "col_1":
+                return {"model": "text-embedding-3-small", "dimension": 1536, "items": []}
+            return {"model": "text-embedding-ada-002", "dimension": 1536, "items": []}
+
+        mock_store.get_index_metadata.side_effect = get_meta
+        loader = PgVectorCollectionLoaderModule(pgvector_store=mock_store)
+        payload = PgVectorCollectionLoaderInputDTO(collection_names=["col_1", "col_2"])
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            loader.execute(payload)
+        self.assertIn("선택된 pgvector 컬렉션들의 임베딩 모델이 일치하지 않습니다", str(ctx.exception))
+
+    def test_openpyxl_region_detector_derives_table_sheets_when_sheet_names_empty(self) -> None:
+        import openpyxl
+        from unittest.mock import MagicMock
+        from backend.modules.docling_table_detector import DoclingTableRegionDTO, TableCellBoundsDTO
+        from backend.modules.openpyxl_region_detector import (
+            OpenpyxlRegionDetectorExecutionDTO,
+            OpenpyxlRegionDetectorModule,
+        )
+
+        wb_path = self.processed_dir / "test_sheets.xlsx"
+        wb = openpyxl.Workbook()
+        ws1 = wb.active
+        ws1.title = "SheetA"
+        ws1["A1"] = "H1"
+        ws1["B2"] = "D1"
+        ws2 = wb.create_sheet(title="SheetB")
+        ws2["A1"] = "H2"
+        ws2["B2"] = "D2"
+        wb.save(wb_path)
+        wb.close()
+
+        mock_catalog = MagicMock()
+        mock_catalog.resolve.return_value = wb_path
+        mock_catalog.sha256.return_value = "dummy_hash"
+        mock_catalog.sheet_names.return_value = ["SheetA", "SheetB"]
+
+        module = OpenpyxlRegionDetectorModule(catalog=mock_catalog)
+        # Empty sheet_names but table for SheetB
+        payload = OpenpyxlRegionDetectorExecutionDTO(
+            file_name="test_sheets.xlsx",
+            workbook_hash="dummy_hash",
+            sheet_names=[],
+            tables=[
+                DoclingTableRegionDTO(
+                    sheet_name="SheetB",
+                    table_index=0,
+                    excel_range="A1:B2",
+                    bbox_px=[0, 0, 100, 100],
+                    cell_bounds=TableCellBoundsDTO(min_row=1, max_row=2, min_column=1, max_column=2),
+                )
+            ],
+        )
+        res = module.execute(payload)
+        # Should derive sheet_names as ["SheetB"] based on catalog order
+        self.assertEqual(res["sheet_names"], ["SheetB"])
+
+    def test_sheet_metadata_persistence_derives_table_sheets_or_rejects_empty(self) -> None:
+        import openpyxl
+        from unittest.mock import MagicMock
+        from backend.modules.base import ModuleExecutionError
+        from backend.modules.docling_table_detector import TableCellBoundsDTO
+        from backend.modules.sheet_metadata_persistence import (
+            SheetMetadataPersistenceInputDTO,
+            SheetMetadataPersistenceModule,
+        )
+        from backend.modules.spreadsheet_structure import (
+            ClassifiedRegionDTO,
+            ClassifiedTableDTO,
+            SpreadsheetStructureOutput,
+        )
+        from backend.modules.vector_index_writer import VectorIndexDTO
+
+        wb_path = self.processed_dir / "test_meta.xlsx"
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "SheetA"
+        ws["A1"] = "Data"
+        wb.save(wb_path)
+        wb.close()
+
+        mock_catalog = MagicMock()
+        mock_catalog.resolve.return_value = wb_path
+        mock_catalog.sheet_names.return_value = ["SheetA"]
+
+        mock_db = MagicMock()
+        mock_db.is_connected.return_value = True
+
+        module = SheetMetadataPersistenceModule(db_manager=mock_db, catalog=mock_catalog)
+
+        # 1. Structure with empty sheet_names and empty tables -> raises error
+        empty_structure = SpreadsheetStructureOutput(
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            sheet_names=[],
+            tables=[],
+        )
+        idx = VectorIndexDTO(
+            index_id="a" * 64,
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            model="text-embedding-3-large",
+            dimension=1536,
+            document_count=1,
+        )
+        with self.assertRaises(ModuleExecutionError) as ctx:
+            module.execute(
+                SheetMetadataPersistenceInputDTO(
+                    structure_input=empty_structure,
+                    index_input=idx,
+                )
+            )
+        self.assertIn("저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다", str(ctx.exception))
+
+        # 2. Structure with empty sheet_names but table for SheetA -> derives SheetA
+        table_structure = SpreadsheetStructureOutput(
+            file_name="test_meta.xlsx",
+            workbook_hash="hash_1",
+            sheet_names=[],
+            tables=[
+                ClassifiedTableDTO(
+                    sheet_name="SheetA",
+                    table_index=0,
+                    excel_range="A1:B2",
+                    regions=[
+                        ClassifiedRegionDTO(
+                            region_id="r1",
+                            type="data",
+                            excel_range="A1:B2",
+                            bbox_px=(0.0, 0.0, 100.0, 100.0),
+                            rows=(1, 2),
+                            columns=(1, 2),
+                            parent_ids=[],
+                        )
+                    ],
+                )
+            ],
+        )
+        res = module.execute(
+            SheetMetadataPersistenceInputDTO(
+                structure_input=table_structure,
+                index_input=idx,
+            )
+        )
+        self.assertEqual(res["sheets_saved"], 1)
+        mock_db.save_sheets.assert_called_once()
 
 
 if __name__ == "__main__":

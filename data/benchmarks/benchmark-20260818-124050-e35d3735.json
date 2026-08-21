@@ -1,0 +1,262 @@
+{
+  "id": "benchmark-20260818-124050-e35d3735",
+  "saved_at": "2026-08-18T12:40:50.322989+09:00",
+  "execution_mode": "sequential_isolated",
+  "use_cache": true,
+  "summary": [
+    {
+      "workflow_id": "default",
+      "cases": 1,
+      "scored_cases": 1,
+      "accuracy": 1.0,
+      "average_latency_seconds": 6.93,
+      "average_tokens": 19035,
+      "average_cost_usd": 0.019475,
+      "errors": 0,
+      "route_cases": 1,
+      "route_accuracy": 0.0,
+      "router_kind": null,
+      "average_router_latency_seconds": null,
+      "average_router_tokens": null,
+      "average_router_cost_usd": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "cases": 1,
+      "scored_cases": 1,
+      "accuracy": 1.0,
+      "average_latency_seconds": 2.556,
+      "average_tokens": 26422,
+      "average_cost_usd": 0.027952,
+      "errors": 0,
+      "route_cases": 1,
+      "route_accuracy": 1.0,
+      "router_kind": "semantic",
+      "average_router_latency_seconds": 0.619,
+      "average_router_tokens": 15,
+      "average_router_cost_usd": 0.0
+    }
+  ],
+  "results": [
+    {
+      "workflow_id": "default",
+      "case_id": "01-ltm-revenue-1",
+      "question": "IBM의 LTM 매출은 얼마인가?",
+      "run_id": "run-d82065c06a8b4ac2ae7efb6409142be3",
+      "status": "completed",
+      "latency_seconds": 6.93,
+      "total_tokens": 19035,
+      "estimated_cost_usd": 0.019475,
+      "answer": "IBM의 LTM 매출은 **67,535**입니다. 단위는 제공된 셀 맥락에 명시되어 있지 않습니다. [Key_Stats Cell A12]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00661
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.21067
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.26914
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.24349
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.04915
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.41819
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 1.00036
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 1.31178
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.82268
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 1.75295
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8451799999999999
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "01-ltm-revenue-1",
+      "question": "IBM의 LTM 매출은 얼마인가?",
+      "run_id": "run-d968b43bd3a344f08a9f626722891009",
+      "status": "completed",
+      "latency_seconds": 2.556,
+      "total_tokens": 26422,
+      "estimated_cost_usd": 0.027952,
+      "answer": "IBM의 **LTM 매출(Revenue)**은 **66,735백만 달러**입니다. [Income_Statement Cell A356]\n\n- 환산: **66,735백만 달러 ÷ 1,000 = 66.735십억 달러** [Income_Statement Cell A356]\n\n참고로 **LTM Total Revenue** 기준은 **67,535백만 달러**입니다. [Income_Statement Cell A538]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.619,
+        "total_tokens": 15,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00715
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.20731
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.19313999999999998
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.27952999999999995
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.053520000000000005
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.30988
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.28706
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.21937
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.5570900000000001
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.23596
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.20582
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    }
+  ]
+}

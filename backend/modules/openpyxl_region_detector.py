@@ -24,6 +24,7 @@ from .spreadsheet_structure import (
 class OpenpyxlRegionDetectorInputDTO(ModuleInputDTO):
     file_name: str
     workbook_hash: str
+    sheet_names: List[str]
     tables: List[DoclingTableRegionDTO]
 
 
@@ -73,7 +74,7 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
             "fill_ratio_threshold",
         ],
         raw_output=True,
-        version="3",
+        version="4",
     )
     input_model = OpenpyxlRegionDetectorInputDTO
     config_model = OpenpyxlRegionDetectorConfigDTO
@@ -403,8 +404,19 @@ class OpenpyxlRegionDetectorModule(ExecutableModule):
             if workbook is not None:
                 workbook.close()
 
+        selected_sheet_names = list(input_data.sheet_names)
+        if not selected_sheet_names:
+            catalog_sheets = self.catalog.sheet_names(workbook_path)
+            if input_data.tables:
+                table_sheets = {table.sheet_name for table in input_data.tables}
+                # Only include sheets that are both in tables and in catalog
+                selected_sheet_names = [s for s in catalog_sheets if s in table_sheets]
+            else:
+                selected_sheet_names = catalog_sheets
+
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
+            "sheet_names": selected_sheet_names,
             "tables": output_tables,
         }

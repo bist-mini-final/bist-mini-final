@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "indexing_prebuilt",
   "name": "indexing_prebuilt",
-  "updated_at": "2026-08-14T05:27:17.656716+00:00",
+  "updated_at": "2026-08-18T02:29:01.025370+00:00",
   "graph": {
     "nodes": [
       {
@@ -75,7 +75,7 @@
         },
         "config": {
           "model": "text-embedding-3-large",
-          "batch_size": 256
+          "batch_size": 2048
         },
         "values": {},
         "ui": {
@@ -161,9 +161,9 @@
       }
     ],
     "viewport": {
-      "x": -283.05484905798653,
-      "y": 367.88822311572,
-      "zoom": 0.5888907448672716
+      "x": -456.8462678089652,
+      "y": 373.0940543896102,
+      "zoom": 0.42280721622455225
     }
   }
 }
