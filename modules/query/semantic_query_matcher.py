@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 """Workflow module wrapper for the isolated semantic query matcher."""
 
 import time
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -98,8 +100,15 @@ class SemanticQueryMatcherModule(BaseModule):
         self.encoder = encoder
         self._matchers: Dict[str, SemanticQueryMatcher] = {}
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(SemanticQueryMatcherExecution, payload)
+    def execute(
+        self,
+        input_data: SemanticQueryMatcherInput,
+        config: Optional[SemanticQueryMatcherConfig] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, SemanticQueryMatcherExecution):
+            cfg = input_data
+        else:
+            cfg = config or SemanticQueryMatcherConfig()
         matcher = self._matchers.get(input_data.model)
         if matcher is None:
             matcher = SemanticQueryMatcher(

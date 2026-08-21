@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, cast
+from typing import Optional, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, cast
 
 import openpyxl
 from openpyxl.cell.cell import MergedCell
@@ -275,8 +275,15 @@ class ExhaustiveCellTextSerializerModule(BaseModule):
                 progress_callback(sheet_index, len(documents))
         return documents
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ExhaustiveCellTextSerializerExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: ExhaustiveCellTextSerializerInputDTO,
+        config: Optional[ExhaustiveCellTextSerializerConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, ExhaustiveCellTextSerializerExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or ExhaustiveCellTextSerializerConfigDTO()
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

@@ -1,4 +1,6 @@
-from typing import Any, Dict, Tuple, cast
+from __future__ import annotations
+
+from typing import Optional, Any, Dict, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -81,8 +83,15 @@ class RrfFusionModule(BaseModule):
     execution_model = RrfFusionExecutionDTO
     output_model = RetrievalDTO
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(RrfFusionExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: RrfFusionInputDTO,
+        config: Optional[RrfFusionConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, RrfFusionExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or RrfFusionConfigDTO()
         bm25_query = input_data.bm25_result.query_context
         dense_query = input_data.dense_result.query_context
         if bm25_query != dense_query:
@@ -116,7 +125,7 @@ class RrfFusionModule(BaseModule):
                 scores_by_query_cell[key] = scores_by_query_cell.get(
                     key,
                     0.0,
-                ) + 1.0 / (input_data.rrf_k + rank)
+                ) + 1.0 / (cfg.rrf_k + rank)
 
         best_by_cell: Dict[
             str,
@@ -126,7 +135,7 @@ class RrfFusionModule(BaseModule):
             subquery, cell_id = key
             candidate = metadata_by_query_cell[key][1]
             if not _has_ratio_intent(subquery) and _is_ratio_header(candidate.text):
-                score *= input_data.ratio_penalty
+                score *= cfg.ratio_penalty
             current = best_by_cell.get(cell_id)
             if current is None or score > current[0]:
                 best_by_cell[cell_id] = (score, candidate)
@@ -134,7 +143,7 @@ class RrfFusionModule(BaseModule):
         ranked = sorted(
             best_by_cell.values(),
             key=lambda item: (-item[0], item[1].cell_id),
-        )[: input_data.top_k]
+        )[: cfg.top_k]
         return {
             "query_context": bm25_query.model_dump(mode="json"),
             "document_context": bm25_document.model_dump(mode="json"),

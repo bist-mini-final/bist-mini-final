@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Optional
+from typing import Optional, Any, ClassVar, Dict, Optional
 
 from pydantic import Field
 
@@ -58,7 +58,11 @@ class IndexCompanyPersistenceModule(BaseModule):
         """Initialize the module with the provided pgvector store or a default store."""
         self.pgvector_store = pgvector_store or PgVectorStore()
 
-    def execute(self, payload: IndexCompanyPersistenceInputDTO) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: IndexCompanyPersistenceInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Persist the company name for an index and return the resulting company metadata.
         

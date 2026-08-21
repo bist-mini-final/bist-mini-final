@@ -1,4 +1,6 @@
-from typing import Any, Dict, Union, cast
+from __future__ import annotations
+
+from typing import Optional, Any, Dict, Union, cast
 
 from pydantic import BaseModel, Field, RootModel, field_validator
 
@@ -92,19 +94,24 @@ class QueryInputModule(BaseModule):
     def __init__(self, repository: AnswerCacheRepository) -> None:
         self.repository = repository
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(QueryExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: QueryInputDTO,
+        config: Optional[QueryConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or QueryConfigDTO()
+        query_text = input_data.query
         query_context = {
-            "question_id": question_id_for(input_data.query),
-            "question_text": input_data.query,
+            "question_id": question_id_for(query_text),
+            "question_text": query_text,
         }
         candidates = self.repository.question_candidates()
         if not candidates:
             return {"query_context": query_context}
 
-        matches = rank_candidates(input_data.query, candidates)
+        matches = rank_candidates(query_text, candidates)
         best = matches[0]
-        if best.combined_score < input_data.threshold:
+        if best.combined_score < cfg.threshold:
             return {"query_context": query_context}
 
         cached_answer = self.repository.get_cached_answer(best.question_id)
@@ -114,7 +121,7 @@ class QueryInputModule(BaseModule):
             "cached_answer": {
                 "query_context": {
                     "question_id": best.question_id.upper(),
-                    "question_text": input_data.query,
+                    "question_text": query_text,
                 },
                 "answer": cached_answer,
             }

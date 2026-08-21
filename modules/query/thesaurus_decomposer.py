@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -97,8 +97,15 @@ class ThesaurusDecomposerModule(BaseModule):
     ) -> None:
         self.completion_client = completion_client
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ThesaurusDecomposerExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: ThesaurusDecomposerInputDTO,
+        config: Optional[ThesaurusDecomposerConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, ThesaurusDecomposerExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or ThesaurusDecomposerConfigDTO()
         question_text = input_data.query_context.question_text
         query_context_dict = input_data.query_context.model_dump(mode="json")
 

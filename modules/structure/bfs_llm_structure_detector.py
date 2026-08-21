@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Optional, Any, Dict, List, Optional, Tuple, cast
 
 import openpyxl
 from pydantic import BaseModel, Field
@@ -281,7 +281,11 @@ class BfsLlmStructureDetectorModule(BaseModule):
             "parent_ids": parent_ids,
         }
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: BfsLlmStructureDetectorInputDTO,
+        config: Optional[BfsLlmStructureDetectorConfigDTO] = None,
+    ) -> Dict[str, Any]:
         settings = cast(BfsLlmStructureDetectorExecutionDTO, payload)
         try:
             workbook_path = self.catalog.resolve(settings.file_name)

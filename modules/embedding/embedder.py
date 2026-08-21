@@ -1,4 +1,6 @@
-from typing import Annotated, Any, Dict, List, Optional, Union
+from __future__ import annotations
+
+from typing import Optional, Annotated, Any, Dict, List, Optional, Union
 
 from pydantic import Field, model_validator
 

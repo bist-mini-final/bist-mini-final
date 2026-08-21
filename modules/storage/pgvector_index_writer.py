@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Dict, Optional, cast
+from typing import Optional, Any, Dict, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -75,7 +77,11 @@ class PgVectorIndexWriterModule(BaseModule):
         self.embedding_encoder = embedding_encoder
         self.processed_dir = processed_dir.resolve()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: PgVectorIndexWriterInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Persist cell embeddings and workbook metadata in a PostgreSQL pgvector index.
         
@@ -87,7 +93,10 @@ class PgVectorIndexWriterModule(BaseModule):
             Dict[str, Any]: Metadata for the created index, including its identifier,
                 workbook, model, embedding dimension, and document count.
         """
-        input_data = cast(PgVectorIndexWriterInputDTO, payload)
+        if config is None and isinstance(input_data, PgVectorIndexWriterInputDTO):
+            cfg = input_data
+        else:
+            cfg = config or EmptyModuleConfigDTO()
         vectors = self.artifact_store.get(
             input_data.artifact_id,
             len(input_data.items),

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Optional, Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -61,25 +63,23 @@ class PgVectorRetrieverModule(BaseModule):
     def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
         self.pgvector_store = pgvector_store or PgVectorStore()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: PgVectorRetrieverInputDTO,
+        config: Optional[PgVectorRetrieverConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Searches selected pgvector collections using the configured query embeddings and ranks the matching documents.
-        
-        Parameters:
-            payload (BaseModel): Execution data containing query embeddings, collection identifiers, retrieval configuration, and document context.
-        
-        Returns:
-            Dict[str, Any]: Query and document context with ranked matches, or an empty item list when no query embeddings are provided.
-        
-        Raises:
-            ModuleExecutionError: If every collection search fails and no matches are available.
         """
-        input_data = cast(PgVectorRetrieverExecutionDTO, payload)
+        if config is None and isinstance(input_data, PgVectorRetrieverExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or PgVectorRetrieverConfigDTO()
         raw_col_name = input_data.index_input.index_id
         target_collections = [c.strip() for c in raw_col_name.split(",") if c.strip()]
         if not target_collections:
             target_collections = [raw_col_name]
-        top_k = input_data.top_k
+        top_k = cfg.top_k
         query_items = list(input_data.query_input.items.items())
 
         if not query_items:

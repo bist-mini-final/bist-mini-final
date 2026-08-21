@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Optional, Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -89,8 +89,15 @@ class MultiCompanyCollectionLoaderModule(BaseModule):
         self.pgvector_store = pgvector_store or PgVectorStore()
         self.db_manager = db_manager or DatabaseManager()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(MultiCompanyCollectionLoaderExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: MultiCompanyCollectionLoaderInputDTO,
+        config: Optional[MultiCompanyCollectionLoaderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, MultiCompanyCollectionLoaderExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or MultiCompanyCollectionLoaderConfigDTO()
 
         target_cols: List[str] = list(input_data.collection_names or [])
         target_companies: List[str] = list(input_data.target_companies or [])

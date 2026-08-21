@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, cast
+from typing import Optional, Any, Dict, Iterable, Optional, cast
 
 from pydantic import BaseModel
 
@@ -141,10 +141,17 @@ class TemplateQueryDecomposerModule(BaseModule):
         self.fallback = AdaptiveQueryDecomposerModule(completion_client=completion_client)
         self.last_decision = "not executed"
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(TemplateQueryDecomposerExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: AdaptiveQueryDecomposerInput,
+        config: Optional[AdaptiveQueryDecomposerConfig] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, TemplateQueryDecomposerExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or AdaptiveQueryDecomposerConfig()
         self.last_usage = None
-        self.last_model = input_data.model
+        self.last_model = cfg.model
         question = input_data.query_context.question_text
         subqueries, reason = build_template_subqueries(question)
         if subqueries:
@@ -155,7 +162,7 @@ class TemplateQueryDecomposerModule(BaseModule):
             }
 
         self.last_decision = f"llm_fallback: {reason}"
-        result = self.fallback.execute(input_data)
+        result = self.fallback.execute(input_data, config=cfg)
         self.last_usage = getattr(self.fallback, "last_usage", None)
-        self.last_model = getattr(self.fallback, "last_model", input_data.model)
+        self.last_model = getattr(self.fallback, "last_model", cfg.model)
         return result

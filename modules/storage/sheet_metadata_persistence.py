@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Union
+from typing import Optional, Any, ClassVar, Dict, List, Union
 
 from pydantic import Field
 
@@ -80,7 +80,11 @@ class SheetMetadataPersistenceModule(BaseModule):
         self._db_manager = db_manager
         self.catalog = catalog or WorkbookCatalog(processed_dir)
 
-    def execute(self, payload: SheetMetadataPersistenceInputDTO) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: SheetMetadataPersistenceInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Persist workbook sheet metadata and detected tables for the selected visible sheets.
         

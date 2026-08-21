@@ -6,7 +6,7 @@ Source: Notion Financial Evaluation Set v2.0 & US-GAAP / IFRS Spreadsheet Metada
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Optional, Any, Dict, List, Optional
 
 
 # Notion v2.0 Standard Metric Mapping Rules & Financial Line Items

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Optional, Any, Dict, List, Optional, Set, Tuple, cast
 
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import BaseModel, Field
@@ -114,8 +114,15 @@ class PgContextExpanderModule(BaseModule):
     def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
         self.pgvector_store = pgvector_store or PgVectorStore()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(PgContextExpanderExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: PgContextExpanderInputDTO,
+        config: Optional[PgContextExpanderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, PgContextExpanderExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or PgContextExpanderConfigDTO()
         retrieval_items = input_data.retrieval_json.items[: input_data.top_k]
         query_context_dict = input_data.retrieval_json.query_context.model_dump(mode="json")
         doc_context_dict = input_data.retrieval_json.document_context.model_dump(mode="json")

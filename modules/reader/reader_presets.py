@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Forwarding presets from modules/reader/reader.py for backwards compatibility."""
 
 from modules.reader.reader import (

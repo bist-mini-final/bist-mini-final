@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, cast
+from typing import Optional, Any, Dict, List, Literal, cast
 
 import openpyxl
 from pydantic import BaseModel, Field
@@ -349,8 +349,15 @@ class OpenpyxlRegionDetectorModule(BaseModule):
             ),
         }
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(OpenpyxlRegionDetectorExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: OpenpyxlRegionDetectorInputDTO,
+        config: Optional[OpenpyxlRegionDetectorConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, OpenpyxlRegionDetectorExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or OpenpyxlRegionDetectorConfigDTO()
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

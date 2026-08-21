@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Set, Tuple, Union, cast
+from typing import Optional, Any, DefaultDict, Dict, List, Set, Tuple, Union, cast
 
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import BaseModel, Field
@@ -146,8 +148,15 @@ class ContextExpanderModule(BaseModule):
             + " | ".join(cells)
         )
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ContextExpanderExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: ContextExpanderInputDTO,
+        config: Optional[ContextExpanderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, ContextExpanderExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or ContextExpanderConfigDTO()
         expected_document = {
             "file_name": input_data.document_input.file_name,
             "workbook_hash": input_data.document_input.workbook_hash,
@@ -156,7 +165,7 @@ class ContextExpanderModule(BaseModule):
             raise ModuleExecutionError(
                 "검색 결과와 Structured Cell Text의 document_context가 일치하지 않습니다"
             )
-        candidates = input_data.retrieval_json.items[: input_data.top_k]
+        candidates = input_data.retrieval_json.items[: cfg.top_k]
         if not candidates:
             raise ModuleExecutionError("컨텍스트를 확장할 RRF 후보가 없습니다")
 
@@ -178,7 +187,7 @@ class ContextExpanderModule(BaseModule):
                 continue
             matched_candidates += 1
             candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
-            for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
+            for offset in range(-cfg.adjacent_radius, cfg.adjacent_radius + 1):
                 row_key = (document.sheet_name, candidate_row + offset)
                 if row_key in rows and row_key not in seen_rows:
                     seen_rows.add(row_key)
@@ -195,7 +204,7 @@ class ContextExpanderModule(BaseModule):
                 row_headers[(sheet_name, row)],
                 rows[(sheet_name, row)],
             )
-            for sheet_name, row in expanded_rows[: input_data.max_blocks]
+            for sheet_name, row in expanded_rows[: cfg.max_blocks]
         ]
         if not context_blocks:
             raise ModuleExecutionError("인접 행 확장 결과가 비어 있습니다")
@@ -207,7 +216,7 @@ class ContextExpanderModule(BaseModule):
                 ),
                 "document_context": expected_document,
                 "top_k_used": matched_candidates,
-                "adjacent_radius": input_data.adjacent_radius,
+                "adjacent_radius": cfg.adjacent_radius,
                 "context_characters": len(context_text),
                 "context_blocks": context_blocks,
                 "block_count": len(context_blocks),

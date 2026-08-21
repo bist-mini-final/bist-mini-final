@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 """pgvector retriever that applies a semantic sheet scope only when it is safe."""
 
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Optional, Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -80,8 +82,15 @@ class SemanticScopedPgVectorRetrieverModule(BaseModule):
             collection,
         )
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(SemanticScopedPgVectorRetrieverExecution, payload)
+    def execute(
+        self,
+        input_data: SemanticScopedPgVectorRetrieverInput,
+        config: Optional[SemanticScopedPgVectorRetrieverConfig] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, SemanticScopedPgVectorRetrieverExecution):
+            cfg = input_data
+        else:
+            cfg = config or SemanticScopedPgVectorRetrieverConfig()
         collections = [item.strip() for item in input_data.index_input.index_id.split(",") if item.strip()]
         if not collections:
             raise ModuleExecutionError("pgvector 컬렉션 참조가 비어 있습니다")

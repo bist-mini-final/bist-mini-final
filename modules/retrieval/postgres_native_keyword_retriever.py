@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Optional, Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -74,17 +74,23 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
     def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
         self.pgvector_store = pgvector_store or PgVectorStore()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: PostgresNativeKeywordRetrieverInputDTO,
+        config: Optional[PostgresNativeKeywordRetrieverConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Executes PostgreSQL full-text search across selected collections for each subquery.
         """
-        input_data = cast(PostgresNativeKeywordRetrieverExecutionDTO, payload)
+        if config is None and isinstance(input_data, PostgresNativeKeywordRetrieverExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or PostgresNativeKeywordRetrieverConfigDTO()
         raw_col_name = input_data.index_input.index_id
         target_collections = [c.strip() for c in raw_col_name.split(",") if c.strip()]
         if not target_collections:
             target_collections = [raw_col_name]
-
-        top_k = input_data.top_k
+        top_k = cfg.top_k
         subqueries = input_data.query_input.subqueries
         query_context_dict = input_data.query_input.query_context.model_dump(mode="json")
         doc_context_dict = {

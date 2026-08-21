@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, Dict, List, Literal, Mapping, Optional, Type, cast
+from typing import Optional, Any, Callable, ClassVar, Dict, List, Literal, Mapping, Optional, Type, cast
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -279,8 +279,8 @@ class BaseModule(ABC):
         return "cached" if cache_hit else "generated"
 
     @abstractmethod
-    def execute(self, payload: BaseModel) -> Any:
-        """Execute the module with an already validated input model."""
+    def execute(self, input_data: Any, config: Optional[Any] = None) -> Any:
+        """Execute the module with validated input_data and optional config."""
 
 
 # Backwards compatibility alias

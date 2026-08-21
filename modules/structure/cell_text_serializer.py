@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, cast
+from typing import Optional, Any, Dict, List, Literal, Optional, cast
 
 import openpyxl
 from openpyxl.utils import get_column_letter
@@ -254,7 +254,11 @@ class CellTextSerializerModule(BaseModule):
                             )
         return documents
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: CellTextSerializerInputDTO,
+        config: Optional[CellTextSerializerConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Serialize classified workbook cells into cell-text documents.
         
@@ -267,7 +271,10 @@ class CellTextSerializerModule(BaseModule):
         Raises:
             ModuleExecutionError: If the workbook cannot be resolved or read, has changed since classification, or references a missing or hidden sheet.
         """
-        input_data = cast(CellTextSerializerInputDTO, payload)
+        if config is None and isinstance(input_data, CellTextSerializerExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or CellTextSerializerConfigDTO()
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

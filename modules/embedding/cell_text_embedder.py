@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -122,7 +124,11 @@ class CellTextEmbedderModule(BaseModule):
             cache=self._encoders,
         )
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: CellTextEmbedderInputDTO,
+        config: Optional[CellTextEmbedderConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Embed cell documents and store their vectors as a content-addressed artifact.
         
@@ -139,7 +145,10 @@ class CellTextEmbedderModule(BaseModule):
                 incorrect number of vectors, or the vectors have inconsistent or zero
                 dimensions.
         """
-        input_data = cast(CellTextEmbedderExecutionDTO, payload)
+        if config is None and isinstance(input_data, CellTextEmbedderExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or CellTextEmbedderConfigDTO()
         encoder = self._encoder_for(input_data.model)
         vectors: List[List[float]] = []
         if not input_data.items:

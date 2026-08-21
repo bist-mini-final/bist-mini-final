@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import time
-from typing import Any, Dict, List, Literal, Optional, cast
+from typing import Optional, Any, Dict, List, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -193,11 +195,15 @@ class ReaderModule(BaseModule):
             latency_seconds=time.perf_counter() - started_at,
         )
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ReaderExecutionDTO, payload)
-        preset = READER_PRESETS[input_data.preset]
-        system_prompt = input_data.system_prompt or preset["system_prompt"]
-        user_template = input_data.user_prompt_template or preset["user_prompt_template"]
+    def execute(
+        self,
+        input_data: ReaderInputDTO,
+        config: Optional[ReaderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or ReaderConfigDTO()
+        preset = READER_PRESETS.get(cfg.preset, READER_PRESETS["luna_reader"])
+        system_prompt = cfg.system_prompt or preset["system_prompt"]
+        user_template = cfg.user_prompt_template or preset["user_prompt_template"]
         context_text = "\n\n".join(input_data.context_json.context_blocks)
         user_prompt = user_template.replace("{context_text}", context_text).replace(
             "{question}",
@@ -205,7 +211,7 @@ class ReaderModule(BaseModule):
         )
         try:
             result = self._complete(
-                input_data.model,
+                cfg.model,
                 [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -222,7 +228,7 @@ class ReaderModule(BaseModule):
                 "document_context": input_data.context_json.document_context.model_dump(
                     mode="json"
                 ),
-                "model": input_data.model,
+                "model": cfg.model,
                 "answer": result.content,
                 "api_usage": result.usage,
                 "latency_seconds": round(result.latency_seconds, 3),

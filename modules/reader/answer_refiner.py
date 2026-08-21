@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Optional, Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
@@ -380,20 +380,28 @@ class AnswerRefinerModule(BaseModule):
 
         return candidates[:max_cells], usage, estimated_cost_usd
 
-    def execute(self, payload: Any) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: AnswerRefinerInputDTO,
+        config: Optional[AnswerRefinerConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Refine an initial Reader answer using direct spreadsheet cell metadata identified
         via LLM spatial reasoning.
         """
         started_at = time.perf_counter()
-        if isinstance(payload, AnswerRefinerExecutionDTO):
-            parsed = payload
-        elif isinstance(payload, dict):
-            parsed = AnswerRefinerExecutionDTO.model_validate(payload)
+        if isinstance(input_data, dict):
+            config_fields = set(AnswerRefinerConfigDTO.model_fields)
+            cfg_dict = {k: v for k, v in input_data.items() if k in config_fields}
+            inp_dict = {k: v for k, v in input_data.items() if k not in config_fields}
+            cfg = AnswerRefinerConfigDTO.model_validate(cfg_dict)
+            input_data = AnswerRefinerInputDTO.model_validate(inp_dict)
+        elif config is None and isinstance(input_data, AnswerRefinerExecutionDTO):
+            cfg = input_data
         else:
-            parsed = AnswerRefinerExecutionDTO.model_validate(payload.model_dump())
+            cfg = config or AnswerRefinerConfigDTO()
 
-        initial_dto = parsed.answer_json
+        initial_dto = input_data.answer_json
         question_text = initial_dto.query_context.question_text
         initial_answer = initial_dto.answer
         workbook_hash = initial_dto.document_context.workbook_hash
@@ -403,22 +411,22 @@ class AnswerRefinerModule(BaseModule):
         extractor_cost = 0.0
         target_cells = []
 
-        if not parsed.target_cell_ids or len(parsed.target_cell_ids) < parsed.max_direct_cells:
+        if not input_data.target_cell_ids or len(input_data.target_cell_ids) < cfg.max_direct_cells:
             target_cells, extractor_usage, extractor_cost = self._infer_candidate_cells(
                 question=question_text,
                 initial_answer=initial_answer,
-                explicit_cell_ids=parsed.target_cell_ids,
-                model=parsed.model,
-                extractor_prompt=parsed.cell_extractor_prompt,
-                max_cells=parsed.max_direct_cells,
+                explicit_cell_ids=input_data.target_cell_ids,
+                model=cfg.model,
+                extractor_prompt=cfg.cell_extractor_prompt,
+                max_cells=cfg.max_direct_cells,
             )
-        elif parsed.target_cell_ids:
+        elif input_data.target_cell_ids:
             # Use explicit cells without inference
             sheet_codes = {
                 code.upper(): sheet_name
                 for sheet_name, code in SHEET_CODE_MAP.items()
             }
-            for cell_id in parsed.target_cell_ids[:parsed.max_direct_cells]:
+            for cell_id in input_data.target_cell_ids[:cfg.max_direct_cells]:
                 cand = self._parse_candidate_token(cell_id, sheet_codes)
                 if cand:
                     target_cells.append(cand)
@@ -433,7 +441,7 @@ class AnswerRefinerModule(BaseModule):
                     for candidate in target_cells
                 ],
                 workbook_hash=workbook_hash,
-                limit=parsed.max_direct_cells,
+                limit=cfg.max_direct_cells,
             )
 
             direct_cells = [
@@ -465,7 +473,7 @@ class AnswerRefinerModule(BaseModule):
             direct_cells_text = "No additional direct cell metadata found in database matching identified coordinates."
 
         # 4. Execute Refinement LLM Completion
-        user_prompt = parsed.user_prompt_template.format(
+        user_prompt = cfg.user_prompt_template.format(
             question=question_text,
             initial_answer=initial_answer,
             direct_cells_text=direct_cells_text,
@@ -480,10 +488,10 @@ class AnswerRefinerModule(BaseModule):
             try:
                 res: ChatCompletionResult = self.completion_client.complete_with_metadata(
                     messages=[
-                        {"role": "system", "content": parsed.system_prompt},
+                        {"role": "system", "content": cfg.system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    model=parsed.model,
+                    model=cfg.model,
                 )
                 refiner_usage = ApiUsageDTO(
                     prompt_tokens=res.usage.get("prompt_tokens", 0),
@@ -493,7 +501,7 @@ class AnswerRefinerModule(BaseModule):
                     total_tokens=res.usage.get("total_tokens", 0),
                 )
                 refiner_cost = calculate_openai_cost(
-                    parsed.model,
+                    cfg.model,
                     prompt_tokens=refiner_usage.prompt_tokens,
                     completion_tokens=refiner_usage.completion_tokens,
                     cached_tokens=refiner_usage.cached_tokens,
@@ -550,7 +558,7 @@ class AnswerRefinerModule(BaseModule):
             refined_answer=refined_answer,
             refinement_summary=refinement_summary,
             direct_cells=direct_cells,
-            model=parsed.model,
+            model=cfg.model,
             api_usage=api_usage,
             latency_seconds=latency_seconds,
             estimated_cost_usd=estimated_cost_usd,

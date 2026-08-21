@@ -6,7 +6,7 @@ import json
 import logging
 import concurrent.futures
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple, cast
+from typing import Optional, Any, Dict, List, Literal, Optional, Protocol, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -726,7 +726,11 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     ) from error
         return []
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: LunaVlmStructureDetectorInputDTO,
+        config: Optional[LunaVlmStructureDetectorConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Analyze the selected workbook's visible sheets and assemble detected table structures.
         

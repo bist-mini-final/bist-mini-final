@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Forwarding presets from modules/query/decomposer.py for backwards compatibility."""
 
 from modules.query.decomposer import (

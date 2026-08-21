@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple, cast
+from typing import Optional, Any, Dict, List, Sequence, Tuple, cast
 
 import openpyxl
 from PIL import Image, ImageDraw, ImageFont
@@ -146,8 +146,15 @@ class DoclingTableDetectorModule(BaseModule):
         )
         return normalized if normalized[2] > normalized[0] and normalized[3] > normalized[1] else None
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(DoclingTableDetectorExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: DoclingTableDetectorInputDTO,
+        config: Optional[DoclingTableDetectorConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, DoclingTableDetectorExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or DoclingTableDetectorConfigDTO()
         try:
             workbook_path = self.catalog.resolve(input_data.file_name)
             current_hash = self.catalog.sha256(workbook_path)

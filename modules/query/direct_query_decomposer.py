@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Convert a question into one retrieval query without an LLM call.
 
 This is intentionally separate from ``decomposer``: it is the fair baseline
@@ -5,7 +7,7 @@ used by dense, hybrid, and router experiments where query-decomposition cost
 must not be included in the measurement.
 """
 
-from typing import Any, Dict, cast
+from typing import Optional, Any, Dict, cast
 
 from pydantic import BaseModel, Field
 
@@ -32,8 +34,15 @@ class DirectQueryDecomposerModule(BaseModule):
     config_model = EmptyModuleConfigDTO
     output_model = SubqueriesDTO
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(DirectQueryDecomposerInput, payload)
+    def execute(
+        self,
+        input_data: DirectQueryDecomposerInput,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, DirectQueryDecomposerInput):
+            cfg = input_data
+        else:
+            cfg = config or EmptyModuleConfigDTO()
         return {
             "query_context": QueryContextDTO(
                 question_id=input_data.query_context.question_id,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """LLM-based counterpart to the embedding semantic query matcher.
 
 The module deliberately returns the same DTO as ``semantic_query_matcher`` so
@@ -7,7 +9,7 @@ and reader nodes identical.
 
 import json
 import time
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -75,8 +77,15 @@ class LlmQueryRouterModule(BaseModule):
     def __init__(self, completion_client: Optional[ChatCompletionClient] = None) -> None:
         self.completion_client = completion_client or ChatCompletionClient()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(LlmQueryRouterExecution, payload)
+    def execute(
+        self,
+        input_data: LlmQueryRouterInput,
+        config: Optional[LlmQueryRouterConfig] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, LlmQueryRouterExecution):
+            cfg = input_data
+        else:
+            cfg = config or LlmQueryRouterConfig()
         examples = load_examples()
         valid_sheets: Dict[str, List[str]] = {}
         for example in examples:

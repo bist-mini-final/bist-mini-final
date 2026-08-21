@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Optional, Set, Tuple, cast
+from typing import Optional, Any, DefaultDict, Dict, List, Optional, Set, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -106,8 +106,15 @@ class TimeseriesContextExpanderModule(BaseModule):
             f"Time Series Cells: " + ", ".join(time_series_entries)
         )
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(TimeseriesContextExpanderExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: TimeseriesContextExpanderInputDTO,
+        config: Optional[TimeseriesContextExpanderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, TimeseriesContextExpanderExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or TimeseriesContextExpanderConfigDTO()
         documents = input_data.document_input.items
         candidates = input_data.retrieval_json.items[: input_data.top_k]
 

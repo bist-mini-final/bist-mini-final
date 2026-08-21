@@ -6,7 +6,7 @@ import ast
 import json
 import logging
 import operator
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -185,8 +185,15 @@ class FinancialFormulaCalculatorModule(BaseModule):
     def __init__(self, completion_client: Optional[ChatCompletionClient] = None) -> None:
         self.completion_client = completion_client or ChatCompletionClient()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(FinancialFormulaCalculatorExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: FinancialFormulaCalculatorInputDTO,
+        config: Optional[FinancialFormulaCalculatorConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, FinancialFormulaCalculatorExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or FinancialFormulaCalculatorConfigDTO()
         if not input_data.enabled:
             res = {
                 "is_calculation_required": False,

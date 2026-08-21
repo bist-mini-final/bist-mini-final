@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import Optional, Any, Dict, List, cast
 
 from pydantic import BaseModel, Field
 
@@ -106,7 +106,11 @@ class DataframeSourceModule(BaseModule):
             file_schema["default"] = available[0]
         return contract
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: DataframeSourceInputDTO,
+        config: Optional[DataframeSourceConfigDTO] = None,
+    ) -> Dict[str, Any]:
         try:
             import pandas as pd
         except ImportError as err:
@@ -114,7 +118,10 @@ class DataframeSourceModule(BaseModule):
                 "pandas가 설치되어 있지 않습니다: pip install pandas openpyxl"
             ) from err
 
-        input_data = cast(DataframeSourceExecutionDTO, payload)
+        if config is None and isinstance(input_data, DataframeSourceExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or DataframeSourceConfigDTO()
 
         try:
             path = self.catalog.resolve(input_data.file_name)

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -114,8 +114,15 @@ class ImageTileSourceModule(BaseModule):
             file_schema["default"] = available[0]
         return contract
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(ImageTileSourceExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: ImageTileSourceInputDTO,
+        config: Optional[ImageTileSourceConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, ImageTileSourceExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or ImageTileSourceConfigDTO()
 
         try:
             path = self.catalog.resolve(input_data.file_name)

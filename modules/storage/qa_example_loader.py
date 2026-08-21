@@ -10,7 +10,7 @@ data/qa_examples/ 아래의 JSON 파일에서 QA 예시 세트를 로드합니�
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -133,8 +133,15 @@ class QaExampleLoaderModule(BaseModule):
             return []
         return sorted(p.name for p in QA_EXAMPLES_DIR.glob("*.json"))
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(QaExampleLoaderExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: QaExampleLoaderInputDTO,
+        config: Optional[QaExampleLoaderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, QaExampleLoaderExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or QaExampleLoaderConfigDTO()
         examples: List[Dict[str, Any]] = []
         source = "builtin"
 

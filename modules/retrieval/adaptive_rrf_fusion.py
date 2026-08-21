@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple, cast
+from typing import Optional, Any, Dict, List, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -92,8 +92,15 @@ class AdaptiveRrfFusionModule(BaseModule):
     execution_model = AdaptiveRrfFusionExecutionDTO
     output_model = RetrievalDTO
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(AdaptiveRrfFusionExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: AdaptiveRrfFusionInputDTO,
+        config: Optional[AdaptiveRrfFusionConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, AdaptiveRrfFusionExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or AdaptiveRrfFusionConfigDTO()
         bm25_res = input_data.bm25_result
         dense_res = input_data.dense_result
 

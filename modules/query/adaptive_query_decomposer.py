@@ -1,13 +1,21 @@
+from __future__ import annotations
+
 """Use semantic routing before paying for LLM query decomposition."""
 
-from typing import Any, Dict, Optional, cast
+from typing import Optional, Any, Dict, Optional, cast
 
 from pydantic import BaseModel, Field
 
 from backend.providers.llm.chat_completion import ChatCompletionClient
 from modules.common.base_module import BaseModule, ModuleDefinition, ModuleInputDTO, QueryContextDTO
 from backend.semantic_matching.plan_validation import validate_plan_reuse
-from modules.query.decomposer import DecomposerConfigDTO, DecomposerExecutionDTO, DecomposerModule, SubqueriesDTO
+from modules.query.decomposer import (
+    DecomposerConfigDTO,
+    DecomposerExecutionDTO,
+    DecomposerInputDTO,
+    DecomposerModule,
+    SubqueriesDTO,
+)
 from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
 from modules.query.subquery_format import augment_subqueries
 
@@ -60,12 +68,19 @@ class AdaptiveQueryDecomposerModule(BaseModule):
     def __init__(self, completion_client: Optional[ChatCompletionClient] = None) -> None:
         self.decomposer = DecomposerModule(completion_client=completion_client)
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(AdaptiveQueryDecomposerExecutionDTO, payload)
+    def execute(
+        self,
+        input_data: AdaptiveQueryDecomposerInput,
+        config: Optional[AdaptiveQueryDecomposerConfig] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, AdaptiveQueryDecomposerExecutionDTO):
+            cfg = input_data
+        else:
+            cfg = config or AdaptiveQueryDecomposerConfig()
         # Module instances may be reused by the in-process executor. Clear
         # previous telemetry so a safe reuse is never reported as an LLM call.
         self.last_usage = None
-        self.last_model = input_data.model
+        self.last_model = cfg.model
         match = input_data.semantic_match
         validation = validate_plan_reuse(
             input_data.query_context.question_text,
@@ -74,7 +89,7 @@ class AdaptiveQueryDecomposerModule(BaseModule):
         )
         if (
             match.matched
-            and match.confidence >= input_data.plan_reuse_threshold
+            and match.confidence >= cfg.plan_reuse_threshold
             and validation.reusable
         ):
             subqueries = augment_subqueries(match.subqueries)
@@ -88,17 +103,16 @@ class AdaptiveQueryDecomposerModule(BaseModule):
         # Low-confidence, missing, or constraint-mismatched plans must be
         # regenerated rather than silently reusing a nearby example's plan.
         result = self.decomposer.execute(
-            DecomposerExecutionDTO(
-                query_context=QueryContextDTO(
-                    question_id=input_data.query_context.question_id,
-                    question_text=input_data.query_context.question_text,
-                ),
-                model=input_data.model,
-                preset=input_data.preset,
-                system_prompt=input_data.system_prompt,
-                user_prompt_template=input_data.user_prompt_template,
-            )
+            DecomposerInputDTO(
+                query_context=input_data.query_context,
+            ),
+            config=DecomposerConfigDTO(
+                model=cfg.model,
+                preset=cfg.preset,
+                system_prompt=cfg.system_prompt,
+                user_prompt_template=cfg.user_prompt_template,
+            ),
         )
         self.last_usage = getattr(self.decomposer, "last_usage", None)
-        self.last_model = getattr(self.decomposer, "last_model", input_data.model)
+        self.last_model = getattr(self.decomposer, "last_model", cfg.model)
         return result

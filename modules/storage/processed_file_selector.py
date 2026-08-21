@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -71,7 +71,11 @@ class ProcessedFileSelectorModule(BaseModule):
             file_schema["default"] = available[0]
         return contract
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: ProcessedFileSelectorInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Resolve the requested processed workbook and select its processing sheets.
         
@@ -87,7 +91,10 @@ class ProcessedFileSelectorModule(BaseModule):
             ModuleExecutionError: If the workbook cannot be resolved, a requested sheet
                 does not exist, or no processing sheets are selected.
         """
-        input_data = cast(ProcessedFileSelectorInputDTO, payload)
+        if config is None and isinstance(input_data, ProcessedFileSelectorInputDTO):
+            cfg = input_data
+        else:
+            cfg = config or EmptyModuleConfigDTO()
         try:
             path = self.catalog.resolve(input_data.file_name)
             available_sheet_names = self.catalog.sheet_names(path)

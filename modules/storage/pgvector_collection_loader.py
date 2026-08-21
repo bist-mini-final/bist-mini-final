@@ -1,4 +1,6 @@
-from typing import Any, Dict, List, Optional, Tuple, cast
+from __future__ import annotations
+
+from typing import Optional, Any, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -72,7 +74,11 @@ class PgVectorCollectionLoaderModule(BaseModule):
         self.pgvector_store = pgvector_store or PgVectorStore()
         self.db_manager = db_manager or DatabaseManager()
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
+    def execute(
+        self,
+        input_data: PgVectorCollectionLoaderInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
         """
         Load selected pgvector collections and combine their documents and index metadata.
         
@@ -85,7 +91,10 @@ class PgVectorCollectionLoaderModule(BaseModule):
         Raises:
         	ModuleExecutionError: If no collections are available, a requested collection is missing, selected collections have inconsistent embedding models or dimensions, or collection documents cannot be loaded.
         """
-        input_data = cast(PgVectorCollectionLoaderInputDTO, payload)
+        if config is None and isinstance(input_data, PgVectorCollectionLoaderInputDTO):
+            cfg = input_data
+        else:
+            cfg = config or EmptyModuleConfigDTO()
         
         # 1. Resolve target collection list (support multi-select and single-select)
         targets: List[str] = []
