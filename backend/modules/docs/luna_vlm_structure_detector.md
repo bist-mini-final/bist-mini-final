@@ -1,6 +1,6 @@
 # Luna Full-Sheet Structure Detector
 
-> Module type: `luna_vlm_structure_detector` · Category: `Logic` · Version: `4`
+> Module type: `luna_vlm_structure_detector` · Category: `Logic` · Version: `5`
 
 후보 영역이나 타일 분할 없이 표시된 시트 전체 이미지와 좌표 컨텍스트를 한 번에 분석합니다.
 
@@ -16,7 +16,7 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `file_name` | `string` | yes | - | 선택된 processed Excel 파일명 |
+| `file_name` | `string` | yes | - | 선택된 source Excel 파일명 |
 | `workbook_hash` | `string` | yes | - | 파일 변경을 식별하는 SHA-256 |
 | `sheet_names` | `array<string>` | yes | - | 내부·빈 시트를 제외한 처리 대상 시트명 |
 

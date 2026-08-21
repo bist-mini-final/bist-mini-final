@@ -106,11 +106,6 @@ class SheetMetadataPersistenceModule(ExecutableModule):
 
         try:
             workbook_path = self.catalog.resolve(structure.file_name)
-            visible_sheets = (
-                structure.sheet_names
-                if isinstance(structure, WorkbookSelectionDTO)
-                else structure.sheet_names or self.catalog.sheet_names(workbook_path)
-            )
         except (OSError, ValueError, WorkbookCatalogError) as error:
             raise ModuleExecutionError(str(error)) from error
 
@@ -119,6 +114,18 @@ class SheetMetadataPersistenceModule(ExecutableModule):
             if isinstance(structure, WorkbookSelectionDTO)
             else structure.tables
         )
+
+        if structure.sheet_names:
+            visible_sheets = list(structure.sheet_names)
+        elif detected_tables:
+            catalog_sheets = self.catalog.sheet_names(workbook_path)
+            table_sheets = {t.sheet_name for t in detected_tables}
+            # Only include sheets that are both in tables and in catalog
+            visible_sheets = [s for s in catalog_sheets if s in table_sheets]
+        else:
+            raise ModuleExecutionError(
+                "저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다"
+            )
         sheet_dimensions: Dict[str, tuple[int, int]] = {}
         try:
             import openpyxl
@@ -144,7 +151,11 @@ class SheetMetadataPersistenceModule(ExecutableModule):
 
         sheets_data: List[Dict[str, Any]] = []
         for sheet_index, sheet_name in enumerate(visible_sheets):
-            rows, columns = sheet_dimensions.get(sheet_name, (0, 0))
+            # Only include sheets that exist in workbook dimensions
+            if sheet_name not in sheet_dimensions:
+                logger.warning("Skipping sheet '%s' not found in workbook dimensions", sheet_name)
+                continue
+            rows, columns = sheet_dimensions[sheet_name]
             sheet_tables = [
                 table.model_dump(mode="json")
                 for table in detected_tables

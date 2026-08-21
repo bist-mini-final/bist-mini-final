@@ -49,11 +49,11 @@ class WorkbookCatalog:
                 raise WorkbookCatalogError("사용할 processed Excel 파일을 선택해야 합니다")
         if selected not in available:
             raise WorkbookCatalogError(
-                f"data/processed에서 선택할 수 없는 Excel 파일입니다: {selected}"
+                f"data/source_files에서 선택할 수 없는 Excel 파일입니다: {selected}"
             )
         path = (self.root / selected).resolve()
         if path.parent != self.root:
-            raise WorkbookCatalogError("processed 디렉터리 밖의 파일은 선택할 수 없습니다")
+            raise WorkbookCatalogError("source_files 디렉터리 밖의 파일은 선택할 수 없습니다")
         return path
 
     @staticmethod

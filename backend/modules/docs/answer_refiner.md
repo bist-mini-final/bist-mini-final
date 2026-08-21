@@ -2,7 +2,7 @@
 
 > Module type: `answer_refiner` · Category: `Output` · Version: `1`
 
-Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, PostgreSQL pgvector 메타데이터에서 해당 셀들을 직접 조회하여 답변을 보강 및 정밀 개선합니다.
+Reader 답변에서 추가 검증이 필요한 셀을 LLM 2D 공간 위상 추론으로 선별하고, PostgreSQL pgvector 메타데이터에서 해당 셀들을 직접 조회하여 답변을 보강 및 정밀 개선합니다.
 
 이 문서는 Pydantic DTO와 `ModuleDefinition`에서 자동 생성됩니다. 정확한 중첩 스키마는 Swagger 또는 `--contract` 명령으로 확인합니다.
 
@@ -27,9 +27,8 @@ Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, PostgreSQ
 | `preset` | `string` | no | `"luna_cell_refiner"` | Refiner 프롬프트 프리셋 ID |
 | `system_prompt` | `string` | no | `<long default; see contract>` | 직접 셀 근거 기반 답변 정밀 교정 시스템 프롬프트 |
 | `user_prompt_template` | `string` | no | `<long default; see contract>` | {question}, {initial_answer}, {direct_cells_text} 템플릿 변수를 포함하는 사용자 프롬프트 |
+| `cell_extractor_prompt` | `string` | no | `<long default; see contract>` | 2D 스프레드시트 공간 위상 추론을 통한 타겟 셀 후보 추출 시스템 프롬프트 |
 | `max_direct_cells` | `integer` | no | `25` | DB에서 직접 인출할 최대 셀 개수 |
-| `spatial_column_radius` | `integer` | no | `3` | 발견된 셀 좌표 기준으로 좌우 인접 열(연도/타임라인)을 자동 확장할 반경 (예: O50 -> N50, P50, Q50, R50) |
-| `enable_auto_cell_discovery` | `boolean` | no | `true` | 질문 및 초기 답변에서 필요한 셀 좌표를 자동 판별하여 추가 인출할지 여부 |
 
 ## Output DTO
 
@@ -119,9 +118,8 @@ Reader 답변에서 추가 검증이 필요한 셀 ID를 선별하고, PostgreSQ
     "preset": "luna_cell_refiner",
     "system_prompt": "<use system_prompt default from ConfigDTO>",
     "user_prompt_template": "<use user_prompt_template default from ConfigDTO>",
-    "max_direct_cells": 25,
-    "spatial_column_radius": 3,
-    "enable_auto_cell_discovery": true
+    "cell_extractor_prompt": "<use cell_extractor_prompt default from ConfigDTO>",
+    "max_direct_cells": 25
   }
 }
 ```

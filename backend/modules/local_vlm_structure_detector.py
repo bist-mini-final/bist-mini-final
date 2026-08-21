@@ -253,7 +253,7 @@ class LocalVlmStructureDetectorModule(ExecutableModule):
             "user_prompt_template",
         ],
         raw_output=True,
-        version="4",
+        version="5",
     )
     input_model = LocalVlmStructureDetectorInputDTO
     config_model = LocalVlmStructureDetectorConfigDTO

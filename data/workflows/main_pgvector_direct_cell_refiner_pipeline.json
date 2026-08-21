@@ -212,9 +212,7 @@
         "config": {
           "model": "gpt-5.6-luna",
           "preset": "luna_cell_refiner",
-          "max_direct_cells": 25,
-          "spatial_column_radius": 3,
-          "enable_auto_cell_discovery": true
+          "max_direct_cells": 25
         },
         "values": {},
         "ui": {

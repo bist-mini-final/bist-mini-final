@@ -33,7 +33,7 @@ Hidden sheets, rows, and columns are intentionally absent. Never infer or restor
 For every supplied table region, decide only these boundaries from its top candidate rows:
 1. title_row_end: absolute last row of conceptual table titles, or null. A title describes the whole table. A row with values in two or more different columns is a header, not a title.
 2. data_start_row: absolute first data row. Consecutive text rows are usually headers; the first row where numeric/formula values become the main content is usually data.
-3. index_column_count: count of leftmost label/category/index columns. Text labels on the left with numeric data to the right indicate index columns. It must be at least 0 and strictly smaller than column_count.
+3. index_column_count: count of leftmost label/category/index columns. Use index columns only for a matrix/crosstab. For a record table whose top header row contains peer fields such as NAME, ROLE, AGE, or SALARY, return 0 even when leading columns contain text and later columns contain numbers. It must be at least 0 and strictly smaller than column_count.
 
 Return one decision for every region_id. Use absolute Excel coordinates. Do not infer any cells not shown. Output only valid JSON in this exact shape:
 {{"decisions":[{{"region_id":"...","title_row_end":null,"data_start_row":1,"index_column_count":1}}]}}"""
@@ -113,7 +113,7 @@ class BfsLlmStructureDetectorModule(ExecutableModule):
             "user_prompt_template",
         ],
         raw_output=True,
-        version="4",
+        version="5",
     )
     input_model = BfsLlmStructureDetectorInputDTO
     config_model = BfsLlmStructureDetectorConfigDTO

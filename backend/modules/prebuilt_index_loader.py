@@ -21,7 +21,7 @@ class PrebuiltIndexLoaderInputDTO(ModuleInputDTO):
     file_name: str = Field(
         default="SPG_Company_KeyStats_v3_prebuilt.parquet",
         min_length=1,
-        description="data/processed 또는 data/vector_db에 공유된 사전 구축 인덱스 (.parquet / .json) 파일명",
+        description="data/source_files 또는 data/vector_db에 공유된 사전 구축 인덱스 (.parquet / .json) 파일명",
     )
 
 
@@ -107,7 +107,7 @@ class PrebuiltIndexLoaderModule(ExecutableModule):
 
         raise ModuleExecutionError(
             f"사전 구축 인덱스 파일을 찾을 수 없습니다: {target_name}. "
-            f"파일을 data/processed/ 디렉터리에 복사해 주세요."
+            f"파일을 data/source_files/ 디렉터리에 복사해 주세요."
         )
 
     def _read_data(self, file_path: Path) -> Dict[str, Any]:

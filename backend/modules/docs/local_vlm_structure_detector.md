@@ -1,6 +1,6 @@
 # Local VLM Table Structure Detector
 
-> Module type: `local_vlm_structure_detector` · Category: `Logic` · Version: `4`
+> Module type: `local_vlm_structure_detector` · Category: `Logic` · Version: `5`
 
 셀 타입 오버레이 이미지와 좌표·타입·값 컨텍스트를 로컬 VLM에 함께 전달해 표와 계층 헤더 영역을 식별합니다.
 
@@ -16,7 +16,7 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `file_name` | `string` | yes | - | 선택된 processed Excel 파일명 |
+| `file_name` | `string` | yes | - | 선택된 source Excel 파일명 |
 | `workbook_hash` | `string` | yes | - | 파일 변경을 식별하는 SHA-256 |
 | `sheet_names` | `array<string>` | yes | - | 내부·빈 시트를 제외한 처리 대상 시트명 |
 

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "luna_vlm_validation",
   "name": "luna_vlm_validation",
-  "updated_at": "2026-08-18T10:02:32.169919+00:00",
+  "updated_at": "2026-08-20T00:29:07.136354+00:00",
   "graph": {
     "nodes": [
       {
@@ -14,7 +14,7 @@
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v3.xlsm"
+          "file_name": "SPG_Worldwide_OwnershipDetail_v5.xlsm"
         },
         "ui": {
           "width": null,
@@ -62,9 +62,9 @@
       }
     ],
     "viewport": {
-      "x": 520.1981943090082,
-      "y": 292.69063073929135,
-      "zoom": 0.7674112954602128
+      "x": -34.38328732519699,
+      "y": 235.06002313472246,
+      "zoom": 1.0585371519265039
     }
   }
 }

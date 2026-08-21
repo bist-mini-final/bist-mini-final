@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "default",
-  "name": "default_pgvector_baseline",
-  "updated_at": "2026-08-20T08:05:42.614313+00:00",
+  "name": "default",
+  "updated_at": "2026-08-20T00:28:05.127259+00:00",
   "graph": {
     "nodes": [
       {
@@ -212,6 +212,27 @@
         "ui": {
           "width": 881.0,
           "height": 1315.0,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "custom-node-1787020430289-1",
+        "module_type": "pgvector_collection_loader",
+        "position": {
+          "x": 2478.2880582893004,
+          "y": 433.354939451034
+        },
+        "config": {},
+        "values": {
+          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
+          "collection_names": [
+            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
+          ]
+        },
+        "ui": {
+          "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }

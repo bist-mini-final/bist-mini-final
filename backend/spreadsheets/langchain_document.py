@@ -38,7 +38,13 @@ def cell_items_to_langchain_documents(
 
         text = doc_dict.get("text", "")
         cell_id = doc_dict.get("cell_id", "")
-        doc_id = f"{cell_id}#{idx}" if cell_id else None
+        prefix = index_id or workbook_hash
+        if prefix and cell_id:
+            doc_id = f"{prefix}:{cell_id}#{idx}"
+        elif cell_id:
+            doc_id = f"{cell_id}#{idx}"
+        else:
+            doc_id = None
         metadata = {
             "cell_id": cell_id,
             "sheet_name": doc_dict.get("sheet_name", ""),

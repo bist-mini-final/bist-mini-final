@@ -23,6 +23,7 @@ from ..spreadsheets.cell_semantics import collect_non_empty_cells, compact_sheet
 from ..spreadsheets.cell_type_overlay import render_cell_type_overlay
 from ..spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
 from ..spreadsheets.prompt_guidance import (
+    LEGACY_TEXT_CELL_ROLE_GUIDANCE,
     TABLE_UNIFICATION_GUIDANCE,
     TEXT_CELL_ROLE_GUIDANCE,
 )
@@ -182,6 +183,16 @@ class LunaVlmStructureDetectorExecutionDTO(
         legacy_system_prompt = migrated.get("system_prompt")
         if (
             isinstance(legacy_system_prompt, str)
+            and LEGACY_TEXT_CELL_ROLE_GUIDANCE in legacy_system_prompt
+            and TEXT_CELL_ROLE_GUIDANCE not in legacy_system_prompt
+        ):
+            migrated["system_prompt"] = legacy_system_prompt.replace(
+                LEGACY_TEXT_CELL_ROLE_GUIDANCE,
+                TEXT_CELL_ROLE_GUIDANCE,
+            )
+            legacy_system_prompt = migrated["system_prompt"]
+        if (
+            isinstance(legacy_system_prompt, str)
             and "You receive two images in this order" in legacy_system_prompt
             and "current tile" in legacy_system_prompt
         ):
@@ -256,7 +267,7 @@ class LunaVlmStructureDetectorModule(ExecutableModule):
             "user_prompt_template",
         ],
         raw_output=True,
-        version="4",
+        version="5",
     )
     input_model = LunaVlmStructureDetectorInputDTO
     config_model = LunaVlmStructureDetectorConfigDTO

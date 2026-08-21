@@ -56,10 +56,24 @@ class FakeConnection:
 
 
 def database_with(cursor):
-    database = object.__new__(DatabaseManager)
+    database = DatabaseManager("postgresql://mock:5432/mock")
     connection = FakeConnection(cursor)
     database._raw_connection = lambda: connection
     return database, connection
+
+
+def test_init_does_not_perform_db_io(monkeypatch):
+    called = False
+
+    def mock_connect(*_args, **_kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("Connection should not be attempted on init")
+
+    monkeypatch.setattr("psycopg2.connect", mock_connect)
+    manager = DatabaseManager("postgresql://mock:5432/mock")
+    assert manager.database_url == "postgresql://mock:5432/mock"
+    assert called is False
 
 
 def test_delete_source_file_resolves_unique_filename_to_one_id():
@@ -126,6 +140,9 @@ def test_ensure_schema_closes_connection_on_success():
     database.ensure_schema()
     assert connection.committed is True
     assert connection.closed is True
+    # Ensure no destructive ALTER TABLE DROP COLUMN in ensure_schema
+    executed_queries = " ".join(e[0] for e in cursor.executions)
+    assert "DROP COLUMN" not in executed_queries
 
 
 def test_ensure_schema_logs_and_closes_connection_on_error():
@@ -139,5 +156,30 @@ def test_ensure_schema_logs_and_closes_connection_on_error():
     database.ensure_schema()
     assert connection.committed is False
     assert connection.closed is True
+
+
+def test_run_migrations_closes_connection_on_success():
+    cursor = FakeCursor()
+    database, connection = database_with(cursor)
+
+    database.run_migrations()
+    assert connection.committed is True
+    assert connection.closed is True
+    executed_queries = " ".join(e[0] for e in cursor.executions)
+    assert "DROP COLUMN IF EXISTS file_content" in executed_queries
+
+
+def test_run_migrations_logs_and_closes_connection_on_error():
+    class ErrorCursor(FakeCursor):
+        def execute(self, query, params=None):
+            raise RuntimeError("Migration error")
+
+    cursor = ErrorCursor()
+    database, connection = database_with(cursor)
+
+    database.run_migrations()
+    assert connection.committed is False
+    assert connection.closed is True
+
 
 
