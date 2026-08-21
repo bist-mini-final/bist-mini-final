@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
+from ..modules.adaptive_rrf_fusion import AdaptiveRrfFusionModule
 from ..modules.answer_refiner import AnswerRefinerModule
 from ..modules.answer_cache_writer import AnswerCacheWriterModule
 from ..modules.base import ExecutableModule
@@ -21,12 +22,16 @@ from ..modules.embedder import EmbedderModule
 from ..modules.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
+from ..modules.financial_formula_calculator import FinancialFormulaCalculatorModule
 from ..modules.image_tile_source import ImageTileSourceModule
 from ..modules.index_company_persistence import IndexCompanyPersistenceModule
 from ..modules.json_inspector import JsonInspectorModule
 from ..modules.json_transformer import JsonTransformerModule
 from ..modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
 from ..modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
+from ..modules.multi_company_collection_loader import (
+    MultiCompanyCollectionLoaderModule,
+)
 from ..modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
 from ..modules.pgvector_collection_loader import PgVectorCollectionLoaderModule
 from ..modules.pgvector_index_writer import PgVectorIndexWriterModule
@@ -38,6 +43,8 @@ from ..modules.query_input import QueryInputModule
 from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
 from ..modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
+from ..modules.thesaurus_decomposer import ThesaurusDecomposerModule
+from ..modules.timeseries_context_expander import TimeseriesContextExpanderModule
 from ..modules.vector_index_writer import VectorIndexWriterModule
 from ..storage.answer_cache import AnswerCacheRepository
 from ..storage.db_manager import DatabaseManager
@@ -101,6 +108,7 @@ class ModuleRegistry(BaseModuleRegistry):
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
             DecomposerModule(completion_client=completion_client),
+            ThesaurusDecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
                 encoder=embedding_encoder,
@@ -123,11 +131,18 @@ class ModuleRegistry(BaseModuleRegistry):
                 pgvector_store=self.pgvector_store,
                 db_manager=self.db_manager,
             ),
+            MultiCompanyCollectionLoaderModule(
+                pgvector_store=self.pgvector_store,
+                db_manager=self.db_manager,
+            ),
             Bm25RetrieverModule(),
             DenseRetrieverModule(vector_indexes),
             PgVectorRetrieverModule(self.pgvector_store),
             RrfFusionModule(),
+            AdaptiveRrfFusionModule(),
             ContextExpanderModule(),
+            TimeseriesContextExpanderModule(),
+            FinancialFormulaCalculatorModule(completion_client=completion_client),
             ReaderModule(completion_client),
             AnswerRefinerModule(
                 completion_client=completion_client,
