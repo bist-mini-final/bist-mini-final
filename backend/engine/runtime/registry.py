@@ -14,6 +14,11 @@ from modules.storage.company_entity_extractor import CompanyEntityExtractorModul
 from modules.retrieval.context_expander import ContextExpanderModule
 from modules.storage.dataframe_source import DataframeSourceModule
 from modules.query.decomposer import DecomposerModule
+from modules.query.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from modules.query.direct_query_decomposer import DirectQueryDecomposerModule
+from modules.query.template_query_decomposer import TemplateQueryDecomposerModule
+from modules.query.llm_query_router import LlmQueryRouterModule
+from modules.query.semantic_query_matcher import SemanticQueryMatcherModule
 from modules.structure.docling_table_detector import DoclingTableDetectorModule
 from modules.embedding.embedder import EmbedderModule
 from modules.structure.exhaustive_cell_text_serializer import (
@@ -30,6 +35,9 @@ from modules.structure.openpyxl_region_detector import OpenpyxlRegionDetectorMod
 from modules.storage.pgvector_collection_loader import PgVectorCollectionLoaderModule
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 from modules.retrieval.pgvector_retriever import PgVectorRetrieverModule
+from modules.retrieval.semantic_scoped_pgvector_retriever import (
+    SemanticScopedPgVectorRetrieverModule,
+)
 from modules.embedding.batch_query_embedder import BatchQueryEmbedderModule
 from modules.retrieval.pg_context_expander import PgContextExpanderModule
 from modules.retrieval.postgres_native_keyword_retriever import (
@@ -64,17 +72,6 @@ class ModuleRegistry(BaseModuleRegistry):
         processed_dir: Path = PROCESSED_DATA_DIR,
         spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
-        """
-        Initialize the registry and register all supported executable modules.
-        
-        Parameters:
-            repository (AnswerCacheRepository): Repository used to cache answers.
-            processed_dir (Path): Directory containing processed data artifacts.
-            spreadsheet_artifact_dir (Path): Directory for spreadsheet processing artifacts.
-        
-        Raises:
-            ValueError: If multiple modules declare the same type.
-        """
         embedding_artifacts = (
             embedding_artifact_store or EmbeddingArtifactStore()
         )
@@ -100,6 +97,11 @@ class ModuleRegistry(BaseModuleRegistry):
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
             DecomposerModule(completion_client=completion_client),
+            AdaptiveQueryDecomposerModule(completion_client=completion_client),
+            DirectQueryDecomposerModule(),
+            TemplateQueryDecomposerModule(completion_client=completion_client),
+            LlmQueryRouterModule(completion_client=completion_client),
+            SemanticQueryMatcherModule(encoder=embedding_encoder),
             ThesaurusDecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
@@ -121,6 +123,7 @@ class ModuleRegistry(BaseModuleRegistry):
                 db_manager=self.db_manager,
             ),
             PgVectorRetrieverModule(self.pgvector_store),
+            SemanticScopedPgVectorRetrieverModule(self.pgvector_store),
             PostgresNativeKeywordRetrieverModule(self.pgvector_store),
             BatchQueryEmbedderModule(encoder=embedding_encoder),
             RrfFusionModule(),

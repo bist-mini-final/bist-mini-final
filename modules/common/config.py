@@ -18,9 +18,7 @@ EMBEDDING_MODEL_OPTIONS: List[str] = [
 # ==============================================================================
 DEFAULT_LLM_MODEL: str = "gpt-5.6-luna"
 LLM_MODEL_OPTIONS: List[str] = [
-    "gpt-5.6-luna",
-    "gpt-5.6-terra",
-    "gpt-5.6-sol",
+    "gpt-5.6-luna"
 ]
 
 # Vision Language Model (for Excel sheet structure detection)

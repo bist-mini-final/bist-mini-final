@@ -819,6 +819,7 @@ class PgVectorStore:
         collection_name: str,
         embedding: List[float],
         k: int = 10,
+        sheet_names: Optional[List[str]] = None,
     ) -> List[Tuple[Any, float]]:
         """
         Search a collection for documents nearest to an embedding vector.

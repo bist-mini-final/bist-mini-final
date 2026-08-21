@@ -51,6 +51,7 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
     from pathlib import Path
 
     from backend.storage.answer_cache import AnswerCacheRepository
+    from backend.storage.db_manager import DatabaseManager
     from backend.storage.embedding_artifacts import EmbeddingArtifactStore
     from .registry import ModuleRegistry
 
@@ -61,6 +62,10 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
         ),
         processed_dir=Path(spec["processed_dir"]),
         spreadsheet_artifact_dir=Path(spec["spreadsheet_artifact_dir"]),
+        # The parent API process owns schema migration. Running DDL from each
+        # short-lived worker can block a simple query_input task behind a
+        # PostgreSQL schema lock before any benchmark work begins.
+        db_manager=DatabaseManager(ensure_schema=False),
     )
     while True:
         task = request_queue.get()

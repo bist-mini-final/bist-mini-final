@@ -6,6 +6,8 @@ import type {
   WorkflowRun,
 } from '../types';
 
+const DEFAULT_WORKFLOW_ID = 'workflow';
+
 interface WorkflowGraphBridge {
   exportGraph: () => WorkflowGraph;
   replaceGraph: (graph: WorkflowGraph) => void;
@@ -310,7 +312,7 @@ export function useWorkflowPersistence(
           workflow = await pipelineApi.getWorkflow(activeWorkflowId, controller.signal);
           graphRef.current.replaceGraph(workflow.graph);
         } catch (error: unknown) {
-          if (!(error instanceof ApiError && error.status === 404)) throw error;
+          if (!(error instanceof ApiError && error.status === 404 && activeWorkflowId === DEFAULT_WORKFLOW_ID)) throw error;
           workflow = await pipelineApi.saveWorkflow(
             activeWorkflowId,
             activeWorkflowName,
@@ -397,12 +399,14 @@ export function useWorkflowPersistence(
       setIsExecuting(true);
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
+        const currentRuntimeInputs = runInputs(currentExecutionGraph, query);
         let run = latestRun &&
           (latestRun.status === 'queued' ||
             latestRun.status === 'running' ||
             latestRun.status === 'paused' ||
             latestRun.status === 'failed') &&
           executionRunMatchesRequest(latestRun, currentExecutionGraph, query)
+          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs)
           ? latestRun
           : await createRun(query, controller.signal);
         applyRun(run);
@@ -619,6 +623,7 @@ export function useWorkflowPersistence(
 
   return {
     workflowId: activeWorkflowId,
+    workflowName: activeWorkflowName,
     ready,
     saveStatus,
     lastSavedAt,

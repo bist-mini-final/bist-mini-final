@@ -279,6 +279,7 @@ class WorkflowExecutor:
             graph=execution_graph,
             runtime_inputs=request.inputs,
             use_cache=request.use_cache,
+            cache_only_module_types=request.cache_only_module_types,
             batches=[
                 RunBatchState(index=index, node_ids=node_ids)
                 for index, node_ids in enumerate(batches)
@@ -769,7 +770,10 @@ class WorkflowExecutor:
                 last_progress_phase = phase
 
         output: Any = None
-        if run.use_cache and module.definition.cacheable:
+        cache_enabled = run.use_cache and module.definition.cacheable and (
+            run.cache_only_module_types is None or node.module_type in run.cache_only_module_types
+        )
+        if cache_enabled:
             output = self.result_cache.get(cache_key)
             state.cache_hit = output is not None
         if output is None:
@@ -793,7 +797,7 @@ class WorkflowExecutor:
                     progress_callback=persist_progress,
                 )
             self._raise_if_cancelled(run.id)
-            if run.use_cache and module.definition.cacheable:
+            if cache_enabled:
                 self.result_cache.put(cache_key, output)
 
         branch_ports = set(module.definition.branch_outputs.values())
@@ -834,6 +838,12 @@ class WorkflowExecutor:
                 node_cost = aj.get("estimated_cost_usd")
                 if isinstance(aj.get("api_usage"), Mapping):
                     node_usage = {k: int(v) for k, v in aj["api_usage"].items() if v is not None}
+            elif "semantic_match" in output and isinstance(output["semantic_match"], Mapping):
+                metrics = output["semantic_match"].get("metrics") or {}
+                raw_usage = metrics.get("api_usage") or {}
+                if isinstance(raw_usage, Mapping):
+                    node_usage = {k: int(v) for k, v in raw_usage.items() if v is not None}
+                node_cost = metrics.get("estimated_cost_usd")
             elif "usage" in output or "_usage" in output:
                 raw_u = output.get("usage") or output.get("_usage")
                 model_used = output.get("model") or validated_config.get("model") or ""

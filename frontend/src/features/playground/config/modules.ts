@@ -5,8 +5,11 @@ export const MODULE_CATEGORIES = ['Source', 'Logic', 'Transform', 'Output'] as c
 /** UI-only metadata. Labels, descriptions, and I/O contracts come from the backend. */
 export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>> = {
   query_input: { icon: 'MessageSquare', color: '#107c41' },
+  direct_query_decomposer: { icon: 'ArrowRight', color: '#475569' },
   decomposer: { icon: 'GitBranch', color: '#7c3aed' },
   thesaurus_decomposer: { icon: 'Languages', color: '#7c3aed' },
+  adaptive_query_decomposer: { icon: 'GitBranch', color: '#6d28d9' },
+  template_query_decomposer: { icon: 'FileCode', color: '#4f46e5' },
   embedder: { icon: 'Cpu', color: '#0891b2' },
   batch_query_embedder: { icon: 'Cpu', color: '#0891b2' },
   cell_text_embedder: { icon: 'Binary', color: '#0f766e' },
@@ -14,7 +17,11 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   pgvector_collection_loader: { icon: 'Database', color: '#0f766e' },
   multi_company_collection_loader: { icon: 'Building2', color: '#0f766e' },
   pgvector_retriever: { icon: 'Search', color: '#0f766e' },
+  semantic_scoped_pgvector_retriever: { icon: 'SearchCheck', color: '#0f766e' },
   postgres_native_keyword_retriever: { icon: 'ListFilter', color: '#2563eb' },
+  semantic_query_matcher: { icon: 'Route', color: '#7c3aed' },
+  llm_query_router: { icon: 'Bot', color: '#c026d3' },
+  semantic_scoped_dense_retriever: { icon: 'SearchCheck', color: '#0f766e' },
   rrf_fusion: { icon: 'Merge', color: '#059669' },
   adaptive_rrf_fusion: { icon: 'Merge', color: '#059669' },
   context: { icon: 'Maximize2', color: '#d97706' },
