@@ -79,7 +79,8 @@ class ChatCompletionClient:
         )
         started_at = time.perf_counter()
         document = None
-        retries = 3
+        retries = 10
+        max_retry_budget_seconds = 60.0
         for attempt in range(retries):
             try:
                 with urlopen(request, timeout=self.timeout_seconds) as response:
@@ -93,13 +94,32 @@ class ChatCompletionClient:
                 except (OSError, ValueError, AttributeError):
                     pass
                 detail = f": {message}" if message else ""
-                if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
-                    time.sleep(1.0 * (2 ** attempt))
+                elapsed = time.perf_counter() - started_at
+                if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1 and elapsed < max_retry_budget_seconds:
+                    sleep_time = min(30.0, 1.5 * (1.5 ** attempt))
+                    if error.code == 429 and message:
+                        try:
+                            import re
+                            m = re.search(r"try again in ([0-9]+(?:\.[0-9]+)?)(m?s)", message)
+                            if m:
+                                val = float(m.group(1))
+                                unit = m.group(2)
+                                parsed_delay = (val / 1000.0) if unit == "ms" else val
+                                sleep_time = min(30.0, max(0.05, parsed_delay))
+                        except (ValueError, TypeError, AttributeError):
+                            pass
+                    if elapsed + sleep_time > max_retry_budget_seconds:
+                        raise ChatCompletionError(f"LLM API가 HTTP {error.code}를 반환했습니다 (재시도 예산 초과){detail}") from error
+                    time.sleep(sleep_time)
                     continue
                 raise ChatCompletionError(f"LLM API가 HTTP {error.code}를 반환했습니다{detail}") from error
             except (URLError, TimeoutError, OSError, ValueError) as error:
-                if attempt < retries - 1:
-                    time.sleep(1.0 * (2 ** attempt))
+                elapsed = time.perf_counter() - started_at
+                if attempt < retries - 1 and elapsed < max_retry_budget_seconds:
+                    sleep_time = min(15.0, 2.0 * (2 ** attempt))
+                    if elapsed + sleep_time > max_retry_budget_seconds:
+                        raise ChatCompletionError(f"LLM API 호출 재시도 예산 초과: {error}") from error
+                    time.sleep(sleep_time)
                     continue
                 raise ChatCompletionError(f"LLM API 호출 또는 응답 해석에 실패했습니다: {error}") from error
         try:

@@ -148,9 +148,9 @@ class PgVectorRetrieverModule(ExecutableModule):
                 doc_id = getattr(doc, "id", None)
                 row_id = doc_id if isinstance(doc_id, str) and doc_id else None
                 persistent_id = (
-                    row_id
-                    or doc.metadata.get("cell_id")
+                    doc.metadata.get("cell_id")
                     or doc.metadata.get("chunk_id")
+                    or row_id
                     or doc.metadata.get("id")
                 )
                 cell_id = persistent_id or f"{target_col}:chunk:{content_hash}"

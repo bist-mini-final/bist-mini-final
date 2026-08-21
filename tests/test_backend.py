@@ -795,22 +795,27 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 32)
+        self.assertEqual(len(definitions), 37)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
                 "query_input",
                 "decomposer",
+                "thesaurus_decomposer",
                 "embedder",
                 "cell_text_embedder",
                 "vector_index_writer",
                 "pgvector_index_writer",
                 "pgvector_collection_loader",
+                "multi_company_collection_loader",
                 "pgvector_retriever",
                 "bm25_retriever",
                 "dense_retriever",
                 "rrf_fusion",
+                "adaptive_rrf_fusion",
                 "context",
+                "timeseries_context_expander",
+                "financial_formula_calculator",
                 "reader",
                 "answer_refiner",
                 "answer_cache_writer",
@@ -1059,7 +1064,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 32)
+        self.assertEqual(len(modules), 37)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -1482,6 +1487,26 @@ class ApiContractTests(unittest.TestCase):
             "index_company_persistence": (
                 {"index_input", "company_input"},
                 set(),
+            ),
+            "thesaurus_decomposer": (
+                {"query_context"},
+                {"model", "preset", "system_prompt", "user_prompt_template"},
+            ),
+            "multi_company_collection_loader": (
+                {"query_context", "collection_names", "target_companies"},
+                {"auto_resolve_from_query", "fallback_company"},
+            ),
+            "adaptive_rrf_fusion": (
+                {"bm25_result", "dense_result"},
+                {"rrf_k", "top_k", "adaptive_weighting"},
+            ),
+            "timeseries_context_expander": (
+                {"retrieval_json", "document_input"},
+                {"top_k", "expand_full_row", "adjacent_radius", "max_blocks"},
+            ),
+            "financial_formula_calculator": (
+                {"context_json"},
+                {"model", "enabled", "calc_keywords", "max_context_blocks"},
             ),
         }
 
