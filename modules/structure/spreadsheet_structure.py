@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+"""Data transfer objects defining spreadsheet structure detector outputs."""
+
 from typing import Dict, List, Literal, Tuple
-
 from pydantic import Field
-
 from modules.common.base_module import ModuleDTO
 
 
 class ColumnHeaderNodeDTO(ModuleDTO):
     """One coordinate-backed node in a worksheet column-header hierarchy."""
-
     name: str
     col_start: int
     col_end: int
@@ -38,7 +37,6 @@ class ClassifiedTableDTO(ModuleDTO):
 
 class SpreadsheetStructureOutput(ModuleDTO):
     """Shared output contract accepted directly by the cell serializer."""
-
     file_name: str
     workbook_hash: str
     sheet_names: List[str] = Field(
@@ -50,3 +48,11 @@ class SpreadsheetStructureOutput(ModuleDTO):
         default_factory=list,
         description="분석하지 못한 시트명과 실패 사유",
     )
+
+
+__all__ = [
+    "ClassifiedRegionDTO",
+    "ClassifiedTableDTO",
+    "ColumnHeaderNodeDTO",
+    "SpreadsheetStructureOutput",
+]

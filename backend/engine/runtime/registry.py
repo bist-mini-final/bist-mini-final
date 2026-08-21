@@ -10,47 +10,57 @@ from modules.embedding.embedder import (
     CellTextEmbedderModule,
     EmbedderModule,
 )
-from modules.query.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
-from modules.query.decomposer import DecomposerModule
-from modules.query.direct_query_decomposer import DirectQueryDecomposerModule
-from modules.query.llm_query_router import LlmQueryRouterModule
+from modules.query.decomposer import (
+    AdaptiveQueryDecomposerModule,
+    DecomposerModule,
+    DirectQueryDecomposerModule,
+    TemplateQueryDecomposerModule,
+    ThesaurusDecomposerModule,
+)
 from modules.query.query_input import QueryInputModule
-from modules.query.semantic_query_matcher import SemanticQueryMatcherModule
-from modules.query.template_query_decomposer import TemplateQueryDecomposerModule
-from modules.query.thesaurus_decomposer import ThesaurusDecomposerModule
+from modules.query.semantic_query_matcher import (
+    LlmQueryRouterModule,
+    SemanticQueryMatcherModule,
+)
 from modules.reader.answer_refiner import AnswerRefinerModule
 from modules.reader.financial_formula_calculator import FinancialFormulaCalculatorModule
 from modules.reader.reader import ReaderModule
-from modules.retrieval.adaptive_rrf_fusion import AdaptiveRrfFusionModule
-from modules.retrieval.context_expander import ContextExpanderModule
-from modules.retrieval.pg_context_expander import PgContextExpanderModule
-from modules.retrieval.pgvector_retriever import PgVectorRetrieverModule
+from modules.retrieval.context_expander import (
+    ContextExpanderModule,
+    PgContextExpanderModule,
+    TimeseriesContextExpanderModule,
+)
+from modules.retrieval.pgvector_retriever import (
+    PgVectorRetrieverModule,
+    SemanticScopedPgVectorRetrieverModule,
+)
 from modules.retrieval.postgres_native_keyword_retriever import (
     PostgresNativeKeywordRetrieverModule,
 )
-from modules.retrieval.rrf_fusion import RrfFusionModule
-from modules.retrieval.semantic_scoped_pgvector_retriever import (
-    SemanticScopedPgVectorRetrieverModule,
+from modules.retrieval.rrf_fusion import (
+    AdaptiveRrfFusionModule,
+    RrfFusionModule,
 )
-from modules.retrieval.timeseries_context_expander import TimeseriesContextExpanderModule
 from modules.storage.company_entity_extractor import CompanyEntityExtractorModule
 from modules.storage.dataframe_source import DataframeSourceModule
 from modules.storage.image_tile_source import ImageTileSourceModule
-from modules.storage.index_company_persistence import IndexCompanyPersistenceModule
-from modules.storage.multi_company_collection_loader import (
+from modules.storage.pgvector_collection_loader import (
     MultiCompanyCollectionLoaderModule,
+    PgVectorCollectionLoaderModule,
 )
-from modules.storage.pgvector_collection_loader import PgVectorCollectionLoaderModule
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 from modules.storage.processed_file_selector import ProcessedFileSelectorModule
 from modules.storage.qa_example_loader import QaExampleLoaderModule
-from modules.storage.sheet_metadata_persistence import SheetMetadataPersistenceModule
+from modules.storage.sheet_metadata_persistence import (
+    IndexCompanyPersistenceModule,
+    SheetMetadataPersistenceModule,
+)
 from modules.structure.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
-from modules.structure.cell_text_serializer import CellTextSerializerModule
-from modules.structure.docling_table_detector import DoclingTableDetectorModule
-from modules.structure.exhaustive_cell_text_serializer import (
+from modules.structure.cell_text_serializer import (
+    CellTextSerializerModule,
     ExhaustiveCellTextSerializerModule,
 )
+from modules.structure.docling_table_detector import DoclingTableDetectorModule
 from modules.structure.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from modules.structure.openpyxl_region_detector import OpenpyxlRegionDetectorModule
 from backend.storage.answer_cache import AnswerCacheRepository

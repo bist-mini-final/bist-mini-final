@@ -9,16 +9,18 @@ from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
 from modules.embedding.embedder import CellTextEmbedderModule
-from modules.structure.cell_text_serializer import CellTextSerializerModule
-from modules.storage.company_entity_extractor import CompanyEntityExtractorModule
-from modules.structure.exhaustive_cell_text_serializer import (
+from modules.structure.cell_text_serializer import (
+    CellTextSerializerModule,
     ExhaustiveCellTextSerializerModule,
 )
-from modules.storage.index_company_persistence import IndexCompanyPersistenceModule
+from modules.storage.company_entity_extractor import CompanyEntityExtractorModule
+from modules.storage.sheet_metadata_persistence import (
+    IndexCompanyPersistenceModule,
+    SheetMetadataPersistenceModule,
+)
 from modules.structure.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 from modules.storage.processed_file_selector import ProcessedFileSelectorModule
-from modules.storage.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from backend.engine.runtime.registry_base import BaseModuleRegistry
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
