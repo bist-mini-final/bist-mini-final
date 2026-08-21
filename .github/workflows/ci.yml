@@ -49,11 +49,11 @@ jobs:
         with:
           version: "0.12.5"
           enable-cache: true
-          cache-dependency-glob: "requirements.txt"
+          cache-dependency-glob: "backend/requirements.txt"
 
       - name: Install Dependencies
         run: |
-          uv pip install --system -r requirements.txt
+          uv pip install --system -r backend/requirements.txt
 
       - name: Run Backend Unit Tests
         env:

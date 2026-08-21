@@ -9,6 +9,7 @@ from backend.api.router import create_api_router
 from backend.core.settings import DEV_CORS_ORIGINS, DIST_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
 
+
 def create_app() -> FastAPI:
     repository = AnswerCacheRepository()
 
@@ -80,4 +81,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app:app", host="0.0.0.0", port=8765, reload=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8765, reload=True)

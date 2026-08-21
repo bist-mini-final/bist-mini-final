@@ -144,10 +144,10 @@ if [[ ! -x .venv/bin/python ]]; then
 fi
 
 if command -v uv >/dev/null 2>&1; then
-  uv pip install --python .venv/bin/python -r requirements.txt
+  uv pip install --python .venv/bin/python -r backend/requirements.txt
 else
   .venv/bin/python -m pip install --upgrade pip
-  .venv/bin/python -m pip install -r requirements.txt
+  .venv/bin/python -m pip install -r backend/requirements.txt
 fi
 
 (
@@ -159,5 +159,5 @@ fi
 
 echo "설치 완료: k3d/KEDA 배치 클러스터가 준비되었습니다."
 echo "상태 확인: ./deploy/kubernetes/local.sh status"
-echo "API 실행: .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8765 --reload"
+echo "API 실행: .venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8765 --reload"
 echo "Frontend 실행: cd frontend && npm run dev"
