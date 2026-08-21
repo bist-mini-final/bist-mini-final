@@ -13,15 +13,15 @@ from openpyxl import Workbook
 
 from backend.api.data_source_routes import create_data_source_router
 from backend.core.settings import PGVECTOR_URL, WORKFLOW_DIR
-from backend.modules.base import ModuleExecutionError
-from backend.runtime.registry import ModuleRegistry
-from backend.spreadsheets.ingestion import search_vector_index
+from modules.common.base_module import ModuleExecutionError
+from backend.engine.runtime.registry import ModuleRegistry
+from backend.storage.spreadsheets.ingestion import search_vector_index
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
-from backend.workflows import (
+from backend.engine.workflows import (
     InteractiveWorkflowDispatcher,
     ResultCache,
     RunStore,

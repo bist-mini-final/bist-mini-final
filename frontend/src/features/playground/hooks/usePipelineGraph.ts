@@ -319,41 +319,6 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
 
   const dagSummary = useMemo(() => summarizeDag(nodes, edges), [edges, nodes]);
 
-  useEffect(() => {
-    setNodes((currentNodes) => {
-      const nodeById = new Map(currentNodes.map((node) => [node.id, node]));
-      const incomingEdgeByTarget = new Map(
-        edges.map((edge) => [edge.target, edge])
-      );
-      const inspectedModuleType = (
-        nodeId: string,
-        visited = new Set<string>(),
-      ): ModuleType | undefined => {
-        if (visited.has(nodeId)) return undefined;
-        visited.add(nodeId);
-        const incomingEdge = incomingEdgeByTarget.get(nodeId);
-        const sourceNode = incomingEdge ? nodeById.get(incomingEdge.source) : undefined;
-        const sourceModuleType = nodeModuleType(sourceNode);
-        if (sourceModuleType === 'json_inspector' && sourceNode) {
-          return inspectedModuleType(sourceNode.id, visited);
-        }
-        return sourceModuleType;
-      };
-      let changed = false;
-      const nextNodes = currentNodes.map((node) => {
-        if (nodeModuleType(node) !== 'json_inspector') return node;
-        const nextModuleType = inspectedModuleType(node.id);
-        if (node.data.upstreamModuleType === nextModuleType) return node;
-        changed = true;
-        return {
-          ...node,
-          data: { ...node.data, upstreamModuleType: nextModuleType },
-        };
-      });
-      return changed ? nextNodes : currentNodes;
-    });
-  }, [edges, setNodes]);
-
   const updateNodeConfig = useCallback(
     (nodeId: string, patch: Record<string, unknown>) => {
       setNodes((currentNodes) =>

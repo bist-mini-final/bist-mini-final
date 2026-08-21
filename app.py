@@ -6,11 +6,11 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.router import create_api_router
-from backend.core.settings import CACHE_DIR, DEV_CORS_ORIGINS, DIST_DIR
+from backend.core.settings import DEV_CORS_ORIGINS, DIST_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
 
 def create_app() -> FastAPI:
-    repository = AnswerCacheRepository(CACHE_DIR / "answers.json")
+    repository = AnswerCacheRepository()
 
     application = FastAPI(
         title="RAG Pipeline Visualizer API",

@@ -22,7 +22,6 @@ import {
   Plus,
   Rows3,
   ScanSearch,
-  ScanText,
   TableProperties,
   Type,
   X,
@@ -96,16 +95,6 @@ const INSPECTOR_META: Record<SpreadsheetInspectorKind, InspectorMeta> = {
     icon: Network,
     layers: [{ value: 'rendered', label: 'BFS + LLM' }],
     defaultLayer: 'rendered',
-  },
-  local_vlm: {
-    title: 'Local VLM 테이블 구조 식별 결과',
-    description: '셀 타입 오버레이와 원본 시트를 전환하며 멀티모달 구조 판단을 확인합니다.',
-    icon: ScanText,
-    layers: [
-      { value: 'typed', label: '셀 타입 오버레이' },
-      { value: 'rendered', label: '원본 시트' },
-    ],
-    defaultLayer: 'typed',
   },
   luna_vlm: {
     title: 'Luna 전체 시트 구조 식별 결과',
@@ -212,7 +201,7 @@ export function SpreadsheetResultModal({
     ?? null;
   const totalRegions = parsed?.tables.reduce((count, table) => count + table.regions.length, 0) ?? 0;
   const supportsClassificationBoxes = kind !== 'docling';
-  const supportsCellTypeColors = kind === 'local_vlm' || kind === 'luna_vlm';
+  const supportsCellTypeColors = kind === 'luna_vlm';
   const imageUrl = parsed && selectedSheet
     ? pipelineApi.spreadsheetArtifactUrl(
         parsed.workbookHash,

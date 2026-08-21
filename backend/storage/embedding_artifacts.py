@@ -5,8 +5,8 @@ from typing import List
 import re
 from uuid import uuid4
 
-from ..core.settings import EMBEDDING_ARTIFACT_DIR
-from ..modules.base import ModuleExecutionError
+from backend.core.settings import EMBEDDING_ARTIFACT_DIR
+from modules.common.base_module import ModuleExecutionError
 
 
 ARTIFACT_ID_PATTERN = re.compile(r"^[a-f0-9]{64}$")

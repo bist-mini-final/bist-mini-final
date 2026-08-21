@@ -69,11 +69,11 @@ PY
 
 start_database() {
   if database_is_local; then
-    docker compose -f "${PROJECT_ROOT}/docker-compose.db.yml" up -d --wait
+    docker compose -f "${PROJECT_ROOT}/deploy/db/docker-compose.yml" up -d --wait
   else
     # A remote PGVECTOR_URL makes the local container unnecessary. Preserve
     # its named volume so switching back to local does not lose data.
-    docker compose -f "${PROJECT_ROOT}/docker-compose.db.yml" down
+    docker compose -f "${PROJECT_ROOT}/deploy/db/docker-compose.yml" down
   fi
   (
     cd "${PROJECT_ROOT}"

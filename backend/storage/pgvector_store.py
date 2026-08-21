@@ -11,9 +11,9 @@ from urllib.parse import urlparse
 import psycopg2.extras
 from langchain_core.documents import Document
 
-from ..core.settings import PGVECTOR_URL
-from ..embeddings.factory import EmbeddingEncoder
-from ..spreadsheets.langchain_document import (
+from backend.core.settings import PGVECTOR_URL
+from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.storage.spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
     langchain_document_to_cell_item,
 )

@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
-  "id": "default",
-  "name": "default",
-  "updated_at": "2026-08-21T00:30:38.172638+00:00",
+  "id": "main_pgvector_rag_pipeline_v3_fast",
+  "name": "main_pgvector_rag_pipeline_v3_fast",
+  "updated_at": "2026-08-21T01:00:00.000000+00:00",
   "graph": {
     "nodes": [
       {
-        "id": "custom-node-1786497067905-2",
+        "id": "node-1-query",
         "module_type": "query_input",
         "position": {
-          "x": 974.6897321879878,
-          "y": -367.4342037563349
+          "x": 900.0,
+          "y": 0.0
         },
         "config": {
           "threshold": 0.95
         },
         "values": {
-          "query": "최근 추세 유지 시 2026년 Total Revenue는?"
+          "query": "2024년 Total Revenue는?"
         },
         "ui": {
           "width": null,
@@ -26,17 +26,15 @@
         }
       },
       {
-        "id": "custom-node-1786497092339-3",
-        "module_type": "decomposer",
+        "id": "node-2-decomposer",
+        "module_type": "thesaurus_decomposer",
         "position": {
-          "x": 1426.1794166088018,
-          "y": -156.69185259474813
+          "x": 1350.0,
+          "y": -150.0
         },
         "config": {
           "model": "gpt-5.6-luna",
-          "preset": "luna_decomposer",
-          "system_prompt": "You are a Financial Query Decomposition Assistant for RAG retrieval over a corporate financial Excel workbook.\nAnalyze the user's Korean financial question and return every useful atomic English cell-search query. There is no maximum number of sub-queries: retrieval coverage is more important than brevity.\n\nGuidelines:\n1. Domain Concept Translation:\n   - Translate Korean financial concepts into standard, formal English financial header terms as used in financial statements (Income Statement, Balance Sheet, Cash Flow Statement, Key Statistics).\n   - For each metric, emit separate sub-queries for its canonical name and every established financial synonym or abbreviation that could appear as an Excel row header.\n   - Required examples: Total Enterprise Value, Enterprise Value, and TEV are equivalent search variants; Market Capitalization, Market Cap, and Equity Market Value are equivalent search variants.\n   - Keep standard financial abbreviations such as TEV, EBIT, EBITDA, CapEx, CFO, CFI, and CFF. Do not invent ambiguous abbreviations.\n\n2. Date and Period Handling:\n   - The indexed workbook snapshot treats LTM, FY0, FY2025, and 2025-12-31 as equivalent current-period headers.\n   - When the user requests any one of those current-period forms, emit a separate sub-query for every form: LTM, FY0, FY2025, and 2025-12-31.\n   - For historical or forecast periods, emit separate relative, fiscal-year, and exact year-end variants when known (for example FY-1, FY2024, and 2024-12-31).\n   - Put only one period representation in each sub-query. Never combine alternatives in one Column Header.\n\n3. Atomic Single-Cell Sub-query Principle (CRITICAL):\n   - In our vector database, EACH EMBEDDING CORRESPONDS TO A SINGLE ATOMIC CELL (one metric for one specific year/period).\n   - Generate the full cross-product of independently requested metrics, metric aliases, and period aliases. Do not stop after an arbitrary count.\n   - DO NOT generate range expressions or concatenated strings (e.g. DO NOT output \"FY-4 to FY0\", \"2021 to 2025\", \"Metric A, Metric B, Metric C\").\n   - FOR CAGR / YoY / TREND / RANGE QUERIES (e.g. \"2021년부터 2025년까지 CAGR 및 YoY\", \"최근 3년간 추이\"):\n     - You MUST GENERATE INDIVIDUAL ATOMIC SUB-QUERIES FOR EVERY SINGLE YEAR AND METRIC IN THAT RANGE!\n\n4. Structured Output Format (CRITICAL):\n   - Every sub-query MUST use this exact four-field format:\n     \"Sheet: {sheet or ?} | Row Header: {metric or ?} | Column Header: {period or ?} | Cell Value: {value or ?}\"\n   - Use `?` for every field that the user did not explicitly specify. In most questions, `Sheet` and `Cell Value` will be `?`.\n   - Do not omit a field. Do not add fields. Do not use `N/A`.\n   - Example: \"Sheet: ? | Row Header: Total Revenue | Column Header: 2025-12-31 | Cell Value: ?\"\n   - Multi-period example: [\"Sheet: ? | Row Header: Alpha Product Sales | Column Header: FY-1 | Cell Value: ?\", \"Sheet: ? | Row Header: Alpha Product Sales | Column Header: 2024-12-31 | Cell Value: ?\"]\n   - Output ONLY a valid JSON array of these strings. Do NOT include markdown formatting, explanations, or extra keys.\n",
-          "user_prompt_template": "Korean Query: \"{question}\"\nJSON Output:"
+          "preset": "luna_thesaurus_decomposer"
         },
         "values": {},
         "ui": {
@@ -47,27 +45,30 @@
         }
       },
       {
-        "id": "custom-node-1786497122336-4",
-        "module_type": "json_inspector",
+        "id": "node-3-loader",
+        "module_type": "multi_company_collection_loader",
         "position": {
-          "x": 1834.0115578389562,
-          "y": -132.24148441548206
+          "x": 1350.0,
+          "y": 250.0
         },
-        "config": {},
+        "config": {
+          "auto_resolve_from_query": true,
+          "fallback_company": "IBM"
+        },
         "values": {},
         "ui": {
-          "width": 502.0,
-          "height": 281.0,
+          "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "custom-node-1786497464152-1",
-        "module_type": "embedder",
+        "id": "node-4-embedder",
+        "module_type": "batch_query_embedder",
         "position": {
-          "x": 2620.9964282611377,
-          "y": 52.54613221170793
+          "x": 1750.0,
+          "y": -200.0
         },
         "config": {
           "model": "text-embedding-3-large"
@@ -81,34 +82,14 @@
         }
       },
       {
-        "id": "custom-node-1786497475934-2",
-        "module_type": "prebuilt_index_loader",
+        "id": "node-5-native-fts",
+        "module_type": "postgres_native_keyword_retriever",
         "position": {
-          "x": 2168.070268203153,
-          "y": 266.7211502837916
-        },
-        "config": {},
-        "values": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
-        },
-        "ui": {
-          "width": null,
-          "height": null,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "custom-node-1786497522370-4",
-        "module_type": "bm25_retriever",
-        "position": {
-          "x": 2644.906603580416,
-          "y": -167.71085042488016
+          "x": 1750.0,
+          "y": 50.0
         },
         "config": {
-          "k1": 1.5,
-          "b": 0.75,
-          "top_k": 1000
+          "top_k": 100
         },
         "values": {},
         "ui": {
@@ -119,14 +100,14 @@
         }
       },
       {
-        "id": "custom-node-1786497551832-5",
-        "module_type": "dense_retriever",
+        "id": "node-6-pg-retriever",
+        "module_type": "pgvector_retriever",
         "position": {
-          "x": 3038.6349662377042,
-          "y": 285.62668906454
+          "x": 2150.0,
+          "y": -200.0
         },
         "config": {
-          "top_k": 1000
+          "top_k": 100
         },
         "values": {},
         "ui": {
@@ -137,16 +118,16 @@
         }
       },
       {
-        "id": "custom-node-1786497565202-6",
-        "module_type": "rrf_fusion",
+        "id": "node-7-rrf",
+        "module_type": "adaptive_rrf_fusion",
         "position": {
-          "x": 3461.3642072020707,
-          "y": 252.07197187556838
+          "x": 2550.0,
+          "y": -50.0
         },
         "config": {
+          "top_k": 25,
           "rrf_k": 60,
-          "top_k": 100,
-          "ratio_penalty": 0.4
+          "adaptive_weighting": true
         },
         "values": {},
         "ui": {
@@ -157,16 +138,16 @@
         }
       },
       {
-        "id": "custom-node-1786497623603-7",
-        "module_type": "context",
+        "id": "node-8-expander",
+        "module_type": "pg_context_expander",
         "position": {
-          "x": 3871.254803653204,
-          "y": 81.88585563253258
+          "x": 2950.0,
+          "y": -50.0
         },
         "config": {
-          "top_k": 100,
-          "adjacent_radius": 3,
-          "max_blocks": 500
+          "top_k": 25,
+          "adjacent_radius": 2,
+          "max_blocks": 100
         },
         "values": {},
         "ui": {
@@ -177,17 +158,15 @@
         }
       },
       {
-        "id": "custom-node-1786497793017-1",
-        "module_type": "reader",
+        "id": "node-9-calculator",
+        "module_type": "financial_formula_calculator",
         "position": {
-          "x": 4287.4382250201415,
-          "y": -287.92125725426297
+          "x": 3350.0,
+          "y": -200.0
         },
         "config": {
           "model": "gpt-5.6-luna",
-          "preset": "luna_reader",
-          "system_prompt": "You are a Senior Financial Analyst and spreadsheet RAG reader.\nAnswer the user's Korean financial question strictly from the supplied Excel cell context.\n\nRules:\n1. State exact values, percentages, dates, and units without inventing missing facts.\n2. Cite the supporting Cell ID for every numeric claim, for example [KS Cell E60].\n3. For comparisons or calculations, show concise arithmetic steps.\n4. Preserve source values such as NA and NM.\n5. If the context is insufficient, explicitly say which fact is missing.\n6. Respond in Korean unless the user requests another language.",
-          "user_prompt_template": "Retrieved Financial Cell Context:\n{context_text}\n\nUser Question:\n{question}\n\nGrounded Financial Answer:"
+          "enabled": true
         },
         "values": {},
         "ui": {
@@ -198,35 +177,36 @@
         }
       },
       {
-        "id": "custom-node-1786497852818-2",
-        "module_type": "json_inspector",
+        "id": "node-10-reader",
+        "module_type": "reader",
         "position": {
-          "x": 4750.795356549791,
-          "y": -353.77556399237073
+          "x": 3350.0,
+          "y": 100.0
         },
-        "config": {},
+        "config": {
+          "model": "gpt-5.6-luna",
+          "preset": "luna_reader"
+        },
         "values": {},
         "ui": {
-          "width": 881.0,
-          "height": 1315.0,
+          "width": null,
+          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
       },
       {
-        "id": "custom-node-1787020430289-1",
-        "module_type": "pgvector_collection_loader",
+        "id": "node-11-refiner",
+        "module_type": "answer_refiner",
         "position": {
-          "x": 2478.2880582893004,
-          "y": 433.354939451034
+          "x": 3750.0,
+          "y": -50.0
         },
-        "config": {},
-        "values": {
-          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
-          "collection_names": [
-            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
-          ]
+        "config": {
+          "model": "gpt-5.6-luna",
+          "preset": "luna_answer_refiner"
         },
+        "values": {},
         "ui": {
           "width": null,
           "height": null,
@@ -237,114 +217,109 @@
     ],
     "edges": [
       {
-        "id": "edge-1786497098970-3",
-        "source": "custom-node-1786497067905-2",
-        "target": "custom-node-1786497092339-3",
+        "id": "edge-1-query-to-decomposer",
+        "source": "node-1-query",
+        "target": "node-2-decomposer",
         "source_output": "query_context",
         "target_input": "query_context",
-        "source_branch": "generated"
-      },
-      {
-        "id": "edge-1786497126170-4",
-        "source": "custom-node-1786497092339-3",
-        "target": "custom-node-1786497122336-4",
-        "source_output": "output",
-        "target_input": "input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497499115-4",
-        "source": "custom-node-1786497122336-4",
-        "target": "custom-node-1786497464152-1",
-        "source_output": "output",
-        "target_input": "input",
+        "id": "edge-2-query-to-loader",
+        "source": "node-1-query",
+        "target": "node-3-loader",
+        "source_output": "query_context",
+        "target_input": "query_context",
         "source_branch": null
       },
       {
-        "id": "edge-1786497528368-5",
-        "source": "custom-node-1786497122336-4",
-        "target": "custom-node-1786497522370-4",
-        "source_output": "output",
+        "id": "edge-3-decomposer-to-embedder",
+        "source": "node-2-decomposer",
+        "target": "node-4-embedder",
+        "source_output": "subqueries",
         "target_input": "query_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497535281-6",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497522370-4",
-        "source_output": "document_output",
-        "target_input": "document_input",
+        "id": "edge-4-decomposer-to-native-fts",
+        "source": "node-2-decomposer",
+        "target": "node-5-native-fts",
+        "source_output": "subqueries",
+        "target_input": "query_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497559034-7",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497551832-5",
+        "id": "edge-5-loader-to-native-fts",
+        "source": "node-3-loader",
+        "target": "node-5-native-fts",
         "source_output": "index_output",
         "target_input": "index_input",
         "source_branch": null
       },
       {
-        "id": "edge-1786497569933-9",
-        "source": "custom-node-1786497522370-4",
-        "target": "custom-node-1786497565202-6",
+        "id": "edge-6-embedder-to-pg-retriever",
+        "source": "node-4-embedder",
+        "target": "node-6-pg-retriever",
+        "source_output": "query_embeddings",
+        "target_input": "query_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-7-loader-to-pg-retriever",
+        "source": "node-3-loader",
+        "target": "node-6-pg-retriever",
+        "source_output": "index_output",
+        "target_input": "index_input",
+        "source_branch": null
+      },
+      {
+        "id": "edge-8-native-fts-to-rrf",
+        "source": "node-5-native-fts",
+        "target": "node-7-rrf",
         "source_output": "bm25_result",
         "target_input": "bm25_result",
         "source_branch": null
       },
       {
-        "id": "edge-1786497572235-10",
-        "source": "custom-node-1786497551832-5",
-        "target": "custom-node-1786497565202-6",
+        "id": "edge-9-pg-retriever-to-rrf",
+        "source": "node-6-pg-retriever",
+        "target": "node-7-rrf",
         "source_output": "dense_result",
         "target_input": "dense_result",
         "source_branch": null
       },
       {
-        "id": "edge-1786497599492-11",
-        "source": "custom-node-1786497464152-1",
-        "target": "custom-node-1786497551832-5",
-        "source_output": "output",
-        "target_input": "query_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-1786497644149-12",
-        "source": "custom-node-1786497565202-6",
-        "target": "custom-node-1786497623603-7",
+        "id": "edge-10-rrf-to-expander",
+        "source": "node-7-rrf",
+        "target": "node-8-expander",
         "source_output": "retrieval_json",
         "target_input": "retrieval_json",
         "source_branch": null
       },
       {
-        "id": "edge-1786497776786-1",
-        "source": "custom-node-1786497475934-2",
-        "target": "custom-node-1786497623603-7",
-        "source_output": "document_output",
-        "target_input": "document_input",
-        "source_branch": null
-      },
-      {
-        "id": "edge-1786497806961-2",
-        "source": "custom-node-1786497623603-7",
-        "target": "custom-node-1786497793017-1",
+        "id": "edge-11-expander-to-calculator",
+        "source": "node-8-expander",
+        "target": "node-9-calculator",
         "source_output": "context_json",
         "target_input": "context_json",
         "source_branch": null
       },
       {
-        "id": "edge-1786497857633-6",
-        "source": "custom-node-1786497793017-1",
-        "target": "custom-node-1786497852818-2",
+        "id": "edge-12-expander-to-reader",
+        "source": "node-8-expander",
+        "target": "node-10-reader",
+        "source_output": "context_json",
+        "target_input": "context_json",
+        "source_branch": null
+      },
+      {
+        "id": "edge-13-reader-to-refiner",
+        "source": "node-10-reader",
+        "target": "node-11-refiner",
         "source_output": "answer_json",
-        "target_input": "input",
+        "target_input": "answer_json",
         "source_branch": null
       }
-    ],
-    "viewport": {
-      "x": -132.89527887992244,
-      "y": 375.84648338376644,
-      "zoom": 0.21944960720963935
-    }
+    ]
   }
 }

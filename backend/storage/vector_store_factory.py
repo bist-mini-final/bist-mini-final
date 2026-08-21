@@ -12,9 +12,9 @@ from langchain_postgres.vectorstores import DistanceStrategy
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-from ..core.settings import PGVECTOR_URL
-from ..embeddings.factory import EmbeddingEncoder
-from ..embeddings.langchain_bridge import LangChainEmbeddingAdapter
+from backend.core.settings import PGVECTOR_URL
+from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.providers.embeddings.langchain_bridge import LangChainEmbeddingAdapter
 
 VectorDbBackend = Literal["pgvector", "local"]
 

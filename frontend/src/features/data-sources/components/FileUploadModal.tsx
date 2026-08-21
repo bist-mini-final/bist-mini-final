@@ -148,9 +148,7 @@ export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
                   value={selectedModel}
                   onChange={(event) => setSelectedModel(event.target.value)}
                 >
-                  <option value="text-embedding-3-large">OpenAI text-embedding-3-large (3072D)</option>
-                  <option value="text-embedding-3-small">OpenAI text-embedding-3-small (1536D)</option>
-                  <option value="BAAI/bge-m3">BAAI/bge-m3 (1024D · Local)</option>
+                  <option value="text-embedding-3-large">OpenAI text-embedding-3-large (3072D · 고정밀 표준)</option>
                 </select>
               </label>
               <label>

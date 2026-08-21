@@ -3,7 +3,7 @@ from typing import Optional, cast
 
 from fastapi import APIRouter
 
-from ..core.settings import (
+from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
     KUBERNETES_INGESTION_QUEUE,
@@ -13,13 +13,13 @@ from ..core.settings import (
     VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
-from ..embeddings.factory import EmbeddingEncoder
-from ..llm.chat_completion import ChatCompletionClient
-from ..storage.answer_cache import AnswerCacheRepository
-from ..runtime.services import create_workflow_runtime_services
-from ..runtime.registry import ModuleRegistry
-from ..orchestration.kubernetes import KubernetesQueueDispatcher
-from ..workflows import InteractiveWorkflowDispatcher
+from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.providers.llm.chat_completion import ChatCompletionClient
+from backend.storage.answer_cache import AnswerCacheRepository
+from backend.engine.runtime.services import create_workflow_runtime_services
+from backend.engine.runtime.registry import ModuleRegistry
+from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
+from backend.engine.workflows import InteractiveWorkflowDispatcher
 from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -33,7 +33,6 @@ def create_api_router(
     cache_dir: Path = CACHE_DIR,
     embedding_artifact_dir: Path = EMBEDDING_ARTIFACT_DIR,
     spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
-    vector_index_dir: Path = VECTOR_INDEX_DIR,
     completion_client: Optional[ChatCompletionClient] = None,
     embedding_encoder: Optional[EmbeddingEncoder] = None,
 ) -> APIRouter:
@@ -47,7 +46,6 @@ def create_api_router(
     	cache_dir (Path): Directory used for workflow result caching.
     	embedding_artifact_dir (Path): Directory for embedding artifacts.
     	spreadsheet_artifact_dir (Path): Directory for spreadsheet artifacts.
-    	vector_index_dir (Path): Directory for vector indexes.
     	completion_client (Optional[ChatCompletionClient]): Optional chat-completion service.
     	embedding_encoder (Optional[EmbeddingEncoder]): Optional embedding encoder.
     
@@ -63,7 +61,6 @@ def create_api_router(
         cache_dir=cache_dir,
         embedding_artifact_dir=embedding_artifact_dir,
         spreadsheet_artifact_dir=spreadsheet_artifact_dir,
-        vector_index_dir=vector_index_dir,
         completion_client=completion_client,
         embedding_encoder=embedding_encoder,
     )
@@ -102,7 +99,6 @@ def create_api_router(
     )
     router.include_router(
         create_data_source_router(
-            vector_index_dir=vector_index_dir,
             embedding_artifact_dir=embedding_artifact_dir,
             embedding_encoder=embedding_encoder,
             pgvector_store=pgvector_store,

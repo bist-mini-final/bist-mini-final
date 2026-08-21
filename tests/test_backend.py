@@ -20,64 +20,60 @@ from pydantic import ValidationError
 
 from app import app
 from backend.api.router import create_api_router
-from backend.documentation.module_docs import MODULE_DOCS_DIR, render_module_markdown
-from backend.embeddings.bge import BgeEncoder
-from backend.embeddings.factory import get_embedding_encoder
-from backend.embeddings.openai import OpenAIEmbeddingEncoder
-from backend.llm.chat_completion import ChatCompletionError
-from backend.retrieval.similarity import combined_similarity, rank_candidates
-from backend.runtime.registry import ModuleRegistry
-from backend.runtime.worker import ModuleWorkerCancelled
+from backend.tools.documentation.module_docs import MODULE_DOCS_DIR, render_module_markdown
+from backend.providers.embeddings.bge import BgeEncoder
+from backend.providers.embeddings.factory import get_embedding_encoder
+from backend.providers.embeddings.openai import OpenAIEmbeddingEncoder
+from backend.providers.llm.chat_completion import ChatCompletionError
+from backend.storage.retrieval.similarity import combined_similarity, rank_candidates
+from backend.engine.runtime.registry import ModuleRegistry
+from backend.engine.runtime.worker import ModuleWorkerCancelled
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.vector_index import VectorIndexStore
-from backend.vision.openai_responses import OpenAIResponsesVisionClient
+from backend.providers.vision.openai_responses import OpenAIResponsesVisionClient
 from backend.api.spreadsheet_artifact_routes import create_spreadsheet_artifact_router
-from backend.modules.decomposer import DecomposerModule
-from backend.modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
-from backend.modules.dense_retriever import DenseRetrieverModule
-from backend.modules.embedder import EmbedderModule
-from backend.modules.cell_text_embedder import CellTextEmbedderModule
-from backend.modules.cell_text_serializer import CellTextSerializerModule
-from backend.modules.context_expander import ContextExpanderModule
-from backend.modules.docling_table_detector import DoclingTableDetectorModule
-from backend.modules.exhaustive_cell_text_serializer import (
+from modules.query.decomposer import DecomposerModule
+from modules.structure.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
+from modules.retrieval.dense_retriever import DenseRetrieverModule
+from modules.embedding.embedder import EmbedderModule
+from modules.embedding.cell_text_embedder import CellTextEmbedderModule
+from modules.structure.cell_text_serializer import CellTextSerializerModule
+from modules.retrieval.context_expander import ContextExpanderModule
+from modules.structure.docling_table_detector import DoclingTableDetectorModule
+from modules.structure.exhaustive_cell_text_serializer import (
     ExhaustiveCellTextSerializerModule,
 )
-from backend.modules.local_vlm_structure_detector import (
-    LocalVlmStructureDetectorModule,
-    LocalVlmTableDecisionDTO,
-)
-from backend.spreadsheets.table_geometry import SheetLayout
-from backend.modules.luna_vlm_structure_detector import (
+from backend.storage.spreadsheets.table_geometry import SheetLayout
+from modules.structure.luna_vlm_structure_detector import (
     LUNA_SHEET_RESPONSE_SCHEMA,
     LUNA_VLM_SYSTEM_PROMPT,
     LunaVlmStructureDetectorModule,
 )
-from backend.modules.base import ModuleExecutionError
-from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModule
-from backend.modules.processed_file_selector import ProcessedFileSelectorModule
-from backend.modules.reader import ReaderModule
-from backend.modules.rrf_fusion import RrfFusionModule
-from backend.modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
-from backend.modules.vector_index_writer import VectorIndexWriterModule
-from backend.spreadsheets.workbook_catalog import WorkbookCatalog
-from backend.spreadsheets.cell_visibility import WorksheetVisibility
-from backend.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
-from backend.spreadsheets.prompt_guidance import (
+from modules.common.base_module import ModuleExecutionError
+from modules.structure.openpyxl_region_detector import OpenpyxlRegionDetectorModule
+from modules.storage.processed_file_selector import ProcessedFileSelectorModule
+from modules.reader.reader import ReaderModule
+from modules.retrieval.rrf_fusion import RrfFusionModule
+from modules.storage.sheet_metadata_persistence import SheetMetadataPersistenceModule
+from modules.storage.vector_index_writer import VectorIndexWriterModule
+from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility
+from backend.storage.spreadsheets.table_geometry import bbox_to_cell_bounds, compute_sheet_layout
+from backend.storage.spreadsheets.prompt_guidance import (
     LEGACY_TEXT_CELL_ROLE_GUIDANCE,
     TEXT_CELL_ROLE_GUIDANCE,
 )
-from backend.spreadsheets.exhaustive_tiling import build_exhaustive_tiles
-from backend.spreadsheets.sheet_renderer import _cell_text_and_color, _rgb_color
-from backend.workflows.executor import (
+from backend.storage.spreadsheets.exhaustive_tiling import build_exhaustive_tiles
+from backend.storage.spreadsheets.sheet_renderer import _cell_text_and_color, _rgb_color
+from backend.engine.workflows.executor import (
     DagExecutionCancelled,
     DagExecutionError,
     WorkflowExecutor,
 )
-from backend.workflows.dispatcher import InteractiveWorkflowDispatcher
-from backend.workflows.models import (
+from backend.engine.workflows.dispatcher import InteractiveWorkflowDispatcher
+from backend.engine.workflows.models import (
     CanvasPosition,
     WorkflowEdge,
     WorkflowExecutionRequest,
@@ -85,7 +81,7 @@ from backend.workflows.models import (
     WorkflowNode,
     WorkflowSaveRequest,
 )
-from backend.workflows.store import ResultCache, RunStore, WorkflowStore
+from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
 
 
 class StubCompletionClient:
@@ -186,7 +182,7 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
                 base_url="https://api.openai.com/v1",
             )
             with patch(
-                "backend.vision.openai_responses.urlopen",
+                "backend.providers.vision.openai_responses.urlopen",
                 side_effect=fake_urlopen,
             ):
                 result = client.complete_structured(
@@ -251,7 +247,7 @@ class OpenAIResponsesVisionClientTests(unittest.TestCase):
                 api_key="test-key",
                 base_url="https://api.openai.com/v1",
             )
-            with patch("backend.vision.openai_responses.urlopen", side_effect=flaky_urlopen), \
+            with patch("backend.providers.vision.openai_responses.urlopen", side_effect=flaky_urlopen), \
                  patch("time.sleep", return_value=None):
                 result = client.complete_structured(
                     model="gpt-5.6-luna",
@@ -795,7 +791,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 37)
+        self.assertEqual(len(definitions), 40)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
@@ -803,6 +799,7 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "decomposer",
                 "thesaurus_decomposer",
                 "embedder",
+                "batch_query_embedder",
                 "cell_text_embedder",
                 "vector_index_writer",
                 "pgvector_index_writer",
@@ -810,20 +807,20 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "multi_company_collection_loader",
                 "pgvector_retriever",
                 "bm25_retriever",
+                "postgres_native_keyword_retriever",
                 "dense_retriever",
                 "rrf_fusion",
                 "adaptive_rrf_fusion",
                 "context",
                 "timeseries_context_expander",
+                "pg_context_expander",
                 "financial_formula_calculator",
                 "reader",
                 "answer_refiner",
-                "answer_cache_writer",
                 "json_transformer",
                 "json_inspector",
                 "processed_file_selector",
                 "bfs_llm_structure_detector",
-                "local_vlm_structure_detector",
                 "luna_vlm_structure_detector",
                 "docling_table_detector",
                 "openpyxl_region_detector",
@@ -926,10 +923,6 @@ class RepositoryIntegrationTests(unittest.TestCase):
         answer = self.module_registry.execute(
             "reader",
             {"context_json": context["context_json"]},
-        )
-        cached_answer = self.module_registry.execute(
-            "answer_cache_writer",
-            {"answer_json": answer["answer_json"]},
         )
 
         self.assertEqual(
@@ -1064,7 +1057,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 37)
+        self.assertEqual(len(modules), 40)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -1347,10 +1340,6 @@ class ApiContractTests(unittest.TestCase):
                 {"context_json"},
                 {"model", "preset", "system_prompt", "user_prompt_template"},
             ),
-            "answer_cache_writer": (
-                {"answer_json"},
-                set(),
-            ),
             "json_transformer": ({"any_json"}, {"mappings"}),
             "json_inspector": (set(), set()),
             "processed_file_selector": ({"file_name", "sheet_names"}, set()),
@@ -1365,20 +1354,6 @@ class ApiContractTests(unittest.TestCase):
                     "min_table_columns",
                     "header_candidate_rows",
                     "llm_batch_size",
-                    "system_prompt",
-                    "user_prompt_template",
-                },
-            ),
-            "local_vlm_structure_detector": (
-                {"file_name", "workbook_hash", "sheet_names"},
-                {
-                    "model",
-                    "max_rows",
-                    "max_columns",
-                    "max_context_cells",
-                    "context_window",
-                    "timeout_seconds",
-                    "validation_retries",
                     "system_prompt",
                     "user_prompt_template",
                 },
@@ -1507,6 +1482,18 @@ class ApiContractTests(unittest.TestCase):
             "financial_formula_calculator": (
                 {"context_json"},
                 {"model", "enabled", "calc_keywords", "max_context_blocks"},
+            ),
+            "batch_query_embedder": (
+                {"query_input"},
+                {"model"},
+            ),
+            "postgres_native_keyword_retriever": (
+                {"query_input", "index_input"},
+                {"top_k"},
+            ),
+            "pg_context_expander": (
+                {"retrieval_json"},
+                {"top_k", "adjacent_radius", "max_blocks"},
             ),
         }
 
@@ -2176,76 +2163,6 @@ class SpreadsheetModuleTests(unittest.TestCase):
         self.assertNotIn(bounds.min_column, visibility.hidden_columns)
         self.assertNotIn(bounds.max_column, visibility.hidden_columns)
         workbook.close()
-
-    def test_local_vlm_detector_uses_typed_image_and_coordinate_context(self) -> None:
-        class VisionClient:
-            def __init__(self):
-                self.calls = []
-
-            def complete_structured(
-                self,
-                model,
-                system_prompt,
-                user_prompt,
-                image_path,
-                json_schema,
-                context_window,
-                timeout_seconds,
-            ):
-                self.calls.append(
-                    {
-                        "model": model,
-                        "system_prompt": system_prompt,
-                        "user_prompt": user_prompt,
-                        "image_path": image_path,
-                        "json_schema": json_schema,
-                        "context_window": context_window,
-                        "timeout_seconds": timeout_seconds,
-                    }
-                )
-                return (
-                    '{"sheet_name":"Key Stats","tables":[{'
-                    '"excel_range":"A1:C4","title_range":null,'
-                    '"column_header_range":"A1:C1","row_header_range":"A2:A4",'
-                    '"data_range":"B2:C4"}]}'
-                )
-
-        client = VisionClient()
-        selection = ProcessedFileSelectorModule(catalog=self.catalog).run(
-            {"file_name": "sample.xlsx"}
-        )
-        structured = LocalVlmStructureDetectorModule(
-            client,
-            catalog=self.catalog,
-            artifact_dir=self.artifact_dir,
-        ).run(selection)
-
-        self.assertEqual(len(client.calls), 1)
-        call = client.calls[0]
-        self.assertEqual(call["model"], "qwen3-vl:4b-instruct")
-        self.assertIn('"cell_tuple":["excel_coord"', call["user_prompt"])
-        self.assertIn('A1', call["user_prompt"])
-        self.assertIn('"text"', call["user_prompt"])
-        self.assertIn('"number"', call["user_prompt"])
-        self.assertIn(
-            "Distinguish record tables from matrix/crosstab tables",
-            call["system_prompt"],
-        )
-        self.assertIn("`NA`", call["system_prompt"])
-        self.assertIn("Keep them inside data_range", call["system_prompt"])
-        self.assertTrue(call["image_path"].is_file())
-        self.assertIn("typed", call["image_path"].parts)
-        table = structured["tables"][0]
-        self.assertEqual(
-            {region["type"] for region in table["regions"]},
-            {"column_header", "row_header", "data"},
-        )
-        self.assertEqual(table["regions"][-1]["parent_ids"], [
-            "table_1_column_header",
-            "table_1_row_header",
-        ])
-        serialized = CellTextSerializerModule(catalog=self.catalog).run(structured)
-        self.assertEqual(len(serialized["items"]), 12)
 
     def test_exhaustive_tiles_cover_every_visible_cell_and_no_hidden_cell(self) -> None:
         workbook = Workbook()
@@ -3495,7 +3412,7 @@ class OpenAIEmbeddingEncoderTest(unittest.TestCase):
         bge_encoder = get_embedding_encoder("BAAI/bge-large-en-v1.5")
         self.assertIsInstance(bge_encoder, BgeEncoder)
 
-    @patch("backend.embeddings.openai.urlopen")
+    @patch("backend.providers.embeddings.openai.urlopen")
     def test_openai_embedding_encode_success(self, mock_urlopen):
         mock_response_data = json.dumps({
             "data": [
@@ -3527,7 +3444,7 @@ class OpenAIEmbeddingEncoderTest(unittest.TestCase):
         self.assertAlmostEqual(vectors[1][0], 1.0)
         self.assertAlmostEqual(vectors[1][1], 0.0)
 
-    @patch("backend.embeddings.openai.urlopen")
+    @patch("backend.providers.embeddings.openai.urlopen")
     def test_openai_embedding_rejects_malformed_batch_indices(self, mock_urlopen):
         class MockHTTPResponse:
             def __init__(self, indices):
@@ -3599,7 +3516,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         import pyarrow as pa
         import pyarrow.parquet as pq
 
-        from backend.modules.prebuilt_index_loader import (
+        from modules.storage.prebuilt_index_loader import (
             PrebuiltIndexLoaderInputDTO,
             PrebuiltIndexLoaderModule,
         )
@@ -3652,7 +3569,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         )
 
     def test_prebuilt_index_loader_execution(self):
-        from backend.modules.prebuilt_index_loader import (
+        from modules.storage.prebuilt_index_loader import (
             PrebuiltIndexLoaderInputDTO,
             PrebuiltIndexLoaderModule,
         )
@@ -3678,11 +3595,11 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertEqual(idx_out["dimension"], 2)
         self.assertEqual(len(idx_out["index_id"]), 64)
 
-        from backend.modules.bm25_retriever import (
+        from modules.retrieval.bm25_retriever import (
             Bm25RetrieverExecutionDTO,
             Bm25RetrieverModule,
         )
-        from backend.modules.dense_retriever import (
+        from modules.retrieval.dense_retriever import (
             DenseRetrieverExecutionDTO,
             DenseRetrieverModule,
         )
@@ -3721,18 +3638,18 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         self.assertTrue(len(bm25_res["items"]) > 0)
 
     def test_unify_sheet_tables(self) -> None:
-        from backend.modules.local_vlm_structure_detector import (
-            LocalVlmTableDecisionDTO,
+        from modules.structure.luna_vlm_structure_detector import (
+            VlmTableDecisionDTO,
             unify_sheet_tables,
         )
-        t1 = LocalVlmTableDecisionDTO(
+        t1 = VlmTableDecisionDTO(
             excel_range="A1:K45",
             title_range="A1:K2",
             column_header_range="A3:K4",
             row_header_range="A5:A45",
             data_range="B5:K45",
         )
-        t2 = LocalVlmTableDecisionDTO(
+        t2 = VlmTableDecisionDTO(
             excel_range="A46:K60",
             title_range="A46:K46",
             column_header_range=None,
@@ -3756,7 +3673,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_retriever_execution(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.pgvector_retriever import (
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
@@ -3792,13 +3709,13 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_retriever_empty_query_items(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.data_lineage import QueryContextDTO
-        from backend.modules.embedder import EmbeddingsDTO
-        from backend.modules.pgvector_retriever import (
+        from modules.common.base_module import QueryContextDTO
+        from modules.embedding.embedder import EmbeddingsDTO
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
-        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from modules.storage.prebuilt_index_loader import IndexOutputDTO
         mock_store = MagicMock()
         retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
         payload = PgVectorRetrieverExecutionDTO.model_construct(
@@ -3827,14 +3744,14 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_retriever_all_collections_fail(self) -> None:
         from unittest.mock import MagicMock, patch
-        from backend.modules.base import ModuleExecutionError
-        from backend.modules.data_lineage import QueryContextDTO
-        from backend.modules.embedder import EmbeddingsDTO
-        from backend.modules.pgvector_retriever import (
+        from modules.common.base_module import ModuleExecutionError
+        from modules.common.base_module import QueryContextDTO
+        from modules.embedding.embedder import EmbeddingsDTO
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
-        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from modules.storage.prebuilt_index_loader import IndexOutputDTO
         from backend.storage.pgvector_store import PgVectorStore
 
         store = PgVectorStore()
@@ -3870,13 +3787,13 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_retriever_partial_collection_failure(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.data_lineage import QueryContextDTO
-        from backend.modules.embedder import EmbeddingsDTO
-        from backend.modules.pgvector_retriever import (
+        from modules.common.base_module import QueryContextDTO
+        from modules.embedding.embedder import EmbeddingsDTO
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
-        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from modules.storage.prebuilt_index_loader import IndexOutputDTO
         mock_store = MagicMock()
         mock_doc = MagicMock()
         mock_doc.page_content = "Total Revenue 2024"
@@ -3922,13 +3839,13 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_retriever_multi_collection_dedup_and_fallback_ids(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.data_lineage import QueryContextDTO
-        from backend.modules.embedder import EmbeddingsDTO
-        from backend.modules.pgvector_retriever import (
+        from modules.common.base_module import QueryContextDTO
+        from modules.embedding.embedder import EmbeddingsDTO
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
-        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from modules.storage.prebuilt_index_loader import IndexOutputDTO
         mock_store = MagicMock()
         doc_col1 = MagicMock()
         doc_col1.page_content = "Doc 1"
@@ -3979,13 +3896,13 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         import hashlib
         from unittest.mock import MagicMock
         from langchain_core.documents import Document
-        from backend.modules.data_lineage import QueryContextDTO
-        from backend.modules.embedder import EmbeddingsDTO
-        from backend.modules.pgvector_retriever import (
+        from modules.common.base_module import QueryContextDTO
+        from modules.embedding.embedder import EmbeddingsDTO
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
-        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from modules.storage.prebuilt_index_loader import IndexOutputDTO
         mock_store = MagicMock()
         doc_a = Document(page_content="Alpha Unique Text")
         doc_b = Document(page_content="Beta Unique Text")
@@ -4024,13 +3941,13 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
     def test_pgvector_retriever_identical_content_different_row_ids(self) -> None:
         from unittest.mock import MagicMock
         from langchain_core.documents import Document
-        from backend.modules.data_lineage import QueryContextDTO
-        from backend.modules.embedder import EmbeddingsDTO
-        from backend.modules.pgvector_retriever import (
+        from modules.common.base_module import QueryContextDTO
+        from modules.embedding.embedder import EmbeddingsDTO
+        from modules.retrieval.pgvector_retriever import (
             PgVectorRetrieverExecutionDTO,
             PgVectorRetrieverModule,
         )
-        from backend.modules.prebuilt_index_loader import IndexOutputDTO
+        from modules.storage.prebuilt_index_loader import IndexOutputDTO
         mock_store = MagicMock()
         doc_a = Document(page_content="Identical Content", metadata={}, id="123")
         doc_b = Document(page_content="Identical Content", metadata={}, id="456")
@@ -4062,7 +3979,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_success(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.pgvector_collection_loader import (
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4088,7 +4005,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_empty_request_selects_first_index(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.pgvector_collection_loader import (
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4113,7 +4030,7 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_sql_reload_preserves_variant(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.pgvector_collection_loader import (
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4155,8 +4072,8 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_missing_target(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.base import ModuleExecutionError
-        from backend.modules.pgvector_collection_loader import (
+        from modules.common.base_module import ModuleExecutionError
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4172,8 +4089,8 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_db_error(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.base import ModuleExecutionError
-        from backend.modules.pgvector_collection_loader import (
+        from modules.common.base_module import ModuleExecutionError
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4192,8 +4109,8 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_dimension_mismatch(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.base import ModuleExecutionError
-        from backend.modules.pgvector_collection_loader import (
+        from modules.common.base_module import ModuleExecutionError
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4225,8 +4142,8 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
 
     def test_pgvector_collection_loader_model_mismatch(self) -> None:
         from unittest.mock import MagicMock
-        from backend.modules.base import ModuleExecutionError
-        from backend.modules.pgvector_collection_loader import (
+        from modules.common.base_module import ModuleExecutionError
+        from modules.storage.pgvector_collection_loader import (
             PgVectorCollectionLoaderInputDTO,
             PgVectorCollectionLoaderModule,
         )
@@ -4260,8 +4177,8 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
     def test_openpyxl_region_detector_derives_table_sheets_when_sheet_names_empty(self) -> None:
         import openpyxl
         from unittest.mock import MagicMock
-        from backend.modules.docling_table_detector import DoclingTableRegionDTO, TableCellBoundsDTO
-        from backend.modules.openpyxl_region_detector import (
+        from modules.structure.docling_table_detector import DoclingTableRegionDTO, TableCellBoundsDTO
+        from modules.structure.openpyxl_region_detector import (
             OpenpyxlRegionDetectorExecutionDTO,
             OpenpyxlRegionDetectorModule,
         )
@@ -4306,17 +4223,17 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
     def test_sheet_metadata_persistence_derives_table_sheets_or_rejects_empty(self) -> None:
         import openpyxl
         from unittest.mock import MagicMock
-        from backend.modules.base import ModuleExecutionError
-        from backend.modules.sheet_metadata_persistence import (
+        from modules.common.base_module import ModuleExecutionError
+        from modules.storage.sheet_metadata_persistence import (
             SheetMetadataPersistenceInputDTO,
             SheetMetadataPersistenceModule,
         )
-        from backend.modules.spreadsheet_structure import (
+        from modules.structure.spreadsheet_structure import (
             ClassifiedRegionDTO,
             ClassifiedTableDTO,
             SpreadsheetStructureOutput,
         )
-        from backend.modules.vector_index_writer import VectorIndexDTO
+        from modules.storage.vector_index_writer import VectorIndexDTO
 
         wb_path = self.processed_dir / "test_meta.xlsx"
         wb = openpyxl.Workbook()

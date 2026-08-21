@@ -77,8 +77,8 @@ class PgVectorMetadataQueryTests(unittest.TestCase):
         self.assertEqual(params[2], "workbook-hash")
 
     def test_cell_items_to_langchain_documents_preserves_variant(self):
-        from backend.spreadsheets.langchain_document import cell_items_to_langchain_documents
-        from backend.modules.cell_text_serializer import CellTextDocumentDTO
+        from backend.storage.spreadsheets.langchain_document import cell_items_to_langchain_documents
+        from modules.structure.cell_text_serializer import CellTextDocumentDTO
 
         dto = CellTextDocumentDTO(
             cell_id="cell-1",

@@ -5,17 +5,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.data_sources import (
+from backend.storage.data_sources import (
     INGESTION_WORKFLOW_IDS,
     IngestionJobService,
     IngestionRequest,
 )
-from backend.data_sources.ingestion_registry import IngestionModuleRegistry
+from backend.storage.data_sources.ingestion_registry import IngestionModuleRegistry
 from backend.core.settings import WORKFLOW_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
-from backend.storage.vector_index import VectorIndexStore
-from backend.workflows import WorkflowStore
+from backend.engine.workflows import WorkflowStore
 
 
 def _service():
@@ -114,7 +113,6 @@ def test_ingestion_registry_loads_only_ingestion_modules_without_child_worker() 
         registry = IngestionModuleRegistry(
             AnswerCacheRepository(root / "answers.json"),
             embedding_artifact_store=EmbeddingArtifactStore(root / "embeddings"),
-            vector_index_store=VectorIndexStore(root / "indexes"),
             pgvector_store=MagicMock(),
             db_manager=MagicMock(),
             processed_dir=root / "source_files",

@@ -12,25 +12,17 @@ import { NODE_COLORS, NODE_MODULE_TYPES } from '../config/pipeline';
 import { ModuleSettingsContext } from '../contexts/ModuleSettingsContext';
 import { CustomEdge } from './CustomEdge';
 import { ContextNode } from './CustomNodes/ContextNode';
-import { AnswerCacheWriterNode } from './CustomNodes/AnswerCacheWriterNode';
-import { Bm25RetrieverNode } from './CustomNodes/Bm25RetrieverNode';
 import { BfsLlmStructureDetectorNode } from './CustomNodes/BfsLlmStructureDetectorNode';
 import { CellTextSerializerNode } from './CustomNodes/CellTextSerializerNode';
 import { ExhaustiveCellTextSerializerNode } from './CustomNodes/ExhaustiveCellTextSerializerNode';
 import { CellTextEmbedderNode } from './CustomNodes/CellTextEmbedderNode';
-import { VectorIndexWriterNode } from './CustomNodes/VectorIndexWriterNode';
 import { DecomposerNode } from './CustomNodes/DecomposerNode';
-import { DenseRetrieverNode } from './CustomNodes/DenseRetrieverNode';
 import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
 import { DoclingTableDetectorNode } from './CustomNodes/DoclingTableDetectorNode';
-import { JsonInspectorNode } from './CustomNodes/JsonInspectorNode';
-import { JsonTransformerNode } from './CustomNodes/JsonTransformerNode';
 import { GenericModuleNode } from './CustomNodes/GenericModuleNode';
-import { LocalVlmStructureDetectorNode } from './CustomNodes/LocalVlmStructureDetectorNode';
 import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDetectorNode';
 import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
 import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
-import { PrebuiltIndexLoaderNode } from './CustomNodes/PrebuiltIndexLoaderNode';
 import { PgVectorCollectionLoaderNode } from './CustomNodes/PgVectorCollectionLoaderNode';
 import { PgVectorRetrieverNode } from './CustomNodes/PgVectorRetrieverNode';
 import { PgVectorIndexWriterNode } from './CustomNodes/PgVectorIndexWriterNode';
@@ -64,22 +56,14 @@ export function PipelineCanvas({
       decomposerNode: DecomposerNode,
       embeddingNode: EmbeddingNode,
       cell_text_embedder: CellTextEmbedderNode,
-      vector_index_writer: VectorIndexWriterNode,
       pgvector_index_writer: PgVectorIndexWriterNode,
       pgvector_collection_loader: PgVectorCollectionLoaderNode,
       pgvector_retriever: PgVectorRetrieverNode,
-      bm25_retriever: Bm25RetrieverNode,
-      dense_retriever: DenseRetrieverNode,
       rrf_fusion: RrfFusionNode,
       contextNode: ContextNode,
       readerNode: ReaderNode,
-      answer_cache_writer: AnswerCacheWriterNode,
-      json_transformer: JsonTransformerNode,
-      json_inspector: JsonInspectorNode,
       processed_file_selector: ProcessedFileSelectorNode,
-      prebuilt_index_loader: PrebuiltIndexLoaderNode,
       bfs_llm_structure_detector: BfsLlmStructureDetectorNode,
-      local_vlm_structure_detector: LocalVlmStructureDetectorNode,
       luna_vlm_structure_detector: LunaVlmStructureDetectorNode,
       docling_table_detector: DoclingTableDetectorNode,
       openpyxl_region_detector: OpenpyxlRegionDetectorNode,

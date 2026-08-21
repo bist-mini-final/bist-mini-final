@@ -22,8 +22,8 @@ def _pool_size(name: str, default: int) -> int:
         return default
 
 
-_MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 2)
-_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 10))
+_MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 10)
+_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 100))
 
 _pool: Optional[psycopg2.pool.ThreadedConnectionPool] = None
 _pool_url: Optional[str] = None
@@ -139,10 +139,19 @@ class PooledConnectionWrapper:
         self.close()
 
 
-def get_pooled_raw_connection(database_url: str) -> PooledConnectionWrapper:
-    """Borrow a connection from the process-wide pool and wrap it so .close() returns it to pool."""
+def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) -> PooledConnectionWrapper:
+    """Borrow a connection from the process-wide pool and wrap it so .close() returns it to pool.
+    
+    If the pool is temporarily exhausted, waits up to timeout_seconds with exponential/short backoff.
+    """
+    import time
     pool = get_pool(database_url)
-    # psycopg2's ThreadedConnectionPool.getconn accepts only an optional key;
-    # connection timeouts belong to pool construction/connect_timeout.
-    conn = pool.getconn()
-    return PooledConnectionWrapper(pool, conn)
+    deadline = time.time() + timeout_seconds
+    while True:
+        try:
+            conn = pool.getconn()
+            return PooledConnectionWrapper(pool, conn)
+        except psycopg2.pool.PoolError:
+            if time.time() >= deadline:
+                raise
+            time.sleep(0.02)

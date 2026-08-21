@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from backend.workflows.store import _atomic_write_text
+from backend.engine.workflows.store import _atomic_write_text
 
 
 def test_atomic_write_retries_transient_windows_permission_error() -> None:
@@ -38,7 +38,7 @@ def test_atomic_write_propagates_permission_error_after_all_retries() -> None:
             raise PermissionError(5, "Access is denied")
 
         with patch.object(Path, "replace", autospec=True, side_effect=always_fails_replace):
-            with patch("backend.workflows.store.time.sleep"):
+            with patch("backend.engine.workflows.store.time.sleep"):
                 try:
                     _atomic_write_text(target, '{"status":"ok"}\n')
                     assert False, "Expected PermissionError to propagate"
@@ -50,8 +50,8 @@ def test_atomic_write_propagates_permission_error_after_all_retries() -> None:
 
 
 def test_run_store_file_only() -> None:
-    from backend.workflows.models import WorkflowGraph, WorkflowRun
-    from backend.workflows.store import RunStore
+    from backend.engine.workflows.models import WorkflowGraph, WorkflowRun
+    from backend.engine.workflows.store import RunStore
 
     with TemporaryDirectory() as temp_dir:
         store = RunStore(Path(temp_dir))
@@ -74,8 +74,8 @@ def test_run_store_file_only() -> None:
 
 def test_run_store_with_db_manager() -> None:
     from unittest.mock import MagicMock
-    from backend.workflows.models import WorkflowGraph, WorkflowRun
-    from backend.workflows.store import RunStore
+    from backend.engine.workflows.models import WorkflowGraph, WorkflowRun
+    from backend.engine.workflows.store import RunStore
 
     mock_db = MagicMock()
     mock_db.is_connected.return_value = True
@@ -114,12 +114,12 @@ def test_run_store_with_db_manager() -> None:
 def test_request_cancel_preserves_existing_external_run_id() -> None:
     from unittest.mock import MagicMock
 
-    from backend.workflows.models import (
+    from backend.engine.workflows.models import (
         RunOrchestrationState,
         WorkflowGraph,
         WorkflowRun,
     )
-    from backend.workflows.store import RunStore
+    from backend.engine.workflows.store import RunStore
 
     mock_db = MagicMock()
     mock_db.is_connected.return_value = True
@@ -153,12 +153,12 @@ def test_request_cancel_preserves_existing_external_run_id() -> None:
 def test_enqueue_explicitly_clears_existing_external_run_id() -> None:
     from unittest.mock import MagicMock
 
-    from backend.workflows.models import (
+    from backend.engine.workflows.models import (
         RunOrchestrationState,
         WorkflowGraph,
         WorkflowRun,
     )
-    from backend.workflows.store import RunStore
+    from backend.engine.workflows.store import RunStore
 
     mock_db = MagicMock()
     mock_db.is_connected.return_value = True
@@ -196,8 +196,8 @@ def test_enqueue_explicitly_clears_existing_external_run_id() -> None:
 def test_list_summaries_merges_database_and_local_history() -> None:
     from unittest.mock import MagicMock
 
-    from backend.workflows.models import WorkflowGraph, WorkflowRun
-    from backend.workflows.store import RunStore
+    from backend.engine.workflows.models import WorkflowGraph, WorkflowRun
+    from backend.engine.workflows.store import RunStore
 
     mock_db = MagicMock()
     mock_db.is_connected.return_value = True

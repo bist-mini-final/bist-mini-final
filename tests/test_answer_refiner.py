@@ -1,13 +1,13 @@
 """Unit and integration tests for Direct Cell Answer Refiner Module (Pure LLM Spatial Reasoning)."""
 
 import pytest
-from backend.modules.answer_refiner import (
+from modules.reader.answer_refiner import (
     AnswerRefinerModule,
     AnswerRefinerInputDTO,
 )
-from backend.modules.reader import AnswerDTO, ApiUsageDTO
-from backend.modules.data_lineage import QueryContextDTO, DocumentContextDTO
-from backend.llm.chat_completion import ChatCompletionResult
+from modules.reader.reader import AnswerDTO, ApiUsageDTO
+from modules.common.base_module import QueryContextDTO, DocumentContextDTO
+from backend.providers.llm.chat_completion import ChatCompletionResult
 
 
 class FakeCellStore:
@@ -212,7 +212,7 @@ def test_answer_refiner_execution_with_llm_reasoning():
 def test_infer_candidate_cells_raises_on_llm_failure():
     """Verify that LLM completion errors in candidate inference raise ModuleExecutionError."""
     from unittest.mock import MagicMock
-    from backend.modules.base import ModuleExecutionError
+    from modules.common.base_module import ModuleExecutionError
 
     mock_client = MagicMock()
     mock_client.complete_with_metadata.side_effect = RuntimeError("API rate limit exceeded")
@@ -228,7 +228,7 @@ def test_infer_candidate_cells_raises_on_llm_failure():
 def test_infer_candidate_cells_raises_on_invalid_or_non_array_json():
     """Verify that non-array or invalid JSON responses raise ModuleExecutionError."""
     from unittest.mock import MagicMock
-    from backend.modules.base import ModuleExecutionError
+    from modules.common.base_module import ModuleExecutionError
 
     # Non-array JSON (dict instead of list)
     mock_client = MagicMock()

@@ -1,13 +1,18 @@
 import {
+  Bot,
   ChartNoAxesCombined,
   Database,
+  FlaskConical,
   House,
+  Scale,
   Settings,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
 import { type ComponentType, lazy } from 'react';
 import { EvaluationsPage } from '../pages/EvaluationsPage';
+import { ChatbotPage } from '../pages/ChatbotPage';
+import { CompanyComparisonPage } from '../pages/CompanyComparisonPage';
 import { HomePage } from '../pages/HomePage';
 import { SettingsPage } from '../pages/SettingsPage';
 
@@ -76,11 +81,29 @@ export const APP_ROUTES: readonly AppRoute[] = [
     status: 'ready',
   },
   {
+    path: '/chatbot',
+    label: 'AI 챗봇',
+    shortLabel: 'Chatbot',
+    description: '자연어로 질의하는 대화형 재무 비서',
+    icon: Bot,
+    component: ChatbotPage,
+    status: 'planned',
+  },
+  {
+    path: '/company-comparison',
+    label: '기업 비교',
+    shortLabel: 'Comparison',
+    description: '다중 기업 재무 지표 비교 분석 대시보드',
+    icon: Scale,
+    component: CompanyComparisonPage,
+    status: 'planned',
+  },
+  {
     path: '/evaluations',
     label: '평가',
     shortLabel: 'Evaluations',
     description: '파이프라인 품질을 비교하는 공간',
-    icon: ChartNoAxesCombined,
+    icon: FlaskConical,
     component: EvaluationsPage,
     status: 'planned',
   },

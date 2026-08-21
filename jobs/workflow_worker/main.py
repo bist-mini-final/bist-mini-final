@@ -13,17 +13,17 @@ from threading import Event, Thread
 import time
 from typing import Iterator, Optional
 
-from backend.core.settings import CACHE_DIR, KUBERNETES_INGESTION_QUEUE
-from backend.data_sources import INGESTION_WORKFLOW_IDS
-from backend.data_sources.ingestion_registry import IngestionModuleRegistry
-from backend.orchestration import compile_task_plan
-from backend.runtime.services import (
+from backend.core.settings import KUBERNETES_INGESTION_QUEUE
+from backend.storage.data_sources import INGESTION_WORKFLOW_IDS
+from backend.storage.data_sources.ingestion_registry import IngestionModuleRegistry
+from backend.engine.orchestration import compile_task_plan
+from backend.engine.runtime.services import (
     WorkflowRuntimeServices,
     create_workflow_runtime_services,
 )
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
-from backend.workflows.executor import DagExecutionCancelled
+from backend.engine.workflows.executor import DagExecutionCancelled
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def runtime_services() -> WorkflowRuntimeServices:
     """Build the lean ingestion runtime once per one-shot Job pod."""
 
     return create_workflow_runtime_services(
-        AnswerCacheRepository(CACHE_DIR / "answers.json"),
+        AnswerCacheRepository(),
         initialize_schema=False,
         require_database=True,
         registry_factory=IngestionModuleRegistry,

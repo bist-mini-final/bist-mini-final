@@ -72,7 +72,7 @@ export function SettingsView() {
   const dbPort = dbStatus?.port || 5432;
   const dbName = dbStatus?.database || 'rag_flow';
   const dbUrl = `postgresql://<user>:<password>@${dbHost}:${dbPort}/${dbName}`;
-  const dockerCmd = 'docker compose -f docker-compose.db.yml up -d';
+  const dockerCmd = 'docker compose -f deploy/db/docker-compose.yml up -d';
 
   const copyToClipboard = async (text: string, type: 'url' | 'cmd') => {
     const setStatus = type === 'url' ? setCopiedUrl : setCopiedCmd;
@@ -178,7 +178,7 @@ export function SettingsView() {
             <div>
               <p className="font-semibold text-rose-900">pgvector 데이터베이스에 연결할 수 없습니다</p>
               <p className="text-xs text-rose-700">
-                Docker 컨테이너가 실행 중인지 확인하거나 <code>docker compose -f docker-compose.db.yml up -d</code>로 데이터베이스를 시작하세요.
+                Docker 컨테이너가 실행 중인지 확인하거나 <code>docker compose -f deploy/db/docker-compose.yml up -d</code>로 데이터베이스를 시작하세요.
               </p>
             </div>
           </div>

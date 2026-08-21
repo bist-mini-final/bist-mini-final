@@ -12,7 +12,7 @@ interface EmbeddingNodeData extends Record<string, unknown> {
 
 export type EmbeddingNodeProps = NodeProps<Node<EmbeddingNodeData>>;
 
-const DEFAULT_EMBEDDING_MODEL = 'BAAI/bge-large-en-v1.5';
+const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-large';
 
 export const EmbeddingNode = ({ data, selected }: EmbeddingNodeProps) => {
   const model = data.config?.model?.trim() || DEFAULT_EMBEDDING_MODEL;

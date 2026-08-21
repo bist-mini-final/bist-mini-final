@@ -13,8 +13,8 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from ..data_sources import IngestionJobService, IngestionRequest as IngestRequestDTO
-from ..core.settings import (
+from backend.storage.data_sources import IngestionJobService, IngestionRequest as IngestRequestDTO
+from backend.core.settings import (
     EMBEDDING_ARTIFACT_DIR,
     KUBERNETES_INGESTION_QUEUE,
     PGVECTOR_URL,
@@ -25,8 +25,8 @@ from ..core.settings import (
     WORKFLOW_DIR,
     CACHE_DIR,
 )
-from ..embeddings.factory import EmbeddingEncoder
-from ..spreadsheets.ingestion import (
+from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.storage.spreadsheets.ingestion import (
     delete_vector_index,
     get_processed_file_info,
     get_vector_index_detail,
@@ -35,13 +35,12 @@ from ..spreadsheets.ingestion import (
     preview_excel_sheet,
     search_vector_index,
 )
-from ..storage.db_manager import DatabaseManager
-from ..storage.embedding_artifacts import EmbeddingArtifactStore
-from ..storage.pgvector_store import PgVectorStore
-from ..storage.vector_index import VectorIndexStore
-from ..storage.answer_cache import AnswerCacheRepository
-from ..runtime.registry import ModuleRegistry
-from ..workflows import (
+from backend.storage.db_manager import DatabaseManager
+from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.pgvector_store import PgVectorStore
+from backend.storage.answer_cache import AnswerCacheRepository
+from backend.engine.runtime.registry import ModuleRegistry
+from backend.engine.workflows import (
     DagExecutionError,
     RunDispatcher,
     ResultCache,
@@ -167,14 +166,12 @@ def create_data_source_router(
     """
     router = APIRouter(prefix="/data-sources", tags=["Data Sources"])
 
-    vector_index_store = VectorIndexStore(vector_index_dir)
     embedding_artifact_store = EmbeddingArtifactStore(embedding_artifact_dir)
     pg_store = pgvector_store or PgVectorStore(PGVECTOR_URL)
     registry = module_registry or ModuleRegistry(
         repository=AnswerCacheRepository(),
         embedding_encoder=embedding_encoder,
         embedding_artifact_store=embedding_artifact_store,
-        vector_index_store=vector_index_store,
         pgvector_store=pg_store,
         db_manager=DatabaseManager(),
         processed_dir=processed_dir,
@@ -188,7 +185,7 @@ def create_data_source_router(
         ResultCache(cache_dir),
     )
     if workflow_dispatcher is None:
-        from ..orchestration.kubernetes import KubernetesQueueDispatcher
+        from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
 
         workflow_dispatcher = KubernetesQueueDispatcher(
             workflow_executor,

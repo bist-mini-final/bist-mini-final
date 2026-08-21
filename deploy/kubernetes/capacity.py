@@ -60,17 +60,17 @@ def recommended_concurrency(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cpu-per-job", type=positive_float, default=1.0)
+    parser.add_argument("--cpu-per-job", type=positive_float, default=0.5)
     parser.add_argument(
         "--memory-per-job-gib",
         type=positive_float,
-        default=2.0,
+        default=0.8,
     )
     parser.add_argument("--reserve-cpu", type=non_negative_float, default=1.0)
     parser.add_argument(
         "--reserve-memory-gib",
         type=non_negative_float,
-        default=2.0,
+        default=1.5,
     )
     parser.add_argument("--hard-cap", type=positive_int, default=10)
     parser.add_argument("--details", action="store_true")

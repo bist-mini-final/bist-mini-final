@@ -57,7 +57,7 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
         <small className="ds-summary-card__caption">
           {dbStatus?.connected
             ? `pgvector ${dbStatus.pgvector_version || '0.8.6'} · HNSW 인덱싱`
-            : 'docker-compose.db.yml 실행 필요'}
+            : 'deploy/db/docker-compose.yml 실행 필요'}
         </small>
       </div>
 

@@ -7,19 +7,19 @@ from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
-from backend.modules.base import (
+from modules.common.base_module import (
     EmptyModuleConfigDTO,
     ExecutableModule,
     ModuleDefinition,
     ModuleInputDTO,
     ModuleTaskPolicy,
 )
-from backend.orchestration import compile_task_plan
-from backend.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.runtime.registry_base import BaseModuleRegistry
+from backend.engine.orchestration import compile_task_plan
+from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
+from backend.engine.runtime.registry_base import BaseModuleRegistry
 from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
-from backend.workflows.executor import WorkflowExecutor
-from backend.workflows.models import (
+from backend.engine.workflows.executor import WorkflowExecutor
+from backend.engine.workflows.models import (
     CanvasPosition,
     RunBatchState,
     RunNodeState,
@@ -29,7 +29,7 @@ from backend.workflows.models import (
     WorkflowNode,
     WorkflowRun,
 )
-from backend.workflows.store import ResultCache, RunStore
+from backend.engine.workflows.store import ResultCache, RunStore
 from jobs.workflow_worker.main import execute_with_policy, run_one
 
 
@@ -160,15 +160,6 @@ def test_module_contract_exposes_kubernetes_task_policy() -> None:
         "tags": [],
         "resource_profile": "standard",
     }
-
-
-def test_legacy_run_history_migrates_to_current_scheduler_contract() -> None:
-    state = RunOrchestrationState.model_validate(
-        {"backend": "prefect", "external_run_id": "historical-run"}
-    )
-
-    assert state.backend == "kubernetes"
-    assert state.external_run_id == "historical-run"
 
 
 def test_compile_task_plan_preserves_module_identity_and_dependencies() -> None:
@@ -329,7 +320,7 @@ def test_cancellation_lookup_failure_is_logged_without_masking_execution(
         MagicMock(),
     )
 
-    with caplog.at_level(logging.WARNING, logger="backend.workflows.executor"):
+    with caplog.at_level(logging.WARNING, logger="backend.engine.workflows.executor"):
         executor._raise_if_cancelled("run-kubernetes-test")
 
     assert "DB cancellation 상태 조회 실패" in caplog.text

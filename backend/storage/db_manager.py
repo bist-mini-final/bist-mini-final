@@ -43,7 +43,7 @@ from uuid import uuid4
 
 import psycopg2.extras
 
-from ..core.settings import PGVECTOR_URL
+from backend.core.settings import PGVECTOR_URL
 from .connection_pool import get_pooled_raw_connection
 
 logger = logging.getLogger(__name__)

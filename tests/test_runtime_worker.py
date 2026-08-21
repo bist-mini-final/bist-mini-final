@@ -6,7 +6,7 @@ from pathlib import Path
 from queue import Queue
 from unittest.mock import patch
 
-from backend.runtime.worker import CancellableModuleWorker, ModuleWorkerError
+from backend.engine.runtime.worker import CancellableModuleWorker, ModuleWorkerError
 
 
 class _FakeProcess:
@@ -41,7 +41,7 @@ class CancellableModuleWorkerTests(unittest.TestCase):
             worker._response_queue.put({"task_id": "task-id", **response})
         return worker, process
 
-    @patch("backend.runtime.worker.uuid4")
+    @patch("backend.engine.runtime.worker.uuid4")
     def test_progress_callback_failure_terminates_worker(self, mock_uuid4) -> None:
         mock_uuid4.return_value.hex = "task-id"
         worker, process = self._worker_with_responses(
@@ -62,7 +62,7 @@ class CancellableModuleWorkerTests(unittest.TestCase):
         self.assertIsNone(worker._process)
         self.assertIsNone(worker._active_task_id)
 
-    @patch("backend.runtime.worker.uuid4")
+    @patch("backend.engine.runtime.worker.uuid4")
     def test_successful_progress_callback_keeps_worker_reusable(self, mock_uuid4) -> None:
         mock_uuid4.return_value.hex = "task-id"
         worker, process = self._worker_with_responses(
