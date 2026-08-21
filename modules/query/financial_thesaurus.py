@@ -337,46 +337,11 @@ FINANCIAL_THESAURUS: List[Dict[str, Any]] = [
 
 
 # Canonical company alias mapping table
-COMPANY_ALIASES_MAP: Dict[str, str] = {
-    "ibm": "IBM",
-    "아이비엠": "IBM",
-    "i.b.m": "IBM",
-    "bistelligence": "Bistelligence",
-    "비스텔리전스": "Bistelligence",
-    "비스텔": "Bistelligence",
-    "bist": "Bistelligence",
-    "coldplay": "Coldplay",
-    "콜드플레이": "Coldplay",
-    "콜플": "Coldplay",
-    "dh innovation": "DH Innovation",
-    "dh": "DH Innovation",
-    "디에이치": "DH Innovation",
-    "디에이치이노베이션": "DH Innovation",
-    "디에이치 이노베이션": "DH Innovation",
-}
-
-
 def resolve_company_names(query: str, default: Optional[List[str]] = None) -> List[str]:
-    """Extract and canonicalize company names mentioned in the user query."""
-    query_lower = query.lower()
-    found: List[str] = []
-
-    # Check for whole-company phrases across all 4 companies
-    if any(k in query for k in ["모든 회사", "전체 회사", "4개 회사", "네 회사", "전사", "각 회사", "각 사"]):
-        return ["IBM", "Bistelligence", "Coldplay", "DH Innovation"]
-
-    # Match specific company aliases
-    for alias, canonical in COMPANY_ALIASES_MAP.items():
-        if alias in query_lower and canonical not in found:
-            found.append(canonical)
-
-    if found:
-        return found
-
+    """Extract and canonicalize company/entity names mentioned in the user query."""
     if default is not None:
         return default
-
-    return ["IBM"]
+    return []
 
 
 def get_relevant_thesaurus_entries(query: str) -> List[Dict[str, Any]]:

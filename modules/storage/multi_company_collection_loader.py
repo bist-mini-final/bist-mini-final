@@ -22,12 +22,7 @@ from modules.query.financial_thesaurus import resolve_company_names
 
 logger = logging.getLogger(__name__)
 
-KNOWN_COMPANY_COLLECTIONS: Dict[str, str] = {
-    "IBM": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
-    "Bistelligence": "27904fbd1eaa13b45618eae270f63d0d3c4a8cb7ee50111dee9eb9cf3b5d512c",
-    "Coldplay": "1873056acbca34a7ed67328540923f55a4be017315cfdc133fa753ac2e157348",
-    "DH Innovation": "3f755b47af8e86a98545e45a2ac8be5aeae9d4dc27c108c588f895aa013b7ab4",
-}
+KNOWN_COMPANY_COLLECTIONS: Dict[str, str] = {}
 
 
 class MultiCompanyCollectionLoaderInputDTO(ModuleInputDTO):
@@ -50,8 +45,8 @@ class MultiCompanyCollectionLoaderConfigDTO(ModuleConfigDTO):
         default=True,
         description="질문 본문에서 기업명을 자동으로 감지하여 컬렉션을 선택할지 여부",
     )
-    fallback_company: str = Field(
-        default="IBM",
+    fallback_company: Optional[str] = Field(
+        default=None,
         description="기업명을 감지하지 못했을 때 사용할 기본 기업명",
     )
 
@@ -120,7 +115,7 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
                     target_cols.append(col_id)
 
         # 3. Fallback if still empty
-        if not target_cols:
+        if not target_cols and input_data.fallback_company:
             fallback_col = KNOWN_COMPANY_COLLECTIONS.get(input_data.fallback_company)
             if fallback_col:
                 target_cols.append(fallback_col)
