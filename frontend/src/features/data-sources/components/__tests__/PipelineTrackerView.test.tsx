@@ -72,6 +72,34 @@ describe('PipelineTrackerView', () => {
     expect(screen.getByText('문서 7,000/12,000개')).toBeInTheDocument();
   });
 
+  it('shows Kubernetes assignment and non-batch module progress', () => {
+    const running = pipeline('running');
+    running.scheduler = {
+      backend: 'kubernetes',
+      deploymentName: 'excel-ingestion',
+      externalRunId: 'excel-ingestion-abc12',
+      workerActive: true,
+    };
+    running.modules[0].liveProgress = {
+      phase: 'sheet_analysis',
+      label: 'Luna VLM 시트 분석',
+      completed: 2,
+      total: 5,
+      unit: '시트',
+      percent: 40,
+      currentItem: 'Key Stats',
+    };
+
+    render(<PipelineTrackerView pipeline={running} onBack={vi.fn()} />);
+
+    expect(screen.getByText('Kubernetes Job')).toBeInTheDocument();
+    expect(screen.getByText('작업 할당됨')).toBeInTheDocument();
+    expect(screen.getByText('Luna VLM 시트 분석 2/5 시트')).toBeInTheDocument();
+    expect(screen.getByText('현재: Key Stats')).toBeInTheDocument();
+    expect(screen.getByText('Kubernetes Job 실행 중')).toBeInTheDocument();
+    expect(screen.getByText('excel-ingestion-ab')).toBeInTheDocument();
+  });
+
   it('shows a resumable paused state without a stop button', () => {
     render(
       <PipelineTrackerView

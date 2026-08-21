@@ -96,7 +96,7 @@ export const CARD_REGISTRY = [
   },
 ] as const satisfies readonly BiCardDefinition[];
 
-export const CARD_IDS = CARD_REGISTRY.map((card) => card.id);
+const CARD_IDS = CARD_REGISTRY.map((card) => card.id);
 
 export const DEFAULT_CARD_LAYOUT = [
   {

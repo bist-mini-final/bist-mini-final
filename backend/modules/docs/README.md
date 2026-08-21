@@ -22,6 +22,7 @@ python -m backend.tools.generate_module_docs
 | Module | Category | Guide |
 |---|---|---|
 | `adaptive_query_decomposer` | Logic | [Adaptive Query Decomposer](./adaptive_query_decomposer.md) |
+| `adaptive_rrf_fusion` | Logic | [Adaptive RRF Fusion](./adaptive_rrf_fusion.md) |
 | `answer_cache_writer` | Output | [Answer Cache Writer](./answer_cache_writer.md) |
 | `answer_refiner` | Output | [Direct Cell Answer Refiner](./answer_refiner.md) |
 | `bfs_llm_structure_detector` | Logic | [BFS + LLM Table Structure Detector](./bfs_llm_structure_detector.md) |
@@ -37,6 +38,7 @@ python -m backend.tools.generate_module_docs
 | `docling_table_detector` | Logic | [Docling Table Region Detector](./docling_table_detector.md) |
 | `embedder` | Logic | [Query Embedder](./embedder.md) |
 | `exhaustive_cell_text_serializer` | Transform | [Exhaustive Cell Header Serializer](./exhaustive_cell_text_serializer.md) |
+| `financial_formula_calculator` | Logic | [Financial Formula Calculator](./financial_formula_calculator.md) |
 | `image_tile_source` | Source | [Image Tile Source (PixelRAG)](./image_tile_source.md) |
 | `index_company_persistence` | Storage / DB | [Index Company Persistence](./index_company_persistence.md) |
 | `json_inspector` | Output | [JSON Data Inspector](./json_inspector.md) |
@@ -44,6 +46,7 @@ python -m backend.tools.generate_module_docs
 | `llm_query_router` | Logic | [LLM Query Router](./llm_query_router.md) |
 | `local_vlm_structure_detector` | Logic | [Local VLM Table Structure Detector](./local_vlm_structure_detector.md) |
 | `luna_vlm_structure_detector` | Logic | [Luna Full-Sheet Structure Detector](./luna_vlm_structure_detector.md) |
+| `multi_company_collection_loader` | Storage | [Multi-Company Collection Loader](./multi_company_collection_loader.md) |
 | `openpyxl_region_detector` | Logic | [OpenPyXL Table Region Classifier](./openpyxl_region_detector.md) |
 | `pgvector_collection_loader` | Source | [PostgreSQL pgvector Collection Loader](./pgvector_collection_loader.md) |
 | `pgvector_index_writer` | Transform | [PostgreSQL pgvector Writer](./pgvector_index_writer.md) |
@@ -59,4 +62,6 @@ python -m backend.tools.generate_module_docs
 | `semantic_scoped_pgvector_retriever` | Logic | [Semantic-Scoped pgvector Retriever](./semantic_scoped_pgvector_retriever.md) |
 | `sheet_metadata_persistence` | Storage / DB | [Sheet Metadata Persistence](./sheet_metadata_persistence.md) |
 | `template_query_decomposer` | Logic | [Template Query Decomposer](./template_query_decomposer.md) |
+| `thesaurus_decomposer` | Logic | [Thesaurus Financial Decomposer](./thesaurus_decomposer.md) |
+| `timeseries_context_expander` | Logic | [Time-Series Full-Row Context Expander](./timeseries_context_expander.md) |
 | `vector_index_writer` | Transform | [Vector Index Writer](./vector_index_writer.md) |

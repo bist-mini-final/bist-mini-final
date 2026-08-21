@@ -15,8 +15,6 @@ from ..spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogErro
 from .base import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleExecutionError, ModuleInputDTO
 from .docling_table_detector import DoclingTableRegionDTO
 from .spreadsheet_structure import (
-    ClassifiedRegionDTO,
-    ClassifiedTableDTO,
     SpreadsheetStructureOutput,
 )
 

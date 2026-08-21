@@ -18,6 +18,7 @@ from .base import (
     ModuleDefinition,
     ModuleDTO,
     ModuleExecutionError,
+    ModuleTaskPolicy,
 )
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
 from .embedder import EMBEDDING_MODEL_OPTIONS
@@ -88,6 +89,13 @@ class CellTextEmbedderModule(ExecutableModule):
         config_fields=["model", "batch_size"],
         raw_output=True,
         version="3",
+        task=ModuleTaskPolicy(
+            retries=2,
+            retry_delay_seconds=5,
+            timeout_seconds=3600,
+            tags=["embedding"],
+            resource_profile="high-memory",
+        ),
     )
     input_model = CellTextEmbedderInputDTO
     config_model = CellTextEmbedderConfigDTO

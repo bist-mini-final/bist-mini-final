@@ -1,4 +1,4 @@
-export const METRIC_IDS = [
+const METRIC_IDS = [
   'revenue',
   'revenue_yoy_growth',
   'operating_income',
@@ -21,23 +21,23 @@ export const METRIC_IDS = [
 
 export type MetricId = (typeof METRIC_IDS)[number];
 export type MetricStatus = 'available' | 'missing' | 'ambiguous' | 'invalid' | 'not_meaningful';
-export type SnapshotStatus = 'ready' | 'partial';
-export type RefreshStatus = 'idle' | 'queued' | 'profiling' | 'extracting' | 'materializing' | 'failed';
+type SnapshotStatus = 'ready' | 'partial';
+type RefreshStatus = 'idle' | 'queued' | 'profiling' | 'extracting' | 'materializing' | 'failed';
 export type PeriodKind = 'fy' | 'ltm';
 export type ValueKind = 'amount' | 'percent';
-export type AmountScale = 'ones' | 'thousands' | 'millions' | 'billions';
+type AmountScale = 'ones' | 'thousands' | 'millions' | 'billions';
 export type PeriodRange = '최근 3개' | '최근 5개' | '전체';
 export type CardSize = 'S' | 'M' | 'L';
 export type BiResizableGridBreakpoint = 'wide' | 'medium';
 export type CardMoveDirection = 'up' | 'down' | 'left' | 'right';
 export type CardState = 'ready' | 'partial' | 'missing' | 'ambiguous' | 'invalid';
 
-export interface BiCompany {
+interface BiCompany {
   readonly companyId: string;
   readonly displayName: string;
 }
 
-export interface BiSnapshotMeta {
+interface BiSnapshotMeta {
   readonly snapshotId: string;
   readonly workbookHash: string;
   readonly status: SnapshotStatus;
@@ -76,12 +76,12 @@ interface ObservationBase {
   readonly notes: readonly string[];
 }
 
-export interface AvailableObservation extends ObservationBase {
+interface AvailableObservation extends ObservationBase {
   readonly status: 'available';
   readonly normalizedValue: string;
 }
 
-export interface UnavailableObservation extends ObservationBase {
+interface UnavailableObservation extends ObservationBase {
   readonly status: Exclude<MetricStatus, 'available'>;
   readonly normalizedValue: null;
   readonly reason: string;
@@ -99,7 +99,7 @@ export interface MetricSeries {
   readonly observations: readonly MetricObservation[];
 }
 
-export interface BiIssue {
+interface BiIssue {
   readonly code: string;
   readonly message: string;
   readonly metricId: MetricId | null;

@@ -2,7 +2,7 @@ import type { ModuleType } from '../../types';
 
 export type JsonRow = Record<string, unknown>;
 
-export interface TableInspectorContent {
+interface TableInspectorContent {
   kind: 'table';
   label: string;
   preferredColumns: string[];
@@ -27,7 +27,7 @@ interface InspectorAdapter {
 
 const ADAPTER_SAMPLE_SIZE = 24;
 
-export function isJsonRow(value: unknown): value is JsonRow {
+function isJsonRow(value: unknown): value is JsonRow {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 

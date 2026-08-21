@@ -1,11 +1,12 @@
 from collections import defaultdict
+import logging
 from threading import Lock, RLock
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
 from uuid import uuid4
 
 from pydantic import ValidationError
 
-from ..runtime.registry import ModuleRegistry
+from ..runtime.registry_base import BaseModuleRegistry
 from ..runtime.worker import (
     CancellableModuleWorker,
     ModuleWorkerCancelled,
@@ -26,6 +27,9 @@ from .history import compact_history_value
 from .store import ResultCache, RunStore
 
 
+logger = logging.getLogger(__name__)
+
+
 class DagExecutionError(ValueError):
     """Raised when a workflow graph or its persisted execution is invalid."""
 
@@ -39,7 +43,7 @@ class WorkflowExecutor:
 
     def __init__(
         self,
-        module_registry: ModuleRegistry,
+        module_registry: BaseModuleRegistry,
         run_store: RunStore,
         result_cache: ResultCache,
         module_worker: Any = None,
@@ -316,6 +320,77 @@ class WorkflowExecutor:
                 ),
             )
 
+    def execute_scheduled_node(self, run_id: str, node_id: str) -> WorkflowRun:
+        """Execute one orchestration-owned node without invalidating descendants.
+
+        A batch worker compiles each persisted Playground node into a task and
+        calls this only after its upstream tasks have completed. The
+        existing run document remains the product-facing source of truth.
+        """
+
+        with self._execution_lock:
+            return self._run_cancellable(
+                run_id,
+                lambda active_run_id: self._execute_scheduled_node(
+                    active_run_id,
+                    node_id,
+                ),
+            )
+
+    def _execute_scheduled_node(self, run_id: str, node_id: str) -> WorkflowRun:
+        self._raise_if_cancelled(run_id)
+        run = self.run_store.load(run_id)
+        graph_nodes = {node.id: node for node in run.graph.nodes}
+        node = graph_nodes.get(node_id)
+        if node is None:
+            raise DagExecutionError(f"실행할 노드를 찾을 수 없습니다: {node_id}")
+
+        state = run.nodes[node_id]
+        if state.status in ("succeeded", "skipped"):
+            return run
+        if state.status in ("failed", "running"):
+            # A worker retry or a restarted Job owns this invocation now.
+            self._reset_node_state(state)
+
+        batch = run.batches[state.batch_index]
+        run.status = "running"
+        batch.status = "running"
+        batch.started_at = batch.started_at or utc_now_iso()
+        batch.completed_at = None
+        self.run_store.save_progress(run, node_id)
+
+        should_execute, skip_reason = self._should_execute_node(run, node)
+        if not should_execute:
+            state.status = "skipped"
+            state.outcome = None
+            state.skip_reason = skip_reason
+            state.completed_at = utc_now_iso()
+            self._refresh_run_status(run)
+            return self.run_store.save(run)
+
+        try:
+            self._execute_node(run, node, state)
+        except (DagExecutionCancelled, ModuleWorkerCancelled):
+            raise
+        except Exception as error:
+            state.status = "failed"
+            state.outcome = "failed"
+            state.error = self._format_error(
+                error,
+                include_type=not isinstance(
+                    error,
+                    (DagExecutionError, ValidationError, ModuleExecutionError),
+                ),
+            )
+            state.completed_at = utc_now_iso()
+            self._refresh_run_status(run)
+            self.run_store.save(run)
+            # The batch worker owns retry/failure policy, so preserve it.
+            raise
+
+        self._refresh_run_status(run)
+        return self.run_store.save(run)
+
     def _execute_single_node(self, run_id: str, node_id: str) -> WorkflowRun:
         """
         Execute a node and its downstream dependents as a standalone run segment.
@@ -549,6 +624,21 @@ class WorkflowExecutor:
         with self._execution_lock:
             return self._run_cancellable(run_id, self._resume)
 
+    def prepare_resume(self, run_id: str) -> WorkflowRun:
+        """Reset failed/paused state and persist it without executing the run.
+
+        External queue consumers use this to make a run claimable again; the
+        actual execution is then owned by a separate process or Flow container.
+        """
+
+        with self._execution_lock:
+            return self._prepare_resume(run_id)
+
+    def request_cancel(self, run_id: str) -> bool:
+        """Signal cancellation without waiting for the execution lock."""
+
+        return self._request_cancel(run_id)
+
     def cancel_run(self, run_id: str) -> WorkflowRun:
         """Signal cancellation before waiting for the execution lock."""
 
@@ -578,15 +668,16 @@ class WorkflowExecutor:
                     self._cancelled_run_ids.clear()
 
     def _resume(self, run_id: str) -> WorkflowRun:
+        self._prepare_resume(run_id)
+        return self._execute_all(run_id)
+
+    def _prepare_resume(self, run_id: str) -> WorkflowRun:
         run = self.run_store.load(run_id)
         failed_node_ids = {
             node_id
             for node_id, state in run.nodes.items()
             if state.status == "failed"
         }
-        if not failed_node_ids:
-            return self._execute_all(run_id)
-
         for node_id in failed_node_ids:
             state = run.nodes[node_id]
             state.status = "pending"
@@ -600,9 +691,9 @@ class WorkflowExecutor:
                 batch.status = "pending"
                 batch.started_at = None
                 batch.completed_at = None
-        run.status = "queued"
-        self.run_store.save(run)
-        return self._execute_all(run_id)
+        if run.status not in ("completed",):
+            run.status = "queued"
+        return self.run_store.save(run)
 
     def _execute_node(
         self,
@@ -640,7 +731,43 @@ class WorkflowExecutor:
         state.cache_hit = False
         state.progress = {}
         state.started_at = utc_now_iso()
-        self.run_store.save(run)
+        self.run_store.save_progress(run, node.id)
+
+        last_progress_persisted_at = 0.0
+        last_progress_phase: Any = None
+
+        def persist_progress(progress: Dict[str, Any]) -> None:
+            """Persist throttled live progress independently from large outputs."""
+
+            nonlocal last_progress_persisted_at, last_progress_phase
+            self._raise_if_cancelled(run.id)
+            compact_progress = compact_history_value(progress)
+            state.progress = compact_progress
+            now = time.monotonic()
+            phase = compact_progress.get("phase")
+            completed_total_pairs = (
+                ("completed_batches", "total_batches"),
+                ("completed_items", "total_items"),
+                ("completed_sheets", "total_sheets"),
+                ("completed_tables", "total_tables"),
+            )
+            is_final = any(
+                isinstance(compact_progress.get(completed_key), (int, float))
+                and isinstance(compact_progress.get(total_key), (int, float))
+                and compact_progress[total_key] > 0
+                and compact_progress[completed_key] >= compact_progress[total_key]
+                for completed_key, total_key in completed_total_pairs
+            )
+            should_persist = (
+                last_progress_persisted_at == 0.0
+                or phase != last_progress_phase
+                or is_final
+                or now - last_progress_persisted_at >= 1.0
+            )
+            if should_persist:
+                self.run_store.save_progress(run, node.id)
+                last_progress_persisted_at = now
+                last_progress_phase = phase
 
         output: Any = None
         cache_enabled = run.use_cache and module.definition.cacheable and (
@@ -652,17 +779,16 @@ class WorkflowExecutor:
         if output is None:
             self._raise_if_cancelled(run.id)
             if self._module_worker is None:
-                output = self.module_registry.execute(
-                    node.module_type,
-                    input_payload,
-                    validated_config,
-                )
+                module.set_progress_callback(persist_progress)
+                try:
+                    output = self.module_registry.execute(
+                        node.module_type,
+                        input_payload,
+                        validated_config,
+                    )
+                finally:
+                    module.set_progress_callback(None)
             else:
-                def persist_progress(progress: Dict[str, Any]) -> None:
-                    """Persist the current node execution progress for the workflow run."""
-                    state.progress = compact_history_value(progress)
-                    self.run_store.save(run)
-
                 output = self._module_worker.execute(
                     node.module_type,
                     input_payload,
@@ -814,6 +940,15 @@ class WorkflowExecutor:
     def _raise_if_cancelled(self, run_id: str) -> None:
         with self._cancellation_lock:
             cancelled = run_id in self._cancelled_run_ids
+        if not cancelled:
+            try:
+                cancelled = self.run_store.is_cancel_requested(run_id)
+            except Exception:
+                logger.warning(
+                    "DB cancellation 상태 조회 실패 (run_id=%s)",
+                    run_id,
+                    exc_info=True,
+                )
         if cancelled:
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다")
 

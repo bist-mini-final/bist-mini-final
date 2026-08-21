@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import type { SaveStatus } from '../types';
 
-export interface ExecutionMetrics {
+interface ExecutionMetrics {
   totalElapsedMs: number;
   totalCostUsd: number;
   totalTokens: number;

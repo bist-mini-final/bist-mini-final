@@ -10,6 +10,10 @@ OutputBranch = str
 NodeStatus = Literal["pending", "running", "succeeded", "failed", "skipped"]
 RunStatus = Literal["queued", "running", "paused", "completed", "failed"]
 BatchStatus = Literal["pending", "running", "completed", "failed"]
+OrchestratorBackend = Literal[
+    "direct",
+    "kubernetes",
+]
 
 
 def utc_now_iso() -> str:
@@ -175,6 +179,25 @@ class RunBatchState(StrictModel):
     completed_at: Optional[str] = None
 
 
+class RunOrchestrationState(StrictModel):
+    """External scheduler identity projected into the product run model."""
+
+    backend: OrchestratorBackend = "direct"
+    deployment_name: Optional[str] = None
+    external_run_id: Optional[str] = None
+    submission_attempt: int = Field(default=0, ge=0)
+    submitted_at: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_scheduler(cls, value: Any) -> Any:
+        """Keep old run-history files readable after removing the old scheduler."""
+
+        if isinstance(value, Mapping) and value.get("backend") == "prefect":
+            return {**value, "backend": "kubernetes"}
+        return value
+
+
 class WorkflowRun(StrictModel):
     schema_version: int = 1
     id: str = Field(pattern=IDENTIFIER_PATTERN)
@@ -187,5 +210,8 @@ class WorkflowRun(StrictModel):
     runtime_inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     use_cache: bool = True
     cache_only_module_types: Optional[List[str]] = None
+    orchestration: RunOrchestrationState = Field(
+        default_factory=RunOrchestrationState
+    )
     batches: List[RunBatchState]
     nodes: Dict[str, RunNodeState]

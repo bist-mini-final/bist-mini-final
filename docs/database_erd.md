@@ -247,7 +247,17 @@ USING gin (cmetadata jsonb_path_ops);
 | :--- | :--- | :--- | :--- |
 | `run_id` | `VARCHAR(64)` | `PRIMARY KEY` | 실행 고유 Run ID (예: `run_20260818_123456`) |
 | `workflow_id` | `VARCHAR(64)` | `FOREIGN KEY` | `workflows.workflow_id` 참조 |
-| `status` | `VARCHAR(32)` | `NOT NULL` | `pending`, `running`, `completed`, `failed` |
+| `status` | `VARCHAR(32)` | `NOT NULL` | `queued`, `running`, `paused`, `completed`, `failed` |
+| `orchestration` | `JSONB` | `DEFAULT '{}'` | Kubernetes queue/Job 공개 식별 정보 |
+| `queue_name` | `VARCHAR(64)` | `NULLABLE` | KEDA ScaledJob이 감시하는 논리 큐 |
+| `worker_id` | `VARCHAR(128)` | `NULLABLE` | run을 claim한 Kubernetes Job 이름 |
+| `lease_token` | `VARCHAR(64)` | `NULLABLE` | 현재 worker claim 세대를 식별하는 불투명 토큰 |
+| `priority` | `INT` | `DEFAULT 0` | 높은 값 우선 claim |
+| `attempt_count` | `INT` | `DEFAULT 0` | 원자적 claim 횟수 |
+| `available_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | retry/backoff 후 claim 가능 시각 |
+| `claimed_at` | `TIMESTAMPTZ` | `NULLABLE` | 최근 claim 시각 |
+| `heartbeat_at` | `TIMESTAMPTZ` | `NULLABLE` | worker lease 갱신 시각 |
+| `cancel_requested` | `BOOLEAN` | `DEFAULT FALSE` | API→외부 Job 취소 신호 |
 | `inputs` | `JSONB` | `NOT NULL` | 시작 질문, 선택 파일 등 초기 입력 데이터 |
 | `outputs` | `JSONB` | `NULLABLE` | 최종 DAG 모듈들의 실행 결과값 |
 | `node_states` | `JSONB` | `DEFAULT '{}'` | 각 노드별 상태 (`idle`, `running`, `completed`, `error`) |
@@ -255,6 +265,9 @@ USING gin (cmetadata jsonb_path_ops);
 | `error_message` | `TEXT` | `NULLABLE` | 실행 중단 시 발생한 오류 메시지 |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | 실행 시작 일시 |
 | `completed_at` | `TIMESTAMPTZ` | `NULLABLE` | 실행 완료 일시 |
+
+KEDA PostgreSQL scaler는 claim 가능한 `queued` run과 lease가 만료된 `running` run의 수를
+조회한다. worker는 `FOR UPDATE SKIP LOCKED`와 PostgreSQL advisory lock을 함께 사용한다.
 
 ---
 

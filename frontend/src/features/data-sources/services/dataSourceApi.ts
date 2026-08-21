@@ -7,7 +7,7 @@ import type {
   VectorIndexInfo,
 } from '../types';
 
-export class DataSourceApiError extends Error {
+class DataSourceApiError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
     this.name = 'DataSourceApiError';

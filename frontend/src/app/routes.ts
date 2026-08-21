@@ -11,15 +11,21 @@ import { EvaluationsPage } from '../pages/EvaluationsPage';
 import { HomePage } from '../pages/HomePage';
 import { SettingsPage } from '../pages/SettingsPage';
 
-const BiPage = lazy(() => import('../features/bi/BiPage'));
-const PlaygroundPage = lazy(() => import('../pages/PlaygroundPage'));
+const BiPage = lazy(() =>
+  import('../features/bi/BiPage').then((module) => ({ default: module.BiPage }))
+);
+const PlaygroundPage = lazy(() =>
+  import('../pages/PlaygroundPage').then((module) => ({
+    default: module.PlaygroundPage,
+  }))
+);
 const DataSourcesPage = lazy(() =>
   import('../pages/DataSourcesPage').then((module) => ({
     default: module.DataSourcesPage,
   }))
 );
 
-export type RouteStatus = 'ready' | 'planned';
+type RouteStatus = 'ready' | 'planned';
 
 export interface AppRoute {
   path: string;

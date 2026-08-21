@@ -15,6 +15,27 @@ RUN_DIR = PROJECT_DIR / "data" / "runs"
 CACHE_DIR = PROJECT_DIR / "data" / "cache"
 BENCHMARK_DIR = PROJECT_DIR / "data" / "benchmarks"
 
+
+def _positive_int_environment(name: str, default: int) -> int:
+    raw_value = os.getenv(name, str(default))
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer") from error
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1")
+    return value
+
+
+PLAYGROUND_MAX_CONCURRENCY = _positive_int_environment(
+    "PLAYGROUND_MAX_CONCURRENCY",
+    4,
+)
+KUBERNETES_INGESTION_QUEUE = os.getenv(
+    "KUBERNETES_INGESTION_QUEUE",
+    "excel-ingestion",
+)
+
 # PostgreSQL + pgvector Configuration
 PGVECTOR_URL = os.getenv(
     "PGVECTOR_URL",
@@ -27,4 +48,3 @@ DEV_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
-

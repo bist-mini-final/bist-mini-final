@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "main_pgvector_direct_cell_refiner_pipeline",
   "name": "main_pgvector_direct_cell_refiner_pipeline",
-  "updated_at": "2026-08-20T07:15:27.565319+00:00",
+  "updated_at": "2026-08-20T08:18:27.372806+00:00",
   "graph": {
     "nodes": [
       {
@@ -89,10 +89,8 @@
         },
         "config": {},
         "values": {
-          "collection_name": "SPG_Company_KeyStats_v4.xlsm,f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928,7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
+          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
           "collection_names": [
-            "SPG_Company_KeyStats_v4.xlsm",
-            "f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928",
             "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
           ]
         },

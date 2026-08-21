@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "main_pgvector_rag_pipeline",
   "name": "main_pgvector_rag_pipeline",
-  "updated_at": "2026-08-18T02:59:45.758214+00:00",
+  "updated_at": "2026-08-20T08:34:57.855295+00:00",
   "graph": {
     "nodes": [
       {
@@ -89,10 +89,9 @@
         },
         "config": {},
         "values": {
-          "collection_name": "SPG_Company_KeyStats_v4.xlsm,f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928",
+          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
           "collection_names": [
-            "SPG_Company_KeyStats_v4.xlsm",
-            "f31de376d8577b0478ac90623450fb09c3a2465929d443e631512ce793155928"
+            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
           ]
         },
         "ui": {
@@ -349,9 +348,9 @@
       }
     ],
     "viewport": {
-      "x": -65.11127036453672,
-      "y": 296.54415390467136,
-      "zoom": 0.5344296313560436
+      "x": -767.6868478447984,
+      "y": 220.7209832404613,
+      "zoom": 0.5680429434173775
     }
   }
 }

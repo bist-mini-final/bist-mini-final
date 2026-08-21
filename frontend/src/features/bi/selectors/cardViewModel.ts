@@ -12,7 +12,7 @@ import type {
 import { formatMetricValue } from './formatMetric';
 import { selectObservations, selectPeriods, selectRepresentativeObservation } from './periods';
 
-export interface BiValueRow {
+interface BiValueRow {
   readonly periodLabel: string;
   readonly value: string;
   readonly status: MetricStatus;
@@ -102,4 +102,3 @@ export function buildCardViewModel(input: CardViewModelInput): BiCardViewModel {
     evidence: primaryObservation?.evidence ?? [],
   };
 }
-

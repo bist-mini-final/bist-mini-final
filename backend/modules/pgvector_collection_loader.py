@@ -8,11 +8,10 @@ from .base import (
     EmptyModuleConfigDTO,
     ExecutableModule,
     ModuleDefinition,
-    ModuleDTO,
     ModuleExecutionError,
     ModuleInputDTO,
 )
-from .prebuilt_index_loader import DocumentOutputDTO, IndexOutputDTO, PrebuiltIndexLoaderOutput
+from .prebuilt_index_loader import PrebuiltIndexLoaderOutput
 
 
 class PgVectorCollectionLoaderInputDTO(ModuleInputDTO):

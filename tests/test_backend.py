@@ -80,7 +80,7 @@ from backend.workflows.executor import (
     DagExecutionError,
     WorkflowExecutor,
 )
-from backend.workflows.dispatcher import WorkflowRunDispatcher
+from backend.workflows.dispatcher import InteractiveWorkflowDispatcher
 from backend.workflows.models import (
     CanvasPosition,
     WorkflowEdge,
@@ -882,25 +882,34 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 32)
+        self.assertEqual(len(definitions), 44)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
                 "query_input",
+                "direct_query_decomposer",
                 "decomposer",
                 "adaptive_query_decomposer",
+                "template_query_decomposer",
+                "thesaurus_decomposer",
                 "embedder",
                 "cell_text_embedder",
                 "vector_index_writer",
                 "pgvector_index_writer",
                 "pgvector_collection_loader",
+                "multi_company_collection_loader",
                 "pgvector_retriever",
                 "bm25_retriever",
                 "dense_retriever",
                 "rrf_fusion",
                 "semantic_query_matcher",
+                "llm_query_router",
                 "semantic_scoped_dense_retriever",
+                "semantic_scoped_pgvector_retriever",
+                "adaptive_rrf_fusion",
                 "context",
+                "timeseries_context_expander",
+                "financial_formula_calculator",
                 "reader",
                 "answer_refiner",
                 "answer_cache_writer",
@@ -1149,7 +1158,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 32)
+        self.assertEqual(len(modules), 44)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)
@@ -1572,6 +1581,26 @@ class ApiContractTests(unittest.TestCase):
             "index_company_persistence": (
                 {"index_input", "company_input"},
                 set(),
+            ),
+            "thesaurus_decomposer": (
+                {"query_context"},
+                {"model", "preset", "system_prompt", "user_prompt_template"},
+            ),
+            "multi_company_collection_loader": (
+                {"query_context", "collection_names", "target_companies"},
+                {"auto_resolve_from_query", "fallback_company"},
+            ),
+            "adaptive_rrf_fusion": (
+                {"bm25_result", "dense_result"},
+                {"rrf_k", "top_k", "adaptive_weighting"},
+            ),
+            "timeseries_context_expander": (
+                {"retrieval_json", "document_input"},
+                {"top_k", "expand_full_row", "adjacent_radius", "max_blocks"},
+            ),
+            "financial_formula_calculator": (
+                {"context_json"},
+                {"model", "enabled", "calc_keywords", "max_context_blocks"},
             ),
         }
 
@@ -3158,7 +3187,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.cache,
             module_worker=worker,
         )
-        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(executor, self.run_store)
 
         try:
             self.assertTrue(dispatcher.submit(run.id))
@@ -3186,7 +3215,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.cache,
             module_worker=worker,
         )
-        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(executor, self.run_store)
 
         try:
             self.assertTrue(dispatcher.submit(active_run.id))
@@ -3213,7 +3242,7 @@ class WorkflowExecutionTests(unittest.TestCase):
             self.cache,
             module_worker=worker,
         )
-        dispatcher = WorkflowRunDispatcher(executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(executor, self.run_store)
 
         try:
             self.assertTrue(dispatcher.submit(run.id))
@@ -3310,7 +3339,7 @@ class WorkflowExecutionTests(unittest.TestCase):
     def test_dispatcher_recovers_only_matching_pending_runs(self) -> None:
         workflow = self.save_workflow()
         run = self.executor.create_run(workflow, self.runtime_request())
-        dispatcher = WorkflowRunDispatcher(self.executor, self.run_store)
+        dispatcher = InteractiveWorkflowDispatcher(self.executor, self.run_store)
         try:
             self.assertEqual(dispatcher.recover_pending({"other-flow"}), 0)
             self.assertEqual(dispatcher.recover_pending({workflow.id}), 1)
@@ -3487,6 +3516,25 @@ class WorkflowExecutionTests(unittest.TestCase):
         )
         self.assertEqual(create_response.status_code, 200)
         run_id = create_response.json()["id"]
+
+        batch_create_response = client.post(
+            "/api/workflows/indexing_pgvector/runs",
+            json=self.runtime_request().model_dump(),
+        )
+        self.assertEqual(batch_create_response.status_code, 409)
+        self.assertIn("Kubernetes", batch_create_response.json()["detail"])
+
+        self.assertIn(
+            client.post(
+                "/api/workflows/api-flow/execute",
+                json=self.runtime_request().model_dump(),
+            ).status_code,
+            {404, 405},
+        )
+        self.assertIn(
+            client.post(f"/api/runs/{run_id}/execute").status_code,
+            {404, 405},
+        )
 
         cancel_response = client.post(f"/api/runs/{run_id}/cancel")
         self.assertEqual(cancel_response.status_code, 200)
@@ -4353,7 +4401,6 @@ class PrebuiltIndexLoaderModuleTest(unittest.TestCase):
         import openpyxl
         from unittest.mock import MagicMock
         from backend.modules.base import ModuleExecutionError
-        from backend.modules.docling_table_detector import TableCellBoundsDTO
         from backend.modules.sheet_metadata_persistence import (
             SheetMetadataPersistenceInputDTO,
             SheetMetadataPersistenceModule,

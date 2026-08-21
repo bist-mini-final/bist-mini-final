@@ -90,6 +90,52 @@ function elapsedSeconds(run: WorkflowRun): number {
   return Math.max(0, (end - start) / 1000);
 }
 
+const PHASE_LABELS: Record<string, string> = {
+  workbook_scan: '워크북 시트 스캔',
+  sheet_analysis: 'Luna VLM 시트 분석',
+  serialization_tables: '셀 문서 직렬화',
+  document_generation: '전수 셀 문서 생성',
+  embedding_batches: '임베딩 생성',
+  storage_batches: 'pgvector 적재',
+};
+
+function numericProgress(progress: Record<string, unknown> | undefined): ModuleStepState['liveProgress'] {
+  if (!progress) return undefined;
+  const phase = typeof progress.phase === 'string' ? progress.phase : 'processing';
+  const candidates = [
+    ['completed_batches', 'total_batches', '배치'],
+    ['finished_sheets', 'total_sheets', '시트'],
+    ['completed_sheets', 'total_sheets', '시트'],
+    ['completed_tables', 'total_tables', '테이블'],
+    ['completed_items', 'total_items', '건'],
+  ] as const;
+  const candidate = candidates.find(([completedKey, totalKey]) => {
+    const completed = Number(progress[completedKey]);
+    const total = Number(progress[totalKey]);
+    return Number.isFinite(completed) && Number.isFinite(total) && total > 0;
+  });
+  if (!candidate) return undefined;
+  const [completedKey, totalKey, unit] = candidate;
+  const completed = Number(progress[completedKey]);
+  const total = Number(progress[totalKey]);
+  const completedItems = Number(progress.completed_items);
+  const totalItems = Number(progress.total_items);
+  const currentItem = typeof progress.current_sheet === 'string'
+    ? progress.current_sheet
+    : undefined;
+  return {
+    phase,
+    label: PHASE_LABELS[phase] || '모듈 처리',
+    completed,
+    total,
+    unit,
+    percent: Math.min(100, Math.max(0, (completed / total) * 100)),
+    completedItems: Number.isFinite(completedItems) ? completedItems : undefined,
+    totalItems: Number.isFinite(totalItems) ? totalItems : undefined,
+    currentItem,
+  };
+}
+
 /**
  * Builds the display state for a workflow module, including its status, progress, metadata, and activity log.
  *
@@ -138,18 +184,27 @@ function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState | null {
         totalItems: Number.isFinite(totalItems) ? totalItems : undefined,
       }
     : undefined;
+  const liveProgress = numericProgress(state.progress);
   if (batchProgress) {
     metaInfo['배치 진행'] = `${batchProgress.completed}/${batchProgress.total}`;
     if (batchProgress.totalItems !== undefined) {
       metaInfo['문서 진행'] = `${batchProgress.completedItems ?? 0}/${batchProgress.totalItems}`;
     }
   }
+  if (liveProgress) {
+    metaInfo['현재 단계'] = liveProgress.label;
+    if (liveProgress.currentItem) metaInfo['처리 대상'] = liveProgress.currentItem;
+  }
+  const failedSheets = Number(state.progress?.failed_sheets);
+  if (Number.isFinite(failedSheets) && failedSheets > 0) {
+    metaInfo['실패 시트'] = failedSheets;
+  }
 
   let message = '실행 대기 중';
   let logStatus: NonNullable<ModuleStepState['sublogs'][number]['status']> = 'info';
   if (state.status === 'running') {
-    message = batchProgress
-      ? `${view.name} 실행 중 · ${batchProgress.completed}/${batchProgress.total} 배치 완료`
+    message = liveProgress
+      ? `${liveProgress.label} 중 · ${liveProgress.completed}/${liveProgress.total} ${liveProgress.unit} 완료`
       : `${view.name} 실행 중`;
     logStatus = 'running';
   } else if (state.status === 'succeeded') {
@@ -178,6 +233,7 @@ function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState | null {
     }],
     metaInfo,
     batchProgress,
+    liveProgress,
   };
 }
 
@@ -201,7 +257,13 @@ export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRun
         ? modules.findIndex((module) => module.status === 'failed')
         : modules.reduce((last, module, index) => module.status === 'done' ? index : last, 0)
   );
-  const terminalCount = modules.filter((module) => module.status === 'done' || module.status === 'failed').length;
+  const completedModuleUnits = modules.reduce((total, module) => {
+    if (module.status === 'done' || module.status === 'failed') return total + 1;
+    if (module.status === 'running') {
+      return total + Math.max(0.03, (module.liveProgress?.percent || 0) / 100);
+    }
+    return total;
+  }, 0);
   const selectorNode = run.graph.nodes.find((node) => node.module_type === 'processed_file_selector');
   const selectorInput = selectorNode ? run.runtime_inputs[selectorNode.id] : undefined;
   const embedderNode = run.graph.nodes.find((node) => node.module_type === 'cell_text_embedder');
@@ -226,7 +288,7 @@ export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRun
     currentStageIndex,
     progressPercent: run.status === 'completed'
       ? 100
-      : Math.round((terminalCount / Math.max(1, modules.length)) * 100),
+      : Math.round((completedModuleUnits / Math.max(1, modules.length)) * 100),
     elapsedSeconds: elapsedSeconds(run),
     chunkCount: job.index?.document_count,
     totalTokens: job.index?.total_tokens,
@@ -235,5 +297,11 @@ export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRun
     error: job.error,
     modules,
     lunaOutput: lunaOutput || undefined,
+    scheduler: {
+      backend: run.orchestration?.backend || 'direct',
+      deploymentName: run.orchestration?.deployment_name || undefined,
+      externalRunId: run.orchestration?.external_run_id || undefined,
+      workerActive: job.worker_active,
+    },
   };
 }

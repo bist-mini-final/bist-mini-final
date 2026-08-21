@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 
 MAX_COLLECTION_PREVIEW = 8

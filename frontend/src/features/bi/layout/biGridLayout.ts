@@ -164,5 +164,3 @@ export function findNearestCardSize(cardId: BiCardId, width: number, columns: nu
     return candidateDistance < nearestDistance ? size : nearest;
   }, definition.defaultSize);
 }
-
-export { moveBiCardInRows, normalizeBiCardRows, projectBiCardRows } from './biRowLayout';
