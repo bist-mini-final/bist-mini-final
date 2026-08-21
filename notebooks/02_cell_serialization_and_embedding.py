@@ -15,7 +15,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.providers.embeddings.factory import get_embedding_encoder
 from modules.embedding.embedder import EmbedderModule
-from modules.embedding.cell_text_embedder import CellTextEmbedderModule
+from modules.embedding.embedder import CellTextEmbedderModule
 from modules.common.base_module import QueryContextDTO
 
 # %% [markdown]

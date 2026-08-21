@@ -8,7 +8,7 @@ from typing import Optional
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
-from modules.embedding.cell_text_embedder import CellTextEmbedderModule
+from modules.embedding.embedder import CellTextEmbedderModule
 from modules.structure.cell_text_serializer import CellTextSerializerModule
 from modules.storage.company_entity_extractor import CompanyEntityExtractorModule
 from modules.structure.exhaustive_cell_text_serializer import (

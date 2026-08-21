@@ -17,7 +17,7 @@ from modules.common.base_module import (
     ModuleDTO,
     ModuleTaskPolicy,
 )
-from modules.embedding.cell_text_embedder import CellTextEmbeddingsDTO
+from modules.embedding.embedder import CellTextEmbeddingsDTO
 
 
 class VectorIndexDTO(ModuleDTO):
