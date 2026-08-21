@@ -218,7 +218,7 @@
         "source": "node-2-decomposer",
         "target": "node-4-embedder",
         "source_output": "subqueries",
-        "target_input": "subqueries"
+        "target_input": "input"
       },
       {
         "id": "edge-2-5",
@@ -235,10 +235,17 @@
         "target_input": "document_input"
       },
       {
+        "id": "edge-3-6",
+        "source": "node-3-loader",
+        "target": "node-6-pg-retriever",
+        "source_output": "index_output",
+        "target_input": "index_input"
+      },
+      {
         "id": "edge-4-6",
         "source": "node-4-embedder",
         "target": "node-6-pg-retriever",
-        "source_output": "embeddings",
+        "source_output": "output",
         "target_input": "query_input"
       },
       {
@@ -294,7 +301,7 @@
         "id": "edge-11-12",
         "source": "node-11-refiner",
         "target": "node-12-cache",
-        "source_output": "answer_json",
+        "source_output": "refined_answer_json",
         "target_input": "answer_json"
       }
     ]

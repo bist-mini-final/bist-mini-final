@@ -156,7 +156,7 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
             logger.warning("Formula calculator 파싱 실패: %s", e)
             return {
                 "formula_result": {
-                    "is_calculation_required": false,
+                    "is_calculation_required": False,
                     "calculated_metrics": [],
                     "summary_text": f"Parsing failed: {e}",
                 }
@@ -165,7 +165,7 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
         if not parsed.get("is_calculation_required"):
             return {
                 "formula_result": {
-                    "is_calculation_required": false,
+                    "is_calculation_required": False,
                     "calculated_metrics": [],
                     "summary_text": "LLM determined no calculation required.",
                 }
@@ -182,6 +182,7 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
 
             # Extract variable numeric values
             num_vars = {}
+            for v_name, v_info in vars_dict.items():
                 if isinstance(v_info, dict):
                     raw_val = v_info.get("value")
                     try:

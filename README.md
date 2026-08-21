@@ -20,30 +20,30 @@
 
 ---
 
-## 새 환경 설치
+## 새 환경 설치 및 빠른 시작 가이드 (Environment Setup Guide)
 
-권장 로컬 구성은 **PostgreSQL 작업 큐 + k3d + KEDA ScaledJob + Metrics Server**다.
-Excel 적재 요청은 API 프로세스에서 실행되지 않는다. API가 run을 DB 큐에 저장하면
-KEDA가 대기 수를 감지해 일회성 Kubernetes Job을 0개에서 필요한 수만큼 생성한다.
+본 프로젝트는 **FastAPI 백엔드 + React 프론트엔드 + PostgreSQL 16 pgvector DB + 로컬 Kubernetes (k3d + KEDA ScaledJob)** 기반으로 동작합니다.
+대용량 Excel 파싱 및 임베딩과 같은 장시간 배치 작업은 API 프로세스를 블로킹하지 않고, DB 작업 큐에 인큐되어 **KEDA ScaledJob**을 통해 일회성(one-shot) Kubernetes Pod에서 격리 실행됩니다.
 
-### 1. 필수 도구
+---
 
-| 도구 | 권장 기준 | 용도 |
-|---|---:|---|
-| Git | 최신 안정 버전 | 소스 코드 관리 |
-| Python | 3.11 | API, 테스트, 배포 helper |
-| Node.js | 20 LTS 이상 | React 개발·빌드 |
-| Docker + Compose | Docker Desktop 또는 Docker Engine | pgvector와 k3d 노드 |
-| k3d | 5.9 이상 | 로컬 k3s 클러스터 |
-| kubectl | 클러스터와 호환 | 리소스 조회 |
-| Helm 3 | 최신 안정 버전 | KEDA 설치 |
+### 1. 필수 요구 도구 (Prerequisites)
 
-Docker Desktop 메모리는 최소 8GB, 여러 Excel Job을 동시에 실행하려면 12~16GB를
-권장한다. 설치기는 Docker의 CPU/메모리를 읽고 안전한 최대 Job 수를 자동 산정한다.
-Kubernetes 스케줄러는 각 Job의 resource request가 들어갈 때만 Pod를 배치한다.
+| 도구 | 권장 버전 | 용도 | 필수 여부 |
+|---|---:|---|:---:|
+| **Git** | 최신 버전 | 소스 코드 버전 관리 | 필수 |
+| **Python** | 3.11 이상 (3.11 ~ 3.13) | FastAPI 백엔드, RAG 파이프라인, 테스트 | 필수 |
+| **Node.js** | 20 LTS 이상 (npm 10+) | React 프론트엔드 캔버스 개발 및 빌드 | 필수 |
+| **Docker & Compose** | Docker Desktop (또는 Docker Engine) | PostgreSQL pgvector 컨테이너 및 k3d 노드 구동 | 필수 |
+| **k3d** | 5.9 이상 | 로컬 경량 Kubernetes (k3s) 클러스터 프로비저닝 | 필수 (배치용) |
+| **kubectl** | 최신 안정 버전 | Kubernetes 리소스 및 Pod/Job 제어 | 필수 (배치용) |
+| **Helm 3** | 최신 안정 버전 | KEDA (Kubernetes Event-driven Autoscaling) 패키지 설치 | 필수 (배치용) |
 
-설치 여부는 다음 명령으로 확인할 수 있다.
+> [!TIP]
+> **Docker Desktop 리소스 권장 사양**: 최소 8GB RAM (12~16GB RAM 권장).
+> 설치 스크립트(`setup.sh`)가 Docker 시스템 자원을 자동 감지하여 최적의 최대 병렬 Job 수를 산정합니다.
 
+설치 확인 명령:
 ```bash
 git --version
 node --version
@@ -54,7 +54,9 @@ kubectl version --client
 helm version
 ```
 
-### 2. 저장소와 환경변수 준비
+---
+
+### 2. 저장소 복제 및 환경 변수 설정
 
 ```bash
 git clone <REPOSITORY_URL> bist-mini-final
@@ -62,251 +64,242 @@ cd bist-mini-final
 cp .env.example .env
 ```
 
-`.env`의 키를 채운 뒤 설치기를 실행한다. Python/npm 의존성, 로컬 DB 설정이면 pgvector,
-k3d 클러스터, KEDA 2.20.2, Metrics Server, 워커 이미지 빌드·import, ScaledJob 적용까지
-포함한다.
+`.env` 파일에 API 키와 접속 정보를 입력합니다:
+
+```dotenv
+# [필수] OpenAI API Key (Decomposer, Reader, text-embedding-3-large, LLM Judge 등)
+OPENAI_API_KEY=sk-proj-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# [기본값] 로컬 PostgreSQL pgvector 연결 주소
+PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
+USE_PGVECTOR=true
+
+# [선택] 로컬 Kubernetes 배치 워커 설정 (비워둘 시 Docker 자원에 맞춰 자동 계산)
+KUBERNETES_INGESTION_QUEUE=excel-ingestion
+KUBERNETES_MAX_JOBS=
+KUBERNETES_JOB_CPU_REQUEST=1000m
+KUBERNETES_JOB_MEMORY_REQUEST=2Gi
+KUBERNETES_JOB_CPU_LIMIT=2
+KUBERNETES_JOB_MEMORY_LIMIT=3Gi
+```
+
+---
+
+### 3. 원클릭 자동 설치 스크립트 실행 (권장)
+
+저장소 루트의 설치 스크립트를 실행하면 **Python 가상환경, npm 의존성, pgvector DB, k3d 클러스터, KEDA 2.20.2, 워커 컨테이너 빌드 및 ScaledJob 배포**까지 한 번에 완료됩니다.
 
 ```bash
 # macOS / Linux / WSL2
 ./setup.sh
 
-# Windows 터미널 또는 더블 클릭 (WSL2 + Docker Desktop 필요)
+# Windows (WSL2 + Docker Desktop 환경)
 setup.bat
 ```
 
-`.env`에서 최소한 다음 값을 확인한다. 실제 키는 Git에 커밋하지 않는다.
+---
 
-```dotenv
-OPENAI_API_KEY=<TEAM_OPENAI_API_KEY>
-OPENAI_BASE_URL=https://api.openai.com/v1
+### 4. 단계별 수동 설치 가이드 (선택)
 
-# 로컬 docker-compose pgvector를 사용할 때의 기본값
-PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
+`setup.sh` 스크립트를 사용하지 않고 직접 수동으로 구성하려면 아래 순서대로 진행합니다.
 
-# 비우면 Docker 자원 기준으로 최대 병렬 Job 수를 자동 결정
-KUBERNETES_MAX_JOBS=
-KUBERNETES_JOB_CPU_REQUEST=1000m
-KUBERNETES_JOB_MEMORY_REQUEST=2Gi
-```
-
-로컬의 `PGVECTOR_URL=...@localhost:5432/...`는 배포 시 cluster 내부
-`bist-pgvector` Service 주소로 변환되어 Kubernetes Secret에 저장된다. pgvector host
-port는 계속 `127.0.0.1`에만 바인딩되며 실제 secret 값은 manifest나 Git에 기록되지 않는다.
-
-### 3. Python 의존성 설치
-
-Docker Job과 같은 Python 3.11을 권장한다. `uv`가 있으면 전역 wheel 캐시를 활용해
-초기 설치와 재설치가 더 빠르다.
-
+#### 4-1. Python 가상환경 및 의존성 설치
 ```bash
-# 권장: uv 사용
+# uv 사용 시 (권장 - 빠른 빌드)
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python -r requirements.txt
 source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# 표준 venv 사용 시
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-`uv`가 없다면 표준 `venv`와 pip를 사용한다.
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-워커 의존성은 `jobs/workflow_worker/requirements.txt`로 분리되어 API 환경과 독립적으로
-캐시된다.
-
-### 4. 프론트엔드 의존성 설치
-
-lock file과 동일한 버전을 설치하기 위해 새 환경에서는 `npm ci`를 사용한다.
-
+#### 4-2. 프론트엔드 의존성 설치
 ```bash
 cd frontend
 npm ci
 cd ..
 ```
 
-### 5. 로컬 Kubernetes 배치 클러스터 구성
-
-`setup.sh`를 쓰지 않고 배치 인프라만 구성하려면 다음을 실행한다.
-
+#### 4-3. PostgreSQL pgvector 컨테이너 구동
 ```bash
-./deploy/kubernetes/local.sh check
-./deploy/kubernetes/local.sh all
+docker compose -f docker-compose.db.yml up -d
+docker compose -f docker-compose.db.yml ps
 ```
 
-최초 설치만 base image와 Helm chart 다운로드가 필요하다. 이후 빌드는 Docker layer와
-BuildKit의 apt/pip cache mount를 사용한다. requirements가 바뀌지 않으면 소스만 다시
-복사하므로 빠르게 갱신된다.
-
-정상 설치되면 다음 리소스가 보인다.
-
+#### 4-4. Kubernetes 배치 인프라 (k3d + KEDA + ScaledJob) 구성
 ```bash
+# 사전 환경 체크
+./deploy/kubernetes/local.sh check
+
+# 클러스터 생성, KEDA 설치, Metrics Server 배포, 워커 이미지 빌드 및 ScaledJob 적용
+./deploy/kubernetes/local.sh all
+
+# 클러스터 상태 확인
 ./deploy/kubernetes/local.sh status
 kubectl get scaledjobs,jobs,pods -n bist-batch
 ```
 
-- `ScaledJob/excel-ingestion`의 `READY=True`가 정상이다.
-- 요청이 없으면 `bist-batch` namespace의 Job/Pod가 0개인 것이 정상이다.
-- `MAX`는 Docker 자원으로 산정한 동시 실행 상한이다. 초과 요청은 DB 큐에 남는다.
+---
 
-### 6. 서버 실행
+### 5. 개발 서버 실행
 
-설치 후 FastAPI와 React 개발 서버만 실행한다. KEDA는 클러스터 안에서 계속 DB 큐를
-감시한다.
+서버 구동 시 **FastAPI 백엔드**와 **React 프론트엔드**를 각각 별도 터미널에서 실행합니다.
 
-터미널 1 — FastAPI:
-
+**터미널 1 — FastAPI 백엔드 (포트 8765):**
 ```bash
 source .venv/bin/activate
 python -m uvicorn app:app --host 127.0.0.1 --port 8765 --reload
 ```
 
-터미널 2 — React:
-
+**터미널 2 — React 프론트엔드 (포트 5173):**
 ```bash
 cd frontend
 npm run dev
 ```
 
-접속 주소:
-
-| 화면 | 주소 |
-|---|---|
-| 애플리케이션 | `http://127.0.0.1:5173` |
-| FastAPI Swagger | `http://127.0.0.1:8765/docs` |
-| Kubernetes 상태 | `./deploy/kubernetes/local.sh status` |
-
-### 7. 설치 검증
-
-```bash
-kubectl get scaledjob excel-ingestion -n bist-batch
-curl --fail http://127.0.0.1:8765/api/modules
-curl --fail http://127.0.0.1:8765/api/data-sources/db-status
-
-python -m pytest -q
-cd frontend && npm run build && npm test -- --run
-```
-
-데이터 소스 페이지에서 Excel 적재를 실행하면 상태가 `queued`가 되고 KEDA가 Job을 만든다.
-Pod가 claim하면 프론트에 Job ID와 노드별 진행률이 표시된다. 완료 Job은 10분 뒤 자동
-정리되며 최근 성공 3건·실패 5건은 진단을 위해 잠시 보존된다.
-
-> [!NOTE]
-> `data/source_files/`, `data/runs/`, `data/cache/`, `data/vector_db/`, `data/artifacts/` 디렉터리는 `.gitkeep`을 통해 저장소에 포함되어 있으므로 별도로 디렉터리를 생성할 필요가 없습니다. 런타임 데이터 파일만 `.gitignore`에 의해 제외됩니다.
-
-### 환경변수 레퍼런스
-
-| 변수 | 필수 | 설명 |
+**접속 주소 안내:**
+| 서비스 | URL | 설명 |
 |---|---|---|
-| `OPENAI_API_KEY` | ✅ | Decomposer, Reader, OpenAI Embeddings (`text-embedding-3-large`) 모듈에 사용 |
-| `OPENAI_BASE_URL` | ⬜ | 기본값 `https://api.openai.com/v1`. 호환 API 사용 시 변경 |
-| `PGVECTOR_URL` | ⬜ | 기본값 `postgresql://postgres:postgres@localhost:5432/rag_flow`. Docker pgvector 접속 URL |
-| `USE_PGVECTOR` | ⬜ | 기본값 `true`. pgvector DB 연결 및 자동 적재 활성화 여부 |
-| `PLAYGROUND_MAX_CONCURRENCY` | ⬜ | 대화형 Playground 백그라운드 실행 동시성. 기본값 `4` |
-| `KUBERNETES_INGESTION_QUEUE` | ⬜ | KEDA가 감시할 DB queue. 기본값 `excel-ingestion` |
-| `KUBERNETES_MAX_JOBS` | ⬜ | 최대 동시 Job. 비우면 Docker CPU/메모리로 자동 계산 |
-| `KUBERNETES_JOB_CPU_REQUEST` | ⬜ | Job 예약 CPU. 기본값 `1000m` |
-| `KUBERNETES_JOB_MEMORY_REQUEST` | ⬜ | Job 예약 메모리. 기본값 `2Gi` |
-| `KUBERNETES_JOB_CPU_LIMIT` | ⬜ | Job CPU limit. 기본값 `2` |
-| `KUBERNETES_JOB_MEMORY_LIMIT` | ⬜ | Job 메모리 limit. 기본값 `3Gi` |
-
-> [!IMPORTANT]
-> 기본 워크플로의 임베딩 모듈(`Embedder`, `Cell Text Embedder`)은 `text-embedding-3-large` (OpenAI API)를 기본값으로 사용합니다. `OPENAI_API_KEY`가 없으면 임베딩 단계를 실행할 수 없습니다.
-
-### pgvector만 별도로 실행하기
-
-벡터 DB 저장소로 **PostgreSQL 16 + pgvector (`vector v0.8.6`)** 컨테이너를 구동합니다. LangChain의 `langchain-postgres`를 통해 표준 포맷으로 인덱스를 적재 및 검색합니다.
-
-```bash
-# 1) Docker 컨테이너 백그라운드 구동
-docker compose -f docker-compose.db.yml up -d
-
-# 2) 컨테이너 상태 및 헬스체크 확인
-docker compose -f docker-compose.db.yml ps
-
-# 3) (선택) DB 로그 실시간 확인
-docker compose -f docker-compose.db.yml logs -f pgvector
-```
-
-- **설정 파일**: [`docker-compose.db.yml`](./docker-compose.db.yml)
-- **호스트 접속 주소**: `postgresql://postgres:postgres@localhost:5432/rag_flow`
-- **Pod 접속 주소**: 설치기가 cluster 내부 `bist-pgvector` Service로 자동 변환
-- **컨테이너 중지**: `docker compose -f docker-compose.db.yml down` (데이터는 `pgvector_data` 볼륨에 영속 보존)
+| **Workbench 웹 UI** | `http://127.0.0.1:5173` | 대화형 모듈 캔버스 및 데이터 소스 관리 화면 |
+| **FastAPI Swagger API** | `http://127.0.0.1:8765/docs` | 백엔드 REST API 인터랙티브 문서 |
+| **K8s 클러스터 상태** | `./deploy/kubernetes/local.sh status` | KEDA ScaledJob 및 배치 Pod 상태 확인 |
 
 ---
 
-## 선택 데이터 및 로컬 모델
+### 6. 설치 및 동작 검증 (Verification)
 
-### 1. 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
+```bash
+# 1) 백엔드 모듈 및 DB 상태 검증
+curl -s http://127.0.0.1:8765/api/modules | grep -o '"type":' | wc -l
+curl -s http://127.0.0.1:8765/api/data-sources/db-status
 
-> [!IMPORTANT]
-> 기본 워크플로(`Pre-built Vector Index Loader` 노드)는 사전 임베딩된 인덱스 파일을 로드합니다. 아래 파일을 구글 드라이브에서 받아 `data/source_files/`에 배치해야 파이프라인을 바로 실행할 수 있습니다.
+# 2) 전체 백엔드 단위/통합 테스트 (197개 테스트)
+pytest tests/
 
-**구글 드라이브에서 다운로드할 파일:**
-
-| 파일명 | 설명 |
-|---|---|
-| `SPG_Company_KeyStats_v3_prebuilt.parquet` | Key Stats 시트 사전 임베딩 인덱스 |
-
+# 3) 프론트엔드 빌드 및 테스트
+cd frontend && npm run build && npm test -- --run && cd ..
 ```
-data/source_files/
-└── SPG_Company_KeyStats_v3_prebuilt.parquet   ← 구글 드라이브에서 다운로드 후 배치
-```
+
+---
+
+## 선택 데이터 및 로컬 모델 (선택 - Optional)
 
 > [!NOTE]
-> prebuilt 인덱스는 `text-embedding-3-large` 모델로 생성되었습니다. 다른 모델로 만든 인덱스를 사용하려면 Dense Retriever의 쿼리 임베딩 모델도 같은 모델로 변경해야 합니다.
-
-**인덱스를 직접 빌드하려면** (선택):
-
-기존 Excel 파일에서 처음부터 인덱스를 생성하려면 `cell_text_embedder` → `vector_index_writer` 파이프라인을 실행한 뒤 아래 명령으로 export합니다.
-
-```bash
-python3 -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output data/source_files/SPG_Company_KeyStats_v3_prebuilt.json
-```
+> 기본 워크플로는 **OpenAI API (`gpt-5.6-luna`, `text-embedding-3-large`)**를 기본 엔진으로 사용합니다. 아래 항목들은 **오프라인 환경, 로컬 VLM 구조 분석, 로컬 오픈소스 임베딩 모델(BGE)**을 사용하고자 할 때만 선택적으로 설치·구성하는 항목입니다.
 
 ---
 
-### 2. Excel 파일 배치
+### 1. (선택) 사전 구축 벡터 인덱스 다운로드 (Prebuilt Index)
 
-팀 구글 드라이브에서 분석 대상 Excel 파일을 다운로드하여 `data/source_files/` 에 복사합니다.
+기본 워크플로 중 `Pre-built Vector Index Loader` 노드를 사용할 경우, 사전 임베딩된 파케이 파일을 구글 드라이브에서 받아 `data/source_files/`에 배치합니다.
 
-- **기본 워크플로 사용 파일**: `SPG_Company_KeyStats_v3.xlsm`
+| 파일명 | 설명 | 필수 여부 |
+|---|---|:---:|
+| `SPG_Company_KeyStats_v3_prebuilt.parquet` | Key Stats 시트 사전 임베딩 인덱스 (`text-embedding-3-large`) | (선택 - Optional) |
 
 ```text
 data/source_files/
-└── SPG_Company_KeyStats_v3.xlsm   ← 구글 드라이브에서 다운로드 후 배치 (Excel 직접 파싱 파이프라인에만 필요)
+└── SPG_Company_KeyStats_v3_prebuilt.parquet   ← (선택) 구글 드라이브에서 다운로드 후 배치
 ```
 
-> [!NOTE]
-> 사전 구축 인덱스(`prebuilt.parquet`)를 사용하는 기본 워크플로에서는 Excel 원본 파일 없이도 검색·답변 파이프라인을 실행할 수 있습니다. Loader는 이전 JSON 포맷도 호환합니다.
-
-### 3. 로컬 VLM 모델 설치
-
-Local VLM Structure Detector 노드를 사용하려면 Ollama와 모델이 필요합니다.
-
-```bash
-# Ollama 설치: https://ollama.com
-ollama pull qwen3-vl:4b-instruct
-```
-
-### 4. 로컬 BGE 임베딩 모델 설치
-
-`BAAI/bge-large-en-v1.5` 모델을 사용하려면 (OpenAI API 없이 로컬 임베딩을 원할 때) 최초 1회 모델을 다운로드해야 합니다.
-
-> [!NOTE]
-> 기본 워크플로는 `text-embedding-3-large` (OpenAI API)를 사용하므로 **BGE 설치는 선택 사항**입니다. 로컬 임베딩이 필요한 경우에만 아래 명령을 실행하세요.
-
-```bash
-python3 -c "from transformers import AutoModel, AutoTokenizer; AutoTokenizer.from_pretrained('BAAI/bge-large-en-v1.5'); AutoModel.from_pretrained('BAAI/bge-large-en-v1.5')"
-```
-
-`Embedder` 또는 `Cell Text Embedder` 노드의 모델 설정에서 `BAAI/bge-large-en-v1.5`를 선택하면 로컬 모델을 사용합니다.
+> [!TIP]
+> **직접 인덱스를 빌드하여 Export하려면**:
+> `cell_text_embedder` → `vector_index_writer` 실행 후 아래 도구로 export 가능합니다.
+> ```bash
+> python -m backend.tools.export_prebuilt_index --index-id <INDEX_ID> --output data/source_files/SPG_Company_KeyStats_v3_prebuilt.json
+> ```
 
 ---
 
-## 개발 서버 실행
+### 2. (선택) Excel 원본 데이터 파일 배치
+
+Excel 파일을 직접 파싱/구조분석/임베딩하는 수집 파이프라인을 실행할 때 원본 파일을 배치합니다.
+
+| 파일명 | 대상 기업 | 위치 |
+|---|---|---|
+| `SPG_Company_KeyStats_v3.xlsm` | IBM 등 다중 기업 Key Stats | `data/source_files/` |
+
+```text
+data/source_files/
+└── SPG_Company_KeyStats_v3.xlsm   ← (선택) 직접 파싱 시 배치
+```
+
+---
+
+### 3. (선택) 로컬 VLM 구조 분석 모델 설치 (Ollama Qwen-VL)
+
+Excel 표 구조 분석 노드 중 `Local VLM Structure Detector` 노드를 사용할 때 로컬 VLM을 구동합니다.
+
+```bash
+# 1) Ollama 설치 (https://ollama.com)
+# 2) Qwen 2.5/3 VL 모델 풀
+ollama pull qwen3-vl:4b-instruct
+```
+
+---
+
+### 4. (선택) 로컬 BGE 임베딩 모델 설치 (Hugging Face BAAI/bge-large-en-v1.5)
+
+OpenAI API 대신 **로컬 CPU/GPU 환경에서 오픈소스 임베딩**을 수행할 때 설치합니다.
+
+```bash
+python -c "from transformers import AutoModel, AutoTokenizer; AutoTokenizer.from_pretrained('BAAI/bge-large-en-v1.5'); AutoModel.from_pretrained('BAAI/bge-large-en-v1.5')"
+```
+
+`Embedder` 또는 `Cell Text Embedder` 노드 설정에서 모델을 `BAAI/bge-large-en-v1.5`로 선택하여 로컬 임베딩으로 전환할 수 있습니다.
+
+---
+
+### 5. (선택) Kubernetes 로컬 모델 지원 워커 빌드
+
+Kubernetes 배치 워커 컨테이너에서 PyTorch 및 Hugging Face BGE 로컬 모델을 구동하려면 `--target local-models` 타겟으로 빌드하여 k3d 클러스터에 import합니다:
+
+```bash
+# 로컬 모델 지원 도커 이미지 빌드
+DOCKER_BUILDKIT=1 docker build \
+  --target local-models \
+  -f jobs/workflow_worker/Dockerfile \
+  -t bist-workflow-worker:local-models .
+
+# k3d 클러스터에 이미지 임포트
+k3d image import bist-workflow-worker:local-models --cluster bist-local
+```
+
+---
+
+## Kubernetes 배치 인프라 및 운영 관리
+
+로컬 배치 실행 인프라를 손쉽게 제어할 수 있는 관리 명령을 제공합니다.
+
+### 주요 관리 명령어
+
+```bash
+# 클러스터 및 KEDA 상태 종합 확인
+./deploy/kubernetes/local.sh status
+
+# 클러스터 및 pgvector 재시작
+./deploy/kubernetes/local.sh restart
+
+# k3d 노드 일시 중지 (DB 볼륨 및 리소스 보존)
+./deploy/kubernetes/local.sh down
+
+# k3d 노드 다시 시작
+./deploy/kubernetes/local.sh up
+
+# 클러스터 및 배치 Job 이력 삭제 (pgvector 데이터 볼륨은 영속 보존)
+./deploy/kubernetes/local.sh destroy
+
+# 전체 초기화 후 재구축
+./deploy/kubernetes/local.sh all
+
+# KEDA ScaledJob 실시간 모니터링
+kubectl get scaledjobs,jobs,pods -n bist-batch -w
+```
 
 최초 설치를 마친 뒤에는 Docker Desktop을 시작하고 아래 상태를 먼저 확인한다.
 
