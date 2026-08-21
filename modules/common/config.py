@@ -43,8 +43,9 @@ DEFAULT_PLAN_REUSE_THRESHOLD: float = 0.80
 # ==============================================================================
 DEFAULT_RETRIEVAL_TOP_K: int = 100
 DEFAULT_RRF_K: int = 60
+# 2D Grid Context Expansion: Number of adjacent rows/columns to expand around a retrieved cell
 DEFAULT_ADJACENT_RADIUS: int = 3
-DEFAULT_CONTEXT_WINDOW: int = DEFAULT_ADJACENT_RADIUS  # Backwards compatibility alias
+DEFAULT_CONTEXT_WINDOW: int = DEFAULT_ADJACENT_RADIUS  # Legacy alias for DEFAULT_ADJACENT_RADIUS
 DEFAULT_MAX_BLOCKS: int = 500
 DEFAULT_MIN_SCOPE_CONFIDENCE: float = 0.80
 
