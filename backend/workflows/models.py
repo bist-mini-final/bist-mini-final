@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-ExecutionBranch = Literal["generated", "cached", "failed"]
-OutputBranch = Literal["generated", "cached"]
+ExecutionBranch = str
+OutputBranch = str
 NodeStatus = Literal["pending", "running", "succeeded", "failed", "skipped"]
 RunStatus = Literal["queued", "running", "paused", "completed", "failed"]
 BatchStatus = Literal["pending", "running", "completed", "failed"]
@@ -140,6 +140,7 @@ class WorkflowExecutionRequest(StrictModel):
         ),
     )
     use_cache: bool = True
+    cache_only_module_types: Optional[List[str]] = None
     inherit_from_run_id: Optional[str] = Field(
         default=None,
         description=(
@@ -208,6 +209,7 @@ class WorkflowRun(StrictModel):
     graph: WorkflowGraph
     runtime_inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     use_cache: bool = True
+    cache_only_module_types: Optional[List[str]] = None
     orchestration: RunOrchestrationState = Field(
         default_factory=RunOrchestrationState
     )

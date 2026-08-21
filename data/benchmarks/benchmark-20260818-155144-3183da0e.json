@@ -1,0 +1,5552 @@
+{
+  "id": "benchmark-20260818-155144-3183da0e",
+  "saved_at": "2026-08-18T15:51:44.780613+09:00",
+  "execution_mode": "sequential_isolated",
+  "use_cache": true,
+  "summary": [
+    {
+      "workflow_id": "default",
+      "cases": 24,
+      "scored_cases": 24,
+      "accuracy": 0.9583,
+      "average_latency_seconds": 33.888,
+      "average_tokens": 18068.2,
+      "average_cost_usd": 0.017349,
+      "average_reused_tokens": 0,
+      "average_reused_cost_usd": 0.0,
+      "cache_hits": 23,
+      "node_runs": 264,
+      "llm_fallback_calls": 0,
+      "errors": 0,
+      "route_cases": 24,
+      "route_accuracy": 0.0,
+      "router_kind": null,
+      "average_router_latency_seconds": null,
+      "average_router_tokens": null,
+      "average_router_cost_usd": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "cases": 24,
+      "scored_cases": 24,
+      "accuracy": 0.6667,
+      "average_latency_seconds": 19.142,
+      "average_tokens": 17331.7,
+      "average_cost_usd": 0.017951,
+      "average_reused_tokens": 1264.6,
+      "average_reused_cost_usd": 0.001454,
+      "cache_hits": 35,
+      "node_runs": 264,
+      "llm_fallback_calls": 10,
+      "errors": 0,
+      "route_cases": 24,
+      "route_accuracy": 0.5417,
+      "router_kind": "semantic",
+      "average_router_latency_seconds": 1.094,
+      "average_router_tokens": 21.8,
+      "average_router_cost_usd": 0.0
+    }
+  ],
+  "results": [
+    {
+      "workflow_id": "default",
+      "case_id": "01-ltm-revenue-1",
+      "question": "IBM의 LTM 매출은 얼마인가?",
+      "run_id": "run-7ad549add9714ae8a650f0b87fb671de",
+      "status": "completed",
+      "latency_seconds": 58.891,
+      "total_tokens": 20849,
+      "estimated_cost_usd": 0.020125,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 0,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM 매출은 **67,535**입니다. [Key_Stats Cell A12]  \n단위는 제공된 셀 context에 명시되어 있지 않습니다.",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.7615
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.072
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.20053
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.88898
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 28.34343
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.3761900000000002
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.0565
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.9571800000000001
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.53958
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.61044
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.08491
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "01-ltm-revenue-1",
+      "question": "IBM의 LTM 매출은 얼마인가?",
+      "run_id": "run-b4c00a398cc64665bd3a7912f2033292",
+      "status": "completed",
+      "latency_seconds": 55.338,
+      "total_tokens": 26306,
+      "estimated_cost_usd": 0.027168,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 0,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM 매출은 **66,735백만 달러(약 667억 3,500만 달러)**입니다. [Income_Statement Cell A356]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 5.757,
+        "total_tokens": 15,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.0074800000000000005
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.24876
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.78288
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.19887
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 35.89674
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.58381
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.2657100000000001
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.87946
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0856
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.00411
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.38504
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "02-fy24-revenue-2",
+      "question": "IBM의 2024년 총매출은 얼마인가?",
+      "run_id": "run-e57539f64e4f4bf387f759d1304f9a5e",
+      "status": "completed",
+      "latency_seconds": 44.708,
+      "total_tokens": 18031,
+      "estimated_cost_usd": 0.016632,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 2024년 총매출은 **62,753**입니다. [Key_Stats Cell A8]  \n※ 제공된 셀 문맥에는 단위가 명시되어 있지 않습니다.",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00932
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.31567
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.84454
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.5582399999999996
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.10028000000000001
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.625310000000001
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 12.5125
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.3633299999999995
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.92607
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.67857
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.77419
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "02-fy24-revenue-2",
+      "question": "IBM의 2024년 총매출은 얼마인가?",
+      "run_id": "run-70b493b54c6b4099a560deeb1808df94",
+      "status": "completed",
+      "latency_seconds": 9.659,
+      "total_tokens": 18301,
+      "estimated_cost_usd": 0.018762,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **2024년 총매출은 62,753백만 달러(약 627억 5,300만 달러)**입니다. [Income_Statement Cell A534]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.931,
+        "total_tokens": 21,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.006860000000000001
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.1380599999999998
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21813
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.2253
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07372
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.01629
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.36718
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.35181999999999997
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.15025
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.27391
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.83726
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "03-fy23-revenue-3",
+      "question": "IBM의 2023년 총매출은 얼마인가?",
+      "run_id": "run-e4e549092a674c4d8718b731c99ba792",
+      "status": "completed",
+      "latency_seconds": 48.953,
+      "total_tokens": 19639,
+      "estimated_cost_usd": 0.018318,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 2023년 총매출은 **61,860백만 달러(약 618억 6,000만 달러)**입니다. [Income_Statement Cell A532]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.01058
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.63882
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.41472000000000003
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.61515
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.09602
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.86274
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 21.02007
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.5330200000000005
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.80984
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.28364
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.6686800000000002
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "03-fy23-revenue-3",
+      "question": "IBM의 2023년 총매출은 얼마인가?",
+      "run_id": "run-d5700c99f7894448af61440ffeb927b3",
+      "status": "completed",
+      "latency_seconds": 7.115,
+      "total_tokens": 17491,
+      "estimated_cost_usd": 0.018032,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **2023년 총매출은 61,860백만 달러(약 618.6억 달러)**입니다. [Income_Statement Cell A532]\n\n계산: 61,860백만 달러 ÷ 100 = **618.6억 달러**. [Income_Statement Cell A532]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.782,
+        "total_tokens": 21,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.0074800000000000005
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.14305
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.2393
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8567400000000001
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07059
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.73711
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.59212
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.25625
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.5091600000000001
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.3435300000000003
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.35958999999999997
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "04-revenue-growth-4",
+      "question": "IBM FY2025 매출 성장률은 몇 %인가?",
+      "run_id": "run-c62fdce0597e408aba553e622a512406",
+      "status": "completed",
+      "latency_seconds": 45.723,
+      "total_tokens": 17162,
+      "estimated_cost_usd": 0.015785,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM FY2025 매출 성장률은 **7.62%**입니다. [Key_Stats Cell A28]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00774
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.14456
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.26053
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.0461
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.08145999999999999
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.83603
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 12.275079999999999
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.49146
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.76896
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.73904
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.0719499999999997
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "04-revenue-growth-4",
+      "question": "IBM FY2025 매출 성장률은 몇 %인가?",
+      "run_id": "run-d75680184f5e455fbaa8ee0f1aaf5055",
+      "status": "completed",
+      "latency_seconds": 15.336,
+      "total_tokens": 20319,
+      "estimated_cost_usd": 0.021463,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM FY2025 매출 성장률은 **약 7.6%**입니다.\n\n계산:  \n\\[\n\\frac{66{,}735-62{,}044}{62{,}044}\\times100\n=\\frac{4{,}691}{62{,}044}\\times100\n\\approx 7.56\\%\n\\]\n\n- FY2024 매출: **$62,044M** [Income_Statement Cell A352]  \n- FY2025 매출: **$66,735M** [Income_Statement Cell A354]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 1.475,
+        "total_tokens": 19,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00898
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.7373800000000001
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.28138
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.78318
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.08217
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.03903
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.70993
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.26713
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8921699999999999
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 9.33198
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.20252
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "05-gross-profit-5",
+      "question": "IBM LTM 매출총이익은 얼마인가?",
+      "run_id": "run-aa3841637bdd46a8936d850962dbba49",
+      "status": "completed",
+      "latency_seconds": 16.809,
+      "total_tokens": 14014,
+      "estimated_cost_usd": 0.013147,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM 매출총이익은 **39,297백만 달러(약 392억 9,700만 달러)**입니다. [Key_Stats Cell A48]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00717
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.39253
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.29301
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.82028
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05727
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.11535
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.04842
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8692000000000001
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.2538900000000002
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.40252
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.54895
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "05-gross-profit-5",
+      "question": "IBM LTM 매출총이익은 얼마인가?",
+      "run_id": "run-9846171fcc54461387c86ba60c388a32",
+      "status": "completed",
+      "latency_seconds": 8.396,
+      "total_tokens": 28609,
+      "estimated_cost_usd": 0.029522,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **LTM 매출총이익**은 제공된 셀 컨텍스트에 매출총이익(Gross Profit) 값이 없어 확인할 수 없습니다.\n\n참고로 LTM 매출은 **66,735백만 달러**로 확인되지만 [Income_Statement Cell A356], 매출원가 또는 매출총이익 값이 누락되어 있어 매출총이익을 계산할 수 없습니다.",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.855,
+        "total_tokens": 20,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00752
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.21109
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.22128
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.94685
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05475
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.77359
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.52567
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.34944
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.49625
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.18642
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.62267
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "06-operating-income-6",
+      "question": "IBM LTM 영업이익은 얼마인가?",
+      "run_id": "run-a6aeebc3592c43f081b212980f4a6cf6",
+      "status": "completed",
+      "latency_seconds": 20.837,
+      "total_tokens": 18390,
+      "estimated_cost_usd": 0.017957,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM 영업이익은 **11,757백만 달러($M)**입니다. [Income_Statement Cell A980]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00705
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.876729999999999
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21125
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.1601
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.061759999999999995
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.61017
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.12193
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.33941
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.52939
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.1204099999999997
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.79886
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "06-operating-income-6",
+      "question": "IBM LTM 영업이익은 얼마인가?",
+      "run_id": "run-31ea76c3de5a40e8bbe6c5fa2b937344",
+      "status": "completed",
+      "latency_seconds": 9.342,
+      "total_tokens": 28446,
+      "estimated_cost_usd": 0.029412,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM 영업이익(EBIT, SBC 제외)은 **13,472백만 달러(약 134.72억 달러)**입니다. [Income_Statement Cell A2358]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.597,
+        "total_tokens": 18,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00607
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8129
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.25789
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.43976
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.055240000000000004
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.78684
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.84416
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.36936
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.95009
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.98452
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8348300000000001
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "07-ebitda-7",
+      "question": "IBM LTM EBITDA는 얼마인가?",
+      "run_id": "run-78c160a052764102a66678c03bb56c64",
+      "status": "completed",
+      "latency_seconds": 19.81,
+      "total_tokens": 18836,
+      "estimated_cost_usd": 0.01801,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM EBITDA는 **16,778백만 달러(약 167억 7,800만 달러)**입니다. [Key_Stats Cell A84]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.01028
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.8574399999999995
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.39907
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.8184200000000001
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.10323
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.47418
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.9818000000000002
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.47703
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.3503900000000002
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.83578
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.50201
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "07-ebitda-7",
+      "question": "IBM LTM EBITDA는 얼마인가?",
+      "run_id": "run-98c66bff6677400184da319d3e863338",
+      "status": "completed",
+      "latency_seconds": 7.474,
+      "total_tokens": 15454,
+      "estimated_cost_usd": 0.016033,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM EBITDA는 **$16,778M(약 $16.8B)**입니다. [Key_Stats Cell A84]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.905,
+        "total_tokens": 14,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00744
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.2174500000000001
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.24647
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.98177
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06749
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8729600000000001
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.54355
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.34175
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.6079199999999999
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.36207
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.22538999999999998
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "08-ebitda-margin-8",
+      "question": "IBM LTM EBITDA 마진은 몇 %인가?",
+      "run_id": "run-d62e2d9b10a142ac95d243f2e04b64db",
+      "status": "completed",
+      "latency_seconds": 52.602,
+      "total_tokens": 15590,
+      "estimated_cost_usd": 0.01432,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM EBITDA 마진은 **24.843414525801435%**입니다. [Key_Stats Cell A102]\n\n계산: **LTM EBITDA 16,778 ÷ LTM Total Revenue 67,535 × 100 = 24.8434%** [Key_Stats Cell A84] [Key_Stats Cell A12]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00633
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.43234
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21759
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.9494200000000002
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05243
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 8.998569999999999
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 15.95182
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.72743
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.30504
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 8.11803
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.84307
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "08-ebitda-margin-8",
+      "question": "IBM LTM EBITDA 마진은 몇 %인가?",
+      "run_id": "run-76348e249f2542abb784d56a32e69aa6",
+      "status": "completed",
+      "latency_seconds": 10.493,
+      "total_tokens": 16363,
+      "estimated_cost_usd": 0.017395,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **LTM EBITDA 마진은 24.8%**입니다.\n\n계산:  \n**LTM EBITDA 16,778백만 달러 ÷ LTM 매출 67,535백만 달러 × 100 = 24.84% ≈ 24.8%**  \n- EBITDA: [Income_Statement Cell A2098]  \n- 매출: [Income_Statement Cell A2644]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.781,
+        "total_tokens": 15,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.01071
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.6970399999999999
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.29402999999999996
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.6670499999999999
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06698
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0109
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.9579500000000001
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.78604
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.94012
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.7490799999999997
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.31283
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "09-eps-dps-9",
+      "question": "2024-12-31 기준 IBM 희석 EPS와 DPS는 각각 얼마인가?",
+      "run_id": "run-c417ab43b0b74ef8902bf5c1e76db950",
+      "status": "completed",
+      "latency_seconds": 24.219,
+      "total_tokens": 19468,
+      "estimated_cost_usd": 0.020341,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "2024-12-31 기준 IBM의:\n\n- **희석 EPS(특별항목 제외)**: **6.42** [Key_Stats Cell A212]\n- **주당배당금(DPS)**: **6.67** [Income_Statement Cell A1940]\n\n참고로 제공된 문맥에는 **Income Statement의 ‘Diluted EPS’ 2024년 직접 값은 없습니다**. 따라서 EPS는 **Key_Stats의 ‘Diluted EPS Excl. Extra Items’** 기준입니다.",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.005679999999999999
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.89656
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.31704000000000004
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.0605300000000004
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05411
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.56174
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.81521
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.49029
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.2133399999999999
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.2437700000000005
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.56029
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 2,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "09-eps-dps-9",
+      "question": "2024-12-31 기준 IBM 희석 EPS와 DPS는 각각 얼마인가?",
+      "run_id": "run-88720425088840f9be0e06f75e468fab",
+      "status": "completed",
+      "latency_seconds": 28.089,
+      "total_tokens": 17116,
+      "estimated_cost_usd": 0.017516,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "2024-12-31 기준 IBM의:\n\n- **희석 EPS(Extra Items 제외): 6.42** [Key_Stats Cell A212]\n- **DPS(주당배당금): 6.67** [Income_Statement Cell A3240]\n\n따라서 DPS가 희석 EPS보다 **0.25 높습니다**: 6.67 − 6.42 = **0.25** [Income_Statement Cell A3240] [Key_Stats Cell A212]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.693,
+        "total_tokens": 30,
+        "estimated_cost_usd": 1e-06
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00567
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.9114800000000001
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.67002
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.3731300000000002
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.045700000000000005
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.31335
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.20737
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.53591
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.7531199999999998
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.87863
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.39434
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 2,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "10-cash-10",
+      "question": "2025년 IBM 현금 및 단기투자자산 총액은 얼마인가?",
+      "run_id": "run-a81dc8fad7984b72a2e341309ff94326",
+      "status": "completed",
+      "latency_seconds": 54.834,
+      "total_tokens": 18049,
+      "estimated_cost_usd": 0.016325,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "2025년 IBM의 **현금 및 단기투자자산 총액은 14,417백만 달러($14.417B)**입니다. [Balance_Sheet Cell A4438]\n\n산술: 14,417백만 달러 ÷ 1,000 = **14.417십억 달러**. [Balance_Sheet Cell A4438]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00866
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.955430000000001
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.30895
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.19821
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07391
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 9.03102
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 15.52872
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.52128
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.4634699999999996
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.5750399999999996
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.16919
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "10-cash-10",
+      "question": "2025년 IBM 현금 및 단기투자자산 총액은 얼마인가?",
+      "run_id": "run-1f8eebb179834da0af81065fc97bd230",
+      "status": "completed",
+      "latency_seconds": 53.207,
+      "total_tokens": 13330,
+      "estimated_cost_usd": 0.012956,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "2025년 IBM의 **현금 및 단기투자자산 총액은 제공된 셀 context에 없어 확인할 수 없습니다**.\n\n참고로 확인 가능한 최근 값은 다음과 같습니다.\n\n- 2024년: **14,591백만 달러** [Balance_Sheet Cell A4436]\n- 2023년: **13,441백만 달러** [Balance_Sheet Cell A4434]\n\n따라서 **2025년 금액을 산출하려면 2025년 ‘Total Cash & ST Investments’ 셀 값이 추가로 필요합니다.**",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.811,
+        "total_tokens": 33,
+        "estimated_cost_usd": 1e-06
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.29478
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0161499999999999
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.67399
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.58151
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.43739999999999996
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 8.41168
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 15.69681
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.16054
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.05016
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.5142299999999995
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.36956
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "11-assets-liabilities-11",
+      "question": "2025년 IBM 총자산과 총부채는 각각 얼마인가?",
+      "run_id": "run-c6349eb1c3b74e0787cc5196cf08c932",
+      "status": "completed",
+      "latency_seconds": 21.387,
+      "total_tokens": 17968,
+      "estimated_cost_usd": 0.017944,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "제공된 셀 문맥에는 **2025년 IBM 총자산**과 **총부채**의 직접적인 값이 없습니다. 따라서 두 금액을 확인할 수 없습니다.\n\n- 총자산: **확인 불가** — 해당 Total Assets 셀 값이 누락됨\n- 총부채: **확인 불가** — 해당 Total Liabilities 셀 값이 누락됨\n\n참고로 2025년 **총자본화(Total Capitalization)**는 97,348로 제공되어 있으나, 이는 총자산이나 총부채와 동일한 항목이 아닙니다 [Balance_Sheet Cell A6986].",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.42805
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.69342
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.22047999999999998
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.38801
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.33053
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.44312
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.79182
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.35572
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.45327
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.52778
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.75518
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "11-assets-liabilities-11",
+      "question": "2025년 IBM 총자산과 총부채는 각각 얼마인가?",
+      "run_id": "run-2140b42b21fe442797a499aaaf08b549",
+      "status": "completed",
+      "latency_seconds": 9.592,
+      "total_tokens": 30,
+      "estimated_cost_usd": 1e-06,
+      "reused_tokens": 16317,
+      "reused_cost_usd": 0.017467,
+      "cache_hits": 7,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "제공된 셀 문맥에는 **2025년 IBM 총자산**과 **총부채**의 직접적인 값이 없습니다. 따라서 두 금액을 확인할 수 없습니다.\n\n- 총자산: **확인 불가** — 해당 Total Assets 셀 값이 누락됨\n- 총부채: **확인 불가** — 해당 Total Liabilities 셀 값이 누락됨\n\n참고로 2025년 **총자본화(Total Capitalization)**는 97,348로 제공되어 있으나, 이는 총자산이나 총부채와 동일한 항목이 아닙니다 [Balance_Sheet Cell A6986].",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.739,
+        "total_tokens": 30,
+        "estimated_cost_usd": 1e-06
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.0076500000000000005
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0290899999999998
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.3148800000000005
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.26864
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06552
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.39808
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.51607
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 1.2208800000000002
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.6684500000000001
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.57398
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.5283300000000001
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "12-ocf-capex-12",
+      "question": "2025년 IBM 영업현금흐름과 CAPEX는 각각 얼마인가?",
+      "run_id": "run-a1bfc9d418c1498b96c3bf615f86f84c",
+      "status": "completed",
+      "latency_seconds": 38.376,
+      "total_tokens": 22562,
+      "estimated_cost_usd": 0.02143,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "2025년 IBM의:\n\n- **영업현금흐름(Cash from Ops.)**: **13,193백만 달러** [Cash_Flow Cell A9458]\n- **CAPEX(Capital Expenditure)**: **-1,617백만 달러** [Cash_Flow Cell A9482]\n\nCAPEX는 현금 유출이므로 절댓값 기준 **1,617백만 달러**입니다. [Cash_Flow Cell A9482]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.04729
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 8.60564
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.47947
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.6178
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06037
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.35828
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 9.79448
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.07613
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.0751999999999997
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.75644
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.50476
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 2,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "12-ocf-capex-12",
+      "question": "2025년 IBM 영업현금흐름과 CAPEX는 각각 얼마인가?",
+      "run_id": "run-ff809361f722461380751f559e893ad9",
+      "status": "completed",
+      "latency_seconds": 37.569,
+      "total_tokens": 22408,
+      "estimated_cost_usd": 0.022439,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "2025년 IBM의:\n\n- **영업현금흐름(Cash from Ops): 13,193백만 달러** [Cash_Flow Cell A9458]\n- **CAPEX(Capital Expenditure): -1,617백만 달러** [Cash_Flow Cell A9482]\n\nCAPEX는 현금 유출로 표시되어 **절대액 기준 1,617백만 달러**입니다. [Cash_Flow Cell A9482]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 1.424,
+        "total_tokens": 33,
+        "estimated_cost_usd": 1e-06
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00762
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.64667
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.89309
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.0554200000000002
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.046079999999999996
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.756810000000001
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 9.334340000000001
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.96911
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.84592
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.87048
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.14307
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 2,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "13-dividends-13",
+      "question": "2025년 IBM 총 배당금 지급액은 얼마인가?",
+      "run_id": "run-d3bfe7f7a9864047a2cfefa35c05de79",
+      "status": "completed",
+      "latency_seconds": 19.376,
+      "total_tokens": 19182,
+      "estimated_cost_usd": 0.018933,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "2025년 IBM의 **총 배당금 지급액은 -6,255백만 달러($M)**입니다. 이는 현금 유출 기준으로 **62억 5,500만 달러**입니다. [Cash_Flow Cell A10080] [Cash_Flow Cell A10082]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00753
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.49804
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.50433
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.37387
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06611
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.13911
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.9645300000000003
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.20039
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.36206
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.64834
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.61121
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "13-dividends-13",
+      "question": "2025년 IBM 총 배당금 지급액은 얼마인가?",
+      "run_id": "run-a2a3abca692e44fba7e96881e4455387",
+      "status": "completed",
+      "latency_seconds": 23.44,
+      "total_tokens": 17442,
+      "estimated_cost_usd": 0.017727,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "2025년 IBM의 총 배당금 지급액은 **-6,255백만 달러($M)**입니다. 현금 유출 기준으로 표현하면 **6,255백만 달러 지급**입니다. [Cash_Flow Cell A10080]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.453,
+        "total_tokens": 25,
+        "estimated_cost_usd": 1e-06
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00634
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.82927
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.39753
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.74347
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07776999999999999
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.57438
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.76714
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.6820899999999999
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.23087
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.79754
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.33365
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "14-market-cap-14",
+      "question": "IBM LTM 시가총액은 얼마인가?",
+      "run_id": "run-dd54e8371059407999ca26d2bd542205",
+      "status": "completed",
+      "latency_seconds": 20.714,
+      "total_tokens": 17300,
+      "estimated_cost_usd": 0.017921,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **LTM 시가총액은 270,970.38886734백만 달러(약 270.97십억 달러)**입니다. [Key_Stats Cell A248]\n\n계산은 다음과 같습니다.\n\n- 주가: **289.89달러** [Key_Stats Cell A242]\n- 발행주식수: **934,735,206주** [Key_Stats Cell A244]\n- 단위 환산: **1,000,000으로 나눔** [Key_Stats Cell A246]\n- 시가총액 = 289.89 × 934,735,206 ÷ 1,000,000  \n  = **270,970.38886734백만 달러** [Key_Stats Cell A248]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.0067800000000000004
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.92699
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21631999999999998
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.0638
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.054979999999999994
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.1894899999999997
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.52727
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.5146199999999999
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8793
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.19563
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.13877
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "14-market-cap-14",
+      "question": "IBM LTM 시가총액은 얼마인가?",
+      "run_id": "run-8355f6e90df549fa92e4395fdb3e9bd6",
+      "status": "completed",
+      "latency_seconds": 7.488,
+      "total_tokens": 25422,
+      "estimated_cost_usd": 0.026378,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM 시가총액은 **270,970.38886734백만 달러**입니다. [Key_Stats Cell A248]\n\n계산: **289.89달러 × 934,735,206주 ÷ 1,000,000 = 270,970.38886734백만 달러** [Key_Stats Cell A242] [Key_Stats Cell A244] [Key_Stats Cell A246]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.508,
+        "total_tokens": 18,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.006690000000000001
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.7100700000000001
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21253999999999998
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.6319400000000001
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05479
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.04684
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.69755
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.27038
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.65665
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.98191
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21863
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "15-tev-15",
+      "question": "IBM LTM TEV는 얼마인가?",
+      "run_id": "run-fb393113c3364fbb91c97e6983f33f2f",
+      "status": "completed",
+      "latency_seconds": 17.323,
+      "total_tokens": 19994,
+      "estimated_cost_usd": 0.019757,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM TEV는 **321,253.38886734**입니다. 단위는 제공된 셀 컨텍스트에 명시되어 있지 않습니다. [Key_Stats Cell A258]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.006059999999999999
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.83339
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.32258
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.60539
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05182
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.3731799999999996
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.53854
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.42678
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.8683099999999999
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.7525999999999997
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.54461
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "15-tev-15",
+      "question": "IBM LTM TEV는 얼마인가?",
+      "run_id": "run-b84325e2518443a083a1ef44b0ba91ee",
+      "status": "completed",
+      "latency_seconds": 8.58,
+      "total_tokens": 24535,
+      "estimated_cost_usd": 0.025556,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM TEV는 **321,253.38886734**입니다. [Key_Stats Cell A258]  \n제공된 셀 문맥에는 TEV의 단위가 명시되어 있지 않습니다.",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_capitalization",
+        "sheets": [
+          "Capitalization"
+        ],
+        "matched": true,
+        "latency_seconds": 0.78,
+        "total_tokens": 13,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00902
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.05378
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.29606
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.70493
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06141
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.89636
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.80349
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.25273
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.54226
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.64448
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.31587
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "16-tev-ebitda-16",
+      "question": "IBM LTM TEV/EBITDA 배수는 얼마인가?",
+      "run_id": "run-90b9d5ad241c41879ccf5961ed1ebe04",
+      "status": "completed",
+      "latency_seconds": 42.522,
+      "total_tokens": 20996,
+      "estimated_cost_usd": 0.0191,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 LTM TEV/EBITDA 배수는 **20.085672배**입니다. [Key_Stats Cell A284]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00851
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.879899999999999
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21628
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.27103
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07129
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.606439999999999
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 13.18425
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.72657
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.5424499999999997
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.38218
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.63286
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "16-tev-ebitda-16",
+      "question": "IBM LTM TEV/EBITDA 배수는 얼마인가?",
+      "run_id": "run-79f8051cb3944abab60d3c32d844566f",
+      "status": "completed",
+      "latency_seconds": 9.173,
+      "total_tokens": 15742,
+      "estimated_cost_usd": 0.016026,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **LTM TEV/EBITDA 배수는 20.085672배**입니다. [Key_Stats Cell A284]",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 1.428,
+        "total_tokens": 19,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00902
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.64169
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.48808999999999997
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.97213
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.08202
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.83739
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.59176
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.6747000000000001
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.67159
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.62534
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.57975
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "17-revenue-comparison-17",
+      "question": "IBM의 2024년과 2025년 매출을 비교해줘.",
+      "run_id": "run-bc2bd179f5e740f0ac871cd54640b331",
+      "status": "completed",
+      "latency_seconds": 35.078,
+      "total_tokens": 19642,
+      "estimated_cost_usd": 0.019188,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 매출은 다음과 같습니다.\n\n- **2024년:** 62,753 [Key_Stats Cell A8]\n- **2025년:** 67,535 [Key_Stats Cell A10]\n\n비교:\n\n- **증가액:** 67,535 − 62,753 = **4,782** [Key_Stats Cell A8][Key_Stats Cell A10]\n- **증가율:** 4,782 ÷ 62,753 × 100 = **약 7.62%** [Key_Stats Cell A8][Key_Stats Cell A10]\n\n따라서 IBM의 2025년 매출은 2024년보다 **4,782 증가했으며, 약 7.62% 성장**했습니다. 셀 컨텍스트에는 매출의 단위가 명시되어 있지 않습니다.",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00786
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.99233
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.26992
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.8778800000000002
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.054
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.61637
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 10.017389999999999
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.89572
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.96258
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.81103
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.57319
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 2,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "17-revenue-comparison-17",
+      "question": "IBM의 2024년과 2025년 매출을 비교해줘.",
+      "run_id": "run-85e7c6ff359f4a35818f7431a36cd2c6",
+      "status": "completed",
+      "latency_seconds": 40.498,
+      "total_tokens": 16036,
+      "estimated_cost_usd": 0.017459,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "IBM의 **Revenue 기준** 매출은 다음과 같습니다.\n\n- **2024년:** $62,044M [Income_Statement Cell A352]\n- **2025년:** $66,735M [Income_Statement Cell A354]\n- **증가액:** $66,735M − $62,044M = **$4,691M** [Income_Statement Cell A352] [Income_Statement Cell A354]\n- **증가율:** $4,691M ÷ $62,044M × 100 = **약 7.56%** [Income_Statement Cell A352] [Income_Statement Cell A354]\n\n따라서 IBM의 2025년 매출은 2024년보다 **$4,691M 증가했으며, 약 7.56% 성장**했습니다. [Income_Statement Cell A352] [Income_Statement Cell A354]\n\n참고로 **Total Revenue 기준**으로는 $62,753M에서 $67,535M으로 증가해, **$4,782M 및 약 7.62% 증가**입니다. [Income_Statement Cell A534] [Income_Statement Cell A536]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.432,
+        "total_tokens": 24,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00663
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.64048
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.4646300000000005
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.29188
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07479999999999999
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.25413
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 10.42288
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.50364
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.48662
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.76096
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.59157
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 2,
+        "expected_numbers": 2,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "18-revenue-trend-18",
+      "question": "IBM의 2021년부터 2025년까지 매출 추이를 알려줘.",
+      "run_id": "run-3b210dba256d4bea92db4958b47f2e52",
+      "status": "completed",
+      "latency_seconds": 103.485,
+      "total_tokens": 18817,
+      "estimated_cost_usd": 0.018964,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 매출은 **2021년부터 2025년까지 매년 증가**했습니다. 제공된 셀에는 매출 단위가 명시되어 있지 않습니다.\n\n| 연도 | 매출 | 전년 대비 증감률 |\n|---|---:|---:|\n| 2021년 | 57,351 [Key_Stats Cell A2] | — |\n| 2022년 | 60,530 [Key_Stats Cell A4] | 약 **5.5%** = (60,530 - 57,351) ÷ 57,351 [Key_Stats Cell A2][Key_Stats Cell A4] |\n| 2023년 | 61,860 [Key_Stats Cell A6] | 약 **2.2%** = (61,860 - 60,530) ÷ 60,530 [Key_Stats Cell A4][Key_Stats Cell A6] |\n| 2024년 | 62,753 [Key_Stats Cell A8] | 약 **1.4%** = (62,753 - 61,860) ÷ 61,860 [Key_Stats Cell A6][Key_Stats Cell A8] |\n| 2025년 | 67,535 [Key_Stats Cell A10] | 약 **7.6%** = (67,535 - 62,753) ÷ 62,753 [Key_Stats Cell A8][Key_Stats Cell A10] |\n\n**추이 요약:**  \n2021년 **57,351**에서 2025년 **67,535**로 **10,184 증가**했으며, 전체 증가율은 약 **17.8%**입니다.  \n계산: (67,535 - 57,351) ÷ 57,351 = 약 17.8% [Key_Stats Cell A2][Key_Stats Cell A10]\n\n특히 2024년까지 성장률이 둔화되다가 2025년에 약 **7.6%**로 크게 확대되었습니다. [Key_Stats Cell A8][Key_Stats Cell A10]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00698
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 11.1996
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.22338
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 31.89726
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05824
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 11.21425
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 22.810740000000003
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 7.66937
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.45508
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 9.162180000000001
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.787979999999999
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 5,
+        "expected_numbers": 5,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "18-revenue-trend-18",
+      "question": "IBM의 2021년부터 2025년까지 매출 추이를 알려줘.",
+      "run_id": "run-d8111dea4e4c4214b0db400a70a7480a",
+      "status": "completed",
+      "latency_seconds": 35.196,
+      "total_tokens": 30,
+      "estimated_cost_usd": 1e-06,
+      "reused_tokens": 14034,
+      "reused_cost_usd": 0.017439,
+      "cache_hits": 7,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "IBM의 매출은 **2021년부터 2025년까지 매년 증가**했습니다. 제공된 셀에는 매출 단위가 명시되어 있지 않습니다.\n\n| 연도 | 매출 | 전년 대비 증감률 |\n|---|---:|---:|\n| 2021년 | 57,351 [Key_Stats Cell A2] | — |\n| 2022년 | 60,530 [Key_Stats Cell A4] | 약 **5.5%** = (60,530 - 57,351) ÷ 57,351 [Key_Stats Cell A2][Key_Stats Cell A4] |\n| 2023년 | 61,860 [Key_Stats Cell A6] | 약 **2.2%** = (61,860 - 60,530) ÷ 60,530 [Key_Stats Cell A4][Key_Stats Cell A6] |\n| 2024년 | 62,753 [Key_Stats Cell A8] | 약 **1.4%** = (62,753 - 61,860) ÷ 61,860 [Key_Stats Cell A6][Key_Stats Cell A8] |\n| 2025년 | 67,535 [Key_Stats Cell A10] | 약 **7.6%** = (67,535 - 62,753) ÷ 62,753 [Key_Stats Cell A8][Key_Stats Cell A10] |\n\n**추이 요약:**  \n2021년 **57,351**에서 2025년 **67,535**로 **10,184 증가**했으며, 전체 증가율은 약 **17.8%**입니다.  \n계산: (67,535 - 57,351) ÷ 57,351 = 약 17.8% [Key_Stats Cell A2][Key_Stats Cell A10]\n\n특히 2024년까지 성장률이 둔화되다가 2025년에 약 **7.6%**로 크게 확대되었습니다. [Key_Stats Cell A8][Key_Stats Cell A10]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.807,
+        "total_tokens": 30,
+        "estimated_cost_usd": 1e-06
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.01033
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.06695
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 10.681719999999999
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.61572
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06805
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 1.45392
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 3.46807
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 3.88431
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 3.99752
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 5.00502
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.9444300000000005
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 5,
+        "expected_numbers": 5,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "19-2025-eps-19",
+      "question": "IBM FY2025 희석 EPS는 얼마인가?",
+      "run_id": "run-71d7a6a689f14fdab85dc1c70536c9cf",
+      "status": "completed",
+      "latency_seconds": 19.812,
+      "total_tokens": 15972,
+      "estimated_cost_usd": 0.015032,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 FY2025 희석 EPS는 **11.14달러**입니다. [Income_Statement Cell A1838]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.18029
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.59302
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.48926
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.121
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.24622
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.31398
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.4449099999999997
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.48598
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.34612
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.3654699999999997
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.22588
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "19-2025-eps-19",
+      "question": "IBM FY2025 희석 EPS는 얼마인가?",
+      "run_id": "run-b2cd8e85404c422f8389fff138ae8267",
+      "status": "completed",
+      "latency_seconds": 19.618,
+      "total_tokens": 14708,
+      "estimated_cost_usd": 0.015175,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "IBM의 FY2025 희석 EPS는 **11.163**입니다 [Income_Statement Cell A1812].",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 1.248,
+        "total_tokens": 18,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00643
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.7607599999999999
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.54472
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.3843299999999998
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05811
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.9657200000000001
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.8445
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.79604
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.13553
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 5.04654
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.07488
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "20-2026-revenue-20",
+      "question": "IBM의 2026년 예상 매출은 얼마인가?",
+      "run_id": "run-c3bd524bd4f8438686e5be4f47a45462",
+      "status": "completed",
+      "latency_seconds": 28.353,
+      "total_tokens": 16957,
+      "estimated_cost_usd": 0.01621,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **2026년 예상 매출은 71,183.31159**입니다. 단, 제공된 셀 문맥에는 매출 단위가 명시되어 있지 않습니다. [Key_Stats Cell A14]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00793
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.1355900000000005
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.27742
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.33288
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.1062
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.51217
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.84071
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.5861199999999998
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.76175
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.05733
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.73513
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "20-2026-revenue-20",
+      "question": "IBM의 2026년 예상 매출은 얼마인가?",
+      "run_id": "run-fa5eddda963b45b285d55101501bf84c",
+      "status": "completed",
+      "latency_seconds": 8.787,
+      "total_tokens": 15513,
+      "estimated_cost_usd": 0.017061,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "제공된 셀 컨텍스트만으로는 **IBM의 2026년 예상 매출을 확인할 수 없습니다.** 2026-12-31 매출 또는 예상 매출에 해당하는 셀이 제공되지 않았습니다.\n\n참고로 제공된 최신 2025년 수치는 다음과 같지만, 이는 2026년 전망치가 아닙니다.\n\n- **Revenue:** 66,735백만 달러 [Income_Statement Cell A354]\n- **As-Reported Total Revenue:** 67,535백만 달러 [Income_Statement Cell A2644]\n\n따라서 **2026년 예상 매출 산출에 필요한 2026년 전망 데이터가 누락되어 있습니다.**",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.796,
+        "total_tokens": 20,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00789
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.99954
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.34797
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.6188899999999999
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.06445000000000001
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.89863
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.56984
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.23565
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.91314
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.82387
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.30694
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "21-2027-revenue-21",
+      "question": "IBM의 2027년 예상 매출은 얼마인가?",
+      "run_id": "run-1333702f43014d04a49b880bef8df16b",
+      "status": "completed",
+      "latency_seconds": 23.093,
+      "total_tokens": 16740,
+      "estimated_cost_usd": 0.015952,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **2027년 예상 매출은 74,255.14892**입니다. [Key_Stats Cell A16]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00605
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.9176400000000005
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.25382
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.83041
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.04481
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.52404
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.4409600000000005
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.49708
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.25626
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.28078
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.04095
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "21-2027-revenue-21",
+      "question": "IBM의 2027년 예상 매출은 얼마인가?",
+      "run_id": "run-0ab6f0a75f8b4aae8a012db0ccb84f7b",
+      "status": "completed",
+      "latency_seconds": 7.917,
+      "total_tokens": 17002,
+      "estimated_cost_usd": 0.01808,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "제공된 셀 컨텍스트에는 **IBM의 2027년 예상 매출**이 없습니다. 따라서 2027년 예상 매출을 산출할 수 없습니다.\n\n참고로 확인 가능한 최근 매출 수치는 다음과 같습니다.\n\n- **2025년 As-Reported Total Revenue: $67,535M** [Income_Statement Cell A2644]\n- **2025년 Revenue: $66,735M** [Income_Statement Cell A354]\n\n2027년 예상 매출을 계산하려면 2027년 전망치 또는 적용할 성장률 가정이 추가로 필요합니다.",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.856,
+        "total_tokens": 20,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.10386
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.14942
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.18513
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.6230399999999999
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.061090000000000005
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.89355
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.58201
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.28901
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.73472
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.08235
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.21242
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "22-2028-revenue-22",
+      "question": "IBM의 2028년 예상 매출은 얼마인가?",
+      "run_id": "run-4add0cb7b54248b69f9db80d5e1a2710",
+      "status": "completed",
+      "latency_seconds": 21.323,
+      "total_tokens": 16891,
+      "estimated_cost_usd": 0.01608,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 2028년 예상 매출은 **78,520.45204**입니다. 단위는 제공된 셀 context에 명시되어 있지 않습니다. [Key_Stats Cell A18]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00555
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.6673
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.19418000000000002
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.119
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.04819
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.18575
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.66662
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.64253
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.61059
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.79184
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.3917
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "22-2028-revenue-22",
+      "question": "IBM의 2028년 예상 매출은 얼마인가?",
+      "run_id": "run-488718fe81054fc4a2ee3d701496da2f",
+      "status": "completed",
+      "latency_seconds": 8.258,
+      "total_tokens": 16130,
+      "estimated_cost_usd": 0.016848,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **2028년 예상 매출은 제공된 셀 문맥에 없습니다.** 따라서 산출할 수 없습니다.\n\n참고로 제공된 매출 데이터는 2025년 **67,535 ($M)**까지이며 [Income_Statement Cell A2644], 2028년 예상치나 이를 계산할 성장률·예측 가정이 누락되어 있습니다.",
+      "router": {
+        "kind": "semantic",
+        "target": "get_ibm_key_financials",
+        "sheets": [
+          "Key_Stats"
+        ],
+        "matched": true,
+        "latency_seconds": 0.846,
+        "total_tokens": 20,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.0072699999999999996
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.05331
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.22629
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.05856
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05964
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.9935499999999999
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.56587
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.22576
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.61637
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.1444699999999997
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.30642
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": false,
+        "matched_numbers": 0,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": true,
+        "target_correct": true,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "23-2026-eps-23",
+      "question": "IBM의 2026년 예상 희석 EPS는 얼마인가?",
+      "run_id": "run-756b81d871ff478ab2c39eadc1871b7e",
+      "status": "completed",
+      "latency_seconds": 21.524,
+      "total_tokens": 16676,
+      "estimated_cost_usd": 0.01581,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 **2026년 예상 희석 EPS(특별항목 제외)**는 **12.41425**입니다. [Key_Stats Cell A218]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00818
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.71911
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.19419999999999998
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.5949
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.04711
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.62431
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.02296
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.6220599999999998
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.18106
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.8569299999999997
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.65299
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "23-2026-eps-23",
+      "question": "IBM의 2026년 예상 희석 EPS는 얼마인가?",
+      "run_id": "run-3cbc83f7062c494f93bf1187a7703b87",
+      "status": "completed",
+      "latency_seconds": 21.976,
+      "total_tokens": 16319,
+      "estimated_cost_usd": 0.016396,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "IBM의 **2026년 예상 희석 EPS는 12.41425**입니다. [Key_Stats Cell A218]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 1.553,
+        "total_tokens": 23,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00649
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.9734
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 6.36963
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.16674
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.07659
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.4251
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.02063
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.25124
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.78782
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.3266199999999997
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.57145
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "default",
+      "case_id": "24-2028-eps-24",
+      "question": "IBM의 2028년 예상 희석 EPS는 얼마인가?",
+      "run_id": "run-9c594a480b2f4abf9c0a04257ca002ce",
+      "status": "completed",
+      "latency_seconds": 13.55,
+      "total_tokens": 13911,
+      "estimated_cost_usd": 0.013088,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 0,
+      "answer": "IBM의 2028년 예상 희석 EPS는 **14.74635**입니다. [Key_Stats Cell A222]",
+      "router": null,
+      "timeline": [
+        {
+          "node_id": "custom-node-1786497067905-2",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00865
+        },
+        {
+          "node_id": "custom-node-1786497092339-3",
+          "module_type": "decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.38369
+        },
+        {
+          "node_id": "custom-node-1786497122336-4",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.53189
+        },
+        {
+          "node_id": "custom-node-1786497464152-1",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0161900000000001
+        },
+        {
+          "node_id": "custom-node-1786497475934-2",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05461
+        },
+        {
+          "node_id": "custom-node-1786497522370-4",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.2741900000000002
+        },
+        {
+          "node_id": "custom-node-1786497551832-5",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.93455
+        },
+        {
+          "node_id": "custom-node-1786497565202-6",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.00153
+        },
+        {
+          "node_id": "custom-node-1786497623603-7",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.1147
+        },
+        {
+          "node_id": "custom-node-1786497793017-1",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.33168
+        },
+        {
+          "node_id": "custom-node-1786497852818-2",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.89785
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": false
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "rag9_semantic_entry_hybrid",
+      "case_id": "24-2028-eps-24",
+      "question": "IBM의 2028년 예상 희석 EPS는 얼마인가?",
+      "run_id": "run-9a1f9613cf9947fbae8c76ffe944c3dc",
+      "status": "completed",
+      "latency_seconds": 16.858,
+      "total_tokens": 12909,
+      "estimated_cost_usd": 0.013408,
+      "reused_tokens": 0,
+      "reused_cost_usd": 0.0,
+      "cache_hits": 1,
+      "node_runs": 11,
+      "llm_fallback_calls": 1,
+      "answer": "IBM의 **2028년 예상 희석 EPS(특별항목 제외)**는 **14.74635달러**입니다. [Key_Stats Cell A222]",
+      "router": {
+        "kind": "semantic",
+        "target": null,
+        "sheets": [],
+        "matched": false,
+        "latency_seconds": 0.791,
+        "total_tokens": 23,
+        "estimated_cost_usd": 0.0
+      },
+      "timeline": [
+        {
+          "node_id": "query",
+          "module_type": "query_input",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.00861
+        },
+        {
+          "node_id": "semantic",
+          "module_type": "semantic_query_matcher",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.9884700000000001
+        },
+        {
+          "node_id": "adaptive",
+          "module_type": "adaptive_query_decomposer",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 4.57562
+        },
+        {
+          "node_id": "embed",
+          "module_type": "embedder",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.12318
+        },
+        {
+          "node_id": "index",
+          "module_type": "prebuilt_index_loader",
+          "status": "succeeded",
+          "cache_hit": true,
+          "latency_seconds": 0.05191
+        },
+        {
+          "node_id": "bm25",
+          "module_type": "bm25_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.92517
+        },
+        {
+          "node_id": "dense",
+          "module_type": "dense_retriever",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 2.29858
+        },
+        {
+          "node_id": "rrf",
+          "module_type": "rrf_fusion",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0863
+        },
+        {
+          "node_id": "context",
+          "module_type": "context",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 1.0374100000000002
+        },
+        {
+          "node_id": "reader",
+          "module_type": "reader",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 3.29913
+        },
+        {
+          "node_id": "final-inspector",
+          "module_type": "json_inspector",
+          "status": "succeeded",
+          "cache_hit": false,
+          "latency_seconds": 0.46317
+        }
+      ],
+      "score": {
+        "scored": true,
+        "correct": true,
+        "matched_numbers": 1,
+        "expected_numbers": 1,
+        "matched_terms": 0,
+        "expected_terms": 0
+      },
+      "route_score": {
+        "correct": false,
+        "target_correct": false,
+        "sheets_correct": true
+      },
+      "error": null
+    }
+  ]
+}

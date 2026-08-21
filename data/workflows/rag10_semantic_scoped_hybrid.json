@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "id": "rag10_semantic_scoped_hybrid",
+  "name": "rag10_semantic_scoped_pgvector_hybrid",
+  "updated_at": "2026-08-20T07:14:42.410849+00:00",
+  "graph": {
+    "nodes": [
+      {
+        "id": "query",
+        "module_type": "query_input",
+        "position": {
+          "x": -56.83937124413994,
+          "y": -161.0448851917298
+        },
+        "config": {
+          "threshold": 1
+        },
+        "values": {
+          "query": "IBM의 2025년 총자산에서 총부채를 뺀 순자산은 얼마이며, 총자산 대비 총부채 비중은 몇 %인가?"
+        },
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "semantic",
+        "module_type": "semantic_query_matcher",
+        "position": {
+          "x": 278.1480666825206,
+          "y": -173.29876977693223
+        },
+        "config": {
+          "model": "text-embedding-3-small",
+          "threshold": 0.74,
+          "top_k": 5,
+          "vote_margin": 0.05
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "adaptive",
+        "module_type": "adaptive_query_decomposer",
+        "position": {
+          "x": 271.02628506469387,
+          "y": 1.7726891510485565
+        },
+        "config": {
+          "model": "gpt-5.6-luna",
+          "preset": "luna_decomposer"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "subquery-inspector",
+        "module_type": "json_inspector",
+        "position": {
+          "x": 705.8645265544553,
+          "y": -438.31277605357684
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "embed",
+        "module_type": "embedder",
+        "position": {
+          "x": 273.49062175463007,
+          "y": 158.60225084486237
+        },
+        "config": {
+          "model": "text-embedding-3-large"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "index",
+        "module_type": "pgvector_collection_loader",
+        "position": {
+          "x": 406.90780395586955,
+          "y": 350.78024239544055
+        },
+        "config": {},
+        "values": {
+          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
+          "collection_names": [
+            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
+          ]
+        },
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "bm25",
+        "module_type": "bm25_retriever",
+        "position": {
+          "x": 763.0254767434792,
+          "y": 61.48976858788478
+        },
+        "config": {
+          "k1": 1.5,
+          "b": 0.75,
+          "top_k": 1000
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "rrf",
+        "module_type": "rrf_fusion",
+        "position": {
+          "x": 1177.8366505758672,
+          "y": 70.67184370810335
+        },
+        "config": {
+          "rrf_k": 60,
+          "top_k": 100,
+          "ratio_penalty": 0.4
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "context",
+        "module_type": "context",
+        "position": {
+          "x": 1606.1301027354186,
+          "y": 95.49535347373507
+        },
+        "config": {
+          "top_k": 100,
+          "adjacent_radius": 3,
+          "max_blocks": 500
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "reader",
+        "module_type": "reader",
+        "position": {
+          "x": 2100.0,
+          "y": 90.0
+        },
+        "config": {
+          "model": "gpt-5.6-luna",
+          "preset": "luna_reader"
+        },
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      },
+      {
+        "id": "final-inspector",
+        "module_type": "json_inspector",
+        "position": {
+          "x": 2450.0,
+          "y": 90.0
+        },
+        "config": {},
+        "values": {},
+        "ui": {
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "query-semantic",
+        "source": "query",
+        "target": "semantic",
+        "source_output": "query_context",
+        "target_input": "query_context",
+        "source_branch": "generated"
+      },
+      {
+        "id": "query-adaptive",
+        "source": "query",
+        "target": "adaptive",
+        "source_output": "query_context",
+        "target_input": "query_context",
+        "source_branch": "generated"
+      },
+      {
+        "id": "semantic-adaptive",
+        "source": "semantic",
+        "target": "adaptive",
+        "source_output": "semantic_match",
+        "target_input": "semantic_match",
+        "source_branch": null
+      },
+      {
+        "id": "adaptive-subquery-inspector",
+        "source": "adaptive",
+        "target": "subquery-inspector",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "subquery-inspector-embed",
+        "source": "subquery-inspector",
+        "target": "embed",
+        "source_output": "output",
+        "target_input": "input",
+        "source_branch": null
+      },
+      {
+        "id": "subquery-inspector-bm25",
+        "source": "subquery-inspector",
+        "target": "bm25",
+        "source_output": "output",
+        "target_input": "query_input",
+        "source_branch": null
+      },
+      {
+        "id": "index-bm25",
+        "source": "index",
+        "target": "bm25",
+        "source_output": "document_output",
+        "target_input": "document_input",
+        "source_branch": null
+      },
+      {
+        "id": "bm25-rrf",
+        "source": "bm25",
+        "target": "rrf",
+        "source_output": "bm25_result",
+        "target_input": "bm25_result",
+        "source_branch": null
+      },
+      {
+        "id": "rrf-context",
+        "source": "rrf",
+        "target": "context",
+        "source_output": "retrieval_json",
+        "target_input": "retrieval_json",
+        "source_branch": null
+      },
+      {
+        "id": "index-context",
+        "source": "index",
+        "target": "context",
+        "source_output": "document_output",
+        "target_input": "document_input",
+        "source_branch": null
+      },
+      {
+        "id": "context-reader",
+        "source": "context",
+        "target": "reader",
+        "source_output": "context_json",
+        "target_input": "context_json",
+        "source_branch": null
+      },
+      {
+        "id": "reader-final-inspector",
+        "source": "reader",
+        "target": "final-inspector",
+        "source_output": "answer_json",
+        "target_input": "input",
+        "source_branch": null
+      }
+    ],
+    "viewport": {
+      "x": 596.1832557703617,
+      "y": 355.69642465618006,
+      "zoom": 1.103271390096918
+    }
+  }
+}

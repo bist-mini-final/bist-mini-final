@@ -21,6 +21,7 @@ python -m backend.tools.generate_module_docs
 
 | Module | Category | Guide |
 |---|---|---|
+| `adaptive_query_decomposer` | Logic | [Adaptive Query Decomposer](./adaptive_query_decomposer.md) |
 | `adaptive_rrf_fusion` | Logic | [Adaptive RRF Fusion](./adaptive_rrf_fusion.md) |
 | `answer_cache_writer` | Output | [Answer Cache Writer](./answer_cache_writer.md) |
 | `answer_refiner` | Output | [Direct Cell Answer Refiner](./answer_refiner.md) |
@@ -33,6 +34,7 @@ python -m backend.tools.generate_module_docs
 | `dataframe_source` | Source | [DataFrame Source (Code RAG)](./dataframe_source.md) |
 | `decomposer` | Logic | [LLM Query Decomposer](./decomposer.md) |
 | `dense_retriever` | Logic | [Dense Vector Retriever](./dense_retriever.md) |
+| `direct_query_decomposer` | Logic | [Direct Query Baseline](./direct_query_decomposer.md) |
 | `docling_table_detector` | Logic | [Docling Table Region Detector](./docling_table_detector.md) |
 | `embedder` | Logic | [Query Embedder](./embedder.md) |
 | `exhaustive_cell_text_serializer` | Transform | [Exhaustive Cell Header Serializer](./exhaustive_cell_text_serializer.md) |
@@ -41,6 +43,7 @@ python -m backend.tools.generate_module_docs
 | `index_company_persistence` | Storage / DB | [Index Company Persistence](./index_company_persistence.md) |
 | `json_inspector` | Output | [JSON Data Inspector](./json_inspector.md) |
 | `json_transformer` | Transform | [JSON Format Mapper](./json_transformer.md) |
+| `llm_query_router` | Logic | [LLM Query Router](./llm_query_router.md) |
 | `local_vlm_structure_detector` | Logic | [Local VLM Table Structure Detector](./local_vlm_structure_detector.md) |
 | `luna_vlm_structure_detector` | Logic | [Luna Full-Sheet Structure Detector](./luna_vlm_structure_detector.md) |
 | `multi_company_collection_loader` | Storage | [Multi-Company Collection Loader](./multi_company_collection_loader.md) |
@@ -54,7 +57,11 @@ python -m backend.tools.generate_module_docs
 | `query_input` | Source | [Query Input & Search](./query_input.md) |
 | `reader` | Output | [LLM Reader Answer](./reader.md) |
 | `rrf_fusion` | Logic | [RRF Fusion](./rrf_fusion.md) |
+| `semantic_query_matcher` | Logic | [Semantic Query Matcher](./semantic_query_matcher.md) |
+| `semantic_scoped_dense_retriever` | Logic | [Semantic-Scoped Dense Retriever](./semantic_scoped_dense_retriever.md) |
+| `semantic_scoped_pgvector_retriever` | Logic | [Semantic-Scoped pgvector Retriever](./semantic_scoped_pgvector_retriever.md) |
 | `sheet_metadata_persistence` | Storage / DB | [Sheet Metadata Persistence](./sheet_metadata_persistence.md) |
+| `template_query_decomposer` | Logic | [Template Query Decomposer](./template_query_decomposer.md) |
 | `thesaurus_decomposer` | Logic | [Thesaurus Financial Decomposer](./thesaurus_decomposer.md) |
 | `timeseries_context_expander` | Logic | [Time-Series Full-Row Context Expander](./timeseries_context_expander.md) |
 | `vector_index_writer` | Transform | [Vector Index Writer](./vector_index_writer.md) |

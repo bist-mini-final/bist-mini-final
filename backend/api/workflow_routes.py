@@ -17,6 +17,7 @@ from ..workflows import (
     WorkflowSaveRequest,
     WorkflowStore,
 )
+from .benchmark_routes import create_benchmark_router
 
 
 def create_workflow_router(
@@ -57,6 +58,7 @@ def create_workflow_router(
         workflow_executor,
         run_store,
     )
+    router.include_router(create_benchmark_router(workflow_store, workflow_executor))
 
     def require_interactive_workflow(workflow_id: str) -> None:
         if workflow_id in INGESTION_WORKFLOW_IDS:
@@ -86,7 +88,18 @@ def create_workflow_router(
 
     @router.get("/workflows")
     def list_workflows():
-        return {"workflows": workflow_store.list()}
+        # ``default.json`` is the canonical starter workflow.  Its legacy
+        # document payload may say id="workflow", so normalize the public id
+        # to the filename-backed route id and never expose it twice.
+        default = workflow_store.load(WorkflowStore.DEFAULT_TEMPLATE_ID).model_copy(
+            update={"id": WorkflowStore.DEFAULT_TEMPLATE_ID}
+        )
+        workflows = [default]
+        workflows.extend(
+            item for item in workflow_store.list()
+            if item.id not in (WorkflowStore.DEFAULT_TEMPLATE_ID, WorkflowStore.ACTIVE_WORKFLOW_ID)
+        )
+        return {"workflows": workflows}
 
     @router.get("/workflows/{workflow_id}")
     def get_workflow(workflow_id: str):
@@ -103,6 +116,16 @@ def create_workflow_router(
     def save_workflow(workflow_id: str, request: WorkflowSaveRequest):
         try:
             return workflow_store.save(workflow_id, request)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.delete("/workflows/{workflow_id}")
+    def delete_workflow(workflow_id: str):
+        try:
+            workflow_store.delete(workflow_id)
+            return {"deleted": workflow_id}
+        except FileNotFoundError as error:
+            raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}") from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 

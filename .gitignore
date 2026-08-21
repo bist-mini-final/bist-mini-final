@@ -31,6 +31,7 @@ dist/
 outputs/
 output/
 data/runs/*
+data/raw/*
 !data/runs/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
@@ -57,6 +58,7 @@ data/virtual/*
 !data/virtual/.gitkeep
 data/workflows/workflow.json
 tmp/
+data/bencmarks/*
 
 # OS / editors
 .DS_Store
@@ -68,3 +70,4 @@ data/notion_questions.json
 *notion_question*.json
 data/eval/results/
 !/.github/scripts/
+.claude/

@@ -1,0 +1,20 @@
+[
+  {"id":"t1-revenue","query_type":1,"question":"IBM LTM 매출 숫자 뭐예요?","expected_numbers":[67535],"expected_target":"get_ibm_key_financials"},
+  {"id":"t1-eps-dps","query_type":1,"question":"24년 말 기준 IBM 주당순이익이랑 주당배당 얼마죠?","expected_numbers":[6.429,6.67],"expected_target":"get_ibm_key_financials"},
+  {"id":"t1-cash","query_type":1,"question":"IBM 현금·단기투자자산 2025년 수치 알려주세요.","expected_numbers":[14417],"expected_target":"get_ibm_key_financials"},
+  {"id":"t2-revenue-trend","query_type":2,"question":"IBM 매출, 2021년부터 2025년까지 연도별로 보여줘.","expected_numbers":[57351,60530,61860,62753,67535],"expected_target":"get_ibm_key_financials"},
+  {"id":"t2-ocf-change","query_type":2,"question":"IBM 영업현금흐름이 2024년에서 2025년으로 얼마나 바뀌었나요?","expected_numbers":[13445,13193],"expected_target":"get_ibm_key_financials"},
+  {"id":"t2-debt-trend","query_type":2,"question":"IBM 장기부채 최근 3개년 흐름 좀 알려줘.","expected_numbers":[49742,49081,54836],"expected_target":"get_ibm_key_financials"},
+  {"id":"t3-profit-set","query_type":3,"question":"IBM의 LTM 매출·EBITDA·순이익을 한 번에 정리해줘.","expected_numbers":[67535,16778,10593],"expected_target":"get_ibm_key_financials"},
+  {"id":"t3-assets-liabilities","query_type":3,"question":"IBM 2025년 총자산과 총부채 같이 확인해줘.","expected_numbers":[151880,119139],"expected_target":"get_ibm_key_financials"},
+  {"id":"t3-cashflow","query_type":3,"question":"IBM 영업현금흐름과 투자지출(CapEx) 각각 얼마야?","expected_numbers":[13193,-1617],"expected_target":"get_ibm_key_financials"},
+  {"id":"t4-fcf","query_type":4,"question":"IBM 2025년 FCF를 영업현금흐름과 CapEx로 계산해줘.","expected_numbers":[11576],"expected_target":"get_ibm_key_financials"},
+  {"id":"t4-margin","query_type":4,"question":"IBM LTM 매출총이익률 직접 계산하면 몇 퍼센트야?","expected_numbers":[58.19],"expected_target":"get_ibm_key_financials"},
+  {"id":"t4-tev-gap","query_type":4,"question":"IBM TEV가 시가총액보다 얼마나 큰지 계산해봐.","expected_numbers":[50283],"expected_target":"get_ibm_key_financials"},
+  {"id":"t5-margin-reason","query_type":5,"question":"IBM의 2025년 매출 성장과 EBITDA 마진 개선을 수치 근거로 설명해줘.","expected_numbers":[7.62,24.84],"expected_terms":["EBITDA"],"expected_target":"get_ibm_key_financials"},
+  {"id":"t5-cash-profit","query_type":5,"question":"IBM 순이익과 영업현금흐름 차이가 나는 이유를 데이터 범위 안에서 해석해줘.","expected_numbers":[10593,13193],"expected_terms":["현금"],"expected_target":"get_ibm_key_financials"},
+  {"id":"t5-debt","query_type":5,"question":"IBM 장기부채가 늘어난 흐름을 최근 3년 수치로 해석해줘.","expected_numbers":[49742,49081,54836],"expected_target":"get_ibm_key_financials"},
+  {"id":"t6-revenue-2026","query_type":6,"question":"IBM의 2026년 예상 매출은 얼마로 잡혀 있나요?","expected_numbers":[71183.3116],"expected_target":"get_ibm_key_financials"},
+  {"id":"t6-eps-2026","query_type":6,"question":"IBM 내년(2026년) 예상 희석 EPS 알려줘.","expected_numbers":[12.4142],"expected_target":"get_ibm_key_financials"},
+  {"id":"t6-revenue-2028","query_type":6,"question":"IBM 2028년 매출 전망치도 확인 가능해?","expected_numbers":[78520.452],"expected_target":"get_ibm_key_financials"}
+]

@@ -85,7 +85,10 @@ class EmbedderModule(ExecutableModule):
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(EmbedderExecutionDTO, payload)
-        vectors = self._encoder_for(input_data.model).encode(input_data.subqueries)
+        encoder = self._encoder_for(input_data.model)
+        vectors = encoder.encode(input_data.subqueries)
+        self.last_usage = getattr(encoder, "last_usage", None)
+        self.last_model = input_data.model
         if len(vectors) != len(input_data.subqueries):
             raise ModuleExecutionError(
                 "서브쿼리 개수와 생성된 임베딩 개수가 일치하지 않습니다"

@@ -184,7 +184,12 @@ CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
 class DatabaseManager:
     """PostgreSQL full ERD database manager."""
 
-    def __init__(self, database_url: str = PGVECTOR_URL) -> None:
+    def __init__(
+        self,
+        database_url: str = PGVECTOR_URL,
+        *,
+        ensure_schema: bool = True,
+    ) -> None:
         self.database_url = database_url
 
     def _raw_connection(self) -> Any:

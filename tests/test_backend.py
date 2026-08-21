@@ -60,6 +60,10 @@ from backend.modules.openpyxl_region_detector import OpenpyxlRegionDetectorModul
 from backend.modules.processed_file_selector import ProcessedFileSelectorModule
 from backend.modules.reader import ReaderModule
 from backend.modules.rrf_fusion import RrfFusionModule
+from backend.modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from backend.modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from backend.semantic_matching.catalog import QueryExample
+from backend.semantic_matching.matcher import SemanticQueryMatcher
 from backend.modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from backend.modules.vector_index_writer import VectorIndexWriterModule
 from backend.spreadsheets.workbook_catalog import WorkbookCatalog
@@ -400,6 +404,89 @@ class SimilarityTests(unittest.TestCase):
             [("Q1", "Apple 매출"), ("Q2", "IBM 시가총액")],
         )
         self.assertEqual(matches[0].question_id, "Q2")
+
+
+class SemanticQueryMatcherTests(unittest.TestCase):
+    class KeywordEncoder:
+        def encode(self, queries):
+            return [
+                [1.0, 0.0] if "revenue" in query.lower() else [0.0, 1.0]
+                for query in queries
+            ]
+
+    def test_route_votes_for_nearby_examples_and_returns_sheet_scope(self) -> None:
+        matcher = SemanticQueryMatcher(self.KeywordEncoder(), examples=(
+            QueryExample("q1", "revenue trend", "financials", ("Key_Stats",)),
+            QueryExample("q2", "revenue growth", "financials", ("Key_Stats",)),
+            QueryExample("q3", "employee count", "headcount", ("Employees",)),
+        ))
+
+        decision = matcher.route("revenue this year", "test", 0.74, 3, 0.05)
+
+        self.assertEqual(decision.target, "financials")
+        self.assertEqual(decision.sheets, ("Key_Stats",))
+        self.assertEqual(len(decision.matches), 3)
+
+    def test_route_falls_back_below_confidence_threshold(self) -> None:
+        matcher = SemanticQueryMatcher(self.KeywordEncoder(), examples=(
+            QueryExample("q1", "employee count", "headcount", ("Employees",)),
+        ))
+
+        decision = matcher.route("revenue this year", "test", 0.74, 1, 0.05)
+
+        self.assertIsNone(decision.target)
+        self.assertEqual(decision.sheets, ())
+
+    def test_scoped_dense_retriever_falls_back_when_no_matching_sheet_exists(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = VectorIndexStore(Path(directory))
+            index_id = "a" * 64
+            metadata = {
+                "workbook_hash": "hash", "model": "test", "dimension": 2,
+                "document_count": 1, "items": [{
+                    "cell_id": "Other Cell A1", "sheet_name": "Other", "cell_coord": "A1",
+                    "row_header": ["Revenue"], "column_header": ["LTM"],
+                    "cell_value": "100", "variant": "header_with_value", "text": "Revenue",
+                    "embedding_index": 0,
+                }],
+            }
+            store.put(index_id, [[1.0, 0.0]], metadata)
+            result = SemanticScopedDenseRetrieverModule(store).run({
+                "query_input": {
+                    "query_context": {"question_id": "q", "question_text": "Revenue"},
+                    "items": {"Revenue": [1.0, 0.0]},
+                },
+                "index_input": {
+                    "index_id": index_id, "file_name": "test.xlsx",
+                    "workbook_hash": "hash", "model": "test",
+                    "dimension": 2, "document_count": 1,
+                },
+                "semantic_match": {"matched": True, "target": "financials", "confidence": 0.9, "sheets": ["Key_Stats"], "reason": "test", "matches": []},
+            })
+        self.assertEqual(result["items"][0]["cell_id"], "Other Cell A1")
+
+    def test_adaptive_decomposer_skips_llm_when_semantic_match_succeeds(self) -> None:
+        class FailingCompletionClient:
+            def complete(self, model, messages):
+                raise AssertionError("LLM must not be called for a confident match")
+
+        result = AdaptiveQueryDecomposerModule(FailingCompletionClient()).run({
+            "query_context": {
+                "question_id": "q",
+                "question_text": "IBM 2025년 revenue",
+            },
+            "semantic_match": {
+                "matched": True, "target": "get_ibm_key_financials", "confidence": 0.9,
+                "sheets": ["Key_Stats"], "reason": "test", "matches": [],
+                "subqueries": [
+                    "Sheet: Key_Stats | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?"
+                ],
+            },
+        })
+        self.assertIn(
+            "Sheet: Key_Stats | Row Header: Total Revenue | Column Header: FY2025 | Cell Value: ?",
+            result["subqueries"],
+        )
 
 
 class PgVectorStoreBatchingTests(unittest.TestCase):
@@ -795,12 +882,15 @@ class RepositoryIntegrationTests(unittest.TestCase):
 
     def test_registry_exposes_all_frontend_modules(self) -> None:
         definitions = self.module_registry.definitions()
-        self.assertEqual(len(definitions), 37)
+        self.assertEqual(len(definitions), 44)
         self.assertEqual(
             {definition["type"] for definition in definitions},
             {
                 "query_input",
+                "direct_query_decomposer",
                 "decomposer",
+                "adaptive_query_decomposer",
+                "template_query_decomposer",
                 "thesaurus_decomposer",
                 "embedder",
                 "cell_text_embedder",
@@ -812,6 +902,10 @@ class RepositoryIntegrationTests(unittest.TestCase):
                 "bm25_retriever",
                 "dense_retriever",
                 "rrf_fusion",
+                "semantic_query_matcher",
+                "llm_query_router",
+                "semantic_scoped_dense_retriever",
+                "semantic_scoped_pgvector_retriever",
                 "adaptive_rrf_fusion",
                 "context",
                 "timeseries_context_expander",
@@ -1064,7 +1158,7 @@ class ApiContractTests(unittest.TestCase):
         response = self.client.get("/api/modules")
         self.assertEqual(response.status_code, 200)
         modules = response.json()["modules"]
-        self.assertEqual(len(modules), 37)
+        self.assertEqual(len(modules), 44)
         for module in modules:
             self.assertIn("input_schema", module)
             self.assertIn("config_schema", module)

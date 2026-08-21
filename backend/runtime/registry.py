@@ -5,9 +5,11 @@ from ..core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
 from ..modules.adaptive_rrf_fusion import AdaptiveRrfFusionModule
+from ..modules.base import ExecutableModule
 from ..modules.answer_refiner import AnswerRefinerModule
 from ..modules.answer_cache_writer import AnswerCacheWriterModule
-from ..modules.base import ExecutableModule
+from ..modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from ..modules.template_query_decomposer import TemplateQueryDecomposerModule
 from ..modules.bfs_llm_structure_detector import BfsLlmStructureDetectorModule
 from ..modules.bm25_retriever import Bm25RetrieverModule
 from ..modules.cell_text_embedder import CellTextEmbedderModule
@@ -16,6 +18,7 @@ from ..modules.company_entity_extractor import CompanyEntityExtractorModule
 from ..modules.context_expander import ContextExpanderModule
 from ..modules.dataframe_source import DataframeSourceModule
 from ..modules.decomposer import DecomposerModule
+from ..modules.direct_query_decomposer import DirectQueryDecomposerModule
 from ..modules.dense_retriever import DenseRetrieverModule
 from ..modules.docling_table_detector import DoclingTableDetectorModule
 from ..modules.embedder import EmbedderModule
@@ -29,6 +32,7 @@ from ..modules.json_inspector import JsonInspectorModule
 from ..modules.json_transformer import JsonTransformerModule
 from ..modules.local_vlm_structure_detector import LocalVlmStructureDetectorModule
 from ..modules.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
+from ..modules.llm_query_router import LlmQueryRouterModule
 from ..modules.multi_company_collection_loader import (
     MultiCompanyCollectionLoaderModule,
 )
@@ -42,6 +46,9 @@ from ..modules.qa_example_loader import QaExampleLoaderModule
 from ..modules.query_input import QueryInputModule
 from ..modules.reader import ReaderModule
 from ..modules.rrf_fusion import RrfFusionModule
+from ..modules.semantic_query_matcher import SemanticQueryMatcherModule
+from ..modules.semantic_scoped_dense_retriever import SemanticScopedDenseRetrieverModule
+from ..modules.semantic_scoped_pgvector_retriever import SemanticScopedPgVectorRetrieverModule
 from ..modules.sheet_metadata_persistence import SheetMetadataPersistenceModule
 from ..modules.thesaurus_decomposer import ThesaurusDecomposerModule
 from ..modules.timeseries_context_expander import TimeseriesContextExpanderModule
@@ -107,7 +114,10 @@ class ModuleRegistry(BaseModuleRegistry):
         )
         modules: List[ExecutableModule] = [
             QueryInputModule(repository=self.repository),
+            DirectQueryDecomposerModule(),
             DecomposerModule(completion_client=completion_client),
+            AdaptiveQueryDecomposerModule(completion_client=completion_client),
+            TemplateQueryDecomposerModule(completion_client=completion_client),
             ThesaurusDecomposerModule(completion_client=completion_client),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
@@ -139,6 +149,10 @@ class ModuleRegistry(BaseModuleRegistry):
             DenseRetrieverModule(vector_indexes),
             PgVectorRetrieverModule(self.pgvector_store),
             RrfFusionModule(),
+            SemanticQueryMatcherModule(encoder=embedding_encoder),
+            LlmQueryRouterModule(completion_client=completion_client),
+            SemanticScopedDenseRetrieverModule(self.vector_index_store),
+            SemanticScopedPgVectorRetrieverModule(self.pgvector_store),
             AdaptiveRrfFusionModule(),
             ContextExpanderModule(),
             TimeseriesContextExpanderModule(),

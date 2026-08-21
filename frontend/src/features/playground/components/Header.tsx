@@ -1,5 +1,6 @@
 import {
   ChevronDown,
+  BarChart3,
   Clock,
   Coins,
   DatabaseZap,
@@ -45,6 +46,7 @@ interface HeaderProps {
   workflows: WorkflowOption[];
   activeWorkflowId: string;
   onSelectWorkflow: (id: string) => void;
+  onOpenBenchmark: () => void;
 }
 
 export function Header({
@@ -65,6 +67,7 @@ export function Header({
   workflows,
   activeWorkflowId,
   onSelectWorkflow,
+  onOpenBenchmark,
 }: HeaderProps) {
 
   return (
@@ -110,6 +113,10 @@ export function Header({
       </div>
 
       <div className="app-header__actions">
+        <button className="control-button" onClick={onOpenBenchmark} title="워크플로우 성능 비교">
+          <BarChart3 className="h-3.5 w-3.5" />
+          <span>성능 비교</span>
+        </button>
         {metrics && (metrics.hasExecution || isRunning) && (
           <div className="execution-stats-panel" title="전체 파이프라인 총 실행 통계 (소요 시간 · 비용 · 토큰 수)">
             <div className="execution-stat-item" title="총 소요 시간">

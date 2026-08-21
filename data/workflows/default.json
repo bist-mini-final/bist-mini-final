@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-21T00:13:14.212288+00:00",
+  "updated_at": "2026-08-21T02:59:39.756838+00:00",
   "graph": {
     "nodes": [
       {
@@ -50,8 +50,8 @@
         "id": "custom-node-1786497122336-4",
         "module_type": "json_inspector",
         "position": {
-          "x": 1834.0115578389562,
-          "y": -132.24148441548206
+          "x": 1882.4596454099208,
+          "y": -162.9873861432096
         },
         "config": {},
         "values": {},
@@ -82,14 +82,17 @@
       },
       {
         "id": "custom-node-1786497475934-2",
-        "module_type": "prebuilt_index_loader",
+        "module_type": "pgvector_collection_loader",
         "position": {
-          "x": 2168.070268203153,
-          "y": 266.7211502837916
+          "x": 2280.2284406188487,
+          "y": 368.9830133686907
         },
         "config": {},
         "values": {
-          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
+          "collection_name": "c7a251b495523abde099db8c3fed37bcb23f5abc502d16c3635e21f37820ff08",
+          "collection_names": [
+            "c7a251b495523abde099db8c3fed37bcb23f5abc502d16c3635e21f37820ff08"
+          ]
         },
         "ui": {
           "width": null,
@@ -120,7 +123,7 @@
       },
       {
         "id": "custom-node-1786497551832-5",
-        "module_type": "dense_retriever",
+        "module_type": "pgvector_retriever",
         "position": {
           "x": 3038.6349662377042,
           "y": 285.62668906454
@@ -342,9 +345,9 @@
       }
     ],
     "viewport": {
-      "x": -132.89527887992244,
-      "y": 375.84648338376644,
-      "zoom": 0.21944960720963935
+      "x": -574.6104190433564,
+      "y": 474.23690067197913,
+      "zoom": 0.39415467875217275
     }
   }
 }

@@ -9,10 +9,10 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   targetY,
   sourcePosition,
   targetPosition,
-  selected,
   style = {},
   markerEnd,
   data,
+  selected,
 }) => {
   const { setEdges, screenToFlowPosition } = useReactFlow();
   const [isHovered, setIsHovered] = useState(false);
@@ -108,6 +108,25 @@ export const CustomEdge: React.FC<EdgeProps> = ({
 
   const isSelectedOrHovered = Boolean(selected || isHovered);
 
+  const selectEdge = useCallback(
+    (event: React.MouseEvent<SVGPathElement>) => {
+      event.stopPropagation();
+      setEdges((edges) => edges.map((edge) => ({
+        ...edge,
+        selected: event.shiftKey ? (edge.id === id ? !edge.selected : edge.selected) : edge.id === id,
+      })));
+    },
+    [id, setEdges]
+  );
+
+  const openContextDelete = useCallback(
+    (event: React.MouseEvent<SVGPathElement>) => {
+      event.preventDefault();
+      selectEdge(event);
+    },
+    [selectEdge]
+  );
+
   return (
     <g
       onMouseEnter={() => setIsHovered(true)}
@@ -159,6 +178,15 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           strokeDasharray: isActive ? '6,6' : 'none',
           transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
+      />
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={18}
+        className="edge-selection-path"
+        onClick={selectEdge}
+        onContextMenu={openContextDelete}
       />
 
       {/* Curve drag handle — always on the path via getPointAtLength */}
