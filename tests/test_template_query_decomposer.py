@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from backend.modules.template_query_decomposer import (
+from modules.query.template_query_decomposer import (
     TemplateQueryDecomposerModule,
     build_template_subqueries,
 )

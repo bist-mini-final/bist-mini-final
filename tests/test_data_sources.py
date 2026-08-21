@@ -20,7 +20,6 @@ from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
-from backend.storage.vector_index import VectorIndexStore
 from backend.engine.workflows import (
     InteractiveWorkflowDispatcher,
     ResultCache,
@@ -95,13 +94,11 @@ class DataSourceApiTests(unittest.TestCase):
 
         self.encoder = FakeEmbeddingEncoder(dimension=8)
         self.embedding_store = EmbeddingArtifactStore(self.embedding_artifact_dir)
-        self.vector_store = VectorIndexStore(self.vector_index_dir)
         self.module_registry = ModuleRegistry(
             AnswerCacheRepository(),
             completion_client=NoApiCompletionClient(),
             embedding_encoder=self.encoder,
             embedding_artifact_store=self.embedding_store,
-            vector_index_store=self.vector_store,
             pgvector_store=self.pg_store,
             db_manager=self.db_mgr,
             processed_dir=self.processed_dir,

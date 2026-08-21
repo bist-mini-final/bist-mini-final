@@ -13,7 +13,7 @@ from backend.api.benchmark_routes import (
     _sheet_score,
     _workflow_for_scope,
 )
-from backend.workflows import WorkflowDocument
+from backend.engine.workflows import WorkflowDocument
 
 
 class BenchmarkSemanticMetricsTests(unittest.TestCase):

@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterable
 
-from ..modules.subquery_format import normalize_structured_query
+from modules.query.subquery_format import normalize_structured_query
 
 
 _YEAR_PATTERN = re.compile(r"(?<!\d)(20(?:2[0-9]))(?!\d)")

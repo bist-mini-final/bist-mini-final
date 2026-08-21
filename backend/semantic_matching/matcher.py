@@ -11,9 +11,9 @@ from threading import Lock
 from typing import Dict, Sequence
 
 from .catalog import QueryExample, load_examples
-from ..embeddings.factory import EmbeddingEncoder
-from ..storage.embedding_artifacts import EmbeddingArtifactStore
-from ..modules.base import ModuleExecutionError
+from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from modules.common.base_module import ModuleExecutionError
 
 
 @dataclass(frozen=True)

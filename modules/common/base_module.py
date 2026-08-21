@@ -239,8 +239,19 @@ class ExecutableModule(ABC):
 
     def run(self, input_payload: Any, config: Any = None) -> Dict[str, Any]:
         """Execute the module with given input and config, returning validated output."""
-        _, _, execution_payload = self._validated_execution(input_payload, config)
-        raw_output = self.execute(execution_payload)
+        import inspect
+        validated_input, validated_config, execution_payload = self._validated_execution(input_payload, config)
+        sig = inspect.signature(self.execute)
+        params = [
+            p
+            for p in sig.parameters.values()
+            if p.name != "self"
+            and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        ]
+        if len(params) >= 2:
+            raw_output = self.execute(validated_input, validated_config)
+        else:
+            raw_output = self.execute(execution_payload)
         validated_output = self.output_model.model_validate(raw_output)
         return validated_output.model_dump(mode="json")
 

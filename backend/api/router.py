@@ -20,6 +20,7 @@ from backend.engine.runtime.services import create_workflow_runtime_services
 from backend.engine.runtime.registry import ModuleRegistry
 from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
 from backend.engine.workflows import InteractiveWorkflowDispatcher
+from .benchmark_routes import create_benchmark_router
 from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -107,6 +108,12 @@ def create_api_router(
             run_store=run_store,
             workflow_executor=workflow_executor,
             workflow_dispatcher=ingestion_dispatcher,
+        )
+    )
+    router.include_router(
+        create_benchmark_router(
+            workflow_store=workflow_store,
+            workflow_executor=workflow_executor,
         )
     )
     return router

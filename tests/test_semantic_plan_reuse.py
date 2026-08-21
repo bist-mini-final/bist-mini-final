@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from backend.modules.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
+from modules.query.adaptive_query_decomposer import AdaptiveQueryDecomposerModule
 from backend.semantic_matching.plan_validation import validate_plan_reuse
 
 
