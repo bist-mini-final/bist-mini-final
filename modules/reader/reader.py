@@ -36,8 +36,13 @@ class ReaderInputDTO(ModuleInputDTO):
     )
 
 
+from modules.common.config import DEFAULT_READER_MODEL
+
+
 class ReaderConfigDTO(ModuleConfigDTO):
-    model: str = Field(default="gpt-5.6-luna", description="답변 생성에 사용할 LLM ID")
+    model: str = Field(
+        default=DEFAULT_READER_MODEL, description="답변 생성에 사용할 LLM ID"
+    )
     preset: Literal["luna_reader", "strict_citation"] = Field(
         default="luna_reader",
         description="Reader 프롬프트 프리셋 ID",

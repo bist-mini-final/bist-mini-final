@@ -31,9 +31,12 @@ class TimeseriesContextExpanderInputDTO(ModuleInputDTO):
     )
 
 
+from modules.common.config import DEFAULT_MAX_BLOCKS, DEFAULT_RETRIEVAL_TOP_K
+
+
 class TimeseriesContextExpanderConfigDTO(ModuleConfigDTO):
     top_k: int = Field(
-        default=100,
+        default=DEFAULT_RETRIEVAL_TOP_K,
         gt=0,
         le=500,
         description="확장할 상위 RRF 후보 수",

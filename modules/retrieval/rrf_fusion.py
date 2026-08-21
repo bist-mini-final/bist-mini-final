@@ -36,15 +36,18 @@ class RrfFusionInputDTO(ModuleInputDTO):
     dense_result: RankedSearchResultDTO = Field(description="Dense 서브쿼리별 후보 순위")
 
 
+from modules.common.config import DEFAULT_RETRIEVAL_TOP_K, DEFAULT_RRF_K
+
+
 class RrfFusionConfigDTO(ModuleConfigDTO):
     rrf_k: int = Field(
-        default=60,
+        default=DEFAULT_RRF_K,
         ge=1,
         le=1000,
         description="RRF 순위 완화 상수",
     )
     top_k: int = Field(
-        default=100,
+        default=DEFAULT_RETRIEVAL_TOP_K,
         gt=0,
         le=1000,
         description="결합 후 유지할 최대 셀 후보 개수",

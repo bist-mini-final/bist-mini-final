@@ -27,21 +27,28 @@ class ContextExpanderInputDTO(ModuleInputDTO):
     )
 
 
+from modules.common.config import (
+    DEFAULT_ADJACENT_RADIUS,
+    DEFAULT_MAX_BLOCKS,
+    DEFAULT_RETRIEVAL_TOP_K,
+)
+
+
 class ContextExpanderConfigDTO(ModuleConfigDTO):
     top_k: int = Field(
-        default=100,
+        default=DEFAULT_RETRIEVAL_TOP_K,
         gt=0,
         le=1000,
         description="인접 행 확장에 사용할 RRF 상위 후보 개수",
     )
     adjacent_radius: int = Field(
-        default=3,
+        default=DEFAULT_ADJACENT_RADIUS,
         ge=0,
         le=100,
         description="검색 셀과 같은 시트에서 확장할 위·아래 행 반경",
     )
     max_blocks: int = Field(
-        default=500,
+        default=DEFAULT_MAX_BLOCKS,
         gt=0,
         le=5000,
         description="Reader로 전달할 최대 확장 행 블록 개수",

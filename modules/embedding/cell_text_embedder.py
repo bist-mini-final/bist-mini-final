@@ -20,7 +20,11 @@ from modules.common.base_module import (
     ModuleExecutionError,
     ModuleTaskPolicy,
 )
-from modules.common.config import DEFAULT_EMBEDDING_MODEL, EMBEDDING_MODEL_OPTIONS
+from modules.common.config import (
+    DEFAULT_CELL_EMBEDDING_BATCH_SIZE,
+    DEFAULT_EMBEDDING_MODEL,
+    EMBEDDING_MODEL_OPTIONS,
+)
 from modules.structure.cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
 
 
@@ -39,7 +43,7 @@ class CellTextEmbedderConfigDTO(ModuleConfigDTO):
         },
     )
     batch_size: int = Field(
-        default=2048,
+        default=DEFAULT_CELL_EMBEDDING_BATCH_SIZE,
         ge=1,
         le=2048,
         description="Excel 셀 문서를 한 번에 임베딩할 배치 크기",

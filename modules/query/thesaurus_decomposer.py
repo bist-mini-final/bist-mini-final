@@ -41,9 +41,12 @@ class ThesaurusDecomposerInputDTO(ModuleInputDTO):
     )
 
 
+from modules.common.config import DEFAULT_LLM_MODEL
+
+
 class ThesaurusDecomposerConfigDTO(ModuleConfigDTO):
     model: str = Field(
-        default="gpt-5.6-luna",
+        default=DEFAULT_LLM_MODEL,
         description="서브쿼리 분해에 사용할 LLM 모델 ID",
     )
     preset: str = Field(

@@ -25,6 +25,9 @@ from modules.query.subquery_format import (
 )
 
 
+from modules.common.config import DEFAULT_LLM_MODEL
+
+
 class DecomposerInputDTO(ModuleInputDTO):
     query_context: QueryContextDTO = Field(
         description="Query Input에서 전달된 질문 ID와 원문 질문",
@@ -32,7 +35,9 @@ class DecomposerInputDTO(ModuleInputDTO):
 
 
 class DecomposerConfigDTO(ModuleConfigDTO):
-    model: str = Field(default="gpt-5.6-luna", description="질의 분해에 사용할 LLM ID")
+    model: str = Field(
+        default=DEFAULT_LLM_MODEL, description="질의 분해에 사용할 LLM ID"
+    )
     preset: Literal[
         "luna_decomposer",
         "rdb_financial",

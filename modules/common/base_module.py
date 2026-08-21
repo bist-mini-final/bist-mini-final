@@ -226,17 +226,6 @@ class ExecutableModule(ABC):
             execution_payload = self.execution_model.model_validate(execution_values)
         return validated_input, validated_config, execution_payload
 
-    def cache_payload(self, input_payload: Any, config: Any = None) -> Dict[str, Any]:
-        """Return a normalized, deterministic dictionary for in-memory caching."""
-        validated_input, validated_config, _ = self._validated_execution(
-            input_payload,
-            config,
-        )
-        return {
-            "input": validated_input.model_dump(mode="json"),
-            "config": validated_config.model_dump(mode="json"),
-        }
-
     def run(self, input_payload: Any, config: Any = None) -> Dict[str, Any]:
         """Execute the module with given input and config, returning validated output."""
         import inspect

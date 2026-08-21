@@ -47,9 +47,12 @@ class AdaptiveRrfFusionInputDTO(ModuleInputDTO):
     )
 
 
+from modules.common.config import DEFAULT_RRF_K
+
+
 class AdaptiveRrfFusionConfigDTO(ModuleConfigDTO):
     rrf_k: int = Field(
-        default=60,
+        default=DEFAULT_RRF_K,
         gt=0,
         le=1000,
         description="RRF 순위 정규화 상수 k (기본값: 60)",

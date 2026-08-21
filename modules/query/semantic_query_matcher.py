@@ -9,7 +9,13 @@ from backend.providers.embeddings.factory import EmbeddingEncoder, get_embedding
 from backend.providers.llm.cost import calculate_openai_cost
 from backend.semantic_matching.matcher import SemanticQueryMatcher
 from modules.common.base_module import ExecutableModule, ModuleConfigDTO, ModuleDefinition, ModuleDTO, ModuleInputDTO, QueryContextDTO
-from modules.common.config import EMBEDDING_MODEL_OPTIONS
+from modules.common.config import (
+    DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_SEMANTIC_THRESHOLD,
+    DEFAULT_SEMANTIC_TOP_K,
+    DEFAULT_SEMANTIC_VOTE_MARGIN,
+    EMBEDDING_MODEL_OPTIONS,
+)
 
 
 class SemanticQueryMatcherInput(ModuleInputDTO):
@@ -17,10 +23,13 @@ class SemanticQueryMatcherInput(ModuleInputDTO):
 
 
 class SemanticQueryMatcherConfig(ModuleConfigDTO):
-    model: str = Field(default="text-embedding-3-small", json_schema_extra={"enum": EMBEDDING_MODEL_OPTIONS})
-    threshold: float = Field(default=0.74, ge=0, le=1)
-    top_k: int = Field(default=5, ge=1, le=20)
-    vote_margin: float = Field(default=0.05, ge=0, le=1)
+    model: str = Field(
+        default=DEFAULT_EMBEDDING_MODEL,
+        json_schema_extra={"enum": EMBEDDING_MODEL_OPTIONS},
+    )
+    threshold: float = Field(default=DEFAULT_SEMANTIC_THRESHOLD, ge=0, le=1)
+    top_k: int = Field(default=DEFAULT_SEMANTIC_TOP_K, ge=1, le=20)
+    vote_margin: float = Field(default=DEFAULT_SEMANTIC_VOTE_MARGIN, ge=0, le=1)
 
 
 class SemanticQueryMatcherExecution(SemanticQueryMatcherInput, SemanticQueryMatcherConfig):

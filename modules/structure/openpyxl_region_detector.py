@@ -26,21 +26,28 @@ class OpenpyxlRegionDetectorInputDTO(ModuleInputDTO):
     tables: List[DoclingTableRegionDTO]
 
 
+from modules.common.config import (
+    DEFAULT_BOLD_RATIO_THRESHOLD,
+    DEFAULT_FILL_RATIO_THRESHOLD,
+    DEFAULT_HEADER_SCAN_ROWS,
+)
+
+
 class OpenpyxlRegionDetectorConfigDTO(ModuleConfigDTO):
     header_scan_rows: int = Field(
-        default=10,
+        default=DEFAULT_HEADER_SCAN_ROWS,
         ge=1,
         le=50,
         description="각 테이블 상단에서 헤더 스타일을 검사할 최대 행 수",
     )
     bold_ratio_threshold: float = Field(
-        default=0.3,
+        default=DEFAULT_BOLD_RATIO_THRESHOLD,
         ge=0,
         le=1,
         description="column_header로 판정할 최소 bold 셀 비율",
     )
     fill_ratio_threshold: float = Field(
-        default=0.4,
+        default=DEFAULT_FILL_RATIO_THRESHOLD,
         ge=0,
         le=1,
         description="column_header로 판정할 최소 배경색 셀 비율",

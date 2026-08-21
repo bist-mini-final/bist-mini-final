@@ -19,9 +19,12 @@ class AdaptiveQueryDecomposerInput(ModuleInputDTO):
     )
 
 
+from modules.common.config import DEFAULT_PLAN_REUSE_THRESHOLD
+
+
 class AdaptiveQueryDecomposerConfig(DecomposerConfigDTO):
     plan_reuse_threshold: float = Field(
-        default=0.80,
+        default=DEFAULT_PLAN_REUSE_THRESHOLD,
         ge=0,
         le=1,
         description="카탈로그 분해 계획을 재사용할 최소 시맨틱 신뢰도",

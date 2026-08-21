@@ -126,14 +126,33 @@ class LunaVlmStructureDetectorInputDTO(WorkbookSelectionDTO):
     """Workbook identity and visible sheet selection."""
 
 
+from modules.common.config import (
+    DEFAULT_STRUCTURE_MAX_COLUMNS,
+    DEFAULT_STRUCTURE_MAX_OUTPUT_TOKENS,
+    DEFAULT_STRUCTURE_MAX_ROWS,
+    DEFAULT_VLM_MODEL,
+    DEFAULT_VLM_TIMEOUT_SECONDS,
+)
+
+
 class LunaVlmStructureDetectorConfigDTO(ModuleConfigDTO):
     model: str = Field(
-        default="gpt-5.6-luna",
+        default=DEFAULT_VLM_MODEL,
         min_length=1,
         description="OpenAI Responses API 멀티모달 모델 ID",
     )
-    max_rows: int = Field(default=400, ge=1, le=2000, description="시트에서 분석할 최대 행 수")
-    max_columns: int = Field(default=60, ge=1, le=200, description="시트에서 분석할 최대 열 수")
+    max_rows: int = Field(
+        default=DEFAULT_STRUCTURE_MAX_ROWS,
+        ge=1,
+        le=2000,
+        description="시트에서 분석할 최대 행 수",
+    )
+    max_columns: int = Field(
+        default=DEFAULT_STRUCTURE_MAX_COLUMNS,
+        ge=1,
+        le=200,
+        description="시트에서 분석할 최대 열 수",
+    )
     max_context_cells: int = Field(
         default=50000,
         ge=100,
@@ -144,8 +163,18 @@ class LunaVlmStructureDetectorConfigDTO(ModuleConfigDTO):
         default="low",
         description="Luna 추론 강도",
     )
-    max_output_tokens: int = Field(default=6000, ge=1000, le=32000, description="시트별 최대 출력 토큰")
-    timeout_seconds: int = Field(default=240, ge=30, le=900, description="시트별 API 요청 제한 시간(초)")
+    max_output_tokens: int = Field(
+        default=DEFAULT_STRUCTURE_MAX_OUTPUT_TOKENS,
+        ge=1000,
+        le=32000,
+        description="시트별 최대 출력 토큰",
+    )
+    timeout_seconds: int = Field(
+        default=DEFAULT_VLM_TIMEOUT_SECONDS,
+        ge=30,
+        le=900,
+        description="시트별 API 요청 제한 시간(초)",
+    )
     validation_retries: int = Field(default=1, ge=0, le=2, description="좌표 규칙 위반 응답의 교정 재시도 횟수")
     max_concurrency: int = Field(
         default=4,

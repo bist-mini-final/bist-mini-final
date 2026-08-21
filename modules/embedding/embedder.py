@@ -1,11 +1,10 @@
-from typing import Annotated, Any, Dict, List, Optional, cast
+from typing import Annotated, Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field, model_validator
 
-from backend.providers.embeddings.bge import DEFAULT_BGE_MODEL
 from backend.providers.embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from modules.common.base_module import (
-    ExecutableModule,
+    BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
@@ -13,20 +12,32 @@ from modules.common.base_module import (
     ModuleInputDTO,
     QueryContextDTO,
 )
+from modules.common.config import DEFAULT_EMBEDDING_MODEL, EMBEDDING_MODEL_OPTIONS
 from modules.query.decomposer import SubqueriesDTO
 
-from modules.common.config import DEFAULT_EMBEDDING_MODEL, EMBEDDING_MODEL_OPTIONS
 
+class EmbedderInputDTO(ModuleInputDTO):
+    """Decomposer output consumed directly or wrapped under query_input."""
 
-class EmbedderInputDTO(SubqueriesDTO):
-    """Decomposer output consumed without module settings mixed in."""
+    query_input: Optional[SubqueriesDTO] = None
+    subqueries: Optional[List[str]] = None
+    query_context: Optional[QueryContextDTO] = None
+
+    @model_validator(mode="after")
+    def populate_fields(self) -> "EmbedderInputDTO":
+        if self.query_input is not None:
+            if self.subqueries is None:
+                self.subqueries = self.query_input.subqueries
+            if self.query_context is None:
+                self.query_context = self.query_input.query_context
+        return self
 
 
 class EmbedderConfigDTO(ModuleConfigDTO):
     model: str = Field(
         default=DEFAULT_EMBEDDING_MODEL,
         min_length=1,
-        description="서브쿼리 임베딩에 사용할 OpenAI 3072차원 모델 ID",
+        description="서브쿼리 임베딩에 사용할 3072차원 OpenAI 모델 ID",
         json_schema_extra={
             "enum": EMBEDDING_MODEL_OPTIONS,
             "options": EMBEDDING_MODEL_OPTIONS,
@@ -35,7 +46,7 @@ class EmbedderConfigDTO(ModuleConfigDTO):
 
 
 class EmbedderExecutionDTO(EmbedderInputDTO, EmbedderConfigDTO):
-    """Internal union of input data and embedding settings."""
+    """Execution model for EmbedderModule."""
 
 
 EmbeddingVector = Annotated[List[float], Field(min_length=1)]
@@ -46,22 +57,24 @@ class EmbeddingsDTO(ModuleDTO):
         description="임베딩이 파생된 원본 질문 컨텍스트"
     )
     items: Dict[str, EmbeddingVector] = Field(
-        min_length=1,
+        min_length=0,
         description="서브쿼리를 key, L2 정규화 숫자 벡터를 value로 갖는 매핑",
     )
 
 
-class EmbedderModule(ExecutableModule):
+class EmbedderModule(BaseModule):
+    """Encodes decomposed subqueries into dense vectors via single-RTT batch calls."""
+
     definition = ModuleDefinition(
         type="embedder",
         label="Query Embedder",
         category="Logic",
-        description="서브쿼리의 임베딩 실행 메타데이터를 생성합니다.",
-        inputs=["input"],
-        outputs=["output"],
+        description="분해된 서브쿼리 목록을 3072차원 고정밀 벡터로 1 RTT 일괄 변환합니다.",
+        inputs=["query_input", "input"],
+        outputs=["query_embeddings", "output"],
         config_fields=["model"],
         raw_output=True,
-        version="7",
+        version="8",
     )
     input_model = EmbedderInputDTO
     config_model = EmbedderConfigDTO
@@ -79,24 +92,67 @@ class EmbedderModule(ExecutableModule):
             cache=self._encoders,
         )
 
-    def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        input_data = cast(EmbedderExecutionDTO, payload)
-        encoder = self._encoder_for(input_data.model)
-        vectors = encoder.encode(input_data.subqueries)
+    def execute(
+        self,
+        input_data: EmbedderInputDTO,
+        config: Optional[EmbedderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        if config is None and isinstance(input_data, EmbedderExecutionDTO):
+            config = input_data
+        model_name = config.model if config else DEFAULT_EMBEDDING_MODEL
+        
+        subqueries = input_data.subqueries or []
+        if input_data.query_context:
+            query_context_dict = input_data.query_context.model_dump(mode="json")
+        else:
+            query_context_dict = {"question_id": "unknown", "question_text": ""}
+
+        unique_subqueries = list(
+            dict.fromkeys([sq.strip() for sq in subqueries if sq.strip()])
+        )
+        if not unique_subqueries and input_data.query_context and input_data.query_context.question_text:
+            unique_subqueries = [input_data.query_context.question_text.strip()]
+
+        if not unique_subqueries:
+            return {
+                "query_context": query_context_dict,
+                "items": {},
+            }
+
+        encoder = self._encoder_for(model_name)
+        vectors = encoder.encode(unique_subqueries)
         self.last_usage = getattr(encoder, "last_usage", None)
-        self.last_model = input_data.model
-        if len(vectors) != len(input_data.subqueries):
+        self.last_model = model_name
+
+        if len(vectors) != len(unique_subqueries):
             raise ModuleExecutionError(
                 "서브쿼리 개수와 생성된 임베딩 개수가 일치하지 않습니다"
             )
-        if len(set(input_data.subqueries)) != len(input_data.subqueries):
-            raise ModuleExecutionError(
-                "서브쿼리-임베딩 매핑의 key로 사용할 중복 서브쿼리가 있습니다"
-            )
+
+        items = {sq: vec for sq, vec in zip(unique_subqueries, vectors)}
         return {
-            "query_context": input_data.query_context.model_dump(mode="json"),
-            "items": {
-                query: vector
-                for query, vector in zip(input_data.subqueries, vectors)
-            },
+            "query_context": query_context_dict,
+            "items": items,
         }
+
+
+class BatchQueryEmbedderModule(EmbedderModule):
+    """Batch Query Embedder alias with type='batch_query_embedder'."""
+
+    definition = ModuleDefinition(
+        type="batch_query_embedder",
+        label="Batch Query Embedder",
+        category="Logic",
+        description="분해된 다중 서브쿼리를 단일 HTTP 배치 요청(1 RTT)으로 전달하여 일괄 임베딩을 생성합니다.",
+        inputs=["query_input", "input"],
+        outputs=["query_embeddings", "output"],
+        config_fields=["model"],
+        raw_output=True,
+        version="2",
+    )
+
+
+# DTO aliases
+BatchQueryEmbedderInputDTO = EmbedderInputDTO
+BatchQueryEmbedderConfigDTO = EmbedderConfigDTO
+BatchQueryEmbedderExecutionDTO = EmbedderExecutionDTO

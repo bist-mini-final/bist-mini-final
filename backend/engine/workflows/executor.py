@@ -712,7 +712,10 @@ class WorkflowExecutor:
         input_payload = self._assemble_input(run, node)
         module = self.module_registry.get(node.module_type)
         validated_config = module.validate_config(node.config).model_dump(mode="json")
-        cache_payload = module.cache_payload(input_payload, validated_config)
+        cache_payload = {
+            "input": module.input_model.model_validate(input_payload).model_dump(mode="json"),
+            "config": validated_config,
+        }
         cache_key = self.result_cache.key(
             f"{node.module_type}@{module.definition.version}", cache_payload
         )

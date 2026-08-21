@@ -23,9 +23,12 @@ class SemanticScopedPgVectorRetrieverInput(ModuleInputDTO):
     semantic_match: SemanticQueryMatchOutput
 
 
+from modules.common.config import DEFAULT_MIN_SCOPE_CONFIDENCE
+
+
 class SemanticScopedPgVectorRetrieverConfig(ModuleConfigDTO):
     top_k: int = Field(default=1000, gt=0, le=10000)
-    min_scope_confidence: float = Field(default=0.80, ge=0, le=1)
+    min_scope_confidence: float = Field(default=DEFAULT_MIN_SCOPE_CONFIDENCE, ge=0, le=1)
 
 
 class SemanticScopedPgVectorRetrieverExecution(

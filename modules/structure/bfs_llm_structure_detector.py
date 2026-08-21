@@ -47,17 +47,71 @@ class BfsLlmStructureDetectorInputDTO(WorkbookSelectionDTO):
     """Workbook identity and visible sheet selection."""
 
 
+from modules.common.config import (
+    DEFAULT_BFS_LLM_BATCH_SIZE,
+    DEFAULT_BFS_MERGE_GAP,
+    DEFAULT_BFS_MIN_NON_EMPTY_CELLS,
+    DEFAULT_BFS_MIN_TABLE_COLUMNS,
+    DEFAULT_HEADER_SCAN_ROWS,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_STRUCTURE_MAX_COLUMNS,
+    DEFAULT_STRUCTURE_MAX_ROWS,
+)
+
+
 class BfsLlmStructureDetectorConfigDTO(ModuleConfigDTO):
-    model: str = Field(default="gpt-5.6-luna", description="표 경계 판단에 사용할 LLM ID")
-    max_rows: int = Field(default=400, ge=1, le=2000, description="시트에서 분석할 최대 행 수")
-    max_columns: int = Field(default=60, ge=1, le=200, description="시트에서 분석할 최대 열 수")
-    merge_gap: int = Field(default=2, ge=0, le=5, description="BFS 영역을 병합할 빈 셀 간격")
-    min_non_empty_cells: int = Field(default=2, ge=1, le=100, description="표 후보로 유지할 최소 비어 있지 않은 셀 수")
-    min_table_columns: int = Field(default=2, ge=1, le=20, description="직렬화 대상 표 후보의 최소 열 수")
-    header_candidate_rows: int = Field(default=10, ge=1, le=30, description="LLM 경계 판정에 전달할 표 상단 행 수")
-    llm_batch_size: int = Field(default=8, ge=1, le=20, description="한 LLM 요청에서 함께 판정할 표 후보 수")
-    system_prompt: str = Field(default=BOUNDARY_SYSTEM_PROMPT, description="제목·헤더·데이터 경계 판단 지시")
-    user_prompt_template: str = Field(default=BOUNDARY_USER_TEMPLATE, description="{regions_json} 변수를 지원하는 사용자 프롬프트")
+    model: str = Field(
+        default=DEFAULT_LLM_MODEL, description="표 경계 판단에 사용할 LLM ID"
+    )
+    max_rows: int = Field(
+        default=DEFAULT_STRUCTURE_MAX_ROWS,
+        ge=1,
+        le=2000,
+        description="시트에서 분석할 최대 행 수",
+    )
+    max_columns: int = Field(
+        default=DEFAULT_STRUCTURE_MAX_COLUMNS,
+        ge=1,
+        le=200,
+        description="시트에서 분석할 최대 열 수",
+    )
+    merge_gap: int = Field(
+        default=DEFAULT_BFS_MERGE_GAP,
+        ge=0,
+        le=5,
+        description="BFS 영역을 병합할 빈 셀 간격",
+    )
+    min_non_empty_cells: int = Field(
+        default=DEFAULT_BFS_MIN_NON_EMPTY_CELLS,
+        ge=1,
+        le=100,
+        description="표 후보로 유지할 최소 비어 있지 않은 셀 수",
+    )
+    min_table_columns: int = Field(
+        default=DEFAULT_BFS_MIN_TABLE_COLUMNS,
+        ge=1,
+        le=20,
+        description="직렬화 대상 표 후보의 최소 열 수",
+    )
+    header_candidate_rows: int = Field(
+        default=DEFAULT_HEADER_SCAN_ROWS,
+        ge=1,
+        le=30,
+        description="LLM 경계 판정에 전달할 표 상단 행 수",
+    )
+    llm_batch_size: int = Field(
+        default=DEFAULT_BFS_LLM_BATCH_SIZE,
+        ge=1,
+        le=20,
+        description="한 LLM 요청에서 함께 판정할 표 후보 수",
+    )
+    system_prompt: str = Field(
+        default=BOUNDARY_SYSTEM_PROMPT, description="제목·헤더·데이터 경계 판단 지시"
+    )
+    user_prompt_template: str = Field(
+        default=BOUNDARY_USER_TEMPLATE,
+        description="{regions_json} 변수를 지원하는 사용자 프롬프트",
+    )
 
 
 class BfsLlmStructureDetectorExecutionDTO(

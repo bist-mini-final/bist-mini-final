@@ -21,12 +21,15 @@ from modules.query.semantic_query_matcher import (
 )
 
 
+from modules.common.config import DEFAULT_ROUTER_MODEL
+
+
 class LlmQueryRouterInput(ModuleInputDTO):
     query_context: QueryContextDTO
 
 
 class LlmQueryRouterConfig(ModuleConfigDTO):
-    model: str = Field(default="gpt-5.6-luna")
+    model: str = Field(default=DEFAULT_ROUTER_MODEL)
 
 
 class LlmQueryRouterExecution(LlmQueryRouterInput, LlmQueryRouterConfig):

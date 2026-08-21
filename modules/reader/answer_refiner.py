@@ -69,8 +69,13 @@ class AnswerRefinerInputDTO(ModuleInputDTO):
     )
 
 
+from modules.common.config import DEFAULT_REFINER_MODEL
+
+
 class AnswerRefinerConfigDTO(ModuleConfigDTO):
-    model: str = Field(default="gpt-5.6-luna", description="답변 정밀 개선에 사용할 LLM ID")
+    model: str = Field(
+        default=DEFAULT_REFINER_MODEL, description="답변 정밀 개선에 사용할 LLM ID"
+    )
     preset: str = Field(default="luna_cell_refiner", description="Refiner 프롬프트 프리셋 ID")
     system_prompt: str = Field(
         default=REFINER_SYSTEM_PROMPT,

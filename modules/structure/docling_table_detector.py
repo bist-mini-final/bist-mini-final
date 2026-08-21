@@ -24,15 +24,21 @@ class DoclingTableDetectorInputDTO(WorkbookSelectionDTO):
     """Workbook identity and visible sheet selection."""
 
 
+from modules.common.config import (
+    DEFAULT_STRUCTURE_MAX_COLUMNS,
+    DEFAULT_STRUCTURE_MAX_ROWS,
+)
+
+
 class DoclingTableDetectorConfigDTO(ModuleConfigDTO):
     max_rows: int = Field(
-        default=400,
+        default=DEFAULT_STRUCTURE_MAX_ROWS,
         ge=1,
         le=2000,
         description="시트 이미지화 및 탐지에 포함할 최대 행 수",
     )
     max_columns: int = Field(
-        default=60,
+        default=DEFAULT_STRUCTURE_MAX_COLUMNS,
         ge=1,
         le=200,
         description="시트 이미지화 및 탐지에 포함할 최대 열 수",

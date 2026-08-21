@@ -3,8 +3,8 @@ from typing import Any, Dict, Union, cast
 from pydantic import BaseModel, Field, RootModel, field_validator
 
 from backend.core.settings import SIMILARITY_THRESHOLD
-from backend.storage.retrieval.similarity import rank_candidates
 from backend.storage.answer_cache import AnswerCacheRepository
+from modules.common.config import DEFAULT_QUERY_INPUT_THRESHOLD
 from modules.common.base_module import (
     ExecutableModule,
     ModuleConfigDTO,
@@ -33,7 +33,7 @@ class QueryInputDTO(ModuleInputDTO):
 
 class QueryConfigDTO(ModuleConfigDTO):
     threshold: float = Field(
-        default=SIMILARITY_THRESHOLD,
+        default=DEFAULT_QUERY_INPUT_THRESHOLD,
         ge=0,
         le=1,
         description="캐시 질문을 일치로 판정할 최소 유사도(0~1)",
