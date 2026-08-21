@@ -159,25 +159,11 @@ class ThesaurusDecomposerModule(ExecutableModule):
             matches = re.findall(r'"([^"]+)"', result.content)
             subqueries = list(dict.fromkeys([m.strip() for m in matches if m.strip()]))
 
-        prompt_tokens = result.usage.get("prompt_tokens", 0)
-        completion_tokens = result.usage.get("completion_tokens", 0)
-        total_tokens = result.usage.get("total_tokens", 0)
-
-        estimated_cost = calculate_openai_cost(
-            input_data.model,
-            prompt_tokens,
-            completion_tokens,
-        )
+        self.last_usage = getattr(result, "usage", {}) or {}
+        self.last_model = input_data.model
+        self.last_latency = getattr(result, "latency_seconds", 0.0)
 
         return {
             "query_context": query_context_dict,
             "subqueries": subqueries,
-            "model": input_data.model,
-            "api_usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": total_tokens,
-            },
-            "estimated_cost_usd": estimated_cost,
-            "latency_seconds": result.latency_seconds,
         }

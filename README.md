@@ -61,7 +61,7 @@ helm version
 ```bash
 git clone <REPOSITORY_URL> bist-mini-final
 cd bist-mini-final
-cp .env.example .env
+[ -f .env ] || cp .env.example .env
 ```
 
 `.env` 파일에 API 키와 접속 정보를 입력합니다:
@@ -163,6 +163,7 @@ npm run dev
 ```
 
 **접속 주소 안내:**
+
 | 서비스 | URL | 설명 |
 |---|---|---|
 | **Workbench 웹 UI** | `http://127.0.0.1:5173` | 대화형 모듈 캔버스 및 데이터 소스 관리 화면 |
@@ -175,8 +176,8 @@ npm run dev
 
 ```bash
 # 1) 백엔드 모듈 및 DB 상태 검증
-curl -s http://127.0.0.1:8765/api/modules | grep -o '"type":' | wc -l
-curl -s http://127.0.0.1:8765/api/data-sources/db-status
+curl -fsS http://127.0.0.1:8765/api/modules | grep -o '"type":' | wc -l
+curl -fsS http://127.0.0.1:8765/api/data-sources/db-status
 
 # 2) 전체 백엔드 단위/통합 테스트 (197개 테스트)
 pytest tests/

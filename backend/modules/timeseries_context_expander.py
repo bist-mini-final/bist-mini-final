@@ -17,14 +17,14 @@ from .base import (
 )
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
 from .context_expander import ContextDTO, coordinate_to_tuple
-from .dense_retriever import RankedSearchResultDTO
+from .retrieval_models import RetrievalDTO
 
 logger = logging.getLogger(__name__)
 
 
 class TimeseriesContextExpanderInputDTO(ModuleInputDTO):
-    retrieval_json: RankedSearchResultDTO = Field(
-        description="RRF 또는 Hybrid Retriever에서 전달된 순위화된 검색 결과"
+    retrieval_json: RetrievalDTO = Field(
+        description="RRF 융합 검색 결과 DTO"
     )
     document_input: CellTextSerializerOutput = Field(
         description="Excel 구조화 셀 문서 입력 포트"

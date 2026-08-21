@@ -2,15 +2,15 @@
   "schema_version": 1,
   "id": "main_pgvector_rag_pipeline_v2",
   "name": "main_pgvector_rag_pipeline_v2",
-  "updated_at": "2026-08-21T08:30:00.000000+00:00",
+  "updated_at": "2026-08-21T00:50:39.035522+00:00",
   "graph": {
     "nodes": [
       {
         "id": "node-1-query",
         "module_type": "query_input",
         "position": {
-          "x": 1000.0,
-          "y": 0.0
+          "x": 916.7328688105656,
+          "y": -4.6911059825033465
         },
         "config": {
           "threshold": 0.95
@@ -19,7 +19,10 @@
           "query": "2024년 Total Revenue는?"
         },
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -35,7 +38,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -51,7 +57,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -66,7 +75,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -83,7 +95,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -98,7 +113,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -115,7 +133,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -133,7 +154,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -149,7 +173,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -165,7 +192,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -181,7 +211,10 @@
         },
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       },
       {
@@ -194,7 +227,10 @@
         "config": {},
         "values": {},
         "ui": {
-          "execution_stopped": false
+          "width": null,
+          "height": null,
+          "execution_stopped": false,
+          "column_widths": {}
         }
       }
     ],
@@ -204,106 +240,126 @@
         "source": "node-1-query",
         "target": "node-2-decomposer",
         "source_output": "query_context",
-        "target_input": "query_context"
+        "target_input": "query_context",
+        "source_branch": null
       },
       {
         "id": "edge-1-3",
         "source": "node-1-query",
         "target": "node-3-loader",
         "source_output": "query_context",
-        "target_input": "query_context"
+        "target_input": "query_context",
+        "source_branch": null
       },
       {
         "id": "edge-2-4",
         "source": "node-2-decomposer",
         "target": "node-4-embedder",
         "source_output": "subqueries",
-        "target_input": "input"
+        "target_input": "input",
+        "source_branch": null
       },
       {
         "id": "edge-2-5",
         "source": "node-2-decomposer",
         "target": "node-5-bm25",
         "source_output": "subqueries",
-        "target_input": "query_input"
+        "target_input": "query_input",
+        "source_branch": null
       },
       {
         "id": "edge-3-5",
         "source": "node-3-loader",
         "target": "node-5-bm25",
         "source_output": "document_output",
-        "target_input": "document_input"
+        "target_input": "document_input",
+        "source_branch": null
       },
       {
         "id": "edge-3-6",
         "source": "node-3-loader",
         "target": "node-6-pg-retriever",
         "source_output": "index_output",
-        "target_input": "index_input"
+        "target_input": "index_input",
+        "source_branch": null
       },
       {
         "id": "edge-4-6",
         "source": "node-4-embedder",
         "target": "node-6-pg-retriever",
         "source_output": "output",
-        "target_input": "query_input"
+        "target_input": "query_input",
+        "source_branch": null
       },
       {
         "id": "edge-5-7",
         "source": "node-5-bm25",
         "target": "node-7-rrf",
         "source_output": "bm25_result",
-        "target_input": "bm25_result"
+        "target_input": "bm25_result",
+        "source_branch": null
       },
       {
         "id": "edge-6-7",
         "source": "node-6-pg-retriever",
         "target": "node-7-rrf",
         "source_output": "dense_result",
-        "target_input": "dense_result"
+        "target_input": "dense_result",
+        "source_branch": null
       },
       {
         "id": "edge-7-8",
         "source": "node-7-rrf",
         "target": "node-8-expander",
         "source_output": "retrieval_json",
-        "target_input": "retrieval_json"
+        "target_input": "retrieval_json",
+        "source_branch": null
       },
       {
         "id": "edge-3-8",
         "source": "node-3-loader",
         "target": "node-8-expander",
         "source_output": "document_output",
-        "target_input": "document_input"
+        "target_input": "document_input",
+        "source_branch": null
       },
       {
         "id": "edge-8-9",
         "source": "node-8-expander",
         "target": "node-9-calculator",
         "source_output": "context_json",
-        "target_input": "context_json"
+        "target_input": "context_json",
+        "source_branch": null
       },
       {
         "id": "edge-8-10",
         "source": "node-8-expander",
         "target": "node-10-reader",
         "source_output": "context_json",
-        "target_input": "context_json"
+        "target_input": "context_json",
+        "source_branch": null
       },
       {
         "id": "edge-10-11",
         "source": "node-10-reader",
         "target": "node-11-refiner",
         "source_output": "answer_json",
-        "target_input": "answer_json"
+        "target_input": "answer_json",
+        "source_branch": null
       },
       {
         "id": "edge-11-12",
         "source": "node-11-refiner",
         "target": "node-12-cache",
         "source_output": "refined_answer_json",
-        "target_input": "answer_json"
+        "target_input": "answer_json",
+        "source_branch": null
       }
-    ]
+    ],
+    "viewport": {
+      "x": -585.6050229018174,
+      "y": 337.3833216749961,
+      "zoom": 0.8766494131581595
+    }
   }
 }

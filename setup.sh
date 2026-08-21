@@ -132,6 +132,13 @@ if [[ ! -x .venv/bin/python ]]; then
     python3.11 -m venv .venv
   else
     require_command python3
+    py_version="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+    py_major="$(echo "${py_version}" | cut -d. -f1)"
+    py_minor="$(echo "${py_version}" | cut -d. -f2)"
+    if [ "${py_major}" -ne 3 ] || [ "${py_minor}" -lt 11 ] || [ "${py_minor}" -ge 14 ]; then
+      echo "지원하지 않는 Python 버전입니다: ${py_version} (Python 3.11 이상 3.14 미만이 필요합니다)" >&2
+      exit 1
+    fi
     python3 -m venv .venv
   fi
 fi

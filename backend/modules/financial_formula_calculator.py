@@ -64,6 +64,15 @@ _ALLOWED_OPERATORS = {
 }
 
 
+_ALLOWED_FUNCTIONS = {
+    "abs": abs,
+    "round": round,
+    "min": min,
+    "max": max,
+    "sum": sum,
+}
+
+
 def _evaluate_ast_node(node: ast.AST, variables: Dict[str, float]) -> float:
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)):
@@ -73,6 +82,12 @@ def _evaluate_ast_node(node: ast.AST, variables: Dict[str, float]) -> float:
         if node.id in variables:
             return float(variables[node.id])
         raise ValueError(f"정의되지 않은 변수: {node.id}")
+    elif isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in _ALLOWED_FUNCTIONS:
+            func = _ALLOWED_FUNCTIONS[node.func.id]
+            arg_vals = [_evaluate_ast_node(arg, variables) for arg in node.args]
+            return float(func(*arg_vals))
+        raise ValueError(f"허용되지 않는 함수 호출: {ast.dump(node)}")
     elif isinstance(node, ast.UnaryOp):
         op_type = type(node.op)
         if op_type in _ALLOWED_OPERATORS:
@@ -236,32 +251,34 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
         summary_lines = ["[정밀 재무 계산 결과]"]
 
         for expr in parsed.get("expressions", []):
+            if not isinstance(expr, dict):
+                continue
             formula = expr.get("formula", "")
             vars_dict = expr.get("variables", {})
             unit = expr.get("unit", "")
             metric_name = expr.get("metric_name", "계산 항목")
 
-            # Extract variable numeric values
-            num_vars = {}
-            for v_name, v_info in vars_dict.items():
-                if isinstance(v_info, dict):
-                    raw_val = v_info.get("value")
-                    try:
-                        num_vars[v_name] = float(raw_val) if raw_val is not None else 0.0
-                    except (ValueError, TypeError):
-                        num_vars[v_name] = 0.0
-                elif isinstance(v_info, (int, float)):
-                    num_vars[v_name] = float(v_info)
-                elif isinstance(v_info, str):
-                    try:
-                        num_vars[v_name] = float(v_info.replace(",", "").strip())
-                    except (ValueError, TypeError):
-                        num_vars[v_name] = 0.0
-
-            # Safely evaluate Python expression using AST
+            # Safely extract variables and evaluate formula inside try-catch
             computed_val: Optional[float] = None
             formatted_res = ""
             try:
+                if not isinstance(vars_dict, dict):
+                    raise ValueError(f"변수 목록이 매핑(dict) 형태가 아닙니다: {type(vars_dict)}")
+
+                num_vars: Dict[str, float] = {}
+                for v_name, v_info in vars_dict.items():
+                    if isinstance(v_info, dict):
+                        raw_val = v_info.get("value")
+                        if raw_val is None:
+                            raise ValueError(f"변수 '{v_name}'의 value 필드가 누락되었습니다")
+                        num_vars[v_name] = float(str(raw_val).replace(",", "").strip())
+                    elif isinstance(v_info, (int, float)):
+                        num_vars[v_name] = float(v_info)
+                    elif isinstance(v_info, str):
+                        num_vars[v_name] = float(v_info.replace(",", "").strip())
+                    else:
+                        raise ValueError(f"변수 '{v_name}'의 값이 비수치 데이터입니다: {v_info}")
+
                 computed_val = _evaluate_formula(formula, num_vars)
                 if unit == "%":
                     formatted_res = f"{computed_val:.2f}%"
@@ -273,10 +290,16 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
                     formatted_res = f"{computed_val:,.2f}"
             except Exception as e:
                 logger.warning("수식 계산 오류 '%s': %s", formula, e)
+                computed_val = None
                 formatted_res = f"계산 실패: {e}"
 
-            vars_summary = ", ".join(
-                f"{k}={v.get('value') if isinstance(v, dict) else v}" for k, v in vars_dict.items()
+            vars_summary = (
+                ", ".join(
+                    f"{k}={v.get('value') if isinstance(v, dict) else v}"
+                    for k, v in vars_dict.items()
+                )
+                if isinstance(vars_dict, dict)
+                else str(vars_dict)
             )
             summary_lines.append(
                 f"- {metric_name}: {formatted_res} (수식: `{formula}`, 변수: {vars_summary})"
@@ -286,7 +309,7 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
                 {
                     "metric_name": metric_name,
                     "formula": formula,
-                    "variables": vars_dict,
+                    "variables": vars_dict if isinstance(vars_dict, dict) else {},
                     "computed_value": computed_val,
                     "formatted_result": formatted_res,
                     "unit": unit,
