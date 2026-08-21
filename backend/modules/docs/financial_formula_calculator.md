@@ -24,14 +24,17 @@
 |---|---|---:|---|---|
 | `model` | `string` | no | `"gpt-5.6-luna"` | 수식 파싱 및 변수 추출에 사용할 LLM ID |
 | `enabled` | `boolean` | no | `true` | 계산 모듈 활성화 여부 |
+| `calc_keywords` | `array<string>` | no | - | 계산 실행 트리거 키워드 목록 |
+| `max_context_blocks` | `integer` | no | `50` | 수식 계산기에 전달할 최대 컨텍스트 블록 수 |
 
 ## Output DTO
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `is_calculation_required` | `boolean` | yes | - | - |
-| `calculated_metrics` | `array<CalculatedMetricDTO>` | yes | - | - |
-| `summary_text` | `string` | yes | - | - |
+| `calculated_metrics` | `array<CalculatedMetricDTO>` | no | - | - |
+| `summary_text` | `string` | no | `""` | - |
+| `formula_result` | `object \| null` | no | `null` | - |
 
 ## Referenced DTOs
 
@@ -85,7 +88,9 @@
   },
   "config": {
     "model": "gpt-5.6-luna",
-    "enabled": true
+    "enabled": true,
+    "calc_keywords": [],
+    "max_context_blocks": 50
   }
 }
 ```

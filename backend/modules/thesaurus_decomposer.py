@@ -108,10 +108,10 @@ class ThesaurusDecomposerModule(ExecutableModule):
 
         preset_data = DECOMPOSER_PRESETS.get(input_data.preset, {})
         system_prompt = input_data.system_prompt or preset_data.get(
-            "system_prompt", DECOMPOSER_SYSTEM_PROMPT
+            "system_prompt", LUNA_SYSTEM_PROMPT
         )
         user_template = input_data.user_prompt_template or preset_data.get(
-            "user_prompt_template", DECOMPOSER_USER_TEMPLATE
+            "user_prompt_template", LUNA_USER_TEMPLATE
         )
 
         # Inject financial thesaurus guidance dynamically
@@ -139,7 +139,15 @@ class ThesaurusDecomposerModule(ExecutableModule):
             if isinstance(parsed, list):
                 subqueries_raw = parsed
             elif isinstance(parsed, dict):
-                subqueries_raw = parsed.get("subqueries", [])
+                raw_val = parsed.get("subqueries", [])
+                if isinstance(raw_val, str):
+                    subqueries_raw = [raw_val]
+                elif isinstance(raw_val, list):
+                    subqueries_raw = raw_val
+                else:
+                    subqueries_raw = [str(raw_val)] if raw_val is not None else []
+            elif isinstance(parsed, str):
+                subqueries_raw = [parsed]
             else:
                 subqueries_raw = [str(parsed)]
             subqueries = list(

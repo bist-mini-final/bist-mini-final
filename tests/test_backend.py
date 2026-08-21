@@ -1506,7 +1506,7 @@ class ApiContractTests(unittest.TestCase):
             ),
             "financial_formula_calculator": (
                 {"context_json"},
-                {"model", "enabled"},
+                {"model", "enabled", "calc_keywords", "max_context_blocks"},
             ),
         }
 

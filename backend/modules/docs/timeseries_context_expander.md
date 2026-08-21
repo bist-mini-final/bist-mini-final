@@ -16,7 +16,7 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `retrieval_json` | `RetrievalDTO` | yes | - | RRF 융합 검색 결과 DTO |
+| `retrieval_json` | `RankedSearchResultDTO` | yes | - | RRF 또는 Hybrid Retriever에서 전달된 순위화된 검색 결과 |
 | `document_input` | `CellTextSerializerOutput` | yes | - | Excel 구조화 셀 문서 입력 포트 |
 
 ## Config DTO
@@ -77,23 +77,23 @@
 | `question_id` | `string` | yes | - | 전체 질의 파이프라인에서 유지되는 원본 질문 ID |
 | `question_text` | `string` | yes | - | 검색·컨텍스트·답변이 참조하는 사용자의 원문 질문 |
 
-### `RetrievalDTO`
+### `RankedSearchCandidateDTO`
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `query_context` | `QueryContextDTO` | yes | - | 결합 검색 결과가 대응하는 원본 질문 컨텍스트 |
-| `document_context` | `DocumentContextDTO` | yes | - | 결합 검색 결과가 참조하는 원본 문서 컨텍스트 |
-| `items` | `array<RrfCandidateDTO>` | yes | - | RRF 점수 내림차순 결합 후보 |
-
-### `RrfCandidateDTO`
-
-| Field | Type | Required | Default | Description |
-|---|---|---:|---|---|
-| `rank` | `integer` | yes | - | RRF 결합 순위 |
+| `rank` | `integer` | yes | - | 검색기 내부 후보 순위 |
 | `cell_id` | `string` | yes | - | 검색된 셀의 고유 ID |
-| `rrf_score` | `number` | yes | - | Reciprocal Rank Fusion 점수 |
+| `score` | `number` | yes | - | 해당 검색기가 계산한 원본 점수 |
 | `text` | `string` | yes | - | 검색된 셀의 직렬화 텍스트 |
 | `matched_subquery` | `string` | yes | - | 해당 셀과 매칭된 서브쿼리 |
+
+### `RankedSearchResultDTO`
+
+| Field | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `query_context` | `QueryContextDTO` | yes | - | 검색 후보가 대응하는 원본 질문 컨텍스트 |
+| `document_context` | `DocumentContextDTO` | yes | - | 검색 후보가 추출된 원본 문서 컨텍스트 |
+| `items` | `array<RankedSearchCandidateDTO>` | yes | - | 각 matched_subquery 내부 검색 점수 내림차순 후보 목록 |
 
 ## Independent execution
 
@@ -103,7 +103,7 @@
 {
   "input": {
     "retrieval_json": {
-      "replace_with": "RetrievalDTO"
+      "replace_with": "RankedSearchResultDTO"
     },
     "document_input": {
       "replace_with": "CellTextSerializerOutput"

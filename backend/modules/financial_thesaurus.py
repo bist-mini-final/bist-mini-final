@@ -178,18 +178,23 @@ def resolve_company_names(query: str, default: Optional[List[str]] = None) -> Li
     """Extract and canonicalize company names mentioned in the user query."""
     query_lower = query.lower()
     found: List[str] = []
-    
-    # Check for "세 회사", "모든 회사", "전체 회사"
-    if any(k in query for k in ["세 회사", "3개 회사", "모든 회사", "전체 회사", "어느 회사가", "각 사"]):
+
+    # Check for whole-company phrases across all 4 companies
+    if any(k in query for k in ["모든 회사", "전체 회사", "4개 회사", "네 회사", "전사", "각 회사", "각 사"]):
         return ["IBM", "Bistelligence", "Coldplay", "DH Innovation"]
 
+    # Match specific company aliases
     for alias, canonical in COMPANY_ALIASES_MAP.items():
         if alias in query_lower and canonical not in found:
             found.append(canonical)
 
-    if not found and default:
+    if found:
+        return found
+
+    if default is not None:
         return default
-    return found or (default or ["IBM"])
+
+    return ["IBM"]
 
 
 def get_relevant_thesaurus_entries(query: str) -> List[Dict[str, Any]]:

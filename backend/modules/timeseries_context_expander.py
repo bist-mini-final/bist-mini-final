@@ -1,4 +1,4 @@
-"""Time-Series Full-Row Context Expander Module for Financial Spreadsheets."""
+"""Module for expanding retrieved cell contexts into continuous time-series rows."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import logging
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Optional, Set, Tuple, cast
 
-from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import BaseModel, Field
 
 from .base import (
@@ -17,15 +16,15 @@ from .base import (
     ModuleInputDTO,
 )
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
-from .context_expander import ContextDTO
-from .retrieval_models import RetrievalDTO
+from .context_expander import ContextDTO, coordinate_to_tuple
+from .dense_retriever import RankedSearchResultDTO
 
 logger = logging.getLogger(__name__)
 
 
 class TimeseriesContextExpanderInputDTO(ModuleInputDTO):
-    retrieval_json: RetrievalDTO = Field(
-        description="RRF 융합 검색 결과 DTO"
+    retrieval_json: RankedSearchResultDTO = Field(
+        description="RRF 또는 Hybrid Retriever에서 전달된 순위화된 검색 결과"
     )
     document_input: CellTextSerializerOutput = Field(
         description="Excel 구조화 셀 문서 입력 포트"
@@ -115,9 +114,15 @@ class TimeseriesContextExpanderModule(ExecutableModule):
         if not candidates or not documents:
             raise ModuleExecutionError("컨텍스트를 확장할 문서 또는 RRF 후보가 없습니다")
 
-        doc_by_cell_id: Dict[str, CellTextDocumentDTO] = {
-            doc.cell_id: doc for doc in documents
-        }
+        # Prefer header_with_value over header_only for duplicate cell_ids
+        doc_by_cell_id: Dict[str, CellTextDocumentDTO] = {}
+        for doc in documents:
+            existing = doc_by_cell_id.get(doc.cell_id)
+            if existing is None:
+                doc_by_cell_id[doc.cell_id] = doc
+            elif existing.variant == "header_only" and doc.variant == "header_with_value":
+                doc_by_cell_id[doc.cell_id] = doc
+
         rows: DefaultDict[Tuple[str, int], List[CellTextDocumentDTO]] = defaultdict(list)
         row_headers: Dict[Tuple[str, int], List[str]] = {}
 
@@ -127,34 +132,60 @@ class TimeseriesContextExpanderModule(ExecutableModule):
             rows[row_key].append(document)
             row_headers.setdefault(row_key, document.row_header)
 
-        expanded_rows: List[Tuple[str, int]] = []
-        seen_rows: Set[Tuple[str, int]] = set()
         matched_count = 0
 
-        for index, candidate in enumerate(candidates):
-            document = doc_by_cell_id.get(candidate.cell_id)
-            if document is None:
-                continue
-            matched_count += 1
-            candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
+        if input_data.expand_full_row:
+            expanded_rows: List[Tuple[str, int]] = []
+            seen_rows: Set[Tuple[str, int]] = set()
 
-            for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
-                row_key = (document.sheet_name, candidate_row + offset)
-                if row_key in rows and row_key not in seen_rows:
-                    seen_rows.add(row_key)
-                    expanded_rows.append(row_key)
+            for index, candidate in enumerate(candidates):
+                document = doc_by_cell_id.get(candidate.cell_id)
+                if document is None:
+                    continue
+                matched_count += 1
+                candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
 
-        if matched_count == 0:
-            raise ModuleExecutionError("RRF 후보 Cell ID가 Structured Cell Text에 존재하지 않습니다")
+                for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
+                    row_key = (document.sheet_name, candidate_row + offset)
+                    if row_key in rows and row_key not in seen_rows:
+                        seen_rows.add(row_key)
+                        expanded_rows.append(row_key)
 
-        context_blocks = [
-            self._format_time_series_row(
-                sheet_name,
-                row_headers.get((sheet_name, row), []),
-                rows[(sheet_name, row)],
-            )
-            for sheet_name, row in expanded_rows[: input_data.max_blocks]
-        ]
+            if matched_count == 0:
+                raise ModuleExecutionError("RRF 후보 Cell ID가 Structured Cell Text에 존재하지 않습니다")
+
+            context_blocks = [
+                self._format_time_series_row(
+                    sheet_name,
+                    row_headers.get((sheet_name, row), []),
+                    rows[(sheet_name, row)],
+                )
+                for sheet_name, row in expanded_rows[: input_data.max_blocks]
+            ]
+        else:
+            # Expand only candidate individual cells (or adjacent cells within radius)
+            seen_cells: Set[str] = set()
+            context_blocks = []
+            for index, candidate in enumerate(candidates):
+                document = doc_by_cell_id.get(candidate.cell_id)
+                if document is None:
+                    continue
+                matched_count += 1
+                candidate_row, _ = self._safe_coord(document.cell_coord, index + 1)
+                for offset in range(-input_data.adjacent_radius, input_data.adjacent_radius + 1):
+                    row_key = (document.sheet_name, candidate_row + offset)
+                    for d in rows.get(row_key, []):
+                        if d.cell_id not in seen_cells:
+                            seen_cells.add(d.cell_id)
+                            context_blocks.append(
+                                f"[Sheet: {d.sheet_name}] {' > '.join(d.row_header)} | "
+                                f"{' > '.join(d.column_header)}: {d.cell_value or d.text} (Cell {d.cell_coord})"
+                            )
+                if len(context_blocks) >= input_data.max_blocks:
+                    break
+
+            if matched_count == 0:
+                raise ModuleExecutionError("RRF 후보 Cell ID가 Structured Cell Text에 존재하지 않습니다")
 
         if not context_blocks:
             raise ModuleExecutionError("인접 행 확장 결과가 비어 있습니다")

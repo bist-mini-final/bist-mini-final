@@ -1,10 +1,11 @@
-"""Deterministic Financial Formula Calculator Module for Playground and Pipeline."""
+"""Module for deterministic Python financial formula calculations."""
 
 from __future__ import annotations
 
+import ast
 import json
 import logging
-import re
+import operator
 from typing import Any, Dict, List, Optional, cast
 
 from pydantic import BaseModel, Field
@@ -22,21 +23,22 @@ from .base import (
     ModuleInputDTO,
 )
 from .context_expander import ContextDTO
-from .data_lineage import QueryContextDTO
 
 logger = logging.getLogger(__name__)
 
-CALCULATOR_SYSTEM_PROMPT = """당신은 재무제표 수치 계산 전문 분석가입니다.
-제공된 스프레드시트 컨텍스트 블록에서 질문에 필요한 수치들을 정확히 추출하여, 요청된 재무 연산(비율, 증감률, 절대 차이, 배수, 마진 등)의 수식과 변수를 JSON으로 도출하십시오.
+CALCULATOR_SYSTEM_PROMPT = """당신은 재무 제표 분석 및 정밀 재무 계산 전문가입니다.
+주어진 재무 컨텍스트와 사용자의 질문을 분석하여, 질문에 답변하기 위해 수치 계산(비율, 증감률, 절대 차이, 비중, 배수 등)이 필요한지 판별하십시오.
 
-[출력 JSON 스키마]
+계산이 필요한 경우:
+1. 컨텍스트에서 필요한 수치 변수(variables)를 정확히 추출하십시오.
+2. Python `eval`로 계산 가능한 수식(formula)을 작성하십시오. (예: `(A - B) / B * 100`, `A / B`, `A - B`, `(A + B) / C` 등)
+3. 다음과 같은 JSON 포맷으로만 응답하십시오:
 {
-  "is_calculation_required": true 또는 false,
-  "operation": "ratio" | "yoy_change" | "difference" | "multiple" | "margin" | "sum",
+  "is_calculation_required": true,
   "expressions": [
     {
-      "metric_name": "계산 항목명",
-      "formula": "수학 표현식 (예: (A - B) / B * 100 또는 A / B)",
+      "metric_name": "계산할 지표명 (예: 총주식보상비용 대비 장기투자자산 비율)",
+      "formula": "B / A * 100",
       "variables": {
         "A": {"label": "2025년 총주식보상비용", "value": 1715.0, "unit": "USD million"},
         "B": {"label": "2025년 장기투자자산", "value": 2112.0, "unit": "USD million"}
@@ -48,6 +50,51 @@ CALCULATOR_SYSTEM_PROMPT = """당신은 재무제표 수치 계산 전문 분석
 }
 만약 단순 수치 조회나 정성적 질문이라 계산이 필요 없으면 "is_calculation_required": false로 반환하십시오.
 반드시 JSON 포맷으로만 응답하십시오."""
+
+_ALLOWED_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _evaluate_ast_node(node: ast.AST, variables: Dict[str, float]) -> float:
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return float(node.value)
+        raise ValueError(f"지원되지 않는 상수 타입: {type(node.value)}")
+    elif isinstance(node, ast.Name):
+        if node.id in variables:
+            return float(variables[node.id])
+        raise ValueError(f"정의되지 않은 변수: {node.id}")
+    elif isinstance(node, ast.UnaryOp):
+        op_type = type(node.op)
+        if op_type in _ALLOWED_OPERATORS:
+            return _ALLOWED_OPERATORS[op_type](_evaluate_ast_node(node.operand, variables))
+        raise ValueError(f"지원되지 않는 단항 연산자: {op_type}")
+    elif isinstance(node, ast.BinOp):
+        op_type = type(node.op)
+        if op_type in _ALLOWED_OPERATORS:
+            left_val = _evaluate_ast_node(node.left, variables)
+            right_val = _evaluate_ast_node(node.right, variables)
+            return _ALLOWED_OPERATORS[op_type](left_val, right_val)
+        raise ValueError(f"지원되지 않는 이항 연산자: {op_type}")
+    elif isinstance(node, ast.Expression):
+        return _evaluate_ast_node(node.body, variables)
+    else:
+        raise ValueError(f"허용되지 않는 AST 노드: {type(node)}")
+
+
+def _evaluate_formula(formula: str, variables: Dict[str, float]) -> float:
+    """Safely evaluates an arithmetic formula using AST whitelist."""
+    parsed = ast.parse(formula.strip(), mode="eval")
+    return _evaluate_ast_node(parsed, variables)
 
 
 class FinancialFormulaCalculatorInputDTO(ModuleInputDTO):
@@ -64,6 +111,20 @@ class FinancialFormulaCalculatorConfigDTO(ModuleConfigDTO):
     enabled: bool = Field(
         default=True,
         description="계산 모듈 활성화 여부",
+    )
+    calc_keywords: List[str] = Field(
+        default_factory=lambda: [
+            "비율", "비중", "증감률", "증감액", "성장률", "차이", "마진", "배수",
+            "YoY", "QoQ", "CAGR", "합계", "총액", "평균", "대비", "몇 %", "몇 배",
+            "percent", "ratio", "margin", "growth", "difference", "sum", "total", "average",
+        ],
+        description="계산 실행 트리거 키워드 목록",
+    )
+    max_context_blocks: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        description="수식 계산기에 전달할 최대 컨텍스트 블록 수",
     )
 
 
@@ -84,8 +145,9 @@ class CalculatedMetricDTO(BaseModel):
 
 class FinancialFormulaCalculatorOutputDTO(BaseModel):
     is_calculation_required: bool
-    calculated_metrics: List[CalculatedMetricDTO]
-    summary_text: str
+    calculated_metrics: List[CalculatedMetricDTO] = Field(default_factory=list)
+    summary_text: str = ""
+    formula_result: Optional[Dict[str, Any]] = None
 
 
 class FinancialFormulaCalculatorModule(ExecutableModule):
@@ -96,7 +158,7 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
         description="컨텍스트에서 재무 수치를 추출하고 Python 엔진으로 오차 없는 결정론적 연산(비율, 증감률 등)을 수행합니다.",
         inputs=["context_json"],
         outputs=["formula_result"],
-        config_fields=["model", "enabled"],
+        config_fields=["model", "enabled", "calc_keywords", "max_context_blocks"],
         raw_output=True,
         version="1",
     )
@@ -105,46 +167,45 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
     execution_model = FinancialFormulaCalculatorExecutionDTO
     output_model = FinancialFormulaCalculatorOutputDTO
 
-    def __init__(
-        self, completion_client: Optional[ChatCompletionClient] = None
-    ) -> None:
-        self.completion_client = completion_client
+    def __init__(self, completion_client: Optional[ChatCompletionClient] = None) -> None:
+        self.completion_client = completion_client or ChatCompletionClient()
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
         input_data = cast(FinancialFormulaCalculatorExecutionDTO, payload)
-        q_context = input_data.context_json.query_context
-        question = q_context.question_text if q_context else ""
+        if not input_data.enabled:
+            res = {
+                "is_calculation_required": False,
+                "calculated_metrics": [],
+                "summary_text": "Formula calculator disabled.",
+            }
+            res["formula_result"] = dict(res)
+            return res
+
+        q_text = input_data.context_json.query_context.question_text
+        keywords = input_data.calc_keywords
+
+        if not any(kw.lower() in q_text.lower() for kw in keywords):
+            res = {
+                "is_calculation_required": False,
+                "calculated_metrics": [],
+                "summary_text": "No calculation keywords detected.",
+            }
+            res["formula_result"] = dict(res)
+            return res
+
         blocks = input_data.context_json.context_blocks
+        limit = input_data.max_context_blocks
+        context_preview = "\n\n".join(blocks[:limit])
 
-        if not input_data.enabled or not question or not blocks:
-            return {
-                "formula_result": {
-                    "is_calculation_required": False,
-                    "calculated_metrics": [],
-                    "summary_text": "No calculation required.",
-                }
-            }
-
-        # Check if question contains calculation keywords
-        calc_keywords = ["비율", "차이", "증가율", "증감", "몇 배", "비중", "마진", "성장률", "어느 쪽이 더", "더 커", "더 작", "빼면", "나누", "합치면"]
-        if not any(k in question for k in calc_keywords):
-            return {
-                "formula_result": {
-                    "is_calculation_required": False,
-                    "calculated_metrics": [],
-                    "summary_text": "No calculation keywords detected.",
-                }
-            }
-
-        client = self.completion_client or ChatCompletionClient()
-        context_str = "\n".join(blocks[:50])
-
-        user_content = f"질문: {question}\n\n[스프레드시트 컨텍스트]\n{context_str}"
         messages = [
             {"role": "system", "content": CALCULATOR_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
+            {
+                "role": "user",
+                "content": f"질문: {q_text}\n\n[재무 컨텍스트]\n{context_preview}\n\n위 질문에 대해 계산이 필요한지 분석하고 수식 및 변수를 JSON으로 작성하십시오.",
+            },
         ]
 
+        client = self.completion_client
         try:
             res: ChatCompletionResult = client.complete_with_metadata(
                 model=input_data.model,
@@ -154,22 +215,22 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
             parsed = json.loads(res.content)
         except Exception as e:
             logger.warning("Formula calculator 파싱 실패: %s", e)
-            return {
-                "formula_result": {
-                    "is_calculation_required": False,
-                    "calculated_metrics": [],
-                    "summary_text": f"Parsing failed: {e}",
-                }
+            res = {
+                "is_calculation_required": False,
+                "calculated_metrics": [],
+                "summary_text": f"Parsing failed: {e}",
             }
+            res["formula_result"] = dict(res)
+            return res
 
         if not parsed.get("is_calculation_required"):
-            return {
-                "formula_result": {
-                    "is_calculation_required": False,
-                    "calculated_metrics": [],
-                    "summary_text": "LLM determined no calculation required.",
-                }
+            res = {
+                "is_calculation_required": False,
+                "calculated_metrics": [],
+                "summary_text": "LLM determined no calculation required.",
             }
+            res["formula_result"] = dict(res)
+            return res
 
         calculated_metrics: List[Dict[str, Any]] = []
         summary_lines = ["[정밀 재무 계산 결과]"]
@@ -197,22 +258,29 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
                     except (ValueError, TypeError):
                         num_vars[v_name] = 0.0
 
-            # Safely evaluate Python expression
+            # Safely evaluate Python expression using AST
             computed_val: Optional[float] = None
             formatted_res = ""
             try:
-                # Safe evaluation with restricted math builtins
-                import math
-                safe_globals = {"math": math, "abs": abs, "round": round}
-                computed_val = float(eval(formula, safe_globals, num_vars))
+                computed_val = _evaluate_formula(formula, num_vars)
                 if unit == "%":
                     formatted_res = f"{computed_val:.2f}%"
                 elif "배" in unit:
                     formatted_res = f"{computed_val:.2f}배"
+                elif unit:
+                    formatted_res = f"{computed_val:,.2f} {unit}"
                 else:
-                    formatted_res = f"{computed_val:,.2f} {unit}".strip()
-            except Exception as eval_err:
-                formatted_res = f"계산 실패 ({eval_err})"
+                    formatted_res = f"{computed_val:,.2f}"
+            except Exception as e:
+                logger.warning("수식 계산 오류 '%s': %s", formula, e)
+                formatted_res = f"계산 실패: {e}"
+
+            vars_summary = ", ".join(
+                f"{k}={v.get('value') if isinstance(v, dict) else v}" for k, v in vars_dict.items()
+            )
+            summary_lines.append(
+                f"- {metric_name}: {formatted_res} (수식: `{formula}`, 변수: {vars_summary})"
+            )
 
             calculated_metrics.append(
                 {
@@ -224,14 +292,11 @@ class FinancialFormulaCalculatorModule(ExecutableModule):
                     "unit": unit,
                 }
             )
-            summary_lines.append(
-                f"- {metric_name}: {formatted_res} (산출식: {formula}, 변수: {num_vars})"
-            )
 
-        return {
-            "formula_result": {
-                "is_calculation_required": True,
-                "calculated_metrics": calculated_metrics,
-                "summary_text": "\n".join(summary_lines),
-            }
+        output_dict = {
+            "is_calculation_required": True,
+            "calculated_metrics": calculated_metrics,
+            "summary_text": "\n".join(summary_lines),
         }
+        output_dict["formula_result"] = dict(output_dict)
+        return output_dict

@@ -100,8 +100,14 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
         target_cols: List[str] = list(input_data.collection_names or [])
         target_companies: List[str] = list(input_data.target_companies or [])
 
-        # Auto-resolve from query if not explicitly passed
-        if input_data.auto_resolve_from_query and input_data.query_context:
+        # 1. If explicit companies provided, resolve their collections first
+        for comp in list(target_companies):
+            col_id = KNOWN_COMPANY_COLLECTIONS.get(comp)
+            if col_id and col_id not in target_cols:
+                target_cols.append(col_id)
+
+        # 2. Only auto-resolve from query when no explicit company or collection was specified
+        if not target_cols and not target_companies and input_data.auto_resolve_from_query and input_data.query_context:
             q_text = input_data.query_context.question_text
             resolved_companies = resolve_company_names(
                 q_text, default=[input_data.fallback_company]
@@ -113,11 +119,13 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
                 if col_id and col_id not in target_cols:
                     target_cols.append(col_id)
 
+        # 3. Fallback if still empty
         if not target_cols:
             fallback_col = KNOWN_COMPANY_COLLECTIONS.get(input_data.fallback_company)
             if fallback_col:
                 target_cols.append(fallback_col)
-                target_companies.append(input_data.fallback_company)
+                if input_data.fallback_company not in target_companies:
+                    target_companies.append(input_data.fallback_company)
 
         all_items: List[CellTextDocumentDTO] = []
         file_names: List[str] = []
@@ -127,6 +135,10 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
         try:
             with conn.cursor() as cur:
                 for col_id in target_cols:
+                    company_name = next(
+                        (k for k, v in KNOWN_COMPANY_COLLECTIONS.items() if v == col_id),
+                        None,
+                    )
                     cur.execute(
                         """
                         SELECT e.id, e.document, e.cmetadata
@@ -141,12 +153,19 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
                         chunk_id = row[0]
                         text = row[1] or ""
                         meta = row[2] or {}
-                        cell_id = (
+                        raw_cell_id = (
                             meta.get("cell_id")
                             or meta.get("chunk_id")
                             or chunk_id
                             or "unknown_cell"
                         )
+                        c_name = meta.get("company_name") or company_name or "UNKNOWN"
+                        # Scoped cell ID to avoid collision across companies
+                        if c_name and not raw_cell_id.startswith(f"{c_name}:"):
+                            scoped_cell_id = f"{c_name}:{raw_cell_id}"
+                        else:
+                            scoped_cell_id = raw_cell_id
+
                         fn = meta.get("file_name", "unknown.xlsm")
                         wh = meta.get("workbook_hash", "")
                         if fn not in file_names:
@@ -156,7 +175,7 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
 
                         all_items.append(
                             CellTextDocumentDTO(
-                                cell_id=cell_id,
+                                cell_id=scoped_cell_id,
                                 text=text,
                                 sheet_name=meta.get("sheet_name", ""),
                                 cell_coord=meta.get("cell_coord", ""),
@@ -179,7 +198,7 @@ class MultiCompanyCollectionLoaderModule(ExecutableModule):
         return {
             "document_output": merged_doc_output.model_dump(mode="json"),
             "index_output": {
-                "index_id": target_cols[0] if target_cols else "",
+                "index_id": ",".join(target_cols),
                 "file_name": merged_doc_output.file_name,
                 "workbook_hash": merged_doc_output.workbook_hash,
                 "model": "text-embedding-3-large",
