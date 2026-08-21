@@ -8,7 +8,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
-import '../../playground.css';
 import {
   Check,
   Columns3,
@@ -169,14 +168,6 @@ type InspectorBodyStyle = CSSProperties & {
   '--spreadsheet-sidebar-width': string;
 };
 
-/**
- * Displays spreadsheet structure detection results in an interactive modal inspector.
- *
- * @param kind - The inspection mode used to determine displayed metadata and overlays
- * @param input - The source data for the spreadsheet inspection
- * @param output - The inspection results to display
- * @param onClose - Callback invoked when the modal is closed
- */
 export function SpreadsheetResultModal({
   kind,
   input,
@@ -186,10 +177,6 @@ export function SpreadsheetResultModal({
   const meta = INSPECTOR_META[kind];
   const InspectorIcon = meta.icon;
   const parsed = useMemo(() => parseSpreadsheetResult(input, output), [input, output]);
-  const firstSheet = parsed?.sheetNames[0] ?? '';
-  const workbookIdentity = parsed
-    ? `${parsed.workbookHash}\u0000${parsed.fileName}\u0000${parsed.sheetNames.join('\u0000')}`
-    : '';
   const [selectedSheet, setSelectedSheet] = useState(parsed?.sheetNames[0] ?? '');
   const [selectedTableKey, setSelectedTableKey] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.6);
@@ -235,9 +222,10 @@ export function SpreadsheetResultModal({
   }, []);
 
   useEffect(() => {
-    setSelectedSheet(firstSheet);
+    const nextSheet = parsed?.sheetNames[0] ?? '';
+    setSelectedSheet(nextSheet);
     setSelectedTableKey(null);
-  }, [firstSheet, workbookIdentity]);
+  }, [parsed]);
 
   useEffect(() => {
     setSelectedTableKey(sheetTables[0] ? spreadsheetTableKey(sheetTables[0]) : null);
@@ -325,15 +313,7 @@ export function SpreadsheetResultModal({
   if (!parsed) return null;
 
   return createPortal(
-    <div
-      className="spreadsheet-result-overlay"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+    <div className="spreadsheet-result-overlay" role="presentation" onMouseDown={onClose}>
       <section
         className="spreadsheet-result-modal"
         role="dialog"
@@ -341,7 +321,6 @@ export function SpreadsheetResultModal({
         aria-labelledby="spreadsheet-result-title"
         data-kind={kind}
         onMouseDown={(event) => event.stopPropagation()}
-        onClick={(event) => event.stopPropagation()}
       >
         <header className="spreadsheet-result-modal__header">
           <span className="spreadsheet-result-modal__mark"><InspectorIcon className="h-5 w-5" /></span>
@@ -372,8 +351,6 @@ export function SpreadsheetResultModal({
             <select
               value={selectedSheet}
               onChange={(event) => setSelectedSheet(event.currentTarget.value)}
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={(event) => event.stopPropagation()}
             >
               {parsed.sheetNames.map((sheetName) => (
                 <option key={sheetName} value={sheetName}>{sheetName}</option>

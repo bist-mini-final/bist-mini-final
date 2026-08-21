@@ -16,7 +16,7 @@ RRF 후보 셀을 기준으로 같은 시트의 인접 행과 모든 열 값을 
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `retrieval_json` | `RetrievalDTO \| RankedSearchResultDTO` | yes | - | RRF Fusion에서 전달되는 셀 단위 결합 검색 결과 |
+| `retrieval_json` | `RetrievalDTO` | yes | - | RRF Fusion에서 전달되는 셀 단위 결합 검색 결과 |
 | `document_input` | `CellTextSerializerOutput` | yes | - | 인접 행과 실제 값을 복원할 Structured Cell Text 문서 |
 
 ## Config DTO
@@ -81,24 +81,6 @@ RRF 후보 셀을 기준으로 같은 시트의 인접 행과 모든 열 값을 
 |---|---|---:|---|---|
 | `question_id` | `string` | yes | - | 전체 질의 파이프라인에서 유지되는 원본 질문 ID |
 | `question_text` | `string` | yes | - | 검색·컨텍스트·답변이 참조하는 사용자의 원문 질문 |
-
-### `RankedSearchCandidateDTO`
-
-| Field | Type | Required | Default | Description |
-|---|---|---:|---|---|
-| `rank` | `integer` | yes | - | 검색기 내부 후보 순위 |
-| `cell_id` | `string` | yes | - | 검색된 셀의 고유 ID |
-| `score` | `number` | yes | - | 해당 검색기가 계산한 원본 점수 |
-| `text` | `string` | yes | - | 검색된 셀의 직렬화 텍스트 |
-| `matched_subquery` | `string` | yes | - | 해당 셀과 매칭된 서브쿼리 |
-
-### `RankedSearchResultDTO`
-
-| Field | Type | Required | Default | Description |
-|---|---|---:|---|---|
-| `query_context` | `QueryContextDTO` | yes | - | 검색 후보가 대응하는 원본 질문 컨텍스트 |
-| `document_context` | `DocumentContextDTO` | yes | - | 검색 후보가 추출된 원본 문서 컨텍스트 |
-| `items` | `array<RankedSearchCandidateDTO>` | yes | - | 각 matched_subquery 내부 검색 점수 내림차순 후보 목록 |
 
 ### `RetrievalDTO`
 

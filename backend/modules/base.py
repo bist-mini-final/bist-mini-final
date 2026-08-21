@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Type
+from typing import Any, ClassVar, Dict, List, Mapping, Type
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -95,38 +95,8 @@ class ExecutableModule(ABC):
     request_model: ClassVar[Type[BaseModel]]
     branch_output_models: ClassVar[Dict[str, Type[BaseModel]]] = {}
 
-    def set_progress_callback(
-        self,
-        callback: Optional[Callable[[Dict[str, Any]], None]],
-    ) -> None:
-        """
-        Attach or clear the callback used to receive progress updates for the current run.
-        
-        Parameters:
-        	callback (Optional[Callable[[Dict[str, Any]], None]]): Callback that receives progress mappings, or `None` to disable progress updates.
-        """
-
-        self._progress_callback = callback
-
-    def report_progress(self, progress: Mapping[str, Any]) -> None:
-        """
-        Publish progress information to the registered execution callback, when available.
-        
-        Parameters:
-            progress (Mapping[str, Any]): Progress data to publish.
-        """
-
-        callback = getattr(self, "_progress_callback", None)
-        if callback is not None:
-            callback(dict(progress))
-
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """
-        Validate a module subclass's DTO declarations and prepare its execution request model.
-        
-        Raises:
-        	TypeError: If the subclass defines incompatible, incomplete, or inconsistent DTO declarations.
-        """
+        """Validate DTO boundaries and materialize the execution request DTO."""
 
         super().__init_subclass__(**kwargs)
         definition = cls.__dict__.get("definition")

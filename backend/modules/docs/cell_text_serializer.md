@@ -18,15 +18,11 @@
 |---|---|---:|---|---|
 | `file_name` | `string` | yes | - | - |
 | `workbook_hash` | `string` | yes | - | - |
-| `sheet_names` | `array<string>` | no | - | 구조 분석 대상으로 선택된 표시 시트명 |
 | `tables` | `array<ClassifiedTableDTO>` | yes | - | - |
-| `failed_sheets` | `array<object<string, string>>` | no | - | 분석하지 못한 시트명과 실패 사유 |
 
 ## Config DTO
 
-| Field | Type | Required | Default | Description |
-|---|---|---:|---|---|
-| `variant_mode` | `string` | no | `"both"` | 생성할 검색 문서 변형 (header_only, header_with_value, 또는 both) |
+원본 JSON 값 전체를 DTO로 사용합니다.
 
 ## Output DTO
 
@@ -95,9 +91,7 @@
     "workbook_hash": "<workbook_hash>",
     "tables": []
   },
-  "config": {
-    "variant_mode": "both"
-  }
+  "config": {}
 }
 ```
 

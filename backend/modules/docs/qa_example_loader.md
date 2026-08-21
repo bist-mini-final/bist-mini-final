@@ -16,7 +16,7 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `file_name` | `string \| null` | no | `null` | data/qa_examples/ 아래의 JSON 파일명. 비워두면 내장 예시 세트를 사용합니다. |
+| `file_name` | `string | null` | no | `null` | data/qa_examples/ 아래의 JSON 파일명. 비워두면 내장 예시 세트를 사용합니다. |
 
 ## Config DTO
 

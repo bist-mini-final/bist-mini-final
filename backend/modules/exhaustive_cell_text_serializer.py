@@ -46,7 +46,7 @@ class ExhaustiveCellTextSerializerConfigDTO(ModuleConfigDTO):
         ),
     )
     max_documents: int = Field(
-        default=250_000,
+        default=2_000_000,
         ge=1,
         le=10_000_000,
         description=(

@@ -64,7 +64,6 @@ class DoclingTableRegionDTO(ModuleDTO):
 class DoclingTableDetectorOutput(ModuleDTO):
     file_name: str
     workbook_hash: str
-    sheet_names: List[str]
     tables: List[DoclingTableRegionDTO]
 
 
@@ -103,7 +102,7 @@ class DoclingTableDetectorModule(ExecutableModule):
         outputs=["output"],
         config_fields=["max_rows", "max_columns"],
         raw_output=True,
-        version="4",
+        version="3",
     )
     input_model = DoclingTableDetectorInputDTO
     config_model = DoclingTableDetectorConfigDTO
@@ -219,6 +218,5 @@ class DoclingTableDetectorModule(ExecutableModule):
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
-            "sheet_names": input_data.sheet_names,
             "tables": table_outputs,
         }

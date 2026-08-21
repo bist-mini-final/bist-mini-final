@@ -13,7 +13,7 @@
           "y": -367.4342037563349
         },
         "config": {
-          "threshold": 0.95
+          "threshold": 0.65
         },
         "values": {
           "query": "TEV가 뭐의 약자야?"

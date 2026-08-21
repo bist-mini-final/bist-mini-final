@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Set, Tuple, Union, cast
+from typing import Any, DefaultDict, Dict, List, Set, Tuple, cast
 
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import BaseModel, Field
@@ -14,11 +14,11 @@ from .base import (
 )
 from .cell_text_serializer import CellTextDocumentDTO, CellTextSerializerOutput
 from .data_lineage import DocumentContextDTO, QueryContextDTO
-from .retrieval_models import RankedSearchResultDTO, RetrievalDTO
+from .retrieval_models import RetrievalDTO
 
 
 class ContextExpanderInputDTO(ModuleInputDTO):
-    retrieval_json: Union[RetrievalDTO, RankedSearchResultDTO] = Field(
+    retrieval_json: RetrievalDTO = Field(
         description="RRF Fusion에서 전달되는 셀 단위 결합 검색 결과"
     )
     document_input: CellTextSerializerOutput = Field(

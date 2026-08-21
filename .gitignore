@@ -30,34 +30,21 @@ dist/
 outputs/
 output/
 data/runs/*
-data/raw/*
 !data/runs/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
-# data/artifacts/ — 모든 런타임 생성 파일 무시
-# 포함: Luna VLM 렌더/타일 이미지, serialized_docs.json 캐시, 임베딩 .npy 파일
 data/artifacts/*
 data/artifacts/**
 !data/artifacts/embeddings/
 !data/artifacts/embeddings/.gitkeep
 !data/artifacts/spreadsheets/
 !data/artifacts/spreadsheets/.gitkeep
-# 구 경로 (레거시) — settings.py 기준 경로는 data/artifacts/spreadsheets/
-data/spreadsheet_artifacts/
 data/vector_db/*
 !data/vector_db/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
-data/source_files/*
-!data/source_files/.gitkeep
-data/sources/*
-!data/sources/.gitkeep
-data/virtual/
-data/virtual/*
-!data/virtual/.gitkeep
 data/workflows/workflow.json
 tmp/
-data/bencmarks/*
 
 # OS / editors
 .DS_Store
@@ -67,6 +54,4 @@ data/bencmarks/*
 # Evaluation / Questions data & Scripts
 data/notion_questions.json
 *notion_question*.json
-/scripts/
-!/.github/scripts/
-.claude/
+scripts/

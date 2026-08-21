@@ -56,7 +56,7 @@ def export_prebuilt_index(
 def main():
     parser = argparse.ArgumentParser(description="Export an indexed vector DB as a single prebuilt JSON file for Google Drive sharing.")
     parser.add_argument("--index-id", required=True, help="Index ID in vector_db to export")
-    parser.add_argument("--output", default=None, help="Output JSON path (default: data/source_files/<index_id>_prebuilt.json)")
+    parser.add_argument("--output", default=None, help="Output JSON path (default: data/processed/<index_id>_prebuilt.json)")
     args = parser.parse_args()
 
     vector_index_store = VectorIndexStore(VECTOR_INDEX_DIR)

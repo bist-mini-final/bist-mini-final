@@ -10,7 +10,7 @@
 | `/playground` | 모듈 기반 RAG 실험 공간 | 구현됨 |
 | `/data-sources` | 데이터·인덱스 자산 관리 | 팀 구현 영역 |
 | `/evaluations` | 실험 품질·비용 비교 | 팀 구현 영역 |
-| `/bi` | BI 기능 작업 공간 | 팀 구현 영역 |
+| `/team` | 공유 워크플로와 협업 | 팀 구현 영역 |
 
 라우트와 사이드바 메뉴의 기준은 `frontend/src/app/routes.ts` 한 파일입니다. `AppShell`이나 `HomePage`에 별도의 라우팅 분기를 추가하지 않습니다.
 
@@ -20,8 +20,6 @@
 frontend/src/
 ├── app/                       # 라우팅과 서비스 공통 셸
 ├── features/
-│   ├── bi/                    # BI 기능 작업 영역
-│   │   └── BiPage.tsx
 │   └── playground/            # 기존 캔버스 기능 전체
 │       ├── components/
 │       ├── config/
@@ -44,10 +42,10 @@ Playground는 지연 로딩되므로 홈 초기 번들에 React Flow와 캔버�
 
 ## Adding a team page
 
-1. 독립 기능은 `frontend/src/features/<feature>/<Feature>Page.tsx`를 생성합니다.
+1. `frontend/src/pages/<Feature>Page.tsx`를 생성합니다.
 2. `frontend/src/app/routes.ts`에 경로, 메뉴명, 설명, 아이콘, 컴포넌트를 등록합니다.
 3. 구현이 시작되면 route의 `status`를 `planned`에서 `ready`로 바꿉니다.
-4. 페이지 전용 상태와 컴포넌트는 해당 `frontend/src/features/<feature>/` 안에서 관리하고 Page는 조립만 담당합니다.
+4. 페이지 전용 상태와 컴포넌트가 커지면 `frontend/src/features/<feature>/`로 이동하고 Page는 조립만 담당합니다.
 5. 공통 App Shell을 수정하지 않고 페이지 경계 안에서 개발합니다.
 
 현재 빈 페이지는 `PlannedFeaturePage`를 사용합니다. 팀원이 기능을 구현할 때 해당 페이지 파일의 내용을 실제 feature entry point로 교체하면 됩니다.

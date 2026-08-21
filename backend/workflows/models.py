@@ -5,10 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-ExecutionBranch = str
-OutputBranch = str
+ExecutionBranch = Literal["generated", "cached", "failed"]
+OutputBranch = Literal["generated", "cached"]
 NodeStatus = Literal["pending", "running", "succeeded", "failed", "skipped"]
-RunStatus = Literal["queued", "running", "paused", "completed", "failed"]
+RunStatus = Literal["queued", "running", "completed", "failed"]
 BatchStatus = Literal["pending", "running", "completed", "failed"]
 
 
@@ -128,15 +128,7 @@ class WorkflowDocument(StrictModel):
 
 class WorkflowExecutionRequest(StrictModel):
     inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
-    config_overrides: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict,
-        description=(
-            "저장된 워크플로를 변경하지 않고 이번 run 스냅샷에만 적용할 "
-            "노드별 Config DTO 값입니다."
-        ),
-    )
     use_cache: bool = True
-    cache_only_module_types: Optional[List[str]] = None
     inherit_from_run_id: Optional[str] = Field(
         default=None,
         description=(
@@ -164,7 +156,6 @@ class RunNodeState(StrictModel):
     elapsed_ms: Optional[float] = None
     cost_usd: Optional[float] = None
     usage: Optional[Dict[str, int]] = None
-    progress: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RunBatchState(StrictModel):
@@ -186,6 +177,5 @@ class WorkflowRun(StrictModel):
     graph: WorkflowGraph
     runtime_inputs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     use_cache: bool = True
-    cache_only_module_types: Optional[List[str]] = None
     batches: List[RunBatchState]
     nodes: Dict[str, RunNodeState]

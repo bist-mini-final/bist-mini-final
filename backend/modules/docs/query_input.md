@@ -22,7 +22,7 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `threshold` | `number` | no | `0.95` | 캐시 질문을 일치로 판정할 최소 유사도(0~1) |
+| `threshold` | `number` | no | `0.65` | 캐시 질문을 일치로 판정할 최소 유사도(0~1) |
 
 ## Output DTO
 
@@ -66,7 +66,7 @@
     "query": "사용자 질문"
   },
   "config": {
-    "threshold": 0.95
+    "threshold": 0.65
   }
 }
 ```

@@ -31,7 +31,7 @@ from .base import (
 class ImageTileSourceInputDTO(ModuleInputDTO):
     file_name: str = Field(
         min_length=1,
-        description="data/source_files에서 선택할 Excel 파일명 (이미지 타일 소스로 사용)",
+        description="data/processed에서 선택할 Excel 파일명 (이미지 타일 소스로 사용)",
     )
     sheet_name: Optional[str] = Field(
         default=None,

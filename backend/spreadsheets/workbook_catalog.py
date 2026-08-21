@@ -49,11 +49,11 @@ class WorkbookCatalog:
                 raise WorkbookCatalogError("사용할 processed Excel 파일을 선택해야 합니다")
         if selected not in available:
             raise WorkbookCatalogError(
-                f"data/source_files에서 선택할 수 없는 Excel 파일입니다: {selected}"
+                f"data/processed에서 선택할 수 없는 Excel 파일입니다: {selected}"
             )
         path = (self.root / selected).resolve()
         if path.parent != self.root:
-            raise WorkbookCatalogError("source_files 디렉터리 밖의 파일은 선택할 수 없습니다")
+            raise WorkbookCatalogError("processed 디렉터리 밖의 파일은 선택할 수 없습니다")
         return path
 
     @staticmethod
@@ -66,32 +66,15 @@ class WorkbookCatalog:
 
     @staticmethod
     def sheet_names(path: Path) -> List[str]:
-        """
-        Return the titles of visible worksheets with nonzero dimensions.
-        
-        Parameters:
-        	path (Path): Path to the workbook to inspect.
-        
-        Returns:
-        	List[str]: Worksheet titles that are visible, do not use a skipped prefix, and contain rows and columns.
-        """
         workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
         try:
-            sheet_names: List[str] = []
-            for sheet in workbook.worksheets:
-                if not worksheet_visible(sheet) or sheet.title.lower().startswith(
-                    SKIP_SHEET_PREFIXES
-                ):
-                    continue
-
-                # Some valid producers omit the worksheet ``dimension`` element.
-                # In openpyxl read-only mode that leaves max_row/max_column unset
-                # until the bounds are calculated from the sheet data.
-                if sheet.max_row is None or sheet.max_column is None:
-                    sheet.calculate_dimension(force=True)
-
-                if sheet.max_row and sheet.max_column:
-                    sheet_names.append(sheet.title)
-            return sheet_names
+            return [
+                sheet.title
+                for sheet in workbook.worksheets
+                if worksheet_visible(sheet)
+                and sheet.max_row
+                and sheet.max_column
+                and not sheet.title.lower().startswith(SKIP_SHEET_PREFIXES)
+            ]
         finally:
             workbook.close()

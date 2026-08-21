@@ -13,7 +13,7 @@
           "y": -367.4342037563349
         },
         "config": {
-          "threshold": 0.95
+          "threshold": 0.65
         },
         "values": {
           "query": "IBM의 LTM 기준 시가총액과 TEV는 각각 얼마인가?"

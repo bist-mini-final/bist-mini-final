@@ -1,11 +1,7 @@
 import type { CSSProperties, DragEvent, KeyboardEvent, PointerEvent } from 'react';
 import {
-  ArchiveRestore,
-  Binary,
-  Building2,
   Cpu,
   CloudCog,
-  Database,
   Eye,
   FileCode,
   FileSpreadsheet,
@@ -17,12 +13,9 @@ import {
   Maximize2,
   Merge,
   MessageSquare,
-  Network,
   Plus,
   Rows3,
-  Route,
   Search,
-  SearchCheck,
   ScanSearch,
   ScanText,
   Shuffle,
@@ -36,18 +29,13 @@ import type { ModuleDefinition, ModuleType } from '../../types';
 import { MODULE_PANEL_MAX_WIDTH, MODULE_PANEL_MIN_WIDTH } from '../../hooks/useResizablePanel';
 
 const ICONS: Record<string, LucideIcon> = {
-  ArchiveRestore,
-  Binary,
-  Building2,
   Shuffle,
   MessageSquare,
   GitBranch,
   Cpu,
   CloudCog,
   ListFilter,
-  Network,
   Search,
-  SearchCheck,
   Merge,
   Maximize2,
   Sparkles,
@@ -58,10 +46,7 @@ const ICONS: Record<string, LucideIcon> = {
   ScanText,
   TableProperties,
   Rows3,
-  Route,
   FolderArchive,
-  Database,
-  Layers,
 };
 
 interface ModulePaletteProps {

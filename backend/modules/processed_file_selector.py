@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, cast
 
 from pydantic import BaseModel, Field
 
@@ -20,16 +20,12 @@ from .base import (
 class ProcessedFileSelectorInputDTO(ModuleInputDTO):
     file_name: str = Field(
         min_length=1,
-        description="data/source_files에서 선택할 Excel 파일명",
-    )
-    sheet_names: Optional[List[str]] = Field(
-        default=None,
-        description="처리할 표시 시트 목록. 생략하면 모든 표시 시트를 선택합니다.",
+        description="data/processed에서 선택할 Excel 파일명",
     )
 
 
 class WorkbookSelectionDTO(ModuleDTO):
-    file_name: str = Field(description="선택된 source Excel 파일명")
+    file_name: str = Field(description="선택된 processed Excel 파일명")
     workbook_hash: str = Field(description="파일 변경을 식별하는 SHA-256")
     sheet_names: List[str] = Field(
         min_length=1,
@@ -42,7 +38,7 @@ class ProcessedFileSelectorModule(ExecutableModule):
         type="processed_file_selector",
         label="Processed Excel File Selector",
         category="Source",
-        description="data/source_files의 Excel 파일 하나를 안전하게 선택합니다.",
+        description="data/processed의 Excel 파일 하나를 안전하게 선택합니다.",
         inputs=[],
         outputs=["output"],
         config_fields=[],
@@ -72,43 +68,12 @@ class ProcessedFileSelectorModule(ExecutableModule):
         return contract
 
     def execute(self, payload: BaseModel) -> Dict[str, Any]:
-        """
-        Resolve the requested processed workbook and select its processing sheets.
-        
-        Parameters:
-            payload (BaseModel): Input containing the processed workbook filename and
-                optionally the sheet names to select.
-        
-        Returns:
-            Dict[str, Any]: The resolved filename, workbook SHA-256 hash, and selected
-                sheet names in catalog order.
-        
-        Raises:
-            ModuleExecutionError: If the workbook cannot be resolved, a requested sheet
-                does not exist, or no processing sheets are selected.
-        """
         input_data = cast(ProcessedFileSelectorInputDTO, payload)
         try:
             path = self.catalog.resolve(input_data.file_name)
-            available_sheet_names = self.catalog.sheet_names(path)
+            sheet_names = self.catalog.sheet_names(path)
         except (OSError, ValueError, WorkbookCatalogError) as error:
             raise ModuleExecutionError(str(error)) from error
-        requested_sheet_names = input_data.sheet_names
-        if requested_sheet_names is None:
-            sheet_names = available_sheet_names
-        else:
-            unknown_sheet_names = sorted(
-                set(requested_sheet_names) - set(available_sheet_names)
-            )
-            if unknown_sheet_names:
-                raise ModuleExecutionError(
-                    "Excel 파일에 없는 시트가 선택되었습니다: "
-                    + ", ".join(unknown_sheet_names)
-                )
-            requested = set(requested_sheet_names)
-            sheet_names = [
-                name for name in available_sheet_names if name in requested
-            ]
         if not sheet_names:
             raise ModuleExecutionError("선택한 Excel 파일에 처리할 시트가 없습니다")
         return {

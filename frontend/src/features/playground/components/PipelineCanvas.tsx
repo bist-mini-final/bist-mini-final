@@ -13,7 +13,6 @@ import { ModuleSettingsContext } from '../contexts/ModuleSettingsContext';
 import { CustomEdge } from './CustomEdge';
 import { ContextNode } from './CustomNodes/ContextNode';
 import { AnswerCacheWriterNode } from './CustomNodes/AnswerCacheWriterNode';
-import { AdaptiveQueryDecomposerNode } from './CustomNodes/AdaptiveQueryDecomposerNode';
 import { Bm25RetrieverNode } from './CustomNodes/Bm25RetrieverNode';
 import { BfsLlmStructureDetectorNode } from './CustomNodes/BfsLlmStructureDetectorNode';
 import { CellTextSerializerNode } from './CustomNodes/CellTextSerializerNode';
@@ -21,7 +20,6 @@ import { ExhaustiveCellTextSerializerNode } from './CustomNodes/ExhaustiveCellTe
 import { CellTextEmbedderNode } from './CustomNodes/CellTextEmbedderNode';
 import { VectorIndexWriterNode } from './CustomNodes/VectorIndexWriterNode';
 import { DecomposerNode } from './CustomNodes/DecomposerNode';
-import { DirectQueryDecomposerNode } from './CustomNodes/DirectQueryDecomposerNode';
 import { DenseRetrieverNode } from './CustomNodes/DenseRetrieverNode';
 import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
 import { DoclingTableDetectorNode } from './CustomNodes/DoclingTableDetectorNode';
@@ -33,18 +31,10 @@ import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDete
 import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
 import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
 import { PrebuiltIndexLoaderNode } from './CustomNodes/PrebuiltIndexLoaderNode';
-import { PgVectorCollectionLoaderNode } from './CustomNodes/PgVectorCollectionLoaderNode';
-import { PgVectorRetrieverNode } from './CustomNodes/PgVectorRetrieverNode';
-import { PgVectorIndexWriterNode } from './CustomNodes/PgVectorIndexWriterNode';
 import { QueryNode } from './CustomNodes/QueryNode';
 import { ReaderNode } from './CustomNodes/ReaderNode';
 import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
-import { SemanticQueryMatcherNode } from './CustomNodes/SemanticQueryMatcherNode';
-import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
-import { SemanticScopedDenseRetrieverNode } from './CustomNodes/SemanticScopedDenseRetrieverNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
-import { WorkflowLayersPanel } from './WorkflowLayersPanel';
-import type { WorkflowOption } from './Header';
 import type { usePipelineGraph } from '../hooks/usePipelineGraph';
 import type { ModuleDefinition, WorkflowRun } from '../types';
 
@@ -56,13 +46,6 @@ interface PipelineCanvasProps {
   onOpenPalette?: () => void;
   modules: ModuleDefinition[];
   runs: WorkflowRun[];
-  workflows: WorkflowOption[];
-  activeWorkflowId: string;
-  onSelectWorkflow: (id: string) => void;
-  onCreateWorkflow: () => void;
-  onDuplicateWorkflow: () => void;
-  onRenameWorkflow: () => void;
-  onDeleteWorkflow: () => void;
 }
 
 export function PipelineCanvas({
@@ -70,27 +53,18 @@ export function PipelineCanvas({
   isPaletteOpen,
   modules,
   runs,
-  workflows, activeWorkflowId, onSelectWorkflow, onCreateWorkflow, onDuplicateWorkflow, onRenameWorkflow, onDeleteWorkflow,
 }: PipelineCanvasProps) {
   const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null);
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       queryNode: QueryNode,
-      direct_query_decomposer: DirectQueryDecomposerNode,
       decomposerNode: DecomposerNode,
-      adaptive_query_decomposer: AdaptiveQueryDecomposerNode,
       embeddingNode: EmbeddingNode,
       cell_text_embedder: CellTextEmbedderNode,
       vector_index_writer: VectorIndexWriterNode,
-      pgvector_index_writer: PgVectorIndexWriterNode,
-      pgvector_collection_loader: PgVectorCollectionLoaderNode,
-      pgvector_retriever: PgVectorRetrieverNode,
       bm25_retriever: Bm25RetrieverNode,
       dense_retriever: DenseRetrieverNode,
       rrf_fusion: RrfFusionNode,
-      semantic_query_matcher: SemanticQueryMatcherNode,
-      llm_query_router: LlmQueryRouterNode,
-      semantic_scoped_dense_retriever: SemanticScopedDenseRetrieverNode,
       contextNode: ContextNode,
       readerNode: ReaderNode,
       answer_cache_writer: AnswerCacheWriterNode,
@@ -130,7 +104,6 @@ export function PipelineCanvas({
           <span>휠로 확대 · 빈 영역 드래그로 이동</span>
         </div>
         <ReactFlow
-        key={activeWorkflowId}
         nodes={graph.nodes}
         edges={graph.edges}
         onNodesChange={graph.onNodesChange}
@@ -141,10 +114,6 @@ export function PipelineCanvas({
         onMoveEnd={graph.onMoveEnd}
         onDrop={graph.onDrop}
         onDragOver={graph.onDragOver}
-        onNodeClick={(_, node) => graph.selectNode(node.id)}
-        selectionOnDrag
-        selectionKeyCode="Shift"
-        multiSelectionKeyCode="Shift"
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -165,7 +134,6 @@ export function PipelineCanvas({
           pannable
         />
         </ReactFlow>
-        <WorkflowLayersPanel nodes={graph.nodes} edges={graph.edges} modules={modules} workflows={workflows} activeWorkflowId={activeWorkflowId} onSelectWorkflow={onSelectWorkflow} onCreateWorkflow={onCreateWorkflow} onDuplicateWorkflow={onDuplicateWorkflow} onRenameWorkflow={onRenameWorkflow} onDeleteWorkflow={onDeleteWorkflow} onSelectNode={graph.selectNode} onDuplicateNode={graph.duplicateNode} />
       </section>
       {settingsNode && settingsModule && (
         <ModuleSettingsModal

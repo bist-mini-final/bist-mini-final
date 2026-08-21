@@ -165,43 +165,17 @@ class WorkflowExecutor:
         workflow: WorkflowDocument,
         request: WorkflowExecutionRequest,
     ) -> WorkflowRun:
-        """
-        Create and persist a workflow run from the requested inputs and configuration.
-        
-        Parameters:
-            workflow (WorkflowDocument): Workflow definition to execute.
-            request (WorkflowExecutionRequest): Runtime inputs, configuration overrides, cache settings, and optional run inheritance settings.
-        
-        Returns:
-            WorkflowRun: The newly created and persisted workflow run.
-        
-        Raises:
-            DagExecutionError: If the request references unknown nodes or contains invalid runtime inputs, or if the workflow graph is invalid.
-        """
-        execution_graph = workflow.graph.model_copy(deep=True)
-        known_nodes = {node.id for node in execution_graph.nodes}
+        batches = self.validate_graph(workflow.graph)
+        known_nodes = {node.id for node in workflow.graph.nodes}
         unknown_inputs = sorted(set(request.inputs) - known_nodes)
         if unknown_inputs:
             raise DagExecutionError(
                 "실행 입력이 존재하지 않는 노드를 참조합니다: "
                 + ", ".join(unknown_inputs)
             )
-        unknown_config_nodes = sorted(set(request.config_overrides) - known_nodes)
-        if unknown_config_nodes:
-            raise DagExecutionError(
-                "실행 설정이 존재하지 않는 노드를 참조합니다: "
-                + ", ".join(unknown_config_nodes)
-            )
-
-        for node in execution_graph.nodes:
-            override = request.config_overrides.get(node.id)
-            if override:
-                node.config = {**node.config, **override}
-
-        batches = self.validate_graph(execution_graph)
         for node_id, runtime_input in request.inputs.items():
             node = next(
-                item for item in execution_graph.nodes if item.id == node_id
+                item for item in workflow.graph.nodes if item.id == node_id
             )
             module = self.module_registry.get(node.module_type)
             if module.definition.raw_input:
@@ -232,11 +206,11 @@ class WorkflowExecutor:
                 prev_run = self.run_store.load(request.inherit_from_run_id)
                 # Build a lookup of the new graph's nodes
                 new_node_map = {
-                    node.id: node for node in execution_graph.nodes
+                    node.id: node for node in workflow.graph.nodes
                 }
                 new_edge_set = {
                     (e.source, e.target, e.source_output, e.target_input, e.source_branch)
-                    for e in execution_graph.edges
+                    for e in workflow.graph.edges
                 }
                 prev_edge_set = {
                     (e.source, e.target, e.source_output, e.target_input, e.source_branch)
@@ -272,10 +246,9 @@ class WorkflowExecutor:
             id=f"run-{uuid4().hex}",
             workflow_id=workflow.id,
             workflow_updated_at=workflow.updated_at,
-            graph=execution_graph,
+            graph=workflow.graph.model_copy(deep=True),
             runtime_inputs=request.inputs,
             use_cache=request.use_cache,
-            cache_only_module_types=request.cache_only_module_types,
             batches=[
                 RunBatchState(index=index, node_ids=node_ids)
                 for index, node_ids in enumerate(batches)
@@ -292,7 +265,7 @@ class WorkflowExecutor:
                         batch_index=batch_index_by_node[node.id],
                     )
                 )
-                for node in execution_graph.nodes
+                for node in workflow.graph.nodes
             },
         )
         # When inheriting, update the run status to reflect already-completed
@@ -317,21 +290,6 @@ class WorkflowExecutor:
             )
 
     def _execute_single_node(self, run_id: str, node_id: str) -> WorkflowRun:
-        """
-        Execute a node and its downstream dependents as a standalone run segment.
-        
-        Parameters:
-            run_id (str): Identifier of the workflow run.
-            node_id (str): Identifier of the node to execute.
-        
-        Returns:
-            WorkflowRun: The persisted workflow run after execution.
-        
-        Raises:
-            DagExecutionError: If the node is unknown or cannot currently be executed.
-            DagExecutionCancelled: If execution is cancelled.
-            ModuleWorkerCancelled: If the execution worker is cancelled.
-        """
         self._raise_if_cancelled(run_id)
         run = self.run_store.load(run_id)
         self._recover_interrupted_state(run)
@@ -371,7 +329,7 @@ class WorkflowExecutor:
         except Exception as error:  # keep the run inspectable on unexpected failures
             state.status = "failed"
             state.outcome = "failed"
-            state.error = self._format_error(error, include_type=True)
+            state.error = f"{type(error).__name__}: {error}"
             state.completed_at = utc_now_iso()
 
         self._refresh_run_status(run)
@@ -379,12 +337,6 @@ class WorkflowExecutor:
 
 
     def _execute_next_batch(self, run_id: str) -> WorkflowRun:
-        """
-        Execute the next incomplete batch of a workflow run.
-        
-        Returns:
-        	WorkflowRun: The updated workflow run after batch execution.
-        """
         self._raise_if_cancelled(run_id)
         run = self.run_store.load(run_id)
         self._recover_interrupted_state(run)
@@ -437,7 +389,7 @@ class WorkflowExecutor:
             except Exception as error:  # keep the run inspectable on unexpected failures
                 state.status = "failed"
                 state.outcome = "failed"
-                state.error = self._format_error(error, include_type=True)
+                state.error = f"{type(error).__name__}: {error}"
                 state.completed_at = utc_now_iso()
                 batch_failed = True
             self.run_store.save(run)
@@ -471,12 +423,6 @@ class WorkflowExecutor:
 
     @staticmethod
     def _reset_node_state(state: RunNodeState) -> None:
-        """
-        Reset a node state to its initial pending state.
-        
-        Parameters:
-        	state (RunNodeState): The node state to reset.
-        """
         state.status = "pending"
         state.input_payload = None
         state.config_payload = {}
@@ -491,19 +437,9 @@ class WorkflowExecutor:
         state.elapsed_ms = None
         state.cost_usd = None
         state.usage = None
-        state.progress = {}
 
     @staticmethod
     def _descendant_node_ids(run: WorkflowRun, node_id: str) -> Set[str]:
-        """Return the identifiers of all nodes downstream from the specified node.
-        
-        Parameters:
-        	run (WorkflowRun): The workflow run containing the graph.
-        	node_id (str): The identifier of the starting node.
-        
-        Returns:
-        	Set[str]: The identifiers of all reachable downstream nodes.
-        """
         outgoing: Dict[str, List[str]] = defaultdict(list)
         for edge in run.graph.edges:
             outgoing[edge.source].append(edge.target)
@@ -610,14 +546,6 @@ class WorkflowExecutor:
         node: WorkflowNode,
         state: RunNodeState,
     ) -> None:
-        """
-        Execute a workflow node, recording its input, output, status, cache state, progress, usage, and cost.
-        
-        Parameters:
-            run (WorkflowRun): The workflow run containing the node.
-            node (WorkflowNode): The node to execute.
-            state (RunNodeState): The node state to update with execution results.
-        """
         input_payload = self._assemble_input(run, node)
         module = self.module_registry.get(node.module_type)
         validated_config = module.validate_config(node.config).model_dump(mode="json")
@@ -638,15 +566,11 @@ class WorkflowExecutor:
         state.outcome = None
         state.cache_key = cache_key
         state.cache_hit = False
-        state.progress = {}
         state.started_at = utc_now_iso()
         self.run_store.save(run)
 
         output: Any = None
-        cache_enabled = run.use_cache and module.definition.cacheable and (
-            run.cache_only_module_types is None or node.module_type in run.cache_only_module_types
-        )
-        if cache_enabled:
+        if run.use_cache and module.definition.cacheable:
             output = self.result_cache.get(cache_key)
             state.cache_hit = output is not None
         if output is None:
@@ -658,20 +582,14 @@ class WorkflowExecutor:
                     validated_config,
                 )
             else:
-                def persist_progress(progress: Dict[str, Any]) -> None:
-                    """Persist the current node execution progress for the workflow run."""
-                    state.progress = compact_history_value(progress)
-                    self.run_store.save(run)
-
                 output = self._module_worker.execute(
                     node.module_type,
                     input_payload,
                     validated_config,
                     run.id,
-                    progress_callback=persist_progress,
                 )
             self._raise_if_cancelled(run.id)
-            if cache_enabled:
+            if run.use_cache and module.definition.cacheable:
                 self.result_cache.put(cache_key, output)
 
         branch_ports = set(module.definition.branch_outputs.values())
@@ -712,12 +630,6 @@ class WorkflowExecutor:
                 node_cost = aj.get("estimated_cost_usd")
                 if isinstance(aj.get("api_usage"), Mapping):
                     node_usage = {k: int(v) for k, v in aj["api_usage"].items() if v is not None}
-            elif "semantic_match" in output and isinstance(output["semantic_match"], Mapping):
-                metrics = output["semantic_match"].get("metrics") or {}
-                raw_usage = metrics.get("api_usage") or {}
-                if isinstance(raw_usage, Mapping):
-                    node_usage = {k: int(v) for k, v in raw_usage.items() if v is not None}
-                node_cost = metrics.get("estimated_cost_usd")
             elif "usage" in output or "_usage" in output:
                 raw_u = output.get("usage") or output.get("_usage")
                 model_used = output.get("model") or validated_config.get("model") or ""
@@ -818,37 +730,16 @@ class WorkflowExecutor:
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다")
 
     def _persist_cancelled_run(self, run_id: str) -> WorkflowRun:
-        """Persist a run after cancellation, resetting running nodes and marking non-terminal runs as paused.
-        
-        Parameters:
-        	run_id (str): Identifier of the run to persist.
-        
-        Returns:
-        	WorkflowRun: The saved run with updated node and execution statuses.
-        """
         run = self.run_store.load(run_id)
-        was_terminal = run.status in ("completed", "failed")
         for state in run.nodes.values():
             if state.status == "running":
                 self._reset_node_state(state)
         self._refresh_run_status(run)
-        if not was_terminal and run.status not in ("completed", "failed"):
-            run.status = "paused"
         return self.run_store.save(run)
 
     def _should_execute_node(
         self, run: WorkflowRun, node: WorkflowNode
     ) -> Tuple[bool, Optional[str]]:
-        """
-        Determine whether a node has all prerequisites required for execution.
-        
-        Parameters:
-            run (WorkflowRun): Workflow run containing the node's inputs and incoming edges.
-            node (WorkflowNode): Node whose execution prerequisites are evaluated.
-        
-        Returns:
-            Tuple[bool, Optional[str]]: Whether the node can execute and, when it cannot, the reason it will be skipped.
-        """
         incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
         if not incoming_edges:
             module = self.module_registry.get(node.module_type)
@@ -1035,7 +926,6 @@ class WorkflowExecutor:
         return source_output, target_input
 
     def _recover_interrupted_state(self, run: WorkflowRun) -> None:
-        """Restore interrupted workflow execution state to pending or queued status and persist the changes."""
         changed = False
         for state in run.nodes.values():
             if state.status == "running":
@@ -1055,31 +945,11 @@ class WorkflowExecutor:
             self.run_store.save(run)
 
     @staticmethod
-    def _format_error(error: Exception, *, include_type: bool = False) -> str:
-        """
-        Format an exception into a concise, user-facing error message.
-        
-        Parameters:
-            error (Exception): The exception to format.
-            include_type (bool): Whether to prefix ordinary error messages with the exception type.
-        
-        Returns:
-            str: The formatted error message, truncated to 4,000 characters when necessary.
-        """
+    def _format_error(error: Exception) -> str:
         if isinstance(error, ValidationError):
             messages = [
                 f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
                 for item in error.errors(include_url=False)
             ]
-            message = "; ".join(messages)
-        else:
-            message = str(error)
-            for marker in ("\n[SQL:", " [SQL:"):
-                if marker in message:
-                    message = message.split(marker, 1)[0].rstrip()
-                    break
-            if include_type:
-                message = f"{type(error).__name__}: {message}"
-        if len(message) > 4000:
-            return message[:4000].rstrip() + "…"
-        return message
+            return "; ".join(messages)
+        return str(error)

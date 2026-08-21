@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default",
   "name": "default",
-  "updated_at": "2026-08-21T02:59:39.756838+00:00",
+  "updated_at": "2026-08-17T23:57:55.483596+00:00",
   "graph": {
     "nodes": [
       {
@@ -13,7 +13,7 @@
           "y": -367.4342037563349
         },
         "config": {
-          "threshold": 0.95
+          "threshold": 0.65
         },
         "values": {
           "query": "최근 추세 유지 시 2026년 Total Revenue는?"
@@ -50,8 +50,8 @@
         "id": "custom-node-1786497122336-4",
         "module_type": "json_inspector",
         "position": {
-          "x": 1882.4596454099208,
-          "y": -162.9873861432096
+          "x": 1834.0115578389562,
+          "y": -132.24148441548206
         },
         "config": {},
         "values": {},
@@ -82,17 +82,14 @@
       },
       {
         "id": "custom-node-1786497475934-2",
-        "module_type": "pgvector_collection_loader",
+        "module_type": "prebuilt_index_loader",
         "position": {
-          "x": 2280.2284406188487,
-          "y": 368.9830133686907
+          "x": 2168.070268203153,
+          "y": 266.7211502837916
         },
         "config": {},
         "values": {
-          "collection_name": "c7a251b495523abde099db8c3fed37bcb23f5abc502d16c3635e21f37820ff08",
-          "collection_names": [
-            "c7a251b495523abde099db8c3fed37bcb23f5abc502d16c3635e21f37820ff08"
-          ]
+          "file_name": "SPG_Company_KeyStats_v3_prebuilt.parquet"
         },
         "ui": {
           "width": null,
@@ -123,7 +120,7 @@
       },
       {
         "id": "custom-node-1786497551832-5",
-        "module_type": "pgvector_retriever",
+        "module_type": "dense_retriever",
         "position": {
           "x": 3038.6349662377042,
           "y": 285.62668906454
@@ -212,27 +209,6 @@
         "ui": {
           "width": 881.0,
           "height": 1315.0,
-          "execution_stopped": false,
-          "column_widths": {}
-        }
-      },
-      {
-        "id": "custom-node-1787020430289-1",
-        "module_type": "pgvector_collection_loader",
-        "position": {
-          "x": 2478.2880582893004,
-          "y": 433.354939451034
-        },
-        "config": {},
-        "values": {
-          "collection_name": "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87",
-          "collection_names": [
-            "7aa04c203cb89bbf1461ed348b9d94ecf0bc09d6b81ce1c9806efa661e902e87"
-          ]
-        },
-        "ui": {
-          "width": null,
-          "height": null,
           "execution_stopped": false,
           "column_widths": {}
         }
@@ -345,9 +321,9 @@
       }
     ],
     "viewport": {
-      "x": -574.6104190433564,
-      "y": 474.23690067197913,
-      "zoom": 0.39415467875217275
+      "x": -353.78453861672597,
+      "y": 395.87130995710527,
+      "zoom": 0.6462086220876893
     }
   }
 }

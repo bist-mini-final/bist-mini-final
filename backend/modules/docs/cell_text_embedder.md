@@ -25,7 +25,7 @@
 | Field | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `model` | `string` | no | `"BAAI/bge-large-en-v1.5"` | Excel 셀 문서 임베딩에 사용할 Hugging Face 또는 OpenAI 모델 ID |
-| `batch_size` | `integer` | no | `2048` | Excel 셀 문서를 한 번에 임베딩할 배치 크기 |
+| `batch_size` | `integer` | no | `64` | Excel 셀 문서를 한 번에 임베딩할 배치 크기 |
 
 ## Output DTO
 
@@ -37,11 +37,6 @@
 | `artifact_id` | `string` | yes | - | float32 문서 벡터 아티팩트의 콘텐츠 주소 |
 | `dimension` | `integer` | yes | - | 각 문서 임베딩 벡터 차원 |
 | `items` | `array<EmbeddedCellTextDocumentDTO>` | yes | - | - |
-| `duration_seconds` | `number \| null` | no | `null` | - |
-| `total_tokens` | `integer \| null` | no | `null` | - |
-| `estimated_cost_usd` | `number \| null` | no | `null` | - |
-| `estimated_cost_krw` | `number \| null` | no | `null` | - |
-| `batch_size` | `integer \| null` | no | `null` | - |
 
 ## Referenced DTOs
 
@@ -85,7 +80,7 @@
   },
   "config": {
     "model": "BAAI/bge-large-en-v1.5",
-    "batch_size": 2048
+    "batch_size": 64
   }
 }
 ```
