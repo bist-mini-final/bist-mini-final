@@ -409,7 +409,7 @@ class OpenpyxlRegionDetectorModule(BaseModule):
                     table.table_index,
                     bounds,
                     layout,
-                    input_data,
+                    cfg,
                 )
                 output_tables.append({"sheet_name": table.sheet_name, **classified})
         finally:

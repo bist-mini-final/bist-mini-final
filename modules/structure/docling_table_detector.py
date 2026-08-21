@@ -189,8 +189,8 @@ class DoclingTableDetectorModule(BaseModule):
                 layout = self.renderer.render(
                     worksheet,
                     image_path,
-                    input_data.max_rows,
-                    input_data.max_columns,
+                    cfg.max_rows,
+                    cfg.max_columns,
                 )
                 try:
                     detected_boxes = self.extractor.detect(image_path)
