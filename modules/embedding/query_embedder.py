@@ -1,3 +1,42 @@
+"""Decomposer에서 분해된 각 원자적 서브쿼리들을 고밀도 임베딩 벡터로 변환하는 모듈.
+
+서브쿼리 텍스트 목록을 받아 OpenAI 또는 Dense 임베딩 모델을 통해 L2 정규화된 고밀도 실수 벡터를 생성하고,
+후속 벡터 검색기(Retriever)에 전달할 맵핑 딕셔너리(`items: {subquery_text: vector}`)를 구성합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "query_context": {
+        "question_id": "q-001",
+        "question_text": "삼성전자 영업이익"
+      },
+      "subqueries": [
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
+      ]
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "query_context": {
+        "question_id": "q-001",
+        "question_text": "삼성전자 영업이익"
+      },
+      "items": {
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?": [0.0123, -0.0456, 0.0789]
+      },
+      "model": "text-embedding-3-large",
+      "dimension": 3072,
+      "metrics": {
+        "latency_seconds": 0.08,
+        "estimated_cost_usd": 0.00001
+      }
+    }
+    ```
+"""
+
 from __future__ import annotations
 
 # ==============================================================================

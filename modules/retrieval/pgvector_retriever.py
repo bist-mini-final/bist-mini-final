@@ -1,3 +1,46 @@
+"""PostgreSQL pgvector 인덱스에 대해 HNSW 코사인 유사도 검색을 수행하는 고밀도(Dense) 벡터 검색기 모듈.
+
+서브쿼리 임베딩 벡터들과 라우팅 스코프(기업, 시트 필터)를 기반으로
+PostgreSQL 데이터베이스의 개별 셀 벡터 테이블을 병렬로 질의하여 상위 Top-K 검색 후보(Ranked Candidates)를 반환합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "query_input": {
+        "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+        "items": {"Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?": [0.01, -0.02]}
+      },
+      "index_input": {
+        "index_id": "rag_cells_a1b2c3d4",
+        "file_name": "samsung_2023.xlsx",
+        "workbook_hash": "a1b2c3d4...",
+        "model": "text-embedding-3-large",
+        "dimension": 3072,
+        "document_count": 1200
+      },
+      "semantic_match": null
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+      "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+      "items": [
+        {
+          "rank": 1,
+          "cell_id": "IS_C5",
+          "score": 0.945,
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
+          "matched_subquery": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
+        }
+      ]
+    }
+    ```
+"""
+
 from __future__ import annotations
 
 # ==============================================================================

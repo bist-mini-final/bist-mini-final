@@ -1,3 +1,41 @@
+"""셀 텍스트 임베딩 벡터와 셀 메타데이터를 PostgreSQL 16 pgvector HNSW 인덱스 테이블에 영구 적재하는 모듈.
+
+CellTextEmbedder에서 생성된 부동소수점 임베딩 아티팩트와 원본 엑셀 셀 정보를 결합하여
+고속 바이너리 복사(COPY) 및 트랜잭션 단위로 pgvector 테이블에 벌크 삽입(bulk insert)합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023_financials.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "model": "text-embedding-3-large",
+      "dimension": 3072,
+      "embedding_artifact_path": "data/artifacts/embeddings/a1b2c3d4.bin",
+      "items": [
+        {
+          "sheet_name": "손익계산서",
+          "row_index": 5,
+          "column_index": 2,
+          "cell_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+        }
+      ]
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "index_id": "idx_a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "file_name": "samsung_2023_financials.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "model": "text-embedding-3-large",
+      "dimension": 3072,
+      "document_count": 1250
+    }
+    ```
+"""
+
 from __future__ import annotations
 
 import logging

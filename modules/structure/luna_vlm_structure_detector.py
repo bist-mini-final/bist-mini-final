@@ -1,4 +1,37 @@
-"""Exhaustive whole-sheet table structure analysis with GPT-5.6 Luna vision."""
+"""시각적 렌더링(VLM) 및 셀 그리드 기하학을 결합하여 복합 엑셀 시트 내 다중 표 구조와 헤더 계층을 감지하는 모듈.
+
+엑셀 워크시트 이미지를 렌더링하고 VLM(Vision-Language Model)에 전달하여
+시트 내 개별 표 영역(테이블 바운딩 박스), 열/행 헤더 영역, 데이터 본문 영역, 복합 병합 헤더 트리를 감지합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "sheet_names": ["손익계산서"]
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "tables": [
+        {
+          "table_id": "tbl_01",
+          "sheet_name": "손익계산서",
+          "table_type": "primary",
+          "bounding_box": {"start_row": 3, "start_col": 1, "end_row": 45, "end_col": 6},
+          "column_header_range": {"start_row": 3, "start_col": 1, "end_row": 4, "end_col": 6},
+          "row_header_range": {"start_row": 5, "start_col": 1, "end_row": 45, "end_col": 1},
+          "data_range": {"start_row": 5, "start_col": 2, "end_row": 45, "end_col": 6}
+        }
+      ]
+    }
+    ```
+"""
 
 from __future__ import annotations
 

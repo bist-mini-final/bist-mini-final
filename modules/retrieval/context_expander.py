@@ -1,4 +1,37 @@
-"""PostgreSQL On-Demand Context Expander directly querying timeseries and header context."""
+"""검색된 핵심 셀 좌표를 기반으로 PostgreSQL DB에서 시계열 전체 행 및 인접 셀 컨텍스트를 확장 복원하는 모듈.
+
+단일 셀 검색 결과에 대해 주변 인접 행(adjacent radius)과 동일 계정 과목의 과거 시계열 연도별 수치 전체를
+PostgreSQL에서 온디맨드로 조회하여 Reader LLM이 표의 문맥을 완벽히 이해할 수 있는 테이블 블록 문자열로 확장합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "retrieval_input": {
+        "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+        "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+        "items": [
+          {"rank": 1, "cell_id": "IS_C5", "score": 0.032, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
+        ]
+      }
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+      "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+      "top_k_used": 1,
+      "adjacent_radius": 1,
+      "context_characters": 512,
+      "context_blocks": [
+        "[Sheet: 손익계산서 | Row 5]\n- 영업수익: 2021=2796048, 2022=3022314, 2023=2589355\n- 영업이익: 2021=516339, 2022=433766, 2023=65670\n- 당기순이익: 2021=399074, 2022=556541, 2023=154871"
+      ],
+      "block_count": 1
+    }
+    ```
+"""
 
 from __future__ import annotations
 

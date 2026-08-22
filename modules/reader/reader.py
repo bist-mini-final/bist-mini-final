@@ -1,4 +1,58 @@
-"""Integrated Agentic Reader synthesizing final answers with LangChain BaseTool native DB lookup and math calculation tools."""
+"""복원된 엑셀 컨텍스트와 LangChain 도구(Tool)를 활용하여 정밀 추론 및 최종 질의응답을 생성하는 에이전틱 Reader 모듈.
+
+확장된 시계열 및 인접 행 컨텍스트를 바탕으로 답변을 작성하며,
+필요시 추가 셀 검색 도구(`query_cell_context`) 및 AST 결정론적 정밀 수식 계산 도구(`calculate_math_expression`)를
+멀티턴 루프로 호출하여 환각 없는 정확한 수치 계산과 논리적 근거를 갖춘 최종 답변을 합성합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "context_json": {
+        "query_context": {
+          "question_id": "q-001",
+          "question_text": "2023년 삼성전자 영업이익과 2022년 대비 증감율은 얼마인가요?"
+        },
+        "document_context": {
+          "file_name": "samsung_2023.xlsx",
+          "workbook_hash": "a1b2c3d4..."
+        },
+        "top_k_used": 1,
+        "adjacent_radius": 1,
+        "context_characters": 350,
+        "context_blocks": [
+          "[Sheet: 손익계산서 | Row 5]\n- 영업이익: 2022=433766, 2023=65670 (단위: 억원)"
+        ],
+        "block_count": 1
+      }
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "answer_json": {
+        "query_context": {
+          "question_id": "q-001",
+          "question_text": "2023년 삼성전자 영업이익과 2022년 대비 증감율은 얼마인가요?"
+        },
+        "document_context": {
+          "file_name": "samsung_2023.xlsx",
+          "workbook_hash": "a1b2c3d4..."
+        },
+        "model": "gpt-4o",
+        "answer": "2023년 삼성전자의 영업이익은 65,670억원이며, 2022년(433,766억원) 대비 약 84.86% 감소했습니다.",
+        "api_usage": {
+          "prompt_tokens": 450,
+          "completion_tokens": 65,
+          "total_tokens": 515
+        },
+        "latency_seconds": 1.25,
+        "estimated_cost_usd": 0.0015
+      }
+    }
+    ```
+"""
 
 from __future__ import annotations
 

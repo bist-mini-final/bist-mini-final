@@ -1,3 +1,38 @@
+"""감지된 표 구조와 엑셀 원본 셀 데이터를 결합하여 대칭적 검색 문자열(Structured Cell Text)을 직렬화하는 모듈.
+
+각 셀의 (행 헤더 계층, 열 헤더/회계기간 계층, 셀 값, 시트명)을 결합하여
+`Company: ... | Sheet: ... | Row Header: ... | Column Header: ... | Cell Value: ...` 표준 포맷의 검색 청크 텍스트를 생성합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "tables": []
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "items": [
+        {
+          "cell_id": "IS_C5",
+          "sheet_name": "손익계산서",
+          "cell_coord": "C5",
+          "row_header": ["영업이익"],
+          "column_header": ["2023"],
+          "cell_value": "65670",
+          "cell_text": "Company: ? | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+        }
+      ]
+    }
+    ```
+"""
+
 from __future__ import annotations
 
 import logging

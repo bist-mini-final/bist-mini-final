@@ -1,12 +1,33 @@
-"""
-QA Example Bank Loader
-─────────────────────
-시맨틱 쿼리 매칭 라우팅 시연용 Source 모듈.
+"""질의 라우팅 벤치마크 및 시연용 QA 예시 뱅크를 로드하는 소스 모듈.
 
-data/qa_examples/ 아래의 JSON 파일에서 QA 예시 세트를 로드합니다.
-각 항목은 {"question": "...", "route": "...", "sheet": "..."} 구조이며
-임베딩 유사도 검색으로 라우팅 대상을 결정할 때 사용됩니다.
+`data/qa_examples/` 디렉터리의 JSON 파일 또는 내장 프리셋으로부터 사전 정의된 질문-시트 라우팅 예시 목록을 로드하여
+시맨틱 매처 모듈이 참조할 수 있는 구조화된 카탈로그를 제공합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "file_name": "sample_qa_bank.json"
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "examples": [
+        {
+          "question": "2023년 삼성전자 영업이익은?",
+          "route": "손익계산서",
+          "sheet": "손익계산서",
+          "description": "단일 지표 조회"
+        }
+      ],
+      "total_count": 1
+    }
+    ```
 """
+
+from __future__ import annotations
 import json
 import logging
 from pathlib import Path

@@ -1,3 +1,37 @@
+"""PostgreSQL pgvector에 이미 적재된 벡터 컬렉션을 조회하여 후속 검색 모듈용 DTO로 변환 로드하는 모듈.
+
+지정된 컬렉션 ID 또는 파일명을 기반으로 pgvector 메타데이터 및 문서 레코드를 조회하여,
+Retriever 모듈들이 즉시 사용할 수 있는 `document_output` 및 `index_output` 포트를 구성합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "collection_name": "samsung_2023_financials.xlsx",
+      "collection_names": []
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "document_output": {
+        "file_name": "samsung_2023_financials.xlsx",
+        "workbook_hash": "a1b2c3d4...",
+        "items": []
+      },
+      "index_output": {
+        "index_id": "rag_cells_a1b2c3d4",
+        "file_name": "samsung_2023_financials.xlsx",
+        "workbook_hash": "a1b2c3d4...",
+        "model": "text-embedding-3-large",
+        "dimension": 3072,
+        "document_count": 1500
+      }
+    }
+    ```
+"""
+
 from __future__ import annotations
 
 # ==============================================================================

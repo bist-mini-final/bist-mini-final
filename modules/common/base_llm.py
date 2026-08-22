@@ -1,4 +1,8 @@
-"""Base LLM module abstraction providing streamlined structured & textual completion."""
+"""LLM 호출, Pydantic 정형 출력 파싱, 에이전틱 도구 루프, 비용/토큰 집계를 전담하는 LLM 기본 클래스(BaseLLMModule).
+
+자식 모듈의 중복 코드를 제거하고, `complete_structured()`, `complete_text()`, `complete_agentic()` 메서드를 통해
+1줄 호출로 LLM 추론 및 성능 텔레메트리를 자동 집계합니다.
+"""
 
 from __future__ import annotations
 

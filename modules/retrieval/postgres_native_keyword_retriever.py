@@ -1,4 +1,47 @@
-"""PostgreSQL Native GIN Full-Text Keyword Search Module."""
+"""PostgreSQL Native GIN FTS(전문 검색) 및 BM25 랭킹을 활용하는 희소(Sparse) 키워드 검색기 모듈.
+
+서브쿼리 내 핵심 키워드 토큰을 추출하여 PostgreSQL의 `to_tsvector` 및 `plainto_tsquery` GIN 인덱스를 질의하고,
+정확한 단어 매칭 및 텍스트 랭킹 점수(ts_rank) 기반 상위 Top-K 검색 후보를 반환합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "query_input": {
+        "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+        "subqueries": [
+          "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
+        ]
+      },
+      "index_input": {
+        "index_id": "rag_cells_a1b2c3d4",
+        "file_name": "samsung_2023.xlsx",
+        "workbook_hash": "a1b2c3d4...",
+        "model": "text-embedding-3-large",
+        "dimension": 3072,
+        "document_count": 1200
+      },
+      "semantic_match": null
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+      "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+      "items": [
+        {
+          "rank": 1,
+          "cell_id": "IS_C5",
+          "score": 0.825,
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
+          "matched_subquery": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
+        }
+      ]
+    }
+    ```
+"""
 
 from __future__ import annotations
 

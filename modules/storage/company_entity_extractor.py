@@ -1,4 +1,39 @@
-"""Extract a company entity from a selected workbook."""
+"""선택된 엑셀 통합 문서로부터 기업 엔티티(공식 기업명, 티커, 표시명)를 LLM으로 추출하고 DB에 영속화하는 모듈.
+
+통합 문서의 파일명, 시트명 목록, 상단 헤더 셀 텍스트를 샘플링하여 LLM 프롬프트에 전달하고,
+추출된 기업명 및 티커 정보를 pgvector 메타데이터 컬렉션에 자동 매핑/저장합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "index_input": {
+        "collection_name": "rag_cells_a1b2c3d4",
+        "workbook_hash": "a1b2c3d4...",
+        "vector_count": 1200
+      },
+      "file_name": "samsung_2023_financials.xlsx",
+      "workbook_hash": "a1b2c3d4..."
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "company_name": "삼성전자",
+      "ticker": "005930",
+      "display_name": "삼성전자 (005930)",
+      "confidence": "high",
+      "persisted": true,
+      "collection_name": "rag_cells_a1b2c3d4",
+      "metrics": {
+        "kind": "llm_structured",
+        "model": "gpt-4o-mini",
+        "latency_seconds": 0.45
+      }
+    }
+    ```
+"""
 
 from __future__ import annotations
 

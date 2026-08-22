@@ -1,4 +1,46 @@
-"""Excel Cell Text Document Embedder for Data Ingestion / Indexing."""
+"""직렬화된 엑셀 셀 텍스트 목록을 배치 임베딩하여 바이너리 아티팩트로 저장하는 인덱싱 모듈.
+
+CellTextSerializer로부터 생성된 직렬화 셀 텍스트들을 배치 단위로 OpenAI 또는 로컬 임베딩 모델에 전달하고,
+고밀도 Float32 바이너리 아티팩트 파일(`data/artifacts/embeddings/`)로 안전하게 디스크에 직렬화 저장합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "items": [
+        {
+          "cell_id": "IS_C5",
+          "sheet_name": "손익계산서",
+          "cell_coord": "C5",
+          "row_header": ["영업이익"],
+          "column_header": ["2023"],
+          "cell_value": "65670",
+          "cell_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+        }
+      ]
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "file_name": "samsung_2023.xlsx",
+      "workbook_hash": "a1b2c3d4...",
+      "model": "text-embedding-3-large",
+      "dimension": 3072,
+      "embedding_artifact_path": "data/artifacts/embeddings/a1b2c3d4.bin",
+      "items": [],
+      "metrics": {
+        "batch_count": 1,
+        "document_count": 1,
+        "latency_seconds": 0.15,
+        "estimated_cost_usd": 0.00005
+      }
+    }
+    ```
+"""
 
 from __future__ import annotations
 

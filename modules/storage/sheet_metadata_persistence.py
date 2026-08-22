@@ -1,4 +1,46 @@
-"""Persist workbook sheet metadata after the pgvector index exists."""
+"""pgvector 벡터 인덱싱 완료 후 엑셀 시트 메타데이터 및 감지된 표 구조를 PostgreSQL에 저장하는 모듈.
+
+엑셀 파일의 실제 행/열 차원(dimensions)과 VLM/파서로 감지된 테이블 바운딩 박스를
+데이터베이스의 `sheet_metadata` 테이블에 영속화합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "structure_input": {
+        "file_name": "samsung_2023.xlsx",
+        "workbook_hash": "a1b2c3d4...",
+        "sheet_names": ["손익계산서", "재무상태표"]
+      },
+      "index_input": {
+        "collection_name": "rag_cells_a1b2c3d4",
+        "workbook_hash": "a1b2c3d4...",
+        "vector_count": 1500
+      }
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "sheets_saved": 2,
+      "sheet_details": [
+        {
+          "sheet_name": "손익계산서",
+          "row_count": 85,
+          "column_count": 12,
+          "table_count": 1
+        },
+        {
+          "sheet_name": "재무상태표",
+          "row_count": 110,
+          "column_count": 14,
+          "table_count": 1
+        }
+      ]
+    }
+    ```
+"""
 
 from __future__ import annotations
 

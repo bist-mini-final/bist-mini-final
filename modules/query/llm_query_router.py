@@ -1,4 +1,51 @@
-"""Zero-shot structured LLM Query Router for extracting target companies, topics, and sheet categories."""
+"""자연어 질문에서 대상 기업, 질문 토픽, 재무제표 시트 카테고리를 추론하는 Zero-shot LLM 라우터 모듈.
+
+정적 사전에 의존하지 않고 최신 LLM의 구조화 추론을 활용하여 질문 내 언급된 대상 기업(엔티티)과
+관련 재무제표 카테고리(BS, IS, CF 등), 추천 시트 목록을 결정론적으로 추출합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "query_context": {
+        "question_id": "q-001",
+        "question_text": "삼성전자 작년 매출액이랑 영업이익 얼마야?"
+      }
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "semantic_match": {
+        "matched": true,
+        "target": "손익계산서",
+        "confidence": 0.95,
+        "sheets": ["손익계산서", "포괄손익계산서"],
+        "company_name": "삼성전자",
+        "company_scopes": [
+          {
+            "raw_mention": "삼성전자",
+            "canonical_name": "삼성전자",
+            "matched_score": 1.0,
+            "target_topics": ["매출액", "영업이익"],
+            "suggested_sheets": ["손익계산서"]
+          }
+        ],
+        "reason": "삼성전자 손익계산서 항목(매출액, 영업이익) 조회 질의",
+        "matches": [],
+        "query_type": null,
+        "subqueries": [],
+        "metrics": {
+          "kind": "llm_structured",
+          "model": "gpt-4o-mini",
+          "latency_seconds": 0.32,
+          "estimated_cost_usd": 0.00012
+        }
+      }
+    }
+    ```
+"""
 
 from __future__ import annotations
 
@@ -40,17 +87,17 @@ Always extract normalized canonical company names and specific financial topics.
 # 3. DTOs & Schema Definitions
 # ==============================================================================
 class CompanyScopeItemDTO(ModuleDTO):
-    """Specific company scope and target financial topics extracted from query."""
+    """질문에서 추출된 기업 엔티티 및 세부 지표 스코프 DTO."""
 
     raw_mention: Optional[str] = Field(default=None, description="질문 내 원본 기업 언급 (예: '삼전', '하닉')")
     canonical_name: str = Field(description="정규화된 공식 기업명 (예: '삼성전자', 'SK하이닉스')")
-    matched_score: float = Field(default=1.0, ge=0.0, le=1.0, description="엔티티 매칭 점수")
+    matched_score: float = Field(default=1.0, ge=0.0, le=1.0, description="엔티티 매칭 점수 (0.0 ~ 1.0)")
     target_topics: List[str] = Field(default_factory=list, description="추출된 질문 지표/토픽 (예: '영업이익', '매출액')")
     suggested_sheets: List[str] = Field(default_factory=list, description="매핑 추천 시트 목록")
 
 
 class LlmRouterResponse(BaseModel):
-    """Pydantic structured response schema for LLM completion."""
+    """LLM Structured Output 응답 파싱 스키마."""
 
     target: Optional[str] = Field(default=None, description="재무제표 카테고리 (예: '손익계산서', '재무상태표', '현금흐름표')")
     confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="라우팅 신뢰도 (0.0 ~ 1.0)")
@@ -63,7 +110,7 @@ class LlmRouterResponse(BaseModel):
 
 
 class RouterDecisionDTO(ModuleDTO):
-    """Self-contained structured routing decision payload."""
+    """자급자족형 구조화 라우팅 결과 DTO."""
 
     matched: bool = Field(description="유효한 라우팅 대상 매칭 여부")
     target: Optional[str] = Field(default=None, description="라우팅 대상 카테고리")
@@ -79,19 +126,19 @@ class RouterDecisionDTO(ModuleDTO):
 
 
 class LlmQueryRouterInputDTO(ModuleInputDTO):
-    """Input contract containing user query context."""
+    """LLM Query Router 입력 DTO 계약."""
 
     query_context: QueryContextDTO = Field(description="사용자 질문 컨텍스트")
 
 
 class LlmQueryRouterConfigDTO(ModuleConfigDTO):
-    """Configuration contract for LLM Query Router."""
+    """LLM Query Router 설정 DTO 계약."""
 
     model: str = Field(default=DEFAULT_ROUTER_MODEL, description="질의 라우팅에 사용할 LLM 모델 ID")
 
 
 class LlmQueryRouterOutputDTO(ModuleDTO):
-    """Output contract containing self-contained routing decision."""
+    """LLM Query Router 출력 DTO 계약."""
 
     semantic_match: RouterDecisionDTO = Field(description="정형화된 시맨틱 매치 및 스코프 결과")
 
@@ -100,7 +147,16 @@ class LlmQueryRouterOutputDTO(ModuleDTO):
 # 4. Module Implementation
 # ==============================================================================
 class LlmQueryRouterModule(BaseLLMModule):
-    """Zero-shot structured LLM Query Router that identifies target companies and financial sheet categories."""
+    """LLM 기반 자연어 질의 인텐트 및 대상 시트/기업 라우터 모듈.
+
+    사용자 질문을 분석하여 대상 기업과 재무제표 카테고리(BS, IS, CF 등) 및 시트 후보를 추론합니다.
+
+    Input:
+        - `query_context` (`QueryContextDTO`): 원본 사용자 질문 메타데이터 및 텍스트
+
+    Output:
+        - `semantic_match` (`RouterDecisionDTO`): 추론된 대상 기업, 재무 카테고리, 추천 시트 목록 및 신뢰도
+    """
 
     definition = ModuleDefinition(
         type="llm_query_router",

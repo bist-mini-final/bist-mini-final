@@ -1,3 +1,47 @@
+"""밀집(Dense) 벡터 검색과 희소(Sparse/BM25) 키워드 검색의 순위 결과를 상호 순위 융합(Reciprocal Rank Fusion)하는 하이브리드 결합 모듈.
+
+Dense 검색과 BM25 검색의 후보 순위를 `score = sum(1 / (k + rank))` 공식을 통해 융합하여,
+어휘적 일치(Exact Match)와 의미론적 유사성(Semantic Similarity)의 장점을 모두 취합한 최적의 셀 후보 목록을 산출합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "dense_result": {
+        "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+        "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+        "items": [
+          {"rank": 1, "cell_id": "IS_C5", "score": 0.95, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
+        ]
+      },
+      "bm25_result": {
+        "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+        "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+        "items": [
+          {"rank": 1, "cell_id": "IS_C5", "score": 0.85, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
+        ]
+      }
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
+      "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
+      "items": [
+        {
+          "rank": 1,
+          "cell_id": "IS_C5",
+          "rrf_score": 0.03278,
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
+          "matched_subquery": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
+        }
+      ]
+    }
+    ```
+"""
+
 from __future__ import annotations
 
 # ==============================================================================

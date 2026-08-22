@@ -1,4 +1,50 @@
-"""Workflow module wrapper for the isolated semantic query matcher and LLM router."""
+"""질문과 사전 정의된 쿼리 뱅크 예제 간의 임베딩 코사인 유사도를 계산하여 대상 시트를 라우팅하는 모듈.
+
+질문 임베딩을 생성한 후 카탈로그 내 과거 질문 예시들과의 KNN 코사인 유사도를 측정하고,
+설정된 임계값(threshold)과 보팅 마진(vote_margin)을 기반으로 대상 재무제표 시트와 카테고리를 결정합니다.
+
+Example:
+    Input DTO (입력 예시):
+    ```json
+    {
+      "query_context": {
+        "question_id": "q-001",
+        "question_text": "2023년 손익계산서 보여줘"
+      }
+    }
+    ```
+
+    Output DTO (출력 예시):
+    ```json
+    {
+      "semantic_match": {
+        "matched": true,
+        "target": "손익계산서",
+        "confidence": 0.92,
+        "sheets": ["손익계산서"],
+        "company_name": null,
+        "company_scopes": [],
+        "reason": "Cosine match against example '손익계산서 조회'",
+        "matches": [
+          {
+            "example_id": "ex-01",
+            "question": "손익계산서 조회",
+            "target": "손익계산서",
+            "sheets": ["손익계산서"],
+            "similarity": 0.92
+          }
+        ],
+        "query_type": 1,
+        "subqueries": [],
+        "metrics": {
+          "kind": "cosine",
+          "model": "text-embedding-3-large",
+          "latency_seconds": 0.05
+        }
+      }
+    }
+    ```
+"""
 
 from __future__ import annotations
 

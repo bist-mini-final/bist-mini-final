@@ -1,4 +1,8 @@
-"""Clean, strictly-typed base abstractions for all modular RAG pipeline components."""
+"""모든 RAG 파이프라인 모듈의 최상위 추상 기본 클래스(BaseModule) 및 공통 DTO 정의.
+
+템플릿 메서드 패턴(`run()`), Pydantic 입력/출력/설정 계약 자동 검증,
+에러 분류 래핑 및 Swagger OpenAPI 계약 명세 직렬화 기능을 제공합니다.
+"""
 
 from __future__ import annotations
 

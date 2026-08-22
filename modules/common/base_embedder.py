@@ -1,4 +1,8 @@
-"""Centralized base embedding module abstraction with encoder lifecycle, model & dimension management."""
+"""임베딩 인코더 생명주기 관리 및 배치 임베딩 생성을 전담하는 임베딩 기본 클래스(BaseEmbeddingModule).
+
+LangChain Embeddings 표준 어댑터 기반으로 텍스트 인코딩, 차원 검증, 배치 분할,
+진행률 스트리밍 및 API 비용 계산을 일괄 처리합니다.
+"""
 
 from __future__ import annotations
 
