@@ -40,7 +40,7 @@ def test_end_to_end_query_reader_pipeline():
     dec = cast(Any, registry.get("decomposer"))
     dec.completion_client = mock_llm
     res_dec = dec.run(DecomposerInputDTO(query_context=res_qi["query_context"]))
-    assert len(res_dec["subqueries"]) == 2
+    assert len(res_dec["items"]) == 2
 
     # 3. Embedder
     mock_encoder = MagicMock()

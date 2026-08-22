@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from modules.common.base_module import QueryContextDTO
-from modules.query.decomposer import SubqueriesDTO
+from modules.query.decomposer import SubqueriesDTO, SubqueryItem
 from modules.retrieval.postgres_native_keyword_retriever import (
     PostgresNativeKeywordRetrieverConfigDTO,
     PostgresNativeKeywordRetrieverInputDTO,
@@ -27,7 +27,15 @@ def test_postgres_native_keyword_retriever_execution():
     input_dto = PostgresNativeKeywordRetrieverInputDTO(
         query_input=SubqueriesDTO(
             query_context=QueryContextDTO(question_id="1", question_text="영업이익"),
-            subqueries=["Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"],
+            items=[
+                SubqueryItem(
+                    company="삼성전자",
+                    sheet="손익계산서",
+                    row_header="영업이익",
+                    column_header="2023",
+                    text="Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?",
+                )
+            ],
         ),
         index_input=IndexOutputDTO(
             index_id="idx_1",

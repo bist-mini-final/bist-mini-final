@@ -56,10 +56,6 @@ Example:
           "cell_value": "?",
           "text": "Company: 현대자동차 | Sheet: 재무상태표 | Row Header: 부채총계 | Column Header: 2022 | Cell Value: ?"
         }
-      ],
-      "subqueries": [
-        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?",
-        "Company: 현대자동차 | Sheet: 재무상태표 | Row Header: 부채총계 | Column Header: 2022 | Cell Value: ?"
       ]
     }
     ```
@@ -73,7 +69,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from modules.common.base_llm import (
     BaseLLMModule,
@@ -181,10 +177,25 @@ class SubqueriesDTO(ModuleDTO):
         default_factory=list,
         description="구조화된 원자적 서브쿼리 객체 목록 (company, sheet, row_header, column_header, cell_value, text)",
     )
-    subqueries: List[str] = Field(
-        default_factory=list,
-        description="직렬화된 단일 셀 검색 서브쿼리 문자열 목록 (하위 호환 및 임베더용)",
-    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_subqueries_input(cls, data: Any) -> Any:
+        """subqueries 리스트가 전달될 경우 items 목록으로 자동 변환합니다."""
+        if isinstance(data, dict):
+            raw_items = data.get("items")
+            raw_subqueries = data.get("subqueries")
+            if not raw_items and raw_subqueries:
+                data["items"] = [
+                    SubqueryItem(text=sq) if isinstance(sq, str) else sq
+                    for sq in raw_subqueries
+                ]
+        return data
+
+    @property
+    def subqueries(self) -> List[str]:
+        """직렬화된 단일 셀 검색 서브쿼리 문자열 목록 (하위 호환 헬퍼 프로퍼티)."""
+        return [item.text or item.to_serialized_query() for item in self.items]
 
 
 # Backward compatibility aliases
@@ -207,7 +218,6 @@ class DecomposerModule(BaseLLMModule):
     Output:
         - `query_context` (`QueryContextDTO`): 원본 사용자 질문 컨텍스트 전달
         - `items` (`List[SubqueryItem]`): 기업명, 시트명, 행/열 헤더 및 text를 포함한 구조화 서브쿼리 목록
-        - `subqueries` (`List[str]`): 분해된 직렬화 셀 서브쿼리 문자열 리스트
     """
 
     definition = ModuleDefinition(
@@ -292,12 +302,10 @@ class DecomposerModule(BaseLLMModule):
                 items_dict[serialized] = item
 
         items_list = list(items_dict.values())
-        subqueries_list = list(items_dict.keys())
 
         return {
             "query_context": input_data.query_context.model_dump(mode="json"),
             "items": [item.model_dump(mode="json") for item in items_list],
-            "subqueries": subqueries_list,
         }
 
 

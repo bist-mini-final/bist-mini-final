@@ -8,7 +8,7 @@ from modules.embedding.query_embedder import (
     EmbedderInputDTO,
     EmbedderModule,
 )
-from modules.query.decomposer import SubqueriesDTO
+from modules.query.decomposer import SubqueriesDTO, SubqueryItem
 
 
 def test_query_embedder_execution():
@@ -18,7 +18,10 @@ def test_query_embedder_execution():
     embedder = EmbedderModule(encoder=mock_encoder)
     subqueries_dto = SubqueriesDTO(
         query_context=QueryContextDTO(question_id="q1", question_text="삼성전자 매출"),
-        subqueries=["subquery 1", "subquery 2"],
+        items=[
+            SubqueryItem(text="subquery 1"),
+            SubqueryItem(text="subquery 2"),
+        ],
     )
     input_dto = EmbedderInputDTO(query_input=subqueries_dto)
     result = embedder.execute(input_dto, config=EmbedderConfigDTO(model="text-embedding-3-large"))
