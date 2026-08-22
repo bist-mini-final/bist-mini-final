@@ -55,14 +55,14 @@ npm run dev
 
 ### 백엔드 테스트 (Pytest)
 ```bash
-# 전체 테스트 실행 (단위 테스트 + BI + 파이프라인 통합 테스트)
+# 전체 테스트 실행 (모듈 단위/통합 테스트 + BI 스위트)
 uv run pytest
 
-# 개별 모듈 단위 테스트만 실행
+# 모듈 단위 및 파이프라인 통합 테스트 실행
 uv run pytest tests/modules -v
 
-# RAG 파이프라인 E2E 통합 테스트만 실행
-uv run pytest tests/test_modules_pipeline.py -v
+# 특정 모듈 단위 테스트 실행 (예: Decomposer)
+uv run pytest tests/modules/test_decomposer.py -v
 ```
 
 ### 프론트엔드 테스트 (Vitest)
@@ -91,8 +91,6 @@ bist-mini-final/
 │   ├── retrieval/            # Dense/Sparse Retriever, RRF Fusion, Expander
 │   └── storage/              # File Selector, Metadata Persistence, PG Loader/Writer
 ├── tests/                    # 테스트 스위트
-│   ├── modules/              # 19개 모듈별 독립 단위 테스트 (test_*.py)
-│   ├── test_base_module.py   # BaseModule/BaseLLMModule 공통 기능 검증
-│   └── test_modules_pipeline.py # RAG 파이프라인 E2E 통합 테스트
+│   └── modules/              # BaseModule, 19개 모듈 단위 테스트 및 파이프라인 통합 테스트
 └── data/                     # 워크플로 템플릿 및 데이터 저장소
 ```
