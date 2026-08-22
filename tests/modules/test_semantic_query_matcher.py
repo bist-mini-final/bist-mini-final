@@ -36,3 +36,5 @@ def test_semantic_query_matcher_module_with_mock_encoder():
     assert "semantic_match" in res
     assert res["semantic_match"]["matched"] is True
     assert res["semantic_match"]["target"] == "손익계산서"
+    assert len(res["semantic_match"]["items"]) == 1
+    assert res["semantic_match"]["items"][0]["similarity"] == 1.0

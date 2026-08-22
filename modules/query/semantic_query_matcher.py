@@ -354,16 +354,23 @@ def _legacy_router_metrics() -> RouterMetricsDTO:
 
 class SemanticQueryMatchOutput(ModuleDTO):
     matched: bool
-    target: Optional[str]
-    confidence: float
-    sheets: List[str]
-    reason: str
+    target: Optional[str] = None
+    sheets: List[str] = Field(default_factory=list)
+    items: List[SemanticMatchItemDTO] = Field(default_factory=list, description="매칭된 쿼리 뱅크 예제 목록")
+    reason: Optional[str] = None
     company_name: Optional[str] = Field(default=None, description="질문 또는 컨텍스트에서 추출된 단일/대표 대상 기업명")
     company_scopes: List[CompanyScopeItemDTO] = Field(default_factory=list, description="질문에서 추출된 기업별 세부 인텐트 스코프 목록")
-    matches: List[SemanticMatchItemDTO]
     query_type: Optional[int] = None
     subqueries: List[str] = Field(default_factory=list)
     metrics: RouterMetricsDTO = Field(default_factory=_legacy_router_metrics)
+
+    @property
+    def matches(self) -> List[SemanticMatchItemDTO]:
+        return self.items
+
+    @property
+    def confidence(self) -> float:
+        return self.items[0].similarity if self.items else (1.0 if self.matched else 0.0)
 
 
 class SemanticQueryMatcherWorkflowOutput(ModuleDTO):
@@ -458,12 +465,10 @@ class SemanticQueryMatcherModule(BaseModule):
             "semantic_match": {
                 "matched": decision.target is not None,
                 "target": decision.target,
-                "confidence": round(decision.confidence, 10),
                 "sheets": list(decision.sheets),
                 "company_name": decision.company_name,
                 "company_scopes": [],
-                "reason": decision.reason,
-                "matches": [
+                "items": [
                     {
                         "example_id": match.example_id,
                         "question": match.question,
@@ -473,6 +478,7 @@ class SemanticQueryMatcherModule(BaseModule):
                     }
                     for match in decision.matches
                 ],
+                "reason": decision.reason,
                 "query_type": decision.query_type,
                 "subqueries": list(decision.subqueries),
                 "metrics": {
