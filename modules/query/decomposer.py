@@ -17,13 +17,11 @@ Example:
         "items": [
           {
             "company_name": "삼성전자",
-            "sheets": ["손익계산서"],
-            "target_topics": ["영업이익"]
+            "sheets": ["손익계산서"]
           },
           {
             "company_name": "현대자동차",
-            "sheets": ["재무상태표"],
-            "target_topics": ["부채상태", "부채총계"]
+            "sheets": ["재무상태표"]
           }
         ]
       }
@@ -262,16 +260,12 @@ class DecomposerModule(BaseLLMModule):
                     cname = getattr(sc, "company_name", None) or getattr(sc, "canonical_name", None) or (
                         sc.get("company_name") or sc.get("canonical_name") if isinstance(sc, dict) else ""
                     )
-                    topics = getattr(sc, "target_topics", None) or (
-                        sc.get("target_topics") if isinstance(sc, dict) else []
-                    )
                     sheets = getattr(sc, "sheets", None) or getattr(sc, "suggested_sheets", None) or (
                         sc.get("sheets") or sc.get("suggested_sheets") if isinstance(sc, dict) else []
                     )
-                    topics_str = ", ".join(str(t) for t in topics) if topics else ""
                     sheets_str = ", ".join(str(s) for s in sheets) if sheets else ""
                     scope_lines.append(
-                        f"- Scope {idx}: Company='{cname}' | Topics=[{topics_str}] | Target Sheets=[{sheets_str}]"
+                        f"- Scope {idx}: Company='{cname}' | Target Sheets=[{sheets_str}]"
                     )
                 entity_scope_prompt = "\n\n[LLM Router Target Data Scopes]:\n" + "\n".join(scope_lines)
             elif getattr(match, "company_name", None) or (isinstance(match, dict) and match.get("company_name")):

@@ -15,7 +15,7 @@ from modules.query.llm_query_router import (
 def test_llm_query_router_execution():
     mock_llm = MagicMock()
     mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}]}',
+        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"]}]}',
         usage={"prompt_tokens": 50, "completion_tokens": 30},
         latency_seconds=0.2,
     )
@@ -45,7 +45,7 @@ def test_llm_query_router_execution():
 def test_llm_query_router_multi_scope_execution():
     mock_llm = MagicMock()
     mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"], "target_topics": ["부채총계"]}]}',
+        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"]}]}',
         usage={"prompt_tokens": 60, "completion_tokens": 40},
         latency_seconds=0.25,
     )

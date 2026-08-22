@@ -22,22 +22,18 @@ Example:
         "items": [
           {
             "company_name": "삼성전자",
-            "raw_mention": "삼성전자",
-            "sheets": ["손익계산서"],
-            "target_topics": ["영업이익"]
+            "sheets": ["손익계산서"]
           },
           {
             "company_name": "현대자동차",
-            "raw_mention": "현대자동차",
-            "sheets": ["재무상태표"],
-            "target_topics": ["부채상태", "부채총계"]
+            "sheets": ["재무상태표"]
           }
         ],
         "metrics": {
           "kind": "llm_structured",
           "model": "gpt-5.6-luna",
-          "latency_seconds": 0.32,
-          "estimated_cost_usd": 0.00012
+          "latency_seconds": 0.21,
+          "estimated_cost_usd": 0.00008
         }
       }
     }
@@ -70,29 +66,27 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # 2. Prompts & Presets
 # ==============================================================================
-ROUTER_SYSTEM_PROMPT = """You are an expert spreadsheet query router for financial statements and corporate business data.
-Analyze the user's natural language question and extract ALL required data scopes (combinations of canonical Company Name, Financial Sheet Categories, and Specific Financial Topics) into the 'items' list.
+ROUTER_SYSTEM_PROMPT = """You are an expert financial spreadsheet query router.
+Analyze the user's natural language question and identify all required target data scopes (combinations of canonical Company Name and standard Financial Statement Sheet Categories) into the 'items' list.
 
 CRITICAL GUIDELINES:
 1. Multi-Entity & Multi-Sheet Support:
    - A single question may ask about multiple companies or multiple financial statements.
-   - ALWAYS extract each distinct (Company + Sheets + Topics) target as an individual item in 'items'.
+   - ALWAYS extract each distinct (Company Name + Target Sheets) as an individual item in 'items'.
 
 2. Company & Sheet Normalization:
-   - Identify the formal canonical corporate entity name.
-   - Infer the appropriate standard financial statement sheet names (e.g., '손익계산서', '재무상태표', '현금흐름표', '자본변동표') and specific financial topics."""
+   - Identify the formal canonical corporate entity name (e.g. '삼성전자', '현대자동차', 'SK하이닉스').
+   - Infer the relevant standard financial statement sheet names (e.g., '손익계산서', '재무상태표', '현금흐름표', '자본변동표')."""
 
 
 # ==============================================================================
 # 3. DTOs & Schema Definitions
 # ==============================================================================
 class CompanyScopeItemDTO(ModuleDTO):
-    """질문에서 추출된 기업 엔티티 및 세부 지표/시트 스코프 DTO."""
+    """질문에서 추출된 대상 기업 및 추천 재무제표 시트 스코프 DTO."""
 
     company_name: str = Field(description="정규화된 공식 기업명 (예: '삼성전자', '현대자동차')")
-    raw_mention: Optional[str] = Field(default=None, description="질문 내 원본 기업 언급 (예: '삼전', '현차')")
     sheets: List[str] = Field(default_factory=list, description="매핑 추천 시트 목록 (예: ['손익계산서'], ['재무상태표'])")
-    target_topics: List[str] = Field(default_factory=list, description="추출된 질문 지표/토픽 (예: ['영업이익', '매출액'])")
     reason: Optional[str] = Field(default=None, description="선택적 스코프 판단 근거")
 
     # Backward compatibility aliases
