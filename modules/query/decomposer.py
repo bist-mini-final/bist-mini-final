@@ -5,28 +5,29 @@
 정확히 부합하는 원자적 서브쿼리(Subquery) 목록으로 분해합니다.
 
 Example:
-    Input DTO (입력 예시 - LLM Query Router 연계):
+    Input DTO (입력 예시 - LLM Query Router 다중 스코프 연계):
     ```json
     {
       "query_context": {
         "question_id": "q-001",
-        "question_text": "삼성전자 2023년과 2022년 영업이익을 비교해줘"
+        "question_text": "삼성전자 2023년 영업이익과 현대자동차 2022년 부채상태를 비교해줘"
       },
       "semantic_match": {
         "matched": true,
-        "target": "손익계산서",
         "confidence": 0.95,
-        "sheets": ["손익계산서"],
-        "company_name": "삼성전자",
-        "company_scopes": [
+        "items": [
           {
-            "canonical_name": "삼성전자",
-            "matched_score": 1.0,
-            "target_topics": ["영업이익"],
-            "suggested_sheets": ["손익계산서"]
+            "company_name": "삼성전자",
+            "sheets": ["손익계산서"],
+            "target_topics": ["영업이익"]
+          },
+          {
+            "company_name": "현대자동차",
+            "sheets": ["재무상태표"],
+            "target_topics": ["부채상태", "부채총계"]
           }
         ],
-        "reason": "삼성전자 손익계산서 영업이익 비교 질의"
+        "reason": "삼성전자 손익계산서 및 현대자동차 재무상태표 복합 비교 질의"
       }
     }
     ```
@@ -36,11 +37,11 @@ Example:
     {
       "query_context": {
         "question_id": "q-001",
-        "question_text": "삼성전자 2023년과 2022년 영업이익을 비교해줘"
+        "question_text": "삼성전자 2023년 영업이익과 현대자동차 2022년 부채상태를 비교해줘"
       },
       "subqueries": [
         "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?",
-        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2022 | Cell Value: ?"
+        "Company: 현대자동차 | Sheet: 재무상태표 | Row Header: 부채총계 | Column Header: 2022 | Cell Value: ?"
       ]
     }
     ```
@@ -216,24 +217,24 @@ class DecomposerModule(BaseLLMModule):
         entity_scope_prompt = ""
         if match:
             scope_lines = []
-            scopes = getattr(match, "company_scopes", None) or (
-                match.get("company_scopes") if isinstance(match, dict) else []
+            scopes = getattr(match, "items", None) or getattr(match, "company_scopes", None) or (
+                match.get("items") or match.get("company_scopes") if isinstance(match, dict) else []
             )
             if scopes:
-                for sc in scopes:
-                    cname = getattr(sc, "canonical_name", None) or (
-                        sc.get("canonical_name") if isinstance(sc, dict) else ""
+                for idx, sc in enumerate(scopes, start=1):
+                    cname = getattr(sc, "company_name", None) or getattr(sc, "canonical_name", None) or (
+                        sc.get("company_name") or sc.get("canonical_name") if isinstance(sc, dict) else ""
                     )
                     topics = getattr(sc, "target_topics", None) or (
                         sc.get("target_topics") if isinstance(sc, dict) else []
                     )
-                    sheets = getattr(sc, "suggested_sheets", None) or (
-                        sc.get("suggested_sheets") if isinstance(sc, dict) else []
+                    sheets = getattr(sc, "sheets", None) or getattr(sc, "suggested_sheets", None) or (
+                        sc.get("sheets") or sc.get("suggested_sheets") if isinstance(sc, dict) else []
                     )
                     scope_lines.append(
-                        f"- Company: '{cname}' | Topics: [{', '.join(topics)}] | Suggested Sheets: [{', '.join(sheets)}]"
+                        f"- Scope {idx}: Company='{cname}' | Topics=[{', '.join(topics)}] | Target Sheets=[{', '.join(sheets)}]"
                     )
-                entity_scope_prompt = "\n\n[LLM Router Target Scopes]:\n" + "\n".join(scope_lines)
+                entity_scope_prompt = "\n\n[LLM Router Target Data Scopes]:\n" + "\n".join(scope_lines)
             elif getattr(match, "company_name", None) or (isinstance(match, dict) and match.get("company_name")):
                 cname = getattr(match, "company_name", None) or match.get("company_name")
                 sheets = getattr(match, "sheets", None) or (
