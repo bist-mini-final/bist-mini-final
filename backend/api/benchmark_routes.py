@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from statistics import mean
 from threading import Event, Lock, Thread
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Sequence
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -340,12 +340,12 @@ def _route_score(case: BenchmarkCase, router: Optional[Dict[str, Any]]) -> Optio
     }
 
 
-def _plan_score(case: BenchmarkCase, decomposition: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _plan_score(case: BenchmarkCase, decomposition: Any) -> Optional[Dict[str, Any]]:
     """Compare a produced retrieval plan with canonical holdout constraints."""
 
     if case.expected_plan is None:
         return None
-    subqueries = decomposition.get("subqueries", []) if decomposition else []
+    subqueries = decomposition.get("subqueries", []) if isinstance(decomposition, dict) else []
     signature = plan_signature(subqueries) if isinstance(subqueries, list) else None
     actual_metrics = set(signature.metrics) if signature else set()
     actual_periods = set(signature.periods) if signature else set()
@@ -366,14 +366,14 @@ def _plan_score(case: BenchmarkCase, decomposition: Optional[Dict[str, Any]]) ->
         "actual_metrics": sorted(actual_metrics),
         "expected_periods": sorted(expected_periods),
         "actual_periods": sorted(actual_periods),
-        "source": decomposition.get("source") if decomposition else None,
+        "source": decomposition.get("source") if isinstance(decomposition, dict) else None,
     }
 
 
 def _sheet_score(
     case: BenchmarkCase,
-    router: Optional[Dict[str, Any]],
-    decomposition: Optional[Dict[str, Any]],
+    router: Any,
+    decomposition: Any,
 ) -> Optional[Dict[str, Any]]:
     """Score concrete sheet selection from either a route or a structured plan."""
 

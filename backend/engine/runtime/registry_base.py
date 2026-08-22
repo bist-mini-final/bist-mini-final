@@ -33,6 +33,9 @@ class BaseModuleRegistry:
                 raise ValueError(f"중복 모듈 type입니다: {module_type}")
             self._modules[module_type] = module
 
+    def list_modules(self) -> list[BaseModule]:
+        return list(self._modules.values())
+
     def definitions(self) -> list[Dict[str, Any]]:
         return [module.contract() for module in self._modules.values()]
 

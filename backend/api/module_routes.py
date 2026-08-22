@@ -35,6 +35,14 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
 
     for definition in module_registry.definitions():
         module = module_registry.get(definition["type"])
+        module_doc = (module.__class__.__doc__ or module.__doc__ or "").strip()
+        description_text = (
+            f"### 📋 모듈 개요\n{definition.get('description', '')}\n\n"
+            f"{module_doc}\n\n"
+            "---\n"
+            "**📌 Input DTO 및 Config DTO는 Pydantic을 통해 독립 검증되며, 실행 결과는 정형 Output DTO JSON으로 반환됩니다.**"
+        ) if module_doc else definition.get("description", "")
+
         router.add_api_route(
             f"/modules/{definition['type']}/execute",
             _execution_handler(
@@ -45,12 +53,8 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
             methods=["POST"],
             response_model=module.output_model,
             operation_id=f"execute_module_{definition['type']}",
-            summary=f"Execute {definition['label']}",
-            description=(
-                f"{definition['description']}\n\n"
-                "Input DTO and Config DTO are validated independently. "
-                "The response is the module's Output DTO JSON."
-            ),
+            summary=f"{definition.get('label', definition['type'])} ({definition['type']})",
+            description=description_text,
         )
 
     @router.get("/modules", summary="List registered module contracts")
