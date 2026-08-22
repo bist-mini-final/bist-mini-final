@@ -126,13 +126,48 @@
   white-space: nowrap;
 }
 
-.bi-fixture-note {
+.bi-source-note {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   color: var(--text-muted);
   font-size: 0.68rem;
 }
+
+.bi-refresh-button {
+  display: inline-flex;
+  min-block-size: 2.75rem;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--brand-200);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding-inline: 0.8rem;
+  color: var(--brand-700);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.bi-refresh-button:disabled { cursor: wait; opacity: 0.68; }
+.bi-refresh-button__spinner { animation: bi-spin 700ms linear infinite; }
+
+.bi-data-state {
+  display: flex;
+  min-block-size: 14rem;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-card);
+}
+
+.bi-data-state[data-tone='error'] { color: var(--bi-danger-text); }
+.bi-data-state > div { display: grid; gap: 0.5rem; }
+.bi-data-state h1 { margin: 0; color: var(--text); font-size: 1.35rem; }
+.bi-data-state p { margin: 0; color: var(--text-muted); font-size: 0.82rem; line-height: 1.6; }
 
 .bi-page__workspace {
   display: grid;
@@ -210,7 +245,8 @@
 .bi-company-tab,
 .bi-segmented-control button,
 .bi-tool-button,
-.bi-card__actions button {
+.bi-card__actions button,
+.bi-card__actions a {
   min-block-size: 2.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -636,7 +672,7 @@
 .bi-card__meta span { color: var(--text-muted); font-size: 0.66rem; white-space: nowrap; }
 .bi-card__meta span + span::before { content: '·'; margin-right: 0.3rem; }
 .bi-card__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.35rem; }
-.bi-card__actions button { display: inline-flex; min-block-size: 2.75rem; align-items: center; gap: 0.3rem; padding-inline: 0.65rem; font-size: 0.65rem; }
+.bi-card__actions button, .bi-card__actions a { display: inline-flex; min-block-size: 2.75rem; align-items: center; gap: 0.3rem; padding-inline: 0.65rem; font-size: 0.65rem; text-decoration: none; }
 .bi-card__deferred-note {
   position: absolute;
   inline-size: 1px;
@@ -663,9 +699,11 @@
 .bi-card-library li > div, .bi-evidence-list li > div { display: grid; min-inline-size: 0; gap: 0.25rem; }
 .bi-card-library strong, .bi-evidence-list strong { font-size: 0.76rem; }
 .bi-card-library span, .bi-evidence-list span { color: var(--text-muted); font-size: 0.68rem; line-height: 1.45; }
+.bi-evidence-list a { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--brand-700); font-size: 0.68rem; font-weight: 750; }
 .bi-card-library button { flex: none; gap: 0.3rem; padding-inline: 0.65rem; }
 
 .bi-page button:focus-visible,
+.bi-page a:focus-visible,
 .bi-page summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand-600) 40%, transparent); outline-offset: 2px; }
 
 @media (max-width: 1279px) {
