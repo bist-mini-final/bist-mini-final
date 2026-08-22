@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from backend.providers.llm.chat_completion import ChatCompletionResult
-from modules.query.semantic_matcher_engine import QueryExample
+from modules.query.semantic_query_matcher import QueryExample
 from modules.common.base_module import QueryContextDTO
 from modules.query.llm_query_router import (
     LlmQueryRouterConfigDTO,

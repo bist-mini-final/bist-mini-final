@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from pydantic import BaseModel, Field
 
-from .semantic_matcher_engine import QueryExample, load_examples
 from modules.common.base_llm import (
     BaseLLMModule,
     ModuleConfigDTO,
@@ -20,7 +19,7 @@ from modules.common.base_llm import (
     QueryContextDTO,
 )
 from modules.common.config import DEFAULT_ROUTER_MODEL
-from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
+from .semantic_query_matcher import QueryExample, SemanticQueryMatchOutput, load_examples
 
 logger = logging.getLogger(__name__)
 
