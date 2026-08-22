@@ -9,7 +9,7 @@ Example:
     {
       "query_context": {
         "question_id": "q-001",
-        "question_text": "2023년 손익계산서 보여줘"
+        "question_text": "삼성전자 2023년 손익계산서 보여줘"
       }
     }
     ```
@@ -20,22 +20,17 @@ Example:
       "semantic_match": {
         "matched": true,
         "target": "손익계산서",
-        "confidence": 0.92,
         "sheets": ["손익계산서"],
-        "company_name": null,
-        "company_scopes": [],
-        "reason": "Cosine match against example '손익계산서 조회'",
-        "matches": [
+        "company_name": "삼성전자",
+        "items": [
           {
             "example_id": "ex-01",
-            "question": "손익계산서 조회",
+            "question": "삼성전자 손익계산서 조회",
             "target": "손익계산서",
             "sheets": ["손익계산서"],
-            "similarity": 0.92
+            "similarity": 0.94
           }
         ],
-        "query_type": 1,
-        "subqueries": [],
         "metrics": {
           "kind": "cosine",
           "model": "text-embedding-3-large",
