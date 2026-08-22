@@ -15,7 +15,7 @@ from modules.query.llm_query_router import (
 def test_llm_query_router_execution():
     mock_llm = MagicMock()
     mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"confidence": 0.95, "items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"], "matched_score": 1.0}]}',
+        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}]}',
         usage={"prompt_tokens": 50, "completion_tokens": 30},
         latency_seconds=0.2,
     )
@@ -45,7 +45,7 @@ def test_llm_query_router_execution():
 def test_llm_query_router_multi_scope_execution():
     mock_llm = MagicMock()
     mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"confidence": 0.98, "items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"], "target_topics": ["부채총계"]}]}',
+        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"], "target_topics": ["부채총계"]}]}',
         usage={"prompt_tokens": 60, "completion_tokens": 40},
         latency_seconds=0.25,
     )
@@ -70,19 +70,19 @@ def test_llm_query_router_multi_scope_execution():
     assert set(dto.sheets) == {"손익계산서", "재무상태표"}
 
 
-def test_llm_query_router_preserves_low_model_confidence():
+def test_llm_query_router_empty_scope_handling():
     client = MagicMock()
     client.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"confidence":0.01,"items":[{"company_name":"Unknown","sheets":["IS"]}],"reason":"weak"}',
+        content='{"items":[]}',
         usage={},
         latency_seconds=0,
     )
     module = LlmQueryRouterModule(completion_client=client)
     result = module.run(
         LlmQueryRouterInputDTO(
-            query_context=QueryContextDTO(question_id="q", question_text="maybe revenue")
+            query_context=QueryContextDTO(question_id="q", question_text="hello how are you")
         )
     )
 
-    assert result["semantic_match"]["matched"] is True
-    assert result["semantic_match"]["items"][0]["sheets"] == ["IS"]
+    assert result["semantic_match"]["matched"] is False
+    assert len(result["semantic_match"]["items"]) == 0

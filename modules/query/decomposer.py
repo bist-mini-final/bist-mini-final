@@ -14,7 +14,6 @@ Example:
       },
       "semantic_match": {
         "matched": true,
-        "confidence": 0.95,
         "items": [
           {
             "company_name": "삼성전자",

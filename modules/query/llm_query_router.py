@@ -19,21 +19,18 @@ Example:
     {
       "semantic_match": {
         "matched": true,
-        "confidence": 0.95,
         "items": [
           {
             "company_name": "삼성전자",
             "raw_mention": "삼성전자",
             "sheets": ["손익계산서"],
-            "target_topics": ["영업이익"],
-            "matched_score": 1.0
+            "target_topics": ["영업이익"]
           },
           {
             "company_name": "현대자동차",
             "raw_mention": "현대자동차",
             "sheets": ["재무상태표"],
-            "target_topics": ["부채상태", "부채총계"],
-            "matched_score": 1.0
+            "target_topics": ["부채상태", "부채총계"]
           }
         ],
         "metrics": {
@@ -83,10 +80,7 @@ CRITICAL GUIDELINES:
 
 2. Company & Sheet Normalization:
    - Identify the formal canonical corporate entity name.
-   - Infer the appropriate standard financial statement sheet names (e.g., '손익계산서', '재무상태표', '현금흐름표', '자본변동표') and specific financial topics.
-
-3. Confidence:
-   - Provide overall confidence score (0.0 to 1.0) of your routing decision."""
+   - Infer the appropriate standard financial statement sheet names (e.g., '손익계산서', '재무상태표', '현금흐름표', '자본변동표') and specific financial topics."""
 
 
 # ==============================================================================
@@ -99,7 +93,6 @@ class CompanyScopeItemDTO(ModuleDTO):
     raw_mention: Optional[str] = Field(default=None, description="질문 내 원본 기업 언급 (예: '삼전', '현차')")
     sheets: List[str] = Field(default_factory=list, description="매핑 추천 시트 목록 (예: ['손익계산서'], ['재무상태표'])")
     target_topics: List[str] = Field(default_factory=list, description="추출된 질문 지표/토픽 (예: ['영업이익', '매출액'])")
-    matched_score: float = Field(default=1.0, ge=0.0, le=1.0, description="엔티티 매칭 점수 (0.0 ~ 1.0)")
     reason: Optional[str] = Field(default=None, description="선택적 스코프 판단 근거")
 
     # Backward compatibility aliases
@@ -120,16 +113,14 @@ class LlmRouterResponse(BaseModel):
         default_factory=list,
         description="질문에서 식별된 모든 기업별/시트별 데이터 스코프 목록",
     )
-    confidence: float = Field(default=0.85, ge=0.0, le=1.0, description="전체 라우팅 신뢰도 (0.0 ~ 1.0)")
-    reason: Optional[str] = Field(default=None, description="선택적 라우팅 판단 근거")
 
 
 class RouterDecisionDTO(ModuleDTO):
     """자급자족형 구조화 라우팅 결과 DTO."""
 
     matched: bool = Field(description="유효한 라우팅 대상 매칭 여부")
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="라우팅 신뢰도")
     items: List[CompanyScopeItemDTO] = Field(default_factory=list, description="식별된 모든 기업/시트/토픽 데이터 스코프 목록")
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="라우팅 신뢰도 (호환용 기본값 1.0)")
     metrics: Dict[str, Any] = Field(default_factory=dict, description="실행 메트릭 및 토큰/비용 텔레메트리")
 
     @property
@@ -227,7 +218,7 @@ class LlmQueryRouterModule(BaseLLMModule):
         return {
             "semantic_match": {
                 "matched": matched,
-                "confidence": round(parsed_res.confidence, 4),
+                "confidence": 1.0 if matched else 0.0,
                 "items": scopes_dump,
                 "metrics": {
                     "kind": "llm_structured",
