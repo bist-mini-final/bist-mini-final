@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional
-
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import BaseModule
 
@@ -16,12 +13,10 @@ class BaseModuleRegistry:
 
     def __init__(
         self,
-        repository: Optional[AnswerCacheRepository] = None,
         embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
         *,
         isolated_worker_spec: Optional[Dict[str, str]] = None,
     ) -> None:
-        self.repository = repository or AnswerCacheRepository()
         self.embedding_artifact_store = embedding_artifact_store or EmbeddingArtifactStore()
         self.isolated_worker_spec = isolated_worker_spec
         self._modules: Dict[str, BaseModule] = {}
@@ -64,7 +59,6 @@ class BaseModuleRegistry:
 
     def clear_caches(self) -> Dict[str, int]:
         return {
-            "answers_removed": self.repository.clear_cached_answers(),
             "embedding_artifacts_removed": self.embedding_artifact_store.clear(),
         }
 

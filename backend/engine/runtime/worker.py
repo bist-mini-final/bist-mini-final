@@ -50,14 +50,12 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
 
     from pathlib import Path
 
-    from backend.storage.answer_cache import AnswerCacheRepository
     from backend.storage.db_manager import DatabaseManager
     from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 
     from .registry import ModuleRegistry
 
     registry = ModuleRegistry(
-        AnswerCacheRepository(Path(spec["answer_cache_path"])),
         embedding_artifact_store=EmbeddingArtifactStore(
             Path(spec["embedding_artifact_dir"])
         ),

@@ -102,10 +102,7 @@ class WorkflowGraph(StrictModel):
                 continue
             source_type = module_by_id.get(edge.get("source"))
             target_type = module_by_id.get(edge.get("target"))
-            if source_type == "query_input" and target_type in {
-                "reader",
-                "answer_cache_writer",
-            }:
+            if source_type == "query_input" and target_type == "reader":
                 continue
             if source_type == "query_input" and target_type == "decomposer":
                 if edge.get("source_output") in {None, "question_text"}:

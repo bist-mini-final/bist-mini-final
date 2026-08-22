@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
@@ -39,7 +38,6 @@ class ModuleRegistry(BaseModuleRegistry):
 
     def __init__(
         self,
-        repository: Optional[AnswerCacheRepository] = None,
         completion_client: Optional[ChatCompletionClient] = None,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
@@ -48,7 +46,6 @@ class ModuleRegistry(BaseModuleRegistry):
         processed_dir: Path = PROCESSED_DATA_DIR,
         spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
-        repo = repository or AnswerCacheRepository()
         shared_completion_client = completion_client or ChatCompletionClient()
         embedding_artifacts = (
             embedding_artifact_store or EmbeddingArtifactStore()
@@ -56,19 +53,13 @@ class ModuleRegistry(BaseModuleRegistry):
         self.pgvector_store = pgvector_store or PgVectorStore()
         self.db_manager = db_manager or DatabaseManager()
         isolated_worker_spec: Optional[Dict[str, str]] = None
-        if (
-            completion_client is None
-            and embedding_encoder is None
-            and repo.path is not None
-        ):
+        if completion_client is None and embedding_encoder is None:
             isolated_worker_spec = {
-                "answer_cache_path": str(repo.path),
                 "embedding_artifact_dir": str(embedding_artifacts.directory),
                 "processed_dir": str(processed_dir),
                 "spreadsheet_artifact_dir": str(spreadsheet_artifact_dir),
             }
         super().__init__(
-            repo,
             embedding_artifacts,
             isolated_worker_spec=isolated_worker_spec,
         )

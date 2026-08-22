@@ -17,9 +17,7 @@ from typing import Any, Sequence
 
 from pydantic import ValidationError
 
-from backend.core.settings import CACHE_DIR
 from backend.engine.runtime.registry import ModuleRegistry
-from backend.storage.answer_cache import AnswerCacheRepository
 from modules.common.base_module import ModuleExecutionError, ModuleExecutionRequestDTO
 
 
@@ -55,9 +53,7 @@ def _write_json(value: Any, stream) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    registry = ModuleRegistry(
-        AnswerCacheRepository(CACHE_DIR / "answers.json")
-    )
+    registry = ModuleRegistry()
     try:
         if args.contract:
             _write_json(registry.definition(args.module_type), sys.stdout)

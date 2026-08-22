@@ -25,7 +25,6 @@ from backend.core.settings import (
 )
 from backend.engine.runtime.registry import ModuleRegistry
 from backend.features.bi.api_routes import register_bi_exception_handlers
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.connection_pool import close_pool, get_pool
 from modules.common.exceptions import PipelineBaseError
 
@@ -177,8 +176,6 @@ def register_global_exception_handlers(application: FastAPI) -> None:
 # 4. Application Factory
 # ==============================================================================
 def create_app() -> FastAPI:
-    repository = AnswerCacheRepository()
-
     application = FastAPI(
         title="RAG Pipeline Visualizer API",
         version="2.0.0",
@@ -257,7 +254,7 @@ def create_app() -> FastAPI:
             )
 
     # 4. API Routers
-    application.include_router(create_api_router(repository))
+    application.include_router(create_api_router())
 
     # 5. Static Assets & SPA Fallback
     assets_dir = DIST_DIR / "assets"

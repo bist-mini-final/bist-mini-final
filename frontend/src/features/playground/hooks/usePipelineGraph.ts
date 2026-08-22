@@ -75,10 +75,7 @@ function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
     // A node can be deleted before ReactFlow emits its connected-edge removal.
     // Never keep that stale edge in a saved graph or send it to DAG validation.
     if (!sourceType || !targetType) continue;
-    if (
-      sourceType === 'query_input'
-      && (targetType === 'reader' || targetType === 'answer_cache_writer')
-    ) {
+    if (sourceType === 'query_input' && targetType === 'reader') {
       continue;
     }
     let sourceOutput = edge.source_output;

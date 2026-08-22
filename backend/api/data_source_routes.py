@@ -34,7 +34,6 @@ from backend.engine.workflows import (
     WorkflowStore,
 )
 from backend.providers.embeddings.factory import EmbeddingEncoder
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.data_sources import IngestionJobService
 from backend.storage.data_sources import IngestionRequest as IngestRequestDTO
 from backend.storage.db_manager import DatabaseManager
@@ -169,7 +168,6 @@ def create_data_source_router(
     embedding_artifact_store = EmbeddingArtifactStore(embedding_artifact_dir)
     pg_store = pgvector_store or PgVectorStore(PGVECTOR_URL)
     registry = module_registry or ModuleRegistry(
-        repository=AnswerCacheRepository(),
         embedding_encoder=embedding_encoder,
         embedding_artifact_store=embedding_artifact_store,
         pgvector_store=pg_store,

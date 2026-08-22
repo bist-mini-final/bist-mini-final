@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from backend.engine.runtime.registry import ModuleRegistry
-from backend.storage.answer_cache import AnswerCacheRepository
-from backend.tools.documentation.module_docs import write_module_guides
+from backend.cli.documentation.module_docs import write_module_guides
 
 
 def main() -> int:
-    registry = ModuleRegistry(AnswerCacheRepository())
+    registry = ModuleRegistry()
     paths = write_module_guides(
         registry.get(definition["type"])
         for definition in registry.definitions()

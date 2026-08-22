@@ -24,7 +24,6 @@ from backend.engine.workflows.executor import WorkflowExecutor
 from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
@@ -45,7 +44,6 @@ class WorkflowRuntimeServices:
 
 
 def create_workflow_runtime_services(
-    repository: AnswerCacheRepository,
     *,
     workflow_dir: Path = WORKFLOW_DIR,
     run_dir: Path = RUN_DIR,
@@ -79,7 +77,6 @@ def create_workflow_runtime_services(
 
         registry_factory = ModuleRegistry
     registry = registry_factory(
-        repository,
         completion_client,
         embedding_encoder,
         embedding_artifact_store=EmbeddingArtifactStore(embedding_artifact_dir),

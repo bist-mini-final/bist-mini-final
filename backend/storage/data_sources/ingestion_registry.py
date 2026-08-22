@@ -9,7 +9,6 @@ from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.engine.runtime.registry_base import BaseModuleRegistry
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
@@ -29,7 +28,6 @@ class IngestionModuleRegistry(BaseModuleRegistry):
 
     def __init__(
         self,
-        repository: AnswerCacheRepository,
         completion_client: Optional[Any] = None,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
@@ -45,7 +43,6 @@ class IngestionModuleRegistry(BaseModuleRegistry):
         # A one-shot job is already the failure/cancellation boundary. Avoid a
         # second spawned Python process for every node.
         super().__init__(
-            repository,
             artifacts,
             isolated_worker_spec=None,
         )

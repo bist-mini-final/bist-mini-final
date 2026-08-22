@@ -19,7 +19,6 @@ from backend.engine.runtime.services import (
     WorkflowRuntimeServices,
     create_workflow_runtime_services,
 )
-from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
 from backend.engine.workflows.executor import DagExecutionCancelled
 
@@ -34,7 +33,6 @@ class ModuleTaskTimeout(TimeoutError):
 def runtime_services() -> WorkflowRuntimeServices:
     """Build the unified workflow runtime once per one-shot Job pod."""
     return create_workflow_runtime_services(
-        AnswerCacheRepository(),
         initialize_schema=False,
         require_database=True,
     )
