@@ -32,7 +32,7 @@ def main() -> int:
         parser.error("connection-hash must be a SHA-256 hex digest")
 
     template = (
-        Path(__file__).with_name("templates") / "excel-ingestion-scaledjob.yaml"
+        Path(__file__).with_name("templates") / "workflow-worker-scaledjob.yaml"
     ).read_text(encoding="utf-8")
     replacements = {
         "__MAX_REPLICAS__": str(args.max_replicas),

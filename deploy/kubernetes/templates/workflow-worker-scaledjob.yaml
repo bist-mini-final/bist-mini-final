@@ -1,7 +1,7 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledJob
 metadata:
-  name: excel-ingestion
+  name: workflow-worker
   namespace: bist-batch
   annotations:
     bist.ai/connection-hash: __CONNECTION_HASH__
