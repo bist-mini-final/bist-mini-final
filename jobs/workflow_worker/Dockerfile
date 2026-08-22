@@ -25,6 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     && python -m pip install -r requirements.txt
 
 COPY backend ./backend
+COPY modules ./modules
 COPY jobs/__init__.py ./jobs/__init__.py
 COPY jobs/workflow_worker ./jobs/workflow_worker
 RUN mkdir -p \
@@ -34,7 +35,7 @@ RUN mkdir -p \
     /app/data/vector_db \
     /app/data/artifacts/embeddings \
     /app/data/artifacts/spreadsheets \
-    && python -m compileall -q /app/backend /app/jobs \
+    && python -m compileall -q /app/backend /app/modules /app/jobs \
     && chown -R appuser:appuser /app/data
 
 USER appuser

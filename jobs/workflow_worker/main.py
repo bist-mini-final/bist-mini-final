@@ -14,15 +14,13 @@ import time
 from typing import Iterator, Optional
 
 from backend.core.settings import KUBERNETES_INGESTION_QUEUE
-from backend.infrastructure.storage.data_sources import INGESTION_WORKFLOW_IDS
-from backend.infrastructure.storage.data_sources.ingestion_registry import IngestionModuleRegistry
 from backend.engine.orchestration import compile_task_plan
 from backend.engine.runtime.services import (
     WorkflowRuntimeServices,
     create_workflow_runtime_services,
 )
-from backend.infrastructure.cache.answer_cache import AnswerCacheRepository
-from backend.infrastructure.database.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
+from backend.storage.answer_cache import AnswerCacheRepository
+from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
 from backend.engine.workflows.executor import DagExecutionCancelled
 
 logger = logging.getLogger(__name__)
@@ -34,20 +32,17 @@ class ModuleTaskTimeout(TimeoutError):
 
 @lru_cache(maxsize=1)
 def runtime_services() -> WorkflowRuntimeServices:
-    """Build the lean ingestion runtime once per one-shot Job pod."""
-
+    """Build the unified workflow runtime once per one-shot Job pod."""
     return create_workflow_runtime_services(
         AnswerCacheRepository(),
         initialize_schema=False,
         require_database=True,
-        registry_factory=IngestionModuleRegistry,
     )
 
 
 @contextmanager
 def task_timeout(seconds: Optional[float]) -> Iterator[None]:
     """Apply a per-module wall-clock timeout in the worker's main thread."""
-
     if seconds is None or not hasattr(signal, "setitimer"):
         yield
         return
@@ -74,7 +69,6 @@ def execute_with_policy(
     timeout_seconds: Optional[float],
 ) -> None:
     """Execute one node and apply its portable retry/timeout policy."""
-
     for attempt in range(retries + 1):
         try:
             with task_timeout(timeout_seconds):
@@ -126,7 +120,6 @@ def _execute_claim(
     heartbeat_seconds: float,
 ) -> str:
     """Execute one selected lease generation while holding its advisory lock."""
-
     run_id = claim.run_id
     lease_token = claim.token
     try:
@@ -155,11 +148,6 @@ def _execute_claim(
                 heartbeat.start()
                 try:
                     run = services.run_store.load(run_id)
-                    if run.workflow_id not in INGESTION_WORKFLOW_IDS:
-                        raise ValueError(
-                            "이 큐가 처리할 수 없는 workflow입니다: "
-                            f"{run.workflow_id}"
-                        )
                     plan = compile_task_plan(run, services.module_registry)
                     for planned in plan:
                         policy = planned.policy
@@ -211,7 +199,6 @@ def run_one(
     heartbeat_seconds: float = 15,
 ) -> Optional[str]:
     """Claim and finish one item; skip candidates still owned by another worker."""
-
     services = runtime_services()
     excluded_run_ids: list[str] = []
     while True:

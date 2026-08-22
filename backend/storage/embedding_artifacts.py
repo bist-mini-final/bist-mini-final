@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from array import array
 from pathlib import Path
 from threading import Lock
@@ -34,6 +35,20 @@ class EmbeddingArtifactVectors(Sequence[List[float]]):
 
     def __len__(self) -> int:
         return self._count
+
+    @property
+    def dimension(self) -> int:
+        """Return the fixed number of float32 values in each vector."""
+        return self._dimension
+
+    def iter_raw_batches(self, batch_size: int) -> Iterator[bytes]:
+        """Yield contiguous little-endian float32 bytes without Python floats."""
+        return self._store.iter_raw_batches(
+            self._artifact_id,
+            self._count,
+            self._dimension,
+            batch_size,
+        )
 
     @overload
     def __getitem__(self, index: int) -> List[float]: ...
@@ -122,10 +137,20 @@ class EmbeddingArtifactStore:
                                 "임베딩 벡터 차원이 아티팩트 DTO와 일치하지 않습니다"
                             )
                     written_count += len(batch)
-                    array(
+                    values = array(
                         "f",
                         (value for vector in batch for value in vector),
-                    ).tofile(file)
+                    )
+                    if values.itemsize != 4:
+                        raise ModuleExecutionError(
+                            "현재 플랫폼의 C float 크기가 float32와 일치하지 않습니다"
+                        )
+                    # Artifact bytes are explicitly little-endian so cache files
+                    # are portable and can be converted to PostgreSQL's network
+                    # byte order without materializing Python float objects.
+                    if sys.byteorder != "little":
+                        values.byteswap()
+                    values.tofile(file)
             if written_count != expected_count:
                 raise ModuleExecutionError(
                     f"임베딩 개수({written_count})가 예상 개수({expected_count})와 일치하지 않습니다"
@@ -161,6 +186,8 @@ class EmbeddingArtifactStore:
                     raise ModuleExecutionError(
                         "문서 임베딩 아티팩트가 예상보다 짧습니다"
                     ) from error
+                if sys.byteorder != "little":
+                    values.byteswap()
                 yield [
                     list(values[index * dimension : (index + 1) * dimension])
                     for index in range(current_count)
@@ -191,6 +218,8 @@ class EmbeddingArtifactStore:
             raise ModuleExecutionError(
                 "문서 임베딩 아티팩트가 예상보다 짧습니다"
             ) from error
+        if sys.byteorder != "little":
+            values.byteswap()
         return [
             list(values[index * dimension : (index + 1) * dimension])
             for index in range(current_count)
@@ -216,6 +245,31 @@ class EmbeddingArtifactStore:
             for batch in self.iter_batches(artifact_id, count, dimension, count)
             for vector in batch
         ]
+
+    def iter_raw_batches(
+        self,
+        artifact_id: str,
+        count: int,
+        dimension: int,
+        batch_size: int,
+    ) -> Iterator[bytes]:
+        """Stream validated little-endian float32 byte batches from one file handle."""
+        if not self.is_valid(artifact_id, count, dimension):
+            raise ModuleExecutionError(
+                "문서 임베딩 아티팩트가 없거나 크기가 DTO와 일치하지 않습니다"
+            )
+        effective_batch_size = max(1, batch_size)
+        bytes_per_vector = dimension * 4
+        with self._path(artifact_id).open("rb") as file:
+            for start in range(0, count, effective_batch_size):
+                current_count = min(effective_batch_size, count - start)
+                expected_bytes = current_count * bytes_per_vector
+                raw = file.read(expected_bytes)
+                if len(raw) != expected_bytes:
+                    raise ModuleExecutionError(
+                        "문서 임베딩 아티팩트가 예상보다 짧습니다"
+                    )
+                yield raw
 
     def clear(self) -> int:
         removed = 0

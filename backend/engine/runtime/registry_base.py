@@ -39,6 +39,9 @@ class BaseModuleRegistry:
     def definition(self, module_type: str) -> Dict[str, Any]:
         return self.get(module_type).contract()
 
+    def has(self, module_type: str) -> bool:
+        return module_type in self._modules
+
     def get(self, module_type: str) -> BaseModule:
         try:
             return self._modules[module_type]

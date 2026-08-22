@@ -15,6 +15,8 @@ from langchain_core.documents import Document
 
 from backend.core.settings import PGVECTOR_URL
 from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.storage.embedding_artifacts import EmbeddingArtifactVectors
+from backend.storage.pgvector_binary_copy import copy_float32_artifact_documents
 from backend.storage.spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
     langchain_document_to_cell_item,
@@ -330,6 +332,13 @@ class PgVectorStore:
                     f"사전 계산된 벡터 개수({len(vectors)})가 문서 개수({total_items})와 일치하지 않습니다."
                 )
             use_precomputed_vectors = True
+            if (
+                isinstance(vectors, EmbeddingArtifactVectors)
+                and vectors.dimension != int(clean_meta["dimension"])
+            ):
+                raise PgVectorStoreError(
+                    "float32 아티팩트 차원과 컬렉션 메타데이터 차원이 일치하지 않습니다"
+                )
 
         swap_suffix = uuid4().hex
         staging_name = f"{index_id}__staging__{swap_suffix}"
@@ -358,10 +367,6 @@ class PgVectorStore:
                 f"pgvector 스테이징 컬렉션('{staging_name}') 생성 실패: {create_error}"
             ) from create_error
 
-        # SQLAlchemy expands each embedding row into several bind parameters.
-        # Sending an entire large workbook at once crosses psycopg's 65,535
-        # parameter protocol limit, so persist bounded batches explicitly.
-
         total_batches = max(
             1,
             (total_items + PGVECTOR_INSERT_BATCH_SIZE - 1)
@@ -378,36 +383,63 @@ class PgVectorStore:
             )
         batch_index = 0
         try:
-            for batch_index, start in enumerate(
-                range(0, total_items, PGVECTOR_INSERT_BATCH_SIZE),
-                start=1,
-            ):
-                stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
-                document_batch = list(documents[start:stop])
-                if use_precomputed_vectors and vectors is not None:
-                    vector_batch = vectors[start:stop]
-                    texts = [doc.page_content for doc in document_batch]
-                    metadatas = [doc.metadata for doc in document_batch]
-                    vec_list = [
-                        vector.tolist() if hasattr(vector, "tolist") else list(vector)
-                        for vector in vector_batch
-                    ]
-                    store.add_embeddings(
-                        texts=texts,
-                        embeddings=vec_list,
-                        metadatas=metadatas,
+            if isinstance(vectors, EmbeddingArtifactVectors):
+                staging_uuid = self._collection_uuid(staging_name)
+                if staging_uuid is None:
+                    raise PgVectorStoreError(
+                        "binary COPY 대상 스테이징 컬렉션을 찾을 수 없습니다"
                     )
-                else:
-                    store.add_documents(document_batch)
-                if progress_callback is not None:
-                    progress_callback(
-                        {
-                            "completed_batches": batch_index,
-                            "total_batches": total_batches,
-                            "completed_items": stop,
-                            "total_items": total_items,
-                        }
+                copy_connection = self._raw_connection()
+                try:
+                    copy_float32_artifact_documents(
+                        copy_connection,
+                        collection_uuid=staging_uuid,
+                        documents=documents,
+                        vectors=vectors,
+                        batch_size=PGVECTOR_INSERT_BATCH_SIZE,
+                        progress_callback=progress_callback,
                     )
+                    copy_connection.commit()
+                    batch_index = total_batches
+                except Exception:
+                    copy_connection.rollback()
+                    raise
+                finally:
+                    copy_connection.close()
+            else:
+                # Compatibility path for generated embeddings and callers that
+                # supply regular Python vector sequences. Artifact-backed writes
+                # take the zero-float-object binary COPY path above.
+                for batch_index, start in enumerate(
+                    range(0, total_items, PGVECTOR_INSERT_BATCH_SIZE),
+                    start=1,
+                ):
+                    stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
+                    document_batch = list(documents[start:stop])
+                    if use_precomputed_vectors and vectors is not None:
+                        vector_batch = vectors[start:stop]
+                        texts = [doc.page_content for doc in document_batch]
+                        metadatas = [doc.metadata for doc in document_batch]
+                        vec_list = [
+                            vector.tolist() if hasattr(vector, "tolist") else list(vector)
+                            for vector in vector_batch
+                        ]
+                        store.add_embeddings(
+                            texts=texts,
+                            embeddings=vec_list,
+                            metadatas=metadatas,
+                        )
+                    else:
+                        store.add_documents(document_batch)
+                    if progress_callback is not None:
+                        progress_callback(
+                            {
+                                "completed_batches": batch_index,
+                                "total_batches": total_batches,
+                                "completed_items": stop,
+                                "total_items": total_items,
+                            }
+                        )
         except Exception as error:
             # A failed write must not leave a queryable partial collection.
             try:
