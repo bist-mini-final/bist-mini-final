@@ -86,3 +86,18 @@ class GlobalExceptionHandlerTests(unittest.TestCase):
         self.assertEqual(res.status_code, 500)
         data = res.json()
         self.assertEqual(data["error_code"], "INTERNAL_SERVER_ERROR")
+
+    def test_healthz_and_probes(self) -> None:
+        from backend.main import create_app
+        prod_app = create_app()
+        client = TestClient(prod_app)
+
+        health = client.get("/healthz")
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.json()["status"], "healthy")
+        self.assertIn("X-Process-Time", health.headers)
+        self.assertIn("X-Request-ID", health.headers)
+
+        live = client.get("/livez")
+        self.assertEqual(live.status_code, 200)
+        self.assertEqual(live.json()["status"], "alive")

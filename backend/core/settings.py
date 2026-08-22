@@ -38,10 +38,11 @@ KUBERNETES_INGESTION_QUEUE = os.getenv(
 )
 
 # PostgreSQL + pgvector Configuration
-PGVECTOR_URL = os.getenv(
-    "PGVECTOR_URL",
-    os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/rag_flow"),
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    os.getenv("PGVECTOR_URL", "postgresql://postgres:postgres@localhost:5432/rag_flow"),
 )
+PGVECTOR_URL = DATABASE_URL
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() in ("true", "1", "yes")
 
 SIMILARITY_THRESHOLD = 0.95

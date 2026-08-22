@@ -176,3 +176,18 @@ def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) 
             if time.time() >= deadline:
                 raise
             time.sleep(0.02)
+
+
+def close_pool() -> None:
+    """Close all connections in the process-wide pool gracefully."""
+    global _pool, _pool_url
+    with _lock:
+        if _pool is not None:
+            try:
+                _pool.closeall()
+                logger.info("psycopg2 connection pool closed gracefully")
+            except Exception as e:
+                logger.warning("Error closing connection pool: %s", e)
+            finally:
+                _pool = None
+                _pool_url = None
