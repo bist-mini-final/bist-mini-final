@@ -23,8 +23,7 @@ Example:
         "metrics": {
           "top_k_used": 1,
           "adjacent_radius": 1,
-          "context_characters": 350,
-          "block_count": 1
+          "context_characters": 350
         }
       }
     }

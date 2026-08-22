@@ -28,8 +28,7 @@ Example:
       "metrics": {
         "top_k_used": 1,
         "adjacent_radius": 1,
-        "context_characters": 512,
-        "block_count": 1
+        "context_characters": 512
       }
     }
     ```
@@ -308,7 +307,6 @@ class PgContextExpanderModule(BaseModule):
                 "top_k_used": len(retrieval_items),
                 "adjacent_radius": cfg.adjacent_radius,
                 "context_characters": total_chars,
-                "block_count": len(context_blocks),
             },
         }
 
