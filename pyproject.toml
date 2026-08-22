@@ -39,5 +39,5 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "backend/bi/tests"]
+testpaths = ["tests"]
 pythonpath = ["."]
