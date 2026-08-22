@@ -9,7 +9,6 @@ from modules.query.decomposer import (
     SubqueryItem,
 )
 from modules.query.llm_query_router import (
-    LlmCompanyScopeDocument,
     LlmQueryRouterConfig,
     LlmQueryRouterConfigDTO,
     LlmQueryRouterExecution,
@@ -18,7 +17,8 @@ from modules.query.llm_query_router import (
     LlmQueryRouterModule,
     LlmQueryRouterOutput,
     LlmQueryRouterOutputDTO,
-    LlmRouterDocument,
+    LlmRouterResponse,
+    RouterDecisionDTO,
 )
 from modules.query.query_input import (
     QueryContextOutput,
@@ -43,7 +43,6 @@ __all__ = [
     "DecomposerConfigDTO",
     "DecomposerInputDTO",
     "DecomposerModule",
-    "LlmCompanyScopeDocument",
     "LlmQueryRouterConfig",
     "LlmQueryRouterConfigDTO",
     "LlmQueryRouterExecution",
@@ -52,10 +51,11 @@ __all__ = [
     "LlmQueryRouterModule",
     "LlmQueryRouterOutput",
     "LlmQueryRouterOutputDTO",
-    "LlmRouterDocument",
+    "LlmRouterResponse",
     "QueryContextOutput",
     "QueryInputDTO",
     "QueryInputModule",
+    "RouterDecisionDTO",
     "RouterMetricsDTO",
     "SemanticMatchItemDTO",
     "SemanticQueryMatchOutput",

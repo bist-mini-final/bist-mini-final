@@ -1,12 +1,12 @@
-"""Zero-shot and structured LLM Query Router for extracting target companies, topics, and sheet categories."""
+"""Zero-shot structured LLM Query Router for extracting target companies, topics, and sheet categories."""
 
 from __future__ import annotations
 
 # ==============================================================================
-# 1. Imports
+# 1. Imports & Logger Setup
 # ==============================================================================
 import logging
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,91 +19,69 @@ from modules.common.base_llm import (
     QueryContextDTO,
 )
 from modules.common.config import DEFAULT_ROUTER_MODEL
-from .semantic_query_matcher import QueryExample, SemanticQueryMatchOutput, load_examples
 
 logger = logging.getLogger(__name__)
 
 
 # ==============================================================================
-# 2. Prompts & Catalog Formatting
+# 2. Prompts & Presets
 # ==============================================================================
-def _build_catalog_prompt(examples: Sequence[QueryExample]) -> str:
-    """Build a structured catalog prompt grouping financial sheet categories and sample queries."""
-    grouped: Dict[str, Dict[str, Any]] = {}
-    for example in examples:
-        entry = grouped.setdefault(
-            example.target,
-            {"sheets": set(), "questions": []},
-        )
-        entry["sheets"].update(example.sheets)
-        entry["questions"].append(example.question)
+ROUTER_SYSTEM_PROMPT = """You are an expert spreadsheet query router for financial statements and corporate business data.
+Analyze the user's natural language question and extract:
+1. Target corporate entities mentioned (e.g., '삼성전자', 'SK하이닉스', 'LG에너지솔루션', '카카오').
+2. Relevant financial statement categories (e.g., '재무상태표'/'BS', '손익계산서'/'IS', '현금흐름표'/'CF', '자본변동표', '주석'/'Notes').
+3. Candidate sheet names relevant to the question metrics.
+4. Confidence score (0.0 to 1.0) and concise reason for your routing decision.
 
-    catalog_lines: List[str] = []
-    for target, payload in sorted(grouped.items()):
-        sheets = ", ".join(sorted(payload["sheets"]))
-        catalog_lines.append(f"Target category: {target}")
-        catalog_lines.append(f"Relevant sheets: {sheets}")
-        catalog_lines.append("Representative questions:")
-        catalog_lines.extend(
-            f"  - {question}" for question in payload["questions"][:8]
-        )
-        catalog_lines.append("")
-
-    return (
-        "You are an expert spreadsheet query router.\n"
-        "Analyze the user's natural language question and extract:\n"
-        "1. Any target companies/entities mentioned (e.g. 'Samsung Electronics', 'SK Hynix').\n"
-        "2. The target financial report category matching the catalog.\n\n"
-        "Respond ONLY with a JSON object:\n"
-        "{\n"
-        '  "target": "<category_or_null>",\n'
-        '  "confidence": <number_between_0_and_1>,\n'
-        '  "company_name": "<primary_company_or_null>",\n'
-        '  "company_scopes": [\n'
-        '    {"raw_mention": "...", "canonical_name": "...", "matched_score": 0.0, '
-        '"target_topics": ["..."], "suggested_sheets": ["..."]}\n'
-        "  ],\n"
-        '  "reason": "..."\n'
-        "}\n\n"
-        f"{chr(10).join(catalog_lines)}"
-    )
+Always extract normalized canonical company names and specific financial topics."""
 
 
 # ==============================================================================
 # 3. DTOs & Schema Definitions
 # ==============================================================================
-class LlmCompanyScopeDocument(BaseModel):
-    """Pydantic schema for individual company entity parsed by the LLM."""
+class CompanyScopeItemDTO(ModuleDTO):
+    """Specific company scope and target financial topics extracted from query."""
 
-    raw_mention: Optional[str] = Field(default=None, description="질문 내 원본 언급 텍스트")
-    canonical_name: str = Field(description="정규화된 공식 기업명")
+    raw_mention: Optional[str] = Field(default=None, description="질문 내 원본 기업 언급 (예: '삼전', '하닉')")
+    canonical_name: str = Field(description="정규화된 공식 기업명 (예: '삼성전자', 'SK하이닉스')")
     matched_score: float = Field(default=1.0, ge=0.0, le=1.0, description="엔티티 매칭 점수")
-    target_topics: List[str] = Field(default_factory=list, description="추출된 질문 지표/토픽")
+    target_topics: List[str] = Field(default_factory=list, description="추출된 질문 지표/토픽 (예: '영업이익', '매출액')")
     suggested_sheets: List[str] = Field(default_factory=list, description="매핑 추천 시트 목록")
 
 
-class LlmRouterDocument(BaseModel):
-    """Pydantic response schema for LLM structured output parsing."""
+class LlmRouterResponse(BaseModel):
+    """Pydantic structured response schema for LLM completion."""
 
-    target: Optional[str] = Field(default=None, description="재무제표 카테고리 (BS, IS, CF 등)")
-    confidence: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="라우팅 신뢰도 (제공되지 않으면 중립값 0.5)",
-    )
-    company_name: Optional[str] = Field(default=None, description="주요 기업명")
-    company_scopes: List[LlmCompanyScopeDocument] = Field(
-        default_factory=list,
-        description="식별된 개별 기업 스코프 목록",
-    )
-    reason: Optional[str] = Field(default=None, description="라우팅 판단 근거")
+    target: Optional[str] = Field(default=None, description="재무제표 카테고리 (예: '손익계산서', '재무상태표', '현금흐름표')")
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="라우팅 신뢰도 (0.0 ~ 1.0)")
+    company_name: Optional[str] = Field(default=None, description="주요 대상 기업명")
+    company_scopes: List[CompanyScopeItemDTO] = Field(default_factory=list, description="식별된 기업별 세부 스코프 목록")
+    sheets: List[str] = Field(default_factory=list, description="질의 해결에 필요한 대상 시트 목록")
+    reason: str = Field(default="LLM based intent routing", description="라우팅 판단 근거")
+    query_type: Optional[int] = Field(default=None, description="질의 유형 코드")
+    subqueries: List[str] = Field(default_factory=list, description="추출된 세부 서브쿼리 목록")
+
+
+class RouterDecisionDTO(ModuleDTO):
+    """Self-contained structured routing decision payload."""
+
+    matched: bool = Field(description="유효한 라우팅 대상 매칭 여부")
+    target: Optional[str] = Field(default=None, description="라우팅 대상 카테고리")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="라우팅 신뢰도")
+    sheets: List[str] = Field(default_factory=list, description="대상 시트 목록")
+    company_name: Optional[str] = Field(default=None, description="단일/대표 대상 기업명")
+    company_scopes: List[CompanyScopeItemDTO] = Field(default_factory=list, description="기업별 세부 인텐트 스코프 목록")
+    reason: str = Field(description="라우팅 판단 근거")
+    matches: List[Dict[str, Any]] = Field(default_factory=list, description="유사도 매치 목록 (LLM 라우터는 빈 리스트)")
+    query_type: Optional[int] = Field(default=None, description="질의 유형 코드")
+    subqueries: List[str] = Field(default_factory=list, description="서브쿼리 목록")
+    metrics: Dict[str, Any] = Field(default_factory=dict, description="실행 메트릭 및 토큰/비용 텔레메트리")
 
 
 class LlmQueryRouterInputDTO(ModuleInputDTO):
     """Input contract containing user query context."""
 
-    query_context: QueryContextDTO = Field(description="원본 사용자 질문 컨텍스트")
+    query_context: QueryContextDTO = Field(description="사용자 질문 컨텍스트")
 
 
 class LlmQueryRouterConfigDTO(ModuleConfigDTO):
@@ -113,16 +91,9 @@ class LlmQueryRouterConfigDTO(ModuleConfigDTO):
 
 
 class LlmQueryRouterOutputDTO(ModuleDTO):
-    """Output contract containing structured semantic matching results."""
+    """Output contract containing self-contained routing decision."""
 
-    semantic_match: SemanticQueryMatchOutput = Field(description="정형화된 시맨틱 매치 및 스코프 결과")
-
-
-# Backward compatibility aliases
-LlmQueryRouterInput = LlmQueryRouterInputDTO
-LlmQueryRouterConfig = LlmQueryRouterConfigDTO
-LlmQueryRouterOutput = LlmQueryRouterOutputDTO
-LlmQueryRouterExecution = LlmQueryRouterInputDTO
+    semantic_match: RouterDecisionDTO = Field(description="정형화된 시맨틱 매치 및 스코프 결과")
 
 
 # ==============================================================================
@@ -145,129 +116,65 @@ class LlmQueryRouterModule(BaseLLMModule):
     config_model = LlmQueryRouterConfigDTO
     output_model = LlmQueryRouterOutputDTO
 
-    def __init__(
-        self,
-        completion_client: Optional[Any] = None,
-        examples: Optional[List[QueryExample]] = None,
-    ) -> None:
+    def __init__(self, completion_client: Optional[Any] = None) -> None:
         super().__init__(completion_client=completion_client)
-        self.examples = examples
 
     def execute(
         self,
         input_data: LlmQueryRouterInputDTO,
         config: Optional[LlmQueryRouterConfigDTO] = None,
     ) -> Dict[str, Any]:
-        """Execute LLM query routing against standard sheet catalog."""
         cfg = config or LlmQueryRouterConfigDTO()
-        examples = self.examples if self.examples is not None else load_examples()
-        if not examples:
-            return {
-                "semantic_match": {
-                    "matched": False,
-                    "target": None,
-                    "confidence": 0.0,
-                    "sheets": [],
-                    "company_name": None,
-                    "company_scopes": [],
-                    "reason": "No catalog examples available",
-                    "matches": [],
-                    "metrics": {
-                        "kind": "llm",
-                        "model": cfg.model,
-                        "latency_seconds": 0.0,
-                        "api_usage": {},
-                        "estimated_cost_usd": 0.0,
-                    },
-                }
-            }
+        question = input_data.query_context.question_text
 
-        # Build catalog sheet map
-        valid_sheets: Dict[str, List[str]] = {}
-        for example in examples:
-            valid_sheets.setdefault(example.target, [])
-            valid_sheets[example.target] = sorted(
-                set(valid_sheets[example.target]) | set(example.sheets)
-            )
-
-        # 1-Line Structured Completion via BaseLLMModule
-        prompt = input_data.query_context.question_text
-        doc, usage, cost, latency = self.complete_structured(
-            messages_or_prompt=prompt,
-            response_model=LlmRouterDocument,
+        parsed_res, usage, cost_usd, latency_sec = self.complete_structured(
+            messages_or_prompt=f"User Query: {question}",
+            response_model=LlmRouterResponse,
             model=cfg.model,
-            system_prompt=_build_catalog_prompt(examples),
+            system_prompt=ROUTER_SYSTEM_PROMPT,
         )
 
-        target = doc.target if doc.target in valid_sheets else None
-        company_name = (
-            doc.company_name.strip()
-            if doc.company_name and doc.company_name.strip()
-            else None
-        )
-
-        # Normalize and enrich parsed company scopes
-        parsed_scopes: List[Dict[str, Any]] = [
-            {
-                "raw_mention": (scope.raw_mention or scope.canonical_name).strip(),
-                "canonical_name": scope.canonical_name.strip(),
-                "matched_score": float(scope.matched_score),
-                "target_topics": [t.strip() for t in scope.target_topics if t.strip()],
-                "suggested_sheets": (
-                    [s.strip() for s in scope.suggested_sheets if s.strip()]
-                    or (valid_sheets.get(target, []) if target else [])
-                ),
-            }
-            for scope in doc.company_scopes
-            if scope.canonical_name and scope.canonical_name.strip()
-        ]
-
-        if not parsed_scopes and company_name:
-            parsed_scopes.append(
-                {
-                    "raw_mention": company_name,
-                    "canonical_name": company_name,
-                    "matched_score": float(doc.confidence),
-                    "target_topics": [],
-                    "suggested_sheets": valid_sheets.get(target, []) if target else [],
-                }
-            )
-
-        if not company_name and parsed_scopes:
-            company_name = parsed_scopes[0]["canonical_name"]
+        matched = parsed_res.target is not None or bool(parsed_res.sheets) or bool(parsed_res.company_name)
 
         return {
             "semantic_match": {
-                "matched": bool(
-                    (target is not None or parsed_scopes) and doc.confidence > 0
-                ),
-                "target": target,
-                "confidence": float(doc.confidence),
-                "sheets": valid_sheets.get(target, []) if target is not None else [],
-                "company_name": company_name,
-                "company_scopes": parsed_scopes,
-                "reason": doc.reason or "LLM route decision",
+                "matched": matched,
+                "target": parsed_res.target,
+                "confidence": round(parsed_res.confidence, 4),
+                "sheets": parsed_res.sheets,
+                "company_name": parsed_res.company_name,
+                "company_scopes": [scope.model_dump(mode="json") for scope in parsed_res.company_scopes],
+                "reason": parsed_res.reason,
                 "matches": [],
+                "query_type": parsed_res.query_type,
+                "subqueries": parsed_res.subqueries,
                 "metrics": {
-                    "kind": "llm",
+                    "kind": "llm_structured",
                     "model": cfg.model,
-                    "latency_seconds": round(latency, 3),
-                    "api_usage": usage.model_dump(mode="json"),
-                    "estimated_cost_usd": round(cost, 6),
+                    "latency_seconds": round(latency_sec, 3),
+                    "api_usage": usage or {},
+                    "estimated_cost_usd": round(cost_usd, 8),
                 },
             }
         }
 
 
+# Backward compatibility aliases
+LlmQueryRouterInput = LlmQueryRouterInputDTO
+LlmQueryRouterConfig = LlmQueryRouterConfigDTO
+LlmQueryRouterOutput = LlmQueryRouterOutputDTO
+LlmQueryRouterExecution = LlmQueryRouterInputDTO
+
 __all__ = [
-    "LlmCompanyScopeDocument",
+    "CompanyScopeItemDTO",
     "LlmQueryRouterConfig",
     "LlmQueryRouterConfigDTO",
     "LlmQueryRouterExecution",
     "LlmQueryRouterInput",
     "LlmQueryRouterInputDTO",
-    "LlmQueryRouterModule",
     "LlmQueryRouterOutput",
     "LlmQueryRouterOutputDTO",
-    "LlmRouterDocument",
+    "LlmQueryRouterModule",
+    "LlmRouterResponse",
+    "RouterDecisionDTO",
 ]

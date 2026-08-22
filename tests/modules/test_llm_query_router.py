@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from backend.providers.llm.chat_completion import ChatCompletionResult
-from modules.query.semantic_query_matcher import QueryExample
 from modules.common.base_module import QueryContextDTO
 from modules.query.llm_query_router import (
     LlmQueryRouterConfigDTO,
@@ -20,17 +19,7 @@ def test_llm_query_router_execution():
         latency_seconds=0.2,
     )
 
-    examples = [
-        QueryExample(
-            example_id="ex-1",
-            question="영업이익이 얼마인가요?",
-            target="손익계산서",
-            sheets=("손익계산서",),
-            query_type=1,
-        )
-    ]
-
-    router_module = LlmQueryRouterModule(completion_client=mock_llm, examples=examples)
+    router_module = LlmQueryRouterModule(completion_client=mock_llm)
     res = router_module.run(
         LlmQueryRouterInputDTO(
             query_context=QueryContextDTO(question_id="q1", question_text="삼성전자 영업이익")
@@ -43,7 +32,7 @@ def test_llm_query_router_execution():
     assert res["semantic_match"]["target"] == "손익계산서"
     assert res["semantic_match"]["company_name"] == "삼성전자"
     assert len(res["semantic_match"]["company_scopes"]) == 1
-    assert res["semantic_match"]["metrics"]["kind"] == "llm"
+    assert res["semantic_match"]["metrics"]["kind"] == "llm_structured"
 
 
 def test_llm_query_router_preserves_low_model_confidence():
@@ -53,18 +42,7 @@ def test_llm_query_router_preserves_low_model_confidence():
         usage={},
         latency_seconds=0,
     )
-    module = LlmQueryRouterModule(
-        client,
-        examples=[
-            QueryExample(
-                example_id="1",
-                question="Revenue?",
-                target="IS",
-                sheets=("IS",),
-                query_type=1,
-            )
-        ],
-    )
+    module = LlmQueryRouterModule(completion_client=client)
     result = module.run(
         LlmQueryRouterInputDTO(
             query_context=QueryContextDTO(question_id="q", question_text="maybe revenue")

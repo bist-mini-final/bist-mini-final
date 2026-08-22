@@ -131,9 +131,9 @@ class DecomposerModule(BaseLLMModule):
 
         # Resolve semantic scopes if available (from Semantic Matcher or LLM Router)
         match_raw = input_data.semantic_match
-        match: Optional[SemanticQueryMatchOutput] = (
+        match: Any = (
             match_raw.semantic_match
-            if isinstance(match_raw, LlmQueryRouterOutputDTO)
+            if hasattr(match_raw, "semantic_match")
             else match_raw
         )
 
