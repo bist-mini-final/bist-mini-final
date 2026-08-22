@@ -11,7 +11,7 @@ import signal
 import socket
 from threading import Event, Thread
 import time
-from typing import Iterator, Optional
+from typing import Generator, Optional
 
 from backend.core.settings import KUBERNETES_INGESTION_QUEUE
 from backend.engine.orchestration import compile_task_plan
@@ -39,7 +39,7 @@ def runtime_services() -> WorkflowRuntimeServices:
 
 
 @contextmanager
-def task_timeout(seconds: Optional[float]) -> Iterator[None]:
+def task_timeout(seconds: Optional[float]) -> Generator[None, None, None]:
     """Apply a per-module wall-clock timeout in the worker's main thread."""
     if seconds is None or not hasattr(signal, "setitimer"):
         yield

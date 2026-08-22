@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Iterable, Optional
+
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import BaseModule
 

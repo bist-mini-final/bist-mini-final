@@ -231,8 +231,10 @@ class DecomposerModule(BaseLLMModule):
                     sheets = getattr(sc, "sheets", None) or getattr(sc, "suggested_sheets", None) or (
                         sc.get("sheets") or sc.get("suggested_sheets") if isinstance(sc, dict) else []
                     )
+                    topics_str = ", ".join(str(t) for t in topics) if topics else ""
+                    sheets_str = ", ".join(str(s) for s in sheets) if sheets else ""
                     scope_lines.append(
-                        f"- Scope {idx}: Company='{cname}' | Topics=[{', '.join(topics)}] | Target Sheets=[{', '.join(sheets)}]"
+                        f"- Scope {idx}: Company='{cname}' | Topics=[{topics_str}] | Target Sheets=[{sheets_str}]"
                     )
                 entity_scope_prompt = "\n\n[LLM Router Target Data Scopes]:\n" + "\n".join(scope_lines)
             elif getattr(match, "company_name", None) or (isinstance(match, dict) and match.get("company_name")):
@@ -240,7 +242,8 @@ class DecomposerModule(BaseLLMModule):
                 sheets = getattr(match, "sheets", None) or (
                     match.get("sheets") if isinstance(match, dict) else []
                 )
-                entity_scope_prompt = f"\n\n[LLM Router Target Scope]: Target Company: '{cname}', Sheets: [{', '.join(sheets)}]"
+                sheets_list_str = ", ".join(str(s) for s in sheets) if sheets else ""
+                entity_scope_prompt = f"\n\n[LLM Router Target Scope]: Target Company: '{cname}', Sheets: [{sheets_list_str}]"
 
         prompt = user_tmpl.format(question=input_data.query_context.question_text) + entity_scope_prompt
 

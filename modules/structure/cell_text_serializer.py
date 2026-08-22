@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Literal, Optional
 
 import openpyxl
@@ -251,7 +252,7 @@ class CellTextSerializerModule(BaseModule):
                     continue
 
                 cell_coord = f"{get_column_letter(column)}{row}"
-                clean_comp = re.sub(r"[^A-Za-z0-9가-힣]", "", str(company_name).strip()) if company_name else ""
+                clean_comp = re.sub(r"[^A-Za-z0-9가-힣]", "", company_name.strip()) if company_name else ""
                 cell_id = f"{clean_comp}:{code}:{cell_coord}" if clean_comp else f"{code}:{cell_coord}"
                 if cell_id in seen_cell_ids:
                     raise ModuleExecutionError(
