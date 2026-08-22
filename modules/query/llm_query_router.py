@@ -74,30 +74,18 @@ logger = logging.getLogger(__name__)
 # 2. Prompts & Presets
 # ==============================================================================
 ROUTER_SYSTEM_PROMPT = """You are an expert spreadsheet query router for financial statements and corporate business data.
-Analyze the user's natural language question and extract ALL required data scopes (combinations of Company, Financial Sheet Categories, and Specific Financial Topics) into the 'items' list.
+Analyze the user's natural language question and extract ALL required data scopes (combinations of canonical Company Name, Financial Sheet Categories, and Specific Financial Topics) into the 'items' list.
 
 CRITICAL GUIDELINES:
-1. Multi-Entity & Multi-Sheet Support (CRITICAL):
-   - A single question may ask about multiple companies (e.g. '삼성전자' AND '현대자동차') or multiple financial statements (e.g. '영업이익' in IS AND '부채' in BS).
+1. Multi-Entity & Multi-Sheet Support:
+   - A single question may ask about multiple companies or multiple financial statements.
    - ALWAYS extract each distinct (Company + Sheets + Topics) target as an individual item in 'items'.
-   - Example 1: "삼성전자 2023년 영업이익과 현대자동차 2022년 부채상태 비교"
-     -> Item 1: company_name='삼성전자', sheets=['손익계산서'], target_topics=['영업이익']
-     -> Item 2: company_name='현대자동차', sheets=['재무상태표'], target_topics=['부채상태', '부채총계']
-   - Example 2: "삼성전자 매출액이랑 부채비율 알려줘"
-     -> Item 1: company_name='삼성전자', sheets=['손익계산서'], target_topics=['매출액']
-     -> Item 2: company_name='삼성전자', sheets=['재무상태표'], target_topics=['부채비율', '부채총계']
 
-2. Canonical Company Normalization:
-   - Normalize colloquial names (e.g. '삼전' -> '삼성전자', '하닉' -> 'SK하이닉스', '현차' -> '현대자동차').
+2. Company & Sheet Normalization:
+   - Identify the formal canonical corporate entity name.
+   - Infer the appropriate standard financial statement sheet names (e.g., '손익계산서', '재무상태표', '현금흐름표', '자본변동표') and specific financial topics.
 
-3. Candidate Sheet Names Mapping:
-   - Map financial topics to standard sheet names:
-     * '매출액', '영업이익', '당기순이익', '매출원가' -> ['손익계산서', '포괄손익계산서']
-     * '자산', '부채', '자본', '유동자산', '부채비율' -> ['재무상태표']
-     * '영업활동현금흐름', '투자활동현금흐름' -> ['현금흐름표']
-     * '배당금', '이익잉여금' -> ['자본변동표', '이익잉여금처분계산서']
-
-4. Confidence:
+3. Confidence:
    - Provide overall confidence score (0.0 to 1.0) of your routing decision."""
 
 
