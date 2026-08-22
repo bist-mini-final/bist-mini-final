@@ -3,6 +3,9 @@ from typing import Optional, cast
 
 from fastapi import APIRouter
 
+from ..bi.api_routes import create_bi_router
+from ..bi.composition import create_bi_services
+from ..bi.ingestion_bridge import create_bi_workflow_dispatcher
 from ..core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
@@ -15,11 +18,10 @@ from ..core.settings import (
 )
 from ..embeddings.factory import EmbeddingEncoder
 from ..llm.chat_completion import ChatCompletionClient
-from ..storage.answer_cache import AnswerCacheRepository
-from ..runtime.services import create_workflow_runtime_services
-from ..runtime.registry import ModuleRegistry
 from ..orchestration.kubernetes import KubernetesQueueDispatcher
-from ..workflows import InteractiveWorkflowDispatcher
+from ..runtime.registry import ModuleRegistry
+from ..runtime.services import create_workflow_runtime_services
+from ..storage.answer_cache import AnswerCacheRepository
 from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -69,9 +71,13 @@ def create_api_router(
     )
     # Playground execution remains interactive. Long-running Excel ingestion
     # is persisted to the PostgreSQL queue watched by KEDA.
-    workflow_dispatcher = InteractiveWorkflowDispatcher(
+    module_registry = cast(ModuleRegistry, services.module_registry)
+    bi_services = create_bi_services(module_registry, completion_client)
+    router.include_router(create_bi_router(bi_services))
+    workflow_dispatcher = create_bi_workflow_dispatcher(
         services.workflow_executor,
         services.run_store,
+        bi_services,
         max_workers=PLAYGROUND_MAX_CONCURRENCY,
     )
     ingestion_dispatcher = KubernetesQueueDispatcher(
@@ -79,7 +85,6 @@ def create_api_router(
         services.run_store,
         KUBERNETES_INGESTION_QUEUE,
     )
-    module_registry = cast(ModuleRegistry, services.module_registry)
     workflow_store = services.workflow_store
     run_store = services.run_store
     workflow_executor = services.workflow_executor

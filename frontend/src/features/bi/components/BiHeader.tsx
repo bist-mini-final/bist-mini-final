@@ -1,12 +1,14 @@
-import { Building2, CalendarRange, CheckCircle2, CircleAlert, Clock3, FlaskConical } from 'lucide-react';
+import { Building2, CalendarRange, CheckCircle2, CircleAlert, Clock3, Database, RefreshCw } from 'lucide-react';
 import type { BiDashboardSnapshot, PeriodRange } from '../types';
 
 interface BiHeaderProps {
   readonly dashboard: BiDashboardSnapshot;
   readonly periodLabel: PeriodRange;
+  readonly isRefreshing: boolean;
+  readonly onRefresh: () => void;
 }
 
-export function BiHeader({ dashboard, periodLabel }: BiHeaderProps) {
+export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
   const generatedAt = dashboard.snapshot.generatedAt.slice(0, 16).replace('T', ' ').split('-').join('.');
 
@@ -39,9 +41,18 @@ export function BiHeader({ dashboard, periodLabel }: BiHeaderProps) {
             <dd title={generatedAt}>{generatedAt}</dd>
           </div>
         </dl>
-        <span className="bi-fixture-note">
-          <FlaskConical size={14} aria-hidden="true" />현재 화면은 디자인 검증용 fixture 데이터입니다.
+        <span className="bi-source-note">
+          <Database size={14} aria-hidden="true" />검증된 BI 스냅샷 API 데이터입니다.
         </span>
+        <button
+          className="bi-refresh-button"
+          type="button"
+          disabled={isRefreshing}
+          onClick={onRefresh}
+        >
+          <RefreshCw className={isRefreshing ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
+          {isRefreshing ? '데이터 갱신 중' : '데이터 갱신'}
+        </button>
       </div>
     </header>
   );

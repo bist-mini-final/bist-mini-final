@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { X } from 'lucide-react';
+import { useBiPlaygroundHandoff } from '../bi/integrations/playgroundHandoffAdapter';
 import { Header } from './components/Header';
 import type { WorkflowOption } from './components/Header';
 import { BenchmarkPanel } from './components/BenchmarkPanel';
@@ -68,6 +69,13 @@ function PlaygroundWorkspace() {
     activeWorkflowId,
     activeWorkflowName,
   );
+  useBiPlaygroundHandoff({
+    modules: controller.modules,
+    nodes: graph.nodes,
+    ready: workflow.ready,
+    search: window.location.search,
+    setQueryText: controller.setQueryText,
+  });
   // Use loose compatibility so that adding new nodes to the canvas does not
   // wipe out the execution results of already-completed nodes.  New nodes have
   // no entry in run.nodes and are therefore shown as idle by applyRun().

@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.router import create_api_router
+from backend.bi.api_routes import register_bi_exception_handlers
 from backend.core.settings import CACHE_DIR, DEV_CORS_ORIGINS, DIST_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(create_api_router(repository))
+    register_bi_exception_handlers(application)
 
     assets_dir = DIST_DIR / "assets"
     if assets_dir.exists():

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Landmark } from 'lucide-react';
 import { BiDashboardGrid } from './components/BiDashboardGrid';
+import { BiDataState } from './components/BiDataState';
 import { BiHeader } from './components/BiHeader';
 import { BiPageNotice } from './components/BiPageNotice';
 import { BiToolbar } from './components/BiToolbar';
@@ -9,7 +10,8 @@ import { CompanyTabs } from './components/CompanyTabs';
 import { EvidenceDialog } from './components/EvidenceDialog';
 import { ResetLayoutDialog } from './components/ResetLayoutDialog';
 import { getCardDefinition } from './config/cardRegistry';
-import { DASHBOARD_FIXTURES } from './fixtures/dashboardFixtures';
+import { useBiCompanies } from './hooks/useBiCompanies';
+import { useBiDashboard } from './hooks/useBiDashboard';
 import { useBiLayout } from './hooks/useBiLayout';
 import { buildCardViewModel } from './selectors/cardViewModel';
 import type { BiCardId, PeriodRange } from './types';
@@ -18,24 +20,71 @@ import './bi.css';
 import './bi-reference.css';
 
 const PERIOD_OPTIONS = ['최근 3개', '최근 5개', '전체'] as const satisfies readonly PeriodRange[];
-const COMPANY_TABS = DASHBOARD_FIXTURES.map((dashboard) => ({
-  id: dashboard.company.companyId,
-  name: dashboard.company.displayName,
-}));
+const SELECTED_COMPANY_KEY = 'rag-flow:bi-selected-company:v1';
+
+function readSelectedCompanyId(): string {
+  try {
+    return window.localStorage.getItem(SELECTED_COMPANY_KEY) ?? '';
+  } catch (error) {
+    if (error instanceof DOMException) return '';
+    throw error;
+  }
+}
+
+function storeSelectedCompanyId(companyId: string): void {
+  try {
+    window.localStorage.setItem(SELECTED_COMPANY_KEY, companyId);
+  } catch (error) {
+    if (!(error instanceof DOMException)) throw error;
+  }
+}
 
 export function BiPage() {
-  const [selectedCompanyId, setSelectedCompanyId] = useState(COMPANY_TABS[0]?.id ?? '');
+  const companiesState = useBiCompanies();
+  const [selectedCompanyId, setSelectedCompanyId] = useState(readSelectedCompanyId);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodRange>('최근 5개');
   const [isEditing, setIsEditing] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [evidenceCardId, setEvidenceCardId] = useState<BiCardId | null>(null);
   const layout = useBiLayout();
+  const dashboardController = useBiDashboard(selectedCompanyId);
+  const dashboardState = dashboardController.state;
 
-  const dashboard = useMemo(
-    () => DASHBOARD_FIXTURES.find((item) => item.company.companyId === selectedCompanyId) ?? DASHBOARD_FIXTURES[0],
-    [selectedCompanyId],
-  );
+  useEffect(() => {
+    if (companiesState.status !== 'ready' || companiesState.companies.length === 0) return;
+    if (companiesState.companies.some((company) => company.companyId === selectedCompanyId)) return;
+    const firstCompanyId = companiesState.companies[0]?.companyId ?? '';
+    setSelectedCompanyId(firstCompanyId);
+    if (firstCompanyId) storeSelectedCompanyId(firstCompanyId);
+  }, [companiesState, selectedCompanyId]);
+
+  if (companiesState.status === 'loading') {
+    return <BiDataState tone="loading" title="BI 데이터를 불러오는 중입니다" message="등록된 기업 목록을 확인하고 있습니다." />;
+  }
+  if (companiesState.status === 'error') {
+    return <BiDataState tone="error" title="기업 목록을 불러오지 못했습니다" message={companiesState.message} />;
+  }
+  if (companiesState.companies.length === 0) {
+    return <BiDataState tone="empty" title="등록된 기업이 없습니다" message="인덱싱 완료 후 BI materialization을 시작하면 대시보드가 표시됩니다." />;
+  }
+  if (dashboardState.status === 'idle' || dashboardState.status === 'loading') {
+    return <BiDataState tone="loading" title="대시보드를 불러오는 중입니다" message="게시된 지표 스냅샷을 확인하고 있습니다." />;
+  }
+  if (dashboardState.status === 'pending') {
+    return <BiDataState tone="loading" title="지표 스냅샷을 생성하고 있습니다" message={dashboardState.job.message ?? '완료된 스냅샷이 게시되면 대시보드를 볼 수 있습니다.'} />;
+  }
+  if (dashboardState.status === 'error') {
+    return <BiDataState tone="error" title="대시보드를 표시할 수 없습니다" message={dashboardState.message} />;
+  }
+
+  const dashboard = dashboardState.dashboard;
+  const isRefreshing = dashboard.refresh.status !== 'idle'
+    && dashboard.refresh.status !== 'failed';
+  const companyTabs = companiesState.companies.map((company) => ({
+    id: company.companyId,
+    name: company.displayName,
+  }));
   const evidenceCard = evidenceCardId ? getCardDefinition(evidenceCardId) : null;
   const evidenceViewModel = evidenceCard ? buildCardViewModel({
     definition: evidenceCard,
@@ -46,7 +95,12 @@ export function BiPage() {
 
   return (
     <section className="bi-page" aria-labelledby="bi-page-title">
-      <BiHeader dashboard={dashboard} periodLabel={selectedPeriod} />
+      <BiHeader
+        dashboard={dashboard}
+        periodLabel={selectedPeriod}
+        isRefreshing={isRefreshing}
+        onRefresh={() => void dashboardController.refresh()}
+      />
       <BiPageNotice refresh={dashboard.refresh} />
 
       <div className="bi-page__workspace">
@@ -56,9 +110,12 @@ export function BiPage() {
             <h2>기업 선택</h2>
           </div>
           <CompanyTabs
-            companies={COMPANY_TABS}
+            companies={companyTabs}
             selectedId={selectedCompanyId}
-            onSelect={setSelectedCompanyId}
+            onSelect={(companyId) => {
+              setSelectedCompanyId(companyId);
+              storeSelectedCompanyId(companyId);
+            }}
           />
         </div>
 
@@ -98,6 +155,8 @@ export function BiPage() {
         <EvidenceDialog
           cardTitle={evidenceCard.title}
           evidence={evidenceViewModel.evidence}
+          source={dashboard.source}
+          snapshotId={dashboard.snapshot.snapshotId}
           onClose={() => setEvidenceCardId(null)}
         />
       ) : null}

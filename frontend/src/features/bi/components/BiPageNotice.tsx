@@ -5,7 +5,7 @@ interface BiPageNoticeProps {
   readonly refresh: BiRefreshState;
 }
 
-const PROCESSING_STATUSES = ['queued', 'profiling', 'extracting', 'materializing'] as const;
+const PROCESSING_STATUSES = ['queued', 'indexing', 'profiling', 'extracting', 'materializing'] as const;
 
 export function BiPageNotice({ refresh }: BiPageNoticeProps) {
   const isProcessing = PROCESSING_STATUSES.some((status) => status === refresh.status);

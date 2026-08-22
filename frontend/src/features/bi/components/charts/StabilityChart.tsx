@@ -17,18 +17,24 @@ export function StabilityChart({ dashboard, range, size }: StabilityChartProps) 
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);
   const latest = data[data.length - 1];
-  const cash = Math.abs(latest?.values.cash_and_short_term_investments ?? 0);
-  const debt = Math.abs(latest?.values.total_debt ?? 0);
-  const netDebt = latest?.values.net_debt ?? 0;
-  const comparison = [{ label: latest?.periodLabel ?? '최근', cash: -cash, debt }];
+  const cashValue = latest?.values.cash_and_short_term_investments ?? null;
+  const debtValue = latest?.values.total_debt ?? null;
+  const netDebt = latest?.values.net_debt ?? null;
+  const cash = Math.abs(cashValue ?? 0);
+  const debt = Math.abs(debtValue ?? 0);
+  const comparison = [{
+    label: latest?.periodLabel ?? '최근',
+    cash: cashValue === null ? null : -cash,
+    debt: debtValue === null ? null : debt,
+  }];
   const plotPadding = Math.max(cash + debt, 1) * 0.05;
   const zeroPosition = ((cash + plotPadding) / (cash + debt + plotPadding * 2)) * 100;
   return (
     <BiChartFrame title="현금·차입금 균형" description="현금은 왼쪽, 차입금은 오른쪽으로 비교합니다." data={data} series={series} valueKind="amount">
       <div className="bi-chart-layout bi-stability-chart">
         <div className="bi-stability-chart__labels" aria-hidden="true">
-          <span><b>현금</b><strong>{formatChartValue(cash, 'amount')}</strong><ArrowLeft size={15} /></span>
-          <span><b>총차입금</b><strong>{formatChartValue(debt, 'amount')}</strong><ArrowRight size={15} /></span>
+          <span><b>현금</b><strong>{formatChartValue(cashValue === null ? null : cash, 'amount')}</strong><ArrowLeft size={15} /></span>
+          <span><b>총차입금</b><strong>{formatChartValue(debtValue === null ? null : debt, 'amount')}</strong><ArrowRight size={15} /></span>
         </div>
         <div className="bi-stability-chart__plot">
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
