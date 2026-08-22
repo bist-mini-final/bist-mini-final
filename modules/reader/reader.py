@@ -17,13 +17,15 @@ Example:
           "file_name": "samsung_2023.xlsx",
           "workbook_hash": "a1b2c3d4..."
         },
-        "top_k_used": 1,
-        "adjacent_radius": 1,
-        "context_characters": 350,
-        "context_blocks": [
+        "items": [
           "[Sheet: 손익계산서 | Row 5]\n- 영업이익: 2022=433766, 2023=65670 (단위: 억원)"
         ],
-        "block_count": 1
+        "metrics": {
+          "top_k_used": 1,
+          "adjacent_radius": 1,
+          "context_characters": 350,
+          "block_count": 1
+        }
       }
     }
     ```
@@ -430,7 +432,7 @@ class ReaderModule(BaseLLMModule):
         query_ctx = input_data.context_json.query_context
         doc_ctx = input_data.context_json.document_context
         question = query_ctx.question_text
-        context_blocks = list(input_data.context_json.context_blocks)
+        context_blocks = list(input_data.context_json.items or input_data.context_json.context_blocks or [])
 
         context_text = "\n\n".join(context_blocks)
         user_prompt = user_template.replace(

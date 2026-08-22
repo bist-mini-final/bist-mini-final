@@ -51,7 +51,7 @@ def test_context_expander_batches_rows_per_sheet():
         config=PgContextExpanderConfigDTO(top_k=5, adjacent_radius=2),
     )
 
-    assert "context_blocks" in result
-    assert len(result["context_blocks"]) > 0
-    assert result["top_k_used"] > 0
+    assert "items" in result
+    assert len(result["items"]) > 0
+    assert result["metrics"]["top_k_used"] > 0
     assert mock_store.fetch_rows_cells.called

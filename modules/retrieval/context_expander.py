@@ -22,13 +22,15 @@ Example:
     {
       "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
       "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
-      "top_k_used": 1,
-      "adjacent_radius": 1,
-      "context_characters": 512,
-      "context_blocks": [
+      "items": [
         "[Sheet: 손익계산서 | Row 5]\n- 영업수익: 2021=2796048, 2022=3022314, 2023=2589355\n- 영업이익: 2021=516339, 2022=433766, 2023=65670\n- 당기순이익: 2021=399074, 2022=556541, 2023=154871"
       ],
-      "block_count": 1
+      "metrics": {
+        "top_k_used": 1,
+        "adjacent_radius": 1,
+        "context_characters": 512,
+        "block_count": 1
+      }
     }
     ```
 """
@@ -78,14 +80,26 @@ class ContextDTO(ModuleDTO):
     document_context: DocumentContextDTO = Field(
         description="컨텍스트 블록이 추출된 원본 문서 컨텍스트"
     )
-    top_k_used: int = Field(gt=0, description="확장에 실제 사용한 RRF 후보 수")
-    adjacent_radius: int = Field(ge=0, description="검색 셀 기준 인접 행 확장 반경")
-    context_characters: int = Field(ge=0, description="전체 컨텍스트 문자 수")
-    context_blocks: List[str] = Field(
-        min_length=1,
-        description="Reader가 그대로 사용할 시트·행 단위 실제 셀 컨텍스트",
+    items: List[str] = Field(
+        default_factory=list,
+        description="Reader가 그대로 사용할 시트·행 단위 실제 셀 컨텍스트 블록 목록",
     )
-    block_count: int = Field(default=0, ge=0, description="생성된 확장 행 블록 개수")
+    metrics: Dict[str, Any] = Field(
+        default_factory=dict, description="확장 실행 메트릭 및 통계"
+    )
+
+    # Backward compatibility properties & initializers
+    context_blocks: Optional[List[str]] = None
+    top_k_used: Optional[int] = None
+    adjacent_radius: Optional[int] = None
+    context_characters: Optional[int] = None
+    block_count: Optional[int] = None
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.context_blocks and not self.items:
+            self.items = list(self.context_blocks)
+        if not self.context_blocks and self.items:
+            self.context_blocks = self.items
 
 
 class PgContextExpanderInputDTO(ModuleInputDTO):
@@ -289,11 +303,13 @@ class PgContextExpanderModule(BaseModule):
         return {
             "query_context": query_context_dict,
             "document_context": doc_context_dict,
-            "top_k_used": len(retrieval_items),
-            "adjacent_radius": cfg.adjacent_radius,
-            "context_characters": total_chars,
-            "context_blocks": context_blocks,
-            "block_count": len(context_blocks),
+            "items": context_blocks,
+            "metrics": {
+                "top_k_used": len(retrieval_items),
+                "adjacent_radius": cfg.adjacent_radius,
+                "context_characters": total_chars,
+                "block_count": len(context_blocks),
+            },
         }
 
 
