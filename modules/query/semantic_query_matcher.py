@@ -19,9 +19,6 @@ Example:
     {
       "semantic_match": {
         "matched": true,
-        "target": "손익계산서",
-        "sheets": ["손익계산서"],
-        "company_name": "삼성전자",
         "items": [
           {
             "example_id": "ex-01",
