@@ -132,7 +132,7 @@ install_control_plane() {
 build_worker() {
   DOCKER_BUILDKIT=1 docker build \
     --target runtime \
-    -f "${PROJECT_ROOT}/jobs/workflow_worker/Dockerfile" \
+    -f "${PROJECT_ROOT}/deploy/docker/Dockerfile.worker" \
     -t "${WORKER_IMAGE}" \
     "${PROJECT_ROOT}"
   k3d image import "${WORKER_IMAGE}" --cluster "${CLUSTER_NAME}"

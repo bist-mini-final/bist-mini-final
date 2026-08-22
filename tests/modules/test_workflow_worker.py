@@ -13,7 +13,7 @@ from backend.engine.workflows.models import (
     WorkflowRun,
     utc_now_iso,
 )
-from jobs.workflow_worker.main import execute_with_policy, run_one, runtime_services
+from backend.engine.worker.main import execute_with_policy, run_one, runtime_services
 
 
 class WorkflowWorkerTests(unittest.TestCase):
@@ -88,6 +88,6 @@ class WorkflowWorkerTests(unittest.TestCase):
     def test_run_one_returns_none_when_queue_empty(self) -> None:
         mock_services = MagicMock()
         mock_services.db_manager.claim_next_workflow_run.return_value = None
-        with patch("jobs.workflow_worker.main.runtime_services", return_value=mock_services):
+        with patch("backend.engine.worker.main.runtime_services", return_value=mock_services):
             result = run_one("test-queue", "worker-1")
             self.assertIsNone(result)

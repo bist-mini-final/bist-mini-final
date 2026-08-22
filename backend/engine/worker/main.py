@@ -1,4 +1,4 @@
-"""Claim and execute exactly one PostgreSQL-queued workflow run."""
+"""Claim and execute exactly one PostgreSQL-queued workflow run in Kubernetes/local worker."""
 
 from __future__ import annotations
 

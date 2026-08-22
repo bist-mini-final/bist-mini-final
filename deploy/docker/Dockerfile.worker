@@ -19,15 +19,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN groupadd -r appuser -g 1000 \
     && useradd -r -u 1000 -g appuser appuser
 
-COPY jobs/workflow_worker/requirements.txt ./requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     python -m pip install --upgrade pip \
     && python -m pip install -r requirements.txt
 
 COPY backend ./backend
 COPY modules ./modules
-COPY jobs/__init__.py ./jobs/__init__.py
-COPY jobs/workflow_worker ./jobs/workflow_worker
+COPY jobs ./jobs
 RUN mkdir -p \
     /app/data/runs \
     /app/data/cache \
@@ -40,17 +39,6 @@ RUN mkdir -p \
 
 USER appuser
 
-ENTRYPOINT ["python", "-m", "jobs.workflow_worker.main"]
-
-# Optional CPU-only local embedding target. The default OpenAI-backed image is
-# deliberately lean so cold starts and k3d imports stay fast.
-FROM base AS local-models
-USER root
-RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
-    python -m pip install \
-        --index-url https://download.pytorch.org/whl/cpu \
-        "torch>=2.2.0,<3.0.0" \
-    && python -m pip install "transformers>=4.44.0,<5.0.0"
-USER appuser
+ENTRYPOINT ["python", "-m", "backend.engine.worker.main"]
 
 FROM base AS runtime
