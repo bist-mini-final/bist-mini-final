@@ -18,6 +18,7 @@ def test_sheet_metadata_persistence_execution(tmp_path: Path):
     wb_path = tmp_path / "test.xlsx"
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = "Sheet1"
     ws["A1"] = "Data"
     wb.save(wb_path)

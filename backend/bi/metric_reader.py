@@ -1,5 +1,5 @@
 import json
-from typing import Protocol, TypeAlias, assert_never
+from typing import Protocol, TypeAlias, assert_never, cast
 
 from pydantic import ValidationError
 
@@ -49,7 +49,7 @@ def _strict_json_schema(
         del normalized["pattern"]
     match normalized.get("properties"):
         case dict() as properties:
-            normalized["required"] = list(properties)
+            normalized["required"] = cast(JsonValue, list(properties))
         case str() | int() | float() | bool() | list() | None:
             pass
         case unreachable:

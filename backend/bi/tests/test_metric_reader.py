@@ -1,3 +1,4 @@
+from typing import Any, cast
 import unittest
 
 from backend.bi.extraction_models import (
@@ -29,14 +30,14 @@ class FakeStructuredCompletionClient:
 
 class CapturingChatCompletionClient(ChatCompletionClient):
     def __init__(self) -> None:
-        self.json_schema: dict[str, JsonValue] | None = None
+        self.json_schema: dict[str, Any] | None = None
 
     def complete_structured(
         self,
         model: str,
         messages: list[dict[str, str]],
         schema_name: str,
-        json_schema: dict[str, JsonValue],
+        json_schema: Any,
     ) -> str:
         self.json_schema = json_schema
         return "{}"
@@ -89,7 +90,7 @@ class BiMetricReaderTests(unittest.TestCase):
         )
 
         # Then
-        schema = client.json_schema
+        schema = cast(dict[str, Any], client.json_schema)
         self.assertIsNotNone(schema)
         assert schema is not None
         normalized_value = schema["properties"]["normalized_value"]
@@ -114,7 +115,7 @@ class BiMetricReaderTests(unittest.TestCase):
         )
 
         # Then
-        schema = client.json_schema
+        schema = cast(dict[str, Any], client.json_schema)
         self.assertIsNotNone(schema)
         assert schema is not None
         self.assertEqual(

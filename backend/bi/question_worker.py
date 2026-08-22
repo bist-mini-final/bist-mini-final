@@ -14,6 +14,7 @@ from .models import AvailableObservation, UnavailableObservation
 from .question_pipeline import BiQuestionSourceError
 from .question_records import (
     AnswerId,
+    BiAnswerOutcome,
     BiAnswerRecord,
     BiCompletedAnswerRecord,
     BiFailedAnswerRecord,
@@ -129,7 +130,7 @@ class BiQuestionWorker:
         return BiCompletedAnswerRecord(
             answer_id=self._answer_id(question),
             question_id=question.question_id,
-            outcome="completed",
+            outcome=BiAnswerOutcome.COMPLETED,
             answer_text=answer_text,
             result=result,
             evidence_cell_ids=tuple(
@@ -164,7 +165,7 @@ class BiQuestionWorker:
         return BiFailedAnswerRecord(
             answer_id=self._answer_id(question),
             question_id=question.question_id,
-            outcome="failed",
+            outcome=BiAnswerOutcome.FAILED,
             error_code=error_code,
             error_message=message[:2_000],
             model_name=BI_WORKER_MODEL,

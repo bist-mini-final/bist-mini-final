@@ -133,15 +133,11 @@ class BiMaterializer:
             case unreachable:
                 assert_never(unreachable)
 
-        source_metric_ids = []
-        for metric_id, definition in METRIC_CATALOG.items():
-            match definition:
-                case SourceMetricDefinition():
-                    source_metric_ids.append(metric_id)
-                case DerivedMetricDefinition():
-                    continue
-                case unreachable:
-                    assert_never(unreachable)
+        source_metric_ids = [
+            metric_id
+            for metric_id, definition in METRIC_CATALOG.items()
+            if isinstance(definition, SourceMetricDefinition)
+        ]
 
         total_requests = len(source_metric_ids) * len(profile.periods)
         job = job.model_copy(

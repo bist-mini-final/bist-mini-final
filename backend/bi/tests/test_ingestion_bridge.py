@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, cast
 import unittest
 
 from backend.bi.api_services import BiApiServices
@@ -291,9 +292,9 @@ class BiIngestionCompletionTests(unittest.TestCase):
             run = completed_ingestion_run()
             run_store.save(run)
             dispatcher = BiWorkflowRunDispatcher(
-                CompletedExecutor(run),
+                cast(Any, CompletedExecutor(run)),
                 run_store,
-                FailingCompletionHook(),
+                cast(Any, FailingCompletionHook()),
             )
 
             # When

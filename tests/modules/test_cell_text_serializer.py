@@ -5,16 +5,17 @@ import openpyxl
 
 from modules.structure.cell_text_serializer import (
     CellTextSerializerConfigDTO,
+    CellTextSerializerInputDTO,
     CellTextSerializerModule,
     CellTextSerializerOutput,
 )
-from modules.structure.luna_vlm_structure_detector import SpreadsheetStructureOutput
 
 
 def test_cell_text_serializer_execution(tmp_path: Path) -> None:
     wb_path = tmp_path / "test.xlsx"
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = "IS"
     ws["B1"] = "FY2024"
     ws["C1"] = "FY2025"
@@ -26,7 +27,7 @@ def test_cell_text_serializer_execution(tmp_path: Path) -> None:
     module = CellTextSerializerModule(processed_dir=tmp_path)
     current_hash = module.catalog.sha256(wb_path)
 
-    input_dto = SpreadsheetStructureOutput.model_validate(
+    input_dto = CellTextSerializerInputDTO.model_validate(
         {
             "file_name": "test.xlsx",
             "workbook_hash": current_hash,

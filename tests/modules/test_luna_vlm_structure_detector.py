@@ -16,6 +16,7 @@ def test_luna_detector_executes_on_tiny_workbook(tmp_path: Path) -> None:
     workbook_path = tmp_path / "tiny.xlsx"
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = "Sheet1"
     ws["A1"] = "Category"
     ws["B1"] = "2023"

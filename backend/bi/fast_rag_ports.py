@@ -1,4 +1,4 @@
-from typing import Mapping, Protocol, Sequence
+from typing import Any, Mapping, Optional, Protocol, Sequence
 
 
 class ModuleRegistryPort(Protocol):
@@ -14,7 +14,9 @@ class RankedCellStorePort(Protocol):
     def fetch_cells_by_metadata(
         self,
         cell_identifiers: list[str],
-        workbook_hash: str | None = None,
-        collection_name: str | None = None,
+        workbook_hash: Optional[str] = None,
+        company_name: Optional[str] = None,
+        collection_name: Optional[str] = None,
         limit: int = 50,
-    ) -> Sequence[Mapping[str, object]]: ...
+        cell_references: Optional[list[dict[str, Optional[str]]]] = None,
+    ) -> Sequence[Mapping[str, Any]]: ...

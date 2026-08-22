@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+from typing import Any, cast
 from unittest.mock import MagicMock
 import pytest
 
@@ -48,7 +47,7 @@ def test_company_metadata_persistence_failure_is_not_silenced():
         pgvector_store=MagicMock(),
     )
     module._sample_workbook = MagicMock(return_value=[])
-    module.pgvector_store.update_index_company.side_effect = RuntimeError("db down")
+    cast(Any, module.pgvector_store).update_index_company.side_effect = RuntimeError("db down")
 
     with pytest.raises(StorageError):
         module.run({"file_name": "acme.xlsx", "index_id": "idx_a"})

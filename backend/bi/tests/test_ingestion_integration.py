@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event
+from typing import Any, cast
 import unittest
 
 from fastapi.testclient import TestClient
@@ -71,7 +72,7 @@ class BiIngestionIntegrationTests(unittest.TestCase):
             run = completed_ingestion_run()
             run_store.save(run)
             dispatcher = create_bi_workflow_dispatcher(
-                CompletedExecutor(run),
+                cast(Any, CompletedExecutor(run)),
                 run_store,
                 services,
             )
