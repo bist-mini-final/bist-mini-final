@@ -18,7 +18,6 @@ Example:
     ```json
     {
       "semantic_match": {
-        "matched": true,
         "items": [
           {
             "company_name": "삼성전자",
@@ -112,10 +111,18 @@ class LlmRouterResponse(BaseModel):
 class RouterDecisionDTO(ModuleDTO):
     """자급자족형 구조화 라우팅 결과 DTO."""
 
-    matched: bool = Field(description="유효한 라우팅 대상 매칭 여부")
     items: List[CompanyScopeItemDTO] = Field(default_factory=list, description="식별된 모든 기업/시트/토픽 데이터 스코프 목록")
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="라우팅 신뢰도 (호환용 기본값 1.0)")
     metrics: Dict[str, Any] = Field(default_factory=dict, description="실행 메트릭 및 토큰/비용 텔레메트리")
+
+    @property
+    def matched(self) -> bool:
+        """유효한 라우팅 대상 매칭 여부 (계산형 프로퍼티)."""
+        return len(self.items) > 0
+
+    @property
+    def confidence(self) -> float:
+        """라우팅 신뢰도 (호환용 기본값 1.0/0.0)."""
+        return 1.0 if self.items else 0.0
 
     @property
     def sheets(self) -> List[str]:
@@ -206,13 +213,10 @@ class LlmQueryRouterModule(BaseLLMModule):
         )
 
         items = parsed_res.items or []
-        matched = bool(items)
         scopes_dump = [scope.model_dump(mode="json") for scope in items]
 
         return {
             "semantic_match": {
-                "matched": matched,
-                "confidence": 1.0 if matched else 0.0,
                 "items": scopes_dump,
                 "metrics": {
                     "kind": "llm_structured",

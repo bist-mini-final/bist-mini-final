@@ -29,7 +29,6 @@ def test_llm_query_router_execution():
     )
 
     assert "semantic_match" in res
-    assert res["semantic_match"]["matched"] is True
     assert len(res["semantic_match"]["items"]) == 1
     assert res["semantic_match"]["items"][0]["company_name"] == "삼성전자"
     assert res["semantic_match"]["items"][0]["sheets"] == ["손익계산서"]
@@ -37,6 +36,7 @@ def test_llm_query_router_execution():
 
     # Verify RouterDecisionDTO properties
     dto = RouterDecisionDTO.model_validate(res["semantic_match"])
+    assert dto.matched is True
     assert dto.company_name == "삼성전자"
     assert dto.sheets == ["손익계산서"]
     assert len(dto.company_scopes) == 1
@@ -61,12 +61,12 @@ def test_llm_query_router_multi_scope_execution():
         config=LlmQueryRouterConfigDTO(),
     )
 
-    assert res["semantic_match"]["matched"] is True
     assert len(res["semantic_match"]["items"]) == 2
     assert res["semantic_match"]["items"][0]["company_name"] == "삼성전자"
     assert res["semantic_match"]["items"][1]["company_name"] == "현대자동차"
 
     dto = RouterDecisionDTO.model_validate(res["semantic_match"])
+    assert dto.matched is True
     assert set(dto.sheets) == {"손익계산서", "재무상태표"}
 
 
@@ -84,5 +84,6 @@ def test_llm_query_router_empty_scope_handling():
         )
     )
 
-    assert result["semantic_match"]["matched"] is False
     assert len(result["semantic_match"]["items"]) == 0
+    dto = RouterDecisionDTO.model_validate(result["semantic_match"])
+    assert dto.matched is False

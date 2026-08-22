@@ -13,7 +13,6 @@ Example:
         "question_text": "삼성전자 2023년 영업이익과 현대자동차 2022년 부채상태를 비교해줘"
       },
       "semantic_match": {
-        "matched": true,
         "items": [
           {
             "company_name": "삼성전자",

@@ -35,10 +35,10 @@ def test_semantic_query_matcher_module_with_mock_encoder():
     )
 
     assert "semantic_match" in res
-    assert res["semantic_match"]["matched"] is True
     assert len(res["semantic_match"]["items"]) == 1
     assert res["semantic_match"]["items"][0]["similarity"] == 1.0
 
     dto = SemanticQueryMatchOutput.model_validate(res["semantic_match"])
+    assert dto.matched is True
     assert dto.target == "손익계산서"
     assert dto.sheets == ["손익계산서"]

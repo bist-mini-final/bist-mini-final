@@ -18,7 +18,6 @@ Example:
     ```json
     {
       "semantic_match": {
-        "matched": true,
         "items": [
           {
             "example_id": "ex-01",
@@ -345,9 +344,13 @@ def _legacy_router_metrics() -> RouterMetricsDTO:
 
 
 class SemanticQueryMatchOutput(ModuleDTO):
-    matched: bool
     items: List[SemanticMatchItemDTO] = Field(default_factory=list, description="매칭된 쿼리 뱅크 예제 목록")
     metrics: RouterMetricsDTO = Field(default_factory=_legacy_router_metrics)
+
+    @property
+    def matched(self) -> bool:
+        """유효한 라우팅 대상 매칭 여부 (계산형 프로퍼티)."""
+        return len(self.items) > 0
 
     @property
     def target(self) -> Optional[str]:
@@ -371,7 +374,7 @@ class SemanticQueryMatchOutput(ModuleDTO):
 
     @property
     def confidence(self) -> float:
-        return self.items[0].similarity if self.items else (1.0 if self.matched else 0.0)
+        return self.items[0].similarity if self.items else 0.0
 
     @property
     def reason(self) -> Optional[str]:
@@ -401,7 +404,7 @@ class SemanticQueryMatcherModule(BaseModule):
         inputs=["query_context"],
         outputs=["semantic_match"],
         config_fields=["threshold", "top_k", "vote_margin", "model", "dimension", "batch_size"],
-        version="3",
+        version="4",
     )
     input_model = SemanticQueryMatcherInput
     config_model = SemanticQueryMatcherConfig
@@ -474,19 +477,20 @@ class SemanticQueryMatcherModule(BaseModule):
 
         model_name = getattr(matcher.encoder, "model_name", cfg.model)
 
+        items_dump = [
+            {
+                "example_id": match.example_id,
+                "question": match.question,
+                "target": match.target,
+                "sheets": list(match.sheets),
+                "similarity": round(match.similarity, 10),
+            }
+            for match in decision.matches
+        ]
+
         return {
             "semantic_match": {
-                "matched": decision.target is not None,
-                "items": [
-                    {
-                        "example_id": match.example_id,
-                        "question": match.question,
-                        "target": match.target,
-                        "sheets": list(match.sheets),
-                        "similarity": round(match.similarity, 10),
-                    }
-                    for match in decision.matches
-                ],
+                "items": items_dump,
                 "metrics": {
                     "kind": "cosine",
                     "model": model_name,
