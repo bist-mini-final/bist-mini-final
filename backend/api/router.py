@@ -3,6 +3,9 @@ from typing import Optional, cast
 
 from fastapi import APIRouter
 
+from backend.bi.api_routes import create_bi_router
+from backend.bi.composition import create_bi_services
+from backend.bi.ingestion_bridge import create_bi_workflow_dispatcher
 from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
@@ -67,9 +70,13 @@ def create_api_router(
     )
     # Playground execution remains interactive. Long-running Excel ingestion
     # is persisted to the PostgreSQL queue watched by KEDA.
-    workflow_dispatcher = InteractiveWorkflowDispatcher(
+    module_registry = cast(ModuleRegistry, services.module_registry)
+    bi_services = create_bi_services(module_registry, completion_client)
+    router.include_router(create_bi_router(bi_services))
+    workflow_dispatcher = create_bi_workflow_dispatcher(
         services.workflow_executor,
         services.run_store,
+        bi_services,
         max_workers=PLAYGROUND_MAX_CONCURRENCY,
     )
     ingestion_dispatcher = KubernetesQueueDispatcher(
@@ -77,7 +84,6 @@ def create_api_router(
         services.run_store,
         KUBERNETES_INGESTION_QUEUE,
     )
-    module_registry = cast(ModuleRegistry, services.module_registry)
     workflow_store = services.workflow_store
     run_store = services.run_store
     workflow_executor = services.workflow_executor

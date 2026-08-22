@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "default",
-  "name": "main_pgvector_rag_pipeline_v3_fast",
-  "updated_at": "2026-08-21T05:37:38.562355+00:00",
+  "name": "default",
+  "updated_at": "2026-08-22T05:07:30.763424+00:00",
   "graph": {
     "nodes": [],
     "edges": [],

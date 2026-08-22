@@ -98,6 +98,7 @@ function createSeries(
 
 function createDashboardFixture(config: FixtureConfig): BiDashboardSnapshot {
   const periods = createPeriods(config);
+  const workbookHash = 'a'.repeat(64);
   const metrics: Partial<Record<MetricId, MetricSeries>> = {};
   for (const seed of METRIC_SEEDS) {
     const status = config.statusOverrides?.[seed.metricId] ?? 'available';
@@ -115,9 +116,14 @@ function createDashboardFixture(config: FixtureConfig): BiDashboardSnapshot {
   return {
     schemaVersion: 1,
     company: { companyId: config.companyId, displayName: config.displayName },
+    source: {
+      fileName: `${config.companyId}.xlsx`,
+      workbookHash,
+      indexId: `index-${config.companyId}`,
+    },
     snapshot: {
       snapshotId: config.snapshotId,
-      workbookHash: `fixture-${config.companyId}`,
+      workbookHash,
       status: issues.length > 0 ? 'partial' : 'ready',
       generatedAt: '2026-08-18T09:30:00+09:00',
       catalogVersion: 'fixture-v1',

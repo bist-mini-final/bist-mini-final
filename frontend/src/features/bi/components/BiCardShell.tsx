@@ -1,6 +1,8 @@
 import { EyeOff, GripVertical, MessageCircleQuestion, Search } from 'lucide-react';
 import type { BiCardDefinition } from '../config/cardRegistry';
+import { buildBiPlaygroundHandoffUrl } from '../integrations/playgroundHandoffAdapter';
 import type { BiCardViewModel } from '../selectors/cardViewModel';
+import { selectPeriods } from '../selectors/periods';
 import type { BiDashboardSnapshot, CardMoveDirection, CardSize, PeriodRange } from '../types';
 import { BiCardChart } from './charts/BiCardChart';
 
@@ -24,6 +26,19 @@ export function BiCardShell(props: BiCardShellProps) {
   const chartOwnsSummary = props.definition.id === 'cash_flow'
     || props.definition.id === 'stability'
     || props.definition.id === 'financial_scale';
+  const selectedPeriods = selectPeriods(props.dashboard.periods, props.periodLabel);
+  const selectedPeriod = selectedPeriods[selectedPeriods.length - 1];
+  const chatbotUrl = selectedPeriod
+    ? buildBiPlaygroundHandoffUrl({
+        companyId: props.dashboard.company.companyId,
+        fileName: props.dashboard.source.fileName,
+        workbookHash: props.dashboard.source.workbookHash,
+        indexId: props.dashboard.source.indexId,
+        metricId: props.definition.primaryMetric,
+        periodId: selectedPeriod.periodId,
+        question: `${props.dashboard.company.displayName}의 ${props.viewModel.primaryLabel}을 ${selectedPeriod.label} 기준으로 쉽게 설명해줘.`,
+      })
+    : null;
 
   return (
     <article
@@ -110,11 +125,16 @@ export function BiCardShell(props: BiCardShellProps) {
           <button type="button" disabled={props.viewModel.evidence.length === 0} onClick={props.onShowEvidence}>
             <Search size={14} aria-hidden="true" />근거 보기
           </button>
-          <button type="button" disabled aria-describedby={`${props.definition.id}-chatbot-note`}>
-            <MessageCircleQuestion size={14} aria-hidden="true" />챗봇 질문
-          </button>
+          {chatbotUrl ? (
+            <a href={chatbotUrl}>
+              <MessageCircleQuestion size={14} aria-hidden="true" />챗봇 질문
+            </a>
+          ) : (
+            <button type="button" disabled>
+              <MessageCircleQuestion size={14} aria-hidden="true" />챗봇 질문
+            </button>
+          )}
         </div>
-        <span className="bi-card__deferred-note" id={`${props.definition.id}-chatbot-note`}>챗봇 연결은 다음 단계입니다.</span>
       </footer>
     </article>
   );

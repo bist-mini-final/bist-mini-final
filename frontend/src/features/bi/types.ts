@@ -1,4 +1,4 @@
-const METRIC_IDS = [
+export const METRIC_IDS = [
   'revenue',
   'revenue_yoy_growth',
   'operating_income',
@@ -21,8 +21,9 @@ const METRIC_IDS = [
 
 export type MetricId = (typeof METRIC_IDS)[number];
 export type MetricStatus = 'available' | 'missing' | 'ambiguous' | 'invalid' | 'not_meaningful';
-type SnapshotStatus = 'ready' | 'partial';
-type RefreshStatus = 'idle' | 'queued' | 'profiling' | 'extracting' | 'materializing' | 'failed';
+export type SnapshotStatus = 'ready' | 'partial';
+export type RefreshStatus = 'idle' | 'queued' | 'indexing' | 'profiling' | 'extracting' | 'materializing' | 'failed';
+export type MaterializationStatus = Exclude<RefreshStatus, 'idle'> | 'ready' | 'partial';
 export type PeriodKind = 'fy' | 'ltm';
 export type ValueKind = 'amount' | 'percent';
 type AmountScale = 'ones' | 'thousands' | 'millions' | 'billions';
@@ -37,7 +38,61 @@ interface BiCompany {
   readonly displayName: string;
 }
 
-interface BiSnapshotMeta {
+export interface BiMaterializationSource {
+  readonly fileName: string;
+  readonly workbookHash: string;
+  readonly indexId: string;
+}
+
+export interface BiMaterializationRequest extends BiCompany {
+  readonly source: BiMaterializationSource;
+}
+
+export interface BiMaterializationAccepted {
+  readonly jobId: string;
+  readonly status: MaterializationStatus;
+  readonly publishedSnapshotId: string | null;
+}
+
+export interface BiCompanySummary extends BiCompany {
+  readonly currentSnapshotId: string | null;
+  readonly snapshotStatus: SnapshotStatus | null;
+  readonly refreshStatus: RefreshStatus;
+  readonly updatedAt: string | null;
+}
+
+export interface BiCompanyListResponse {
+  readonly companies: readonly BiCompanySummary[];
+}
+
+export interface BiMaterializationJob {
+  readonly jobId: string;
+  readonly companyId: string;
+  readonly workbookHash: string;
+  readonly status: MaterializationStatus;
+  readonly completedRequests: number;
+  readonly totalRequests: number;
+  readonly publishedSnapshotId: string | null;
+  readonly errorCode: string | null;
+  readonly message: string | null;
+  readonly startedAt: string;
+  readonly updatedAt: string;
+}
+
+export interface BiQuestionJobProgress {
+  readonly jobId: string;
+  readonly totalQuestions: number;
+  readonly queuedQuestions: number;
+  readonly runningQuestions: number;
+  readonly completedQuestions: number;
+  readonly failedQuestions: number;
+}
+
+export type BiDashboardFetchResult =
+  | { readonly kind: 'snapshot'; readonly dashboard: BiDashboardSnapshot }
+  | { readonly kind: 'pending'; readonly job: BiMaterializationJob };
+
+export interface BiSnapshotMeta {
   readonly snapshotId: string;
   readonly workbookHash: string;
   readonly status: SnapshotStatus;
@@ -108,6 +163,7 @@ interface BiIssue {
 export interface BiDashboardSnapshot {
   readonly schemaVersion: 1;
   readonly company: BiCompany;
+  readonly source: BiMaterializationSource;
   readonly snapshot: BiSnapshotMeta;
   readonly refresh: BiRefreshState;
   readonly periods: readonly BiPeriod[];

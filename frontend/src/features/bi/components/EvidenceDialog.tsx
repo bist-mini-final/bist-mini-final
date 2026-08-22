@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { FileSpreadsheet, X } from 'lucide-react';
-import type { BiEvidence } from '../types';
+import { ExternalLink, FileSpreadsheet, X } from 'lucide-react';
+import type { BiEvidence, BiMaterializationSource } from '../types';
 
 interface EvidenceDialogProps {
   readonly cardTitle: string;
   readonly evidence: readonly BiEvidence[];
+  readonly source: BiMaterializationSource;
+  readonly snapshotId: string;
   readonly onClose: () => void;
 }
 
-export function EvidenceDialog({ cardTitle, evidence, onClose }: EvidenceDialogProps) {
+export function EvidenceDialog({ cardTitle, evidence, source, snapshotId, onClose }: EvidenceDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -34,11 +36,23 @@ export function EvidenceDialog({ cardTitle, evidence, onClose }: EvidenceDialogP
         {evidence.map((item) => (
           <li key={item.cellId}>
             <FileSpreadsheet size={18} aria-hidden="true" />
-            <div><strong>{item.sheetName}!{item.cellCoord}</strong><span>{item.sourceText}</span></div>
+            <div>
+              <strong>{item.sheetName}!{item.cellCoord}</strong>
+              <span>{item.sourceText}</span>
+              <a
+                href={`/api/spreadsheet-artifacts/${encodeURIComponent(source.workbookHash)}/sheets/${encodeURIComponent(item.sheetName)}?layer=rendered`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink size={13} aria-hidden="true" />원본 시트 열기
+              </a>
+            </div>
           </li>
         ))}
       </ul>
-      <p className="bi-dialog__note">실제 파일 연결 전 fixture 근거 위치를 표시합니다.</p>
+      <p className="bi-dialog__note" title={source.workbookHash}>
+        파일 {source.fileName} · 스냅샷 {snapshotId}
+      </p>
     </dialog>
   );
 }
