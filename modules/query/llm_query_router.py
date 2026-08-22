@@ -33,9 +33,6 @@ Example:
           }
         ],
         "reason": "삼성전자 손익계산서 항목(매출액, 영업이익) 조회 질의",
-        "matches": [],
-        "query_type": null,
-        "subqueries": [],
         "metrics": {
           "kind": "llm_structured",
           "model": "gpt-4o-mini",

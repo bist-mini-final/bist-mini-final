@@ -13,23 +13,20 @@ Example:
         "question_text": "삼성전자 2023년과 2022년 영업이익을 비교해줘"
       },
       "semantic_match": {
-        "semantic_match": {
-          "matched": true,
-          "target": "손익계산서",
-          "confidence": 0.95,
-          "sheets": ["손익계산서"],
-          "company_name": "삼성전자",
-          "company_scopes": [
-            {
-              "raw_mention": "삼성전자",
-              "canonical_name": "삼성전자",
-              "matched_score": 1.0,
-              "target_topics": ["영업이익"],
-              "suggested_sheets": ["손익계산서"]
-            }
-          ],
-          "reason": "삼성전자 손익계산서 영업이익 비교 질의"
-        }
+        "matched": true,
+        "target": "손익계산서",
+        "confidence": 0.95,
+        "sheets": ["손익계산서"],
+        "company_name": "삼성전자",
+        "company_scopes": [
+          {
+            "canonical_name": "삼성전자",
+            "matched_score": 1.0,
+            "target_topics": ["영업이익"],
+            "suggested_sheets": ["손익계산서"]
+          }
+        ],
+        "reason": "삼성전자 손익계산서 영업이익 비교 질의"
       }
     }
     ```
@@ -68,7 +65,11 @@ from modules.common.base_llm import (
     QueryContextDTO,
 )
 from modules.common.config import DEFAULT_LLM_MODEL
-from modules.query.llm_query_router import LlmQueryRouterOutputDTO
+from modules.query.llm_query_router import (
+    CompanyScopeItemDTO,
+    LlmQueryRouterOutputDTO,
+    RouterDecisionDTO,
+)
 from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
 
 logger = logging.getLogger(__name__)
@@ -136,9 +137,9 @@ class DecomposerInputDTO(ModuleInputDTO):
     """Decomposer 모듈 입력 DTO 계약."""
 
     query_context: QueryContextDTO = Field(description="사용자 질문 컨텍스트")
-    semantic_match: Optional[Union[LlmQueryRouterOutputDTO, SemanticQueryMatchOutput, Any]] = Field(
+    semantic_match: Optional[Union[RouterDecisionDTO, LlmQueryRouterOutputDTO, SemanticQueryMatchOutput, Dict[str, Any]]] = Field(
         default=None,
-        description="LLM 쿼리 라우터(LlmQueryRouterModule)의 엔티티/인텐트/시트 라우팅 결과 DTO",
+        description="LLM 쿼리 라우터(LlmQueryRouterModule)의 엔티티/인텐트/시트 라우팅 결과 (RouterDecisionDTO)",
     )
 
 
