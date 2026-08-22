@@ -1,11 +1,11 @@
-"""자연어 복합 질문을 원자 단위 셀 검색 서브쿼리들로 분해하는 LLM 모듈.
+"""자연어 복합 질문을 LLM 라우터 스코프 기반의 원자 단위 셀 검색 서브쿼리들로 분해하는 LLM 모듈.
 
-사용자의 복합 질문(기간 비교, 다중 재무제표 항목, 복수 기업 등)을 분석하여
+사용자의 복합 질문(기간 비교, 다중 재무제표 항목, 복수 기업 등)과 LLM 쿼리 라우터(`LlmQueryRouterModule`)의 엔티티/시트 분석 결과를 결합하여
 벡터 데이터베이스의 단일 셀 임베딩 검색 포맷(`Company: ... | Sheet: ... | Row Header: ... | Column Header: ... | Cell Value: ...`)에
 정확히 부합하는 원자적 서브쿼리(Subquery) 목록으로 분해합니다.
 
 Example:
-    Input DTO (입력 예시):
+    Input DTO (입력 예시 - LLM Query Router 연계):
     ```json
     {
       "query_context": {
@@ -13,9 +13,23 @@ Example:
         "question_text": "삼성전자 2023년과 2022년 영업이익을 비교해줘"
       },
       "semantic_match": {
-        "matched": true,
-        "company_name": "삼성전자",
-        "sheets": ["손익계산서"]
+        "semantic_match": {
+          "matched": true,
+          "target": "손익계산서",
+          "confidence": 0.95,
+          "sheets": ["손익계산서"],
+          "company_name": "삼성전자",
+          "company_scopes": [
+            {
+              "raw_mention": "삼성전자",
+              "canonical_name": "삼성전자",
+              "matched_score": 1.0,
+              "target_topics": ["영업이익"],
+              "suggested_sheets": ["손익계산서"]
+            }
+          ],
+          "reason": "삼성전자 손익계산서 영업이익 비교 질의"
+        }
       }
     }
     ```
@@ -78,7 +92,9 @@ Guidelines:
    - Generate individual atomic subqueries for every single period and metric within that scope.
 4. Company and Entity-to-Intent Isolation (CRITICAL):
    - Populate the 'company' field with the canonical company name.
-   - Partition subqueries strictly per company."""
+   - Partition subqueries strictly per company.
+5. LLM Router Target Scope Compliance:
+   - If [LLM Router Target Scopes] are provided, strictly prioritize the specified Company, Topics, and Suggested Sheets."""
 
 LUNA_USER_TEMPLATE = "User Query: \"{question}\""
 
@@ -120,9 +136,9 @@ class DecomposerInputDTO(ModuleInputDTO):
     """Decomposer 모듈 입력 DTO 계약."""
 
     query_context: QueryContextDTO = Field(description="사용자 질문 컨텍스트")
-    semantic_match: Optional[Union[SemanticQueryMatchOutput, LlmQueryRouterOutputDTO, Any]] = Field(
+    semantic_match: Optional[Union[LlmQueryRouterOutputDTO, SemanticQueryMatchOutput, Any]] = Field(
         default=None,
-        description="시맨틱 라우터 또는 LLM 라우터의 엔티티/인텐트 스코프 매칭 결과 (선택)",
+        description="LLM 쿼리 라우터(LlmQueryRouterModule)의 엔티티/인텐트/시트 라우팅 결과 DTO",
     )
 
 
@@ -156,7 +172,7 @@ class DecomposerModule(BaseLLMModule):
 
     Input:
         - `query_context` (`QueryContextDTO`): 원본 사용자 질문 메타데이터 및 텍스트
-        - `semantic_match` (`Optional[Any]`): 라우터에서 추출된 대상 기업 및 시트 정보
+        - `semantic_match` (`Optional[Union[LlmQueryRouterOutputDTO, Any]]`): LLM 라우터에서 추출된 대상 기업, 인텐트 토픽, 추천 시트 정보
 
     Output:
         - `query_context` (`QueryContextDTO`): 원본 사용자 질문 컨텍스트 전달
@@ -187,7 +203,7 @@ class DecomposerModule(BaseLLMModule):
         sys_prompt = cfg.system_prompt or LUNA_SYSTEM_PROMPT
         user_tmpl = cfg.user_prompt_template or LUNA_USER_TEMPLATE
 
-        # Resolve semantic scopes if available (from Semantic Matcher or LLM Router)
+        # Resolve routing scopes from LLM Query Router or Semantic Matcher
         match_raw = input_data.semantic_match
         match: Any = (
             match_raw.semantic_match
@@ -195,17 +211,34 @@ class DecomposerModule(BaseLLMModule):
             else match_raw
         )
 
-        # Append entity / scope constraints if provided
+        # Append entity / scope constraints from LLM Router
         entity_scope_prompt = ""
-        scopes = match.company_scopes if (match and hasattr(match, "company_scopes") and match.company_scopes) else []
-        if scopes:
-            scope_lines = [
-                f"- Company: '{sc.canonical_name if hasattr(sc, 'canonical_name') else sc.get('canonical_name')}' | Assigned Topics: [{', '.join(sc.target_topics if hasattr(sc, 'target_topics') else sc.get('target_topics', []))}]"
-                for sc in scopes
-            ]
-            entity_scope_prompt = "\n\n[Entity & Company Intent Scope Assignment]:\n" + "\n".join(scope_lines)
-        elif match and getattr(match, "company_name", None):
-            entity_scope_prompt = f"\n\n[Entity Assignment]: Target Company: '{match.company_name}'"
+        if match:
+            scope_lines = []
+            scopes = getattr(match, "company_scopes", None) or (
+                match.get("company_scopes") if isinstance(match, dict) else []
+            )
+            if scopes:
+                for sc in scopes:
+                    cname = getattr(sc, "canonical_name", None) or (
+                        sc.get("canonical_name") if isinstance(sc, dict) else ""
+                    )
+                    topics = getattr(sc, "target_topics", None) or (
+                        sc.get("target_topics") if isinstance(sc, dict) else []
+                    )
+                    sheets = getattr(sc, "suggested_sheets", None) or (
+                        sc.get("suggested_sheets") if isinstance(sc, dict) else []
+                    )
+                    scope_lines.append(
+                        f"- Company: '{cname}' | Topics: [{', '.join(topics)}] | Suggested Sheets: [{', '.join(sheets)}]"
+                    )
+                entity_scope_prompt = "\n\n[LLM Router Target Scopes]:\n" + "\n".join(scope_lines)
+            elif getattr(match, "company_name", None) or (isinstance(match, dict) and match.get("company_name")):
+                cname = getattr(match, "company_name", None) or match.get("company_name")
+                sheets = getattr(match, "sheets", None) or (
+                    match.get("sheets") if isinstance(match, dict) else []
+                )
+                entity_scope_prompt = f"\n\n[LLM Router Target Scope]: Target Company: '{cname}', Sheets: [{', '.join(sheets)}]"
 
         prompt = user_tmpl.format(question=input_data.query_context.question_text) + entity_scope_prompt
 
