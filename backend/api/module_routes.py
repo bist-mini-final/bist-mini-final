@@ -5,7 +5,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from backend.engine.runtime.registry import ModuleRegistry
-from backend.tools.documentation.module_docs import render_module_markdown
+from backend.cli.documentation.module_docs import render_module_markdown
 
 
 def _execution_handler(

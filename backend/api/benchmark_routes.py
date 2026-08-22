@@ -23,7 +23,29 @@ from backend.engine.workflows import (
 )
 
 from ..core.settings import BENCHMARK_DIR, PROJECT_DIR
-from ..semantic_matching.plan_validation import plan_signature
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PlanSignature:
+    metrics: tuple[str, ...] = ()
+    periods: tuple[int, ...] = ()
+
+
+def plan_signature(subqueries: Sequence[Any]) -> PlanSignature:
+    metrics: list[str] = []
+    periods: list[int] = []
+    for item in subqueries:
+        text = str(item.get("query_text") if isinstance(item, dict) else item)
+        for part in text.split():
+            if part.isdigit() and len(part) == 4:
+                try:
+                    periods.append(int(part))
+                except ValueError:
+                    pass
+            elif len(part) > 1:
+                metrics.append(part)
+    return PlanSignature(metrics=tuple(metrics), periods=tuple(periods))
 
 
 class ExpectedPlan(BaseModel):

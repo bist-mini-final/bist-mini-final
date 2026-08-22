@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -9,6 +11,8 @@ from backend.features.bi.api_routes import register_bi_exception_handlers
 from backend.core.settings import DEV_CORS_ORIGINS, DIST_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
 from modules.common.exceptions import PipelineBaseError
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -47,25 +51,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @application.exception_handler(PipelineBaseError)
-    async def pipeline_exception_handler(request: Request, exc: PipelineBaseError) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=exc.to_dict(),
-        )
-
-    @application.exception_handler(ValidationError)
-    async def validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error_code": "VALIDATION_ERROR",
-                "message": "데이터 유효성 검증에 실패했습니다.",
-                "module_type": None,
-                "details": {"errors": exc.errors(include_url=False)},
-            },
-        )
-
+    register_global_exception_handlers(application)
     application.include_router(create_api_router(repository))
     register_bi_exception_handlers(application)
 
@@ -95,6 +81,54 @@ def create_app() -> FastAPI:
         return frontend_index_response()
 
     return application
+
+
+def register_global_exception_handlers(application: FastAPI) -> None:
+    """Register centralized standard JSON exception handlers across all pipeline and server errors."""
+
+    @application.exception_handler(PipelineBaseError)
+    async def pipeline_exception_handler(request: Request, exc: PipelineBaseError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.to_dict(),
+        )
+
+    @application.exception_handler(ValidationError)
+    async def validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "VALIDATION_ERROR",
+                "message": "데이터 유효성 검증에 실패했습니다.",
+                "module_type": None,
+                "details": {"errors": exc.errors(include_url=False)},
+            },
+        )
+
+    @application.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error_code": "HTTP_ERROR",
+                "message": str(exc.detail),
+                "module_type": None,
+                "details": {"status_code": exc.status_code},
+            },
+        )
+
+    @application.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error("Unhandled global server exception: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error_code": "INTERNAL_SERVER_ERROR",
+                "message": "서버 내부 오류가 발생했습니다.",
+                "module_type": None,
+                "details": {"error": str(exc)},
+            },
+        )
 
 
 app = create_app()
