@@ -26,19 +26,16 @@ Example:
             "raw_mention": "삼성전자",
             "sheets": ["손익계산서"],
             "target_topics": ["영업이익"],
-            "matched_score": 1.0,
-            "reason": "삼성전자 2023년 영업이익 조회"
+            "matched_score": 1.0
           },
           {
             "company_name": "현대자동차",
             "raw_mention": "현대자동차",
             "sheets": ["재무상태표"],
             "target_topics": ["부채상태", "부채총계"],
-            "matched_score": 1.0,
-            "reason": "현대자동차 2022년 부채상태 조회"
+            "matched_score": 1.0
           }
         ],
-        "reason": "삼성전자 손익계산서(영업이익) 및 현대자동차 재무상태표(부채상태) 복합 비교 질의",
         "sheets": ["손익계산서", "재무상태표"],
         "company_name": "삼성전자",
         "metrics": {
@@ -102,8 +99,8 @@ CRITICAL GUIDELINES:
      * '영업활동현금흐름', '투자활동현금흐름' -> ['현금흐름표']
      * '배당금', '이익잉여금' -> ['자본변동표', '이익잉여금처분계산서']
 
-4. Confidence & Reason:
-   - Provide confidence score (0.0 to 1.0) and a clear Korean explanation of your routing decision."""
+4. Confidence:
+   - Provide overall confidence score (0.0 to 1.0) of your routing decision."""
 
 
 # ==============================================================================
@@ -117,7 +114,7 @@ class CompanyScopeItemDTO(ModuleDTO):
     sheets: List[str] = Field(default_factory=list, description="매핑 추천 시트 목록 (예: ['손익계산서'], ['재무상태표'])")
     target_topics: List[str] = Field(default_factory=list, description="추출된 질문 지표/토픽 (예: ['영업이익', '매출액'])")
     matched_score: float = Field(default=1.0, ge=0.0, le=1.0, description="엔티티 매칭 점수 (0.0 ~ 1.0)")
-    reason: Optional[str] = Field(default=None, description="해당 기업/시트 스코프 판단 근거")
+    reason: Optional[str] = Field(default=None, description="선택적 스코프 판단 근거")
 
     # Backward compatibility aliases
     canonical_name: Optional[str] = None
@@ -138,7 +135,7 @@ class LlmRouterResponse(BaseModel):
         description="질문에서 식별된 모든 기업별/시트별 데이터 스코프 목록",
     )
     confidence: float = Field(default=0.85, ge=0.0, le=1.0, description="전체 라우팅 신뢰도 (0.0 ~ 1.0)")
-    reason: str = Field(default="LLM based multi-scope query routing", description="라우팅 판단 및 스코프 분할 근거")
+    reason: Optional[str] = Field(default=None, description="선택적 라우팅 판단 근거")
 
 
 class RouterDecisionDTO(ModuleDTO):
@@ -147,7 +144,7 @@ class RouterDecisionDTO(ModuleDTO):
     matched: bool = Field(description="유효한 라우팅 대상 매칭 여부")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="라우팅 신뢰도")
     items: List[CompanyScopeItemDTO] = Field(default_factory=list, description="식별된 모든 기업/시트/토픽 데이터 스코프 목록")
-    reason: str = Field(description="라우팅 판단 근거")
+    reason: Optional[str] = Field(default=None, description="라우팅 판단 근거")
     sheets: List[str] = Field(default_factory=list, description="전체 스코프 대상 시트 합집합")
     company_name: Optional[str] = Field(default=None, description="단일/주요 대상 기업명")
     company_scopes: List[CompanyScopeItemDTO] = Field(default_factory=list, description="items와 동일한 기업 스코프 목록 (호환용)")

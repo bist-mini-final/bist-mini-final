@@ -8,6 +8,7 @@ from modules.query.decomposer import (
     DecomposerConfigDTO,
     DecomposerInputDTO,
     DecomposerModule,
+    SubqueriesDTO,
     SubqueryItem,
 )
 
@@ -55,7 +56,7 @@ def test_decomposer_module_execution():
     assert "Company: 삼성전자" in result["items"][0]["text"]
 
     # Verify SubqueriesDTO model validation and .subqueries helper property
-    dto = module.output_model.model_validate(result)
+    dto = SubqueriesDTO.model_validate(result)
     assert len(dto.items) == 2
     assert len(dto.subqueries) == 2
     assert "Company: 삼성전자" in dto.subqueries[0]
