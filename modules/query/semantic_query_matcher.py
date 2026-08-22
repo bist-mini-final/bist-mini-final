@@ -349,15 +349,24 @@ def _legacy_router_metrics() -> RouterMetricsDTO:
 
 class SemanticQueryMatchOutput(ModuleDTO):
     matched: bool
-    target: Optional[str] = None
-    sheets: List[str] = Field(default_factory=list)
     items: List[SemanticMatchItemDTO] = Field(default_factory=list, description="매칭된 쿼리 뱅크 예제 목록")
-    reason: Optional[str] = None
-    company_name: Optional[str] = Field(default=None, description="질문 또는 컨텍스트에서 추출된 단일/대표 대상 기업명")
-    company_scopes: List[CompanyScopeItemDTO] = Field(default_factory=list, description="질문에서 추출된 기업별 세부 인텐트 스코프 목록")
-    query_type: Optional[int] = None
-    subqueries: List[str] = Field(default_factory=list)
     metrics: RouterMetricsDTO = Field(default_factory=_legacy_router_metrics)
+
+    @property
+    def target(self) -> Optional[str]:
+        return self.items[0].target if self.items else None
+
+    @property
+    def sheets(self) -> List[str]:
+        return list(dict.fromkeys(sheet for item in self.items for sheet in item.sheets))
+
+    @property
+    def company_name(self) -> Optional[str]:
+        return None
+
+    @property
+    def company_scopes(self) -> List[Any]:
+        return []
 
     @property
     def matches(self) -> List[SemanticMatchItemDTO]:
@@ -366,6 +375,18 @@ class SemanticQueryMatchOutput(ModuleDTO):
     @property
     def confidence(self) -> float:
         return self.items[0].similarity if self.items else (1.0 if self.matched else 0.0)
+
+    @property
+    def reason(self) -> Optional[str]:
+        return f"Cosine match against example '{self.items[0].question}'" if self.items else None
+
+    @property
+    def query_type(self) -> Optional[int]:
+        return None
+
+    @property
+    def subqueries(self) -> List[str]:
+        return []
 
 
 class SemanticQueryMatcherWorkflowOutput(ModuleDTO):
@@ -459,10 +480,6 @@ class SemanticQueryMatcherModule(BaseModule):
         return {
             "semantic_match": {
                 "matched": decision.target is not None,
-                "target": decision.target,
-                "sheets": list(decision.sheets),
-                "company_name": decision.company_name,
-                "company_scopes": [],
                 "items": [
                     {
                         "example_id": match.example_id,
@@ -473,9 +490,6 @@ class SemanticQueryMatcherModule(BaseModule):
                     }
                     for match in decision.matches
                 ],
-                "reason": decision.reason,
-                "query_type": decision.query_type,
-                "subqueries": list(decision.subqueries),
                 "metrics": {
                     "kind": "cosine",
                     "model": model_name,

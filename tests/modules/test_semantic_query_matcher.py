@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from modules.query.semantic_query_matcher import QueryExample
 from modules.common.base_module import QueryContextDTO
 from modules.query.semantic_query_matcher import (
+    QueryExample,
     SemanticQueryMatcherConfig,
     SemanticQueryMatcherInput,
     SemanticQueryMatcherModule,
+    SemanticQueryMatchOutput,
 )
 
 
@@ -35,6 +36,9 @@ def test_semantic_query_matcher_module_with_mock_encoder():
 
     assert "semantic_match" in res
     assert res["semantic_match"]["matched"] is True
-    assert res["semantic_match"]["target"] == "손익계산서"
     assert len(res["semantic_match"]["items"]) == 1
     assert res["semantic_match"]["items"][0]["similarity"] == 1.0
+
+    dto = SemanticQueryMatchOutput.model_validate(res["semantic_match"])
+    assert dto.target == "손익계산서"
+    assert dto.sheets == ["손익계산서"]
