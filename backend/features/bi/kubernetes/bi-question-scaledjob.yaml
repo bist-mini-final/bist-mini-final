@@ -35,7 +35,7 @@ spec:
           - name: worker
             image: __IMAGE__
             imagePullPolicy: IfNotPresent
-            command: ["python", "-m", "backend.bi.question_worker_main"]
+            command: ["python", "-m", "backend.features.bi.question_worker_main"]
             env:
               - name: KUBERNETES_JOB_NAME
                 valueFrom:

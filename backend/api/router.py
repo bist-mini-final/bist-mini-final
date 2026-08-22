@@ -3,9 +3,9 @@ from typing import Optional, cast
 
 from fastapi import APIRouter
 
-from backend.bi.api_routes import create_bi_router
-from backend.bi.composition import create_bi_services
-from backend.bi.ingestion_bridge import create_bi_workflow_dispatcher
+from backend.features.bi.api_routes import create_bi_router
+from backend.features.bi.composition import create_bi_services
+from backend.features.bi.ingestion_bridge import create_bi_workflow_dispatcher
 from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,

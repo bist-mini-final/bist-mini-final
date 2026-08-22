@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from backend.api.router import create_api_router
-from backend.bi.api_routes import register_bi_exception_handlers
+from backend.features.bi.api_routes import register_bi_exception_handlers
 from backend.core.settings import DEV_CORS_ORIGINS, DIST_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
 from modules.common.exceptions import PipelineBaseError

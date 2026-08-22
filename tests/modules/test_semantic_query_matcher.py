@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.semantic_matching.catalog import QueryExample
+from modules.query.semantic_matcher_engine import QueryExample
 from modules.common.base_module import QueryContextDTO
 from modules.query.semantic_query_matcher import (
     SemanticQueryMatcherConfig,

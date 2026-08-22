@@ -9,8 +9,7 @@ from pydantic import Field
 
 from backend.providers.embeddings.factory import EmbeddingEncoder, get_embedding_encoder
 from backend.providers.llm.cost import calculate_openai_cost
-from backend.semantic_matching.catalog import QueryExample
-from backend.semantic_matching.matcher import SemanticQueryMatcher
+from .semantic_matcher_engine import QueryExample, SemanticQueryMatcher
 from modules.common.base_embedder import (
     BaseModule,
     EmbeddingConfigDTO,

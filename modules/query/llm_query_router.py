@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from pydantic import BaseModel, Field
 
-from backend.semantic_matching.catalog import QueryExample, load_examples
+from .semantic_matcher_engine import QueryExample, load_examples
 from modules.common.base_llm import (
     BaseLLMModule,
     ModuleConfigDTO,
