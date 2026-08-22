@@ -1,6 +1,6 @@
 """감지된 표 구조와 엑셀 원본 셀 데이터를 결합하여 대칭적 검색 문자열(Structured Cell Text)을 직렬화하는 모듈.
 
-각 셀의 (행 헤더 계층, 열 헤더/회계기간 계층, 셀 값, 시트명)을 결합하여
+각 셀의 (행 헤더 계층, 열 헤더/회계기간 계층, 셀 값, 기업명, 시트명)을 결합하여
 `Company: ... | Sheet: ... | Row Header: ... | Column Header: ... | Cell Value: ...` 표준 포맷의 검색 청크 텍스트를 생성합니다.
 
 Example:
@@ -9,6 +9,8 @@ Example:
     {
       "file_name": "samsung_2023.xlsx",
       "workbook_hash": "a1b2c3d4...",
+      "company_name": "삼성전자",
+      "sheet_names": ["손익계산서"],
       "tables": []
     }
     ```
@@ -18,6 +20,7 @@ Example:
     {
       "file_name": "samsung_2023.xlsx",
       "workbook_hash": "a1b2c3d4...",
+      "company_name": "삼성전자",
       "items": [
         {
           "cell_id": "IS_C5",
@@ -26,7 +29,9 @@ Example:
           "row_header": ["영업이익"],
           "column_header": ["2023"],
           "cell_value": "65670",
-          "cell_text": "Company: ? | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+          "company_name": "삼성전자",
+          "variant": "header_with_value",
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
         }
       ]
     }
@@ -95,6 +100,10 @@ class CellTextDocumentDTO(ModuleDTO):
     row_header: List[str] = Field(description="상위 수준부터 수집한 행 헤더")
     column_header: List[str] = Field(description="상위 수준부터 수집한 열 헤더")
     cell_value: str = Field(description="Excel 데이터 셀의 표시 값")
+    company_name: Optional[str] = Field(
+        default=None,
+        description="추출된 공식 기업명 (알려진 경우)",
+    )
     variant: Literal["header_only", "header_with_value"]
     text: str = Field(description="Company를 포함한 5필드 공통 포맷 검색 문서")
 
@@ -102,6 +111,10 @@ class CellTextDocumentDTO(ModuleDTO):
 class CellTextSerializerOutput(ModuleDTO):
     file_name: str
     workbook_hash: str
+    company_name: Optional[str] = Field(
+        default=None,
+        description="알려진 경우 직렬화 문서에 포함할 공식 기업명",
+    )
     items: List[CellTextDocumentDTO]
 
 
@@ -260,6 +273,7 @@ class CellTextSerializerModule(BaseModule):
                         "row_header": r_combo,
                         "column_header": c_combo,
                         "cell_value": cell_value,
+                        "company_name": company_name,
                     }
                     if variant_mode == "both":
                         active_variants = [("header_only", UNKNOWN_FIELD), ("header_with_value", cell_value)]
@@ -371,6 +385,7 @@ class CellTextSerializerModule(BaseModule):
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
+            "company_name": input_data.company_name,
             "items": items,
         }
 

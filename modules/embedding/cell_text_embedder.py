@@ -9,6 +9,7 @@ Example:
     {
       "file_name": "samsung_2023.xlsx",
       "workbook_hash": "a1b2c3d4...",
+      "company_name": "삼성전자",
       "items": [
         {
           "cell_id": "IS_C5",
@@ -17,7 +18,9 @@ Example:
           "row_header": ["영업이익"],
           "column_header": ["2023"],
           "cell_value": "65670",
-          "cell_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+          "company_name": "삼성전자",
+          "variant": "header_with_value",
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
         }
       ]
     }
@@ -28,16 +31,28 @@ Example:
     {
       "file_name": "samsung_2023.xlsx",
       "workbook_hash": "a1b2c3d4...",
+      "company_name": "삼성전자",
       "model": "text-embedding-3-large",
+      "artifact_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       "dimension": 3072,
-      "embedding_artifact_path": "data/artifacts/embeddings/a1b2c3d4.bin",
-      "items": [],
-      "metrics": {
-        "batch_count": 1,
-        "document_count": 1,
-        "latency_seconds": 0.15,
-        "estimated_cost_usd": 0.00005
-      }
+      "items": [
+        {
+          "cell_id": "IS_C5",
+          "sheet_name": "손익계산서",
+          "cell_coord": "C5",
+          "row_header": ["영업이익"],
+          "column_header": ["2023"],
+          "cell_value": "65670",
+          "company_name": "삼성전자",
+          "variant": "header_with_value",
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
+          "embedding_index": 0
+        }
+      ],
+      "duration_seconds": 0.15,
+      "total_tokens": 45,
+      "estimated_cost_usd": 0.00005,
+      "cache_hit": false
     }
     ```
 """
@@ -99,6 +114,10 @@ class CellTextEmbeddingsDTO(ModuleDTO):
     model_config = ConfigDict(extra="forbid")
     file_name: str
     workbook_hash: str
+    company_name: Optional[str] = Field(
+        default=None,
+        description="알려진 경우 직렬화 문서에 포함할 공식 기업명",
+    )
     model: str = Field(description="문서 임베딩에 사용된 모델 ID")
     artifact_id: str = Field(
         pattern=r"^[a-f0-9]{64}$",
@@ -239,6 +258,7 @@ class CellTextEmbedderModule(BaseEmbeddingModule):
         return {
             "file_name": input_data.file_name,
             "workbook_hash": input_data.workbook_hash,
+            "company_name": input_data.company_name,
             "model": model_name,
             "artifact_id": artifact_id,
             "dimension": dimension,
