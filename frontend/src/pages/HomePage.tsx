@@ -5,7 +5,6 @@ import {
   ChartNoAxesCombined,
   Database,
   FileSpreadsheet,
-  FlaskConical,
   Scale,
   Sparkles,
   TrendingUp,
@@ -27,13 +26,6 @@ const plannedCards = [
     description: 'IBM, Bistelligence, DH Innovation 등 다중 기업 간의 재무 비율과 성장성을 크로스 비교합니다.',
     icon: Scale,
     tone: 'cyan',
-  },
-  {
-    path: '/evaluations',
-    title: '정량적 평가 & 벤치마크',
-    description: '123문항 재무 질의응답 품질, 응답 속도 및 파이프라인 정확도를 평가합니다.',
-    icon: FlaskConical,
-    tone: 'amber',
   },
 ] as const;
 
@@ -65,7 +57,7 @@ export function HomePage() {
             <span>WORKSPACES</span>
             <h2 id="workspace-title">작업 공간</h2>
           </div>
-          <small>3개 사용 가능 · 3개 준비 중</small>
+          <small>3개 사용 가능 · 2개 준비 중</small>
         </div>
 
         <div className="workspace-grid">
