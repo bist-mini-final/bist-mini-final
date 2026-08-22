@@ -36,8 +36,6 @@ Example:
             "matched_score": 1.0
           }
         ],
-        "sheets": ["손익계산서", "재무상태표"],
-        "company_name": "삼성전자",
         "metrics": {
           "kind": "llm_structured",
           "model": "gpt-5.6-luna",
@@ -144,12 +142,29 @@ class RouterDecisionDTO(ModuleDTO):
     matched: bool = Field(description="유효한 라우팅 대상 매칭 여부")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="라우팅 신뢰도")
     items: List[CompanyScopeItemDTO] = Field(default_factory=list, description="식별된 모든 기업/시트/토픽 데이터 스코프 목록")
-    reason: Optional[str] = Field(default=None, description="라우팅 판단 근거")
-    sheets: List[str] = Field(default_factory=list, description="전체 스코프 대상 시트 합집합")
-    company_name: Optional[str] = Field(default=None, description="단일/주요 대상 기업명")
-    company_scopes: List[CompanyScopeItemDTO] = Field(default_factory=list, description="items와 동일한 기업 스코프 목록 (호환용)")
-    target: Optional[str] = Field(default=None, description="주요 대상 카테고리 (호환용)")
     metrics: Dict[str, Any] = Field(default_factory=dict, description="실행 메트릭 및 토큰/비용 텔레메트리")
+
+    @property
+    def sheets(self) -> List[str]:
+        """전체 스코프 대상 시트 합집합 (하위 호환 헬퍼 프로퍼티)."""
+        return list(dict.fromkeys(
+            sheet for item in self.items for sheet in (item.sheets or item.suggested_sheets or [])
+        ))
+
+    @property
+    def company_name(self) -> Optional[str]:
+        """주요 대상 기업명 (하위 호환 헬퍼 프로퍼티)."""
+        return self.items[0].company_name if self.items else None
+
+    @property
+    def company_scopes(self) -> List[CompanyScopeItemDTO]:
+        """items와 동일한 기업 스코프 목록 (하위 호환 헬퍼 프로퍼티)."""
+        return self.items
+
+    @property
+    def target(self) -> Optional[str]:
+        """주요 대상 카테고리 (하위 호환 헬퍼 프로퍼티)."""
+        return self.items[0].sheets[0] if (self.items and self.items[0].sheets) else None
 
 
 class LlmQueryRouterInputDTO(ModuleInputDTO):
@@ -193,7 +208,7 @@ class LlmQueryRouterModule(BaseLLMModule):
         inputs=["query_context"],
         outputs=["semantic_match"],
         config_fields=["model"],
-        version="5",
+        version="6",
     )
     input_model = LlmQueryRouterInputDTO
     config_model = LlmQueryRouterConfigDTO
@@ -219,14 +234,6 @@ class LlmQueryRouterModule(BaseLLMModule):
 
         items = parsed_res.items or []
         matched = bool(items)
-        
-        # Collect all aggregated sheets and primary company
-        all_sheets = list(dict.fromkeys(
-            sheet for item in items for sheet in (item.sheets or item.suggested_sheets or [])
-        ))
-        primary_company = items[0].company_name if items else None
-        primary_target = (items[0].sheets[0] if (items and items[0].sheets) else None)
-
         scopes_dump = [scope.model_dump(mode="json") for scope in items]
 
         return {
@@ -234,11 +241,6 @@ class LlmQueryRouterModule(BaseLLMModule):
                 "matched": matched,
                 "confidence": round(parsed_res.confidence, 4),
                 "items": scopes_dump,
-                "reason": parsed_res.reason,
-                "sheets": all_sheets,
-                "company_name": primary_company,
-                "company_scopes": scopes_dump,
-                "target": primary_target,
                 "metrics": {
                     "kind": "llm_structured",
                     "model": cfg.model,

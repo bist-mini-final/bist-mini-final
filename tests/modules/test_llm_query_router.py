@@ -8,13 +8,14 @@ from modules.query.llm_query_router import (
     LlmQueryRouterConfigDTO,
     LlmQueryRouterInputDTO,
     LlmQueryRouterModule,
+    RouterDecisionDTO,
 )
 
 
 def test_llm_query_router_execution():
     mock_llm = MagicMock()
     mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"confidence": 0.95, "items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"], "matched_score": 1.0, "reason": "삼성전자 손익계산서"}], "reason": "손익계산서 관련 질문"}',
+        content='{"confidence": 0.95, "items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"], "matched_score": 1.0}]}',
         usage={"prompt_tokens": 50, "completion_tokens": 30},
         latency_seconds=0.2,
     )
@@ -29,17 +30,22 @@ def test_llm_query_router_execution():
 
     assert "semantic_match" in res
     assert res["semantic_match"]["matched"] is True
-    assert res["semantic_match"]["company_name"] == "삼성전자"
     assert len(res["semantic_match"]["items"]) == 1
     assert res["semantic_match"]["items"][0]["company_name"] == "삼성전자"
     assert res["semantic_match"]["items"][0]["sheets"] == ["손익계산서"]
     assert res["semantic_match"]["metrics"]["kind"] == "llm_structured"
 
+    # Verify RouterDecisionDTO properties
+    dto = RouterDecisionDTO.model_validate(res["semantic_match"])
+    assert dto.company_name == "삼성전자"
+    assert dto.sheets == ["손익계산서"]
+    assert len(dto.company_scopes) == 1
+
 
 def test_llm_query_router_multi_scope_execution():
     mock_llm = MagicMock()
     mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
-        content='{"confidence": 0.98, "items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"], "target_topics": ["부채총계"]}], "reason": "다중 기업 비교"}',
+        content='{"confidence": 0.98, "items": [{"company_name": "삼성전자", "sheets": ["손익계산서"], "target_topics": ["영업이익"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"], "target_topics": ["부채총계"]}]}',
         usage={"prompt_tokens": 60, "completion_tokens": 40},
         latency_seconds=0.25,
     )
@@ -59,7 +65,9 @@ def test_llm_query_router_multi_scope_execution():
     assert len(res["semantic_match"]["items"]) == 2
     assert res["semantic_match"]["items"][0]["company_name"] == "삼성전자"
     assert res["semantic_match"]["items"][1]["company_name"] == "현대자동차"
-    assert set(res["semantic_match"]["sheets"]) == {"손익계산서", "재무상태표"}
+
+    dto = RouterDecisionDTO.model_validate(res["semantic_match"])
+    assert set(dto.sheets) == {"손익계산서", "재무상태표"}
 
 
 def test_llm_query_router_preserves_low_model_confidence():
