@@ -238,7 +238,7 @@ class BaseModule(ABC):
 
             unknown_fields = set(actual_input) - input_fields - config_fields
             if unknown_fields:
-                unknown = ", ".join(sorted(str(field) for field in unknown_fields))
+                unknown = ", ".join(sorted(unknown_fields))
                 raise ValueError(f"알 수 없는 입력 필드입니다: {unknown}")
 
             if input_fields:

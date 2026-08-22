@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info(
             "📦 Registered %d pipeline modules: %s",
             len(available_modules),
-            ", ".join(m.type for m in available_modules[:6]) + ("..." if len(available_modules) > 6 else ""),
+            ", ".join(m.definition.type for m in available_modules[:6]) + ("..." if len(available_modules) > 6 else ""),
         )
     except Exception as exc:
         logger.error("❌ Failed to inspect module registry: %s", exc)
@@ -148,11 +148,12 @@ def register_global_exception_handlers(application: FastAPI) -> None:
 
     @application.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        detail_msg = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
         return JSONResponse(
             status_code=exc.status_code,
             content={
                 "error_code": "HTTP_ERROR",
-                "message": str(exc.detail),
+                "message": detail_msg,
                 "module_type": None,
                 "details": {"status_code": exc.status_code},
             },
