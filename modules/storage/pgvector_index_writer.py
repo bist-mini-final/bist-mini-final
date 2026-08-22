@@ -1,28 +1,32 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-from typing import Optional, Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.core.settings import PROCESSED_DATA_DIR
+from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PGVECTOR_INSERT_BATCH_SIZE, PgVectorStore
+from backend.storage.spreadsheets.langchain_document import lazy_cell_documents
 from modules.common.base_module import (
-    EmptyModuleConfigDTO,
     BaseModule,
+    EmptyModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
     ModuleTaskPolicy,
 )
-from modules.embedding.embedder import CellTextEmbeddingsDTO
+from modules.embedding.cell_text_embedder import CellTextEmbeddingsDTO
+
+logger = logging.getLogger(__name__)
 
 
 class VectorIndexDTO(ModuleDTO):
     index_id: str = Field(
-        pattern=r"^[a-f0-9]{64}$",
+        pattern=r"^idx_[a-f0-9]{64}$",
         description="영속 벡터 인덱스의 콘텐츠 주소",
     )
     file_name: str = Field(description="인덱싱한 원본 Excel 파일명")
@@ -42,7 +46,7 @@ class PgVectorIndexWriterModule(BaseModule):
     definition = ModuleDefinition(
         type="pgvector_index_writer",
         label="PostgreSQL pgvector Writer",
-        category="Transform",
+        category="Storage / DB",
         description="셀 임베딩과 청크 메타데이터를 PostgreSQL 16 pgvector DB의 6개 ERD 테이블 및 HNSW 인덱스에 영구 적재합니다.",
         inputs=["input"],
         outputs=["index_output"],
@@ -60,7 +64,6 @@ class PgVectorIndexWriterModule(BaseModule):
     )
     input_model = PgVectorIndexWriterInputDTO
     config_model = EmptyModuleConfigDTO
-    execution_model = PgVectorIndexWriterInputDTO
     output_model = VectorIndexDTO
 
     def __init__(
@@ -93,18 +96,13 @@ class PgVectorIndexWriterModule(BaseModule):
             Dict[str, Any]: Metadata for the created index, including its identifier,
                 workbook, model, embedding dimension, and document count.
         """
-        if config is None and isinstance(input_data, PgVectorIndexWriterInputDTO):
-            cfg = input_data
-        else:
-            cfg = config or EmptyModuleConfigDTO()
-        vectors = self.artifact_store.get(
+        vectors = self.artifact_store.vector_sequence(
             input_data.artifact_id,
             len(input_data.items),
             input_data.dimension,
         )
 
         collection_name = PgVectorStore.index_id(input_data.artifact_id)
-        items_dict = [item.model_dump(mode="json") for item in input_data.items]
         self.report_progress(
             {
                 "phase": "storage_batches",
@@ -112,11 +110,11 @@ class PgVectorIndexWriterModule(BaseModule):
                 "completed_batches": 0,
                 "total_batches": max(
                     1,
-                    (len(items_dict) + PGVECTOR_INSERT_BATCH_SIZE - 1)
+                    (len(input_data.items) + PGVECTOR_INSERT_BATCH_SIZE - 1)
                     // PGVECTOR_INSERT_BATCH_SIZE,
                 ),
                 "completed_items": 0,
-                "total_items": len(items_dict),
+                "total_items": len(input_data.items),
             }
         )
 
@@ -132,22 +130,30 @@ class PgVectorIndexWriterModule(BaseModule):
             ),
         )
 
-        # 2. Save embeddings into pgvector via PgVectorStore (LangChain collection & embeddings)
-        self.pgvector_store.put(
+        # 2. Save embeddings in bounded file/DB batches. The full vector matrix is
+        # never materialized in memory.
+        documents = lazy_cell_documents(
+            items=input_data.items,
+            file_name=input_data.file_name,
+            workbook_hash=input_data.workbook_hash,
             index_id=collection_name,
+        )
+        self.pgvector_store.put_documents(
+            index_id=collection_name,
+            documents=documents,
+            model_name=input_data.model,
             vectors=vectors,
             metadata={
                 "file_name": input_data.file_name,
                 "workbook_hash": input_data.workbook_hash,
                 "model": input_data.model,
                 "dimension": input_data.dimension,
-                "document_count": len(items_dict),
+                "document_count": len(input_data.items),
                 "duration_seconds": input_data.duration_seconds,
                 "total_tokens": input_data.total_tokens,
                 "estimated_cost_usd": input_data.estimated_cost_usd,
                 "estimated_cost_krw": input_data.estimated_cost_krw,
                 "batch_size": input_data.batch_size,
-                "items": items_dict,
             },
             embedding_encoder=self.embedding_encoder,
             progress_callback=lambda progress: self.report_progress(

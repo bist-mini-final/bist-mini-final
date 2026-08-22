@@ -5,7 +5,6 @@ from openpyxl.utils import get_column_letter
 
 from .cell_visibility import WorksheetVisibility
 
-
 COL_UNIT_PX = 7.5
 ROW_POINT_TO_PX = 1.33
 DEFAULT_COLUMN_WIDTH = 11.0

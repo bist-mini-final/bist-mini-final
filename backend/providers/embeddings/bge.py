@@ -2,14 +2,15 @@ import os
 from threading import Lock
 from typing import Any, List, Optional
 
-from modules.common.base_module import ModuleExecutionError
+from langchain_core.embeddings import Embeddings
 
+from modules.common.base_module import ModuleExecutionError
 
 DEFAULT_BGE_MODEL = "BAAI/bge-large-en-v1.5"
 
 
-class BgeEncoder:
-    """Lazy, process-local BGE encoder using CLS pooling and L2 normalization."""
+class BgeEncoder(Embeddings):
+    """Lazy, process-local BGE encoder using CLS pooling and L2 normalization implementing LangChain Embeddings."""
 
     def __init__(self, model_name: str = DEFAULT_BGE_MODEL) -> None:
         self.model_name = model_name
@@ -77,3 +78,14 @@ class BgeEncoder:
                 return vectors.cpu().tolist()
             except (RuntimeError, ValueError, TypeError) as error:
                 raise ModuleExecutionError("BGE 질의 임베딩 생성에 실패했습니다") from error
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """LangChain standard interface for embedding a list of document strings."""
+        return self.encode(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        """LangChain standard interface for embedding a single query string."""
+        vectors = self.encode([text])
+        if not vectors:
+            raise ValueError(f"Failed to embed query with model {self.model_name}")
+        return vectors[0]

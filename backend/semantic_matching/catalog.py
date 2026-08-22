@@ -9,7 +9,6 @@ from pathlib import Path
 
 from ..core.settings import PROJECT_DIR
 
-
 DEFAULT_CATALOG_PATH = PROJECT_DIR / "data" / "semantic_query_plans.json"
 
 

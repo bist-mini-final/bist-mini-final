@@ -6,7 +6,6 @@ import threading
 from functools import lru_cache
 from typing import Any, Dict, Literal, Optional
 
-from langchain_core.vectorstores import VectorStore
 from langchain_postgres import PGVector
 from langchain_postgres.vectorstores import DistanceStrategy
 from sqlalchemy import create_engine

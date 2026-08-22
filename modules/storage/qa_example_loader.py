@@ -7,12 +7,12 @@ data/qa_examples/ 아래의 JSON 파일에서 QA 예시 세트를 로드합니�
 각 항목은 {"question": "...", "route": "...", "sheet": "..."} 구조이며
 임베딩 유사도 검색으로 라우팅 대상을 결정할 때 사용됩니다.
 """
-from __future__ import annotations
-
 import json
-from typing import Optional, Any, Dict, List, Optional, cast
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backend.core.settings import PROJECT_DIR
 from modules.common.base_module import (
@@ -23,6 +23,8 @@ from modules.common.base_module import (
     ModuleExecutionError,
     ModuleInputDTO,
 )
+
+logger = logging.getLogger(__name__)
 
 QA_EXAMPLES_DIR = PROJECT_DIR / "data" / "qa_examples"
 
@@ -83,8 +85,8 @@ class QaExampleLoaderConfigDTO(ModuleConfigDTO):
     )
 
 
-class QaExampleLoaderExecutionDTO(QaExampleLoaderInputDTO, QaExampleLoaderConfigDTO):
-    """Internal union of example source and inclusion policy."""
+# Backward compatibility alias
+QaExampleLoaderExecutionDTO = QaExampleLoaderInputDTO
 
 
 class QaExampleItem(ModuleDTO):
@@ -113,11 +115,10 @@ class QaExampleLoaderModule(BaseModule):
         outputs=["output"],
         config_fields=["include_builtin"],
         raw_output=True,
-        version="1",
+        version="2",
     )
     input_model = QaExampleLoaderInputDTO
     config_model = QaExampleLoaderConfigDTO
-    execution_model = QaExampleLoaderExecutionDTO
     output_model = QaExampleLoaderOutput
 
     def contract(self) -> Dict[str, Any]:
@@ -125,7 +126,7 @@ class QaExampleLoaderModule(BaseModule):
         # Populate enum with available JSON files
         available = self._available_files()
         file_schema = contract["input_schema"]["properties"]["file_name"]
-        file_schema["enum"] = [None] + available
+        file_schema["enum"] = [None, *available]
         return contract
 
     def _available_files(self) -> List[str]:
@@ -138,15 +139,20 @@ class QaExampleLoaderModule(BaseModule):
         input_data: QaExampleLoaderInputDTO,
         config: Optional[QaExampleLoaderConfigDTO] = None,
     ) -> Dict[str, Any]:
-        if config is None and isinstance(input_data, QaExampleLoaderExecutionDTO):
-            cfg = input_data
-        else:
-            cfg = config or QaExampleLoaderConfigDTO()
+        cfg = config or QaExampleLoaderConfigDTO()
         examples: List[Dict[str, Any]] = []
         source = "builtin"
 
         if input_data.file_name:
-            path = QA_EXAMPLES_DIR / input_data.file_name
+            requested = Path(input_data.file_name)
+            if (
+                requested.name != input_data.file_name
+                or requested.suffix.lower() != ".json"
+            ):
+                raise ModuleExecutionError("QA 예시 파일은 디렉터리 내 JSON 파일명만 허용됩니다")
+            path = (QA_EXAMPLES_DIR / requested.name).resolve()
+            if path.parent != QA_EXAMPLES_DIR.resolve():
+                raise ModuleExecutionError("QA 예시 파일 경로가 허용된 디렉터리를 벗어났습니다")
             if not path.is_file():
                 raise ModuleExecutionError(
                     f"QA 예시 파일을 찾을 수 없습니다: {input_data.file_name}"
@@ -164,19 +170,30 @@ class QaExampleLoaderModule(BaseModule):
         if cfg.include_builtin or not input_data.file_name:
             examples.extend(BUILTIN_EXAMPLES)
 
-        items = []
-        for ex in examples:
-            items.append(
+        items = [
                 QaExampleItem(
                     question=ex.get("question", ""),
                     route=ex.get("route", "KeyStats"),
                     sheet=ex.get("sheet", "KeyStats"),
                     description=ex.get("description", ""),
                 ).model_dump()
-            )
+            for ex in examples
+        ]
 
         return {
             "examples": items,
             "total_count": len(items),
             "source": source,
         }
+
+
+__all__ = [
+    "BUILTIN_EXAMPLES",
+    "QA_EXAMPLES_DIR",
+    "QaExampleItem",
+    "QaExampleLoaderConfigDTO",
+    "QaExampleLoaderExecutionDTO",
+    "QaExampleLoaderInputDTO",
+    "QaExampleLoaderModule",
+    "QaExampleLoaderOutput",
+]

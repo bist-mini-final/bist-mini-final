@@ -1,11 +1,11 @@
-import json
 import math
 import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+import httpx
+from langchain_core.embeddings import Embeddings
 
 from modules.common.base_module import ModuleExecutionError
 
@@ -34,8 +34,8 @@ def _l2_normalize(vector: List[float]) -> List[float]:
     return [x / norm for x in vector]
 
 
-class OpenAIEmbeddingEncoder:
-    """Embedding encoder calling OpenAI-compatible embeddings REST API."""
+class OpenAIEmbeddingEncoder(Embeddings):
+    """Embedding encoder calling OpenAI-compatible embeddings REST API and implementing LangChain Embeddings."""
 
     def __init__(
         self,
@@ -43,6 +43,7 @@ class OpenAIEmbeddingEncoder:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout_seconds: float = 60,
+        http_client: Optional[httpx.Client] = None,
     ) -> None:
         """
         Initialize an OpenAI-compatible embedding encoder.
@@ -63,6 +64,11 @@ class OpenAIEmbeddingEncoder:
         self.endpoint = f"{configured_base.rstrip('/')}/embeddings"
         self.timeout_seconds = timeout_seconds
         self.last_usage: Dict[str, int] = {}
+        self._owns_http_client = http_client is None
+        self.http_client = http_client or httpx.Client(
+            timeout=httpx.Timeout(timeout_seconds),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
 
     def encode(self, queries: List[str], batch_size: int = 2048) -> List[List[float]]:
         """
@@ -110,41 +116,45 @@ class OpenAIEmbeddingEncoder:
                 "model": self.model_name,
                 "input": batch_items,
             }
-            body = json.dumps(request_body, ensure_ascii=False).encode("utf-8")
-            request = Request(
-                self.endpoint,
-                data=body,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                method="POST",
-            )
-
             document = None
             retries = 4
             for attempt in range(retries):
                 try:
-                    with urlopen(request, timeout=self.timeout_seconds) as response:
-                        document = json.loads(response.read().decode("utf-8"))
+                    response = self.http_client.post(
+                        self.endpoint,
+                        json=request_body,
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    if response.status_code >= 400:
+                        message = ""
+                        try:
+                            error_doc = response.json()
+                            message = str(
+                                (error_doc.get("error") or {}).get("message") or ""
+                            )
+                        except (ValueError, AttributeError):
+                            pass
+                        detail = f": {message}" if message else ""
+                        if (
+                            response.status_code in (429, 500, 502, 503, 504)
+                            and attempt < retries - 1
+                        ):
+                            time.sleep(1.5 * (2**attempt))
+                            continue
+                        raise ModuleExecutionError(
+                            "OpenAI Embeddings API가 HTTP "
+                            f"{response.status_code}를 반환했습니다{detail}"
+                        )
+                    document = response.json()
                     break
-                except HTTPError as error:
-                    message = ""
-                    try:
-                        error_doc = json.loads(error.read().decode("utf-8"))
-                        message = str((error_doc.get("error") or {}).get("message") or "")
-                    except (OSError, ValueError, AttributeError):
-                        pass
-                    detail = f": {message}" if message else ""
-                    if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
-                        time.sleep(1.5 * (2 ** attempt))
-                        continue
-                    raise ModuleExecutionError(
-                        f"OpenAI Embeddings API가 HTTP {error.code}를 반환했습니다{detail}"
-                    ) from error
-                except (URLError, TimeoutError, OSError, ValueError) as error:
+                except ModuleExecutionError:
+                    raise
+                except (httpx.HTTPError, ValueError) as error:
                     if attempt < retries - 1:
-                        time.sleep(1.5 * (2 ** attempt))
+                        time.sleep(1.5 * (2**attempt))
                         continue
                     raise ModuleExecutionError(f"OpenAI Embeddings API 호출 또는 응답 해석에 실패했습니다: {error}") from error
 
@@ -216,3 +226,19 @@ class OpenAIEmbeddingEncoder:
             raise ModuleExecutionError("생성된 OpenAI 임베딩 개수가 요청과 일치하지 않습니다")
 
         return [_l2_normalize(vec) for vec in all_vectors]
+
+    def close(self) -> None:
+        """Close the owned keep-alive connection pool."""
+        if self._owns_http_client:
+            self.http_client.close()
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """LangChain standard interface for embedding a list of document strings."""
+        return self.encode(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        """LangChain standard interface for embedding a single query string."""
+        vectors = self.encode([text])
+        if not vectors:
+            raise ValueError(f"Failed to embed query with model {self.model_name}")
+        return vectors[0]

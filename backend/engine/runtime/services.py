@@ -20,14 +20,15 @@ from backend.core.settings import (
     VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
+from backend.engine.workflows.executor import WorkflowExecutor
+from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
 from backend.storage.answer_cache import AnswerCacheRepository
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
-from backend.engine.workflows.executor import WorkflowExecutor
-from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
+
 from .registry_base import BaseModuleRegistry
 
 

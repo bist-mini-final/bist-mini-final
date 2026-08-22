@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.storage.pgvector_store import PgVectorStore
 from backend.engine.workflows import (
     DagExecutionError,
     RunDispatcher,
@@ -23,6 +22,7 @@ from backend.engine.workflows import (
     WorkflowRun,
     WorkflowStore,
 )
+from backend.storage.pgvector_store import PgVectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -285,8 +285,9 @@ class IngestionJobService:
         ]
         if file_name is not None:
             safe_file_name = Path(file_name).name
-            runs: List[WorkflowRun] = []
-            for summary in summaries:
+            runs = [
+                summary
+                for summary in summaries
                 if any(
                     node.module_type == "processed_file_selector"
                     and Path(
@@ -299,8 +300,8 @@ class IngestionJobService:
                     ).name
                     == safe_file_name
                     for node in summary.graph.nodes
-                ):
-                    runs.append(summary)
+                )
+            ]
         else:
             runs = summaries
         return sorted(runs, key=lambda run: run.updated_at, reverse=True)

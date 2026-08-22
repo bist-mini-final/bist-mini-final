@@ -1,4 +1,9 @@
 {
+  "include": ["modules", "backend", "tests"],
+  "exclude": ["backend/infrastructure", ".venv"],
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": false
 }

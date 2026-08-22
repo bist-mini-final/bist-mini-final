@@ -2,33 +2,39 @@
 
 from __future__ import annotations
 
+# ==============================================================================
+# 1. Imports & Logger Setup
+# ==============================================================================
 import logging
 from pathlib import Path
-from typing import Optional, Any, ClassVar, Dict, List, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 from pydantic import Field
 
 from backend.core.settings import PROCESSED_DATA_DIR
-from backend.storage.pgvector_store import PgVectorStore
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
+from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import (
-    EmptyModuleConfigDTO,
     BaseModule,
+    EmptyModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
     ModuleExecutionError,
 )
-from modules.storage.company_entity_extractor import CompanyEntityExtractorOutputDTO
-from modules.storage.processed_file_selector import WorkbookSelectionDTO
-from modules.structure.spreadsheet_structure import SpreadsheetStructureOutput
+from modules.common.exceptions import DocumentParsingError, StorageError
 from modules.storage.pgvector_index_writer import VectorIndexDTO
-
+from modules.storage.processed_file_selector import WorkbookSelectionDTO
+from modules.structure.luna_vlm_structure_detector import SpreadsheetStructureOutput
 
 logger = logging.getLogger(__name__)
 StructureSourceDTO = Union[SpreadsheetStructureOutput, WorkbookSelectionDTO]
 
 
+# ==============================================================================
+# 2. DTOs & Item Models
+# ==============================================================================
 class SheetMetadataPersistenceInputDTO(ModuleDTO):
+    """Input contract containing workbook structure and pgvector index outcome."""
+
     structure_input: StructureSourceDTO = Field(
         description="구조 감지 결과 또는 전수 직렬화용 워크북 선택 결과",
     )
@@ -38,10 +44,15 @@ class SheetMetadataPersistenceInputDTO(ModuleDTO):
 
 
 class SheetMetadataPersistenceOutputDTO(ModuleDTO):
+    """Output contract containing saved sheet metadata summary."""
+
     sheets_saved: int = Field(description="DB에 저장된 시트 수")
     sheet_details: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+# ==============================================================================
+# 3. Module Definition & Implementation
+# ==============================================================================
 _SHEET_META_DEFINITION = ModuleDefinition(
     type="sheet_metadata_persistence",
     label="Sheet Metadata Persistence",
@@ -62,7 +73,6 @@ class SheetMetadataPersistenceModule(BaseModule):
     definition: ClassVar[ModuleDefinition] = _SHEET_META_DEFINITION
     input_model = SheetMetadataPersistenceInputDTO
     config_model = EmptyModuleConfigDTO
-    execution_model = SheetMetadataPersistenceInputDTO
     output_model = SheetMetadataPersistenceOutputDTO
 
     def __init__(
@@ -71,14 +81,8 @@ class SheetMetadataPersistenceModule(BaseModule):
         catalog: WorkbookCatalog | None = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
     ) -> None:
-        """Initialize the module with an optional database manager and workbook catalog.
-        
-        Parameters:
-            db_manager (Any): Database manager used for persistence.
-            catalog (WorkbookCatalog | None): Workbook catalog to use. A catalog for
-                `processed_dir` is created when omitted.
-            processed_dir (Path): Directory containing processed workbook data.
-        """
+        """Initialize the module with an optional database manager and workbook catalog."""
+        super().__init__()
         self._db_manager = db_manager
         self.catalog = catalog or WorkbookCatalog(processed_dir)
 
@@ -87,18 +91,7 @@ class SheetMetadataPersistenceModule(BaseModule):
         input_data: SheetMetadataPersistenceInputDTO,
         config: Optional[EmptyModuleConfigDTO] = None,
     ) -> Dict[str, Any]:
-        """
-        Persist workbook sheet metadata and detected tables for the selected visible sheets.
-        
-        Parameters:
-            payload (SheetMetadataPersistenceInputDTO): Workbook structure and index data used to identify and describe the sheets.
-        
-        Returns:
-            Dict[str, Any]: The number of saved sheets and per-sheet summaries containing dimensions and detected-table counts.
-        
-        Raises:
-            ModuleExecutionError: If workbook inputs reference different workbooks, the database is unavailable, workbook metadata cannot be loaded, or persistence fails.
-        """
+        """Persist workbook sheet metadata and detected tables for the selected visible sheets."""
         from backend.storage.db_manager import DatabaseManager
 
         structure = input_data.structure_input
@@ -108,12 +101,9 @@ class SheetMetadataPersistenceModule(BaseModule):
 
         database = self._db_manager or DatabaseManager()
         if not database.is_connected():
-            raise ModuleExecutionError("시트 메타데이터를 저장할 DB에 연결할 수 없습니다")
+            raise StorageError("시트 메타데이터를 저장할 DB에 연결할 수 없습니다")
 
-        try:
-            workbook_path = self.catalog.resolve(structure.file_name)
-        except (OSError, ValueError, WorkbookCatalogError) as error:
-            raise ModuleExecutionError(str(error)) from error
+        workbook_path = self.catalog.resolve(structure.file_name)
 
         detected_tables = (
             []
@@ -126,12 +116,12 @@ class SheetMetadataPersistenceModule(BaseModule):
         elif detected_tables:
             catalog_sheets = self.catalog.sheet_names(workbook_path)
             table_sheets = {t.sheet_name for t in detected_tables}
-            # Only include sheets that are both in tables and in catalog
             visible_sheets = [s for s in catalog_sheets if s in table_sheets]
         else:
             raise ModuleExecutionError(
                 "저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다"
             )
+
         sheet_dimensions: Dict[str, tuple[int, int]] = {}
         try:
             import openpyxl
@@ -153,11 +143,10 @@ class SheetMetadataPersistenceModule(BaseModule):
             finally:
                 workbook.close()
         except Exception as error:
-            raise ModuleExecutionError(f"시트 크기 측정 실패: {error}") from error
+            raise DocumentParsingError(f"시트 크기 측정 실패: {error}") from error
 
         sheets_data: List[Dict[str, Any]] = []
         for sheet_index, sheet_name in enumerate(visible_sheets):
-            # Only include sheets that exist in workbook dimensions
             if sheet_name not in sheet_dimensions:
                 logger.warning("Skipping sheet '%s' not found in workbook dimensions", sheet_name)
                 continue
@@ -184,7 +173,7 @@ class SheetMetadataPersistenceModule(BaseModule):
                 sheets_info=sheets_data,
             )
         except Exception as error:
-            raise ModuleExecutionError(f"시트 메타데이터 저장 실패: {error}") from error
+            raise StorageError(f"시트 메타데이터 저장 실패: {error}") from error
 
         return {
             "sheets_saved": len(sheets_data),
@@ -201,88 +190,9 @@ class SheetMetadataPersistenceModule(BaseModule):
 
 
 # ==============================================================================
-# 2. Index Company Persistence Module
+# 4. Exports
 # ==============================================================================
-
-class IndexCompanyPersistenceInputDTO(ModuleDTO):
-    index_input: VectorIndexDTO = Field(description="pgvector 인덱스 저장 결과")
-    company_input: CompanyEntityExtractorOutputDTO = Field(
-        description="기업 엔티티 추출 결과",
-    )
-
-
-class IndexCompanyPersistenceOutputDTO(ModuleDTO):
-    index_id: str = Field(description="기업 메타데이터가 반영된 pgvector 인덱스 ID")
-    company_name: str = Field(description="인덱스와 셀 메타데이터에 저장된 기업 표시명")
-    ticker: str = Field(default="", description="추출된 티커 심볼 (없으면 빈 문자열)")
-
-
-_INDEX_COMPANY_DEFINITION = ModuleDefinition(
-    type="index_company_persistence",
-    label="Index Company Persistence",
-    category="Storage / DB",
-    description="추출한 기업명을 pgvector 컬렉션과 청크 메타데이터에 반영합니다.",
-    inputs=["index_input", "company_input"],
-    outputs=["output"],
-    config_fields=[],
-    raw_output=True,
-    cacheable=False,
-    version="2",
-)
-
-
-class IndexCompanyPersistenceModule(BaseModule):
-    """Persist company metadata only after both upstream branches complete."""
-
-    definition: ClassVar[ModuleDefinition] = _INDEX_COMPANY_DEFINITION
-    input_model = IndexCompanyPersistenceInputDTO
-    config_model = EmptyModuleConfigDTO
-    execution_model = IndexCompanyPersistenceInputDTO
-    output_model = IndexCompanyPersistenceOutputDTO
-
-    def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
-        """Initialize the module with the provided pgvector store or a default store."""
-        self.pgvector_store = pgvector_store or PgVectorStore()
-
-    def execute(
-        self,
-        input_data: IndexCompanyPersistenceInputDTO,
-        config: Optional[EmptyModuleConfigDTO] = None,
-    ) -> Dict[str, Any]:
-        """
-        Persist the company name for an index and return the resulting company metadata.
-        
-        Parameters:
-            payload (IndexCompanyPersistenceInputDTO): Index persistence result and extracted company information.
-        
-        Returns:
-            Dict[str, Any]: The index ID, stored company name, and ticker.
-        
-        Raises:
-            ModuleExecutionError: If no company name is available or the index update fails.
-        """
-        company = input_data.company_input
-        company_name = company.display_name or company.company_name
-        if not company_name:
-            raise ModuleExecutionError("저장할 기업명이 없습니다")
-        try:
-            self.pgvector_store.update_index_company(
-                input_data.index_input.index_id,
-                company_name,
-            )
-        except Exception as error:
-            raise ModuleExecutionError(f"인덱스 기업명 저장 실패: {error}") from error
-        return {
-            "index_id": input_data.index_input.index_id,
-            "company_name": company_name,
-            "ticker": company.ticker,
-        }
-
-
 __all__ = [
-    "IndexCompanyPersistenceInputDTO",
-    "IndexCompanyPersistenceModule",
-    "IndexCompanyPersistenceOutputDTO",
     "SheetMetadataPersistenceInputDTO",
     "SheetMetadataPersistenceModule",
     "SheetMetadataPersistenceOutputDTO",

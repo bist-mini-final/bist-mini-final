@@ -6,9 +6,6 @@ import re
 from dataclasses import dataclass
 from typing import Iterable
 
-from modules.query.decomposer import normalize_structured_query
-
-
 _YEAR_PATTERN = re.compile(r"(?<!\d)(20(?:2[0-9]))(?!\d)")
 _SHORT_KOREAN_YEAR_PATTERN = re.compile(r"(?<!\d)(\d{2})\s*년")
 _RECENT_PERIOD_PATTERN = re.compile(r"최근\s*(\d+)\s*(?:개년|년)")
@@ -103,7 +100,7 @@ def _question_years(question: str) -> set[int]:
         if 20 <= int(value) <= 29
     )
     range_match = re.search(
-        r"(20(?:2[0-9]))\s*년?\s*(?:부터|~|～|-)\s*(20(?:2[0-9]))",
+        r"(20(?:2[0-9]))\s*년?\s*(?:부터|~|～|-)\s*(20(?:2[0-9]))",  # noqa: RUF001
         question,
     )
     if range_match:
@@ -133,13 +130,13 @@ def _plan_fields(subqueries: Iterable[str]) -> list[dict[str, str]] | None:
     fields: list[dict[str, str]] = []
     try:
         for subquery in subqueries:
-            normalized = normalize_structured_query(subquery)
             parsed: dict[str, str] = {}
-            for part in normalized.split("|"):
+            for part in subquery.split("|"):
                 key, separator, value = part.partition(":")
                 if separator:
                     parsed[key.strip().casefold()] = value.strip()
-            fields.append(parsed)
+            if parsed:
+                fields.append(parsed)
     except (TypeError, ValueError):
         return None
     return fields or None

@@ -1,6 +1,5 @@
 from typing import Any
 
-
 MAX_COLLECTION_PREVIEW = 8
 MAX_VECTOR_PREVIEW = 12
 

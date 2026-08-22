@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import math
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from typing import Dict, Sequence
 
-from .catalog import QueryExample, load_examples
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import ModuleExecutionError
+
+from .catalog import QueryExample, load_examples
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class SemanticDecision:
     sheets: tuple[str, ...]
     matches: tuple[SemanticMatch, ...]
     reason: str
+    company_name: str | None = None
     query_type: int | None = None
     subqueries: tuple[str, ...] = ()
 
@@ -43,7 +45,7 @@ def _cosine(left: Sequence[float], right: Sequence[float]) -> float:
     right_norm = math.sqrt(sum(value * value for value in right))
     if not left_norm or not right_norm:
         return 0.0
-    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
+    return sum(a * b for a, b in zip(left, right, strict=True)) / (left_norm * right_norm)
 
 
 class SemanticQueryMatcher:
@@ -126,7 +128,7 @@ class SemanticQueryMatcher:
                     sheets=example.sheets,
                     similarity=_cosine(query_vectors[0], vector),
                 )
-                for example, vector in zip(examples, vectors)
+                for example, vector in zip(examples, vectors, strict=True)
             ),
             key=lambda item: (-item.similarity, item.example_id),
         )[:top_k]
@@ -162,5 +164,5 @@ class SemanticQueryMatcher:
                 f"{representative.similarity:.3f}; nearby-example votes {votes}"
             ),
             query_type=representative_example.query_type,
-            subqueries=representative_example.subqueries,
+            subqueries=(),
         )

@@ -14,15 +14,15 @@ import time
 from typing import Iterator, Optional
 
 from backend.core.settings import KUBERNETES_INGESTION_QUEUE
-from backend.storage.data_sources import INGESTION_WORKFLOW_IDS
-from backend.storage.data_sources.ingestion_registry import IngestionModuleRegistry
+from backend.infrastructure.storage.data_sources import INGESTION_WORKFLOW_IDS
+from backend.infrastructure.storage.data_sources.ingestion_registry import IngestionModuleRegistry
 from backend.engine.orchestration import compile_task_plan
 from backend.engine.runtime.services import (
     WorkflowRuntimeServices,
     create_workflow_runtime_services,
 )
-from backend.storage.answer_cache import AnswerCacheRepository
-from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
+from backend.infrastructure.cache.answer_cache import AnswerCacheRepository
+from backend.infrastructure.database.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
 from backend.engine.workflows.executor import DagExecutionCancelled
 
 logger = logging.getLogger(__name__)

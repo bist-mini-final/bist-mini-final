@@ -1,10 +1,12 @@
+import asyncio
+import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from sse_starlette.sse import EventSourceResponse
 
 from backend.core.settings import CACHE_DIR, RUN_DIR, WORKFLOW_DIR
-from backend.storage.data_sources import INGESTION_WORKFLOW_IDS
 from backend.engine.runtime.registry import ModuleRegistry
 from backend.engine.workflows import (
     DagExecutionCancelled,
@@ -17,6 +19,8 @@ from backend.engine.workflows import (
     WorkflowSaveRequest,
     WorkflowStore,
 )
+from backend.storage.data_sources import INGESTION_WORKFLOW_IDS
+
 from .benchmark_routes import create_benchmark_router
 
 
@@ -211,5 +215,30 @@ def create_workflow_router(
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
             ) from error
+
+    @router.get("/runs/{run_id}/stream")
+    async def stream_workflow_run(run_id: str, request: Request):
+        """Stream live DAG execution events for a workflow run using Server-Sent Events (SSE)."""
+        require_interactive_run(run_id)
+
+        async def event_generator():
+            try:
+                async for event in workflow_executor.execute_and_stream(run_id):
+                    if await request.is_disconnected():
+                        workflow_dispatcher.cancel(run_id)
+                        break
+                    yield {
+                        "event": event.get("event", "message"),
+                        "data": json.dumps(event.get("data", {}), ensure_ascii=False),
+                    }
+            except asyncio.CancelledError:
+                workflow_dispatcher.cancel(run_id)
+            except Exception as error:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"error": str(error), "run_id": run_id}, ensure_ascii=False),
+                }
+
+        return EventSourceResponse(event_generator())
 
     return router

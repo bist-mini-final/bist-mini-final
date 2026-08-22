@@ -10,8 +10,9 @@ from typing import Any, Dict, List, Optional
 
 from backend.core.settings import PROCESSED_DATA_DIR
 from backend.providers.embeddings.factory import EmbeddingEncoder
-from modules.common.base_module import ModuleExecutionError
 from backend.storage.pgvector_store import PgVectorStore
+from modules.common.base_module import ModuleExecutionError
+
 from .workbook_catalog import SUPPORTED_WORKBOOK_SUFFIXES, WorkbookCatalog
 
 logger = logging.getLogger(__name__)

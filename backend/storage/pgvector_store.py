@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
+import threading
+from datetime import datetime, timezone
 from numbers import Real
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
+from uuid import UUID, uuid4
 
 import psycopg2.extras
 from langchain_core.documents import Document
@@ -17,9 +19,9 @@ from backend.storage.spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
     langchain_document_to_cell_item,
 )
+
 from .connection_pool import get_pooled_raw_connection
 from .vector_store_factory import get_vector_store
-
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +35,14 @@ _CONCURRENT_OPTIMIZED_INDEX_NAMES = (
     "idx_langchain_pg_embedding_cell_id",
     "idx_langchain_pg_embedding_cell_coord_upper",
     "idx_langchain_pg_embedding_workbook_hash",
+    "idx_langchain_pg_embedding_company_name",
+    "idx_langchain_pg_embedding_sheet_name",
+    "idx_langchain_pg_embedding_sheet_row",
+    "idx_langchain_pg_embedding_sheet_legacy_row",
     "idx_langchain_pg_embedding_collection_id",
     "idx_langchain_pg_embedding_hnsw_halfvec_3072",
     "idx_langchain_pg_embedding_hnsw_halfvec_1536",
+    "idx_langchain_pg_embedding_document_fts",
 )
 
 
@@ -64,6 +71,11 @@ def _is_numeric_vector_collection(candidate: Any) -> bool:
     return True
 
 
+def _escape_like_term(text: str) -> str:
+    """Escape user-derived wildcard characters for a literal ILIKE substring."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class PgVectorStore:
     """Manages vector indexes in PostgreSQL using LangChain PGVector."""
 
@@ -74,10 +86,121 @@ class PgVectorStore:
 
     def __init__(self, database_url: str = PGVECTOR_URL) -> None:
         self.database_url = database_url
+        self._collection_uuid_cache: Dict[str, str] = {}
+        self._collection_uuid_lock = threading.Lock()
 
     def _raw_connection(self) -> Any:
         raw_url = getattr(self, "database_url", PGVECTOR_URL).replace("postgresql+psycopg://", "postgresql://")
         return get_pooled_raw_connection(raw_url)
+
+    def _read_connection(self) -> Any:
+        """Borrow an autocommit connection so SELECTs avoid a rollback round trip."""
+        connection = self._raw_connection()
+        connection.autocommit = True
+        return connection
+
+    def _collection_uuid(self, collection_name: str) -> Optional[str]:
+        """Resolve and cache a collection UUID to remove a lookup from hot searches."""
+        cached = self._collection_uuid_cache.get(collection_name)
+        if cached is not None:
+            return cached
+        connection = self._read_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
+                    (collection_name,),
+                )
+                row = cursor.fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            return None
+        # The canonical UUID representation is also safe to embed in a query
+        # predicate when selecting a collection-local partial index.
+        resolved = str(UUID(str(row[0])))
+        with self._collection_uuid_lock:
+            self._collection_uuid_cache[collection_name] = resolved
+        return resolved
+
+    @staticmethod
+    def _collection_vector_index_name(collection_uuid: str, dimension: int) -> str:
+        uuid_hex = UUID(collection_uuid).hex
+        return f"idx_lc_hnsw_bq_c_{uuid_hex}_{dimension}"
+
+    @staticmethod
+    def _legacy_collection_vector_index_name(
+        collection_uuid: str,
+        dimension: int,
+    ) -> str:
+        uuid_hex = UUID(collection_uuid).hex
+        return f"idx_lc_hnsw_c_{uuid_hex}_{dimension}"
+
+    def ensure_collection_vector_index(
+        self,
+        collection_name: str,
+        dimension: int,
+    ) -> str:
+        """Create a compact collection-local binary-quantized HNSW index."""
+        collection_uuid = self._collection_uuid(collection_name)
+        if collection_uuid is None:
+            raise PgVectorStoreError(
+                f"컬렉션별 HNSW 인덱스 대상이 없습니다: {collection_name}"
+            )
+        if not 0 < dimension <= 64_000:
+            raise PgVectorStoreError(
+                f"HNSW 인덱스를 지원하지 않는 벡터 차원입니다: {dimension}"
+            )
+        index_name = self._collection_vector_index_name(collection_uuid, dimension)
+        legacy_index_name = self._legacy_collection_vector_index_name(
+            collection_uuid,
+            dimension,
+        )
+        connection = self._read_connection()
+        try:
+            with connection.cursor() as cursor:
+                # A previous half-vector implementation was much larger and
+                # slower to build. It is safe to remove because this method
+                # recreates the query accelerator before publishing a staging
+                # collection.
+                cursor.execute(
+                    f'DROP INDEX CONCURRENTLY IF EXISTS "{legacy_index_name}";'
+                )
+                cursor.execute(
+                    f"""
+                    CREATE INDEX CONCURRENTLY IF NOT EXISTS "{index_name}"
+                    ON langchain_pg_embedding
+                    USING hnsw (
+                        (binary_quantize(embedding)::bit({dimension}))
+                        bit_hamming_ops
+                    )
+                    WHERE collection_id = '{collection_uuid}'::uuid
+                      AND vector_dims(embedding) = {dimension};
+                    """
+                )
+        finally:
+            connection.close()
+        return index_name
+
+    def _drop_collection_vector_index(
+        self,
+        collection_uuid: str,
+        dimension: int,
+    ) -> None:
+        index_name = self._collection_vector_index_name(collection_uuid, dimension)
+        legacy_index_name = self._legacy_collection_vector_index_name(
+            collection_uuid,
+            dimension,
+        )
+        connection = self._read_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(f'DROP INDEX CONCURRENTLY IF EXISTS "{index_name}";')
+                cursor.execute(
+                    f'DROP INDEX CONCURRENTLY IF EXISTS "{legacy_index_name}";'
+                )
+        finally:
+            connection.close()
 
     def is_connected(self) -> bool:
         """Check if PostgreSQL + pgvector is reachable."""
@@ -155,7 +278,7 @@ class PgVectorStore:
     def put_documents(
         self,
         index_id: str,
-        documents: List[Document],
+        documents: Sequence[Document],
         model_name: str = "text-embedding-3-large",
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -208,8 +331,11 @@ class PgVectorStore:
                 )
             use_precomputed_vectors = True
 
+        swap_suffix = uuid4().hex
+        staging_name = f"{index_id}__staging__{swap_suffix}"
+        retired_name = f"{index_id}__retired__{swap_suffix}"
         store = get_vector_store(
-            collection_name=index_id,
+            collection_name=staging_name,
             backend="pgvector",
             model_name=model_name,
             embedding_encoder=embedding_encoder,
@@ -217,32 +343,19 @@ class PgVectorStore:
             database_url=self.database_url,
         )
 
-        # Pre-delete existing collection to replace clean
-        try:
-            store.delete_collection()
-        except Exception as delete_error:
-            logger.error(
-                "기존 pgvector 컬렉션('%s') 삭제 실패: %s",
-                index_id,
-                delete_error,
-                exc_info=True,
-            )
-            raise PgVectorStoreError(
-                f"기존 pgvector 컬렉션('{index_id}') 삭제 실패: {delete_error}"
-            ) from delete_error
-
-        # Ensure collection is created with metadata
+        # Build a private staging collection so the current queryable index
+        # remains intact until every batch has been persisted successfully.
         try:
             store.create_collection()
         except Exception as create_error:
             logger.error(
                 "pgvector 컬렉션('%s') 생성 실패: %s",
-                index_id,
+                staging_name,
                 create_error,
                 exc_info=True,
             )
             raise PgVectorStoreError(
-                f"pgvector 컬렉션('{index_id}') 생성 실패: {create_error}"
+                f"pgvector 스테이징 컬렉션('{staging_name}') 생성 실패: {create_error}"
             ) from create_error
 
         # SQLAlchemy expands each embedding row into several bind parameters.
@@ -270,7 +383,7 @@ class PgVectorStore:
                 start=1,
             ):
                 stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
-                document_batch = documents[start:stop]
+                document_batch = list(documents[start:stop])
                 if use_precomputed_vectors and vectors is not None:
                     vector_batch = vectors[start:stop]
                     texts = [doc.page_content for doc in document_batch]
@@ -311,28 +424,136 @@ class PgVectorStore:
                 f"({batch_index}/{total_batches}): {error_message[:2000]}"
             ) from error
 
-        # Also execute direct update for guarantee
+        try:
+            self.ensure_collection_vector_index(
+                staging_name,
+                int(clean_meta["dimension"]),
+            )
+        except Exception as index_error:
+            staging_uuid = self._collection_uuid_cache.get(staging_name)
+            try:
+                store.delete_collection()
+            except Exception:
+                pass
+            if staging_uuid is not None:
+                try:
+                    self._drop_collection_vector_index(
+                        staging_uuid,
+                        int(clean_meta["dimension"]),
+                    )
+                except Exception:
+                    pass
+            raise PgVectorStoreError(
+                f"컬렉션별 HNSW 인덱스 생성 실패: {index_error}"
+            ) from index_error
+
+        # Atomically publish the completed staging collection. Renaming the old
+        # collection first keeps reads available and makes a failed rebuild
+        # non-destructive.
+        had_previous_collection = False
+        retired_uuid: Optional[str] = None
+        retired_dimension = int(clean_meta["dimension"])
+        published_uuid: Optional[str] = None
         try:
             conn = self._raw_connection()
             try:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        UPDATE langchain_pg_collection
-                        SET cmetadata = %s
-                        WHERE name = %s;
+                        SELECT pg_advisory_xact_lock(hashtext(%s));
                         """,
-                        (psycopg2.extras.Json(clean_meta), index_id),
+                        (index_id,),
                     )
+                    cur.execute(
+                        """
+                        UPDATE langchain_pg_collection
+                        SET name = %s
+                        WHERE name = %s
+                        RETURNING uuid, cmetadata;
+                        """,
+                        (retired_name, index_id),
+                    )
+                    retired_row = cur.fetchone()
+                    had_previous_collection = retired_row is not None
+                    if retired_row is not None:
+                        retired_uuid = str(retired_row[0])
+                        retired_metadata = retired_row[1]
+                        if isinstance(retired_metadata, dict):
+                            retired_dimension = int(
+                                retired_metadata.get("dimension")
+                                or retired_dimension
+                            )
+                    cur.execute(
+                        """
+                        UPDATE langchain_pg_collection
+                        SET name = %s, cmetadata = %s
+                        WHERE name = %s
+                        RETURNING uuid;
+                        """,
+                        (
+                            index_id,
+                            psycopg2.extras.Json(clean_meta),
+                            staging_name,
+                        ),
+                    )
+                    published_row = cur.fetchone()
+                    if published_row is None:
+                        raise PgVectorStoreError(
+                            "완료된 pgvector 스테이징 컬렉션을 찾을 수 없습니다"
+                        )
+                    published_uuid = str(published_row[0])
                 conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
             finally:
                 conn.close()
-        except Exception:
-            logger.warning(
-                "langchain_pg_collection 메타데이터 직접 업데이트 실패: %s",
-                index_id,
-                exc_info=True,
-            )
+        except Exception as publish_error:
+            staging_uuid = self._collection_uuid_cache.get(staging_name)
+            try:
+                store.delete_collection()
+            except Exception:
+                pass
+            if staging_uuid is not None:
+                try:
+                    self._drop_collection_vector_index(
+                        staging_uuid,
+                        int(clean_meta["dimension"]),
+                    )
+                except Exception:
+                    pass
+            raise PgVectorStoreError(
+                f"pgvector 컬렉션 원자적 교체 실패: {publish_error}"
+            ) from publish_error
+
+        if published_uuid is not None:
+            with self._collection_uuid_lock:
+                self._collection_uuid_cache.pop(staging_name, None)
+                self._collection_uuid_cache[index_id] = published_uuid
+
+        if had_previous_collection:
+            try:
+                cleanup_conn = self._raw_connection()
+                try:
+                    with cleanup_conn.cursor() as cur:
+                        cur.execute(
+                            "DELETE FROM langchain_pg_collection WHERE name = %s;",
+                            (retired_name,),
+                        )
+                    cleanup_conn.commit()
+                finally:
+                    cleanup_conn.close()
+                if retired_uuid is not None:
+                    self._drop_collection_vector_index(
+                        retired_uuid,
+                        retired_dimension,
+                    )
+            except Exception:
+                logger.warning(
+                    "교체된 이전 pgvector 컬렉션 정리 실패: %s",
+                    retired_name,
+                    exc_info=True,
+                )
 
         self.ensure_optimized_indexes()
 
@@ -595,13 +816,18 @@ class PgVectorStore:
                     """
                     UPDATE langchain_pg_embedding
                     SET cmetadata = jsonb_set(
-                        COALESCE(cmetadata, '{}'::jsonb),
-                        '{company_name}',
-                        to_jsonb(%s::text)
-                    )
+                            COALESCE(cmetadata, '{}'::jsonb),
+                            '{company_name}',
+                            to_jsonb(%s::text)
+                        ),
+                        document = regexp_replace(
+                            document,
+                            '^Company:\\s*[^|]*\\|\\s*',
+                            'Company: ' || %s || ' | '
+                        )
                     WHERE collection_id = %s;
                     """,
-                    (company_name, collection_uuid),
+                    (company_name, company_name, collection_uuid),
                 )
 
             conn.commit()
@@ -632,60 +858,46 @@ class PgVectorStore:
                     )
                     if cur.fetchone()[0] > 0:
                         self._drop_invalid_optimized_indexes(cur)
-                        cur.execute(
+                        index_stmts = [
+                            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_id ON langchain_pg_embedding ((cmetadata->>'cell_id'));",
+                            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));",
+                            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));",
+                            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_company_name ON langchain_pg_embedding ((cmetadata->>'company_name'));",
+                            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_sheet_name ON langchain_pg_embedding ((cmetadata->>'sheet_name'));",
                             """
-                            CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_hnsw
+                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_sheet_row
+                            ON langchain_pg_embedding (
+                                (cmetadata->>'sheet_name'),
+                                ((cmetadata->>'row_index')::int)
+                            )
+                            WHERE cmetadata->>'row_index' ~ '^\\d+$';
+                            """,
+                            """
+                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_sheet_legacy_row
+                            ON langchain_pg_embedding (
+                                (cmetadata->>'sheet_name'),
+                                ((substring(cmetadata->>'cell_coord' FROM '([0-9]+)$'))::int)
+                            )
+                            WHERE NOT COALESCE(cmetadata->>'row_index' ~ '^\\d+$', false)
+                              AND cmetadata->>'cell_coord' ~ '[0-9]+$';
+                            """,
+                            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_collection_id ON langchain_pg_embedding (collection_id);",
+                            """
+                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_document_fts
                             ON langchain_pg_embedding
-                            USING hnsw (embedding vector_cosine_ops);
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_id
-                            ON langchain_pg_embedding ((cmetadata->>'cell_id'));
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_cell_coord_upper
-                            ON langchain_pg_embedding ((UPPER(cmetadata->>'cell_coord')));
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_workbook_hash
-                            ON langchain_pg_embedding ((cmetadata->>'workbook_hash'));
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_collection_id
-                            ON langchain_pg_embedding (collection_id);
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_hnsw_halfvec_3072
-                            ON langchain_pg_embedding
-                            USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
-                            WHERE vector_dims(embedding) = 3072;
-                            """
-                        )
-                        cur.execute(
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_hnsw_halfvec_1536
-                            ON langchain_pg_embedding
-                            USING hnsw ((embedding::halfvec(1536)) halfvec_cosine_ops)
-                            WHERE vector_dims(embedding) = 1536;
-                            """
-                        )
-                        cur.execute(
+                            USING gin (to_tsvector('simple', document));
+                            """,
                             """
                             CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
                             ON langchain_pg_embedding
                             USING gin (cmetadata jsonb_path_ops);
-                            """
-                        )
+                            """,
+                        ]
+                        for stmt in index_stmts:
+                            try:
+                                cur.execute(stmt)
+                            except Exception as stmt_err:
+                                logger.debug("Index creation notice: %s (%s)", stmt[:60], stmt_err)
             except Exception as error:
                 logger.warning("pgvector 최적화 인덱스 생성 실패: %s", error)
                 try:
@@ -736,14 +948,32 @@ class PgVectorStore:
             try:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "DELETE FROM langchain_pg_collection WHERE name = %s RETURNING name;",
+                        """
+                        DELETE FROM langchain_pg_collection
+                        WHERE name = %s
+                        RETURNING uuid, cmetadata;
+                        """,
                         (index_id,),
                     )
-                    deleted = cur.fetchone() is not None
+                    deleted_row = cur.fetchone()
                 conn.commit()
-                return deleted
             finally:
                 conn.close()
+            if deleted_row is None:
+                return False
+            with self._collection_uuid_lock:
+                self._collection_uuid_cache.pop(index_id, None)
+            metadata = deleted_row[1] if isinstance(deleted_row[1], dict) else {}
+            dimension = int(metadata.get("dimension") or 3072)
+            try:
+                self._drop_collection_vector_index(str(deleted_row[0]), dimension)
+            except Exception:
+                logger.warning(
+                    "삭제된 컬렉션의 HNSW 인덱스 정리 실패: %s",
+                    index_id,
+                    exc_info=True,
+                )
+            return True
         except Exception:
             return False
 
@@ -759,15 +989,31 @@ class PgVectorStore:
                         """
                         DELETE FROM langchain_pg_collection
                         WHERE cmetadata->>'workbook_hash' = %s
-                        RETURNING name;
+                        RETURNING name, uuid, cmetadata;
                         """,
                         (workbook_hash,),
                     )
                     deleted_rows = cur.fetchall()
                 conn.commit()
-                return len(deleted_rows)
             finally:
                 conn.close()
+            for collection_name, collection_uuid, raw_metadata in deleted_rows:
+                with self._collection_uuid_lock:
+                    self._collection_uuid_cache.pop(str(collection_name), None)
+                metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
+                dimension = int(metadata.get("dimension") or 3072)
+                try:
+                    self._drop_collection_vector_index(
+                        str(collection_uuid),
+                        dimension,
+                    )
+                except Exception:
+                    logger.warning(
+                        "삭제된 컬렉션의 HNSW 인덱스 정리 실패: %s",
+                        collection_name,
+                        exc_info=True,
+                    )
+            return len(deleted_rows)
         except Exception:
             return 0
 
@@ -779,7 +1025,7 @@ class PgVectorStore:
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         limit: int = 5,
     ) -> List[Tuple[float, Dict[str, Any]]]:
-        """Perform similarity search with score (Cosine distance) using halfvec HNSW acceleration."""
+        """Perform similarity search with quantized HNSW candidates and exact reranking."""
         try:
             from .vector_store_factory import LangChainEmbeddingAdapter
             adapter = LangChainEmbeddingAdapter(
@@ -826,14 +1072,17 @@ class PgVectorStore:
         embedding: List[float],
         k: int = 10,
         sheet_names: Optional[List[str]] = None,
+        company_name: Optional[str] = None,
     ) -> List[Tuple[Any, float]]:
         """
-        Search a collection for documents nearest to an embedding vector.
+        Search a collection for documents nearest to an embedding vector with optional company and sheet filters.
         
         Parameters:
             collection_name (str): Name of the collection to search.
             embedding (List[float]): Query embedding vector.
             k (int): Maximum number of results to return.
+            sheet_names (Optional[List[str]]): Specific worksheet names to restrict search scope.
+            company_name (Optional[str]): Company/Entity identifier to restrict search scope.
         
         Returns:
             List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list when the collection does not exist.
@@ -843,41 +1092,83 @@ class PgVectorStore:
         """
         conn = None
         dim = len(embedding) if hasattr(embedding, "__len__") else 0
-        use_halfvec = dim in (1536, 3072)
+        use_quantized_index = 0 < dim <= 64_000
         try:
-            conn = self._raw_connection()
+            collection_uuid = self._collection_uuid(collection_name)
+            if collection_uuid is None:
+                return []
+            conn = self._read_connection()
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
-                    (collection_name,),
-                )
-                row = cur.fetchone()
-                if not row:
-                    return []
-                col_uuid = row[0]
+                # The UUID is canonicalized by _collection_uuid(). Keeping the
+                # value literal lets PostgreSQL prove that the collection-local
+                # partial HNSW predicate matches even after it switches from a
+                # custom to a generic prepared-query plan.
+                where_clauses = [f"collection_id = '{collection_uuid}'::uuid"]
+                params: List[Any] = []
 
-                if use_halfvec:
-                    cur.execute(
-                        f"""
-                        SELECT id, document, cmetadata, ((embedding::halfvec({dim})) <=> %s::halfvec({dim})) AS distance
-                        FROM langchain_pg_embedding
-                        WHERE collection_id = %s AND vector_dims(embedding) = {dim}
-                        ORDER BY (embedding::halfvec({dim})) <=> %s::halfvec({dim})
-                        LIMIT %s;
-                        """,
-                        (embedding, col_uuid, embedding, k),
+                if use_quantized_index:
+                    where_clauses.append(f"vector_dims(embedding) = {dim}")
+
+                if company_name and isinstance(company_name, str) and company_name.strip():
+                    clean_company = company_name.strip()
+                    escaped_company = _escape_like_term(clean_company)
+                    where_clauses.append(
+                        "(cmetadata->>'company_name' ILIKE %s ESCAPE '\\\\' "
+                        "OR cmetadata->>'company_name' = %s)"
                     )
+                    params.extend([f"%{escaped_company}%", clean_company])
+
+                if sheet_names and isinstance(sheet_names, (list, tuple, set)):
+                    valid_sheets = [s.strip() for s in sheet_names if isinstance(s, str) and s.strip()]
+                    if valid_sheets:
+                        where_clauses.append("(cmetadata->>'sheet_name' = ANY(%s))")
+                        params.append(valid_sheets)
+
+                where_sql = " AND ".join(where_clauses)
+
+                if use_quantized_index:
+                    candidate_limit = min(max(k * 20, 100), 1000)
+                    query_sql = f"""
+                        WITH query_vector AS MATERIALIZED (
+                            SELECT %s::vector AS embedding
+                        ), candidates AS MATERIALIZED (
+                            SELECT id, document, cmetadata, source.embedding
+                            FROM langchain_pg_embedding AS source
+                            WHERE {where_sql}
+                            ORDER BY
+                                binary_quantize(source.embedding)::bit({dim})
+                                <~> binary_quantize(
+                                    (SELECT embedding FROM query_vector)
+                                )::bit({dim})
+                            LIMIT %s
+                        )
+                        SELECT id, document, cmetadata,
+                               candidates.embedding <=> query_vector.embedding
+                                   AS distance
+                        FROM candidates
+                        CROSS JOIN query_vector
+                        ORDER BY
+                            candidates.embedding <=> query_vector.embedding
+                        LIMIT %s;
+                    """
+                    full_params = [
+                        embedding,
+                        *params,
+                        candidate_limit,
+                        k,
+                    ]
+                    cur.execute(query_sql, full_params)
                 else:
-                    cur.execute(
-                        """
+                    query_sql = f"""
                         SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
                         FROM langchain_pg_embedding
-                        WHERE collection_id = %s
+                        WHERE {where_sql}
                         ORDER BY embedding <=> %s::vector
                         LIMIT %s;
-                        """,
-                        (embedding, col_uuid, embedding, k),
-                    )
+                    """
+                    full_params = [embedding, *params, embedding, k]
+                    cur.execute(query_sql, full_params)
+
                 rows = cur.fetchall()
 
             from langchain_core.documents import Document
@@ -932,29 +1223,31 @@ class PgVectorStore:
         self,
         cell_identifiers: List[str],
         workbook_hash: Optional[str] = None,
+        company_name: Optional[str] = None,
         collection_name: Optional[str] = None,
         limit: int = 50,
         cell_references: Optional[List[Dict[str, Optional[str]]]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch cell documents matching the provided identifiers, optionally filtered by workbook or collection.
+        Fetch cell documents matching the provided identifiers, optionally filtered by workbook, company, or collection.
         
         Parameters:
             cell_identifiers (List[str]): Cell IDs, coordinates, or strings containing coordinate-like values.
             workbook_hash (Optional[str]): Restricts results to a workbook with this hash.
+            company_name (Optional[str]): Restricts results to this company name.
             collection_name (Optional[str]): Restricts results to this collection.
             limit (int): Maximum number of matching cells to return.
             cell_references (Optional[List[Dict[str, Optional[str]]]]): Structured
-                coordinate filters whose optional ``sheet_name`` is matched together
-                with the coordinate.
+                coordinate filters whose optional ``sheet_name`` and ``company_name``
+                are matched together with the coordinate.
         
         Returns:
             List[Dict[str, Any]]: Normalized cell records containing identifiers, values, headers, source text, and company metadata. Returns an empty list when the input is empty or retrieval fails.
         """
-        if not cell_identifiers or (not workbook_hash and not collection_name):
+        if not cell_identifiers or (not workbook_hash and not collection_name and not company_name):
             if cell_identifiers:
                 logger.warning(
-                    "직접 셀 메타데이터 조회를 거부했습니다: collection_name 또는 workbook_hash가 필요합니다"
+                    "직접 셀 메타데이터 조회를 거부했습니다: collection_name, workbook_hash 또는 company_name이 필요합니다"
                 )
             return []
 
@@ -974,11 +1267,11 @@ class PgVectorStore:
                     row = cur.fetchone()
                     if row:
                         col_uuid = row[0]
-                    elif not workbook_hash:
+                    elif not workbook_hash and not company_name:
                         return []
 
                 # Legacy callers search matching cell IDs or coordinates. Structured
-                # references keep qualified sheet/coordinate pairs together.
+                # references keep qualified company/sheet/coordinate pairs together.
                 extracted_coords = []
                 for cid in clean_ids:
                     parts = cid.replace(":", " ").replace("!", " ").split()
@@ -1003,23 +1296,43 @@ class PgVectorStore:
                     )
                     params.extend([clean_ids, all_search_targets, all_search_targets])
                 else:
-                    qualified_sheets: List[str] = []
-                    qualified_coords: List[str] = []
+                    triple_companies: List[str] = []
+                    triple_sheets: List[str] = []
+                    triple_coords: List[str] = []
+
+                    sheet_pair_sheets: List[str] = []
+                    sheet_pair_coords: List[str] = []
+
+                    company_pair_companies: List[str] = []
+                    company_pair_coords: List[str] = []
+
                     unqualified_coords: List[str] = []
+
                     for reference in cell_references:
-                        coord = str(reference.get("cell_coord") or "").strip().upper()
+                        coord = (reference.get("cell_coord") or "").strip().upper()
                         if not coord:
                             continue
-                        sheet_name = str(reference.get("sheet_name") or "").strip()
-                        if sheet_name:
-                            qualified_sheets.append(sheet_name.upper())
-                            qualified_coords.append(coord)
+                        ref_sheet = (reference.get("sheet_name") or "").strip()
+                        ref_company = (reference.get("company_name") or "").strip()
+
+                        if ref_company and ref_sheet:
+                            triple_companies.append(ref_company.upper())
+                            triple_sheets.append(ref_sheet.upper())
+                            triple_coords.append(coord)
+                        elif ref_sheet:
+                            sheet_pair_sheets.append(ref_sheet.upper())
+                            sheet_pair_coords.append(coord)
+                        elif ref_company:
+                            company_pair_companies.append(ref_company.upper())
+                            company_pair_coords.append(coord)
                         else:
                             unqualified_coords.append(coord)
+
                     if unqualified_coords:
                         where_clauses.append("UPPER(cmetadata->>'cell_coord') = ANY(%s)")
                         params.append(list(dict.fromkeys(unqualified_coords)))
-                    if qualified_coords:
+
+                    if sheet_pair_coords:
                         where_clauses.append(
                             """EXISTS (
                                 SELECT 1
@@ -1029,7 +1342,33 @@ class PgVectorStore:
                                   AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
                             )"""
                         )
-                        params.extend([qualified_sheets, qualified_coords])
+                        params.extend([sheet_pair_sheets, sheet_pair_coords])
+
+                    if company_pair_coords:
+                        where_clauses.append(
+                            """EXISTS (
+                                SELECT 1
+                                FROM unnest(%s::text[], %s::text[])
+                                    AS reference(company_name, cell_coord)
+                                WHERE UPPER(COALESCE(cmetadata->>'company_name', '')) = reference.company_name
+                                  AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
+                            )"""
+                        )
+                        params.extend([company_pair_companies, company_pair_coords])
+
+                    if triple_coords:
+                        where_clauses.append(
+                            """EXISTS (
+                                SELECT 1
+                                FROM unnest(%s::text[], %s::text[], %s::text[])
+                                    AS reference(company_name, sheet_name, cell_coord)
+                                WHERE UPPER(COALESCE(cmetadata->>'company_name', '')) = reference.company_name
+                                  AND UPPER(cmetadata->>'sheet_name') = reference.sheet_name
+                                  AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
+                            )"""
+                        )
+                        params.extend([triple_companies, triple_sheets, triple_coords])
+
                     if not where_clauses:
                         return []
 
@@ -1048,6 +1387,7 @@ class PgVectorStore:
                         cmetadata->>'company_name' AS company_name,
                         ROW_NUMBER() OVER (
                             PARTITION BY
+                                UPPER(COALESCE(cmetadata->>'company_name', '')),
                                 UPPER(cmetadata->>'sheet_name'),
                                 UPPER(cmetadata->>'cell_coord')
                             ORDER BY
@@ -1071,6 +1411,10 @@ class PgVectorStore:
                 elif workbook_hash:
                     query += " AND cmetadata->>'workbook_hash' = %s"
                     params.append(workbook_hash)
+
+                if company_name and company_name.strip():
+                    query += " AND UPPER(cmetadata->>'company_name') = %s"
+                    params.append(company_name.strip().upper())
 
                 query += """
                     )
@@ -1127,3 +1471,201 @@ class PgVectorStore:
                 "source_text": text,
             })
         return results
+
+    def fetch_adjacent_row_cells(
+        self,
+        collection_name: Optional[str] = None,
+        workbook_hash: Optional[str] = None,
+        sheet_name: Optional[str] = None,
+        row_index: Optional[int] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Fetch all cells on a given row index within a sheet and collection for horizontal timeseries expansion."""
+        if not (collection_name or workbook_hash) or row_index is None:
+            return []
+        return self.fetch_rows_cells(
+            collection_name=collection_name,
+            workbook_hash=workbook_hash,
+            sheet_name=sheet_name,
+            row_indices=[row_index],
+            limit_per_row=limit,
+        ).get(row_index, [])
+
+    def fetch_rows_cells(
+        self,
+        collection_name: Optional[str],
+        workbook_hash: Optional[str],
+        sheet_name: Optional[str],
+        row_indices: List[int],
+        limit_per_row: int = 50,
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """Fetch several rows in one SQL round trip, bounded per requested row."""
+        unique_rows = sorted({row for row in row_indices if row > 0})
+        if not unique_rows or not (collection_name or workbook_hash):
+            return {}
+        conn = self._read_connection()
+        try:
+            with conn.cursor() as cur:
+                if collection_name:
+                    collection_names = [
+                        name.strip()
+                        for name in collection_name.split(",")
+                        if name.strip()
+                    ]
+                else:
+                    collection_names = []
+
+                scope_clauses: List[str] = []
+                scope_params: List[Any] = []
+                cte_params: List[Any] = []
+                if collection_names:
+                    collection_cte_sql = (
+                        "target_collections AS ("
+                        "SELECT uuid FROM langchain_pg_collection WHERE name = ANY(%s)"
+                        "),"
+                    )
+                    cte_params.append(collection_names)
+                    scope_clauses.append(
+                        "collection_id IN (SELECT uuid FROM target_collections)"
+                    )
+                else:
+                    collection_cte_sql = ""
+                if workbook_hash and not collection_names:
+                    workbook_hashes = [
+                        value.strip()
+                        for value in workbook_hash.split(",")
+                        if value.strip()
+                    ]
+                    scope_clauses.append("cmetadata->>'workbook_hash' = ANY(%s)")
+                    scope_params.append(workbook_hashes)
+                if sheet_name:
+                    scope_clauses.append("cmetadata->>'sheet_name' = %s")
+                    scope_params.append(sheet_name)
+
+                scope_sql = (
+                    " AND " + " AND ".join(scope_clauses)
+                    if scope_clauses
+                    else ""
+                )
+
+                query_sql = f"""
+                    WITH {collection_cte_sql}
+                    requested_rows AS (
+                        SELECT unnest(%s::int[]) AS row_index
+                    )
+                    SELECT candidate.id,
+                           candidate.document,
+                           candidate.cmetadata,
+                           candidate.resolved_row_index,
+                           candidate.resolved_col_index
+                    FROM requested_rows
+                    CROSS JOIN LATERAL (
+                        SELECT DISTINCT ON (logical_cell_id)
+                               id,
+                               document,
+                               cmetadata,
+                               resolved_row_index,
+                               resolved_col_index,
+                               logical_cell_id
+                        FROM (
+                            SELECT
+                                id,
+                                document,
+                                cmetadata,
+                                (cmetadata->>'row_index')::int
+                                    AS resolved_row_index,
+                                CASE
+                                    WHEN cmetadata->>'col_index' ~ '^\\d+$'
+                                        THEN (cmetadata->>'col_index')::int
+                                    ELSE NULL
+                                END AS resolved_col_index,
+                                COALESCE(
+                                    NULLIF(cmetadata->>'cell_id', ''),
+                                    NULLIF(cmetadata->>'cell_coord', ''),
+                                    id
+                                ) AS logical_cell_id
+                            FROM langchain_pg_embedding
+                            WHERE cmetadata->>'row_index' ~ '^\\d+$'
+                              AND (cmetadata->>'row_index')::int
+                                  = requested_rows.row_index
+                              {scope_sql}
+                            UNION ALL
+                            SELECT
+                                id,
+                                document,
+                                cmetadata,
+                                substring(
+                                    cmetadata->>'cell_coord' FROM '([0-9]+)$'
+                                )::int AS resolved_row_index,
+                                NULL::int AS resolved_col_index,
+                                COALESCE(
+                                    NULLIF(cmetadata->>'cell_id', ''),
+                                    NULLIF(cmetadata->>'cell_coord', ''),
+                                    id
+                                ) AS logical_cell_id
+                            FROM langchain_pg_embedding
+                            WHERE NOT COALESCE(
+                                    cmetadata->>'row_index' ~ '^\\d+$',
+                                    false
+                                )
+                              AND cmetadata->>'cell_coord' ~ '[0-9]+$'
+                              AND substring(
+                                    cmetadata->>'cell_coord' FROM '([0-9]+)$'
+                                  )::int = requested_rows.row_index
+                              {scope_sql}
+                        ) AS matched_cells
+                        ORDER BY logical_cell_id,
+                                 resolved_col_index ASC NULLS LAST,
+                                 id
+                        LIMIT %s
+                    ) AS candidate
+                    ORDER BY candidate.resolved_row_index,
+                             candidate.resolved_col_index ASC NULLS LAST,
+                             candidate.logical_cell_id;
+                """
+                params = [
+                    *cte_params,
+                    unique_rows,
+                    *scope_params,
+                    *scope_params,
+                    max(1, limit_per_row),
+                ]
+                cur.execute(query_sql, tuple(params))
+                results: Dict[int, List[Dict[str, Any]]] = {}
+                for cid, doc, meta, resolved_row, resolved_col in cur.fetchall():
+                    cmetadata = meta if isinstance(meta, dict) else {}
+                    results.setdefault(int(resolved_row), []).append(
+                        {
+                            "cell_id": cid or cmetadata.get("cell_id", ""),
+                            "cell_coord": cmetadata.get("cell_coord", ""),
+                            "cell_value": cmetadata.get("cell_value", ""),
+                            "sheet_name": cmetadata.get("sheet_name", ""),
+                            "row_header": cmetadata.get("row_header", []),
+                            "column_header": cmetadata.get("column_header", []),
+                            "row_index": resolved_row,
+                            "col_index": resolved_col,
+                            "source_text": doc or "",
+                        }
+                    )
+                return results
+        except Exception as err:
+            logger.warning("fetch_rows_cells 실패: %s", err)
+            return {}
+        finally:
+            conn.close()
+
+    def list_registered_collections(self) -> List[Dict[str, Any]]:
+        """List all indexed pgvector collections and metadata."""
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT uuid, name, cmetadata FROM langchain_pg_collection ORDER BY name ASC;")
+                return [
+                    {"uuid": str(row[0]), "name": str(row[1]), "cmetadata": row[2] if isinstance(row[2], dict) else {}}
+                    for row in cur.fetchall()
+                ]
+        except Exception as err:
+            logger.warning(f"list_registered_collections 실패: {err}")
+            return []
+        finally:
+            conn.close()

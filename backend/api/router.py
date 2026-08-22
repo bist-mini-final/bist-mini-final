@@ -10,16 +10,16 @@ from backend.core.settings import (
     PLAYGROUND_MAX_CONCURRENCY,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
-    VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
+from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
+from backend.engine.runtime.registry import ModuleRegistry
+from backend.engine.runtime.services import create_workflow_runtime_services
+from backend.engine.workflows import InteractiveWorkflowDispatcher
 from backend.providers.embeddings.factory import EmbeddingEncoder
 from backend.providers.llm.chat_completion import ChatCompletionClient
 from backend.storage.answer_cache import AnswerCacheRepository
-from backend.engine.runtime.services import create_workflow_runtime_services
-from backend.engine.runtime.registry import ModuleRegistry
-from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.workflows import InteractiveWorkflowDispatcher
+
 from .benchmark_routes import create_benchmark_router
 from .data_source_routes import create_data_source_router
 from .module_routes import create_module_router

@@ -6,7 +6,6 @@ import openpyxl
 
 from .cell_visibility import worksheet_visible
 
-
 SUPPORTED_WORKBOOK_SUFFIXES = {".xlsx", ".xlsm"}
 SKIP_SHEET_PREFIXES = (
     "__snloffice",

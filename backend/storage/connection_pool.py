@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from typing import Any, Optional
 
 import psycopg2
@@ -56,6 +57,11 @@ def get_pool(database_url: str) -> psycopg2.pool.ThreadedConnectionPool:
                     _MAX_CONN,
                     normalized,
                     connect_timeout=10,
+                    options=(
+                        "-c hnsw.iterative_scan=strict_order "
+                        "-c hnsw.max_scan_tuples=20000 "
+                        "-c hnsw.ef_search=40"
+                    ),
                 )
                 _pool_url = normalized
                 logger.info(
@@ -86,6 +92,22 @@ class PooledConnectionWrapper:
         if self._closed:
             return
         try:
+            try:
+                if (
+                    self._conn.get_transaction_status()
+                    != psycopg2.extensions.TRANSACTION_STATUS_IDLE
+                ):
+                    self._conn.rollback()
+            except Exception as error:
+                logger.error(
+                    "커넥션 트랜잭션 복구 실패로 풀에 반환하지 않고 직접 닫습니다: %s",
+                    error,
+                )
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+                return
             try:
                 if getattr(self._conn, "autocommit", False):
                     self._conn.autocommit = False
@@ -144,7 +166,6 @@ def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) 
     
     If the pool is temporarily exhausted, waits up to timeout_seconds with exponential/short backoff.
     """
-    import time
     pool = get_pool(database_url)
     deadline = time.time() + timeout_seconds
     while True:

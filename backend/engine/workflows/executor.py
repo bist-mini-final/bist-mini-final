@@ -1,17 +1,20 @@
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from threading import Lock, RLock
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
 from uuid import uuid4
 
 from pydantic import ValidationError
 
+from backend.core.telemetry import trace_node_execution
 from backend.engine.runtime.registry_base import BaseModuleRegistry
 from backend.engine.runtime.worker import (
     CancellableModuleWorker,
     ModuleWorkerCancelled,
 )
 from modules.common.base_module import ModuleExecutionError
+
+from .history import compact_history_value
 from .models import (
     RunBatchState,
     RunNodeState,
@@ -23,9 +26,7 @@ from .models import (
     WorkflowRun,
     utc_now_iso,
 )
-from .history import compact_history_value
 from .store import ResultCache, RunStore
-
 
 logger = logging.getLogger(__name__)
 
@@ -102,11 +103,13 @@ class WorkflowExecutor:
                 )
             node_by_id[node.id] = node
 
+        import networkx as nx
+
         edge_ids: Set[str] = set()
         occupied_inputs: Dict[Tuple[str, str], List[WorkflowEdge]] = defaultdict(list)
-        dependencies: Set[Tuple[str, str]] = set()
-        indegree = {node.id: 0 for node in graph.nodes}
-        outgoing: Dict[str, List[str]] = defaultdict(list)
+        graph_dag = nx.DiGraph()
+        for node in graph.nodes:
+            graph_dag.add_node(node.id)
 
         for edge in graph.edges:
             if edge.id in edge_ids:
@@ -135,33 +138,21 @@ class WorkflowExecutor:
                         f"노드 {edge.target}의 입력 {target_input}에 호환되지 않는 여러 연결이 들어옵니다"
                     )
             alternatives.append(edge)
+            graph_dag.add_edge(edge.source, edge.target)
 
-            dependency = (edge.source, edge.target)
-            if dependency not in dependencies:
-                dependencies.add(dependency)
-                indegree[edge.target] += 1
-                outgoing[edge.source].append(edge.target)
+        if not nx.is_directed_acyclic_graph(graph_dag):
+            try:
+                cycle = nx.find_cycle(graph_dag, orientation="original")
+                cycle_str = " -> ".join([u for u, v, _ in cycle] + [cycle[0][0]])
+                raise DagExecutionError(f"순환 연결이 감지되었습니다: {cycle_str}")
+            except DagExecutionError:
+                raise
+            except Exception:
+                raise DagExecutionError("순환 연결이 감지되었습니다")
 
-        remaining = dict(indegree)
-        current = [node.id for node in graph.nodes if remaining[node.id] == 0]
-        batches: List[List[str]] = []
-        visited = 0
-        while current:
-            batches.append(current)
-            visited += len(current)
-            next_nodes: List[str] = []
-            for node_id in current:
-                for target_id in outgoing[node_id]:
-                    remaining[target_id] -= 1
-                    if remaining[target_id] == 0:
-                        next_nodes.append(target_id)
-            current = next_nodes
-
-        if visited != len(graph.nodes):
-            cycle_nodes = [node_id for node_id, count in remaining.items() if count > 0]
-            raise DagExecutionError(
-                "순환 연결이 감지되었습니다: " + ", ".join(cycle_nodes)
-            )
+        batches: List[List[str]] = [
+            list(generation) for generation in nx.topological_generations(graph_dag)
+        ]
         return batches
 
     def create_run(
@@ -308,6 +299,100 @@ class WorkflowExecutor:
     def execute_next_batch(self, run_id: str) -> WorkflowRun:
         with self._execution_lock:
             return self._run_cancellable(run_id, self._execute_next_batch)
+
+    async def execute_and_stream(self, run_id: str):
+        """Asynchronously execute remaining batches in the DAG and yield live event dicts."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+
+        self._raise_if_cancelled(run_id)
+        run = self.run_store.load(run_id)
+        yield {
+            "event": "run_started",
+            "data": {
+                "run_id": run.id,
+                "workflow_id": run.workflow_id,
+                "status": run.status,
+                "batches_count": len(run.batches),
+                "nodes_count": len(run.nodes),
+            },
+        }
+
+        while run.status in ("queued", "running", "paused"):
+            self._raise_if_cancelled(run_id)
+            next_batch = next(
+                (
+                    b
+                    for b in run.batches
+                    if b.status not in ("succeeded", "skipped")
+                ),
+                None,
+            )
+            if next_batch is None:
+                break
+
+            yield {
+                "event": "batch_started",
+                "data": {
+                    "batch_index": next_batch.index,
+                    "node_ids": next_batch.node_ids,
+                },
+            }
+
+            def _step():
+                return self.execute_next_batch(run_id)
+
+            try:
+                run = await loop.run_in_executor(None, _step)
+            except Exception as exc:
+                yield {
+                    "event": "error",
+                    "data": {"error": str(exc), "run_id": run_id},
+                }
+                raise
+
+            for node_id in next_batch.node_ids:
+                node_state = run.nodes.get(node_id)
+                if node_state:
+                    yield {
+                        "event": (
+                            "node_completed"
+                            if node_state.status in ("succeeded", "skipped")
+                            else "node_failed"
+                        ),
+                        "data": {
+                            "node_id": node_id,
+                            "module_type": node_state.module_type,
+                            "status": node_state.status,
+                            "cache_hit": node_state.cache_hit,
+                            "elapsed_ms": node_state.elapsed_ms,
+                            "cost_usd": node_state.cost_usd,
+                            "usage": node_state.usage,
+                            "output": node_state.output,
+                            "error": node_state.error,
+                        },
+                    }
+
+            yield {
+                "event": "batch_completed",
+                "data": {
+                    "batch_index": next_batch.index,
+                    "status": next_batch.status,
+                },
+            }
+
+            if run.status in ("completed", "failed"):
+                break
+
+        yield {
+            "event": "run_completed",
+            "data": {
+                "run_id": run.id,
+                "status": run.status,
+                "run": run.model_dump(mode="json"),
+            },
+        }
 
     def execute_node(self, run_id: str, node_id: str) -> WorkflowRun:
         """Execute exactly one requested node and invalidate only its descendants."""
@@ -570,27 +655,15 @@ class WorkflowExecutor:
 
     @staticmethod
     def _descendant_node_ids(run: WorkflowRun, node_id: str) -> Set[str]:
-        """Return the identifiers of all nodes downstream from the specified node.
-        
-        Parameters:
-        	run (WorkflowRun): The workflow run containing the graph.
-        	node_id (str): The identifier of the starting node.
-        
-        Returns:
-        	Set[str]: The identifiers of all reachable downstream nodes.
-        """
-        outgoing: Dict[str, List[str]] = defaultdict(list)
+        """Return the identifiers of all nodes downstream from the specified node using networkx."""
+        import networkx as nx
+
+        graph_dag = nx.DiGraph()
         for edge in run.graph.edges:
-            outgoing[edge.source].append(edge.target)
-        descendants: Set[str] = set()
-        pending = list(outgoing[node_id])
-        while pending:
-            candidate = pending.pop()
-            if candidate in descendants:
-                continue
-            descendants.add(candidate)
-            pending.extend(outgoing[candidate])
-        return descendants
+            graph_dag.add_edge(edge.source, edge.target)
+        if node_id in graph_dag:
+            return set(nx.descendants(graph_dag, node_id))
+        return set()
 
     @staticmethod
     def _refresh_run_status(run: WorkflowRun) -> None:
@@ -721,6 +794,7 @@ class WorkflowExecutor:
         )
 
         import time
+
         from backend.providers.llm.cost import calculate_openai_cost
 
         t_start = time.perf_counter()
@@ -781,24 +855,31 @@ class WorkflowExecutor:
             state.cache_hit = output is not None
         if output is None:
             self._raise_if_cancelled(run.id)
-            if self._module_worker is None:
-                module.set_progress_callback(persist_progress)
-                try:
-                    output = self.module_registry.execute(
+            with trace_node_execution(
+                run.workflow_id,
+                run.id,
+                node.id,
+                node.module_type,
+                state.batch_index,
+            ) as _span:
+                if self._module_worker is None:
+                    module.set_progress_callback(persist_progress)
+                    try:
+                        output = self.module_registry.execute(
+                            node.module_type,
+                            input_payload,
+                            validated_config,
+                        )
+                    finally:
+                        module.set_progress_callback(None)
+                else:
+                    output = self._module_worker.execute(
                         node.module_type,
                         input_payload,
                         validated_config,
+                        run.id,
+                        progress_callback=persist_progress,
                     )
-                finally:
-                    module.set_progress_callback(None)
-            else:
-                output = self._module_worker.execute(
-                    node.module_type,
-                    input_payload,
-                    validated_config,
-                    run.id,
-                    progress_callback=persist_progress,
-                )
             self._raise_if_cancelled(run.id)
             if cache_enabled:
                 self.result_cache.put(cache_key, output)

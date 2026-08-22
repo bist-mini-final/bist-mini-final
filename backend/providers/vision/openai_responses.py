@@ -156,7 +156,7 @@ class OpenAIResponsesVisionClient:
                 raise OpenAIResponsesVisionError(
                     f"OpenAI Responses API가 HTTP {error.code}를 반환했습니다{detail}"
                 ) from error
-            except (URLError, TimeoutError, OSError, ValueError) as error:
+            except (URLError, TimeoutError, OSError, ValueError):
                 if attempt < retries - 1:
                     time.sleep(1.0 * (2 ** attempt))
                     continue

@@ -3,11 +3,9 @@ from typing import Callable, Type
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
-from pydantic import ValidationError
 
-from backend.tools.documentation.module_docs import render_module_markdown
-from modules.common.base_module import ModuleExecutionError
 from backend.engine.runtime.registry import ModuleRegistry
+from backend.tools.documentation.module_docs import render_module_markdown
 
 
 def _execution_handler(
@@ -18,19 +16,11 @@ def _execution_handler(
     """Build a statically typed FastAPI handler for one dynamic module class."""
 
     def execute_module(request):
-        try:
-            return module_registry.execute(
-                module_type,
-                request.input,
-                request.config,
-            )
-        except ValidationError as error:
-            raise HTTPException(
-                status_code=422,
-                detail=error.errors(include_url=False),
-            ) from error
-        except ModuleExecutionError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+        return module_registry.execute(
+            module_type,
+            request.input,
+            request.config,
+        )
 
     execute_module.__name__ = f"execute_{module_type}"
     execute_module.__doc__ = (

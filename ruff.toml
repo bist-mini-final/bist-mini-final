@@ -1,0 +1,20 @@
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  ".venv",
+  "backend/infrastructure",
+]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "PERF", "RUF"]
+ignore = [
+  "B008",   # FastAPI/Pydantic declarations intentionally call factories.
+  "B904",   # The module boundary centrally wraps untyped third-party errors.
+  "RUF012", # Pydantic models intentionally declare mutable-looking class fields.
+  "RUF022", # Public export order is grouped by module domain for readability.
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["B017"]
+"backend/core/config.py" = ["F403", "F401"]
+"backend/storage/db_manager.py" = ["PERF401"]

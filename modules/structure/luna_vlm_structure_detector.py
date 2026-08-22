@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import itertools
 import json
 import logging
-import concurrent.futures
 from pathlib import Path
-from typing import Optional, Any, Dict, List, Literal, Optional, Protocol, Tuple, cast
-
-logger = logging.getLogger(__name__)
+from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple
 
 import openpyxl
-from pydantic import BaseModel, Field, model_validator
+from openpyxl.utils.cell import range_boundaries
+from pydantic import Field, model_validator
 
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.providers.vision.openai_responses import (
@@ -19,19 +19,22 @@ from backend.providers.vision.openai_responses import (
     OpenAIResponsesVisionError,
     OpenAIResponsesVisionResult,
 )
-from backend.storage.spreadsheets.cell_semantics import collect_non_empty_cells, compact_sheet_context
+from backend.storage.spreadsheets.cell_semantics import (
+    collect_non_empty_cells,
+    compact_sheet_context,
+)
 from backend.storage.spreadsheets.cell_type_overlay import render_cell_type_overlay
 from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
+from backend.storage.spreadsheets.grid_structure import build_column_header_tree
 from backend.storage.spreadsheets.prompt_guidance import (
     LEGACY_TEXT_CELL_ROLE_GUIDANCE,
     TABLE_UNIFICATION_GUIDANCE,
     TEXT_CELL_ROLE_GUIDANCE,
 )
-from backend.storage.spreadsheets.grid_structure import build_column_header_tree
 from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
 from backend.storage.spreadsheets.table_fragment_merge import parse_excel_range
 from backend.storage.spreadsheets.table_geometry import CellBounds, SheetLayout, cell_bounds_bbox
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
+from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import (
     BaseModule,
     ModuleConfigDTO,
@@ -40,10 +43,74 @@ from modules.common.base_module import (
     ModuleExecutionError,
     ModuleTaskPolicy,
 )
-from modules.structure.docling_table_detector import _safe_name
+from modules.common.config import (
+    DEFAULT_STRUCTURE_MAX_COLUMNS,
+    DEFAULT_STRUCTURE_MAX_CONTEXT_CELLS,
+    DEFAULT_STRUCTURE_MAX_OUTPUT_TOKENS,
+    DEFAULT_STRUCTURE_MAX_ROWS,
+    DEFAULT_VLM_MODEL,
+    DEFAULT_VLM_REASONING_EFFORT,
+    DEFAULT_VLM_TIMEOUT_SECONDS,
+)
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
-from modules.structure.spreadsheet_structure import SpreadsheetStructureOutput
-from openpyxl.utils.cell import range_boundaries
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_name(value: str) -> str:
+    return "".join("_" if character in '\\/*?:\"<>| ' else character for character in value).strip("_")
+
+
+# ==============================================================================
+# 2. Structure DTOs & Item Models
+# ==============================================================================
+class ColumnHeaderNodeDTO(ModuleDTO):
+    """One coordinate-backed node in a worksheet column-header hierarchy."""
+
+    name: str
+    col_start: int
+    col_end: int
+    row_start: int
+    row_end: int
+    children: List["ColumnHeaderNodeDTO"] = Field(default_factory=list)
+
+
+class ClassifiedRegionDTO(ModuleDTO):
+    region_id: str
+    type: Literal["title", "column_header", "row_header", "data"]
+    excel_range: str
+    bbox_px: Tuple[float, float, float, float]
+    rows: Tuple[int, int]
+    columns: Tuple[int, int]
+    parent_ids: List[str]
+
+
+class ClassifiedTableDTO(ModuleDTO):
+    sheet_name: str
+    table_index: int
+    excel_range: str
+    regions: List[ClassifiedRegionDTO]
+    header_tree: List[ColumnHeaderNodeDTO] = Field(default_factory=list)
+
+
+class SpreadsheetStructureOutput(ModuleDTO):
+    """Shared output contract accepted directly by the cell serializer."""
+
+    file_name: str
+    workbook_hash: str
+    company_name: Optional[str] = Field(
+        default=None,
+        description="알려진 경우 직렬화 문서에 포함할 공식 기업명",
+    )
+    sheet_names: List[str] = Field(
+        default_factory=list,
+        description="구조 분석 대상으로 선택된 표시 시트명",
+    )
+    tables: List[ClassifiedTableDTO]
+    failed_sheets: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="분석하지 못한 시트명과 실패 사유",
+    )
 
 
 LUNA_VLM_SYSTEM_PROMPT = f"""You identify every table and its internal regions in an Excel worksheet.
@@ -126,15 +193,6 @@ class LunaVlmStructureDetectorInputDTO(WorkbookSelectionDTO):
     """Workbook identity and visible sheet selection."""
 
 
-from modules.common.config import (
-    DEFAULT_STRUCTURE_MAX_COLUMNS,
-    DEFAULT_STRUCTURE_MAX_OUTPUT_TOKENS,
-    DEFAULT_STRUCTURE_MAX_ROWS,
-    DEFAULT_VLM_MODEL,
-    DEFAULT_VLM_TIMEOUT_SECONDS,
-)
-
-
 class LunaVlmStructureDetectorConfigDTO(ModuleConfigDTO):
     model: str = Field(
         default=DEFAULT_VLM_MODEL,
@@ -154,13 +212,13 @@ class LunaVlmStructureDetectorConfigDTO(ModuleConfigDTO):
         description="시트에서 분석할 최대 열 수",
     )
     max_context_cells: int = Field(
-        default=50000,
+        default=DEFAULT_STRUCTURE_MAX_CONTEXT_CELLS,
         ge=100,
         le=100000,
         description="한 시트에서 좌표 컨텍스트로 전달할 최대 값 셀 수",
     )
     reasoning_effort: Literal["none", "low", "medium", "high"] = Field(
-        default="low",
+        default=DEFAULT_VLM_REASONING_EFFORT,
         description="Luna 추론 강도",
     )
     max_output_tokens: int = Field(
@@ -322,7 +380,17 @@ def unify_sheet_tables(
         for item in parsed_tables
     )
 
-    if all_same_columns:
+    ordered_tables = sorted(parsed_tables, key=lambda item: item[1].min_row)
+    vertically_contiguous = all(
+        current[1].max_row < following[1].min_row
+        and following[1].min_row - current[1].max_row <= 2
+        for current, following in itertools.pairwise(ordered_tables)
+    )
+    continuation_sections = all(
+        item[3] is None and item[4] is None for item in ordered_tables[1:]
+    )
+
+    if all_same_columns and vertically_contiguous and continuation_sections:
         primary_header = next(
             (item[3] for item in parsed_tables if item[3] is not None),
             None,
@@ -423,7 +491,6 @@ class LunaVlmStructureDetectorModule(BaseModule):
     )
     input_model = LunaVlmStructureDetectorInputDTO
     config_model = LunaVlmStructureDetectorConfigDTO
-    execution_model = LunaVlmStructureDetectorExecutionDTO
     output_model = LunaVlmStructureDetectorOutput
 
     def __init__(
@@ -464,15 +531,17 @@ class LunaVlmStructureDetectorModule(BaseModule):
         layout,
         visibility: WorksheetVisibility,
     ) -> Dict[str, CellBounds | None]:
-        named = {
+        named: Dict[str, Optional[CellBounds]] = {
             "excel_range": _bounds(table.excel_range, "excel_range"),
             "title_range": _bounds(table.title_range, "title_range") if table.title_range else None,
             "column_header_range": _bounds(table.column_header_range, "column_header_range") if table.column_header_range else None,
             "row_header_range": _bounds(table.row_header_range, "row_header_range") if table.row_header_range else None,
             "data_range": _bounds(table.data_range, "data_range"),
         }
-        whole = cast(CellBounds, named["excel_range"])
-        data = cast(CellBounds, named["data_range"])
+        whole = named["excel_range"]
+        data = named["data_range"]
+        if whole is None or data is None:
+            raise ModuleExecutionError("VLM excel_range 또는 data_range가 누락되었습니다")
         sheet = CellBounds(1, layout.max_row, 1, layout.max_column)
         if not _contains(sheet, whole):
             raise ModuleExecutionError(f"VLM 테이블 범위가 분석 시트를 벗어났습니다: {whole.excel_range}")
@@ -489,11 +558,9 @@ class LunaVlmStructureDetectorModule(BaseModule):
             )
             for field_name, bounds in named.items()
         }
-        whole = cast(CellBounds, named["excel_range"])
-        data = cast(CellBounds, named["data_range"])
-        title = cast(Optional[CellBounds], named["title_range"])
-        column_header = cast(Optional[CellBounds], named["column_header_range"])
-        row_header = cast(Optional[CellBounds], named["row_header_range"])
+        title = named["title_range"]
+        column_header = named["column_header_range"]
+        row_header = named["row_header_range"]
 
         if title and column_header:
             if title.max_row >= column_header.min_row:
@@ -617,8 +684,10 @@ class LunaVlmStructureDetectorModule(BaseModule):
     ) -> Dict[str, Any]:
         visibility = WorksheetVisibility.from_worksheet(worksheet)
         named = self._validate_table(table, layout, visibility)
-        whole = cast(CellBounds, named["excel_range"])
-        data = cast(CellBounds, named["data_range"])
+        whole = named["excel_range"]
+        data = named["data_range"]
+        if whole is None or data is None:
+            raise ModuleExecutionError("VLM excel_range 또는 data_range가 누락되었습니다")
         prefix = f"table_{table_index}"
         regions: List[Dict[str, Any]] = []
         parents: List[str] = []
@@ -627,21 +696,21 @@ class LunaVlmStructureDetectorModule(BaseModule):
             ("title_range", "title"),
             ("column_header_range", "column_header"),
         ):
-            bounds = cast(Optional[CellBounds], named[key])
+            bounds = named.get(key)
             if bounds is None:
                 continue
             region_id = f"{prefix}_{region_type}"
             regions.append(self._region(region_id, region_type, bounds, layout, list(parents)))
             parents.append(region_id)
 
-        row_header = cast(Optional[CellBounds], named["row_header_range"])
+        row_header = named.get("row_header_range")
         if row_header is not None:
             row_header_id = f"{prefix}_row_header"
             regions.append(self._region(row_header_id, "row_header", row_header, layout, list(parents)))
             parents.append(row_header_id)
         regions.append(self._region(f"{prefix}_data", "data", data, layout, list(parents)))
 
-        column_header = cast(Optional[CellBounds], named["column_header_range"])
+        column_header = named.get("column_header_range")
         return {
             "sheet_name": worksheet.title,
             "table_index": table_index,
@@ -658,7 +727,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
 
     def _analyze_sheet(
         self,
-        settings: LunaVlmStructureDetectorExecutionDTO,
+        settings: LunaVlmStructureDetectorConfigDTO,
         sheet_name: str,
         sheet_bounds: CellBounds,
         image_path: Path,
@@ -705,7 +774,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                 previous_response = (
                     response.content
                     if isinstance(response, OpenAIResponsesVisionResult)
-                    else str(response)
+                    else response
                 )
                 decision = LunaSheetDecisionDTO.model_validate_json(previous_response)
                 unified_tables = unify_sheet_tables(decision.tables)
@@ -743,20 +812,10 @@ class LunaVlmStructureDetectorModule(BaseModule):
         Raises:
         	ModuleExecutionError: If the workbook cannot be resolved, has changed since selection, no sheets can be analyzed, or all sheet analyses fail.
         """
-        if isinstance(input_data, LunaVlmStructureDetectorExecutionDTO):
-            settings = input_data
-        else:
-            cfg = config or LunaVlmStructureDetectorConfigDTO()
-            settings = LunaVlmStructureDetectorExecutionDTO(
-                **input_data.model_dump(),
-                **cfg.model_dump(),
-            )
-        try:
-            workbook_path = self.catalog.resolve(settings.file_name)
-            current_hash = self.catalog.sha256(workbook_path)
-        except (OSError, ValueError, WorkbookCatalogError) as error:
-            raise ModuleExecutionError(str(error)) from error
-        if current_hash != settings.workbook_hash:
+        cfg = config or LunaVlmStructureDetectorConfigDTO()
+        workbook_path = self.catalog.resolve(input_data.file_name)
+        current_hash = self.catalog.sha256(workbook_path)
+        if current_hash != input_data.workbook_hash:
             raise ModuleExecutionError("선택 이후 Excel 파일이 변경되었습니다. 파일 선택 모듈을 다시 실행하세요")
 
         formula_workbook = None
@@ -775,7 +834,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
 
             # Phase 1: Render and extract geometry on the main thread (openpyxl is not thread-safe)
             prepared_sheets: List[Dict[str, Any]] = []
-            for sheet_name in settings.sheet_names:
+            for sheet_name in input_data.sheet_names:
                 if sheet_name not in formula_workbook.sheetnames:
                     logger.warning("[Luna VLM] Excel 시트를 찾을 수 없어 건너뜁니다: %s", sheet_name)
                     failed_sheets.append({"sheet_name": sheet_name, "error": "시트를 찾을 수 없습니다"})
@@ -794,56 +853,39 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     layout = self.renderer.render(
                         value_sheet,
                         rendered_path,
-                        settings.max_rows,
-                        settings.max_columns,
+                        cfg.max_rows,
+                        cfg.max_columns,
                     )
                     cells = collect_non_empty_cells(
                         formula_sheet,
                         value_sheet,
                         layout,
-                        settings.max_context_cells,
+                        cfg.max_context_cells,
                     )
 
                     render_cell_type_overlay(rendered_path, typed_path, layout, cells)
-                    visible_rows = [row for row, height in enumerate(layout.row_heights, start=1) if height > 0]
-                    visible_columns = [column for column, width in enumerate(layout.column_widths, start=1) if width > 0]
-                    if not visible_rows or not visible_columns or not cells:
-                        logger.warning("[Luna VLM] 시트 %s에 표시된 셀이 없어 건너뜁니다.", sheet_name)
-                        failed_sheets.append({"sheet_name": sheet_name, "error": "표시된 데이터 셀이 없습니다"})
-                        continue
-
                     sheet_bounds = CellBounds(
-                        visible_rows[0],
-                        visible_rows[-1],
-                        visible_columns[0],
-                        visible_columns[-1],
+                        min_row=1,
+                        max_row=max((cell["row"] for cell in cells), default=1),
+                        min_column=1,
+                        max_column=max((cell["column"] for cell in cells), default=1),
                     )
-                    visibility = WorksheetVisibility.from_worksheet(value_sheet)
-                    prepared_sheets.append({
-                        "sheet_name": sheet_name,
-                        "sheet_bounds": sheet_bounds,
-                        "typed_path": typed_path,
-                        "layout": layout,
-                        "visibility": visibility,
-                        "cells": cells,
-                        "value_sheet": value_sheet,
-                    })
-                    print(f"[Luna VLM] 시트 '{sheet_name}' 사전 렌더링 완료 ({len(cells)}개 셀)", flush=True)
-                except Exception as prep_err:
-                    logger.exception("[Luna VLM] 시트 '%s' 사전 렌더링 실패", sheet_name)
-                    failed_sheets.append({"sheet_name": sheet_name, "error": str(prep_err)})
-                    continue
+                    prepared_sheets.append(
+                        {
+                            "sheet_name": sheet_name,
+                            "sheet_bounds": sheet_bounds,
+                            "typed_path": typed_path,
+                            "layout": layout,
+                            "visibility": WorksheetVisibility.from_worksheet(formula_sheet),
+                            "cells": cells,
+                            "value_sheet": value_sheet,
+                        }
+                    )
+                except Exception as sheet_err:
+                    logger.exception("[Luna VLM] 시트 '%s' 전처리 중 예외 발생", sheet_name)
+                    failed_sheets.append({"sheet_name": sheet_name, "error": str(sheet_err)})
 
-            # Phase 2: Parallel OpenAI Vision API calls (pure I/O, completely thread-safe)
-            if not prepared_sheets:
-                reasons = "; ".join(
-                    f"{failure['sheet_name']}: {failure['error']}"
-                    for failure in failed_sheets
-                )
-                raise ModuleExecutionError(
-                    f"분석 가능한 시트가 없습니다. {reasons or '선택된 시트가 비어 있습니다'}"
-                )
-
+            # Phase 2: Call OpenAI Responses API in parallel across prepared sheets
             def _call_vlm(ctx: Dict[str, Any]) -> Tuple[Dict[str, Any], List[LocalVlmTableDecisionDTO]]:
                 """
                 Analyze a prepared worksheet with the vision-language model.
@@ -856,7 +898,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                 """
                 print(f"[Luna VLM] 시트 '{ctx['sheet_name']}' OpenAI VLM 호출 시작...", flush=True)
                 decisions = self._analyze_sheet(
-                    settings,
+                    cfg,
                     ctx["sheet_name"],
                     ctx["sheet_bounds"],
                     ctx["typed_path"],
@@ -867,14 +909,14 @@ class LunaVlmStructureDetectorModule(BaseModule):
                 print(f"[Luna VLM] 시트 '{ctx['sheet_name']}' OpenAI VLM 응답 완료 ({len(decisions)}개 표 감지)", flush=True)
                 return ctx, decisions
 
-            max_workers = min(settings.max_concurrency, len(prepared_sheets)) or 1
+            max_workers = min(cfg.max_concurrency, len(prepared_sheets)) or 1
             print(f"[Luna VLM] {len(prepared_sheets)}개 시트 병렬 VLM 분석 시작 (스레드 {max_workers}개)...", flush=True)
             self.report_progress(
                 {
                     "phase": "sheet_analysis",
                     "completed_sheets": 0,
                     "failed_sheets": len(failed_sheets),
-                    "total_sheets": len(settings.sheet_names),
+                    "total_sheets": len(input_data.sheet_names),
                     "active_sheets": [
                         str(context["sheet_name"])
                         for context in prepared_sheets
@@ -918,7 +960,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                                 "phase": "sheet_analysis",
                                 "completed_sheets": analyzed_sheet_count,
                                 "failed_sheets": len(failed_sheets),
-                                "total_sheets": len(settings.sheet_names),
+                                "total_sheets": len(input_data.sheet_names),
                                 "finished_sheets": analyzed_sheet_count
                                 + len(failed_sheets),
                             }
@@ -926,7 +968,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
 
             outputs = [
                 table
-                for sheet_name in settings.sheet_names
+                for sheet_name in input_data.sheet_names
                 for table in tables_by_sheet.get(sheet_name, [])
             ]
 
@@ -935,7 +977,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     "phase": "sheet_analysis",
                     "completed_sheets": analyzed_sheet_count,
                     "failed_sheets": len(failed_sheets),
-                    "total_sheets": len(settings.sheet_names),
+                    "total_sheets": len(input_data.sheet_names),
                 }
             )
             if analyzed_sheet_count == 0:
@@ -953,7 +995,28 @@ class LunaVlmStructureDetectorModule(BaseModule):
         return {
             "file_name": workbook_path.name,
             "workbook_hash": current_hash,
-            "sheet_names": settings.sheet_names,
+            "sheet_names": input_data.sheet_names,
             "tables": outputs,
             "failed_sheets": failed_sheets,
         }
+
+
+# ==============================================================================
+# 5. Exports
+# ==============================================================================
+__all__ = [
+    "LUNA_SHEET_RESPONSE_SCHEMA",
+    "LUNA_VLM_SYSTEM_PROMPT",
+    "LUNA_VLM_USER_TEMPLATE",
+    "ClassifiedRegionDTO",
+    "ClassifiedTableDTO",
+    "ColumnHeaderNodeDTO",
+    "LunaVisionClient",
+    "LunaVlmStructureDetectorConfigDTO",
+    "LunaVlmStructureDetectorExecutionDTO",
+    "LunaVlmStructureDetectorInputDTO",
+    "LunaVlmStructureDetectorModule",
+    "LunaVlmStructureDetectorOutput",
+    "SpreadsheetStructureOutput",
+    "_safe_name",
+]

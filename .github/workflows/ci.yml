@@ -62,6 +62,12 @@ jobs:
         run: |
           pytest -v --tb=short
 
+      - name: Ruff Static Quality Check
+        run: ruff check modules backend tests
+
+      - name: Pyright Type Check
+        run: pyright
+
   frontend-unit-tests:
     name: Frontend Unit Tests & Build (Vitest)
     runs-on: ubuntu-latest

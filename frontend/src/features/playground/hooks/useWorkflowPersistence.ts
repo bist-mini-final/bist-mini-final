@@ -411,49 +411,63 @@ export function useWorkflowPersistence(
           : await createRun(query, controller.signal);
         applyRun(run);
         onBatch?.(run);
-        if (run.status === 'failed') {
-          const stableRun = run;
-          const runningRun = markNextBatchRunning(run);
-          stableRunRef.current = stableRun;
-          applyRun(runningRun);
-          onBatch?.(runningRun);
-          try {
-            run = await executeNextOrResume(run, controller.signal);
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              applyRun(stableRun);
-              onBatch?.(stableRun);
-            }
-            throw error;
-          } finally {
-            if (executionController.current === controller) {
-              stableRunRef.current = null;
-            }
-          }
+        try {
+          run = await pipelineApi.streamRun(
+            run.id,
+            (event) => {
+              if (event.event === 'node_completed' || event.event === 'node_failed') {
+                const nodeUpdate = event.data;
+                if (nodeUpdate?.node_id) {
+                  setLatestRun((prev) => {
+                    if (!prev) return prev;
+                    const existing = prev.nodes[nodeUpdate.node_id];
+                    if (!existing) return prev;
+                    const updated = {
+                      ...prev,
+                      nodes: {
+                        ...prev.nodes,
+                        [nodeUpdate.node_id]: { ...existing, ...nodeUpdate },
+                      },
+                    };
+                    applyRun(updated);
+                    onBatch?.(updated);
+                    return updated;
+                  });
+                }
+              } else if (event.event === 'run_completed' && event.data?.run) {
+                applyRun(event.data.run);
+                onBatch?.(event.data.run);
+              }
+            },
+            controller.signal
+          );
           applyRun(run);
           onBatch?.(run);
-        }
-        while (run.status === 'queued' || run.status === 'running' || run.status === 'paused') {
-          const stableRun = run;
-          const runningRun = markNextBatchRunning(run);
-          stableRunRef.current = stableRun;
-          applyRun(runningRun);
-          onBatch?.(runningRun);
-          try {
-            run = await executeNextOrResume(run, controller.signal);
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              applyRun(stableRun);
-              onBatch?.(stableRun);
+        } catch (streamError) {
+          if (controller.signal.aborted) throw streamError;
+          // Fallback to step batch execution if SSE stream drops
+          while (run.status === 'queued' || run.status === 'running' || run.status === 'paused') {
+            const stableRun = run;
+            const runningRun = markNextBatchRunning(run);
+            stableRunRef.current = stableRun;
+            applyRun(runningRun);
+            onBatch?.(runningRun);
+            try {
+              run = await executeNextOrResume(run, controller.signal);
+            } catch (error) {
+              if (!controller.signal.aborted) {
+                applyRun(stableRun);
+                onBatch?.(stableRun);
+              }
+              throw error;
+            } finally {
+              if (executionController.current === controller) {
+                stableRunRef.current = null;
+              }
             }
-            throw error;
-          } finally {
-            if (executionController.current === controller) {
-              stableRunRef.current = null;
-            }
+            applyRun(run);
+            onBatch?.(run);
           }
-          applyRun(run);
-          onBatch?.(run);
         }
         if (run.status === 'failed') {
           const failure = Object.values(run.nodes).find((node) => node.status === 'failed');

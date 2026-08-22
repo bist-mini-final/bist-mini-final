@@ -5,7 +5,6 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
-
 WORKBOOK_HASH_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 

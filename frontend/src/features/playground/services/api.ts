@@ -152,6 +152,66 @@ export const pipelineApi = {
     return postJson<WorkflowRun>(`/api/runs/${runId}/resume`, undefined, signal);
   },
 
+  async streamRun(
+    runId: string,
+    onEvent: (event: { event: string; data: any }) => void,
+    signal?: AbortSignal
+  ): Promise<WorkflowRun> {
+    const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/stream`, {
+      headers: { Accept: 'text/event-stream' },
+      signal,
+    });
+    if (!response.ok) {
+      throw new ApiError(`스트림 요청 실패 (${response.status})`, response.status);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new ApiError('스트림 응답 본문을 읽을 수 없습니다.', 500);
+    }
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let completedRun: WorkflowRun | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() ?? '';
+
+        for (const block of lines) {
+          if (!block.trim()) continue;
+          let eventType = 'message';
+          let eventData = '';
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              eventData = line.slice(5).trim();
+            }
+          }
+          if (eventData) {
+            try {
+              const parsed = JSON.parse(eventData);
+              if (eventType === 'run_completed' && parsed.run) {
+                completedRun = parsed.run;
+              }
+              onEvent({ event: eventType, data: parsed });
+            } catch {
+              onEvent({ event: eventType, data: eventData });
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    if (completedRun) return completedRun;
+    return await this.getRun(runId, signal);
+  },
+
   clearCache(signal?: AbortSignal) {
     return writeJson<{
       runs_removed: number;

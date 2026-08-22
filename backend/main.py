@@ -1,13 +1,13 @@
-"""FastAPI entry point for the RAG Pipeline Visualizer."""
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 
 from backend.api.router import create_api_router
 from backend.core.settings import DEV_CORS_ORIGINS, DIST_DIR
 from backend.storage.answer_cache import AnswerCacheRepository
+from modules.common.exceptions import PipelineBaseError
 
 
 def create_app() -> FastAPI:
@@ -45,6 +45,26 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
+
+    @application.exception_handler(PipelineBaseError)
+    async def pipeline_exception_handler(request: Request, exc: PipelineBaseError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.to_dict(),
+        )
+
+    @application.exception_handler(ValidationError)
+    async def validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "VALIDATION_ERROR",
+                "message": "데이터 유효성 검증에 실패했습니다.",
+                "module_type": None,
+                "details": {"errors": exc.errors(include_url=False)},
+            },
+        )
+
     application.include_router(create_api_router(repository))
 
     assets_dir = DIST_DIR / "assets"

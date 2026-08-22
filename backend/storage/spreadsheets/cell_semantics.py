@@ -10,7 +10,6 @@ from openpyxl.utils import get_column_letter
 from .cell_visibility import WorksheetVisibility
 from .table_geometry import SheetLayout
 
-
 CELL_TYPE_COLORS = {
     "text": "#F59E0B",
     "number": "#22C55E",

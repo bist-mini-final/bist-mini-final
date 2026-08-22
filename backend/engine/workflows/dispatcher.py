@@ -12,7 +12,6 @@ from .executor import DagExecutionCancelled, WorkflowExecutor
 from .models import WorkflowRun, utc_now_iso
 from .store import RunStore
 
-
 logger = logging.getLogger(__name__)
 
 

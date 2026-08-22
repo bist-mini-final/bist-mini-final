@@ -53,6 +53,7 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
     from backend.storage.answer_cache import AnswerCacheRepository
     from backend.storage.db_manager import DatabaseManager
     from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+
     from .registry import ModuleRegistry
 
     registry = ModuleRegistry(
@@ -76,9 +77,9 @@ def _worker_main(request_queue, response_queue, spec: Dict[str, str]) -> None:
         try:
             module = registry.get(task["module_type"])
             module.set_progress_callback(
-                lambda progress: response_queue.put(
+                lambda progress, current_task_id=task_id: response_queue.put(
                     {
-                        "task_id": task_id,
+                        "task_id": current_task_id,
                         "event": "progress",
                         "progress": progress,
                     }

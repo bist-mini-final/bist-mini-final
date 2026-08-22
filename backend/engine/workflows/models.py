@@ -3,7 +3,6 @@ from typing import Annotated, Any, Dict, List, Literal, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
 ExecutionBranch = str
 OutputBranch = str

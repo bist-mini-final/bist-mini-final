@@ -10,7 +10,6 @@ from openpyxl.cell.cell import MergedCell
 from .cell_visibility import WorksheetVisibility
 from .table_geometry import CellBounds
 
-
 Coordinate = Tuple[int, int]
 
 

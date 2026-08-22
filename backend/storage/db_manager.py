@@ -33,9 +33,9 @@ Documented ERD Schema:
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
-import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Collection, Dict, Iterator, List, Optional
@@ -44,6 +44,7 @@ from uuid import uuid4
 import psycopg2.extras
 
 from backend.core.settings import PGVECTOR_URL
+
 from .connection_pool import get_pooled_raw_connection
 
 logger = logging.getLogger(__name__)

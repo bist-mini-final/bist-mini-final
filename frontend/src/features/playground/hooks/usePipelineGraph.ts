@@ -47,9 +47,6 @@ const FALLBACK_BRANCH_OUTPUTS: Partial<Record<ModuleType, Record<string, string>
 
 const LEGACY_CONFIG_INPUT_FIELDS: Partial<Record<ModuleType, string[]>> = {
   processed_file_selector: ['file_name'],
-  prebuilt_index_loader: ['file_name'],
-  dataframe_source: ['file_name'],
-  image_tile_source: ['file_name', 'sheet_name'],
   qa_example_loader: ['file_name'],
 };
 

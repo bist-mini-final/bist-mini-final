@@ -1,22 +1,19 @@
-from __future__ import annotations
+import logging
+from typing import Any, Dict, Optional
 
-from typing import Optional, Any, Dict, Union, cast
+from pydantic import Field, field_validator
 
-from pydantic import BaseModel, Field, RootModel, field_validator
-
-from backend.core.settings import SIMILARITY_THRESHOLD
-from backend.storage.answer_cache import AnswerCacheRepository
-from backend.storage.retrieval.similarity import rank_candidates
-from modules.common.config import DEFAULT_QUERY_INPUT_THRESHOLD
 from modules.common.base_module import (
     BaseModule,
-    ModuleConfigDTO,
+    EmptyModuleConfigDTO,
     ModuleDefinition,
     ModuleDTO,
     ModuleInputDTO,
     QueryContextDTO,
     question_id_for,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class QueryInputDTO(ModuleInputDTO):
@@ -34,96 +31,47 @@ class QueryInputDTO(ModuleInputDTO):
         return value
 
 
-class QueryConfigDTO(ModuleConfigDTO):
-    threshold: float = Field(
-        default=DEFAULT_QUERY_INPUT_THRESHOLD,
-        ge=0,
-        le=1,
-        description="캐시 질문을 일치로 판정할 최소 유사도(0~1)",
-    )
-
-
-
-class QueryExecutionDTO(QueryInputDTO, QueryConfigDTO):
-    """Internal validated view used only by QueryInputModule.execute."""
-
-
-class CachedAnswerDTO(ModuleDTO):
-    query_context: QueryContextDTO = Field(description="캐시 답변이 대응하는 질문")
-    answer: str = Field(description="캐시에 저장된 기존 LLM 답변")
-
-
-class CachedAnswerOutput(ModuleDTO):
-    cached_answer: CachedAnswerDTO = Field(description="질문 계보가 포함된 캐시 답변")
-
-
 class QueryContextOutput(ModuleDTO):
     query_context: QueryContextDTO = Field(
         description="후속 질의 파이프라인 전체에 전달할 원본 질문 컨텍스트"
     )
 
 
-class QueryInputOutput(RootModel[Union[CachedAnswerOutput, QueryContextOutput]]):
-    """Exactly one branch DTO is returned per execution."""
-
-
 class QueryInputModule(BaseModule):
     definition = ModuleDefinition(
         type="query_input",
-        label="Query Input & Search",
+        label="Query Input",
         category="Source",
-        description="질문을 받아 캐시 답변 또는 질문 식별자가 포함된 Query Context를 전달합니다.",
+        description="자연어 질문을 받아 질문 식별자와 텍스트가 포함된 Query Context를 생성합니다.",
         inputs=[],
-        outputs=["cached_answer", "query_context"],
-        branch_outputs={
-            "cached": "cached_answer",
-            "generated": "query_context",
-        },
-        config_fields=["threshold"],
+        outputs=["query_context"],
+        config_fields=[],
         cacheable=False,
-        version="2",
+        version="3",
     )
     input_model = QueryInputDTO
-    config_model = QueryConfigDTO
-    execution_model = QueryExecutionDTO
-    output_model = QueryInputOutput
-    branch_output_models = {
-        "cached": CachedAnswerOutput,
-        "generated": QueryContextOutput,
-    }
+    config_model = EmptyModuleConfigDTO
+    output_model = QueryContextOutput
 
-    def __init__(self, repository: AnswerCacheRepository) -> None:
-        self.repository = repository
+    def __init__(self) -> None:
+        pass
 
     def execute(
         self,
         input_data: QueryInputDTO,
-        config: Optional[QueryConfigDTO] = None,
+        config: Optional[EmptyModuleConfigDTO] = None,
     ) -> Dict[str, Any]:
-        cfg = config or QueryConfigDTO()
         query_text = input_data.query
-        query_context = {
-            "question_id": question_id_for(query_text),
-            "question_text": query_text,
-        }
-        candidates = self.repository.question_candidates()
-        if not candidates:
-            return {"query_context": query_context}
-
-        matches = rank_candidates(query_text, candidates)
-        best = matches[0]
-        if best.combined_score < cfg.threshold:
-            return {"query_context": query_context}
-
-        cached_answer = self.repository.get_cached_answer(best.question_id)
-        if cached_answer is None:
-            return {"query_context": query_context}
         return {
-            "cached_answer": {
-                "query_context": {
-                    "question_id": best.question_id.upper(),
-                    "question_text": query_text,
-                },
-                "answer": cached_answer,
-            }
+            "query_context": QueryContextDTO(
+                question_id=question_id_for(query_text),
+                question_text=query_text,
+            ).model_dump(mode="json")
         }
+
+
+__all__ = [
+    "QueryContextOutput",
+    "QueryInputDTO",
+    "QueryInputModule",
+]

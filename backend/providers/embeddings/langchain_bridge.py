@@ -15,7 +15,7 @@ class LangChainEmbeddingAdapter(Embeddings):
     def __init__(
         self,
         model_name: str = "text-embedding-3-large",
-        encoder: Optional[EmbeddingEncoder] = None,
+        encoder: Optional[EmbeddingEncoder | Embeddings] = None,
     ) -> None:
         self.model_name = model_name
         self.encoder = encoder or get_embedding_encoder(model_name)
@@ -24,10 +24,14 @@ class LangChainEmbeddingAdapter(Embeddings):
         """Embed search document texts."""
         if not texts:
             return []
+        if isinstance(self.encoder, Embeddings):
+            return self.encoder.embed_documents(texts)
         return self.encoder.encode(texts)
 
     def embed_query(self, text: str) -> List[float]:
         """Embed a single query text."""
+        if isinstance(self.encoder, Embeddings):
+            return self.encoder.embed_query(text)
         vectors = self.encoder.encode([text])
         if not vectors:
             raise ValueError(f"Failed to embed query with model {self.model_name}")

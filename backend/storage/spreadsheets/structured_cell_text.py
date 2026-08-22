@@ -4,27 +4,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .cell_visibility import WorksheetVisibility
 
-
 UNKNOWN_FIELD = "?"
 SERIALIZATION_VERSION = "structured-cell-v5-visible-only"
-SHEET_NAME_ALIASES = {
-    "balance sheet": "Balance_Sheet",
-    "balance_sheet": "Balance_Sheet",
-    "income statement": "Income_Statement",
-    "income_statement": "Income_Statement",
-    "cash flow": "Cash_Flow",
-    "cash flow statement": "Cash_Flow",
-    "cash_flow": "Cash_Flow",
-    "key stats": "Key_Stats",
-    "key statistics": "Key_Stats",
-    "key_stats": "Key_Stats",
-}
-SHEET_CODE_MAP = {
-    "Balance_Sheet": "BS",
-    "Income_Statement": "IS",
-    "Cash_Flow": "CF",
-    "Key_Stats": "KS",
-}
+SHEET_NAME_ALIASES: Dict[str, str] = {}
+SHEET_CODE_MAP: Dict[str, str] = {}
 PERIOD_PATTERN = re.compile(
     r"\b(?:19|20)\d{2}(?:-\d{2}-\d{2})?\b|\bFY(?:-?\d+|\d{4})\b|\bLTM\b",
     re.IGNORECASE,
@@ -32,13 +15,14 @@ PERIOD_PATTERN = re.compile(
 
 
 def canonical_sheet_name(sheet_name: str) -> str:
-    normalized = sheet_name.strip()
-    return SHEET_NAME_ALIASES.get(normalized.lower(), normalized)
+    """Return cleanly stripped sheet name without arbitrary alias overriding."""
+    return str(sheet_name).strip()
 
 
 def sheet_code(sheet_name: str) -> str:
-    canonical = canonical_sheet_name(sheet_name)
-    return SHEET_CODE_MAP.get(canonical, canonical)
+    """Generate a clean alphanumeric prefix code for the sheet."""
+    clean = re.sub(r"[^A-Za-z0-9]", "", str(sheet_name).strip())
+    return clean or str(sheet_name).strip()
 
 
 def format_cell_value(value: Any) -> Optional[str]:
@@ -55,16 +39,19 @@ def serialize_structured_cell(
     row_headers: List[str],
     column_headers: List[str],
     cell_value: str = UNKNOWN_FIELD,
+    company_name: Optional[str] = None,
 ) -> str:
     row_text = " > ".join(row_headers) if row_headers else UNKNOWN_FIELD
     column_text = " > ".join(column_headers) if column_headers else UNKNOWN_FIELD
     value_text = cell_value if cell_value else UNKNOWN_FIELD
-    return (
-        f"Sheet: {canonical_sheet_name(sheet_name) or UNKNOWN_FIELD} | "
-        f"Row Header: {row_text} | "
-        f"Column Header: {column_text} | "
-        f"Cell Value: {value_text}"
-    )
+    sheet = canonical_sheet_name(sheet_name) or UNKNOWN_FIELD
+    company = str(company_name).strip() if company_name else UNKNOWN_FIELD
+    parts = [f"Company: {company or UNKNOWN_FIELD}"]
+    parts.append(f"Sheet: {sheet}")
+    parts.append(f"Row Header: {row_text}")
+    parts.append(f"Column Header: {column_text}")
+    parts.append(f"Cell Value: {value_text}")
+    return " | ".join(parts)
 
 
 def generate_header_combinations(
@@ -160,6 +147,5 @@ class WorksheetValueReader:
 
 
 def ensure_period_header(headers: List[str]) -> List[str]:
-    if any(PERIOD_PATTERN.search(header) for header in headers):
-        return headers
-    return [*headers, "LTM"]
+    """Return headers without injecting artificial periods."""
+    return list(headers)

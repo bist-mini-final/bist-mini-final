@@ -17,7 +17,7 @@ import { HomePage } from '../pages/HomePage';
 import { SettingsPage } from '../pages/SettingsPage';
 
 const BiPage = lazy(() =>
-  import('../features/bi/BiPage').then((module) => ({ default: module.BiPage }))
+  import('../pages/BiPage').then((module) => ({ default: module.BiPage }))
 );
 const PlaygroundPage = lazy(() =>
   import('../pages/PlaygroundPage').then((module) => ({

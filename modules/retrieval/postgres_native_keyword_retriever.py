@@ -4,21 +4,24 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Optional, Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
     BaseModule,
     ModuleConfigDTO,
     ModuleDefinition,
-    ModuleExecutionError,
     ModuleInputDTO,
 )
+from modules.common.config import DEFAULT_MIN_SCOPE_CONFIDENCE, DEFAULT_RETRIEVAL_TOP_K
 from modules.query.decomposer import SubqueriesDTO
+from modules.query.llm_query_router import LlmQueryRouterOutputDTO
+from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
+from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
+from modules.retrieval.query_scope import extract_query_scope
 from modules.storage.pgvector_collection_loader import IndexOutputDTO
-from modules.retrieval.retrieval_models import RankedSearchCandidateDTO, RankedSearchResultDTO
 
 logger = logging.getLogger(__name__)
 
@@ -28,21 +31,29 @@ class PostgresNativeKeywordRetrieverInputDTO(ModuleInputDTO):
     index_input: IndexOutputDTO = Field(
         description="pgvector Collection Loader가 전달한 대상 컬렉션 식별자"
     )
+    semantic_match: Optional[Union[SemanticQueryMatchOutput, LlmQueryRouterOutputDTO]] = Field(
+        default=None,
+        description="선택적 시맨틱 라우터 또는 LLM 라우터 결과 (company_name 및 sheet_names 스코프 사전 필터링용)",
+    )
 
 
 class PostgresNativeKeywordRetrieverConfigDTO(ModuleConfigDTO):
     top_k: int = Field(
-        default=100,
+        default=DEFAULT_RETRIEVAL_TOP_K,
         gt=0,
         le=5000,
         description="각 서브쿼리별 PostgreSQL GIN FTS 키워드 검색 최대 후보 개수",
     )
+    min_scope_confidence: float = Field(
+        default=DEFAULT_MIN_SCOPE_CONFIDENCE,
+        ge=0,
+        le=1,
+        description="시맨틱 스코프 적용을 위한 최소 신뢰도 임계값",
+    )
 
 
-class PostgresNativeKeywordRetrieverExecutionDTO(
-    PostgresNativeKeywordRetrieverInputDTO, PostgresNativeKeywordRetrieverConfigDTO
-):
-    """Internal union of search inputs and retrieval policy."""
+# Backward compatibility alias
+PostgresNativeKeywordRetrieverExecutionDTO = PostgresNativeKeywordRetrieverInputDTO
 
 
 def _clean_tsquery_term(text: str) -> str:
@@ -50,6 +61,10 @@ def _clean_tsquery_term(text: str) -> str:
     cleaned = re.sub(r"[^\w\s가-힣0-9]", " ", text)
     tokens = [t.strip() for t in cleaned.split() if len(t.strip()) >= 1]
     return " ".join(tokens) if tokens else text.strip()
+
+
+def _escape_like_term(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class PostgresNativeKeywordRetrieverModule(BaseModule):
@@ -62,13 +77,12 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         description="PostgreSQL GIN 인덱스와 tsvector 풀텍스트 검색을 활용하여 수 밀리초 내에 초고속 키워드 검색을 수행합니다.",
         inputs=["query_input", "index_input"],
         outputs=["bm25_result"],
-        config_fields=["top_k"],
+        config_fields=["top_k", "min_scope_confidence"],
         raw_output=True,
-        version="1",
+        version="2",
     )
     input_model = PostgresNativeKeywordRetrieverInputDTO
     config_model = PostgresNativeKeywordRetrieverConfigDTO
-    execution_model = PostgresNativeKeywordRetrieverExecutionDTO
     output_model = RankedSearchResultDTO
 
     def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
@@ -82,10 +96,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         """
         Executes PostgreSQL full-text search across selected collections for each subquery.
         """
-        if config is None and isinstance(input_data, PostgresNativeKeywordRetrieverExecutionDTO):
-            cfg = input_data
-        else:
-            cfg = config or PostgresNativeKeywordRetrieverConfigDTO()
+        cfg = config or PostgresNativeKeywordRetrieverConfigDTO()
         raw_col_name = input_data.index_input.index_id
         target_collections = [c.strip() for c in raw_col_name.split(",") if c.strip()]
         if not target_collections:
@@ -96,6 +107,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         doc_context_dict = {
             "file_name": input_data.index_input.file_name,
             "workbook_hash": input_data.index_input.workbook_hash,
+            "index_id": input_data.index_input.index_id,
         }
 
         if not subqueries:
@@ -105,86 +117,143 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
                 "items": [],
             }
 
-        conn = self.pgvector_store._raw_connection()
+        # Resolve semantic scopes if available (from Semantic Matcher or LLM Router)
+        match_raw = input_data.semantic_match
+        match: Optional[SemanticQueryMatchOutput] = (
+            match_raw.semantic_match
+            if isinstance(match_raw, LlmQueryRouterOutputDTO)
+            else match_raw
+        )
+        global_sheets: List[str] = []
+        global_company: Optional[str] = None
+        if match and match.matched and match.confidence >= cfg.min_scope_confidence:
+            global_sheets = list(match.sheets or [])
+            global_company = match.company_name
+
+        conn = self.pgvector_store._read_connection()
         all_hits: List[Tuple[float, Dict[str, Any], str, str]] = []
 
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT uuid, name FROM langchain_pg_collection WHERE name = ANY(%s);",
-                    (target_collections,),
-                )
-                col_rows = cur.fetchall()
-                col_map = {name: str(u) for u, name in col_rows}
-                col_uuids = list(col_map.values())
-
-                if not col_uuids:
-                    logger.warning("PostgresNativeKeywordRetriever: 컬렉션을 찾을 수 없음: %s", target_collections)
-                    return {
-                        "query_context": query_context_dict,
-                        "document_context": doc_context_dict,
-                        "items": [],
-                    }
-
                 for sq in subqueries:
                     clean_q = _clean_tsquery_term(sq)
                     if not clean_q:
                         continue
 
-                    sql = """
-                        SELECT 
+                    # Dynamically extract per-subquery company and sheet scope
+                    sq_company, sq_sheets = extract_query_scope(
+                        sq,
+                        fallback_company=global_company,
+                        fallback_sheets=global_sheets,
+                    )
+
+                    where_extra: List[str] = []
+                    where_params: List[Any] = []
+                    if sq_company and isinstance(sq_company, str) and sq_company.strip():
+                        clean_company = sq_company.strip()
+                        escaped_company = _escape_like_term(clean_company)
+                        where_extra.append(
+                            "AND (cmetadata->>'company_name' ILIKE %s ESCAPE '\\\\' "
+                            "OR cmetadata->>'company_name' = %s)"
+                        )
+                        where_params.extend([f"%{escaped_company}%", clean_company])
+                    if sq_sheets:
+                        where_extra.append("AND (cmetadata->>'sheet_name' = ANY(%s))")
+                        where_params.append(sq_sheets)
+
+                    extra_sql = " ".join(where_extra)
+
+                    sql = f"""
+                        SELECT
                             id,
                             document,
                             cmetadata,
                             ts_rank_cd(to_tsvector('simple', document), plainto_tsquery('simple', %s)) AS fts_score,
                             collection_id
                         FROM langchain_pg_embedding
-                        WHERE collection_id::text = ANY(%s)
+                        WHERE collection_id IN (
+                                SELECT uuid
+                                FROM langchain_pg_collection
+                                WHERE name = ANY(%s)
+                              )
                           AND to_tsvector('simple', document) @@ plainto_tsquery('simple', %s)
+                          {extra_sql}
                         ORDER BY fts_score DESC, id
                         LIMIT %s;
                     """
-                    cur.execute(sql, (clean_q, col_uuids, clean_q, top_k))
+                    full_params = [
+                        clean_q,
+                        target_collections,
+                        clean_q,
+                        *where_params,
+                        top_k,
+                    ]
+                    cur.execute(sql, full_params)
                     rows = cur.fetchall()
 
+                    # Fallback to relaxed search if scoped search yielded no results
+                    if not rows and extra_sql:
+                        fallback_sql = """
+                            SELECT
+                                id,
+                                document,
+                                cmetadata,
+                                ts_rank_cd(to_tsvector('simple', document), plainto_tsquery('simple', %s)) AS fts_score,
+                                collection_id
+                            FROM langchain_pg_embedding
+                            WHERE collection_id IN (
+                                    SELECT uuid
+                                    FROM langchain_pg_collection
+                                    WHERE name = ANY(%s)
+                                  )
+                              AND to_tsvector('simple', document) @@ plainto_tsquery('simple', %s)
+                            ORDER BY fts_score DESC, id
+                            LIMIT %s;
+                        """
+                        cur.execute(
+                            fallback_sql,
+                            (clean_q, target_collections, clean_q, top_k),
+                        )
+                        rows = cur.fetchall()
+
                     for r in rows:
-                        doc_id, doc_text, cmeta, score, _ = r
+                        _, doc_text, cmeta, score, _ = r
                         cmeta_dict = cmeta if isinstance(cmeta, dict) else {}
                         final_score = float(score) if score and float(score) > 0 else 0.05
                         all_hits.append((final_score, cmeta_dict, doc_text, sq))
-
-        except Exception as e:
-            logger.exception("PostgresNativeKeywordRetriever 실행 실패: %s", e)
-            raise ModuleExecutionError(f"PostgreSQL FTS 키워드 검색 실패: {e}") from e
         finally:
             conn.close()
 
         ranked_items: List[Dict[str, Any]] = []
-        seen_keys = set()
-        rank_counter = 1
-
-        for score, cmeta, doc_text, matched_sq in sorted(all_hits, key=lambda x: x[0], reverse=True):
-            company = cmeta.get("company_name", "")
-            cell_coord = cmeta.get("cell_coord", "")
-            sheet = cmeta.get("sheet_name", "")
-            raw_cell_id = cmeta.get("cell_id") or f"{sheet}:{cell_coord}"
-            cell_id = f"{company}:{raw_cell_id}" if company and not str(raw_cell_id).startswith(f"{company}:") else str(raw_cell_id)
-
-            key = (cell_id, matched_sq)
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-
-            ranked_items.append(
-                {
-                    "rank": rank_counter,
-                    "cell_id": cell_id,
-                    "score": score,
-                    "text": doc_text,
-                    "matched_subquery": matched_sq,
-                }
+        for subquery in subqueries:
+            seen_cell_ids = set()
+            subquery_hits = sorted(
+                (hit for hit in all_hits if hit[3] == subquery),
+                key=lambda item: item[0],
+                reverse=True,
             )
-            rank_counter += 1
+            for score, cmeta, doc_text, _ in subquery_hits:
+                company = cmeta.get("company_name", "")
+                cell_coord = cmeta.get("cell_coord", "")
+                sheet = cmeta.get("sheet_name", "")
+                raw_cell_id = cmeta.get("cell_id") or f"{sheet}:{cell_coord}"
+                cell_id = (
+                    f"{company}:{raw_cell_id}"
+                    if company and not str(raw_cell_id).startswith(f"{company}:")
+                    else str(raw_cell_id)
+                )
+                if cell_id in seen_cell_ids:
+                    continue
+                seen_cell_ids.add(cell_id)
+                ranked_items.append(
+                    {
+                        "rank": len(seen_cell_ids),
+                        "cell_id": cell_id,
+                        "score": score,
+                        "text": doc_text,
+                        "matched_subquery": subquery,
+                    }
+                )
 
         return {
             "query_context": query_context_dict,

@@ -1,14 +1,13 @@
+import textwrap
 from datetime import date, datetime
 from pathlib import Path
-import textwrap
 from typing import Any, Dict, List, Optional, Tuple
 
-from PIL import Image, ImageDraw, ImageFont
 from openpyxl.styles.numbers import is_date_format
 from openpyxl.utils.datetime import WINDOWS_EPOCH, from_excel
+from PIL import Image, ImageDraw, ImageFont
 
 from .table_geometry import SheetLayout, compute_sheet_layout
-
 
 # Standard Office Theme Palette (Theme 0 ~ 11)
 THEME_COLORS = {
@@ -263,7 +262,7 @@ def _text_size(
     font: Any,
 ) -> Tuple[int, int]:
     box = draw.multiline_textbbox((0, 0), text, font=font, spacing=1)
-    return int(round(box[2] - box[0])), int(round(box[3] - box[1]))
+    return round(box[2] - box[0]), round(box[3] - box[1])
 
 
 def _wrap_text(

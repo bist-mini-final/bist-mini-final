@@ -1,20 +1,23 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-from typing import Optional, Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backend.core.settings import PROCESSED_DATA_DIR
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog, WorkbookCatalogError
+from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import (
-    EmptyModuleConfigDTO,
     BaseModule,
+    EmptyModuleConfigDTO,
     ModuleDefinition,
+    ModuleDTO,
     ModuleExecutionError,
     ModuleInputDTO,
-    ModuleDTO,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessedFileSelectorInputDTO(ModuleInputDTO):
@@ -52,7 +55,6 @@ class ProcessedFileSelectorModule(BaseModule):
     )
     input_model = ProcessedFileSelectorInputDTO
     config_model = EmptyModuleConfigDTO
-    execution_model = ProcessedFileSelectorInputDTO
     output_model = WorkbookSelectionDTO
 
     def __init__(
@@ -78,28 +80,9 @@ class ProcessedFileSelectorModule(BaseModule):
     ) -> Dict[str, Any]:
         """
         Resolve the requested processed workbook and select its processing sheets.
-        
-        Parameters:
-            payload (BaseModel): Input containing the processed workbook filename and
-                optionally the sheet names to select.
-        
-        Returns:
-            Dict[str, Any]: The resolved filename, workbook SHA-256 hash, and selected
-                sheet names in catalog order.
-        
-        Raises:
-            ModuleExecutionError: If the workbook cannot be resolved, a requested sheet
-                does not exist, or no processing sheets are selected.
         """
-        if config is None and isinstance(input_data, ProcessedFileSelectorInputDTO):
-            cfg = input_data
-        else:
-            cfg = config or EmptyModuleConfigDTO()
-        try:
-            path = self.catalog.resolve(input_data.file_name)
-            available_sheet_names = self.catalog.sheet_names(path)
-        except (OSError, ValueError, WorkbookCatalogError) as error:
-            raise ModuleExecutionError(str(error)) from error
+        path = self.catalog.resolve(input_data.file_name)
+        available_sheet_names = self.catalog.sheet_names(path)
         requested_sheet_names = input_data.sheet_names
         if requested_sheet_names is None:
             sheet_names = available_sheet_names
@@ -123,3 +106,10 @@ class ProcessedFileSelectorModule(BaseModule):
             "workbook_hash": self.catalog.sha256(path),
             "sheet_names": sheet_names,
         }
+
+
+__all__ = [
+    "ProcessedFileSelectorInputDTO",
+    "ProcessedFileSelectorModule",
+    "WorkbookSelectionDTO",
+]

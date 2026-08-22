@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
-from modules.common.base_module import ModuleTaskPolicy
 from backend.engine.runtime.registry_base import BaseModuleRegistry
 from backend.engine.workflows.models import WorkflowRun
+from modules.common.base_module import ModuleTaskPolicy
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,7 @@ def compile_task_plan(
         for node_id in batch.node_ids:
             node = nodes_by_id[node_id]
             module = module_registry.get(node.module_type)
-            policy = module.definition.task
+            policy = module.definition.task or module.definition.task_policy
             if not policy.enabled:
                 raise ValueError(
                     f"배치 실행이 비활성화된 모듈입니다: {node.module_type}"
