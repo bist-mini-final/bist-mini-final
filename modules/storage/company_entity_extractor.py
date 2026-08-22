@@ -28,7 +28,7 @@ Example:
       "collection_name": "rag_cells_a1b2c3d4",
       "metrics": {
         "kind": "llm_structured",
-        "model": "gpt-4o-mini",
+        "model": "gpt-5.6-luna",
         "latency_seconds": 0.45
       }
     }

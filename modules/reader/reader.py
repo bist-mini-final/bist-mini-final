@@ -40,7 +40,7 @@ Example:
           "file_name": "samsung_2023.xlsx",
           "workbook_hash": "a1b2c3d4..."
         },
-        "model": "gpt-4o",
+        "model": "gpt-5.6-luna",
         "answer": "2023년 삼성전자의 영업이익은 65,670억원이며, 2022년(433,766억원) 대비 약 84.86% 감소했습니다.",
         "api_usage": {
           "prompt_tokens": 450,

@@ -40,7 +40,7 @@ Example:
         "company_name": "삼성전자",
         "metrics": {
           "kind": "llm_structured",
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-luna",
           "latency_seconds": 0.32,
           "estimated_cost_usd": 0.00012
         }
