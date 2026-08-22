@@ -50,3 +50,11 @@ def test_decomposer_module_execution():
     assert "Company: 삼성전자" in result["subqueries"][0]
     assert "2023" in result["subqueries"][0]
     assert "2024" in result["subqueries"][1]
+
+    assert "items" in result
+    assert len(result["items"]) == 2
+    assert result["items"][0]["company"] == "삼성전자"
+    assert result["items"][0]["sheet"] == "손익계산서"
+    assert result["items"][0]["row_header"] == "영업이익"
+    assert result["items"][0]["column_header"] == "2023"
+    assert "text" in result["items"][0]

@@ -39,6 +39,24 @@ Example:
         "question_id": "q-001",
         "question_text": "삼성전자 2023년 영업이익과 현대자동차 2022년 부채상태를 비교해줘"
       },
+      "items": [
+        {
+          "company": "삼성전자",
+          "sheet": "손익계산서",
+          "row_header": "영업이익",
+          "column_header": "2023",
+          "cell_value": "?",
+          "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
+        },
+        {
+          "company": "현대자동차",
+          "sheet": "재무상태표",
+          "row_header": "부채총계",
+          "column_header": "2022",
+          "cell_value": "?",
+          "text": "Company: 현대자동차 | Sheet: 재무상태표 | Row Header: 부채총계 | Column Header: 2022 | Cell Value: ?"
+        }
+      ],
       "subqueries": [
         "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?",
         "Company: 현대자동차 | Sheet: 재무상태표 | Row Header: 부채총계 | Column Header: 2022 | Cell Value: ?"
@@ -114,15 +132,18 @@ class SubqueryItem(BaseModel):
     row_header: str = Field(default=UNKNOWN_FIELD, description="재무 항목 또는 행 헤더")
     column_header: str = Field(default=UNKNOWN_FIELD, description="회계 기간 또는 열 헤더")
     cell_value: str = Field(default=UNKNOWN_FIELD, description="셀 값 제약 조건 또는 '?'")
+    text: Optional[str] = Field(default=None, description="직렬화된 단일 셀 검색 포맷 텍스트")
 
     def to_serialized_query(self) -> str:
-        """벡터 검색에 사용되는 표준 직렬화 문자열로 변환합니다."""
+        """벡터 검색에 사용되는 표준 직렬화 문자열로 변환하고 text 필드를 채웁니다."""
         parts = [f"Company: {self.company or UNKNOWN_FIELD}"]
         parts.append(f"Sheet: {self.sheet or UNKNOWN_FIELD}")
         parts.append(f"Row Header: {self.row_header or UNKNOWN_FIELD}")
         parts.append(f"Column Header: {self.column_header or UNKNOWN_FIELD}")
         parts.append(f"Cell Value: {self.cell_value or UNKNOWN_FIELD}")
-        return " | ".join(parts)
+        serialized = " | ".join(parts)
+        self.text = serialized
+        return serialized
 
 
 class DecomposedSubqueriesResponse(BaseModel):
@@ -156,7 +177,14 @@ class SubqueriesDTO(ModuleDTO):
     """Decomposer 모듈 출력 DTO 계약."""
 
     query_context: QueryContextDTO = Field(description="전달받은 질문 컨텍스트")
-    subqueries: List[str] = Field(description="직렬화된 단일 셀 검색 서브쿼리 문자열 목록")
+    items: List[SubqueryItem] = Field(
+        default_factory=list,
+        description="구조화된 원자적 서브쿼리 객체 목록 (company, sheet, row_header, column_header, cell_value, text)",
+    )
+    subqueries: List[str] = Field(
+        default_factory=list,
+        description="직렬화된 단일 셀 검색 서브쿼리 문자열 목록 (하위 호환 및 임베더용)",
+    )
 
 
 # Backward compatibility aliases
@@ -178,6 +206,7 @@ class DecomposerModule(BaseLLMModule):
 
     Output:
         - `query_context` (`QueryContextDTO`): 원본 사용자 질문 컨텍스트 전달
+        - `items` (`List[SubqueryItem]`): 기업명, 시트명, 행/열 헤더 및 text를 포함한 구조화 서브쿼리 목록
         - `subqueries` (`List[str]`): 분해된 직렬화 셀 서브쿼리 문자열 리스트
     """
 
@@ -190,7 +219,7 @@ class DecomposerModule(BaseLLMModule):
         outputs=["output"],
         config_fields=["model", "system_prompt", "user_prompt_template"],
         raw_output=True,
-        version="7",
+        version="8",
     )
     input_model = DecomposerInputDTO
     config_model = DecomposerConfigDTO
@@ -254,10 +283,21 @@ class DecomposerModule(BaseLLMModule):
             system_prompt=sys_prompt,
         )
 
-        subqueries = list(dict.fromkeys(item.to_serialized_query() for item in parsed_resp.items if item))
+        items_dict: Dict[str, SubqueryItem] = {}
+        for item in parsed_resp.items:
+            if not item:
+                continue
+            serialized = item.to_serialized_query()
+            if serialized not in items_dict:
+                items_dict[serialized] = item
+
+        items_list = list(items_dict.values())
+        subqueries_list = list(items_dict.keys())
+
         return {
             "query_context": input_data.query_context.model_dump(mode="json"),
-            "subqueries": subqueries,
+            "items": [item.model_dump(mode="json") for item in items_list],
+            "subqueries": subqueries_list,
         }
 
 
