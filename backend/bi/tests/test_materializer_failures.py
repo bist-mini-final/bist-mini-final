@@ -10,7 +10,7 @@ from backend.bi.materializer import BiMaterializer, BiMaterializerServices
 from backend.bi.models import JobId, MaterializationStatus
 from backend.bi.snapshot_store import FileBiSnapshotStore
 from backend.bi.tests.test_materializer import FixedClock, FakeProfiler, profile, request
-from backend.llm.chat_completion import ChatCompletionError
+from backend.providers.llm.chat_completion import ChatCompletionError
 
 
 class FailingExtractor:

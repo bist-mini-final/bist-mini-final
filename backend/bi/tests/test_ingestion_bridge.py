@@ -30,7 +30,7 @@ from backend.bi.models import (
 )
 from backend.bi.snapshot_store import FileBiSnapshotStore
 from backend.bi.tests.question_api_fakes import UnusedQuestionApi
-from backend.workflows.models import (
+from backend.engine.workflows.models import (
     CanvasPosition,
     NodeUI,
     RunBatchState,
@@ -40,7 +40,7 @@ from backend.workflows.models import (
     WorkflowRun,
     RunStatus,
 )
-from backend.workflows.store import RunStore
+from backend.engine.workflows.store import RunStore
 
 
 NOW = datetime(2026, 8, 20, tzinfo=UTC)
@@ -143,7 +143,7 @@ def completed_ingestion_run(
                 batch_index=0,
                 status="succeeded" if status == "completed" else "failed",
                 output={
-                    "index_id": "1" * 64,
+                    "index_id": "idx_" + ("1" * 64),
                     "file_name": "company.xlsx",
                     "workbook_hash": workbook_hash,
                     "model": "text-embedding-3-large",
@@ -153,11 +153,11 @@ def completed_ingestion_run(
             ),
             "company": RunNodeState(
                 node_id="company",
-                module_type="index_company_persistence",
+                module_type="company_entity_extractor",
                 batch_index=0,
                 status="succeeded" if status == "completed" else "failed",
                 output={
-                    "index_id": "1" * 64,
+                    "index_id": "idx_" + ("1" * 64),
                     "company_name": "BISTelligence",
                     "ticker": "BIST",
                 },
@@ -214,7 +214,7 @@ class BiIngestionCompletionTests(unittest.TestCase):
             self.assertEqual(request.display_name, "BISTelligence")
             self.assertEqual(request.source.file_name, "company.xlsx")
             self.assertEqual(request.source.workbook_hash, "a" * 64)
-            self.assertEqual(request.source.index_id, "1" * 64)
+            self.assertEqual(request.source.index_id, "idx_" + ("1" * 64))
             stored_job = store.get_job(job_id)
             self.assertEqual(
                 stored_job.status if stored_job else None,

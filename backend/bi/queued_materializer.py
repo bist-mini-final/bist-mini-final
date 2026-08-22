@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Protocol, assert_never
 
-from backend.llm.chat_completion import ChatCompletionError
-from backend.modules.base import ModuleExecutionError
+from backend.providers.llm.chat_completion import ChatCompletionError
+from modules.common.exceptions import ModuleExecutionError
 from pydantic import ValidationError
 
 from .catalog import METRIC_CATALOG, SourceMetricDefinition

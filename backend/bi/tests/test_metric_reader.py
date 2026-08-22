@@ -14,7 +14,7 @@ from backend.bi.metric_reader import (
 )
 from backend.bi.models import BiMaterializationSource, MetricId
 from backend.bi.profile_models import BiDocumentProfileReaderResponse
-from backend.llm.chat_completion import ChatCompletionClient
+from backend.providers.llm.chat_completion import ChatCompletionClient
 
 
 class FakeStructuredCompletionClient:

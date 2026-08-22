@@ -3,7 +3,7 @@ from typing import Protocol, TypeAlias, assert_never
 
 from pydantic import ValidationError
 
-from backend.llm.chat_completion import ChatCompletionClient
+from backend.providers.llm.chat_completion import ChatCompletionClient
 
 from .extraction_models import (
     BiMetricExtractionRequest,

@@ -11,7 +11,7 @@ from backend.bi.composition import create_bi_services
 from backend.storage.db_manager import DatabaseManager
 
 with patch.object(DatabaseManager, "ensure_schema"):
-    from app import create_app
+    from backend.main import create_app
 
 
 def create_test_app() -> FastAPI:

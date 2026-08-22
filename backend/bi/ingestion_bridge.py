@@ -8,14 +8,14 @@ from unicodedata import normalize
 
 from pydantic import ValidationError
 
-from backend.modules.index_company_persistence import (
-    IndexCompanyPersistenceOutputDTO,
+from modules.storage.company_entity_extractor import (
+    CompanyEntityExtractorOutputDTO,
 )
-from backend.modules.vector_index_writer import VectorIndexDTO
-from backend.workflows.dispatcher import InteractiveWorkflowDispatcher
-from backend.workflows.executor import WorkflowExecutor
-from backend.workflows.models import RunNodeState, WorkflowRun
-from backend.workflows.store import RunStore
+from modules.storage.pgvector_index_writer import VectorIndexDTO
+from backend.engine.workflows.dispatcher import InteractiveWorkflowDispatcher
+from backend.engine.workflows.executor import WorkflowExecutor
+from backend.engine.workflows.models import RunNodeState, WorkflowRun
+from backend.engine.workflows.store import RunStore
 
 from .api_services import BiApiServices
 from .models import (
@@ -60,7 +60,7 @@ class BiIndexingCompletionAdapter:
                 assert_never(unreachable)
 
         writer_state = self._node_state(run, "pgvector_index_writer")
-        company_state = self._node_state(run, "index_company_persistence")
+        company_state = self._node_state(run, "company_entity_extractor") or self._node_state(run, "index_company_persistence")
         if writer_state is None:
             raise BiIndexingCompletionContractError(run.id, "index_output_missing")
         if company_state is None:
@@ -68,7 +68,7 @@ class BiIndexingCompletionAdapter:
 
         try:
             index = VectorIndexDTO.model_validate(writer_state.output)
-            company = IndexCompanyPersistenceOutputDTO.model_validate(
+            company = CompanyEntityExtractorOutputDTO.model_validate(
                 company_state.output
             )
             if company.index_id != index.index_id:

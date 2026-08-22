@@ -5,8 +5,8 @@ from typing import Final, Protocol, assert_never
 
 from pydantic import ValidationError
 
-from backend.llm.chat_completion import ChatCompletionError
-from backend.modules.base import ModuleExecutionError
+from backend.providers.llm.chat_completion import ChatCompletionError
+from modules.common.exceptions import ModuleExecutionError
 
 from .catalog import METRIC_CATALOG, DerivedMetricDefinition, SourceMetricDefinition
 from .extraction_models import BiMetricExtractionRequest, BiMetricExtractionResult

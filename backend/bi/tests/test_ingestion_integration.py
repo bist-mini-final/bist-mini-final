@@ -23,7 +23,7 @@ from backend.bi.tests.test_ingestion_bridge import (
     NOW,
     completed_ingestion_run,
 )
-from backend.workflows.store import RunStore
+from backend.engine.workflows.store import RunStore
 
 
 class CompletingRunner:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from backend.llm.chat_completion import ChatCompletionClient
+from backend.providers.llm.chat_completion import ChatCompletionClient
 from backend.storage.pgvector_store import PgVectorStore
 
 from .api_services import BiApiServices
@@ -38,7 +38,7 @@ from .question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
 from .snapshot_store import DEFAULT_BI_ARTIFACT_DIR, FileBiSnapshotStore
 
 if TYPE_CHECKING:
-    from backend.runtime.registry import ModuleRegistry
+    from backend.engine.runtime.registry import ModuleRegistry
 
 
 BI_READER_MODEL: Final = "gpt-5.6-luna"

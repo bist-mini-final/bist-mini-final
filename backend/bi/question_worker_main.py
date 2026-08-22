@@ -3,8 +3,8 @@ import socket
 from uuid import uuid4
 
 from backend.core.settings import CACHE_DIR
-from backend.llm.chat_completion import ChatCompletionClient
-from backend.runtime.registry import ModuleRegistry
+from backend.providers.llm.chat_completion import ChatCompletionClient
+from backend.engine.runtime.registry import ModuleRegistry
 from backend.storage.answer_cache import AnswerCacheRepository
 
 from .composition import create_bi_question_worker
