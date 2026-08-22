@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: __FRONTEND_IMAGE__
+          image: bist-frontend:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

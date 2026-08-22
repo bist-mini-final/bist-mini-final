@@ -69,11 +69,11 @@ PY
 
 start_database() {
   if database_is_local; then
-    docker compose -f "${PROJECT_ROOT}/deploy/db/docker-compose.yml" up -d --wait
+    docker compose -f "${PROJECT_ROOT}/deploy/compose/docker-compose.yml" up -d --wait
   else
     # A remote PGVECTOR_URL makes the local container unnecessary. Preserve
     # its named volume so switching back to local does not lose data.
-    docker compose -f "${PROJECT_ROOT}/deploy/db/docker-compose.yml" down
+    docker compose -f "${PROJECT_ROOT}/deploy/compose/docker-compose.yml" down
   fi
   (
     cd "${PROJECT_ROOT}"
@@ -172,20 +172,20 @@ PY
 )"
   scaledjob_existed="false"
   previous_connection_hash=""
-  if kubectl get scaledjob excel-ingestion -n "${NAMESPACE}" >/dev/null 2>&1; then
+  if kubectl get scaledjob workflow-worker -n "${NAMESPACE}" >/dev/null 2>&1; then
     scaledjob_existed="true"
-    previous_connection_hash="$(kubectl get scaledjob excel-ingestion \
+    previous_connection_hash="$(kubectl get scaledjob workflow-worker \
       -n "${NAMESPACE}" \
       -o jsonpath='{.metadata.annotations.bist\.ai/connection-hash}')"
   fi
   configured_max_jobs="$(env_value KUBERNETES_MAX_JOBS)"
-  max_jobs="${KUBERNETES_MAX_JOBS:-${configured_max_jobs:-$(python3 "${DEPLOY_DIR}/capacity.py")}}"
+  max_jobs="${KUBERNETES_MAX_JOBS:-${configured_max_jobs:-$(python3 "${DEPLOY_DIR}/scripts/capacity.py")}}"
 
-  kubectl apply -f "${DEPLOY_DIR}/templates/namespace.yaml"
+  kubectl apply -f "${DEPLOY_DIR}/manifests/00-namespace.yaml"
   if database_is_local; then
     database_endpoint="$(docker inspect bist-pgvector \
       --format "{{(index .NetworkSettings.Networks \"k3d-${CLUSTER_NAME}\").IPAddress}}")"
-    python3 "${DEPLOY_DIR}/render_database.py" \
+    python3 "${DEPLOY_DIR}/scripts/render_database.py" \
       --endpoint "${database_endpoint}" | kubectl apply -f -
   else
     kubectl delete service bist-pgvector -n "${NAMESPACE}" --ignore-not-found
@@ -197,7 +197,7 @@ PY
     --from-literal=OPENAI_API_KEY="${openai_key}" \
     --from-literal=OPENAI_BASE_URL="${openai_base}" \
     --dry-run=client -o yaml | kubectl apply -f -
-  python3 "${DEPLOY_DIR}/render.py" \
+  python3 "${DEPLOY_DIR}/scripts/render.py" \
     --max-replicas "${max_jobs}" \
     --queue "${QUEUE_NAME}" \
     --image "${WORKER_IMAGE}" \
@@ -219,7 +219,7 @@ PY
 
 show_status() {
   kubectl config use-context "k3d-${CLUSTER_NAME}" >/dev/null 2>&1 || true
-  python3 "${DEPLOY_DIR}/capacity.py" --details
+  python3 "${DEPLOY_DIR}/scripts/capacity.py" --details
   k3d cluster list
   kubectl get pods -n keda 2>/dev/null || true
   kubectl get scaledjobs,jobs,pods -n "${NAMESPACE}" 2>/dev/null || true
