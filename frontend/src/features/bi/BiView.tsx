@@ -46,7 +46,12 @@ export function BiView() {
 
   return (
     <section className="bi-page" aria-labelledby="bi-page-title">
-      <BiHeader dashboard={dashboard} periodLabel={selectedPeriod} />
+      <BiHeader
+        dashboard={dashboard}
+        periodLabel={selectedPeriod}
+        isRefreshing={false}
+        onRefresh={() => {}}
+      />
       <BiPageNotice refresh={dashboard.refresh} />
 
       <div className="bi-page__workspace">
@@ -98,6 +103,8 @@ export function BiView() {
         <EvidenceDialog
           cardTitle={evidenceCard.title}
           evidence={evidenceViewModel.evidence}
+          source={dashboard.source}
+          snapshotId={dashboard.snapshot.snapshotId}
           onClose={() => setEvidenceCardId(null)}
         />
       ) : null}

@@ -1,6 +1,8 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { ModuleType } from '../types';
 
+export const INITIAL_QUERY = '삼성전자 2023년 대비 2024년 영업이익 증가율은?';
+
 export const PIPELINE_STAGES = [
   { id: 'query', label: '1. Query Input', color: '#107c41' },
   { id: 'decompose', label: '2. Decompose', color: '#7c3aed' },
