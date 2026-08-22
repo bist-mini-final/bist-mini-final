@@ -23,13 +23,12 @@ Example:
       "company_name": "삼성전자",
       "items": [
         {
-          "cell_id": "IS_C5",
+          "cell_id": "삼성전자:IS:C5",
           "sheet_name": "손익계산서",
           "cell_coord": "C5",
           "row_header": ["영업이익"],
           "column_header": ["2023"],
           "cell_value": "65670",
-          "company_name": "삼성전자",
           "variant": "header_with_value",
           "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
         }
@@ -94,16 +93,12 @@ CellTextSerializerExecutionDTO = CellTextSerializerInputDTO
 
 
 class CellTextDocumentDTO(ModuleDTO):
-    cell_id: str = Field(description="시트 코드와 셀 좌표로 만든 검색 문서 ID")
+    cell_id: str = Field(description="기업명·시트코드·셀좌표 기반 전역 고유 검색 문서 ID (예: Samsung:IS:C5)")
     sheet_name: str = Field(description="정규화된 원본 시트 이름")
     cell_coord: str = Field(description="Excel 셀 좌표")
     row_header: List[str] = Field(description="상위 수준부터 수집한 행 헤더")
     column_header: List[str] = Field(description="상위 수준부터 수집한 열 헤더")
     cell_value: str = Field(description="Excel 데이터 셀의 표시 값")
-    company_name: Optional[str] = Field(
-        default=None,
-        description="추출된 공식 기업명 (알려진 경우)",
-    )
     variant: Literal["header_only", "header_with_value"]
     text: str = Field(description="Company를 포함한 5필드 공통 포맷 검색 문서")
 
@@ -256,7 +251,8 @@ class CellTextSerializerModule(BaseModule):
                     continue
 
                 cell_coord = f"{get_column_letter(column)}{row}"
-                cell_id = f"{code} Cell {cell_coord}"
+                clean_comp = re.sub(r"[^A-Za-z0-9가-힣]", "", str(company_name).strip()) if company_name else ""
+                cell_id = f"{clean_comp}:{code}:{cell_coord}" if clean_comp else f"{code}:{cell_coord}"
                 if cell_id in seen_cell_ids:
                     raise ModuleExecutionError(
                         f"겹치는 테이블 영역에서 중복 셀이 생성되었습니다: {cell_id}"
@@ -273,7 +269,6 @@ class CellTextSerializerModule(BaseModule):
                         "row_header": r_combo,
                         "column_header": c_combo,
                         "cell_value": cell_value,
-                        "company_name": company_name,
                     }
                     if variant_mode == "both":
                         active_variants = [("header_only", UNKNOWN_FIELD), ("header_with_value", cell_value)]

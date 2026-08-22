@@ -12,13 +12,12 @@ Example:
       "company_name": "삼성전자",
       "items": [
         {
-          "cell_id": "IS_C5",
+          "cell_id": "삼성전자:IS:C5",
           "sheet_name": "손익계산서",
           "cell_coord": "C5",
           "row_header": ["영업이익"],
           "column_header": ["2023"],
           "cell_value": "65670",
-          "company_name": "삼성전자",
           "variant": "header_with_value",
           "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
         }
@@ -37,13 +36,12 @@ Example:
       "dimension": 3072,
       "items": [
         {
-          "cell_id": "IS_C5",
+          "cell_id": "삼성전자:IS:C5",
           "sheet_name": "손익계산서",
           "cell_coord": "C5",
           "row_header": ["영업이익"],
           "column_header": ["2023"],
           "cell_value": "65670",
-          "company_name": "삼성전자",
           "variant": "header_with_value",
           "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
           "embedding_index": 0
