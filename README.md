@@ -77,20 +77,27 @@ npm test
 
 ```
 bist-mini-final/
-├── backend/                  # FastAPI 백엔드, BI 엔진, DB 및 프로바이더
-│   ├── api/                  # REST 엔드포인트 및 라우터
-│   ├── bi/                   # BI 메트릭 분석, 질의 워커, 스냅샷 스토어
-│   ├── engine/               # 워크플로 DAG 실행기 및 모듈 레지스트리
-│   └── storage/              # PostgreSQL pgvector 스토어 및 아티팩트
-├── frontend/                 # React, Vite, TailwindCSS, XYFlow 시각화 UI
-├── modules/                  # 19개 표준 RAG 파이프라인 모듈 (Single Source of Truth)
+├── modules/                  # 19개 표준 RAG 단위 모듈 (Single Source of Truth)
 │   ├── common/               # BaseModule, BaseLLMModule, BaseEmbedderModule
 │   ├── embedding/            # Query & Cell Text Embedders
 │   ├── query/                # QueryInput, Decomposer, Router, Matcher
 │   ├── reader/               # Agentic Reader & Tools
 │   ├── retrieval/            # Dense/Sparse Retriever, RRF Fusion, Expander
 │   └── storage/              # File Selector, Metadata Persistence, PG Loader/Writer
-├── tests/                    # 테스트 스위트
-│   └── modules/              # BaseModule, 19개 모듈 단위 테스트 및 파이프라인 통합 테스트
-└── data/                     # 워크플로 템플릿 및 데이터 저장소
+├── jobs/                     # 선언적 파이프라인 Job 조합 레시피 (Pure Compositions)
+│   ├── excel_ingestion.py    # 엑셀 구조화 및 pgvector 인덱싱 Job 정의
+│   ├── bi_materialization.py # BI 재무제표 메트릭 분석 Job 정의
+│   └── rag_pipeline.py       # 하이브리드 RAG 질의응답 파이프라인 Job 정의
+├── backend/                  # FastAPI 백엔드 & 공통 런타임 엔진
+│   ├── api/                  # REST API 라우터 (Producer)
+│   ├── bi/                   # BI 메트릭 분석 및 대시보드 스냅샷 스토어
+│   ├── engine/               # PipelineRunner (인메모리 모듈 실행기)
+│   │   └── worker/           # 쿠버네티스 워커 런타임 (Consumer: DB Lease & Heartbeat)
+│   └── storage/              # PostgreSQL pgvector 스토어 및 아티팩트
+├── frontend/                 # React, Vite, TailwindCSS, XYFlow 시각화 UI
+├── deploy/                   # 배포 및 인프라 (Docker, KEDA ScaledJob, Kubernetes)
+│   ├── docker/               # Dockerfile.worker
+│   └── kubernetes/           # KEDA ScaledJob, Deployment, Ingress 매니페스트
+└── tests/                    # 테스트 스위트
+    └── modules/              # 모듈/파이프라인/워커/Job 단위 테스트
 ```
