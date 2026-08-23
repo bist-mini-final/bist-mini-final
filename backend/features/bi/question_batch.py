@@ -71,7 +71,7 @@ def build_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
                             question_version=plan.question_version,
                             question_text=definition.question_template.format(
                                 period_label=period.label,
-                                metric_label=definition.label_ko,
+                                metric_label=definition.label_en,
                             ),
                             status=BiQuestionStatus.QUEUED,
                             attempt_count=0,

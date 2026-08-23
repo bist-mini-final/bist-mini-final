@@ -56,7 +56,7 @@ class BiMetricExtractionService:
             return self._invalid(request, definition.value_kind, "unsupported_metric_definition")
         question = definition.question_template.format(
             period_label=request.period_label,
-            metric_label=definition.label_ko,
+            metric_label=definition.label_en,
         )
         return self.extract_question(request, question)
 
@@ -106,11 +106,13 @@ class BiMetricExtractionService:
         context: BiRetrievedContext,
         response: BiMetricReaderResponse,
     ) -> BiMetricExtractionResult:
-        if (
-            response.request_id != request.request_id
-            or response.metric_id != request.metric_id
-            or response.period_id != request.period_id
-        ):
+        metric_match = str(response.metric_id) == str(request.metric_id)
+        period_match = (
+            str(response.period_id) == str(request.period_id)
+            or str(request.period_id).endswith(str(response.period_id))
+            or str(response.period_id).endswith(str(request.period_id))
+        )
+        if not metric_match or not period_match:
             return self._invalid(request, value_kind, "reader_identity_mismatch")
 
         evidence = self._trusted_evidence(context, response.evidence_cell_ids)

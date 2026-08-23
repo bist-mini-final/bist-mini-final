@@ -24,7 +24,7 @@ def _pool_size(name: str, default: int) -> int:
 
 
 _MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 2)
-_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 10))
+_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 50))
 
 def _normalize_url(database_url: str) -> str:
     """Strip SQLAlchemy dialect prefix so psycopg2 can parse the URL."""

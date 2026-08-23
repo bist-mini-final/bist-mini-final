@@ -183,18 +183,16 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
     def create_materialization(
         request: BiMaterializationRequest,
     ) -> BiMaterializationAccepted:
-        existing = services.store.find_latest_job(
-            request.company_id,
-            request.source.workbook_hash,
-        )
-        if (
-            existing is not None
-            and existing.status is not MaterializationStatus.FAILED
-        ):
-            return accepted(existing)
-        latest_job = services.store.get_latest_job(request.company_id)
-        if latest_job is not None and is_active(latest_job.status):
-            raise HTTPException(status.HTTP_409_CONFLICT, MATERIALIZATION_ACTIVE)
+        # 동일 company에 대한 최신 job을 workbook hash 무관하게 조회한다.
+        existing = services.store.find_latest_job(request.company_id)
+        if existing is not None and existing.status is not MaterializationStatus.FAILED:
+            if existing.workbook_hash == request.source.workbook_hash:
+                # 같은 workbook으로 이미 처리 중이거나 완료 → 기존 job 반환
+                return accepted(existing)
+            if is_active(existing.status):
+                # 다른 workbook이지만 아직 active → 충돌
+                raise HTTPException(status.HTTP_409_CONFLICT, MATERIALIZATION_ACTIVE)
+            # 다른 workbook이고 완료 상태(partial/ready) → 새 hash로 materialization 허용
 
         job_id = job_id_for(request)
         now = services.clock.now()

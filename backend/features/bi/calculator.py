@@ -244,26 +244,48 @@ def calculate_total_debt(
     inputs = components.observations()
     period_id = components.short_term_debt.period_id
     formula_id = "total_debt_components"
+    avail_components = [
+        obs for obs in inputs if isinstance(obs, AvailableObservation)
+    ]
+    if avail_components:
+        st_val = (
+            components.short_term_debt.normalized_value
+            if isinstance(components.short_term_debt, AvailableObservation)
+            else Decimal(0)
+        )
+        cp_val = (
+            components.current_portion_of_long_term_debt.normalized_value
+            if isinstance(
+                components.current_portion_of_long_term_debt,
+                AvailableObservation,
+            )
+            else Decimal(0)
+        )
+        lt_val = (
+            components.long_term_debt.normalized_value
+            if isinstance(components.long_term_debt, AvailableObservation)
+            else Decimal(0)
+        )
+        return _available_result(
+            DerivedValue(
+                period_id,
+                formula_id,
+                st_val + cp_val + lt_val,
+            ),
+            inputs,
+        )
+
     blocked = _prepare_inputs(period_id, formula_id, inputs)
     if blocked is not None:
         return blocked
 
-    match inputs:
-        case (
-            AvailableObservation(normalized_value=short_term),
-            AvailableObservation(normalized_value=current_portion),
-            AvailableObservation(normalized_value=long_term),
-        ):
-            return _available_result(
-                DerivedValue(
-                    period_id,
-                    formula_id,
-                    short_term + current_portion + long_term,
-                ),
-                inputs,
-            )
-        case _:
-            raise TypeError("total-debt inputs were not narrowed to available observations")
+    return UnavailableObservation(
+        period_id=period_id,
+        status=MetricStatus.MISSING,
+        evidence=_merge_evidence(inputs),
+        notes=(formula_id,),
+        reason="no_debt_components_available",
+    )
 
 
 def calculate_net_debt(

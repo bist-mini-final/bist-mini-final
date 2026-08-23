@@ -196,29 +196,39 @@ class LlmQueryRouterModule(BaseLLMModule):
         selections: Dict[int, RouteSelectionDTO] = {}
         for selection in parsed.routes:
             if selection.subquery_index >= len(subqueries):
-                raise ModuleExecutionError(
-                    f"Router가 존재하지 않는 subquery_index를 반환했습니다: "
-                    f"{selection.subquery_index}"
-                )
+                continue
             if selection.subquery_index in selections:
-                raise ModuleExecutionError(
-                    f"Router가 subquery_index를 중복 반환했습니다: "
-                    f"{selection.subquery_index}"
-                )
+                continue
             unique_ids = list(dict.fromkeys(selection.index_ids))
-            unknown = [index_id for index_id in unique_ids if index_id not in catalog_by_id]
-            if unknown:
-                raise ModuleExecutionError(
-                    "Router가 catalog에 없는 collection을 선택했습니다: "
-                    + ", ".join(unknown)
-                )
-            if len(unique_ids) > cfg.max_collections_per_subquery:
-                raise ModuleExecutionError(
-                    f"서브쿼리당 collection 선택 한도는 "
-                    f"{cfg.max_collections_per_subquery}개입니다"
-                )
+            resolved_ids = []
+            for index_id in unique_ids:
+                if index_id in catalog_by_id:
+                    resolved_ids.append(index_id)
+                elif len(catalog) == 1:
+                    resolved_ids.append(catalog[0].index_id)
+                else:
+                    matched = next(
+                        (
+                            c.index_id
+                            for c in catalog
+                            if len(index_id) >= 8
+                            and (
+                                c.index_id.startswith(index_id[:8])
+                                or index_id.startswith(c.index_id[:8])
+                            )
+                        ),
+                        None,
+                    )
+                    if matched:
+                        resolved_ids.append(matched)
+                    else:
+                        raise ModuleExecutionError(
+                            f"Router가 catalog에 없는 collection을 반환했습니다: {index_id}"
+                        )
+
+            resolved_ids = resolved_ids[: cfg.max_collections_per_subquery]
             selections[selection.subquery_index] = selection.model_copy(
-                update={"index_ids": unique_ids}
+                update={"index_ids": resolved_ids}
             )
 
         missing = [index for index in range(len(subqueries)) if index not in selections]

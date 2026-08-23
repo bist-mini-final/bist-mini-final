@@ -22,11 +22,13 @@ export function StabilityChart({ dashboard, range, size }: StabilityChartProps) 
   const netDebt = latest?.values.net_debt ?? null;
   const cash = Math.abs(cashValue ?? 0);
   const debt = Math.abs(debtValue ?? 0);
-  const comparison = [{
-    label: latest?.periodLabel ?? '최근',
-    cash: cashValue === null ? null : -cash,
-    debt: debtValue === null ? null : debt,
-  }];
+  const comparison = [
+    {
+      label: latest?.periodLabel ?? '최근',
+      cash: cashValue === null ? null : -cash,
+      debt: debtValue === null ? null : debt,
+    },
+  ];
   const plotPadding = Math.max(cash + debt, 1) * 0.05;
   const zeroPosition = ((cash + plotPadding) / (cash + debt + plotPadding * 2)) * 100;
   return (

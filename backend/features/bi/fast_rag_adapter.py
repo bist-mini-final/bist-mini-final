@@ -256,7 +256,10 @@ class FastRagPipelineAdapter:
             collection_name=identity.index_id,
             limit=self._settings.context_cell_limit,
         )
-        cells_by_id: dict[str, RankedEvidenceCell] = {}
+        if not raw_cells:
+            raise RagPipelineContractError(code="context_cells_missing")
+
+        cells_by_key: dict[str, RankedEvidenceCell] = {}
         for raw_cell in raw_cells:
             cell = RankedEvidenceCell.model_validate(
                 {
@@ -266,12 +269,50 @@ class FastRagPipelineAdapter:
                     "source_text": raw_cell.get("source_text"),
                 }
             )
-            cells_by_id.setdefault(cell.cell_id, cell)
-        selected = tuple(
-            cells_by_id[cell_id]
-            for cell_id in ranked_ids
-            if cell_id in cells_by_id
-        )
-        if not selected:
+            keys = [
+                str(raw_cell.get("id") or ""),
+                str(raw_cell.get("cell_id") or ""),
+                str(raw_cell.get("cell_coord") or ""),
+                f"{raw_cell.get('sheet_name')} Cell {raw_cell.get('cell_coord')}",
+                f"{raw_cell.get('sheet_name')}:{raw_cell.get('cell_coord')}",
+            ]
+            sheet = str(raw_cell.get("sheet_name") or "")
+            coord = str(raw_cell.get("cell_coord") or "")
+            if sheet == "Income_Statement":
+                keys.append(f"IS Cell {coord}")
+            elif sheet == "Balance_Sheet":
+                keys.append(f"BS Cell {coord}")
+            elif sheet == "Cash_Flow":
+                keys.append(f"CF Cell {coord}")
+            elif sheet == "Key_Stats":
+                keys.append(f"KS Cell {coord}")
+
+            for k in keys:
+                if k:
+                    cells_by_key.setdefault(k, cell)
+
+        selected_list: list[RankedEvidenceCell] = []
+        seen_ids: set[str] = set()
+        for cell_id in ranked_ids:
+            matched = cells_by_key.get(cell_id)
+            if matched and matched.cell_id not in seen_ids:
+                seen_ids.add(matched.cell_id)
+                selected_list.append(matched)
+
+        if not selected_list and raw_cells:
+            for raw_cell in raw_cells:
+                cell = RankedEvidenceCell.model_validate(
+                    {
+                        "cell_id": raw_cell.get("cell_id"),
+                        "sheet_name": raw_cell.get("sheet_name"),
+                        "cell_coord": raw_cell.get("cell_coord"),
+                        "source_text": raw_cell.get("source_text"),
+                    }
+                )
+                if cell.cell_id not in seen_ids:
+                    seen_ids.add(cell.cell_id)
+                    selected_list.append(cell)
+
+        if not selected_list:
             raise RagPipelineContractError(code="context_cells_missing")
-        return selected
+        return tuple(selected_list[: self._settings.context_cell_limit])

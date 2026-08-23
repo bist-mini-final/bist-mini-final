@@ -20,6 +20,7 @@ from .models import (
 )
 from .profile_models import (
     BiDocumentProfileReaderResponse,
+    BiPeriodReaderPayload,
     BiProfileRetrievalRequest,
 )
 
@@ -102,7 +103,11 @@ class BiDocumentProfiler:
                     "content": (
                         "재무 문서의 기간과 표시 단위를 구조화한다. "
                         "allowed_evidence_cells의 cell_id만 근거로 사용하고 "
-                        "각 기간은 별도 항목으로 반환하며 발견되지 않은 정보는 null로 둔다."
+                        "각 기간은 별도 항목으로 반환하며 발견되지 않은 정보는 null로 둔다. "
+                        "currency는 반드시 ISO 4217 3자리 대문자 코드만 사용하라 "
+                        "(예: KRW, USD, EUR, JPY, GBP). "
+                        "통화를 특정할 수 없거나 문서에 명시되지 않은 경우 반드시 null을 반환하라. "
+                        "'Won', 'Dollar', '$', 'USD Dollar' 등 비표준 형식은 절대 사용 금지."
                     ),
                 },
                 {"role": "user", "content": payload},
@@ -144,7 +149,7 @@ class BiDocumentProfiler:
                 relevant_sheets=relevant_sheets,
                 evidence=evidence,
             )
-        except ValidationError:
+        except (ValidationError, ValueError):
             return BiProfilingFailure(
                 code="invalid_profile_payload",
                 message="document profile did not match the structured contract",
@@ -218,16 +223,19 @@ class BiDocumentProfiler:
         )
 
     @staticmethod
-    def _canonical_period(period: BiPeriod) -> BiPeriod:
+    def _canonical_period(period: BiPeriodReaderPayload) -> BiPeriod:
         if period.end_date is not None:
             period_key = period.end_date.isoformat()
         else:
             normalized_label = " ".join(period.source_label.split()).casefold()
             period_key = sha256(normalized_label.encode("utf-8")).hexdigest()[:16]
-        return period.model_copy(
-            update={
-                "period_id": PeriodId(f"{period.kind.value}-{period_key}")
-            }
+        return BiPeriod(
+            period_id=PeriodId(f"{period.kind.value}-{period_key}"),
+            kind=period.kind,
+            label=period.label,
+            source_label=period.source_label,
+            end_date=period.end_date,
+            ordinal=period.ordinal,
         )
 
     def _profile_requests(

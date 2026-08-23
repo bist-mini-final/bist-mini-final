@@ -46,7 +46,6 @@ class BiApiStorePort(Protocol):
     def find_latest_job(
         self,
         company_id: CompanyId,
-        workbook_hash: str,
     ) -> BiMaterializationJob | None: ...
 
 

@@ -34,13 +34,12 @@ class BiDocumentProfile(BiContractModel):
         periods: tuple[BiPeriod, ...],
     ) -> tuple[BiPeriod, ...]:
         ids = {period.period_id for period in periods}
-        ordinals = {period.ordinal for period in periods}
-        if len(ids) != len(periods) or len(ordinals) != len(periods):
+        if len(ids) != len(periods):
             raise PydanticCustomError(
                 "duplicate_period",
-                "period_id and ordinal must be unique",
+                "period_id must be unique",
             )
-        return tuple(sorted(periods, key=lambda period: period.ordinal))
+        return tuple(sorted(periods, key=lambda period: (period.ordinal, period.kind.value)))
 
 
 @dataclass(frozen=True, slots=True)

@@ -44,7 +44,7 @@ class OpenAIProvider:
         api_key: str | None = None,
         base_url: str | None = None,
         timeout_seconds: float = 60.0,
-        max_retries: int = 2,
+        max_retries: int = 6,
         http_client: httpx.Client | None = None,
     ) -> None:
         self.api_key = api_key or project_env_value("OPENAI_API_KEY")

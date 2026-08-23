@@ -46,7 +46,15 @@ const STATE_LABELS: Readonly<Record<CardState, string>> = {
 };
 
 function getCardState(definition: BiCardDefinition, metrics: BiDashboardSnapshot['metrics']): CardState {
+  const primaryStatus = metrics[definition.primaryMetric]?.status ?? 'missing';
   const statuses = definition.requiredMetrics.map((metricId) => metrics[metricId]?.status ?? 'missing');
+
+  // If the primary metric has available data, allow the chart to render (ready or partial)
+  if (primaryStatus === 'available') {
+    const allAvailable = statuses.every((status) => status === 'available');
+    return allAvailable ? 'ready' : 'partial';
+  }
+
   if (statuses.includes('invalid')) return 'invalid';
   if (statuses.includes('ambiguous')) return 'ambiguous';
   const availableCount = statuses.filter((status) => status === 'available').length;

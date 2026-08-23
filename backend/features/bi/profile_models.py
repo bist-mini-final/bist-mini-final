@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import Field
 
 from .models import (
@@ -5,7 +7,7 @@ from .models import (
     AmountScale,
     BiContractModel,
     BiMaterializationSource,
-    BiPeriod,
+    PeriodKind,
 )
 
 
@@ -16,8 +18,22 @@ class BiProfileRetrievalRequest(BiContractModel):
     sheet_name: str | None = Field(default=None, min_length=1, max_length=128)
 
 
+class BiPeriodReaderPayload(BiContractModel):
+    """LLM 응답 전용 period DTO.
+
+    `period_id`는 서버의 `_canonical_period()`에서 결정론적으로 생성하므로
+    LLM에게 엄격한 regex 패턴을 요구하지 않는다.
+    """
+
+    kind: PeriodKind
+    label: str = Field(min_length=1, max_length=64)
+    source_label: str = Field(min_length=1, max_length=64)
+    end_date: date | None
+    ordinal: int
+
+
 class BiProfilePeriodReaderResponse(BiContractModel):
-    period: BiPeriod
+    period: BiPeriodReaderPayload
     evidence_cell_ids: tuple[str, ...] = ()
 
 

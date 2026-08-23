@@ -29,6 +29,12 @@ from .question_snapshot import (
 )
 from .question_snapshot_repository import PostgresBiQuestionSnapshotRepository
 from .question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
+from .question_batch_worker import (
+    BiQuestionBatchWorker,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MAX_WORKERS,
+    SystemBiQuestionBatchWorkerClock,
+)
 from .queued_materializer import BiQueuedMaterializer, BiQueuedMaterializerServices
 
 if TYPE_CHECKING:
@@ -119,4 +125,38 @@ def create_bi_question_worker(
         BiPublishingQuestionService(service, snapshot_materializer),
         create_bi_question_pipeline(registry, completion_client),
         SystemBiQuestionWorkerClock(),
+    )
+
+
+def create_bi_question_batch_worker(
+    registry: ModuleRegistry,
+    completion_client: OpenAIResponsesClient,
+    *,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    max_workers: int = DEFAULT_MAX_WORKERS,
+) -> BiQuestionBatchWorker:
+    """Build a batch question worker that claims *batch_size* questions and
+    processes them concurrently using up to *max_workers* threads.
+
+    Snapshot refresh (publish_snapshot) is triggered per-question through the
+    same :class:`BiPublishingQuestionService` used by the single-question worker
+    so no changes to the snapshot pipeline are required.
+    """
+    service = create_bi_question_service()
+    store = PostgresBiStore(registry.db_manager.database_url)
+    snapshot_materializer = BiQuestionSnapshotMaterializer(
+        BiQuestionSnapshotMaterializerServices(
+            questions=service,
+            answers=PostgresBiQuestionSnapshotRepository(),
+            store=store,
+            clock=SystemClock(),
+        )
+    )
+    publishing_service = BiPublishingQuestionService(service, snapshot_materializer)
+    return BiQuestionBatchWorker(
+        publishing_service,
+        create_bi_question_pipeline(registry, completion_client),
+        SystemBiQuestionBatchWorkerClock(),
+        batch_size=batch_size,
+        max_workers=max_workers,
     )

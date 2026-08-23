@@ -1227,34 +1227,32 @@ class PgVectorStore:
                 params: List[Any] = []
 
                 if use_quantized_index:
-                    where_clauses.append(f"vector_dims(embedding) = {dim}")
-
-                if company_name and isinstance(company_name, str) and company_name.strip():
-                    clean_company = company_name.strip()
-                    escaped_company = _escape_like_term(clean_company)
-                    where_clauses.append(
-                        "(cmetadata->>'company_name' ILIKE %s ESCAPE '!' "
-                        "OR cmetadata->>'company_name' = %s)"
-                    )
-                    params.extend([f"%{escaped_company}%", clean_company])
-
-                if sheet_names and isinstance(sheet_names, (list, tuple, set)):
-                    valid_sheets = [s.strip() for s in sheet_names if isinstance(s, str) and s.strip()]
-                    if valid_sheets:
-                        where_clauses.append("(cmetadata->>'sheet_name' = ANY(%s))")
-                        params.append(valid_sheets)
-
-                where_sql = " AND ".join(where_clauses)
-
-                if use_quantized_index:
                     candidate_limit = min(max(k * 20, 100), 1000)
+                    index_where_sql = f"collection_id = '{collection_uuid}'::uuid AND vector_dims(embedding) = {dim}"
+                    outer_where_clauses: List[str] = []
+                    outer_params: List[Any] = []
+                    if company_name and isinstance(company_name, str) and company_name.strip():
+                        clean_company = company_name.strip()
+                        escaped_company = _escape_like_term(clean_company)
+                        outer_where_clauses.append(
+                            "(cmetadata->>'company_name' ILIKE %s ESCAPE '!' "
+                            "OR cmetadata->>'company_name' = %s)"
+                        )
+                        outer_params.extend([f"%{escaped_company}%", clean_company])
+                    if sheet_names and isinstance(sheet_names, (list, tuple, set)):
+                        valid_sheets = [s.strip() for s in sheet_names if isinstance(s, str) and s.strip()]
+                        if valid_sheets:
+                            outer_where_clauses.append("(cmetadata->>'sheet_name' = ANY(%s))")
+                            outer_params.append(valid_sheets)
+                    outer_where_sql = f"WHERE {' AND '.join(outer_where_clauses)}" if outer_where_clauses else ""
+
                     query_sql = f"""
                         WITH query_vector AS MATERIALIZED (
                             SELECT %s::vector AS embedding
                         ), candidates AS MATERIALIZED (
                             SELECT id, document, cmetadata, source.embedding
                             FROM langchain_pg_embedding AS source
-                            WHERE {where_sql}
+                            WHERE {index_where_sql}
                             ORDER BY
                                 binary_quantize(source.embedding)::bit({dim})
                                 <~> binary_quantize(
@@ -1267,18 +1265,35 @@ class PgVectorStore:
                                    AS distance
                         FROM candidates
                         CROSS JOIN query_vector
+                        {outer_where_sql}
                         ORDER BY
                             candidates.embedding <=> query_vector.embedding
                         LIMIT %s;
                     """
                     full_params = [
                         embedding,
-                        *params,
                         candidate_limit,
+                        *outer_params,
                         k,
                     ]
                     cur.execute(query_sql, full_params)
                 else:
+                    if company_name and isinstance(company_name, str) and company_name.strip():
+                        clean_company = company_name.strip()
+                        escaped_company = _escape_like_term(clean_company)
+                        where_clauses.append(
+                            "(cmetadata->>'company_name' ILIKE %s ESCAPE '!' "
+                            "OR cmetadata->>'company_name' = %s)"
+                        )
+                        params.extend([f"%{escaped_company}%", clean_company])
+
+                    if sheet_names and isinstance(sheet_names, (list, tuple, set)):
+                        valid_sheets = [s.strip() for s in sheet_names if isinstance(s, str) and s.strip()]
+                        if valid_sheets:
+                            where_clauses.append("(cmetadata->>'sheet_name' = ANY(%s))")
+                            params.append(valid_sheets)
+
+                    where_sql = " AND ".join(where_clauses)
                     query_sql = f"""
                         SELECT id, document, cmetadata, (embedding <=> %s::vector) AS distance
                         FROM langchain_pg_embedding
@@ -1491,14 +1506,15 @@ class PgVectorStore:
                                 UPPER(cmetadata->>'sheet_name'),
                                 UPPER(cmetadata->>'cell_coord')
                             ORDER BY
-                                CASE cmetadata->>'variant'
-                                    WHEN 'header_with_value' THEN 0
-                                    WHEN 'header_only' THEN 1
-                                    ELSE 2
+                                CASE
+                                    WHEN document NOT LIKE '%%Cell Value: ?%%' AND document NOT LIKE '%%Cell Value: NA%%' AND NULLIF(cmetadata->>'cell_value', '') IS NOT NULL AND cmetadata->>'cell_value' NOT IN ('?', 'NA') THEN 0
+                                    WHEN cmetadata->>'variant' = 'header_with_value' THEN 1
+                                    WHEN document NOT LIKE '%%Cell Value: ?%%' THEN 2
+                                    WHEN cmetadata->>'variant' = 'header_only' THEN 3
+                                    ELSE 4
                                 END,
                                 COALESCE(cmetadata->'row_header', '[]'::jsonb)::text,
                                 COALESCE(cmetadata->'column_header', '[]'::jsonb)::text,
-                                COALESCE(document, ''),
                                 id
                         ) AS cell_rank
                     FROM langchain_pg_embedding
@@ -1522,7 +1538,7 @@ class PgVectorStore:
                         id,
                         document,
                         cmetadata,
-                        cell_id,
+                        COALESCE(cell_id, sheet_name || ' Cell ' || cell_coord) AS cell_id,
                         cell_coord,
                         sheet_name,
                         cell_value,
@@ -1531,9 +1547,14 @@ class PgVectorStore:
                         company_name
                     FROM ranked_cells
                     WHERE cell_rank = 1
-                    ORDER BY UPPER(sheet_name), UPPER(cell_coord), id
+                    ORDER BY
+                        CASE WHEN COALESCE(cell_id, sheet_name || ' Cell ' || cell_coord) = ANY(%s) THEN 0 ELSE 1 END,
+                        UPPER(sheet_name),
+                        UPPER(cell_coord),
+                        id
                     LIMIT %s;
                 """
+                params.append(clean_ids)
                 params.append(limit)
 
                 try:
@@ -1549,6 +1570,7 @@ class PgVectorStore:
         results = []
         for r in rows:
             _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
+            resolved_cell_id = cell_id or f"{sheet_name} Cell {cell_coord}"
             if isinstance(row_header, str):
                 try:
                     row_header = json.loads(row_header)
@@ -1650,83 +1672,38 @@ class PgVectorStore:
 
                 query_sql = f"""
                     WITH {collection_cte_sql}
-                    requested_rows AS (
-                        SELECT unnest(%s::int[]) AS row_index
+                    filtered_rows AS (
+                        SELECT
+                            id,
+                            document,
+                            cmetadata,
+                            (cmetadata->>'row_index')::int AS resolved_row_index,
+                            CASE
+                                WHEN cmetadata->>'col_index' ~ '^\\d+$'
+                                    THEN (cmetadata->>'col_index')::int
+                                ELSE NULL
+                            END AS resolved_col_index,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY (cmetadata->>'row_index')::int
+                                ORDER BY
+                                    CASE WHEN cmetadata->>'col_index' ~ '^\\d+$' THEN (cmetadata->>'col_index')::int ELSE 99999 END,
+                                    id
+                            ) AS row_rank
+                        FROM langchain_pg_embedding
+                        WHERE cmetadata->>'row_index' ~ '^\\d+$'
+                          AND (cmetadata->>'row_index')::int = ANY(%s)
+                          {scope_sql}
                     )
-                    SELECT candidate.id,
-                           candidate.document,
-                           candidate.cmetadata,
-                           candidate.resolved_row_index,
-                           candidate.resolved_col_index
-                    FROM requested_rows
-                    CROSS JOIN LATERAL (
-                        SELECT DISTINCT ON (logical_cell_id)
-                               id,
-                               document,
-                               cmetadata,
-                               resolved_row_index,
-                               resolved_col_index,
-                               logical_cell_id
-                        FROM (
-                            SELECT
-                                id,
-                                document,
-                                cmetadata,
-                                (cmetadata->>'row_index')::int
-                                    AS resolved_row_index,
-                                CASE
-                                    WHEN cmetadata->>'col_index' ~ '^\\d+$'
-                                        THEN (cmetadata->>'col_index')::int
-                                    ELSE NULL
-                                END AS resolved_col_index,
-                                COALESCE(
-                                    NULLIF(cmetadata->>'cell_id', ''),
-                                    NULLIF(cmetadata->>'cell_coord', ''),
-                                    id
-                                ) AS logical_cell_id
-                            FROM langchain_pg_embedding
-                            WHERE cmetadata->>'row_index' ~ '^\\d+$'
-                              AND (cmetadata->>'row_index')::int
-                                  = requested_rows.row_index
-                              {scope_sql}
-                            UNION ALL
-                            SELECT
-                                id,
-                                document,
-                                cmetadata,
-                                substring(
-                                    cmetadata->>'cell_coord' FROM '([0-9]+)$'
-                                )::int AS resolved_row_index,
-                                NULL::int AS resolved_col_index,
-                                COALESCE(
-                                    NULLIF(cmetadata->>'cell_id', ''),
-                                    NULLIF(cmetadata->>'cell_coord', ''),
-                                    id
-                                ) AS logical_cell_id
-                            FROM langchain_pg_embedding
-                            WHERE NOT COALESCE(
-                                    cmetadata->>'row_index' ~ '^\\d+$',
-                                    false
-                                )
-                              AND cmetadata->>'cell_coord' ~ '[0-9]+$'
-                              AND substring(
-                                    cmetadata->>'cell_coord' FROM '([0-9]+)$'
-                                  )::int = requested_rows.row_index
-                              {scope_sql}
-                        ) AS matched_cells
-                        ORDER BY logical_cell_id,
-                                 resolved_col_index ASC NULLS LAST,
-                                 id
-                        LIMIT %s
-                    ) AS candidate
-                    ORDER BY candidate.resolved_row_index,
-                             candidate.resolved_col_index ASC NULLS LAST,
-                             candidate.logical_cell_id;
+                    SELECT id, document, cmetadata, resolved_row_index, resolved_col_index
+                    FROM filtered_rows
+                    WHERE row_rank <= %s
+                    ORDER BY resolved_row_index,
+                             resolved_col_index ASC NULLS LAST,
+                             id;
                 """
                 params = [
                     *cte_params,
                     unique_rows,
-                    *scope_params,
                     *scope_params,
                     max(1, limit_per_row),
                 ]

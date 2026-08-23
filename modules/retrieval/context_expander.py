@@ -114,22 +114,39 @@ class PgContextExpanderConfigDTO(ModuleConfigDTO):
 # ==============================================================================
 # 3. Coordinate Helper Functions
 # ==============================================================================
-def _parse_cell_id_coords(cell_id: str) -> Tuple[str, str, Optional[int], Optional[int]]:
-    """Parses cell_id string into (company, sheet_name, row_idx, col_idx)."""
-    parts = cell_id.split(":")
+def _parse_cell_id_coords(cell_id: str, text: str = "") -> Tuple[str, str, Optional[int], Optional[int]]:
+    """Parses cell_id string and candidate text into (company, sheet_name, row_idx, col_idx)."""
     company = ""
     sheet = ""
     coord = ""
 
+    parts = cell_id.split(":")
     if len(parts) >= 3:
-        company = parts[0]
-        sheet = parts[1]
-        coord = parts[2]
+        company = parts[0].strip()
+        sheet = parts[1].strip()
+        coord = parts[2].strip()
     elif len(parts) == 2:
-        sheet = parts[0]
-        coord = parts[1]
+        sheet = parts[0].strip()
+        coord = parts[1].strip()
     else:
-        coord = parts[0]
+        coord = parts[0].strip()
+
+    # If sheet is not in cell_id, extract from candidate text (e.g. "Sheet: Income_Statement | ...")
+    if not sheet and text:
+        match_sheet = re.search(r"Sheet:\s*([^|]+)", text)
+        if match_sheet:
+            sheet = match_sheet.group(1).strip()
+
+    # Fallback to standard sheet prefixes if still empty
+    if not sheet:
+        if cell_id.startswith("IS ") or "Income_Statement" in cell_id:
+            sheet = "Income_Statement"
+        elif cell_id.startswith("BS ") or "Balance_Sheet" in cell_id:
+            sheet = "Balance_Sheet"
+        elif cell_id.startswith("CF ") or "Cash_Flow" in cell_id:
+            sheet = "Cash_Flow"
+        elif cell_id.startswith("KS ") or "Key_Stats" in cell_id:
+            sheet = "Key_Stats"
 
     row_idx = None
     col_idx = None
@@ -137,7 +154,7 @@ def _parse_cell_id_coords(cell_id: str) -> Tuple[str, str, Optional[int], Option
         match = re.search(r"([A-Za-z]+)(\d+)", coord)
         if match:
             try:
-                r_tuple, c_tuple = coordinate_to_tuple(coord)
+                r_tuple, c_tuple = coordinate_to_tuple(match.group(0))
                 row_idx = r_tuple
                 col_idx = c_tuple
             except Exception:
@@ -201,7 +218,7 @@ class PgContextExpanderModule(BaseModule):
         # Step 2: Target the exact rows for all candidate cells
         target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
         for candidate in retrieval_items:
-            _, sheet, r_idx, _ = _parse_cell_id_coords(candidate.cell_id)
+            _, sheet, r_idx, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
             if candidate.index_id and sheet and r_idx is not None:
                 scope_key = (candidate.index_id, sheet)
                 if cfg.adjacent_radius and cfg.adjacent_radius > 0:

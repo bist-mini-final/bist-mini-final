@@ -161,6 +161,13 @@ class PostgresBiQuestionRepository:
     ) -> BiQuestionRecord | None:
         return self._claimer.claim_next(command)
 
+    def claim_next_batch(
+        self,
+        command: BiQuestionClaim,
+        batch_size: int = 16,
+    ) -> tuple[BiQuestionRecord, ...]:
+        return self._claimer.claim_next_batch(command, batch_size=batch_size)
+
     def start_question(self, command: BiQuestionStart) -> BiQuestionRecord:
         try:
             with get_pooled_raw_connection(self._database_url) as connection:

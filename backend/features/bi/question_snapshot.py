@@ -69,6 +69,12 @@ class BiQuestionSnapshotMaterializerPort(Protocol):
 class BiQuestionWorkerServicePort(Protocol):
     def claim_next(self, command: BiQuestionClaim) -> BiQuestionRecord | None: ...
 
+    def claim_next_batch(
+        self,
+        command: BiQuestionClaim,
+        batch_size: int,
+    ) -> tuple[BiQuestionRecord, ...]: ...
+
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord: ...
 
     def heartbeat(
@@ -222,6 +228,13 @@ class BiPublishingQuestionService:
 
     def claim_next(self, command: BiQuestionClaim) -> BiQuestionRecord | None:
         return self._service.claim_next(command)
+
+    def claim_next_batch(
+        self,
+        command: BiQuestionClaim,
+        batch_size: int,
+    ) -> tuple[BiQuestionRecord, ...]:
+        return self._service.claim_next_batch(command, batch_size=batch_size)
 
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord:
         saved = self._service.save_answer(answer)

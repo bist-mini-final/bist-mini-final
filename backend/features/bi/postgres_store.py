@@ -194,12 +194,14 @@ class PostgresBiStore:
                     cursor.execute(
                         "UPDATE bi_companies SET display_name = %s, "
                         "current_snapshot_id = %s, updated_at = %s "
-                        "WHERE company_id = %s",
+                        "WHERE company_id = %s "
+                        "AND (updated_at IS NULL OR updated_at <= %s)",
                         (
                             snapshot.company.display_name,
                             snapshot.snapshot.snapshot_id,
                             snapshot.snapshot.generated_at,
                             snapshot.company.company_id,
+                            snapshot.snapshot.generated_at,
                         ),
                     )
                     if cursor.rowcount != 1:
@@ -242,13 +244,17 @@ class PostgresBiStore:
             self._company_key(str(row["display_name"])): row
             for row in company_rows
         }
+        def _source_priority(row: dict[str, object]) -> tuple[int, str]:
+            file_name = str(row.get("file_name") or "").casefold()
+            is_preferred_financials = 1 if "v3" in file_name or "ai_dx" in file_name or "golden" in file_name else 0
+            created_at = str(row.get("created_at") or "")
+            return (is_preferred_financials, created_at)
+
         latest_sources: dict[str, dict[str, object]] = {}
         for row in source_rows:
             key = self._company_key(str(row["display_name"]))
             current = latest_sources.get(key)
-            if current is None or str(row.get("created_at") or "") > str(
-                current.get("created_at") or ""
-            ):
+            if current is None or _source_priority(row) > _source_priority(current):
                 latest_sources[key] = row
 
         entries: list[BiCompanyIndexEntry] = []
@@ -404,13 +410,17 @@ class PostgresBiStore:
     def find_latest_job(
         self,
         company_id: CompanyId,
-        workbook_hash: str,
     ) -> BiMaterializationJob | None:
+        """Return the most recent job for the company regardless of workbook hash.
+
+        This allows callers to detect any in-progress or completed job before
+        deciding whether to start a new materialisation.
+        """
         row = self._fetchone(
             f"SELECT {MATERIALIZATION_JOB_COLUMNS} "
-            "FROM bi_materialization_jobs WHERE company_id = %s AND workbook_hash = %s "
+            "FROM bi_materialization_jobs WHERE company_id = %s "
             "ORDER BY updated_at DESC LIMIT 1",
-            (company_id, workbook_hash),
+            (company_id,),
             "find_latest_job",
         )
         return (

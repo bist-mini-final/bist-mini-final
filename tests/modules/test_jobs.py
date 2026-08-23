@@ -14,6 +14,7 @@ from jobs import (
     ALL_JOBS,
     BENCHMARK_JOB,
     BI_MATERIALIZATION_JOB,
+    BI_METRIC_EXTRACTION_JOB,
     BI_QUESTION_JOB,
     EXCEL_INGESTION_JOB,
     RAG_QUERY_JOB,
@@ -26,10 +27,11 @@ from tests.modules.registry_factory import create_test_registry
 
 class JobsDefinitionTests(unittest.TestCase):
     def test_all_jobs_registered(self) -> None:
-        self.assertEqual(len(ALL_JOBS), 5)
+        self.assertEqual(len(ALL_JOBS), 6)
         self.assertEqual(get_job_definition("excel_ingestion"), EXCEL_INGESTION_JOB)
         self.assertEqual(get_job_definition("bi_materialization"), BI_MATERIALIZATION_JOB)
         self.assertEqual(get_job_definition("bi_question"), BI_QUESTION_JOB)
+        self.assertEqual(get_job_definition("bi_metric_extraction"), BI_METRIC_EXTRACTION_JOB)
         self.assertEqual(get_job_definition("benchmark"), BENCHMARK_JOB)
         self.assertEqual(get_job_definition("rag_query"), RAG_QUERY_JOB)
 
@@ -45,7 +47,7 @@ class JobsDefinitionTests(unittest.TestCase):
 
     def test_workflow_jobs_compile_against_live_module_ports(self) -> None:
         executor = WorkflowExecutor(create_test_registry(), RunStore(), ResultCache())
-        for job in (EXCEL_INGESTION_JOB, RAG_QUERY_JOB):
+        for job in (EXCEL_INGESTION_JOB, RAG_QUERY_JOB, BI_METRIC_EXTRACTION_JOB):
             workflow = workflow_from_job(job)
             batches = executor.validate_graph(workflow.graph)
             self.assertGreater(len(batches), 0)

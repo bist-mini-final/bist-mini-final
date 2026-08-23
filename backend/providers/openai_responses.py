@@ -132,9 +132,10 @@ class OpenAIResponsesClient:
         request: dict[str, Any] = {
             "model": model,
             "input": input_items,
-            "reasoning": {"effort": reasoning_effort},
             "store": store,
         }
+        if reasoning_effort is not None:
+            request["reasoning"] = {"effort": reasoning_effort}
         if instructions:
             request["instructions"] = instructions
         if text_format is not None:
@@ -147,15 +148,27 @@ class OpenAIResponsesClient:
             request["max_output_tokens"] = max_output_tokens
 
         started_at = time.perf_counter()
-        try:
-            response = self.provider.with_timeout(
-                timeout_seconds or self.timeout_seconds
-            ).responses.create(**request)
-            document = response.model_dump(mode="json")
-        except (OpenAIError, OpenAIProviderError, ValueError) as error:
-            raise OpenAIResponsesError(
-                f"OpenAI Responses API 호출에 실패했습니다: {error}"
-            ) from error
+        retries = 5
+        document = None
+        for attempt in range(retries + 1):
+            try:
+                response = self.provider.with_timeout(
+                    timeout_seconds or self.timeout_seconds
+                ).responses.create(**request)
+                document = response.model_dump(mode="json")
+                break
+            except (OpenAIError, OpenAIProviderError, ValueError) as error:
+                is_rate_limit = (
+                    "429" in str(error)
+                    or "Rate limit" in str(error)
+                    or "rate_limit_exceeded" in str(error)
+                )
+                if is_rate_limit and attempt < retries:
+                    time.sleep(2.0 * (1.5**attempt))
+                    continue
+                raise OpenAIResponsesError(
+                    f"OpenAI Responses API 호출에 실패했습니다: {error}"
+                ) from error
 
         status = document.get("status")
         if status == "incomplete":

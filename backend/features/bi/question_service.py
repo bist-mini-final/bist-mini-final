@@ -53,6 +53,12 @@ class BiQuestionRepositoryPort(Protocol):
         command: BiQuestionClaim,
     ) -> BiQuestionRecord | None: ...
 
+    def claim_next_batch(
+        self,
+        command: BiQuestionClaim,
+        batch_size: int,
+    ) -> tuple[BiQuestionRecord, ...]: ...
+
     def start_question(self, command: BiQuestionStart) -> BiQuestionRecord: ...
 
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord: ...
@@ -109,6 +115,13 @@ class BiQuestionService:
         command: BiQuestionClaim,
     ) -> BiQuestionRecord | None:
         return self._repository.claim_next(command)
+
+    def claim_next_batch(
+        self,
+        command: BiQuestionClaim,
+        batch_size: int,
+    ) -> tuple[BiQuestionRecord, ...]:
+        return self._repository.claim_next_batch(command, batch_size=batch_size)
 
     def start_question(self, command: BiQuestionStart) -> BiQuestionRecord:
         return self._repository.start_question(command)
