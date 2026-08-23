@@ -62,6 +62,9 @@ FastAPI router → application service → domain/module port
 - API는 queue 제출까지만 책임지고 실제 계산은 일회성 Kubernetes Job이 수행한다.
 - KEDA는 네 개의 event-driven queue backlog를 기준으로 worker를 0→N→0 확장한다.
 - claim, lease heartbeat, stale lease recovery, cancel은 PostgreSQL 상태 전이로 보장한다.
+- `workflow_runs`와 `node_execution_logs`가 실행 이력의 유일한 source of truth다. API와
+  worker는 DB 저장이 성공한 뒤에만 process-local projection을 갱신하며, DB가 없으면
+  production container가 시작되지 않는다.
 - 별도 scheduler나 이중 실행 소유권을 추가하지 않는다.
 - 실행 정책 변경은 `JobDefinition`과 Kubernetes 투영 계층에서만 수행한다.
 
@@ -76,16 +79,27 @@ FastAPI router → application service → domain/module port
 - SDK와 DB의 재시도는 infrastructure adapter 한 곳에서 bounded budget으로 처리한다.
   route, module, worker가 중첩 재시도를 추가하지 않는다.
 - 진행 이벤트는 변경된 node/run projection만 저장하며 전체 그래프를 다시 쓰지 않는다.
+- `backend.core.state_stream.SharedStateStream`이 persisted run/job 관찰의 공통 코어다.
+  같은 API 프로세스에서 동일 resource를 보는 SSE client는 DB observer 하나를 공유하고,
+  느린 client에는 최신 projection만 전달한다. client 수만큼 polling query를 늘리지 않는다.
+- 인덱스별 로그 조회는 `node_execution_logs.output.index_id` expression index로 직접
+  찾으며 전체 run 목록을 스캔하지 않는다. 과거 누락 이력 복구는 read endpoint가
+  아니라 명시적 `backend.cli.backfill_ingestion_run` 운영 명령에서만 수행한다.
 
 ## frontend 계약
 
 - `src/shared/api/httpClient.ts`가 유일한 HTTP transport와 `ApiError` 해석을 소유한다.
+- `src/shared/api/sse.ts`가 chunk/CRLF-safe SSE decoding을, `src/shared/workflows/`가
+  WorkflowRun 타입·node event 병합·재연결을 소유한다. Playground와 Data Sources가
+  별도의 streaming/polling 구현을 만들지 않는다.
 - feature service는 endpoint와 DTO 변환만 담당하고 자체 `ky.create`나 오류 envelope를
   만들지 않는다.
 - graph 탐색과 module 기본값은 `domain/`, React Flow 변환은 `adapters/`, React 상태와
   effect는 `hooks/`에 둔다.
 - module category와 canonical workflow는 backend 응답에서 가져오며 누락된 새 category를
   화면에서 숨기지 않는다.
+- BI 제품 화면은 `/api/bi/companies`와 published snapshot만 사용한다. fixture는
+  `src/test/fixtures`에서 테스트에만 사용하고 제품 route에서 import하지 않는다.
 
 ## 자동 강제 규칙
 

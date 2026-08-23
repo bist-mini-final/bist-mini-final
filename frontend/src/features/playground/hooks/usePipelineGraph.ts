@@ -17,6 +17,7 @@ import {
 } from '../config/pipeline';
 import { nodeModuleType } from '../adapters/reactFlowGraph';
 import { collectDescendantNodeIds, summarizeDag } from '../domain/graph';
+import { persistentNodeValues, runtimeQueryFromRun } from '../domain/execution';
 import {
   moduleConfigDefaults,
   moduleInputDefaults,
@@ -98,6 +99,14 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       _onNodesChange(changes);
     },
     [_onNodesChange, setEdges]
+  );
+
+  const onReadOnlyNodesChange = useCallback<typeof _onNodesChange>(
+    (changes) => {
+      const dimensions = changes.filter((change) => change.type === 'dimensions');
+      if (dimensions.length > 0) _onNodesChange(dimensions);
+    },
+    [_onNodesChange]
   );
 
   // Block automatic ReactFlow 'remove' events for edges only.
@@ -414,12 +423,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
         module_type: moduleType,
         position: { x: node.position.x, y: node.position.y },
         config: objectConfig(node.data.config),
-        values: {
-          ...objectConfig(node.data.values),
-          ...(moduleType === 'query_input' && typeof node.data.queryText === 'string'
-            ? { query: node.data.queryText }
-            : {}),
-        },
+        values: persistentNodeValues(moduleType, objectConfig(node.data.values)),
         ui: {
           ...(typeof node.data.nodeWidth === 'number'
             ? { width: node.data.nodeWidth }
@@ -610,6 +614,11 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     [setEdges, setNodes]
   );
 
+  const restoreRuntimeInputs = useCallback((run: WorkflowRun) => {
+    const query = runtimeQueryFromRun(run);
+    if (query !== undefined) setQueryText(query);
+  }, [setQueryText]);
+
   const clearExecutionState = useCallback(() => {
     stoppedNodeIdsRef.current = new Set();
     setNodes((currentNodes) =>
@@ -735,6 +744,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     edges,
     viewport,
     onNodesChange,
+    onReadOnlyNodesChange,
     onEdgesChange,
     onConnect,
     onDrop,
@@ -747,6 +757,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     exportGraph,
     replaceGraph,
     applyRun,
+    restoreRuntimeInputs,
     clearExecutionState,
     clearNodeExecutionState,
     resumeNodeExecution,

@@ -13,6 +13,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { getExecutionNodeState, NodeShell } from '../FlowNode/NodeShell';
+import { unwrapModuleOutput } from '../../adapters/moduleOutput';
+import { MarkdownAnswer } from '../MarkdownAnswer';
 
 const MODEL_OPTIONS = [
   { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna · 효율 중심' },
@@ -20,7 +22,7 @@ const MODEL_OPTIONS = [
   { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol · 품질 중심' },
 ];
 
-interface ReaderExecutionOutput {
+interface ReaderExecutionOutput extends Record<string, unknown> {
   answer?: string;
   answer_markdown?: string;
   model?: string;
@@ -38,8 +40,8 @@ interface ReaderExecutionOutput {
 
 interface ReaderNodeData extends Record<string, unknown> {
   executionState?: string;
-  executionOutput?: ReaderExecutionOutput;
-  output?: ReaderExecutionOutput;
+  executionOutput?: unknown;
+  output?: unknown;
   config?: { model?: string };
   onConfigChange?: (patch: Record<string, unknown>) => void;
 }
@@ -57,7 +59,10 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
   const [expanded, setExpanded] = useState(true);
 
   // Resolve output payload
-  const outputPayload = (data.executionOutput ?? data.output ?? {}) as ReaderExecutionOutput;
+  const outputPayload = unwrapModuleOutput<ReaderExecutionOutput>(
+    data.executionOutput ?? data.output,
+    'answer_json',
+  ) ?? {};
   const answerText = outputPayload.answer ?? outputPayload.answer_markdown ?? '';
   const latency = outputPayload.latency_seconds;
   const cost = outputPayload.estimated_cost_usd;
@@ -160,8 +165,8 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
           </div>
 
           {expanded && (
-            <div className="max-h-64 overflow-y-auto rounded-lg border border-rose-100 bg-white p-2.5 text-xs leading-relaxed text-slate-800 select-text whitespace-pre-wrap">
-              {answerText}
+            <div className="max-h-72 overflow-y-auto rounded-lg border border-rose-100 bg-white p-3 text-xs text-slate-800 select-text">
+              <MarkdownAnswer markdown={answerText} />
             </div>
           )}
 

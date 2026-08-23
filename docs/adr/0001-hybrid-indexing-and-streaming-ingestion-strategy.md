@@ -48,7 +48,7 @@ WHERE collection_id = '<uuid>'::uuid
 
 검색은 Hamming distance로 최대 1,000개 후보를 제한한 뒤 원본 vector cosine distance로 top-k를 재정렬한다. collection UUID와 dimension은 SQL predicate에 고정해 PostgreSQL planner가 partial index를 선택할 수 있게 한다.
 
-Query embedder는 collection loader의 `index_output`을 필수로 받아 동일 model과 dimension을 사용한다. 별도의 query-side 기본 model은 두지 않는다.
+Query embedder는 LLM Router의 `retrieval_plan`을 필수로 받아 서브쿼리별 collection model과 dimension을 사용한다. 서로 같은 embedding 계약은 한 batch로 합치며 별도의 query-side 기본 model은 두지 않는다.
 
 ## Keyword index
 

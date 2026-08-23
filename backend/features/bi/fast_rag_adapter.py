@@ -6,12 +6,12 @@ from modules.embedding.query_embedder import EmbeddingsDTO
 from modules.query.decomposer import SubqueriesDTO
 from modules.query.llm_query_router import (
     LlmQueryRouterOutputDTO,
-    RouterDecisionDTO,
+    RetrievalPlanDTO,
 )
 from modules.retrieval.context_expander import ContextDTO
 from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
 from modules.retrieval.rrf_fusion import RetrievalDTO
-from modules.storage.pgvector_collection_loader import IndexOutputDTO
+from modules.storage.pgvector_data_scope import DataScopeCatalogDTO, DataScopeDTO
 
 from .extraction_models import (
     BiContextCell,
@@ -48,12 +48,15 @@ class FastRagPipelineAdapter:
             question_id=self._question_id(identity.question),
             question_text=identity.question,
         )
-        semantic_match = self._route(query_context)
-        subqueries = self._decompose(query_context, semantic_match)
-        index = self._index_reference(identity)
-        embeddings = self._embed(subqueries, index)
-        dense = self._retrieve_dense(embeddings, index, semantic_match)
-        keyword = self._retrieve_keyword(subqueries, index, semantic_match)
+        subqueries = self._decompose(query_context)
+        scope = self._data_scope(identity)
+        retrieval_plan = self._route(
+            subqueries,
+            DataScopeCatalogDTO(collections=[scope]),
+        )
+        embeddings = self._embed(retrieval_plan)
+        dense = self._retrieve_dense(embeddings)
+        keyword = self._retrieve_keyword(retrieval_plan)
         retrieval = self._fuse(dense, keyword)
         self._require_lineage(identity, retrieval)
         context = self._expand(retrieval)
@@ -106,24 +109,29 @@ class FastRagPipelineAdapter:
         digest = sha256(normalized.encode("utf-8")).hexdigest()[:16].upper()
         return f"QUERY-{digest}"
 
-    def _route(self, query_context: QueryContextDTO) -> RouterDecisionDTO:
+    def _route(
+        self,
+        subqueries: SubqueriesDTO,
+        scope_catalog: DataScopeCatalogDTO,
+    ) -> RetrievalPlanDTO:
         output = self._registry.execute(
             "llm_query_router",
-            {"query_context": query_context.model_dump(mode="json")},
+            {
+                "query_input": subqueries.model_dump(mode="json"),
+                "scope_catalog": scope_catalog.model_dump(mode="json"),
+            },
             {"model": self._settings.decomposer_model},
         )
-        return LlmQueryRouterOutputDTO.model_validate(output).semantic_match
+        return LlmQueryRouterOutputDTO.model_validate(output)
 
     def _decompose(
         self,
         query_context: QueryContextDTO,
-        semantic_match: RouterDecisionDTO,
     ) -> SubqueriesDTO:
         output = self._registry.execute(
             "decomposer",
             {
                 "query_context": query_context.model_dump(mode="json"),
-                "semantic_match": semantic_match.model_dump(mode="json"),
             },
             {"model": self._settings.decomposer_model},
         )
@@ -131,23 +139,21 @@ class FastRagPipelineAdapter:
 
     def _embed(
         self,
-        subqueries: SubqueriesDTO,
-        index: IndexOutputDTO,
+        retrieval_plan: RetrievalPlanDTO,
     ) -> EmbeddingsDTO:
         output = self._registry.execute(
             "embedder",
             {
-                "query_input": subqueries.model_dump(mode="json"),
-                "index_input": index.model_dump(mode="json"),
+                "retrieval_plan": retrieval_plan.model_dump(mode="json"),
             },
             {},
         )
         return EmbeddingsDTO.model_validate(output)
 
-    def _index_reference(
+    def _data_scope(
         self,
         identity: RetrievalIdentity,
-    ) -> IndexOutputDTO:
+    ) -> DataScopeDTO:
         metadata = self._cell_store.get_index_metadata(identity.index_id)
         if (
             str(metadata.get("file_name") or "") != identity.file_name
@@ -158,27 +164,26 @@ class FastRagPipelineAdapter:
         dimension = int(metadata.get("dimension") or 0)
         if not model or dimension < 1:
             raise RagPipelineContractError(code="index_embedding_contract_missing")
-        return IndexOutputDTO(
+        raw_sheet_names = metadata.get("sheet_names") or []
+        return DataScopeDTO(
             index_id=identity.index_id,
             file_name=identity.file_name,
             workbook_hash=identity.workbook_hash,
             model=model,
             dimension=dimension,
             document_count=int(metadata.get("document_count") or 0),
+            company_name=str(metadata.get("company_name") or ""),
+            sheet_names=[str(name) for name in raw_sheet_names],
         )
 
     def _retrieve_dense(
         self,
         embeddings: EmbeddingsDTO,
-        index: IndexOutputDTO,
-        semantic_match: RouterDecisionDTO,
     ) -> RankedSearchResultDTO:
         output = self._registry.execute(
             "pgvector_retriever",
             {
                 "query_input": embeddings.model_dump(mode="json"),
-                "index_input": index.model_dump(mode="json"),
-                "semantic_match": semantic_match.model_dump(mode="json"),
             },
             {"top_k": self._settings.retrieval_top_k},
         )
@@ -186,16 +191,12 @@ class FastRagPipelineAdapter:
 
     def _retrieve_keyword(
         self,
-        subqueries: SubqueriesDTO,
-        index: IndexOutputDTO,
-        semantic_match: RouterDecisionDTO,
+        retrieval_plan: RetrievalPlanDTO,
     ) -> RankedSearchResultDTO:
         output = self._registry.execute(
             "postgres_native_keyword_retriever",
             {
-                "query_input": subqueries.model_dump(mode="json"),
-                "index_input": index.model_dump(mode="json"),
-                "semantic_match": semantic_match.model_dump(mode="json"),
+                "retrieval_plan": retrieval_plan.model_dump(mode="json"),
             },
             {"top_k": self._settings.retrieval_top_k},
         )

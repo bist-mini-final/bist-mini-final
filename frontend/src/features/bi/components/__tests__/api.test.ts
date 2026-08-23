@@ -7,6 +7,7 @@ import {
   fetchBiMaterializationJob,
   fetchBiQuestionJob,
   refreshBiDashboard,
+  streamBiMaterializationJob,
 } from '../../services/api';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -136,6 +137,51 @@ describe('BI API service', () => {
 
     // Then
     expect(result.status).toBe('materializing');
+  });
+
+  it('delivers BI materialization progress before the SSE response closes', async () => {
+    let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    });
+    fetchMock.mockResolvedValue(new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    }));
+    const statuses: string[] = [];
+    const stream = streamBiMaterializationJob(
+      'job-live',
+      (job) => statuses.push(job.status),
+      new AbortController().signal,
+    );
+    const encoder = new TextEncoder();
+    const payload = (status: 'extracting' | 'ready') => ({
+      job_id: 'job-live',
+      company_id: 'acme',
+      workbook_hash: 'a'.repeat(64),
+      status,
+      completed_requests: status === 'ready' ? 10 : 4,
+      total_requests: 10,
+      published_snapshot_id: status === 'ready' ? 'snapshot-live' : null,
+      error_code: null,
+      message: status === 'ready' ? null : '처리 중',
+      started_at: '2026-08-20T00:00:00Z',
+      updated_at: '2026-08-20T00:01:00Z',
+    });
+
+    streamController?.enqueue(encoder.encode(
+      `event: materialization_progress\r\ndata: ${JSON.stringify(payload('extracting'))}\r\n\r\n`,
+    ));
+    await vi.waitFor(() => expect(statuses).toEqual(['extracting']));
+    streamController?.enqueue(encoder.encode(
+      `event: materialization_completed\r\ndata: ${JSON.stringify(payload('ready'))}\r\n\r\n`,
+    ));
+    streamController?.close();
+
+    await expect(stream).resolves.toMatchObject({ status: 'ready' });
+    expect(statuses).toEqual(['extracting', 'ready']);
   });
 
   it('queues and reads a single-question dashboard refresh job', async () => {

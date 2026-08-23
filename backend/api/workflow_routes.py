@@ -1,4 +1,3 @@
-import asyncio
 import json
 from typing import Optional
 
@@ -6,6 +5,7 @@ from anyio import to_thread
 from fastapi import APIRouter, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
+from backend.core.state_stream import SharedStateStream
 from backend.engine.workflows import (
     DagExecutionError,
     RunDispatcher,
@@ -40,6 +40,12 @@ def create_workflow_router(
         APIRouter: Configured router for workflow and run management.
     """
     router = APIRouter(tags=["Workflows"])
+    run_stream = SharedStateStream(
+        run_store.load_summary,
+        fingerprint=lambda run: run.updated_at,
+        terminal=lambda run: run.status in ("completed", "failed", "paused"),
+    )
+
     @router.delete("/cache")
     def clear_runtime_cache():
         workflow_dispatcher.cancel_all()
@@ -179,7 +185,7 @@ def create_workflow_router(
     async def stream_workflow_run(run_id: str, request: Request):
         """Observe a Kubernetes-owned run without executing work in the API."""
         try:
-            await to_thread.run_sync(run_store.load_summary, run_id)
+            initial_run = await to_thread.run_sync(run_store.load_summary, run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
@@ -196,14 +202,14 @@ def create_workflow_router(
             ) from error
 
         async def event_generator():
-            previous_updated_at: Optional[str] = None
             previous_node_statuses: dict[str, tuple[object, ...]] = {}
+            started = False
             try:
-                while True:
+                async for run in run_stream.subscribe(run_id, initial=initial_run):
                     if await request.is_disconnected():
                         break
-                    run = await to_thread.run_sync(run_store.load_summary, run_id)
-                    if previous_updated_at is None:
+                    if not started:
+                        started = True
                         yield {
                             "event": "run_started",
                             "data": json.dumps(
@@ -217,31 +223,29 @@ def create_workflow_router(
                                 ensure_ascii=False,
                             ),
                         }
-                    if run.updated_at != previous_updated_at:
-                        for node_id, node in run.nodes.items():
-                            fingerprint = (
-                                node.status,
-                                node.elapsed_ms,
-                                node.error,
-                                json.dumps(node.progress, sort_keys=True, default=str),
-                            )
-                            if previous_node_statuses.get(node_id) == fingerprint:
-                                continue
-                            previous_node_statuses[node_id] = fingerprint
-                            yield {
-                                "event": (
-                                    "node_completed"
-                                    if node.status in ("succeeded", "skipped")
-                                    else "node_failed"
-                                    if node.status == "failed"
-                                    else "node_progress"
-                                ),
-                                "data": json.dumps(
-                                    node.model_dump(mode="json"),
-                                    ensure_ascii=False,
-                                ),
-                            }
-                        previous_updated_at = run.updated_at
+                    for node_id, node in run.nodes.items():
+                        fingerprint = (
+                            node.status,
+                            node.elapsed_ms,
+                            node.error,
+                            json.dumps(node.progress, sort_keys=True, default=str),
+                        )
+                        if previous_node_statuses.get(node_id) == fingerprint:
+                            continue
+                        previous_node_statuses[node_id] = fingerprint
+                        yield {
+                            "event": (
+                                "node_completed"
+                                if node.status in ("succeeded", "skipped")
+                                else "node_failed"
+                                if node.status == "failed"
+                                else "node_progress"
+                            ),
+                            "data": json.dumps(
+                                node.model_dump(mode="json"),
+                                ensure_ascii=False,
+                            ),
+                        }
                     if run.status in ("completed", "failed", "paused"):
                         yield {
                             "event": "run_completed",
@@ -255,9 +259,6 @@ def create_workflow_router(
                             ),
                         }
                         break
-                    await asyncio.sleep(0.5)
-            except asyncio.CancelledError:
-                return
             except Exception as error:
                 yield {
                     "event": "error",

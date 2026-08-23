@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from backend.providers.openai_responses import OpenAIResponseResult
 from modules.embedding.query_embedder import EmbedderInputDTO, EmbeddingsDTO
 from modules.query.decomposer import DecomposerInputDTO, SubqueriesDTO
+from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO
 from modules.query.query_input import QueryInputDTO
 from modules.retrieval.context_expander import DocumentContextDTO
 from modules.retrieval.pgvector_retriever import (
@@ -12,7 +13,7 @@ from modules.retrieval.pgvector_retriever import (
     RankedSearchResultDTO,
 )
 from modules.retrieval.rrf_fusion import RrfFusionInputDTO
-from modules.storage.pgvector_collection_loader import IndexOutputDTO
+from modules.storage.pgvector_data_scope import DataScopeDTO
 from tests.modules.registry_factory import create_test_registry
 
 
@@ -48,18 +49,35 @@ def test_end_to_end_query_reader_pipeline():
     mock_encoder.encode.return_value = [[0.1] * 3072, [0.2] * 3072]
     embedder = cast(Any, registry.get("embedder"))
     embedder.encoder = mock_encoder
-    dummy_index = IndexOutputDTO(
+    data_scope = DataScopeDTO(
         index_id="samsung_2023",
         file_name="samsung.xlsx",
         workbook_hash="hash123",
         model="text-embedding-3-large",
         dimension=3072,
         document_count=1000,
+        company_name="삼성전자",
+        sheet_names=["손익계산서"],
     )
+    subqueries = SubqueriesDTO.model_validate(res_dec)
+    retrieval_plan = RetrievalPlanDTO(
+        query_context=subqueries.query_context,
+        routes=[
+            RoutedSubqueryDTO(
+                subquery_index=index,
+                subquery=subquery,
+                collections=[data_scope],
+            )
+            for index, subquery in enumerate(subqueries.items)
+        ],
+    )
+    mock_encoder.encode_for_model.return_value = [
+        [0.1] * 3072,
+        [0.2] * 3072,
+    ]
     res_emb = embedder.run(
         EmbedderInputDTO(
-            query_input=SubqueriesDTO.model_validate(res_dec),
-            index_input=dummy_index,
+            retrieval_plan=retrieval_plan,
         )
     )
     assert len(res_emb["items"]) == 2
@@ -76,7 +94,6 @@ def test_end_to_end_query_reader_pipeline():
     res_dense = retriever.run(
         PgVectorRetrieverInputDTO(
             query_input=EmbeddingsDTO(query_context=res_qi["query_context"], items=res_emb["items"]),
-            index_input=dummy_index,
         )
     )
     assert len(res_dense["items"]) == 2
@@ -94,6 +111,7 @@ def test_end_to_end_query_reader_pipeline():
         items=[
             RankedSearchCandidateDTO(
                 rank=1,
+                index_id="samsung_2023",
                 cell_id="Samsung:IS:E60",
                 score=0.9,
                 text=mock_doc.page_content,

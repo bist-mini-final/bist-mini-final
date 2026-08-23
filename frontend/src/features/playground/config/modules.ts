@@ -21,7 +21,7 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   embedder: { icon: 'Cpu', color: '#0891b2' },
   cell_text_embedder: { icon: 'Binary', color: '#0f766e' },
   pgvector_index_writer: { icon: 'Database', color: '#0f766e' },
-  pgvector_collection_loader: { icon: 'Database', color: '#0f766e' },
+  pgvector_data_scope: { icon: 'Database', color: '#0f766e' },
   pgvector_retriever: { icon: 'Search', color: '#0f766e' },
   postgres_native_keyword_retriever: { icon: 'ListFilter', color: '#2563eb' },
   semantic_query_matcher: { icon: 'Route', color: '#7c3aed' },

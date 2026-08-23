@@ -3,6 +3,7 @@ from datetime import datetime
 from .models import (
     BiContractModel,
     BiMaterializationJob,
+    BiMaterializationSource,
     CompanyId,
     JobId,
     MaterializationStatus,
@@ -15,6 +16,7 @@ from .models import (
 class BiCompanySummary(BiContractModel):
     company_id: CompanyId
     display_name: str
+    source: BiMaterializationSource | None
     current_snapshot_id: SnapshotId | None
     snapshot_status: SnapshotStatus | None
     refresh_status: RefreshStatus

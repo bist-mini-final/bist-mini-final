@@ -116,7 +116,7 @@ class ApplicationContainer:
         *,
         runtime: RuntimeContainer | None = None,
     ) -> "ApplicationContainer":
-        shared_runtime = runtime or RuntimeContainer.create()
+        shared_runtime = runtime or RuntimeContainer.create(require_database=True)
         services = shared_runtime.services
         dispatcher = KubernetesQueueDispatcher(
             services.workflow_executor,

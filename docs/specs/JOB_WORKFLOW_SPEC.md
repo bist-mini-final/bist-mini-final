@@ -22,23 +22,30 @@ pgvector_index_writer.index_output ───────────────
 큐: `workflow-core`
 
 ```text
-query_input ──> llm_query_router ──semantic_match─┐
-     └────────> decomposer ──subqueries───────────┼─> dense + keyword
-pgvector_collection_loader ──index_output─────────┘
-pgvector_collection_loader.index_output ───────────> embedder.index_input
-embedder(query/subqueries, index contract) ─────────> dense.query_input
+query_input ──> decomposer ──subqueries───────────┐
+pgvector_data_scope ──scope_catalog───────────────┼─> llm_query_router
+llm_query_router.retrieval_plan ──────────────────┼─> embedder
+                                                  └─> keyword
+embedder.routed_embeddings ─────────────────────────> dense
 dense.dense_result + keyword.bm25_result ──────────> rrf_fusion
 rrf_fusion.retrieval_json ─────────────────────────> pg_context_expander
 pg_context_expander.context_json ──────────────────> reader
 ```
 
-query embedder는 선택한 collection의 embedding model과 dimension을 그대로 사용한다. 두 검색기는 같은 semantic scope와 collection을 사용한다. RRF 이전의 한쪽 결과가 비어도 다른 결과로 계속 진행할 수 있으나, 검색 인프라 오류를 빈 결과로 숨기지 않는다.
+사용자는 collection을 선택하지 않는다. data scope 모듈은 DB의 compact collection/company/sheet/model/dimension catalog만 읽고, Router가 각 서브쿼리에 concrete collection을 지정한다. Query Embedder는 routing plan을 model/dimension별로 묶어 중복 호출 없이 임베딩하고, dense와 keyword 검색은 지정받은 collection 밖을 검색하지 않는다. metadata 조건이 0건이면 같은 collection 안에서만 company/sheet 조건을 완화한다.
 
 ## `bi_materialization` / `bi_question`
 
 큐: `bi-materialization` → `bi-question`
 
 API는 `bi_materialization_jobs`에 요청만 등록한다. `bi-materialization` ScaledJob이 문서 프로파일링과 질문 work item 생성을 수행하고, `bi-question` ScaledJob들이 표준 하이브리드 RAG 검색 → 계산/단위 정규화 → 근거 검증을 병렬 수행한다. 마지막 질문 worker가 PostgreSQL snapshot을 원자적으로 publish한다. 두 worker는 heartbeat를 갱신하며 stale claim만 새 generation으로 회수한다.
+
+기업 catalog는 `langchain_pg_collection.cmetadata`의 `company_name`, `file_name`,
+`workbook_hash`, collection `name`을 source lineage로 사용한다. 같은 기업의 collection이
+여러 개면 최신 `created_at` source를 선택하되 게시된 BI company ID와 snapshot pointer는
+유지한다. dashboard read는 current snapshot을 재사용하고 source-only 기업의 최초 요청만
+멱등 materialization을 제출한다. 진행 상태는 API 계산이 아니라 PostgreSQL job/question
+projection을 공통 SSE observer로 fan-out한다.
 
 ## `benchmark`
 

@@ -14,7 +14,9 @@ from modules.query.llm_query_router import (
     LlmQueryRouterModule,
     LlmQueryRouterOutputDTO,
     LlmRouterResponse,
-    RouterDecisionDTO,
+    RetrievalPlanDTO,
+    RoutedSubqueryDTO,
+    RouteSelectionDTO,
 )
 from modules.query.query_input import (
     QueryContextOutput,
@@ -46,7 +48,9 @@ __all__ = [
     "QueryContextOutput",
     "QueryInputDTO",
     "QueryInputModule",
-    "RouterDecisionDTO",
+    "RetrievalPlanDTO",
+    "RouteSelectionDTO",
+    "RoutedSubqueryDTO",
     "RouterMetricsDTO",
     "SemanticMatchItemDTO",
     "SemanticQueryMatchOutput",

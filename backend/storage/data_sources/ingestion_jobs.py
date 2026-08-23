@@ -329,6 +329,14 @@ class IngestionJobService:
         return sorted(runs, key=lambda run: run.updated_at, reverse=True)
 
     def find_by_index(self, index_id: str) -> WorkflowRun:
+        database = self.run_store.db_manager
+        direct_lookup = getattr(database, "find_ingestion_run_id_by_index", None)
+        if callable(direct_lookup):
+            run_id = direct_lookup(index_id)
+            if isinstance(run_id, str):
+                return self.load_status(run_id)
+
+        # Optional in-memory operation is retained for isolated module tests.
         for summary in self.list():
             writer_output = self.node_output(summary, "pgvector_index_writer")
             if writer_output and writer_output.get("index_id") == index_id:

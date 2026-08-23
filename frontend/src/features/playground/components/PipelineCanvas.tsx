@@ -19,7 +19,7 @@ import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
 import { GenericModuleNode } from './CustomNodes/GenericModuleNode';
 import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDetectorNode';
 import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
-import { PgVectorCollectionLoaderNode } from './CustomNodes/PgVectorCollectionLoaderNode';
+import { PgVectorDataScopeNode } from './CustomNodes/PgVectorDataScopeNode';
 import { PgVectorRetrieverNode } from './CustomNodes/PgVectorRetrieverNode';
 import { PgVectorIndexWriterNode } from './CustomNodes/PgVectorIndexWriterNode';
 import { QueryNode } from './CustomNodes/QueryNode';
@@ -73,8 +73,9 @@ export function PipelineCanvas({
       embeddingNode: EmbeddingNode,
       cell_text_embedder: CellTextEmbedderNode,
       pgvector_index_writer: PgVectorIndexWriterNode,
-      pgvector_collection_loader: PgVectorCollectionLoaderNode,
+      pgvector_data_scope: PgVectorDataScopeNode,
       pgvector_retriever: PgVectorRetrieverNode,
+      postgres_native_keyword_retriever: GenericModuleNode,
       rrf_fusion: RrfFusionNode,
       semantic_query_matcher: SemanticQueryMatcherNode,
       llm_query_router: LlmQueryRouterNode,
@@ -116,7 +117,7 @@ export function PipelineCanvas({
           key={activeWorkflowId}
           nodes={graph.nodes}
           edges={graph.edges}
-          onNodesChange={readOnly ? undefined : graph.onNodesChange}
+          onNodesChange={readOnly ? graph.onReadOnlyNodesChange : graph.onNodesChange}
           onEdgesChange={readOnly ? undefined : graph.onEdgesChange}
           onConnect={readOnly ? undefined : graph.onConnect}
           connectOnClick

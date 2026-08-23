@@ -13,6 +13,7 @@ from .models import (
     BiEvidence,
     BiMaterializationJob,
     BiMaterializationRequest,
+    BiMaterializationSource,
     BiPeriod,
     JobId,
     SnapshotId,
@@ -75,6 +76,7 @@ class BiSnapshotRefreshInput:
 
 class BiCompanyIndexEntry(BiContractModel):
     company: BiCompany
+    source: BiMaterializationSource | None = None
     current_snapshot_id: SnapshotId | None = Field(
         default=None,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",

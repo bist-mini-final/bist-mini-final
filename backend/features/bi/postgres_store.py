@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from hashlib import sha256
 from typing import Final
 
 import psycopg2
@@ -17,7 +18,9 @@ from .models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
     BiMaterializationRequest,
+    BiMaterializationSource,
     CompanyId,
+    IndexId,
     JobId,
     MaterializationStatus,
     SnapshotId,
@@ -217,26 +220,100 @@ class PostgresBiStore:
         return BiCompany.model_validate(row) if row is not None else None
 
     def list_companies(self) -> tuple[BiCompanyIndexEntry, ...]:
-        rows = self._fetchall(
+        company_rows = self._fetchall(
             "SELECT company_id, display_name, current_snapshot_id "
             "FROM bi_companies ORDER BY display_name, company_id",
             (),
             "list_companies",
         )
+        source_rows = self._fetchall(
+            "SELECT name AS index_id, cmetadata->>'company_name' AS display_name, "
+            "cmetadata->>'file_name' AS file_name, "
+            "cmetadata->>'workbook_hash' AS workbook_hash, "
+            "cmetadata->>'created_at' AS created_at "
+            "FROM langchain_pg_collection "
+            "WHERE NULLIF(BTRIM(cmetadata->>'company_name'), '') IS NOT NULL "
+            "AND NULLIF(BTRIM(cmetadata->>'file_name'), '') IS NOT NULL "
+            "AND (cmetadata->>'workbook_hash') ~ '^[a-f0-9]{64}$'",
+            (),
+            "list_company_sources",
+        )
+        persisted = {
+            self._company_key(str(row["display_name"])): row
+            for row in company_rows
+        }
+        latest_sources: dict[str, dict[str, object]] = {}
+        for row in source_rows:
+            key = self._company_key(str(row["display_name"]))
+            current = latest_sources.get(key)
+            if current is None or str(row.get("created_at") or "") > str(
+                current.get("created_at") or ""
+            ):
+                latest_sources[key] = row
+
+        entries: list[BiCompanyIndexEntry] = []
+        represented: set[str] = set()
+        for key, source_row in latest_sources.items():
+            company_row = persisted.get(key)
+            display_name = str(source_row["display_name"]).strip()
+            company_id = (
+                CompanyId(str(company_row["company_id"]))
+                if company_row is not None
+                else self._company_id(display_name)
+            )
+            entries.append(
+                BiCompanyIndexEntry(
+                    company=BiCompany(
+                        company_id=company_id,
+                        display_name=display_name,
+                    ),
+                    source=BiMaterializationSource(
+                        file_name=str(source_row["file_name"]),
+                        workbook_hash=str(source_row["workbook_hash"]),
+                        index_id=IndexId(str(source_row["index_id"])),
+                    ),
+                    current_snapshot_id=(
+                        SnapshotId(str(company_row["current_snapshot_id"]))
+                        if company_row is not None
+                        and company_row["current_snapshot_id"] is not None
+                        else None
+                    ),
+                )
+            )
+            represented.add(key)
+
+        for key, company_row in persisted.items():
+            if key in represented or company_row["current_snapshot_id"] is None:
+                continue
+            entries.append(
+                BiCompanyIndexEntry(
+                    company=BiCompany(
+                        company_id=CompanyId(str(company_row["company_id"])),
+                        display_name=str(company_row["display_name"]),
+                    ),
+                    current_snapshot_id=SnapshotId(
+                        str(company_row["current_snapshot_id"])
+                    ),
+                )
+            )
         return tuple(
-            BiCompanyIndexEntry(
-                company=BiCompany(
-                    company_id=CompanyId(str(row["company_id"])),
-                    display_name=str(row["display_name"]),
-                ),
-                current_snapshot_id=(
-                    SnapshotId(str(row["current_snapshot_id"]))
-                    if row["current_snapshot_id"] is not None
-                    else None
+            sorted(
+                entries,
+                key=lambda entry: (
+                    entry.company.display_name.casefold(),
+                    str(entry.company.company_id),
                 ),
             )
-            for row in rows
         )
+
+    @staticmethod
+    def _company_key(display_name: str) -> str:
+        return " ".join(display_name.split()).casefold()
+
+    @classmethod
+    def _company_id(cls, display_name: str) -> CompanyId:
+        digest = sha256(cls._company_key(display_name).encode("utf-8")).hexdigest()
+        return CompanyId(f"company-{digest[:24]}")
 
     def get_current(self, company_id: CompanyId) -> BiDashboardSnapshot | None:
         row = self._fetchone(
@@ -248,6 +325,28 @@ class PostgresBiStore:
             "get_current",
         )
         return self._validate_snapshot(row, "get_current") if row is not None else None
+
+    def get_current_many(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiDashboardSnapshot]:
+        if not company_ids:
+            return {}
+        rows = self._fetchall(
+            "SELECT company.company_id, snapshot.snapshot_payload "
+            "FROM bi_companies company JOIN bi_dashboard_snapshots snapshot "
+            "ON snapshot.snapshot_id = company.current_snapshot_id "
+            "WHERE company.company_id = ANY(%s)",
+            (list(company_ids),),
+            "get_current_many",
+        )
+        return {
+            CompanyId(str(row["company_id"])): self._validate_snapshot(
+                row,
+                "get_current_many",
+            )
+            for row in rows
+        }
 
     def get_snapshot(
         self,
@@ -280,6 +379,27 @@ class PostgresBiStore:
             "get_latest_job",
         )
         return self._validate_job(row, "get_latest_job") if row is not None else None
+
+    def get_latest_jobs(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiMaterializationJob]:
+        if not company_ids:
+            return {}
+        rows = self._fetchall(
+            f"SELECT DISTINCT ON (company_id) {MATERIALIZATION_JOB_COLUMNS} "
+            "FROM bi_materialization_jobs WHERE company_id = ANY(%s) "
+            "ORDER BY company_id, updated_at DESC",
+            (list(company_ids),),
+            "get_latest_jobs",
+        )
+        return {
+            CompanyId(str(row["company_id"])): self._validate_job(
+                row,
+                "get_latest_jobs",
+            )
+            for row in rows
+        }
 
     def find_latest_job(
         self,

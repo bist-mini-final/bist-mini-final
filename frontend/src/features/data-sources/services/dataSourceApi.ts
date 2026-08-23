@@ -10,6 +10,7 @@ import {
   requestJson as httpJson,
   requestResponse,
 } from '../../../shared/api/httpClient';
+import { observeWorkflowRun } from '../../../shared/workflows/observeRun';
 
 async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   return httpJson<T>(url, { signal });
@@ -138,6 +139,35 @@ export const dataSourceApi = {
       `/api/data-sources/ingestion-jobs/${encodeURIComponent(runId)}`,
       signal
     );
+  },
+
+  async streamIngestionJob(
+    initialJob: IngestionJobResponse,
+    onUpdate: (job: IngestionJobResponse) => void,
+    signal?: AbortSignal,
+  ): Promise<IngestionJobResponse> {
+    let projected = initialJob;
+    const run = await observeWorkflowRun(initialJob.job_id, {
+      initialRun: initialJob.run,
+      signal,
+      onRun(nextRun) {
+        projected = {
+          ...projected,
+          status: nextRun.status,
+          run: nextRun,
+          worker_active: nextRun.status === 'running',
+        };
+        onUpdate(projected);
+      },
+    });
+    projected = { ...projected, status: run.status, run, worker_active: false };
+    try {
+      projected = await this.getIngestionJob(initialJob.job_id, signal);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+    onUpdate(projected);
+    return projected;
   },
 
   async getIngestionJobByIndex(

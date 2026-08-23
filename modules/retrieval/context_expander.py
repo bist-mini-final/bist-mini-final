@@ -199,31 +199,23 @@ class PgContextExpanderModule(BaseModule):
                 context_blocks.append(t)
 
         # Step 2: Target the exact rows for all candidate cells
-        target_rows_by_sheet: Dict[str, Set[int]] = defaultdict(set)
+        target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
         for candidate in retrieval_items:
             _, sheet, r_idx, _ = _parse_cell_id_coords(candidate.cell_id)
-            if sheet and r_idx is not None:
+            if candidate.index_id and sheet and r_idx is not None:
+                scope_key = (candidate.index_id, sheet)
                 if cfg.adjacent_radius and cfg.adjacent_radius > 0:
                     radius = cfg.adjacent_radius
                     for r in range(max(1, r_idx - radius), r_idx + radius + 1):
-                        target_rows_by_sheet[sheet].add(r)
+                        target_rows_by_scope[scope_key].add(r)
                 else:
-                    target_rows_by_sheet[sheet].add(r_idx)
+                    target_rows_by_scope[scope_key].add(r_idx)
 
-        collection_name = doc_context_dict.get("index_id")
-        workbook_hash = doc_context_dict.get("workbook_hash")
-        if not collection_name and retrieval_items:
-            for cand in retrieval_items:
-                cid = cand.cell_id
-                if ":" in cid:
-                    collection_name = cid.split(":")[0]
-                    break
-
-        if collection_name and target_rows_by_sheet:
-            for sheet, row_indices in target_rows_by_sheet.items():
+        if target_rows_by_scope:
+            for (collection_name, sheet), row_indices in target_rows_by_scope.items():
                 rows_by_index = self.pgvector_store.fetch_rows_cells(
                     collection_name=collection_name,
-                    workbook_hash=workbook_hash,
+                    workbook_hash=None,
                     sheet_name=sheet,
                     row_indices=sorted(row_indices),
                     limit_per_row=100,
@@ -241,6 +233,13 @@ class PgContextExpanderModule(BaseModule):
                         ),
                     ):
                         raw_text = (cell.get("source_text") or "").strip()
+                        actual_value = str(cell.get("cell_value") or "").strip()
+                        if raw_text and actual_value and actual_value != "?":
+                            raw_text = re.sub(
+                                r"Cell Value:\s*\?(?=\s*(?:\||$))",
+                                f"Cell Value: {actual_value}",
+                                raw_text,
+                            )
                         if not raw_text:
                             c_name = cell.get("company_name") or doc_context_dict.get("company_name", "")
                             s_name = cell.get("sheet_name") or sheet
@@ -254,7 +253,7 @@ class PgContextExpanderModule(BaseModule):
                                 if isinstance(cell.get("column_header"), list)
                                 else str(cell.get("column_header") or "")
                             )
-                            val = str(cell.get("cell_value") or "")
+                            val = actual_value
                             parts = []
                             if c_name:
                                 parts.append(f"Company: {c_name}")

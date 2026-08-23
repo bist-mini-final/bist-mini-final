@@ -48,10 +48,11 @@ class OpenAIEmbeddingEncoder(Embeddings):
         self,
         batch_index: int,
         batch_items: Sequence[str],
+        model_name: str,
     ) -> tuple[int, List[List[float]], int, int]:
         try:
             response = self.provider.client.embeddings.create(
-                model=self.model_name,
+                model=model_name,
                 input=list(batch_items),
             )
         except (OpenAIError, OpenAIProviderError, ValueError) as error:
@@ -84,8 +85,13 @@ class OpenAIEmbeddingEncoder(Embeddings):
             int(usage.total_tokens or 0),
         )
 
-    def encode(self, queries: List[str], batch_size: int = 2048) -> List[List[float]]:
-        """Return L2-normalized vectors in the same order as the input texts."""
+    def encode_for_model(
+        self,
+        queries: List[str],
+        model_name: str,
+        batch_size: int = 2048,
+    ) -> List[List[float]]:
+        """Return ordered vectors using the collection's exact model contract."""
         if not queries:
             return []
         effective_batch_size = min(max(1, batch_size), 2048)
@@ -99,11 +105,11 @@ class OpenAIEmbeddingEncoder(Embeddings):
         total_tokens = 0
         max_workers = min(8, len(batches))
         if max_workers == 1:
-            results = [self._fetch_batch(*batches[0])]
+            results = [self._fetch_batch(*batches[0], model_name)]
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
-                    executor.submit(self._fetch_batch, index, items)
+                    executor.submit(self._fetch_batch, index, items, model_name)
                     for index, items in batches
                 ]
                 results = [future.result() for future in as_completed(futures)]
@@ -127,6 +133,10 @@ class OpenAIEmbeddingEncoder(Embeddings):
             "total_tokens": total_tokens,
         }
         return [_l2_normalize(vector) for vector in ordered_vectors]
+
+    def encode(self, queries: List[str], batch_size: int = 2048) -> List[List[float]]:
+        """Return vectors using this encoder's default ingestion model."""
+        return self.encode_for_model(queries, self.model_name, batch_size)
 
     def close(self) -> None:
         if self._owns_provider:

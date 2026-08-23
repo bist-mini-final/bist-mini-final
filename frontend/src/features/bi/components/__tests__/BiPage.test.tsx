@@ -1,28 +1,29 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BiPage } from '../../BiPage';
-import { DASHBOARD_FIXTURES } from '../../fixtures/dashboardFixtures';
+import { DASHBOARD_FIXTURES } from '../../../../test/fixtures/biDashboardFixtures';
 import {
   fetchBiCompanies,
   fetchBiDashboard,
-  fetchBiMaterializationJob,
-  fetchBiQuestionJob,
   refreshBiDashboard,
+  streamBiMaterializationJob,
+  streamBiQuestionJob,
 } from '../../services/api';
 
 vi.mock('../../services/api', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../services/api')>(),
   fetchBiCompanies: vi.fn(),
   fetchBiDashboard: vi.fn(),
-  fetchBiMaterializationJob: vi.fn(),
-  fetchBiQuestionJob: vi.fn(),
   refreshBiDashboard: vi.fn(),
+  streamBiMaterializationJob: vi.fn(),
+  streamBiQuestionJob: vi.fn(),
 }));
 
 const companyResponse = {
   companies: DASHBOARD_FIXTURES.map((dashboard) => ({
     companyId: dashboard.company.companyId,
     displayName: dashboard.company.displayName,
+    source: dashboard.source,
     currentSnapshotId: dashboard.snapshot.snapshotId,
     snapshotStatus: dashboard.snapshot.status,
     refreshStatus: dashboard.refresh.status,
@@ -42,15 +43,19 @@ describe('BiPage Component', () => {
       completedQuestions: 0,
       failedQuestions: 0,
     });
-    vi.mocked(fetchBiQuestionJob).mockResolvedValue({
+    const completedProgress = {
       jobId: 'question-job-refresh',
       totalQuestions: 10,
       queuedQuestions: 0,
       runningQuestions: 0,
       completedQuestions: 10,
       failedQuestions: 0,
+    };
+    vi.mocked(streamBiQuestionJob).mockImplementation(async (_jobId, onUpdate) => {
+      onUpdate(completedProgress);
+      return completedProgress;
     });
-    vi.mocked(fetchBiMaterializationJob).mockResolvedValue({
+    vi.mocked(streamBiMaterializationJob).mockResolvedValue({
       jobId: 'job-refresh',
       companyId: DASHBOARD_FIXTURES[0].company.companyId,
       workbookHash: DASHBOARD_FIXTURES[0].source.workbookHash,
@@ -89,12 +94,39 @@ describe('BiPage Component', () => {
   it('loads the selected company dashboard from the API service', async () => {
     render(<BiPage />);
 
-    const greenLabsTab = await screen.findByRole('tab', { name: '그린랩스' });
+    await screen.findByRole('heading', { name: '기업 Dashboard' });
+    const greenLabsTab = screen.getByRole('tab', { name: '그린랩스' });
     fireEvent.click(greenLabsTab);
 
     await waitFor(() => expect(fetchBiDashboard).toHaveBeenCalledWith('green-labs', expect.any(AbortSignal)));
     expect(await screen.findByRole('tab', { name: '그린랩스' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getAllByText('그린랩스').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps company switching available when the selected snapshot failed', async () => {
+    vi.mocked(fetchBiCompanies).mockResolvedValue({
+      companies: [
+        {
+          ...companyResponse.companies[0],
+          currentSnapshotId: null,
+          snapshotStatus: null,
+          refreshStatus: 'failed',
+          updatedAt: null,
+        },
+        companyResponse.companies[1],
+      ],
+    });
+
+    render(<BiPage />);
+
+    expect(await screen.findByRole('button', { name: '스냅샷 다시 생성' })).toBeInTheDocument();
+    const greenLabsTab = screen.getByRole('tab', { name: '그린랩스' });
+    fireEvent.click(greenLabsTab);
+    await waitFor(() => expect(greenLabsTab).toHaveAttribute('aria-selected', 'true'));
+    await waitFor(() => expect(fetchBiDashboard).toHaveBeenCalledWith(
+      'green-labs',
+      expect.any(AbortSignal),
+    ));
   });
 
   it('switches period range when clicking toolbar period buttons', async () => {

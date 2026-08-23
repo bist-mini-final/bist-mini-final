@@ -136,8 +136,8 @@ export function DataSourcesView() {
     return () => controller.abort();
   }, [fetchData]);
 
-  // Polling observes the persisted run only. Closing this page does not own or
-  // cancel the worker; a later visit reconnects with ACTIVE_JOB_KEY.
+  // The shared workflow SSE core observes the persisted run. Closing this page
+  // only disconnects observation; Kubernetes continues to own the worker.
   useEffect(() => {
     if (
       !activePipelineRun
@@ -148,48 +148,47 @@ export function DataSourcesView() {
     if (!isServerRun(runId)) return;
 
     let stopped = false;
-    let requestInFlight = false;
-    let consecutiveFailures = 0;
+    let terminalHandled = false;
     const controller = new AbortController();
 
-    const refreshJob = async () => {
-      if (requestInFlight || stopped) return;
-      requestInFlight = true;
-      try {
-        const job = await dataSourceApi.getIngestionJob(runId, controller.signal);
-        if (stopped) return;
-        consecutiveFailures = 0;
-        setError(null);
-        const pipeline = pipelineFromIngestionJob(job);
-        setActivePipelineRun(pipeline);
-        if (pipeline.status === 'completed') {
-          localStorage.removeItem(ACTIVE_JOB_KEY);
-          setFailedRuns((existing) => existing.filter((run) => run.pipelineId !== runId));
-          await fetchData();
-        } else if (pipeline.status === 'failed') {
-          setFailedRuns((existing) => [
-            ...existing.filter((run) => run.pipelineId !== runId),
-            pipeline,
-          ]);
-        }
-      } catch (err: any) {
-        if (!stopped && err?.name !== 'AbortError') {
-          consecutiveFailures += 1;
-          if (consecutiveFailures === 3) {
-            setError(err.message || '인덱싱 실행 상태를 조회하지 못했습니다.');
-          }
-        }
-      } finally {
-        requestInFlight = false;
+    const applyJob = (job: IngestionJobResponse): void => {
+      if (stopped) return;
+      setError(null);
+      const pipeline = pipelineFromIngestionJob(job);
+      setActivePipelineRun(pipeline);
+      if (!terminalHandled && pipeline.status === 'completed') {
+        terminalHandled = true;
+        localStorage.removeItem(ACTIVE_JOB_KEY);
+        setFailedRuns((existing) => existing.filter((run) => run.pipelineId !== runId));
+        void fetchData();
+      } else if (!terminalHandled && pipeline.status === 'failed') {
+        terminalHandled = true;
+        setFailedRuns((existing) => [
+          ...existing.filter((run) => run.pipelineId !== runId),
+          pipeline,
+        ]);
       }
     };
 
-    void refreshJob();
-    const timer = window.setInterval(refreshJob, 1000);
+    const observeJob = async (): Promise<void> => {
+      try {
+        const initial = await dataSourceApi.getIngestionJob(runId, controller.signal);
+        if (stopped) return;
+        applyJob(initial);
+        if (initial.status === 'queued' || initial.status === 'running') {
+          await dataSourceApi.streamIngestionJob(initial, applyJob, controller.signal);
+        }
+      } catch (err: any) {
+        if (!stopped && err?.name !== 'AbortError') {
+          setError(err.message || '인덱싱 실행 상태 스트림에 연결하지 못했습니다.');
+        }
+      }
+    };
+
+    void observeJob();
     return () => {
       stopped = true;
       controller.abort();
-      window.clearInterval(timer);
     };
   }, [activePipelineRun?.pipelineId, activePipelineRun?.status, deletingPipelineId, fetchData]);
 

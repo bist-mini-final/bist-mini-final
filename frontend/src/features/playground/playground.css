@@ -1011,6 +1011,70 @@
   line-height: 1.5;
 }
 
+.reader-markdown {
+  color: #334155;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.reader-markdown > :first-child { margin-top: 0; }
+.reader-markdown > :last-child { margin-bottom: 0; }
+.reader-markdown p { margin: 0.45rem 0; }
+.reader-markdown strong { color: #881337; font-weight: 750; }
+.reader-markdown ul,
+.reader-markdown ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+.reader-markdown ul { list-style: disc; }
+.reader-markdown ol { list-style: decimal; }
+.reader-markdown li { margin: 0.24rem 0; padding-left: 0.15rem; }
+.reader-markdown li::marker { color: #e11d48; font-weight: 700; }
+.reader-markdown h1,
+.reader-markdown h2,
+.reader-markdown h3 {
+  margin: 0.8rem 0 0.4rem;
+  color: #4c0519;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.reader-markdown h1 { font-size: 1rem; }
+.reader-markdown h2 { font-size: 0.9rem; }
+.reader-markdown h3 { font-size: 0.82rem; }
+.reader-markdown blockquote {
+  margin: 0.6rem 0;
+  padding: 0.45rem 0.65rem;
+  border-left: 3px solid #fda4af;
+  border-radius: 0 0.45rem 0.45rem 0;
+  background: #fff1f2;
+  color: #6b2136;
+}
+.reader-markdown code {
+  padding: 0.1rem 0.28rem;
+  border-radius: 0.3rem;
+  background: #f1f5f9;
+  color: #be123c;
+  font-family: var(--font-code);
+  font-size: 0.92em;
+}
+.reader-markdown pre {
+  margin: 0.6rem 0;
+  padding: 0.65rem;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.55rem;
+  background: #f8fafc;
+}
+.reader-markdown pre code { padding: 0; background: transparent; color: #334155; }
+.reader-markdown table {
+  width: 100%;
+  margin: 0.6rem 0;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.reader-markdown th,
+.reader-markdown td { padding: 0.35rem 0.45rem; border: 1px solid #fecdd3; text-align: left; }
+.reader-markdown th { background: #fff1f2; color: #881337; font-weight: 750; }
+.reader-markdown a { color: #be123c; font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
+.reader-markdown hr { margin: 0.7rem 0; border: 0; border-top: 1px solid #fecdd3; }
+
 .flow-node__resize-handle {
   position: absolute;
   z-index: 4;

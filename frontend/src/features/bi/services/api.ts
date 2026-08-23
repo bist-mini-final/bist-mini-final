@@ -18,6 +18,7 @@ import {
   requestJson,
   requestResponse,
 } from '../../../shared/api/httpClient';
+import { streamJsonEvents } from '../../../shared/api/sse';
 
 export { ApiError as BiApiRequestError } from '../../../shared/api/httpClient';
 
@@ -70,6 +71,43 @@ export async function fetchBiMaterializationJob(
   );
 }
 
+function waitForReconnect(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(resolve, 500);
+    signal.addEventListener('abort', () => {
+      window.clearTimeout(timer);
+      reject(signal.reason);
+    }, { once: true });
+  });
+}
+
+export async function streamBiMaterializationJob(
+  jobId: string,
+  onUpdate: (job: BiMaterializationJob) => void,
+  signal: AbortSignal,
+): Promise<BiMaterializationJob> {
+  let latest: BiMaterializationJob | null = null;
+  const endpoint = `/api/bi/materializations/${encodeURIComponent(jobId)}/stream`;
+  while (!signal.aborted) {
+    try {
+      await streamJsonEvents(endpoint, (event) => {
+        if (!event.event.startsWith('materialization_')) return;
+        latest = parseBiMaterializationJob(event.data);
+        onUpdate(latest);
+      }, signal);
+    } catch (error) {
+      if (signal.aborted) throw error;
+    }
+    if (latest && ['ready', 'partial', 'failed'].includes(latest.status)) return latest;
+    latest = await fetchBiMaterializationJob(jobId, signal);
+    onUpdate(latest);
+    if (['ready', 'partial', 'failed'].includes(latest.status)) return latest;
+    await waitForReconnect(signal);
+  }
+  throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+}
+
 export async function refreshBiDashboard(
   companyId: string,
   signal: AbortSignal,
@@ -88,4 +126,32 @@ export async function fetchBiQuestionJob(
   return parseBiQuestionJobProgress(
     await requestJson<unknown>(endpoint, { signal }),
   );
+}
+
+export async function streamBiQuestionJob(
+  jobId: string,
+  onUpdate: (progress: BiQuestionJobProgress) => void,
+  signal: AbortSignal,
+): Promise<BiQuestionJobProgress> {
+  let latest: BiQuestionJobProgress | null = null;
+  const endpoint = `/api/bi/question-jobs/${encodeURIComponent(jobId)}/stream`;
+  while (!signal.aborted) {
+    try {
+      await streamJsonEvents(endpoint, (event) => {
+        if (!event.event.startsWith('question_job_')) return;
+        latest = parseBiQuestionJobProgress(event.data);
+        onUpdate(latest);
+      }, signal);
+    } catch (error) {
+      if (signal.aborted) throw error;
+    }
+    if (latest && latest.queuedQuestions === 0 && latest.runningQuestions === 0) {
+      return latest;
+    }
+    latest = await fetchBiQuestionJob(jobId, signal);
+    onUpdate(latest);
+    if (latest.queuedQuestions === 0 && latest.runningQuestions === 0) return latest;
+    await waitForReconnect(signal);
+  }
+  throw signal.reason ?? new DOMException('Aborted', 'AbortError');
 }

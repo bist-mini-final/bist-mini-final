@@ -24,7 +24,7 @@ from modules.retrieval.postgres_native_keyword_retriever import (
 )
 from modules.retrieval.rrf_fusion import RrfFusionModule
 from modules.storage.company_entity_extractor import CompanyEntityExtractorModule
-from modules.storage.pgvector_collection_loader import PgVectorCollectionLoaderModule
+from modules.storage.pgvector_data_scope import PgVectorDataScopeModule
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 from modules.storage.processed_file_selector import ProcessedFileSelectorModule
 from modules.storage.qa_example_loader import QaExampleLoaderModule
@@ -74,10 +74,7 @@ class ModuleRegistry(BaseModuleRegistry):
                 embedding_encoder=embedding_encoder,
                 processed_dir=processed_dir,
             ),
-            PgVectorCollectionLoaderModule(
-                pgvector_store=self.pgvector_store,
-                db_manager=self.db_manager,
-            ),
+            PgVectorDataScopeModule(pgvector_store=self.pgvector_store),
             PgVectorRetrieverModule(self.pgvector_store),
             PostgresNativeKeywordRetrieverModule(self.pgvector_store),
             RrfFusionModule(),

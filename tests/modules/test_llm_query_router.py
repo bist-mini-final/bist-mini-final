@@ -2,91 +2,97 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from backend.providers.openai_responses import OpenAIResponseResult
-from modules.common.base_module import QueryContextDTO
+from modules.common.base_module import ModuleExecutionError, QueryContextDTO
+from modules.query.decomposer import SubqueriesDTO, SubqueryItem
 from modules.query.llm_query_router import (
-    LlmQueryRouterConfigDTO,
     LlmQueryRouterInputDTO,
     LlmQueryRouterModule,
-    RouterDecisionDTO,
+    RetrievalPlanDTO,
 )
+from modules.storage.pgvector_data_scope import DataScopeCatalogDTO, DataScopeDTO
 
 
-def test_llm_query_router_execution():
-    mock_llm = MagicMock()
-    mock_llm.create_response.return_value = OpenAIResponseResult(
-        response_id="resp_router_1",
-        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"]}]}',
-        usage={"prompt_tokens": 50, "completion_tokens": 30},
-        latency_seconds=0.2,
+def _scope(index_id: str, company: str, sheet: str) -> DataScopeDTO:
+    return DataScopeDTO(
+        index_id=index_id,
+        file_name=f"{company}.xlsx",
+        workbook_hash=f"hash-{index_id}",
+        company_name=company,
+        sheet_names=[sheet],
+        model="text-embedding-3-small",
+        dimension=1536,
+        document_count=100,
     )
 
-    router_module = LlmQueryRouterModule(completion_client=mock_llm)
-    res = router_module.run(
-        LlmQueryRouterInputDTO(
-            query_context=QueryContextDTO(question_id="q1", question_text="삼성전자 영업이익")
-        ),
-        config=LlmQueryRouterConfigDTO(),
-    )
 
-    assert "semantic_match" in res
-    assert len(res["semantic_match"]["items"]) == 1
-    assert res["semantic_match"]["items"][0]["company_name"] == "삼성전자"
-    assert res["semantic_match"]["items"][0]["sheets"] == ["손익계산서"]
-    assert res["semantic_match"]["metrics"]["kind"] == "llm_structured"
-
-    # Verify RouterDecisionDTO properties
-    dto = RouterDecisionDTO.model_validate(res["semantic_match"])
-    assert dto.matched is True
-    assert dto.company_name == "삼성전자"
-    assert dto.sheets == ["손익계산서"]
-    assert len(dto.company_scopes) == 1
-
-
-def test_llm_query_router_multi_scope_execution():
-    mock_llm = MagicMock()
-    mock_llm.create_response.return_value = OpenAIResponseResult(
-        response_id="resp_router_2",
-        content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"]}]}',
-        usage={"prompt_tokens": 60, "completion_tokens": 40},
-        latency_seconds=0.25,
-    )
-
-    router_module = LlmQueryRouterModule(completion_client=mock_llm)
-    res = router_module.run(
-        LlmQueryRouterInputDTO(
+def _input() -> LlmQueryRouterInputDTO:
+    return LlmQueryRouterInputDTO(
+        query_input=SubqueriesDTO(
             query_context=QueryContextDTO(
-                question_id="q2",
-                question_text="삼성전자 2023년 영업이익과 현대자동차 2022년 부채상태를 비교해줘",
-            )
+                question_id="q1",
+                question_text="삼성전자 매출과 현대자동차 부채를 비교해줘",
+            ),
+            items=[
+                SubqueryItem(company="삼성전자", sheet="손익계산서", row_header="매출"),
+                SubqueryItem(company="현대자동차", sheet="재무상태표", row_header="부채"),
+            ],
         ),
-        config=LlmQueryRouterConfigDTO(),
+        scope_catalog=DataScopeCatalogDTO(
+            collections=[
+                _scope("idx-samsung", "삼성전자", "손익계산서"),
+                _scope("idx-hyundai", "현대자동차", "재무상태표"),
+            ]
+        ),
     )
 
-    assert len(res["semantic_match"]["items"]) == 2
-    assert res["semantic_match"]["items"][0]["company_name"] == "삼성전자"
-    assert res["semantic_match"]["items"][1]["company_name"] == "현대자동차"
 
-    dto = RouterDecisionDTO.model_validate(res["semantic_match"])
-    assert dto.matched is True
-    assert set(dto.sheets) == {"손익계산서", "재무상태표"}
-
-
-def test_llm_query_router_empty_scope_handling():
+def test_router_maps_each_subquery_to_concrete_collection() -> None:
     client = MagicMock()
     client.create_response.return_value = OpenAIResponseResult(
-        response_id="resp_router_empty",
-        content='{"items":[]}',
+        response_id="resp-router",
+        content=(
+            '{"routes":['
+            '{"subquery_index":0,"index_ids":["idx-samsung"]},'
+            '{"subquery_index":1,"index_ids":["idx-hyundai"]}'
+            "]}"
+        ),
+        usage={"prompt_tokens": 60, "completion_tokens": 20, "total_tokens": 80},
+        latency_seconds=0.2,
+    )
+    result = LlmQueryRouterModule(client).run(_input())
+    plan = RetrievalPlanDTO.model_validate(result)
+
+    assert plan.selected_index_ids == ["idx-samsung", "idx-hyundai"]
+    assert plan.routes[0].subquery.company == "삼성전자"
+    assert plan.routes[1].collections[0].index_id == "idx-hyundai"
+    assert plan.metrics["kind"] == "llm_collection_router"
+
+
+def test_router_rejects_collection_not_present_in_db_catalog() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-router-invalid",
+        content=(
+            '{"routes":['
+            '{"subquery_index":0,"index_ids":["invented"]},'
+            '{"subquery_index":1,"index_ids":["idx-hyundai"]}'
+            "]}"
+        ),
         usage={},
         latency_seconds=0,
     )
-    module = LlmQueryRouterModule(completion_client=client)
-    result = module.run(
-        LlmQueryRouterInputDTO(
-            query_context=QueryContextDTO(question_id="q", question_text="hello how are you")
-        )
-    )
+    with pytest.raises(ModuleExecutionError, match="catalog에 없는 collection"):
+        LlmQueryRouterModule(client).run(_input())
 
-    assert len(result["semantic_match"]["items"]) == 0
-    dto = RouterDecisionDTO.model_validate(result["semantic_match"])
-    assert dto.matched is False
+
+def test_router_skips_provider_call_for_empty_subquery_set() -> None:
+    client = MagicMock()
+    input_data = _input()
+    input_data.query_input.items = []
+    result = LlmQueryRouterModule(client).run(input_data)
+
+    assert result["routes"] == []
+    client.create_response.assert_not_called()

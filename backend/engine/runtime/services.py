@@ -64,7 +64,7 @@ def create_workflow_runtime_services(
     database = db_manager or DatabaseManager()
     database_connected = database.is_connected()
     if require_database and not database_connected:
-        raise RuntimeError("Kubernetes 배치 워커가 PostgreSQL 데이터베이스에 연결할 수 없습니다")
+        raise RuntimeError("워크플로 런타임이 PostgreSQL 데이터베이스에 연결할 수 없습니다")
     if database_connected and initialize_schema and not database.ensure_schema():
         raise RuntimeError("PostgreSQL 워크플로 스키마를 초기화할 수 없습니다")
 
@@ -82,6 +82,7 @@ def create_workflow_runtime_services(
     run_store = RunStore(
         run_dir,
         db_manager=database if database_connected else None,
+        require_database=require_database,
     )
     workflow_executor = WorkflowExecutor(
         registry,

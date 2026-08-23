@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, pipelineApi } from '../api';
+import type { WorkflowRun } from '../../types';
 
 describe('playground API errors', () => {
   afterEach(() => {
@@ -34,5 +35,38 @@ describe('playground API errors', () => {
       retryable: true,
       context: { workflow_id: 'rag_query' },
     });
+  });
+
+  it('delivers CRLF SSE progress before the response stream closes', async () => {
+    let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    })));
+    const events: string[] = [];
+    const streamPromise = pipelineApi.streamRun(
+      'run-1',
+      (event) => events.push(event.event),
+    );
+    const encoder = new TextEncoder();
+
+    streamController?.enqueue(encoder.encode(
+      'event: node_progress\r\ndata: {"node_id":"query","status":"running"}\r\n\r\n'
+    ));
+    await vi.waitFor(() => expect(events).toEqual(['node_progress']));
+
+    const completedRun = { id: 'run-1', status: 'completed' } as unknown as WorkflowRun;
+    streamController?.enqueue(encoder.encode(
+      `event: run_completed\r\ndata: ${JSON.stringify({ run: completedRun })}\r\n\r\n`
+    ));
+    streamController?.close();
+
+    await expect(streamPromise).resolves.toEqual(completedRun);
+    expect(events).toEqual(['node_progress', 'run_completed']);
   });
 });

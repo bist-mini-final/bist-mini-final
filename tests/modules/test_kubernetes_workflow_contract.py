@@ -31,6 +31,7 @@ class RecordingDatabase:
         self.saved: WorkflowRun | None = None
         self.saved_nodes: list[str] = []
         self.enqueue_count = 0
+        self.fail_progress = False
 
     def is_connected(self) -> bool:
         return True
@@ -54,6 +55,18 @@ class RecordingDatabase:
         del lease_token
         self.saved = run
         self.saved_nodes.append(node_id)
+
+    def save_workflow_node_progress(
+        self,
+        run: WorkflowRun,
+        node_id: str,
+        *,
+        lease_token: str | None = None,
+    ) -> None:
+        del lease_token, node_id
+        if self.fail_progress:
+            raise RuntimeError("database unavailable")
+        self.saved = run
 
     def get_workflow_run(self, run_id: str) -> dict[str, Any] | None:
         if self.saved is None or self.saved.id != run_id:
@@ -138,6 +151,19 @@ def workflow_run_with_output(output: Any) -> WorkflowRun:
 
 
 class KubernetesWorkflowContractTests(unittest.TestCase):
+    def test_production_run_store_requires_postgresql(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "PostgreSQL 연결"):
+            RunStore(require_database=True)
+
+    def test_progress_persistence_failure_is_not_silenced(self) -> None:
+        database = RecordingDatabase()
+        store = RunStore(db_manager=database, require_database=True)
+        run = store.save(workflow_run_with_output(None))
+        database.fail_progress = True
+
+        with self.assertRaisesRegex(RuntimeError, "진행률"):
+            store.save_progress(run, "query")
+
     def test_canonical_jobs_cannot_be_overwritten_or_deleted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = WorkflowStore(Path(directory))

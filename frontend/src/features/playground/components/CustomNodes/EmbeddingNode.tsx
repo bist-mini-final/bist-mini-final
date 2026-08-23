@@ -18,7 +18,7 @@ export const EmbeddingNode = ({ data, selected }: EmbeddingNodeProps) => {
       title="Query Embedder"
       state={getExecutionNodeState(data.executionState)}
       nodeData={data}
-      inputPorts={['query_input', 'index_input']}
+      inputPorts={['retrieval_plan']}
       selected={selected}
       width={320}
       bodyClassName="space-y-2"

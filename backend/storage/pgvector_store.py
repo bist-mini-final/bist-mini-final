@@ -754,6 +754,62 @@ class PgVectorStore:
             })
         return results
 
+    def list_data_scopes(self) -> List[Dict[str, Any]]:
+        """Return the compact collection catalog used by query routing.
+
+        Document counts come from collection metadata and sheet names come from
+        the normalized ``sheets`` table, so routing never scans the embedding
+        table merely to discover available data.
+        """
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        collection.name,
+                        collection.cmetadata,
+                        COALESCE(
+                            ARRAY(
+                                SELECT sheet.sheet_name
+                                FROM sheets AS sheet
+                                WHERE sheet.file_id = collection.cmetadata->>'workbook_hash'
+                                  AND sheet.is_visible = TRUE
+                                ORDER BY sheet.sheet_index, sheet.sheet_name
+                            ),
+                            ARRAY[]::text[]
+                        ) AS sheet_names
+                    FROM langchain_pg_collection AS collection
+                    ORDER BY collection.name;
+                    """
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+
+        scopes: List[Dict[str, Any]] = []
+        for index_id, raw_metadata, raw_sheet_names in rows:
+            metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
+            scopes.append(
+                {
+                    "index_id": str(index_id),
+                    "file_name": str(metadata.get("file_name") or index_id),
+                    "workbook_hash": str(metadata.get("workbook_hash") or index_id),
+                    "company_name": str(metadata.get("company_name") or ""),
+                    "sheet_names": [
+                        str(name)
+                        for name in (raw_sheet_names or [])
+                        if str(name).strip()
+                    ],
+                    "model": str(metadata.get("model") or DEFAULT_EMBEDDING_MODEL),
+                    "dimension": int(
+                        metadata.get("dimension") or DEFAULT_EMBEDDING_DIMENSION
+                    ),
+                    "document_count": int(metadata.get("document_count") or 0),
+                }
+            )
+        return scopes
+
     def get_index_metadata(self, index_id: str) -> Dict[str, Any]:
         """Retrieve metadata dictionary for a pgvector collection."""
         try:

@@ -38,6 +38,7 @@ def test_context_expander_batches_rows_per_sheet():
         items=[
             RrfCandidateDTO(
                 rank=1,
+                index_id="idx_1",
                 cell_id="samsung:IS:B10",
                 rrf_score=0.9,
                 text="영업이익: 65670억",
@@ -93,6 +94,7 @@ def test_context_expander_preserves_raw_document_texts():
         items=[
             RrfCandidateDTO(
                 rank=1,
+                index_id="samsung_idx",
                 cell_id="삼성전자:손익계산서:C5",
                 rrf_score=0.95,
                 text="Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
@@ -113,3 +115,41 @@ def test_context_expander_preserves_raw_document_texts():
     assert "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670" in items
 
 
+def test_context_expander_restores_values_hidden_by_header_only_variants() -> None:
+    store = MagicMock()
+    store.fetch_rows_cells.return_value = {
+        8: [
+            {
+                "col_index": 3,
+                "cell_value": "120",
+                "source_text": (
+                    "Company: Example Corp | Sheet: Financials | "
+                    "Row Header: Revenue | Column Header: FY2025 | Cell Value: ?"
+                ),
+            }
+        ]
+    }
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(question_id="q1", question_text="FY2025 Revenue"),
+        document_context=DocumentContextDTO(
+            file_name="sample.xlsx",
+            workbook_hash="hash-1",
+            index_id="idx-1",
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="idx-1",
+                cell_id="Financials:C8",
+                rrf_score=0.9,
+                text="Revenue FY2025",
+                matched_subquery="Revenue FY2025",
+            )
+        ],
+    )
+
+    result = PgContextExpanderModule(store).run(
+        PgContextExpanderInputDTO(retrieval_json=retrieval)
+    )
+
+    assert any("Cell Value: 120" in item for item in result["items"])

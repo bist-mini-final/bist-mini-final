@@ -7,7 +7,7 @@ import {
   Rows3,
   Sparkles,
 } from 'lucide-react';
-import type { WorkflowRun } from '../playground/types';
+import type { WorkflowRun } from '../../shared/workflows/types';
 import type { IngestionJobResponse } from './types';
 import type { ModuleStepState, PipelineRunState } from './pipelineTypes';
 

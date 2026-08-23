@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pipelineApi, ApiError } from '../services/api';
+import {
+  executionDefinitionFingerprint,
+  executionRunMatchesRequest,
+  mergeRunNodeUpdate,
+  workflowRuntimeInputs,
+} from '../domain/execution';
 import type {
   SaveStatus,
   WorkflowGraph,
@@ -10,49 +16,8 @@ interface WorkflowGraphBridge {
   exportGraph: () => WorkflowGraph;
   replaceGraph: (graph: WorkflowGraph) => void;
   applyRun: (run: WorkflowRun) => void;
+  restoreRuntimeInputs: (run: WorkflowRun) => void;
   clearExecutionState: () => void;
-}
-
-function runInputs(
-  graph: WorkflowGraph,
-  query: string
-): Record<string, Record<string, unknown>> {
-  return Object.fromEntries(
-    graph.nodes
-      .filter((node) => node.module_type === 'query_input')
-      .map((node) => [
-        node.id,
-        { query },
-      ])
-  );
-}
-
-function executionFingerprint(graph: WorkflowGraph): string {
-  return JSON.stringify({
-    nodes: (graph.nodes ?? []).map(({ id, module_type, config, values }) => ({
-      id,
-      module_type,
-      config: config ?? {},
-      values: values ?? {},
-    })),
-    edges: (graph.edges ?? []).map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      source_output: edge.source_output ?? null,
-      target_input: edge.target_input ?? null,
-      source_branch: edge.source_branch ?? null,
-    })),
-  });
-}
-
-function executionRunMatchesRequest(
-  run: WorkflowRun,
-  graph: WorkflowGraph,
-  query: string,
-): boolean {
-  return executionFingerprint(run.graph) === executionFingerprint(graph)
-    && JSON.stringify(run.runtime_inputs) === JSON.stringify(runInputs(graph, query));
 }
 
 const CANONICAL_WORKFLOW_IDS = new Set(['rag_query', 'excel_ingestion']);
@@ -104,13 +69,17 @@ export function useWorkflowPersistence(
   const [isExecuting, setIsExecuting] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const executionController = useRef<AbortController | null>(null);
+  const latestRunRef = useRef<WorkflowRun | null>(null);
   const runtimeMutationEpoch = useRef(0);
   const latestRunMatchesGraph = Boolean(
-    latestRun && executionFingerprint(latestRun.graph) === executionFingerprint(currentGraph)
+    latestRun
+      && executionDefinitionFingerprint(latestRun.graph)
+        === executionDefinitionFingerprint(currentGraph)
   );
   const isCanonicalWorkflow = CANONICAL_WORKFLOW_IDS.has(activeWorkflowId);
 
   const applyRun = useCallback((run: WorkflowRun) => {
+    latestRunRef.current = run;
     setLatestRun(run);
     setRuns((currentRuns) =>
       [run, ...currentRuns.filter((candidate) => candidate.id !== run.id)]
@@ -133,6 +102,7 @@ export function useWorkflowPersistence(
     setIsExecuting(false);
     setReady(false);
     setLatestRun(null);
+    latestRunRef.current = null;
     setRuns([]);
 
     const load = async () => {
@@ -147,7 +117,10 @@ export function useWorkflowPersistence(
           .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
         setRuns(sortedRuns);
         const mostRecentRun = sortedRuns[0];
-        if (mostRecentRun) applyRun(mostRecentRun);
+        if (mostRecentRun) {
+          graphRef.current.restoreRuntimeInputs(mostRecentRun);
+          applyRun(mostRecentRun);
+        }
         setLastSavedAt(workflow.updated_at);
         setSaveStatus('saved');
         setReady(true);
@@ -202,7 +175,7 @@ export function useWorkflowPersistence(
         : await saveNow(signal);
       const run = await pipelineApi.createRun(
         activeWorkflowId,
-        runInputs(workflow.graph, query),
+        workflowRuntimeInputs(workflow.graph, query),
         signal
       );
       applyRun(run);
@@ -222,7 +195,7 @@ export function useWorkflowPersistence(
       setIsExecuting(true);
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
-        const currentRuntimeInputs = runInputs(currentExecutionGraph, query);
+        const currentRuntimeInputs = workflowRuntimeInputs(currentExecutionGraph, query);
         let run = latestRun &&
           (latestRun.status === 'queued' ||
             latestRun.status === 'running' ||
@@ -241,24 +214,18 @@ export function useWorkflowPersistence(
           run = await pipelineApi.streamRun(
             run.id,
             (event) => {
-              if (event.event === 'node_completed' || event.event === 'node_failed') {
+              if (
+                event.event === 'node_progress'
+                || event.event === 'node_completed'
+                || event.event === 'node_failed'
+              ) {
                 const nodeUpdate = event.data;
                 if (nodeUpdate?.node_id) {
-                  setLatestRun((prev) => {
-                    if (!prev) return prev;
-                    const existing = prev.nodes[nodeUpdate.node_id];
-                    if (!existing) return prev;
-                    const updated = {
-                      ...prev,
-                      nodes: {
-                        ...prev.nodes,
-                        [nodeUpdate.node_id]: { ...existing, ...nodeUpdate },
-                      },
-                    };
-                    applyRun(updated);
-                    onBatch?.(updated);
-                    return updated;
-                  });
+                  const current = latestRunRef.current;
+                  if (!current) return;
+                  const updated = mergeRunNodeUpdate(current, nodeUpdate);
+                  applyRun(updated);
+                  onBatch?.(updated);
                 }
               } else if (event.event === 'run_completed' && event.data?.run) {
                 applyRun(event.data.run);
@@ -321,6 +288,7 @@ export function useWorkflowPersistence(
       const result = await pipelineApi.clearCache();
       if (runtimeMutationEpoch.current !== epoch) return result;
       setLatestRun(null);
+      latestRunRef.current = null;
       setRuns([]);
       graphRef.current.clearExecutionState();
       return result;

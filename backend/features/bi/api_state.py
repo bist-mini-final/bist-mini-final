@@ -28,6 +28,19 @@ def build_company_summary(
     snapshot: BiDashboardSnapshot | None,
     latest_job: BiMaterializationJob | None,
 ) -> BiCompanySummary:
+    source = entry.source
+    if source is not None:
+        if (
+            snapshot is not None
+            and snapshot.source.workbook_hash != source.workbook_hash
+        ):
+            snapshot = None
+            entry = entry.model_copy(update={"current_snapshot_id": None})
+        if (
+            latest_job is not None
+            and latest_job.workbook_hash != source.workbook_hash
+        ):
+            latest_job = None
     latest_job = _refresh_job(snapshot, latest_job)
     updated_at = snapshot.snapshot.generated_at if snapshot is not None else None
     if latest_job is not None and (
@@ -37,6 +50,7 @@ def build_company_summary(
     return BiCompanySummary(
         company_id=entry.company.company_id,
         display_name=entry.company.display_name,
+        source=entry.source,
         current_snapshot_id=entry.current_snapshot_id,
         snapshot_status=(snapshot.snapshot.status if snapshot is not None else None),
         refresh_status=refresh_status(latest_job),

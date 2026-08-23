@@ -4,51 +4,66 @@ from unittest.mock import MagicMock
 
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import QueryContextDTO
-from modules.embedding.query_embedder import EmbeddingsDTO
+from modules.embedding.query_embedder import EmbeddingsDTO, RoutedEmbeddingDTO
+from modules.query.decomposer import SubqueryItem
 from modules.retrieval.pgvector_retriever import (
     PgVectorRetrieverConfigDTO,
     PgVectorRetrieverInputDTO,
     PgVectorRetrieverModule,
 )
-from modules.storage.pgvector_collection_loader import IndexOutputDTO
+from modules.storage.pgvector_data_scope import DataScopeDTO
 
 
-def test_dense_retrieval_preserves_top_k_per_subquery():
-    mock_store = MagicMock()
-    doc1 = MagicMock()
-    doc1.page_content = "Cell 1 content"
-    doc1.metadata = {"cell_id": "cell_1"}
-    mock_store.similarity_search_by_vector_with_score.return_value = [(doc1, 0.15)]
-
-    retriever = PgVectorRetrieverModule(pgvector_store=mock_store)
-
-    index_input = IndexOutputDTO(
-        index_id="idx_1",
-        file_name="samsung.xlsx",
-        workbook_hash="hash_1",
-        model="text-embedding-3-large",
-        dimension=3072,
+def test_dense_retrieval_searches_only_the_routed_collection() -> None:
+    store = MagicMock()
+    document = MagicMock()
+    document.page_content = "Cell 1 content"
+    document.metadata = {"cell_id": "cell_1"}
+    store.similarity_search_by_vector_with_score.return_value = [(document, 0.15)]
+    scope = DataScopeDTO(
+        index_id="idx-routed",
+        file_name="sample.xlsx",
+        workbook_hash="hash-1",
+        company_name="Example Corp",
+        sheet_names=["Financials"],
+        model="text-embedding-3-small",
+        dimension=1536,
         document_count=100,
     )
+    subquery = SubqueryItem(
+        company="Example Corp",
+        sheet="Financials",
+        row_header="Revenue",
+        text="Revenue",
+    )
     embeddings = EmbeddingsDTO(
-        query_context=QueryContextDTO(question_id="q1", question_text="영업이익"),
-        items={"subquery_1": [0.1] * 3072},
+        query_context=QueryContextDTO(question_id="q1", question_text="Revenue"),
+        items=[
+            RoutedEmbeddingDTO(
+                subquery_index=0,
+                subquery=subquery,
+                collection=scope,
+                vector=[0.1] * 1536,
+            )
+        ],
+    )
+    result = PgVectorRetrieverModule(store).run(
+        PgVectorRetrieverInputDTO(query_input=embeddings),
+        PgVectorRetrieverConfigDTO(top_k=5),
     )
 
-    input_dto = PgVectorRetrieverInputDTO(
-        query_input=embeddings,
-        index_input=index_input,
+    assert result["items"][0]["index_id"] == "idx-routed"
+    assert result["items"][0]["cell_id"] == "cell_1"
+    store.similarity_search_by_vector_with_score.assert_called_once_with(
+        collection_name="idx-routed",
+        embedding=[0.1] * 1536,
+        k=5,
+        sheet_names=["Financials"],
+        company_name="Example Corp",
     )
-    res = retriever.execute(input_dto, config=PgVectorRetrieverConfigDTO(top_k=5))
-
-    assert "items" in res
-    assert len(res["items"]) == 1
-    assert res["items"][0]["cell_id"] == "cell_1"
-    assert res["items"][0]["matched_subquery"] == "subquery_1"
-    assert res["items"][0]["rank"] == 1
 
 
-def test_direct_dense_sql_uses_single_character_like_escape():
+def test_direct_dense_sql_uses_single_character_like_escape() -> None:
     class Cursor:
         def __init__(self) -> None:
             self.sql = ""

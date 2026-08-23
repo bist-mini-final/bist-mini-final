@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Mapping, Optional
+from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Mapping, Optional, cast
 
 from pydantic import Field
 
@@ -261,7 +261,15 @@ class BaseEmbeddingModule(BaseModule):
         for batch_idx, start in enumerate(range(0, total_items, effective_batch_size), start=1):
             end = min(start + effective_batch_size, total_items)
             batch_texts = texts[start:end]
-            batch_vectors = encoder.encode(batch_texts)
+            encode_for_model: Any = getattr(type(encoder), "encode_for_model", None)
+            batch_vectors = cast(
+                List[List[float]],
+                (
+                    encoder.encode_for_model(batch_texts, resolved_model)
+                    if callable(encode_for_model)
+                    else encoder.encode(batch_texts)
+                ),
+            )
 
             if len(batch_vectors) != len(batch_texts):
                 raise ModuleExecutionError(

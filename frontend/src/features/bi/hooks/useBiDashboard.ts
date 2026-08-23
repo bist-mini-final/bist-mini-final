@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  BiApiRequestError,
+  createBiMaterialization,
   fetchBiDashboard,
-  fetchBiMaterializationJob,
-  fetchBiQuestionJob,
   refreshBiDashboard,
+  streamBiMaterializationJob,
+  streamBiQuestionJob,
+  BiApiRequestError,
 } from '../services/api';
 import type {
+  BiCompanySummary,
+  BiDashboardFetchResult,
   BiDashboardSnapshot,
   BiMaterializationJob,
   BiQuestionJobProgress,
@@ -24,6 +27,7 @@ export type BiDashboardState =
 export interface UseBiDashboardResult {
   readonly state: BiDashboardState;
   readonly refresh: () => Promise<void>;
+  readonly retryMaterialization: () => Promise<void>;
 }
 
 function dashboardErrorMessage(error: unknown): string {
@@ -54,15 +58,16 @@ function refreshStatus(status: MaterializationStatus): RefreshStatus {
 }
 
 function assertNever(value: never): never {
-  throw new RangeError(`Unexpected materialization status: ${String(value)}`);
+  throw new RangeError(`Unexpected BI state: ${String(value)}`);
 }
 
-export function useBiDashboard(companyId: string): UseBiDashboardResult {
+export function useBiDashboard(
+  company: BiCompanySummary | null,
+): UseBiDashboardResult {
+  const companyId = company?.companyId ?? '';
   const [state, setState] = useState<BiDashboardState>({ status: 'idle' });
   const controllerRef = useRef<AbortController | null>(null);
   const dashboardRef = useRef<BiDashboardSnapshot | null>(null);
-  const pollTimerRef = useRef<number | null>(null);
-  const pollAttemptRef = useRef(0);
 
   const isCurrent = (controller: AbortController): boolean => (
     controllerRef.current === controller && !controller.signal.aborted
@@ -76,11 +81,7 @@ export function useBiDashboard(companyId: string): UseBiDashboardResult {
     }
     const failedDashboard = {
       ...dashboard,
-      refresh: {
-        ...dashboard.refresh,
-        status: 'failed',
-        message,
-      },
+      refresh: { ...dashboard.refresh, status: 'failed', message },
     } satisfies BiDashboardSnapshot;
     dashboardRef.current = failedDashboard;
     setState({ status: 'ready', companyId, dashboard: failedDashboard });
@@ -125,117 +126,55 @@ export function useBiDashboard(companyId: string): UseBiDashboardResult {
     setState({ status: 'ready', companyId, dashboard: progressingDashboard });
   };
 
-  async function loadDashboard(controller: AbortController): Promise<void> {
-    const result = await fetchBiDashboard(companyId, controller.signal);
-    if (!isCurrent(controller)) return;
+  const publishResult = (
+    result: BiDashboardFetchResult,
+  ): string | null => {
     switch (result.kind) {
       case 'snapshot':
         dashboardRef.current = result.dashboard;
         setState({ status: 'ready', companyId, dashboard: result.dashboard });
-        if (result.dashboard.refresh.jobId && result.dashboard.refresh.status !== 'idle') {
-          await pollQuestionJob(result.dashboard.refresh.jobId, controller);
-        }
-        return;
+        return result.dashboard.refresh.jobId
+          && result.dashboard.refresh.status !== 'idle'
+          && result.dashboard.refresh.status !== 'failed'
+          ? result.dashboard.refresh.jobId
+          : null;
       case 'pending':
-        setState({ status: 'pending', companyId, job: result.job });
-        await pollJob(result.job.jobId, controller);
-        return;
+        showJobProgress(result.job);
+        return result.job.jobId;
       default:
         return assertNever(result);
     }
-  }
+  };
 
-  async function pollJob(jobId: string, controller: AbortController): Promise<void> {
-    try {
-      const job = await fetchBiMaterializationJob(jobId, controller.signal);
-      if (!isCurrent(controller)) return;
-      switch (job.status) {
-        case 'queued':
-        case 'indexing':
-        case 'profiling':
-        case 'extracting':
-        case 'materializing': {
-          showJobProgress(job);
-          const baseDelay = Math.min(1_000 * (2 ** pollAttemptRef.current), 8_000);
-          pollAttemptRef.current += 1;
-          const delay = document.visibilityState === 'hidden' ? Math.max(baseDelay, 5_000) : baseDelay;
-          pollTimerRef.current = window.setTimeout(
-            () => void pollJob(jobId, controller),
-            delay,
-          );
-          return;
-        }
-        case 'ready':
-        case 'partial': {
-          pollAttemptRef.current = 0;
-          const result = await fetchBiDashboard(companyId, controller.signal);
-          if (!isCurrent(controller)) return;
-          switch (result.kind) {
-            case 'snapshot':
-              dashboardRef.current = result.dashboard;
-              setState({ status: 'ready', companyId, dashboard: result.dashboard });
-              return;
-            case 'pending':
-              setState({ status: 'pending', companyId, job: result.job });
-              return;
-            default:
-              return assertNever(result);
-          }
-        }
-        case 'failed':
-          showRefreshFailure(job.message ?? '새 데이터 처리에 실패해 이전 스냅샷을 유지합니다.');
-          return;
-        default:
-          return assertNever(job.status);
-      }
-    } catch (error) {
-      if (!isCurrent(controller)) return;
-      showRefreshFailure(dashboardErrorMessage(error));
-    }
-  }
+  const loadPublishedSnapshot = async (
+    controller: AbortController,
+  ): Promise<string | null> => {
+    const result = await fetchBiDashboard(companyId, controller.signal);
+    if (!isCurrent(controller)) return null;
+    return publishResult(result);
+  };
 
-  async function pollQuestionJob(
+  const observeMaterialization = async (
     jobId: string,
     controller: AbortController,
-  ): Promise<void> {
-    try {
-      const progress = await fetchBiQuestionJob(jobId, controller.signal);
-      if (!isCurrent(controller)) return;
-      if (progress.queuedQuestions > 0 || progress.runningQuestions > 0) {
-        showQuestionProgress(progress);
-        const baseDelay = Math.min(1_000 * (2 ** pollAttemptRef.current), 8_000);
-        pollAttemptRef.current += 1;
-        const delay = document.visibilityState === 'hidden'
-          ? Math.max(baseDelay, 5_000)
-          : baseDelay;
-        pollTimerRef.current = window.setTimeout(
-          () => void pollQuestionJob(jobId, controller),
-          delay,
-        );
-        return;
-      }
-      pollAttemptRef.current = 0;
-      const result = await fetchBiDashboard(companyId, controller.signal);
-      if (!isCurrent(controller)) return;
-      switch (result.kind) {
-        case 'snapshot':
-          dashboardRef.current = result.dashboard;
-          setState({ status: 'ready', companyId, dashboard: result.dashboard });
-          return;
-        case 'pending':
-          setState({ status: 'pending', companyId, job: result.job });
-          return;
-        default:
-          return assertNever(result);
-      }
-    } catch (error) {
-      if (!isCurrent(controller)) return;
-      showRefreshFailure(dashboardErrorMessage(error));
+  ): Promise<void> => {
+    const job = await streamBiMaterializationJob(
+      jobId,
+      (progress) => {
+        if (isCurrent(controller)) showJobProgress(progress);
+      },
+      controller.signal,
+    );
+    if (!isCurrent(controller)) return;
+    if (job.status === 'failed') {
+      showRefreshFailure(job.message ?? 'BI 스냅샷 생성에 실패했습니다.');
+      return;
     }
-  }
+    await loadPublishedSnapshot(controller);
+  };
 
   useEffect(() => {
-    if (!companyId) {
+    if (!company) {
       dashboardRef.current = null;
       setState({ status: 'idle' });
       return undefined;
@@ -244,52 +183,89 @@ export function useBiDashboard(companyId: string): UseBiDashboardResult {
     const controller = new AbortController();
     controllerRef.current = controller;
     dashboardRef.current = null;
-    pollAttemptRef.current = 0;
     setState({ status: 'loading', companyId });
-    const load = async () => {
+
+    const load = async (): Promise<void> => {
       try {
-        await loadDashboard(controller);
+        if (!company.currentSnapshotId) {
+          if (company.refreshStatus === 'failed') {
+            setState({
+              status: 'error',
+              companyId,
+              message: '이 기업의 이전 BI 스냅샷 생성이 실패했습니다.',
+            });
+            return;
+          }
+          if (!company.source) {
+            setState({
+              status: 'error',
+              companyId,
+              message: 'BI 스냅샷을 만들 pgvector 원본이 없습니다.',
+            });
+            return;
+          }
+          const accepted = await createBiMaterialization({
+            companyId: company.companyId,
+            displayName: company.displayName,
+            source: company.source,
+          }, controller.signal);
+          if (!isCurrent(controller)) return;
+          await observeMaterialization(accepted.jobId, controller);
+          return;
+        }
+
+        const activeJobId = await loadPublishedSnapshot(controller);
+        if (activeJobId) await observeMaterialization(activeJobId, controller);
       } catch (error) {
         if (!isCurrent(controller)) return;
-        setState({ status: 'error', companyId, message: dashboardErrorMessage(error) });
+        showRefreshFailure(dashboardErrorMessage(error));
       }
     };
+
     void load();
-    return () => {
-      controller.abort();
-      if (pollTimerRef.current !== null) window.clearTimeout(pollTimerRef.current);
-    };
-  }, [companyId]);
+    return () => controller.abort();
+  }, [companyId, company?.currentSnapshotId, company?.refreshStatus, company?.source]);
 
   const refresh = async (): Promise<void> => {
     const dashboard = dashboardRef.current;
     const controller = controllerRef.current;
     if (!dashboard || !controller || !isCurrent(controller)) return;
-    if (pollTimerRef.current !== null) window.clearTimeout(pollTimerRef.current);
-    pollAttemptRef.current = 0;
     try {
-      const accepted = await refreshBiDashboard(
-        dashboard.company.companyId,
+      const accepted = await refreshBiDashboard(companyId, controller.signal);
+      if (!isCurrent(controller)) return;
+      showQuestionProgress(accepted);
+      await streamBiQuestionJob(
+        accepted.jobId,
+        (progress) => {
+          if (isCurrent(controller)) showQuestionProgress(progress);
+        },
         controller.signal,
       );
       if (!isCurrent(controller)) return;
-      const queuedDashboard = {
-        ...dashboard,
-        refresh: {
-          status: 'queued',
-          jobId: accepted.jobId,
-          startedAt: new Date().toISOString(),
-          message: `지표 질문 ${accepted.totalQuestions}건을 요청했습니다.`,
-        },
-      } satisfies BiDashboardSnapshot;
-      dashboardRef.current = queuedDashboard;
-      setState({ status: 'ready', companyId, dashboard: queuedDashboard });
-      await pollQuestionJob(accepted.jobId, controller);
+      await loadPublishedSnapshot(controller);
     } catch (error) {
       if (!isCurrent(controller)) return;
       showRefreshFailure(dashboardErrorMessage(error));
     }
   };
 
-  return { state, refresh };
+  const retryMaterialization = async (): Promise<void> => {
+    const controller = controllerRef.current;
+    if (!company?.source || !controller || !isCurrent(controller)) return;
+    setState({ status: 'loading', companyId });
+    try {
+      const accepted = await createBiMaterialization({
+        companyId: company.companyId,
+        displayName: company.displayName,
+        source: company.source,
+      }, controller.signal);
+      if (!isCurrent(controller)) return;
+      await observeMaterialization(accepted.jobId, controller);
+    } catch (error) {
+      if (!isCurrent(controller)) return;
+      showRefreshFailure(dashboardErrorMessage(error));
+    }
+  };
+
+  return { state, refresh, retryMaterialization };
 }

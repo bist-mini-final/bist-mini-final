@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { z } from 'zod';
-import { dataSourceApi } from '../../data-sources/services/dataSourceApi';
 
 const PROCESSED_FILE_SELECTOR = 'processed_file_selector' as const;
-const PGVECTOR_COLLECTION_LOADER = 'pgvector_collection_loader' as const;
 
 const BiPlaygroundHandoffSchema = z.object({
   company_id: z.string().min(1),
@@ -123,30 +121,5 @@ export function useBiPlaygroundHandoff(options: UsePlaygroundHandoffOptions): vo
       fileUpdater({ file_name: handoff.fileName });
     }
 
-    const indexUpdater = findNodeValuesUpdater(nodes, PGVECTOR_COLLECTION_LOADER);
-    if (!indexUpdater) return;
-
-    const requestController = new AbortController();
-    void dataSourceApi.listIndexes(requestController.signal)
-      .then((indexes) => {
-        if (
-          requestController.signal.aborted
-          || !indexes.some((index) => index.index_id === handoff.indexId)
-        ) return;
-        indexUpdater({
-          collection_name: handoff.indexId,
-          collection_names: [handoff.indexId],
-        });
-      })
-      .catch((error: unknown) => {
-        if (requestController.signal.aborted) return;
-        if (error instanceof Error) {
-          console.warn('BI Playground 인덱스 검증에 실패했습니다.', error.message);
-          return;
-        }
-        console.warn('BI Playground 인덱스 검증에 실패했습니다.', error);
-      });
-
-    return () => requestController.abort();
   }, [handoff, options.ready, options.search, options.setQueryText]);
 }

@@ -26,12 +26,22 @@ class BiApiStorePort(Protocol):
 
     def get_current(self, company_id: CompanyId) -> BiDashboardSnapshot | None: ...
 
+    def get_current_many(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiDashboardSnapshot]: ...
+
     def get_job(self, job_id: JobId) -> BiMaterializationJob | None: ...
 
     def get_latest_job(
         self,
         company_id: CompanyId,
     ) -> BiMaterializationJob | None: ...
+
+    def get_latest_jobs(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiMaterializationJob]: ...
 
     def find_latest_job(
         self,

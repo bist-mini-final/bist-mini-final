@@ -5,7 +5,7 @@ import type {
   MetricSeries,
   MetricStatus,
   ValueKind,
-} from '../types';
+} from '../../features/bi/types';
 
 interface MetricSeed {
   readonly metricId: MetricId;

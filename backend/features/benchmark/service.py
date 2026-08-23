@@ -211,6 +211,42 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
                     "total_tokens": int(usage.get("total_tokens", 0) or 0),
                     "estimated_cost_usd": float(metrics.get("estimated_cost_usd", 0) or 0),
                 }
+            routes = output.get("routes")
+            metrics = output.get("metrics")
+            if isinstance(routes, list) and isinstance(metrics, dict):
+                usage = metrics.get("api_usage") or {}
+                first_route = (
+                    routes[0]
+                    if routes and isinstance(routes[0], dict)
+                    else {}
+                )
+                first_collections = first_route.get("collections") or []
+                first_collection = (
+                    first_collections[0]
+                    if first_collections and isinstance(first_collections[0], dict)
+                    else {}
+                )
+                router = {
+                    "kind": str(metrics.get("kind") or "unknown"),
+                    "target": first_collection.get("company_name"),
+                    "sheets": list(
+                        dict.fromkeys(
+                            str(route.get("subquery", {}).get("sheet"))
+                            for route in routes
+                            if isinstance(route, dict)
+                            and isinstance(route.get("subquery"), dict)
+                            and route["subquery"].get("sheet") not in (None, "", "?")
+                        )
+                    ),
+                    "matched": bool(routes),
+                    "latency_seconds": float(
+                        metrics.get("latency_seconds", 0) or 0
+                    ),
+                    "total_tokens": int(usage.get("total_tokens", 0) or 0),
+                    "estimated_cost_usd": float(
+                        metrics.get("estimated_cost_usd", 0) or 0
+                    ),
+                }
         node_rows.append({
             "node_id": state.node_id,
             "module_type": state.module_type,
@@ -455,7 +491,9 @@ def execute_benchmark_comparison(
                     run = workflow_executor.create_run(workflow, WorkflowExecutionRequest(
                         inputs={query_node_id: {"query": case.question}},
                         use_cache=cache_mode != "off",
-                        cache_only_module_types=["prebuilt_index_loader", "pgvector_collection_loader"] if cache_mode == "index_only" else None,
+                        cache_only_module_types=["pgvector_data_scope"]
+                        if cache_mode == "index_only"
+                        else None,
                     ))
                 if on_progress:
                     on_progress({"event": "running", "completed": completed, "total": total, "case_index": case_index, "case_id": case.id, "question": case.question, "workflow_id": workflow_id, "run_id": run.id})
@@ -634,4 +672,3 @@ __all__ = [
     "run_snapshot",
     "validate_workflows",
 ]
-

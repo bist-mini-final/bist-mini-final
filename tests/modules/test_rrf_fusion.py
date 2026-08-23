@@ -24,16 +24,16 @@ def test_rrf_fusion_successful_combination():
         query_context=query_ctx,
         document_context=doc_ctx,
         items=[
-            RankedSearchCandidateDTO(rank=1, cell_id="c1", score=0.9, text="cell 1", matched_subquery="q"),
-            RankedSearchCandidateDTO(rank=2, cell_id="c2", score=0.8, text="cell 2", matched_subquery="q"),
+            RankedSearchCandidateDTO(rank=1, index_id="idx_1", cell_id="c1", score=0.9, text="cell 1", matched_subquery="q"),
+            RankedSearchCandidateDTO(rank=2, index_id="idx_1", cell_id="c2", score=0.8, text="cell 2", matched_subquery="q"),
         ],
     )
     dense_res = RankedSearchResultDTO(
         query_context=query_ctx,
         document_context=doc_ctx,
         items=[
-            RankedSearchCandidateDTO(rank=1, cell_id="c1", score=0.95, text="cell 1", matched_subquery="q"),
-            RankedSearchCandidateDTO(rank=2, cell_id="c3", score=0.7, text="cell 3", matched_subquery="q"),
+            RankedSearchCandidateDTO(rank=1, index_id="idx_1", cell_id="c1", score=0.95, text="cell 1", matched_subquery="q"),
+            RankedSearchCandidateDTO(rank=2, index_id="idx_1", cell_id="c3", score=0.7, text="cell 3", matched_subquery="q"),
         ],
     )
 

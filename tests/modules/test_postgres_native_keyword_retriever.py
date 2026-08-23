@@ -3,59 +3,70 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from modules.common.base_module import QueryContextDTO
-from modules.query.decomposer import SubqueriesDTO, SubqueryItem
+from modules.query.decomposer import SubqueryItem
+from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO
 from modules.retrieval.postgres_native_keyword_retriever import (
-    PostgresNativeKeywordRetrieverConfigDTO,
     PostgresNativeKeywordRetrieverInputDTO,
     PostgresNativeKeywordRetrieverModule,
     _clean_tsquery_term,
     _escape_like_term,
 )
-from modules.storage.pgvector_collection_loader import IndexOutputDTO
+from modules.storage.pgvector_data_scope import DataScopeDTO
 
 
-def test_postgres_native_keyword_retriever_execution():
-    mock_store = MagicMock()
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [
-        ("id-1", "2023 영업이익 65670억", {"cell_id": "c1", "company": "삼성전자"}, 0.85, "uuid-1")
+def test_keyword_retriever_uses_only_router_selected_collection() -> None:
+    store = MagicMock()
+    connection = MagicMock()
+    cursor = MagicMock()
+    cursor.fetchall.return_value = [
+        (
+            "2023 Revenue 120",
+            {
+                "cell_id": "c1",
+                "company_name": "Example Corp",
+                "sheet_name": "Financials",
+            },
+            0.85,
+            "idx-routed",
+        )
     ]
-    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
-    mock_store._read_connection.return_value = mock_conn
-
-    retriever = PostgresNativeKeywordRetrieverModule(pgvector_store=mock_store)
-
-    input_dto = PostgresNativeKeywordRetrieverInputDTO(
-        query_input=SubqueriesDTO(
-            query_context=QueryContextDTO(question_id="1", question_text="영업이익"),
-            items=[
-                SubqueryItem(
-                    company="삼성전자",
-                    sheet="손익계산서",
-                    row_header="영업이익",
-                    column_header="2023",
-                    text="Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?",
-                )
-            ],
-        ),
-        index_input=IndexOutputDTO(
-            index_id="idx_1",
-            file_name="samsung.xlsx",
-            workbook_hash="hash1",
-            model="text-embedding-3-large",
-            dimension=3072,
-            document_count=100,
-        ),
+    connection.cursor.return_value.__enter__.return_value = cursor
+    store._read_connection.return_value = connection
+    scope = DataScopeDTO(
+        index_id="idx-routed",
+        file_name="sample.xlsx",
+        workbook_hash="hash-1",
+        company_name="Example Corp",
+        sheet_names=["Financials"],
+        model="text-embedding-3-small",
+        dimension=1536,
+        document_count=100,
     )
-    res = retriever.execute(input_dto, config=PostgresNativeKeywordRetrieverConfigDTO())
+    plan = RetrievalPlanDTO(
+        query_context=QueryContextDTO(question_id="q1", question_text="Revenue"),
+        routes=[
+            RoutedSubqueryDTO(
+                subquery_index=0,
+                subquery=SubqueryItem(
+                    company="Example Corp",
+                    sheet="Financials",
+                    row_header="Revenue",
+                    column_header="2023",
+                ),
+                collections=[scope],
+            )
+        ],
+    )
+    result = PostgresNativeKeywordRetrieverModule(store).run(
+        PostgresNativeKeywordRetrieverInputDTO(retrieval_plan=plan)
+    )
 
-    assert "items" in res
-    assert len(res["items"]) == 1
-    assert res["items"][0]["cell_id"] == "c1"
-    assert res["items"][0]["rank"] == 1
-    scoped_sql = mock_cursor.execute.call_args_list[0].args[0]
-    assert "ESCAPE '!'" in scoped_sql
+    assert result["items"][0]["index_id"] == "idx-routed"
+    assert result["items"][0]["cell_id"] == "Example Corp:c1"
+    sql, params = cursor.execute.call_args_list[0].args
+    assert "collection.name = ANY(%s)" in sql
+    assert "ESCAPE '!'" in sql
+    assert params[1] == ["idx-routed"]
 
 
 def test_like_scope_escaping_uses_one_character_escape() -> None:
@@ -64,6 +75,6 @@ def test_like_scope_escaping_uses_one_character_escape() -> None:
 
 def test_structured_keyword_query_uses_metric_and_period_only() -> None:
     assert _clean_tsquery_term(
-        "Company: Codex Low Cost Test Corp | Sheet: 손익계산서 | "
+        "Company: Codex Low Cost Test Corp | Sheet: Financials | "
         "Row Header: Revenue | Column Header: FY2025 | Cell Value: ?"
     ) == "Revenue FY2025"

@@ -73,7 +73,7 @@ from modules.retrieval.pgvector_retriever import (
 
 logger = logging.getLogger(__name__)
 
-CandidateKey = Tuple[str, str]
+CandidateKey = Tuple[str, str, str]
 
 
 # ==============================================================================
@@ -83,6 +83,7 @@ class RrfCandidateDTO(ModuleDTO):
     """Single cell candidate after Reciprocal Rank Fusion."""
 
     rank: int = Field(ge=1, description="RRF 결합 순위")
+    index_id: str = Field(min_length=1, description="후보가 속한 collection ID")
     cell_id: str = Field(min_length=1, description="검색된 셀의 고유 ID")
     rrf_score: float = Field(gt=0, description="Reciprocal Rank Fusion 점수")
     text: str = Field(description="검색된 셀의 직렬화 텍스트")
@@ -190,7 +191,11 @@ class RrfFusionModule(BaseModule):
                 continue
             branch_ranks: Dict[CandidateKey, int] = {}
             for candidate in branch.items:
-                key = (candidate.matched_subquery, candidate.cell_id)
+                key = (
+                    candidate.matched_subquery,
+                    candidate.index_id,
+                    candidate.cell_id,
+                )
                 previous_rank = branch_ranks.get(key)
                 if previous_rank is not None and previous_rank <= candidate.rank:
                     continue
@@ -204,13 +209,16 @@ class RrfFusionModule(BaseModule):
                     weight / (cfg.rrf_k + rank)
                 )
 
-        best_by_cell: Dict[str, Tuple[float, RankedSearchCandidateDTO]] = {}
+        best_by_cell: Dict[
+            Tuple[str, str], Tuple[float, RankedSearchCandidateDTO]
+        ] = {}
         for key, score in scores_by_query_cell.items():
-            _, cell_id = key
+            _, index_id, cell_id = key
             candidate = metadata_by_query_cell[key][1]
-            current = best_by_cell.get(cell_id)
+            candidate_key = (index_id, cell_id)
+            current = best_by_cell.get(candidate_key)
             if current is None or score > current[0]:
-                best_by_cell[cell_id] = (score, candidate)
+                best_by_cell[candidate_key] = (score, candidate)
 
         ranked = sorted(
             best_by_cell.values(),
@@ -223,6 +231,7 @@ class RrfFusionModule(BaseModule):
             "items": [
                 {
                     "rank": rank,
+                    "index_id": candidate.index_id,
                     "cell_id": candidate.cell_id,
                     "rrf_score": round(score, 10),
                     "text": candidate.text,

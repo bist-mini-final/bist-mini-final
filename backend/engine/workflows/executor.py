@@ -595,6 +595,24 @@ class WorkflowExecutor:
                 if isinstance(raw_usage, Mapping):
                     node_usage = {k: int(v) for k, v in raw_usage.items() if v is not None}
                 node_cost = metrics.get("estimated_cost_usd")
+            elif isinstance(output.get("metrics"), Mapping):
+                metrics = output["metrics"]
+                raw_usage = metrics.get("api_usage") or {}
+                if isinstance(raw_usage, Mapping) and raw_usage:
+                    node_usage = {
+                        key: int(value)
+                        for key, value in raw_usage.items()
+                        if value is not None
+                    }
+                elif metrics.get("total_tokens") is not None:
+                    total_tokens = int(metrics.get("total_tokens") or 0)
+                    node_usage = {
+                        "prompt_tokens": total_tokens,
+                        "completion_tokens": 0,
+                        "cached_tokens": 0,
+                        "total_tokens": total_tokens,
+                    }
+                node_cost = metrics.get("estimated_cost_usd")
             elif "usage" in output or "_usage" in output:
                 raw_u = output.get("usage") or output.get("_usage")
                 model_used = output.get("model") or validated_config.get("model") or ""

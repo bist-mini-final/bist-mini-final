@@ -10,5 +10,13 @@ class EmbeddingEncoder(Protocol):
         """Return one numeric vector per query."""
         ...
 
+    def encode_for_model(
+        self,
+        queries: list[str],
+        model_name: str,
+    ) -> list[list[float]]:
+        """Return vectors using the exact model declared by a stored collection."""
+        ...
+
 
 __all__ = ["EmbeddingEncoder"]

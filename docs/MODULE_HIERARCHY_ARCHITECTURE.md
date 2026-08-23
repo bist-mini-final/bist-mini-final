@@ -67,7 +67,7 @@ classDiagram
 
 문서 수집 시 `CellTextEmbedderModule`은 선택한 모델로 batch embedding을 만들고 content-addressed artifact를 저장한다. `PgVectorIndexWriterModule`이 artifact를 PostgreSQL에 기록하고 collection metadata에 model과 dimension을 함께 저장한다.
 
-질의 시 `EmbedderModule`은 수동 기본 모델을 사용하지 않는다. `pgvector_collection_loader.index_output`을 필수 입력으로 받아 해당 collection의 model과 dimension으로만 query embedding을 생성한다. 따라서 1536차원과 3072차원 collection이 섞여도 선택한 인덱스와 질의 벡터가 어긋나지 않는다.
+질의 시 `PgVectorDataScopeModule`은 embedding row를 스캔하지 않고 collection·company·sheet·model·dimension catalog만 읽는다. `LlmQueryRouterModule`이 각 decomposed subquery에 concrete collection을 대응시키며 사용자가 collection을 선택하는 입력은 없다. `EmbedderModule`은 retrieval plan을 model/dimension별로 묶어 동일 텍스트를 한 번만 임베딩하고 collection lineage를 보존한다. 1536차원과 3072차원 collection이 함께 선택되어도 각각 정확한 모델 계약으로 호출한다.
 
 ## I/O 원칙
 

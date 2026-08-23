@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Copy, Layers3, Link2, Pencil, Plus, Trash2 }
 import type { Edge, Node } from '@xyflow/react';
 import type { ModuleDefinition } from '../types';
 import type { WorkflowOption } from './Header';
-import { NODE_MODULE_TYPES } from '../config/pipeline';
+import { nodeModuleType } from '../adapters/reactFlowGraph';
 
 interface Props {
   nodes: Node[];
@@ -44,8 +44,8 @@ export function WorkflowLayersPanel(props: Props) {
           {isActive && isExpanded && <div className="workflow-layers__nodes">
             <small>{props.nodes.length} layers · {props.edges.length} connections</small>
             {props.nodes.map((node, index) => {
-              const type = NODE_MODULE_TYPES[node.type ?? ''];
-              const name = labels.get(type) ?? type ?? 'Unknown node';
+              const type = nodeModuleType(node);
+              const name = type ? labels.get(type) ?? type : 'Unknown node';
               const inCount = props.edges.filter((edge) => edge.target === node.id).length;
               const outCount = props.edges.filter((edge) => edge.source === node.id).length;
               return <div className={`workflow-layer${node.selected ? ' workflow-layer--selected' : ''}`} key={node.id}><button className="workflow-layer__select" onClick={() => props.onSelectNode(node.id)}><span>{index + 1}</span><b>{name}</b><em><Link2 size={11} />{inCount}/{outCount}</em></button><button className="workflow-layer__copy" onClick={() => props.onDuplicateNode(node.id)} title="레이어 복제" disabled={props.readOnly}><Copy size={12} /></button></div>;

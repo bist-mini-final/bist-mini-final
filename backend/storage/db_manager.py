@@ -178,6 +178,9 @@ CREATE INDEX IF NOT EXISTS idx_workflow_runs_stale_lease
     WHERE status = 'running' AND cancel_requested = FALSE;
 CREATE INDEX IF NOT EXISTS idx_node_logs_run_id ON node_execution_logs(run_id);
 CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
+CREATE INDEX IF NOT EXISTS idx_node_logs_pgvector_index_id
+    ON node_execution_logs ((output->>'index_id'))
+    WHERE module_type = 'pgvector_index_writer';
 """
 
 
@@ -449,6 +452,41 @@ class DatabaseManager:
                         ),
                     )
             conn.commit()
+        finally:
+            conn.close()
+
+    def list_sheets(self, file_id: str) -> List[Dict[str, Any]]:
+        """Return normalized sheet metadata for one workbook in display order."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT sheet_name, sheet_index, is_visible, row_count,
+                           column_count, detected_tables, parsed_at
+                    FROM sheets
+                    WHERE file_id = %s
+                    ORDER BY sheet_index, sheet_name;
+                    """,
+                    (file_id,),
+                )
+                return [
+                    {
+                        "sheet_name": str(row[0]),
+                        "sheet_index": int(row[1]),
+                        "is_visible": bool(row[2]),
+                        "row_count": int(row[3]),
+                        "column_count": int(row[4]),
+                        "detected_tables": row[5] or [],
+                        "parsed_at": (
+                            row[6].isoformat()
+                            if hasattr(row[6], "isoformat")
+                            else str(row[6])
+                        ),
+                    }
+                    for row in cur.fetchall()
+                ]
         finally:
             conn.close()
 
@@ -913,6 +951,34 @@ class DatabaseManager:
                 )
                 for row in rows
             ]
+        finally:
+            conn.close()
+
+    def find_ingestion_run_id_by_index(self, index_id: str) -> Optional[str]:
+        """Resolve an index to its durable ingestion run without scanning run JSON."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT log.run_id
+                    FROM node_execution_logs AS log
+                    JOIN workflow_runs AS run ON run.run_id = log.run_id
+                    WHERE run.workflow_id = 'excel_ingestion'
+                      AND log.module_type = 'pgvector_index_writer'
+                      AND (
+                          log.output->>'index_id' = %s
+                          OR log.progress->>'target_index_id' = %s
+                      )
+                    ORDER BY log.completed_at DESC NULLS LAST,
+                             run.updated_at DESC
+                    LIMIT 1;
+                    """,
+                    (index_id, index_id),
+                )
+                row = cur.fetchone()
+                return str(row[0]) if row else None
         finally:
             conn.close()
 

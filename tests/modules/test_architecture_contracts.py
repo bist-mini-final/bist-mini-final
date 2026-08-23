@@ -77,3 +77,37 @@ def test_kubernetes_tooling_uses_the_locked_project_python() -> None:
     )
     assert 'PROJECT_PYTHON="${PROJECT_ROOT}/.venv/bin/python"' in script
     assert "python3" not in script
+
+
+def test_execution_views_share_the_streaming_core() -> None:
+    frontend = PROJECT_ROOT / "frontend" / "src"
+    playground_api = (
+        frontend / "features" / "playground" / "services" / "api.ts"
+    ).read_text(encoding="utf-8")
+    ingestion_api = (
+        frontend / "features" / "data-sources" / "services" / "dataSourceApi.ts"
+    ).read_text(encoding="utf-8")
+    ingestion_view = (
+        frontend / "features" / "data-sources" / "DataSourcesView.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert "observeWorkflowRun" in playground_api
+    assert "observeWorkflowRun" in ingestion_api
+    assert "setInterval" not in ingestion_view
+
+
+def test_bi_product_route_never_uses_dashboard_fixtures() -> None:
+    frontend = PROJECT_ROOT / "frontend" / "src"
+    route = (frontend / "pages" / "BiPage.tsx").read_text(encoding="utf-8")
+    production_bi_files = [
+        path
+        for path in (frontend / "features" / "bi").rglob("*.ts*")
+        if "__tests__" not in path.parts
+    ]
+
+    assert "features/bi/BiPage" in route
+    assert not (frontend / "features" / "bi" / "BiView.tsx").exists()
+    assert all(
+        "dashboardFixtures" not in path.read_text(encoding="utf-8")
+        for path in production_bi_files
+    )

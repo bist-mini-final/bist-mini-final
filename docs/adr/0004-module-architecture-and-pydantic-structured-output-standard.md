@@ -3,7 +3,7 @@
 - **상태(Status)**: `Accepted`
 - **날짜(Date)**: 2026-08-22
 - **결정자(Deciders)**: RAG Engine Team
-- **영향 범위(Scope)**: `modules/`, `backend/engine/runtime/`, `backend/semantic_matching/`
+- **영향 범위(Scope)**: `modules/`, `backend/engine/runtime/`, `backend/providers/`
 
 ---
 
@@ -30,8 +30,9 @@
 - 정적 thesaurus 사전(`financial_thesaurus.py`)을 완전히 폐기하고 프롬프트와 LLM 추론에 위임.
 
 ### 2.2 Pydantic Structured Output 전면 도입
-- 모든 LLM 호출 시 `complete_with_metadata(..., response_format={"type": "json_object"})`를 사용.
-- 수동 백틱 자르기, regex 검색, 다중 try-except fallback을 전면 폐지하고 `PydanticModel.model_validate_json()`으로 단일 단계 역직렬화 수행.
+- 모든 LLM 호출은 공통 `OpenAIResponsesClient`의 `POST /v1/responses` 경계를 사용한다.
+- 정형 출력은 `text.format.type=json_schema`, `strict=true`와 Pydantic JSON Schema를 사용한다.
+- 수동 백틱 자르기, regex 검색, 다중 try-except fallback을 전면 폐지하고 `PydanticModel.model_validate_json()`으로 단일 단계 역직렬화한다.
 - 벡터 검색 직렬화 로직은 Item Pydantic 모델의 `.to_serialized_query()` 메서드로 캡슐화.
 
 ### 2.3 4단계 표준 레이아웃 적용
@@ -52,4 +53,4 @@
 - **유지보수성 향상**: 모든 모듈이 동일한 레이아웃과 직관적인 데이터 흐름을 공유하여 신규 모듈 개발 및 디버깅 용이.
 
 ### 위험 및 완화 (Risks & Mitigations)
-- **OpenAI API JSON Object 의존**: OpenAI 호환 API의 `response_format`을 활용하므로, 로컬 LLM 연동 시에도 `vLLM`, `Ollama` 등의 OpenAI 호환 JSON 모드 endpoint 사용을 권장.
+- **Responses API 계약 의존**: 공급자 호출을 `backend/providers/`의 단일 gateway 뒤에 격리하고, module은 주입된 port만 사용한다. API 형식 변경 시 gateway와 계약 테스트를 함께 갱신한다.

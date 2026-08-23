@@ -1,3 +1,4 @@
+import json
 from hashlib import sha256
 from typing import Annotated, Final
 
@@ -10,9 +11,11 @@ from fastapi import (
     Response,
 )
 from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
 from starlette import status
 
 from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
+from backend.core.state_stream import SharedStateStream
 
 from .api_models import (
     BiCompanyListResponse,
@@ -55,18 +58,84 @@ IdentifierPath = Annotated[str, Path(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127
 def create_bi_router(services: BiApiServices) -> APIRouter:
     router = APIRouter(prefix="/bi", tags=["BI"])
 
+    def load_materialization(job_id: str) -> BiMaterializationJob:
+        job = services.store.get_job(JobId(job_id))
+        if job is None:
+            raise LookupError(JOB_NOT_FOUND)
+        if job.status is MaterializationStatus.MATERIALIZING:
+            progress = services.questions.get_job_progress(JobId(job_id))
+            if progress is not None:
+                completed = (
+                    progress.completed_questions + progress.failed_questions
+                )
+                job = job.model_copy(
+                    update={
+                        "completed_requests": completed,
+                        "total_requests": progress.total_questions,
+                        "message": (
+                            f"지표 질문 {completed}/{progress.total_questions}건을 "
+                            "병렬 처리했습니다."
+                        ),
+                    }
+                )
+        return job
+
+    def load_question_progress(job_id: str) -> BiQuestionJobProgress:
+        progress = services.questions.get_job_progress(JobId(job_id))
+        if progress is None:
+            raise LookupError(QUESTION_JOB_NOT_FOUND)
+        return progress
+
+    materialization_stream = SharedStateStream(
+        load_materialization,
+        fingerprint=lambda job: (
+            job.updated_at,
+            job.status,
+            job.completed_requests,
+            job.total_requests,
+        ),
+        terminal=lambda job: job.status
+        in (
+            MaterializationStatus.READY,
+            MaterializationStatus.PARTIAL,
+            MaterializationStatus.FAILED,
+        ),
+    )
+    question_stream = SharedStateStream(
+        load_question_progress,
+        fingerprint=lambda progress: (
+            progress.queued_questions,
+            progress.running_questions,
+            progress.completed_questions,
+            progress.failed_questions,
+        ),
+        terminal=lambda progress: (
+            progress.queued_questions == 0 and progress.running_questions == 0
+        ),
+    )
+
     @router.get(
         "/companies",
         response_model=BiCompanyListResponse,
         responses={500: {"model": ApiErrorEnvelope}},
     )
     def list_companies() -> BiCompanyListResponse:
+        entries = services.store.list_companies()
+        if not entries:
+            return BiCompanyListResponse(companies=())
+        company_ids = tuple(entry.company.company_id for entry in entries)
+        snapshots = services.store.get_current_many(company_ids)
+        latest_jobs = services.store.get_latest_jobs(company_ids)
         companies: list[BiCompanySummary] = []
-        for entry in services.store.list_companies():
+        for entry in entries:
             company_id = entry.company.company_id
-            snapshot = services.store.get_current(company_id)
-            latest_job = services.store.get_latest_job(company_id)
-            companies.append(build_company_summary(entry, snapshot, latest_job))
+            companies.append(
+                build_company_summary(
+                    entry,
+                    snapshots.get(company_id),
+                    latest_jobs.get(company_id),
+                )
+            )
         return BiCompanyListResponse(companies=tuple(companies))
 
     @router.get(
@@ -162,6 +231,48 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
             raise HTTPException(status.HTTP_404_NOT_FOUND, JOB_NOT_FOUND)
         return job
 
+    @router.get(
+        "/materializations/{job_id}/stream",
+        responses={404: {"model": ApiErrorEnvelope}},
+    )
+    async def stream_materialization(job_id: IdentifierPath, request: Request):
+        try:
+            initial = load_materialization(job_id)
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, JOB_NOT_FOUND) from error
+
+        async def events():
+            try:
+                async for job in materialization_stream.subscribe(job_id, initial=initial):
+                    if await request.is_disconnected():
+                        return
+                    terminal = job.status in (
+                        MaterializationStatus.READY,
+                        MaterializationStatus.PARTIAL,
+                        MaterializationStatus.FAILED,
+                    )
+                    yield {
+                        "event": (
+                            "materialization_completed"
+                            if terminal
+                            else "materialization_progress"
+                        ),
+                        "data": json.dumps(
+                            job.model_dump(mode="json"),
+                            ensure_ascii=False,
+                        ),
+                    }
+            except Exception as error:
+                yield {
+                    "event": "error",
+                    "data": json.dumps(
+                        {"error": str(error), "job_id": job_id},
+                        ensure_ascii=False,
+                    ),
+                }
+
+        return EventSourceResponse(events())
+
     @router.post(
         "/companies/{company_id}/refresh",
         response_model=BiQuestionJobProgress,
@@ -230,6 +341,53 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         if progress is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, QUESTION_JOB_NOT_FOUND)
         return progress
+
+    @router.get(
+        "/question-jobs/{job_id}/stream",
+        responses={404: {"model": ApiErrorEnvelope}},
+    )
+    async def stream_question_job(job_id: IdentifierPath, request: Request):
+        try:
+            initial = load_question_progress(job_id)
+        except LookupError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                QUESTION_JOB_NOT_FOUND,
+            ) from error
+
+        async def events():
+            try:
+                async for progress in question_stream.subscribe(
+                    job_id,
+                    initial=initial,
+                ):
+                    if await request.is_disconnected():
+                        return
+                    terminal = (
+                        progress.queued_questions == 0
+                        and progress.running_questions == 0
+                    )
+                    yield {
+                        "event": (
+                            "question_job_completed"
+                            if terminal
+                            else "question_job_progress"
+                        ),
+                        "data": json.dumps(
+                            progress.model_dump(mode="json"),
+                            ensure_ascii=False,
+                        ),
+                    }
+            except Exception as error:
+                yield {
+                    "event": "error",
+                    "data": json.dumps(
+                        {"error": str(error), "job_id": job_id},
+                        ensure_ascii=False,
+                    ),
+                }
+
+        return EventSourceResponse(events())
 
     return router
 

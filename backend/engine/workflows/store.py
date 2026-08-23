@@ -214,9 +214,15 @@ logger = logging.getLogger(__name__)
 
 
 class RunStore:
-    """In-memory and PostgreSQL-backed store for workflow runs (zero disk JSON dumping)."""
+    """PostgreSQL source of truth with optional in-memory test operation."""
 
-    def __init__(self, directory: Optional[Path] = None, db_manager: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        directory: Optional[Path] = None,
+        db_manager: Optional[Any] = None,
+        *,
+        require_database: bool = False,
+    ) -> None:
         self.directory = directory
         self._artifact_directory = (
             directory / "artifacts" if directory is not None else None
@@ -235,6 +241,11 @@ class RunStore:
             and getattr(db_manager, "is_connected", lambda: False)()
             else None
         )
+        self.require_database = require_database
+        if self.require_database and self.db_manager is None:
+            raise RuntimeError(
+                "WorkflowRun 영속화에는 PostgreSQL 연결이 필요합니다"
+            )
 
     def _externalize_output(self, run_id: str, node_id: str, value: Any) -> Any:
         """Store large JSON output once on the shared volume and return a DB ref."""
@@ -348,11 +359,8 @@ class RunStore:
         )
 
     def save(self, run: WorkflowRun) -> WorkflowRun:
-        """Persist a workflow run in memory and DB."""
+        """Persist to PostgreSQL before publishing the process-local copy."""
         run.updated_at = utc_now_iso()
-        with self._memory_lock:
-            self._memory_runs[run.id] = run
-
         lease_token = self._lease_token_for(run.id)
         if self.db_manager is not None:
             try:
@@ -365,14 +373,17 @@ class RunStore:
                 raise RuntimeError(
                     "WorkflowRun을 PostgreSQL에 저장할 수 없습니다"
                 ) from error
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 영속화에는 PostgreSQL 연결이 필요합니다"
+            )
+        with self._memory_lock:
+            self._memory_runs[run.id] = run
         return run
 
     def save_progress(self, run: WorkflowRun, node_id: str) -> WorkflowRun:
-        """Persist live node progress in memory and DB."""
+        """Persist live progress durably before updating the local projection."""
         run.updated_at = utc_now_iso()
-        with self._memory_lock:
-            self._memory_runs[run.id] = run
-
         lease_token = self._lease_token_for(run.id)
         if self.db_manager is not None:
             try:
@@ -388,14 +399,21 @@ class RunStore:
                     node_id,
                     error,
                 )
+                raise RuntimeError(
+                    "WorkflowRun 진행률을 PostgreSQL에 저장할 수 없습니다"
+                ) from error
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 진행률 영속화에는 PostgreSQL 연결이 필요합니다"
+            )
+        with self._memory_lock:
+            self._memory_runs[run.id] = run
         return run
 
     def save_node(self, run: WorkflowRun, node_id: str) -> WorkflowRun:
         """Persist one terminal node transition without rewriting the full run."""
 
         run.updated_at = utc_now_iso()
-        with self._memory_lock:
-            self._memory_runs[run.id] = run
         if self.db_manager is not None:
             try:
                 database_run = self._database_copy(run, (node_id,))
@@ -412,6 +430,12 @@ class RunStore:
                     error,
                 )
                 raise
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 노드 영속화에는 PostgreSQL 연결이 필요합니다"
+            )
+        with self._memory_lock:
+            self._memory_runs[run.id] = run
         return run
 
     def enqueue(
@@ -455,18 +479,24 @@ class RunStore:
 
     def request_cancel(self, run_id: str) -> bool:
         """Persist cancellation in memory and DB."""
+        if self.db_manager is not None:
+            try:
+                persisted = bool(self.db_manager.request_workflow_cancel(run_id))
+            except Exception as error:
+                raise RuntimeError(
+                    "WorkflowRun 취소 요청을 PostgreSQL에 저장할 수 없습니다"
+                ) from error
+            if not persisted:
+                return False
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 취소 요청에는 PostgreSQL 연결이 필요합니다"
+            )
         with self._memory_lock:
             if run_id in self._memory_runs:
                 self._memory_runs[run_id].status = "paused"
                 self._memory_runs[run_id].updated_at = utc_now_iso()
-        if self.db_manager is None:
-            return True
-        try:
-            return bool(self.db_manager.request_workflow_cancel(run_id))
-        except Exception as error:
-            raise RuntimeError(
-                "WorkflowRun 취소 요청을 PostgreSQL에 저장할 수 없습니다"
-            ) from error
+        return True
 
     def is_cancel_requested(self, run_id: str) -> bool:
         """Check the cross-process cancellation flag."""
@@ -511,6 +541,17 @@ class RunStore:
                     return run
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 로드 실패 (run_id=%s): %s", run_id, error)
+                if self.require_database:
+                    raise RuntimeError(
+                        "WorkflowRun을 PostgreSQL에서 조회할 수 없습니다"
+                    ) from error
+
+            if self.require_database:
+                raise FileNotFoundError(f"실행 {run_id}를 찾을 수 없습니다")
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 조회에는 PostgreSQL 연결이 필요합니다"
+            )
 
         with self._memory_lock:
             if run_id in self._memory_runs:
@@ -536,6 +577,16 @@ class RunStore:
                     run_id,
                     error,
                 )
+                if self.require_database:
+                    raise RuntimeError(
+                        "WorkflowRun 요약을 PostgreSQL에서 조회할 수 없습니다"
+                    ) from error
+            if self.require_database:
+                raise FileNotFoundError(f"실행 {run_id}를 찾을 수 없습니다")
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 요약 조회에는 PostgreSQL 연결이 필요합니다"
+            )
         return self._summary(self.load(run_id))
 
     def list_summaries(
@@ -573,6 +624,14 @@ class RunStore:
                 return ordered[:limit] if limit is not None else ordered
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 요약 목록 조회 실패: %s", error)
+                if self.require_database:
+                    raise RuntimeError(
+                        "WorkflowRun 목록을 PostgreSQL에서 조회할 수 없습니다"
+                    ) from error
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 목록 조회에는 PostgreSQL 연결이 필요합니다"
+            )
 
         ordered = sorted(local_runs, key=lambda run: run.updated_at, reverse=True)
         return ordered[:limit] if limit is not None else ordered
@@ -598,6 +657,14 @@ class RunStore:
                 return [self.load(run_id) for run_id in run_ids]
             except Exception as error:
                 logger.warning("DB에서 미완료 WorkflowRun 조회 실패: %s", error)
+                if self.require_database:
+                    raise RuntimeError(
+                        "미완료 WorkflowRun을 PostgreSQL에서 조회할 수 없습니다"
+                    ) from error
+        elif self.require_database:
+            raise RuntimeError(
+                "미완료 WorkflowRun 조회에는 PostgreSQL 연결이 필요합니다"
+            )
         return [
             run
             for run in self.list()
@@ -607,15 +674,23 @@ class RunStore:
 
     def delete(self, run_id: str) -> bool:
         """Remove one full run."""
-        with self._memory_lock:
-            existed = self._memory_runs.pop(run_id, None) is not None
-
         db_deleted = False
         if self.db_manager is not None:
             try:
                 db_deleted = self.db_manager.delete_workflow_run(run_id)
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 삭제 실패 (run_id=%s): %s", run_id, error)
+                if self.require_database:
+                    raise RuntimeError(
+                        "WorkflowRun을 PostgreSQL에서 삭제할 수 없습니다"
+                    ) from error
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 삭제에는 PostgreSQL 연결이 필요합니다"
+            )
+
+        with self._memory_lock:
+            existed = self._memory_runs.pop(run_id, None) is not None
 
         if self._artifact_directory is not None:
             for path in self._artifact_directory.glob(f"{run_id}.*.json.gz"):
@@ -625,16 +700,24 @@ class RunStore:
 
     def clear(self) -> int:
         """Delete all stored workflow runs."""
-        with self._memory_lock:
-            count = len(self._memory_runs)
-            self._memory_runs.clear()
-
         db_cleared = 0
         if self.db_manager is not None:
             try:
                 db_cleared = self.db_manager.clear_workflow_runs()
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 전체 삭제 실패: %s", error)
+                if self.require_database:
+                    raise RuntimeError(
+                        "WorkflowRun 전체 기록을 PostgreSQL에서 삭제할 수 없습니다"
+                    ) from error
+        elif self.require_database:
+            raise RuntimeError(
+                "WorkflowRun 전체 삭제에는 PostgreSQL 연결이 필요합니다"
+            )
+
+        with self._memory_lock:
+            count = len(self._memory_runs)
+            self._memory_runs.clear()
 
         # Also clean up any leftover json files if directory exists
         if self.directory and self.directory.is_dir():
