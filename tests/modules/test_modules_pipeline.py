@@ -113,7 +113,7 @@ def test_end_to_end_query_reader_pipeline():
     }
     pg_expander.pgvector_store = mock_store
     res_ctx = pg_expander.run({"retrieval_json": res_rrf})
-    assert len(res_ctx["context_blocks"]) == 2
+    assert len(res_ctx["context_blocks"]) == 3
 
     # 7. Integrated Agentic Reader
     mock_reader_llm = MagicMock()

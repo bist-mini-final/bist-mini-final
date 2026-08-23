@@ -18,13 +18,9 @@ Example:
           "workbook_hash": "a1b2c3d4..."
         },
         "items": [
-          "[Sheet: 손익계산서 | Row 5]\n- 영업이익: 2022=433766, 2023=65670 (단위: 억원)"
-        ],
-        "metrics": {
-          "top_k_used": 1,
-          "adjacent_radius": 1,
-          "context_characters": 350
-        }
+          "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2022 | Cell Value: 433766",
+          "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+        ]
       }
     }
     ```

@@ -52,9 +52,9 @@ DEFAULT_MIN_SCOPE_CONFIDENCE: float = 0.80
 # ==============================================================================
 # 5. Context Expansion Defaults (PostgreSQL DB On-Demand)
 # ==============================================================================
-DEFAULT_PG_CONTEXT_TOP_K: int = 25
-DEFAULT_PG_ADJACENT_RADIUS: int = 2
-DEFAULT_PG_MAX_BLOCKS: int = 100
+DEFAULT_PG_CONTEXT_TOP_K: int = 100
+DEFAULT_PG_ADJACENT_RADIUS: int = 0
+DEFAULT_PG_MAX_BLOCKS: int = 1000
 DEFAULT_CONTEXT_TOP_K: int = DEFAULT_PG_CONTEXT_TOP_K
 DEFAULT_CONTEXT_ADJACENT_RADIUS: int = DEFAULT_PG_ADJACENT_RADIUS
 DEFAULT_CONTEXT_MAX_BLOCKS: int = DEFAULT_PG_MAX_BLOCKS

@@ -62,8 +62,10 @@ from modules.common.config import DEFAULT_MIN_SCOPE_CONFIDENCE, DEFAULT_RETRIEVA
 from modules.query.decomposer import SubqueriesDTO
 from modules.query.llm_query_router import LlmQueryRouterOutputDTO
 from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
-from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
-from modules.retrieval.query_scope import extract_query_scope
+from modules.retrieval.pgvector_retriever import (
+    RankedSearchResultDTO,
+    extract_query_scope,
+)
 from modules.storage.pgvector_collection_loader import IndexOutputDTO
 
 logger = logging.getLogger(__name__)
@@ -162,11 +164,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
 
         # Resolve semantic scopes if available (from Semantic Matcher or LLM Router)
         match_raw = input_data.semantic_match
-        match: Any = (
-            match_raw.semantic_match
-            if hasattr(match_raw, "semantic_match")
-            else match_raw
-        )
+        match: Any = getattr(match_raw, "semantic_match", match_raw)
         global_sheets: List[str] = []
         global_company: Optional[str] = None
         if match and match.matched and match.confidence >= cfg.min_scope_confidence:

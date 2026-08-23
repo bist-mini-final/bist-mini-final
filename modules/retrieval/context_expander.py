@@ -1,7 +1,7 @@
-"""검색된 핵심 셀 좌표를 기반으로 PostgreSQL DB에서 시계열 전체 행 및 인접 셀 컨텍스트를 확장 복원하는 모듈.
+"""검색된 핵심 셀 좌표를 기반으로 PostgreSQL DB에서 해당 행(Row)의 전체 열(Column) 셀 다큐먼트를 확장 복원하는 모듈.
 
-단일 셀 검색 결과에 대해 주변 인접 행(adjacent radius)과 동일 계정 과목의 과거 시계열 연도별 수치 전체를
-PostgreSQL에서 온디맨드로 조회하여 Reader LLM이 표의 문맥을 완벽히 이해할 수 있는 테이블 블록 문자열로 확장합니다.
+단일 셀 검색 결과에 대해 해당 셀이 속한 전체 행(Row)의 모든 열(과거 연도별 시계열 수치, 헤더 등)을
+PostgreSQL에서 온디맨드로 일괄 조회하여 Reader LLM이 원본 행의 전체 맥락을 완벽히 이해할 수 있도록 셀 단위 원본 다큐먼트 텍스트 리스트로 확장합니다.
 
 Example:
     Input DTO (입력 예시):
@@ -11,7 +11,7 @@ Example:
         "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
         "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
         "items": [
-          {"rank": 1, "cell_id": "IS_C5", "score": 0.032, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
+          {"rank": 1, "cell_id": "삼성전자:손익계산서:C5", "score": 0.032, "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670", "matched_subquery": "..."}
         ]
       }
     }
@@ -23,13 +23,10 @@ Example:
       "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
       "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
       "items": [
-        "[Sheet: 손익계산서 | Row 5]\n- 영업수익: 2021=2796048, 2022=3022314, 2023=2589355\n- 영업이익: 2021=516339, 2022=433766, 2023=65670\n- 당기순이익: 2021=399074, 2022=556541, 2023=154871"
-      ],
-      "metrics": {
-        "top_k_used": 1,
-        "adjacent_radius": 1,
-        "context_characters": 512
-      }
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2021 | Cell Value: 516339",
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2022 | Cell Value: 433766",
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+      ]
     }
     ```
 """
@@ -58,7 +55,6 @@ from modules.common.base_module import (
     QueryContextDTO,
 )
 from modules.common.config import (
-    DEFAULT_PG_ADJACENT_RADIUS,
     DEFAULT_PG_CONTEXT_TOP_K,
     DEFAULT_PG_MAX_BLOCKS,
 )
@@ -71,7 +67,7 @@ logger = logging.getLogger(__name__)
 # 2. DTOs & Item Models
 # ==============================================================================
 class ContextDTO(ModuleDTO):
-    """Structured context output carrying adjacent rows and timeseries blocks."""
+    """Structured context output carrying full-row timeseries documents."""
 
     query_context: QueryContextDTO = Field(
         description="Reader까지 보존되는 원본 질문 컨텍스트"
@@ -83,12 +79,10 @@ class ContextDTO(ModuleDTO):
         default_factory=list,
         description="Reader가 그대로 사용할 시트·행 단위 실제 셀 컨텍스트 블록 목록",
     )
-    metrics: Dict[str, Any] = Field(
-        default_factory=dict, description="확장 실행 메트릭 및 통계"
-    )
 
     # Backward compatibility properties & initializers
     context_blocks: Optional[List[str]] = None
+    metrics: Optional[Dict[str, Any]] = None
     top_k_used: Optional[int] = None
     adjacent_radius: Optional[int] = None
     context_characters: Optional[int] = None
@@ -110,25 +104,25 @@ class PgContextExpanderInputDTO(ModuleInputDTO):
 
 
 class PgContextExpanderConfigDTO(ModuleConfigDTO):
-    """Configuration contract for DB-level adjacent row & timeseries expansion."""
+    """Configuration contract for DB-level full-row column expansion."""
 
     top_k: int = Field(
         default=DEFAULT_PG_CONTEXT_TOP_K,
         gt=0,
         le=500,
-        description="인접 행 및 시계열 확장에 사용할 RRF 상위 후보 개수",
+        description="행 확장에 사용할 RRF 상위 후보 개수",
     )
-    adjacent_radius: int = Field(
-        default=DEFAULT_PG_ADJACENT_RADIUS,
+    adjacent_radius: Optional[int] = Field(
+        default=None,
         ge=0,
         le=20,
-        description="검색 셀과 같은 시트에서 확장할 위·아래 행 반경",
+        description="하위 호환성을 위한 선택적 인접 행 반경 (기본 단일 행 확장)",
     )
     max_blocks: int = Field(
         default=DEFAULT_PG_MAX_BLOCKS,
         gt=0,
-        le=1000,
-        description="LLM Generator 및 Calculator로 전달할 최대 확장 컨텍스트 블록 개수",
+        le=5000,
+        description="LLM Reader로 전달할 최대 확장 셀 다큐먼트 개수",
     )
 
 
@@ -186,7 +180,7 @@ class PgContextExpanderModule(BaseModule):
         description="RRF 상위 후보 셀에 대해 PostgreSQL DB에서 해당 행의 시계열 셀 및 헤더를 On-Demand로 직접 쿼리하여 제로카피 고속 컨텍스트를 생성합니다.",
         inputs=["retrieval_json"],
         outputs=["context_json"],
-        config_fields=["top_k", "adjacent_radius", "max_blocks"],
+        config_fields=["top_k", "max_blocks"],
         raw_output=True,
         version="2",
     )
@@ -212,11 +206,8 @@ class PgContextExpanderModule(BaseModule):
             return {
                 "query_context": query_context_dict,
                 "document_context": doc_context_dict,
-                "top_k_used": 0,
-                "adjacent_radius": cfg.adjacent_radius,
-                "context_characters": 0,
+                "items": ["[No context blocks available]"],
                 "context_blocks": ["[No context blocks available]"],
-                "block_count": 0,
             }
 
         # Step 1: Collect candidate cell texts and extract sheet + row targets
@@ -229,14 +220,17 @@ class PgContextExpanderModule(BaseModule):
                 seen_blocks.add(t)
                 context_blocks.append(t)
 
-        # Step 2: Query PostgreSQL for row-level adjacent & timeseries cells
+        # Step 2: Target the exact rows for all candidate cells
         target_rows_by_sheet: Dict[str, Set[int]] = defaultdict(set)
         for candidate in retrieval_items:
             _, sheet, r_idx, _ = _parse_cell_id_coords(candidate.cell_id)
             if sheet and r_idx is not None:
-                radius = cfg.adjacent_radius
-                for r in range(max(1, r_idx - radius), r_idx + radius + 1):
-                    target_rows_by_sheet[sheet].add(r)
+                if cfg.adjacent_radius and cfg.adjacent_radius > 0:
+                    radius = cfg.adjacent_radius
+                    for r in range(max(1, r_idx - radius), r_idx + radius + 1):
+                        target_rows_by_sheet[sheet].add(r)
+                else:
+                    target_rows_by_sheet[sheet].add(r_idx)
 
         collection_name = doc_context_dict.get("index_id")
         workbook_hash = doc_context_dict.get("workbook_hash")
@@ -254,15 +248,13 @@ class PgContextExpanderModule(BaseModule):
                     workbook_hash=workbook_hash,
                     sheet_name=sheet,
                     row_indices=sorted(row_indices),
-                    limit_per_row=50,
+                    limit_per_row=100,
                 )
                 for r_idx in sorted(row_indices):
                     rows = rows_by_index.get(r_idx, [])
                     if not rows:
                         continue
 
-                    row_header_label = ""
-                    col_entries = []
                     for cell in sorted(
                         rows,
                         key=lambda value: (
@@ -270,44 +262,52 @@ class PgContextExpanderModule(BaseModule):
                             value.get("col_index") or 0,
                         ),
                     ):
-                        if not row_header_label and cell.get("row_header"):
-                            rh = cell["row_header"]
-                            row_header_label = " > ".join(rh) if isinstance(rh, list) else str(rh)
-                        col_h = cell.get("column_header")
-                        ch_label = " > ".join(col_h) if isinstance(col_h, list) else str(col_h or cell.get("cell_coord", ""))
-                        val = cell.get("cell_value") or cell.get("text", "")
-                        coord = cell.get("cell_coord", "")
-                        col_entries.append(f"[{ch_label} (Cell {coord})]: {val}")
+                        raw_text = (cell.get("source_text") or "").strip()
+                        if not raw_text:
+                            c_name = cell.get("company_name") or doc_context_dict.get("company_name", "")
+                            s_name = cell.get("sheet_name") or sheet
+                            rh = (
+                                " > ".join(cell["row_header"])
+                                if isinstance(cell.get("row_header"), list)
+                                else str(cell.get("row_header") or "")
+                            )
+                            ch = (
+                                " > ".join(cell["column_header"])
+                                if isinstance(cell.get("column_header"), list)
+                                else str(cell.get("column_header") or "")
+                            )
+                            val = str(cell.get("cell_value") or "")
+                            parts = []
+                            if c_name:
+                                parts.append(f"Company: {c_name}")
+                            if s_name:
+                                parts.append(f"Sheet: {s_name}")
+                            if rh:
+                                parts.append(f"Row Header: {rh}")
+                            if ch:
+                                parts.append(f"Column Header: {ch}")
+                            if val:
+                                parts.append(f"Cell Value: {val}")
+                            raw_text = " | ".join(parts)
 
-                    if col_entries:
-                        formatted_block = (
-                            f"[Sheet: {sheet}] Row Header: {row_header_label or 'N/A'}\n"
-                            f"  -> Horizontally & Vertically Expanded Cells: " + " | ".join(col_entries)
-                        )
-                        if formatted_block not in seen_blocks:
-                            seen_blocks.add(formatted_block)
-                            context_blocks.append(formatted_block)
+                        if raw_text and raw_text not in seen_blocks:
+                            seen_blocks.add(raw_text)
+                            context_blocks.append(raw_text)
 
+                        if len(context_blocks) >= cfg.max_blocks:
+                            break
                     if len(context_blocks) >= cfg.max_blocks:
                         break
-                if len(context_blocks) >= cfg.max_blocks:
-                    break
 
         context_blocks = context_blocks[: cfg.max_blocks]
         if not context_blocks:
             context_blocks = ["[No context blocks available]"]
 
-        total_chars = sum(len(b) for b in context_blocks)
-
         return {
             "query_context": query_context_dict,
             "document_context": doc_context_dict,
             "items": context_blocks,
-            "metrics": {
-                "top_k_used": len(retrieval_items),
-                "adjacent_radius": cfg.adjacent_radius,
-                "context_characters": total_chars,
-            },
+            "context_blocks": context_blocks,
         }
 
 
