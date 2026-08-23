@@ -15,7 +15,9 @@ const METRICS = ['total_assets', 'total_liabilities', 'total_equity'] as const;
 export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);
-  const latest = data[data.length - 1];
+  const latest = [...data].reverse().find(
+    (pt) => pt.values.total_assets !== null && pt.values.total_assets !== undefined
+  ) ?? data[data.length - 1];
   const composition = [
     {
       name: '부채',

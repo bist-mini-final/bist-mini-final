@@ -8,10 +8,18 @@ const RANGE_LIMIT: Readonly<Record<PeriodRange, number | null>> = {
 
 export function selectPeriods(periods: readonly BiPeriod[], range: PeriodRange): readonly BiPeriod[] {
   const sorted = [...periods].sort((left, right) => left.ordinal - right.ordinal);
-  const fyPeriods = sorted.filter((period) => period.kind === 'fy');
   const ltmPeriod = [...sorted].reverse().find((period) => period.kind === 'ltm');
+  const historicalFy = ltmPeriod
+    ? sorted.filter((period) => period.kind === 'fy' && period.endDate <= ltmPeriod.endDate)
+    : sorted.filter((period) => period.kind === 'fy');
+  const futureFy = ltmPeriod
+    ? sorted.filter((period) => period.kind === 'fy' && period.endDate > ltmPeriod.endDate)
+    : [];
   const limit = RANGE_LIMIT[range];
-  const selectedFy = limit === null ? fyPeriods : fyPeriods.slice(-limit);
+  if (limit === null) {
+    return ltmPeriod ? [...historicalFy, ltmPeriod, ...futureFy] : sorted;
+  }
+  const selectedFy = historicalFy.slice(-limit);
   return ltmPeriod ? [...selectedFy, ltmPeriod] : selectedFy;
 }
 
