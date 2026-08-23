@@ -14,6 +14,7 @@ from .question_records import (
     BiQuestionStatus,
     JobId,
     QuestionId,
+    WorkflowRunId,
 )
 
 
@@ -55,6 +56,12 @@ class BiQuestionRepositoryPort(Protocol):
     def start_question(self, command: BiQuestionStart) -> BiQuestionRecord: ...
 
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord: ...
+
+    def heartbeat(
+        self,
+        question_id: QuestionId,
+        workflow_run_id: WorkflowRunId,
+    ) -> bool: ...
 
     def latest_answers(
         self,
@@ -108,6 +115,13 @@ class BiQuestionService:
 
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord:
         return self._repository.save_answer(answer)
+
+    def heartbeat(
+        self,
+        question_id: QuestionId,
+        workflow_run_id: WorkflowRunId,
+    ) -> bool:
+        return self._repository.heartbeat(question_id, workflow_run_id)
 
     def latest_answers(
         self,

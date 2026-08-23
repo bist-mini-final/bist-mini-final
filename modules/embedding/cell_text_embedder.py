@@ -63,7 +63,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field
 
-from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_embedder import (
     BaseEmbeddingModule,
@@ -95,10 +95,6 @@ class CellTextEmbedderConfigDTO(EmbeddingConfigDTO):
         le=2048,
         description="Excel 셀 문서를 한 번에 임베딩할 배치 크기",
     )
-
-
-# Backward compatibility alias
-CellTextEmbedderExecutionDTO = CellTextEmbedderInputDTO
 
 
 class EmbeddedCellTextDocumentDTO(CellTextDocumentDTO):
@@ -165,12 +161,12 @@ class CellTextEmbedderModule(BaseEmbeddingModule):
 
     def __init__(
         self,
-        encoder: Optional[EmbeddingEncoder] = None,
-        artifact_store: Optional[EmbeddingArtifactStore] = None,
+        encoder: EmbeddingEncoder,
+        artifact_store: EmbeddingArtifactStore,
         storage_sink: Optional[Any] = None,
     ) -> None:
         super().__init__(encoder=encoder)
-        self.artifact_store = artifact_store or EmbeddingArtifactStore()
+        self.artifact_store = artifact_store
         self.storage_sink = storage_sink
 
     def execute(
@@ -278,7 +274,6 @@ class CellTextEmbedderModule(BaseEmbeddingModule):
 
 __all__ = [
     "CellTextEmbedderConfigDTO",
-    "CellTextEmbedderExecutionDTO",
     "CellTextEmbedderInputDTO",
     "CellTextEmbedderModule",
     "CellTextEmbeddingsDTO",

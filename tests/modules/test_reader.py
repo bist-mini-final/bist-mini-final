@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+
 import pytest
 
-from backend.providers.llm.chat_completion import ChatCompletionResult
+from backend.providers.openai_responses import OpenAIResponseResult
 from modules.common.base_module import DocumentContextDTO, QueryContextDTO
 from modules.reader.reader import (
     ContextDTO,
@@ -31,23 +32,22 @@ def test_reader_tool_input_bounds():
 
 def test_reader_tool_calling_execution():
     mock_llm = MagicMock()
-    mock_llm.complete_with_metadata.side_effect = [
-        ChatCompletionResult(
+    mock_llm.create_response.side_effect = [
+        OpenAIResponseResult(
+            response_id="resp_lookup_call",
             content="",
             usage={"prompt_tokens": 100, "completion_tokens": 20},
             latency_seconds=0.1,
-            tool_calls=[
+            function_calls=(
                 {
-                    "id": "call_123",
-                    "type": "function",
-                    "function": {
-                        "name": "lookup_cell_metadata",
-                        "arguments": '{"cell_coords": ["B10"], "sheet_name": "손익계산서", "company_name": "삼성전자"}',
-                    },
-                }
-            ],
+                    "call_id": "call_123",
+                    "name": "lookup_cell_metadata",
+                    "arguments": '{"cell_coords": ["B10"], "sheet_name": "손익계산서", "company_name": "삼성전자"}',
+                },
+            ),
         ),
-        ChatCompletionResult(
+        OpenAIResponseResult(
+            response_id="resp_lookup_answer",
             content="삼성전자의 손익계산서 B10 셀의 정확한 영업이익은 65,670억원입니다. [Sheet: 손익계산서 | Cell: B10]",
             usage={"prompt_tokens": 150, "completion_tokens": 30},
             latency_seconds=0.15,
@@ -77,10 +77,7 @@ def test_reader_tool_calling_execution():
                 company_name="삼성전자",
                 sheet_names=["손익계산서"],
             ),
-            top_k_used=5,
-            adjacent_radius=2,
-            context_characters=100,
-            context_blocks=["초안 컨텍스트 데이터"],
+            items=["초안 컨텍스트 데이터"],
         )
     )
 
@@ -89,34 +86,44 @@ def test_reader_tool_calling_execution():
     assert "65,670억원" in ans
     assert "[Sheet: 손익계산서 | Cell: B10]" in ans
     assert mock_store.fetch_cells_by_metadata.called
+    first_call, continuation = mock_llm.create_response.call_args_list
+    function_tool = first_call.kwargs["tools"][0]
+    assert function_tool["type"] == "function"
+    assert function_tool["strict"] is True
+    assert function_tool["parameters"]["additionalProperties"] is False
+    assert continuation.kwargs["previous_response_id"] == "resp_lookup_call"
+    assert continuation.kwargs["input_items"][0]["type"] == "function_call_output"
+    assert continuation.kwargs["input_items"][0]["call_id"] == "call_123"
 
 
 def test_reader_math_tool_calling_execution():
     mock_llm = MagicMock()
-    mock_llm.complete_with_metadata.side_effect = [
-        ChatCompletionResult(
+    mock_llm.create_response.side_effect = [
+        OpenAIResponseResult(
+            response_id="resp_math_call",
             content="",
             usage={"prompt_tokens": 100, "completion_tokens": 20},
             latency_seconds=0.1,
-            tool_calls=[
+            function_calls=(
                 {
-                    "id": "call_math_1",
-                    "type": "function",
-                    "function": {
-                        "name": "calculate_math_expression",
-                        "arguments": '{"expression": "(350000 - 65670) / 65670 * 100"}',
-                    },
-                }
-            ],
+                    "call_id": "call_math_1",
+                    "name": "calculate_math_expression",
+                    "arguments": '{"expression": "(350000 - 65670) / 65670 * 100"}',
+                },
+            ),
         ),
-        ChatCompletionResult(
+        OpenAIResponseResult(
+            response_id="resp_math_answer",
             content="영업이익 증가율은 432.97% 입니다. [Sheet: 손익계산서 | Cell: E60, F60]",
             usage={"prompt_tokens": 140, "completion_tokens": 25},
             latency_seconds=0.15,
         ),
     ]
 
-    reader = ReaderModule(completion_client=mock_llm)
+    reader = ReaderModule(
+        completion_client=mock_llm,
+        pgvector_store=MagicMock(),
+    )
     input_dto = ReaderInputDTO(
         context_json=ContextDTO(
             query_context=QueryContextDTO(question_id="q2", question_text="영업이익 증가율은?"),
@@ -126,10 +133,7 @@ def test_reader_math_tool_calling_execution():
                 company_name="삼성전자",
                 sheet_names=["손익계산서"],
             ),
-            top_k_used=5,
-            adjacent_radius=2,
-            context_characters=100,
-            context_blocks=["2023년 영업이익: 65670억, 2024년 영업이익: 350000억"],
+            items=["2023년 영업이익: 65670억, 2024년 영업이익: 350000억"],
         )
     )
 

@@ -13,8 +13,9 @@ from .models import (
     MaterializationStatus,
     MetricId,
     MetricStatus,
-    UnavailableObservation,
+    PeriodId,
     SnapshotStatus,
+    UnavailableObservation,
 )
 from .question_records import (
     BiAnswerRecord,
@@ -22,6 +23,8 @@ from .question_records import (
     BiQuestionJobProgress,
     BiQuestionRecord,
     BiQuestionStatus,
+    QuestionId,
+    WorkflowRunId,
 )
 from .snapshot_builder import BiSnapshotBuilder
 
@@ -67,6 +70,12 @@ class BiQuestionWorkerServicePort(Protocol):
     def claim_next(self, command: BiQuestionClaim) -> BiQuestionRecord | None: ...
 
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord: ...
+
+    def heartbeat(
+        self,
+        question_id: QuestionId,
+        workflow_run_id: WorkflowRunId,
+    ) -> bool: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,9 +185,9 @@ class BiQuestionSnapshotMaterializer:
     @staticmethod
     def _result_for(
         metric_id: MetricId,
-        period_id: str,
+        period_id: PeriodId,
         question: BiQuestionRecord | None,
-        completed: dict[tuple[MetricId, str], BiMetricExtractionResult],
+        completed: dict[tuple[MetricId, PeriodId], BiMetricExtractionResult],
     ) -> BiMetricExtractionResult:
         definition = METRIC_CATALOG[metric_id]
         result = completed.get((metric_id, period_id))
@@ -218,3 +227,10 @@ class BiPublishingQuestionService:
         saved = self._service.save_answer(answer)
         self._materializer.materialize_if_terminal(saved.materialization_job_id)
         return saved
+
+    def heartbeat(
+        self,
+        question_id: QuestionId,
+        workflow_run_id: WorkflowRunId,
+    ) -> bool:
+        return self._service.heartbeat(question_id, workflow_run_id)

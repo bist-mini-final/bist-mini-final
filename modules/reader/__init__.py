@@ -10,7 +10,6 @@ from modules.reader.reader import (
     ReaderConfigDTO,
     ReaderInputDTO,
     ReaderModule,
-    ReaderOutput,
     ReaderOutputDTO,
     safe_calculate_expression,
 )
@@ -25,7 +24,6 @@ __all__ = [
     "ReaderConfigDTO",
     "ReaderInputDTO",
     "ReaderModule",
-    "ReaderOutput",
     "ReaderOutputDTO",
     "safe_calculate_expression",
 ]

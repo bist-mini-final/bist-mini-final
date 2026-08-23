@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable
 
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import BaseModule
@@ -15,12 +15,9 @@ class BaseModuleRegistry:
 
     def __init__(
         self,
-        embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
-        *,
-        isolated_worker_spec: Optional[Dict[str, str]] = None,
+        embedding_artifact_store: EmbeddingArtifactStore,
     ) -> None:
-        self.embedding_artifact_store = embedding_artifact_store or EmbeddingArtifactStore()
-        self.isolated_worker_spec = isolated_worker_spec
+        self.embedding_artifact_store = embedding_artifact_store
         self._modules: Dict[str, BaseModule] = {}
 
     def register(self, modules: Iterable[BaseModule]) -> None:

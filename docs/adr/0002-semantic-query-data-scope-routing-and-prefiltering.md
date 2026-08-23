@@ -108,7 +108,7 @@ flowchart TD
 
 ### C. 계층별 구현 사양 (Implementation Specifications)
 
-#### 1. 시맨틱 라우터 계층 ([modules/query/semantic_query_matcher.py](file:///Users/pileuszu/Repos/bist-mini-final/modules/query/semantic_query_matcher.py))
+#### 1. 시맨틱 라우터 계층 ([modules/query/semantic_query_matcher.py](../../modules/query/semantic_query_matcher.py))
 - `SemanticQueryMatchOutput` DTO 스펙:
   ```python
   class SemanticQueryMatchOutput(ModuleDTO):
@@ -123,7 +123,7 @@ flowchart TD
   ```
 - LLM 라우터 프롬프트 가이드에 기업명(`company_name`) 및 대상 시트(`sheets`) 동시 감지 규칙 적용.
 
-#### 2. PostgreSQL 저장소 계층 ([backend/storage/pgvector_store.py](file:///Users/pileuszu/Repos/bist-mini-final/backend/storage/pgvector_store.py))
+#### 2. PostgreSQL 저장소 계층 ([backend/storage/pgvector_store.py](../../backend/storage/pgvector_store.py))
 - `similarity_search_by_vector_with_score(..., sheet_names=None, company_name=None)`:
   - 동적 SQL `WHERE` 절 조합:
     ```sql
@@ -133,10 +133,10 @@ flowchart TD
     ```
 
 #### 3. 하이브리드 검색기 계층
-- **Dense Retriever ([modules/retrieval/pgvector_retriever.py](file:///Users/pileuszu/Repos/bist-mini-final/modules/retrieval/pgvector_retriever.py))**:
+- **Dense Retriever ([modules/retrieval/pgvector_retriever.py](../../modules/retrieval/pgvector_retriever.py))**:
   - `semantic_match`로부터 `(scoped_company, allowed_sheets)`를 추출하여 pgvector 쿼리에 전달.
   - 필터링 결과가 비어있을 경우 자동 릴랙스 전역 검색 수행.
-- **BM25 / FTS Retriever ([modules/retrieval/postgres_native_keyword_retriever.py](file:///Users/pileuszu/Repos/bist-mini-final/modules/retrieval/postgres_native_keyword_retriever.py))**:
+- **BM25 / FTS Retriever ([modules/retrieval/postgres_native_keyword_retriever.py](../../modules/retrieval/postgres_native_keyword_retriever.py))**:
   - 동일한 `(company_name, sheet_name)` SQL 조건을 전문검색 쿼리에 바인딩하고 결과 0건 시 릴랙스 전역 검색 폴백.
 
 ---

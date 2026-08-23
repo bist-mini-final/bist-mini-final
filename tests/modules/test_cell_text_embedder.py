@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from modules.common.base_embedder import calculate_embedding_cost
 from modules.embedding.cell_text_embedder import (
     CellTextEmbedderConfigDTO,
     CellTextEmbedderInputDTO,
@@ -60,3 +61,12 @@ def test_cell_embedder_streams_and_reuses_artifact(tmp_path: Path) -> None:
     assert second["cache_hit"] is True
     assert encoder.encode.call_count == 2
     assert artifact_store.is_valid(first["artifact_id"], 3, 2)
+
+
+def test_embedding_cost_uses_model_specific_rate() -> None:
+    assert calculate_embedding_cost("text-embedding-3-small", 1_000_000)[
+        "cost_usd"
+    ] == 0.02
+    assert calculate_embedding_cost("text-embedding-3-large", 1_000_000)[
+        "cost_usd"
+    ] == 0.13

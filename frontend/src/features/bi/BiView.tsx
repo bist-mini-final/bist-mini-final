@@ -117,6 +117,3 @@ export function BiView() {
     </section>
   );
 }
-
-// Backward compatibility alias
-export const BiPage = BiView;

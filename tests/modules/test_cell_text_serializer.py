@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import openpyxl
 
+from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.structure.cell_text_serializer import (
     CellTextSerializerConfigDTO,
     CellTextSerializerInputDTO,
@@ -24,7 +26,7 @@ def test_cell_text_serializer_execution(tmp_path: Path) -> None:
     ws["C2"] = 120
     wb.save(wb_path)
 
-    module = CellTextSerializerModule(processed_dir=tmp_path)
+    module = CellTextSerializerModule(catalog=WorkbookCatalog(tmp_path))
     current_hash = module.catalog.sha256(wb_path)
 
     input_dto = CellTextSerializerInputDTO.model_validate(

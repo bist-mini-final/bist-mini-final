@@ -1,6 +1,6 @@
 """Persistent workflow definitions and resumable DAG execution."""
 
-from .dispatcher import InteractiveWorkflowDispatcher, RunDispatcher
+from .dispatcher import RunDispatcher
 from .executor import DagExecutionCancelled, DagExecutionError, WorkflowExecutor
 from .models import (
     WorkflowDocument,
@@ -14,7 +14,6 @@ from .store import ResultCache, RunStore, WorkflowStore
 __all__ = [
     "DagExecutionCancelled",
     "DagExecutionError",
-    "InteractiveWorkflowDispatcher",
     "ResultCache",
     "RunDispatcher",
     "RunStore",

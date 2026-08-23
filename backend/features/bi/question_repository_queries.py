@@ -18,7 +18,6 @@ from .question_records import (
     QuestionId,
 )
 
-
 QUESTION_COLUMNS: Final = (
     "question_id, materialization_job_id, company_id, workbook_hash, index_id, "
     "metric_id, period_id, question_version, question_text, status, "
@@ -116,7 +115,8 @@ class PostgresBiQuestionQueries:
                 with connection.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute(
                         "SELECT DISTINCT ON (q.metric_id, q.period_id) "
-                        "a.answer_id, a.question_id, a.outcome, a.answer_text, "
+                        "a.answer_id, a.question_id, q.workflow_run_id, "
+                        "a.outcome, a.answer_text, "
                         "a.answer_payload AS result, a.evidence_cell_ids, "
                         "a.error_code, a.error_message, a.model_name, a.latency_ms, "
                         "a.prompt_tokens, a.completion_tokens, a.created_at, a.updated_at "

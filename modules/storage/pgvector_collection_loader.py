@@ -114,11 +114,11 @@ class PgVectorCollectionLoaderModule(BaseModule):
 
     def __init__(
         self,
-        pgvector_store: Optional[PgVectorStore] = None,
-        db_manager: Optional[DatabaseManager] = None,
+        pgvector_store: PgVectorStore,
+        db_manager: DatabaseManager,
     ) -> None:
-        self.pgvector_store = pgvector_store or PgVectorStore()
-        self.db_manager = db_manager or DatabaseManager()
+        self.pgvector_store = pgvector_store
+        self.db_manager = db_manager
 
     def execute(
         self,

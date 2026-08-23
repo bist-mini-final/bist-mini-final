@@ -41,20 +41,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
+import time
 from dataclasses import dataclass
 from functools import lru_cache
-import logging
 from pathlib import Path
 from threading import Lock
-import time
 from typing import Any, Dict, List, Optional, Sequence
 
 from pydantic import Field
 
 from backend.core.settings import PROJECT_DIR
-from backend.providers.embeddings.factory import EmbeddingEncoder, get_embedding_encoder
-from backend.providers.llm.cost import calculate_openai_cost
+from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.providers.openai_pricing import calculate_openai_cost
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_embedder import (
     BaseModule,
@@ -157,14 +157,14 @@ class SemanticQueryMatcher:
     def __init__(
         self,
         encoder: EmbeddingEncoder,
+        artifact_store: EmbeddingArtifactStore,
         catalog_path: str | None = None,
         examples: tuple[QueryExample, ...] | None = None,
-        artifact_store: EmbeddingArtifactStore | None = None,
     ) -> None:
         self.encoder = encoder
         self.catalog_path = catalog_path
         self.examples = examples
-        self.artifact_store = artifact_store or EmbeddingArtifactStore()
+        self.artifact_store = artifact_store
         self._cache: Dict[str, tuple[tuple[QueryExample, ...], list[list[float]]]] = {}
         self._lock = Lock()
 
@@ -334,18 +334,9 @@ class RouterMetricsDTO(ModuleDTO):
     estimated_cost_usd: float = Field(default=0, ge=0)
 
 
-def _legacy_router_metrics() -> RouterMetricsDTO:
-    """Keep saved workflows and tests created before benchmark telemetry valid."""
-    return RouterMetricsDTO(
-        kind="unknown",
-        model="unknown",
-        latency_seconds=0,
-    )
-
-
 class SemanticQueryMatchOutput(ModuleDTO):
     items: List[SemanticMatchItemDTO] = Field(default_factory=list, description="매칭된 쿼리 뱅크 예제 목록")
-    metrics: RouterMetricsDTO = Field(default_factory=_legacy_router_metrics)
+    metrics: RouterMetricsDTO
 
     @property
     def matched(self) -> bool:
@@ -412,12 +403,14 @@ class SemanticQueryMatcherModule(BaseModule):
 
     def __init__(
         self,
+        encoder: EmbeddingEncoder,
+        artifact_store: EmbeddingArtifactStore,
         matcher: Optional[SemanticQueryMatcher] = None,
-        encoder: Optional[EmbeddingEncoder] = None,
         examples: Optional[Sequence[QueryExample]] = None,
     ) -> None:
         super().__init__()
         self.encoder = encoder
+        self.artifact_store = artifact_store
         self.examples = examples
         self.matcher = matcher
         self._matchers: Dict[str, SemanticQueryMatcher] = {}
@@ -429,13 +422,10 @@ class SemanticQueryMatcherModule(BaseModule):
         model = config.model
         matcher = self._matchers.get(model)
         if matcher is None:
-            encoder = get_embedding_encoder(
-                model_name=model,
-                override_encoder=self.encoder,
-            )
             examples = tuple(self.examples) if self.examples is not None else None
             matcher = SemanticQueryMatcher(
-                encoder=encoder,
+                encoder=self.encoder,
+                artifact_store=self.artifact_store,
                 examples=examples,
             )
             self._matchers[model] = matcher
@@ -502,9 +492,6 @@ class SemanticQueryMatcherModule(BaseModule):
         }
 
 
-# Backward compatibility aliases
-SemanticQueryMatcherExecution = SemanticQueryMatcherInput
-
 __all__ = [
     "CompanyScopeItemDTO",
     "QueryExample",
@@ -515,7 +502,6 @@ __all__ = [
     "SemanticQueryMatchOutput",
     "SemanticQueryMatcher",
     "SemanticQueryMatcherConfig",
-    "SemanticQueryMatcherExecution",
     "SemanticQueryMatcherInput",
     "SemanticQueryMatcherModule",
     "SemanticQueryMatcherWorkflowOutput",

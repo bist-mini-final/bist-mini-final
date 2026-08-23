@@ -9,7 +9,7 @@ from backend.storage.connection_pool import get_pooled_raw_connection
 from .extraction_models import BiContextCell, BiRetrievedContext
 from .models import BiMaterializationSource
 from .profile_models import BiProfileRetrievalRequest
-from .rag_adapter import RagPipelineContractError
+from .rag_errors import RagPipelineContractError
 
 
 @dataclass(frozen=True, slots=True)

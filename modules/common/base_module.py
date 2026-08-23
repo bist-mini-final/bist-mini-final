@@ -417,15 +417,11 @@ class BaseModule(ABC):
         """Execute the module with validated input_data and optional config."""
 
 
-# Backwards compatibility alias
-ExecutableModule = BaseModule
-
 __all__ = [
     "BaseModule",
     "DocumentContextDTO",
     "DocumentParsingError",
     "EmptyModuleConfigDTO",
-    "ExecutableModule",
     "ModuleConfigDTO",
     "ModuleConfigPreset",
     "ModuleDTO",

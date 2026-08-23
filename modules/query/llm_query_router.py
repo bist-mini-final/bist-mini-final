@@ -88,16 +88,6 @@ class CompanyScopeItemDTO(ModuleDTO):
     sheets: List[str] = Field(default_factory=list, description="매핑 추천 시트 목록 (예: ['손익계산서'], ['재무상태표'])")
     reason: Optional[str] = Field(default=None, description="선택적 스코프 판단 근거")
 
-    # Backward compatibility aliases
-    canonical_name: Optional[str] = None
-    suggested_sheets: Optional[List[str]] = None
-
-    def model_post_init(self, __context: Any) -> None:
-        if not self.canonical_name:
-            self.canonical_name = self.company_name
-        if not self.suggested_sheets:
-            self.suggested_sheets = self.sheets
-
 
 class LlmRouterResponse(BaseModel):
     """LLM Structured Output 응답 파싱 스키마."""
@@ -121,29 +111,29 @@ class RouterDecisionDTO(ModuleDTO):
 
     @property
     def confidence(self) -> float:
-        """라우팅 신뢰도 (호환용 기본값 1.0/0.0)."""
+        """Return deterministic structured-routing confidence."""
         return 1.0 if self.items else 0.0
 
     @property
     def sheets(self) -> List[str]:
-        """전체 스코프 대상 시트 합집합 (하위 호환 헬퍼 프로퍼티)."""
+        """Return the ordered union of routed sheets."""
         return list(dict.fromkeys(
-            sheet for item in self.items for sheet in (item.sheets or item.suggested_sheets or [])
+            sheet for item in self.items for sheet in item.sheets
         ))
 
     @property
     def company_name(self) -> Optional[str]:
-        """주요 대상 기업명 (하위 호환 헬퍼 프로퍼티)."""
+        """Return the primary routed company."""
         return self.items[0].company_name if self.items else None
 
     @property
     def company_scopes(self) -> List[CompanyScopeItemDTO]:
-        """items와 동일한 기업 스코프 목록 (하위 호환 헬퍼 프로퍼티)."""
+        """Return every structured company scope."""
         return self.items
 
     @property
     def target(self) -> Optional[str]:
-        """주요 대상 카테고리 (하위 호환 헬퍼 프로퍼티)."""
+        """Return the primary routed sheet."""
         return self.items[0].sheets[0] if (self.items and self.items[0].sheets) else None
 
 
@@ -194,7 +184,7 @@ class LlmQueryRouterModule(BaseLLMModule):
     config_model = LlmQueryRouterConfigDTO
     output_model = LlmQueryRouterOutputDTO
 
-    def __init__(self, completion_client: Optional[Any] = None) -> None:
+    def __init__(self, completion_client: Any) -> None:
         super().__init__(completion_client=completion_client)
 
     def execute(
@@ -229,20 +219,10 @@ class LlmQueryRouterModule(BaseLLMModule):
         }
 
 
-# Backward compatibility aliases
-LlmQueryRouterInput = LlmQueryRouterInputDTO
-LlmQueryRouterConfig = LlmQueryRouterConfigDTO
-LlmQueryRouterOutput = LlmQueryRouterOutputDTO
-LlmQueryRouterExecution = LlmQueryRouterInputDTO
-
 __all__ = [
     "CompanyScopeItemDTO",
-    "LlmQueryRouterConfig",
     "LlmQueryRouterConfigDTO",
-    "LlmQueryRouterExecution",
-    "LlmQueryRouterInput",
     "LlmQueryRouterInputDTO",
-    "LlmQueryRouterOutput",
     "LlmQueryRouterOutputDTO",
     "LlmQueryRouterModule",
     "LlmRouterResponse",

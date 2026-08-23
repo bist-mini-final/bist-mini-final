@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.providers.llm.chat_completion import ChatCompletionResult
+from backend.providers.openai_responses import OpenAIResponseResult
 from modules.common.base_module import QueryContextDTO
 from modules.query.llm_query_router import (
     LlmQueryRouterConfigDTO,
@@ -14,7 +14,8 @@ from modules.query.llm_query_router import (
 
 def test_llm_query_router_execution():
     mock_llm = MagicMock()
-    mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_router_1",
         content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"]}]}',
         usage={"prompt_tokens": 50, "completion_tokens": 30},
         latency_seconds=0.2,
@@ -44,7 +45,8 @@ def test_llm_query_router_execution():
 
 def test_llm_query_router_multi_scope_execution():
     mock_llm = MagicMock()
-    mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_router_2",
         content='{"items": [{"company_name": "삼성전자", "sheets": ["손익계산서"]}, {"company_name": "현대자동차", "sheets": ["재무상태표"]}]}',
         usage={"prompt_tokens": 60, "completion_tokens": 40},
         latency_seconds=0.25,
@@ -72,7 +74,8 @@ def test_llm_query_router_multi_scope_execution():
 
 def test_llm_query_router_empty_scope_handling():
     client = MagicMock()
-    client.complete_with_metadata.return_value = ChatCompletionResult(
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_router_empty",
         content='{"items":[]}',
         usage={},
         latency_seconds=0,

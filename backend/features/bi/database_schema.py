@@ -6,8 +6,46 @@ import psycopg2
 from backend.core.settings import PGVECTOR_URL
 from backend.storage.connection_pool import get_pooled_raw_connection
 
-
 BI_SCHEMA_SQL: Final = """
+CREATE TABLE IF NOT EXISTS bi_companies (
+    company_id VARCHAR(128) PRIMARY KEY,
+    display_name VARCHAR(200) NOT NULL,
+    current_snapshot_id VARCHAR(128),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS bi_materialization_jobs (
+    job_id VARCHAR(128) PRIMARY KEY,
+    company_id VARCHAR(128) NOT NULL REFERENCES bi_companies(company_id),
+    workbook_hash CHAR(64) NOT NULL CHECK (workbook_hash ~ '^[a-f0-9]{64}$'),
+    request_payload JSONB NOT NULL CHECK (jsonb_typeof(request_payload) = 'object'),
+    status VARCHAR(32) NOT NULL CHECK (
+        status IN ('queued', 'indexing', 'profiling', 'extracting',
+                   'materializing', 'ready', 'partial', 'failed')
+    ),
+    completed_requests INTEGER NOT NULL DEFAULT 0 CHECK (completed_requests >= 0),
+    total_requests INTEGER NOT NULL DEFAULT 0 CHECK (total_requests >= 0),
+    published_snapshot_id VARCHAR(128),
+    error_code VARCHAR(128),
+    message VARCHAR(500),
+    worker_id VARCHAR(128),
+    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    heartbeat_at TIMESTAMPTZ,
+    started_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bi_dashboard_snapshots (
+    snapshot_id VARCHAR(128) PRIMARY KEY,
+    company_id VARCHAR(128) NOT NULL REFERENCES bi_companies(company_id),
+    workbook_hash CHAR(64) NOT NULL CHECK (workbook_hash ~ '^[a-f0-9]{64}$'),
+    snapshot_payload JSONB NOT NULL CHECK (jsonb_typeof(snapshot_payload) = 'object'),
+    generated_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS bi_questions (
     question_id VARCHAR(128) PRIMARY KEY,
     materialization_job_id VARCHAR(128) NOT NULL,
@@ -97,6 +135,12 @@ CREATE INDEX IF NOT EXISTS idx_bi_questions_status
     ON bi_questions(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_bi_document_profiles_source
     ON bi_document_profiles(company_id, workbook_hash, index_id);
+CREATE INDEX IF NOT EXISTS idx_bi_materialization_queue
+    ON bi_materialization_jobs(status, available_at, updated_at);
+CREATE INDEX IF NOT EXISTS idx_bi_materialization_company
+    ON bi_materialization_jobs(company_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bi_snapshots_company
+    ON bi_dashboard_snapshots(company_id, generated_at DESC);
 """
 
 

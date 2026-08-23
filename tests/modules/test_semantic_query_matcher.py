@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import QueryContextDTO
 from modules.query.semantic_query_matcher import (
     QueryExample,
@@ -12,7 +13,7 @@ from modules.query.semantic_query_matcher import (
 )
 
 
-def test_semantic_query_matcher_module_with_mock_encoder():
+def test_semantic_query_matcher_module_with_mock_encoder(tmp_path):
     mock_encoder = MagicMock(spec=["encode"])
     mock_encoder.encode.return_value = [[1.0, 0.0, 0.0]]
 
@@ -26,7 +27,11 @@ def test_semantic_query_matcher_module_with_mock_encoder():
         )
     ]
 
-    matcher_module = SemanticQueryMatcherModule(encoder=mock_encoder, examples=examples)
+    matcher_module = SemanticQueryMatcherModule(
+        encoder=mock_encoder,
+        artifact_store=EmbeddingArtifactStore(tmp_path),
+        examples=examples,
+    )
     res = matcher_module.run(
         SemanticQueryMatcherInput(
             query_context=QueryContextDTO(question_id="q1", question_text="영업이익 질문")

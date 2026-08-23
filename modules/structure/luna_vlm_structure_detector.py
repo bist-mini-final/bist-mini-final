@@ -44,14 +44,10 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple
 
 import openpyxl
 from openpyxl.utils.cell import range_boundaries
-from pydantic import Field, model_validator
+from pydantic import Field
 
-from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
-from backend.providers.vision.openai_responses import (
-    OpenAIResponsesVisionClient,
-    OpenAIResponsesVisionError,
-    OpenAIResponsesVisionResult,
-)
+from backend.core.settings import SPREADSHEET_ARTIFACT_DIR
+from backend.providers.openai_responses import OpenAIResponseResult, OpenAIResponsesError
 from backend.storage.spreadsheets.cell_semantics import (
     collect_non_empty_cells,
     compact_sheet_context,
@@ -60,12 +56,10 @@ from backend.storage.spreadsheets.cell_type_overlay import render_cell_type_over
 from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
 from backend.storage.spreadsheets.grid_structure import build_column_header_tree
 from backend.storage.spreadsheets.prompt_guidance import (
-    LEGACY_TEXT_CELL_ROLE_GUIDANCE,
     TABLE_UNIFICATION_GUIDANCE,
     TEXT_CELL_ROLE_GUIDANCE,
 )
 from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
-from backend.storage.spreadsheets.table_fragment_merge import parse_excel_range
 from backend.storage.spreadsheets.table_geometry import CellBounds, SheetLayout, cell_bounds_bbox
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import (
@@ -207,7 +201,7 @@ LUNA_SHEET_RESPONSE_SCHEMA: Dict[str, Any] = {
 
 
 class LunaVisionClient(Protocol):
-    def complete_structured(
+    def complete_vision_structured(
         self,
         *,
         model: str,
@@ -219,7 +213,7 @@ class LunaVisionClient(Protocol):
         reasoning_effort: Literal["none", "low", "medium", "high"],
         max_output_tokens: int,
         timeout_seconds: int,
-    ) -> OpenAIResponsesVisionResult | str: ...
+    ) -> OpenAIResponseResult | str: ...
 
 
 class LunaVlmStructureDetectorInputDTO(WorkbookSelectionDTO):
@@ -285,49 +279,7 @@ class LunaVlmStructureDetectorExecutionDTO(
     LunaVlmStructureDetectorInputDTO,
     LunaVlmStructureDetectorConfigDTO,
 ):
-    """Internal union with legacy workflow migration support."""
-
-    @model_validator(mode="before")
-    @classmethod
-    def discard_legacy_tiling_settings(cls, value: Any) -> Any:
-        """Accept workflows saved before whole-sheet inference replaced tiling."""
-
-        if not isinstance(value, dict):
-            return value
-        migrated = dict(value)
-        for field_name in (
-            "tile_rows",
-            "tile_columns",
-            "row_overlap",
-            "column_overlap",
-            "overview_max_edge",
-        ):
-            migrated.pop(field_name, None)
-        legacy_system_prompt = migrated.get("system_prompt")
-        if (
-            isinstance(legacy_system_prompt, str)
-            and LEGACY_TEXT_CELL_ROLE_GUIDANCE in legacy_system_prompt
-            and TEXT_CELL_ROLE_GUIDANCE not in legacy_system_prompt
-        ):
-            migrated["system_prompt"] = legacy_system_prompt.replace(
-                LEGACY_TEXT_CELL_ROLE_GUIDANCE,
-                TEXT_CELL_ROLE_GUIDANCE,
-            )
-            legacy_system_prompt = migrated["system_prompt"]
-        if (
-            isinstance(legacy_system_prompt, str)
-            and "You receive two images in this order" in legacy_system_prompt
-            and "current tile" in legacy_system_prompt
-        ):
-            migrated.pop("system_prompt", None)
-        legacy_user_prompt = migrated.get("user_prompt_template")
-        if (
-            isinstance(legacy_user_prompt, str)
-            and "{tile_index}" in legacy_user_prompt
-            and "{tile_context}" in legacy_user_prompt
-        ):
-            migrated.pop("user_prompt_template", None)
-        return migrated
+    """Validated execution payload for whole-sheet Responses inference."""
 
 
 class VlmTableDecisionDTO(ModuleDTO):
@@ -472,7 +424,7 @@ def _validated_sheet_decision(
     table: VlmTableDecisionDTO,
     sheet_bounds: CellBounds,
 ) -> VlmTableDecisionDTO:
-    whole = parse_excel_range(table.excel_range)
+    whole = _bounds(table.excel_range, "excel_range")
     if not _contains(sheet_bounds, whole):
         raise ModuleExecutionError(
             f"Luna 응답 범위가 시트 {sheet_bounds.excel_range}를 벗어났습니다: {table.excel_range}"
@@ -484,7 +436,7 @@ def _validated_sheet_decision(
         "data_range",
     ):
         value = getattr(table, field_name)
-        if value and not _contains(whole, parse_excel_range(value)):
+        if value and not _contains(whole, _bounds(value, field_name)):
             raise ModuleExecutionError(
                 f"Luna {field_name}이 excel_range를 벗어났습니다: {value}"
             )
@@ -528,17 +480,23 @@ class LunaVlmStructureDetectorModule(BaseModule):
 
     def __init__(
         self,
-        vision_client: Optional[LunaVisionClient] = None,
-        catalog: Optional[WorkbookCatalog] = None,
-        renderer: Optional[ExcelSheetRenderer] = None,
-        processed_dir: Path = PROCESSED_DATA_DIR,
+        vision_client: LunaVisionClient,
+        catalog: WorkbookCatalog,
+        renderer: ExcelSheetRenderer,
         artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
-        self.vision_client = vision_client or OpenAIResponsesVisionClient()
-        self.catalog = catalog or WorkbookCatalog(processed_dir)
-        self.renderer = renderer or ExcelSheetRenderer()
+        if vision_client is None:
+            raise ValueError(
+                "LunaVlmStructureDetectorModule에는 vision_client 주입이 필요합니다"
+            )
+        self.vision_client = vision_client
+        self.catalog = catalog
+        self.renderer = renderer
         self.artifact_dir = artifact_dir
         self.structure_assembler = self
+        self.last_usage: Optional[Dict[str, int]] = None
+        self.last_model: Optional[str] = None
+        self.last_duration_seconds: float = 0.0
 
     @staticmethod
     def _region(
@@ -767,7 +725,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
         layout: SheetLayout,
         visibility: WorksheetVisibility,
         cells: List[Dict[str, Any]],
-    ) -> List[LocalVlmTableDecisionDTO]:
+    ) -> Tuple[List[LocalVlmTableDecisionDTO], Dict[str, int], float]:
         context = compact_sheet_context(sheet_name, layout, cells)
         prompt = _replace_prompt_variables(
             settings.user_prompt_template,
@@ -783,6 +741,13 @@ class LunaVlmStructureDetectorModule(BaseModule):
         )
         previous_response = ""
         validation_error = ""
+        aggregate_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "cached_tokens": 0,
+            "total_tokens": 0,
+        }
+        aggregate_latency = 0.0
         for attempt in range(settings.validation_retries + 1):
             correction = ""
             if attempt:
@@ -793,7 +758,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     f"{sheet_bounds.excel_range}."
                 )
             try:
-                response = self.vision_client.complete_structured(
+                response = self.vision_client.complete_vision_structured(
                     model=settings.model,
                     system_prompt=settings.system_prompt,
                     user_prompt=prompt + correction,
@@ -804,9 +769,13 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     max_output_tokens=settings.max_output_tokens,
                     timeout_seconds=settings.timeout_seconds,
                 )
+                if isinstance(response, OpenAIResponseResult):
+                    for key in aggregate_usage:
+                        aggregate_usage[key] += int(response.usage.get(key, 0) or 0)
+                    aggregate_latency += response.latency_seconds
                 previous_response = (
                     response.content
-                    if isinstance(response, OpenAIResponsesVisionResult)
+                    if isinstance(response, OpenAIResponseResult)
                     else response
                 )
                 decision = LunaSheetDecisionDTO.model_validate_json(previous_response)
@@ -817,8 +786,8 @@ class LunaVlmStructureDetectorModule(BaseModule):
                 ]
                 for table in tables:
                     self.structure_assembler._validate_table(table, layout, visibility)
-                return tables
-            except OpenAIResponsesVisionError:
+                return tables, aggregate_usage, aggregate_latency
+            except OpenAIResponsesError:
                 raise
             except (ValueError, TypeError, json.JSONDecodeError, ModuleExecutionError) as error:
                 validation_error = str(error)
@@ -826,7 +795,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     raise ModuleExecutionError(
                         f"Luna 시트 {sheet_name} 응답을 좌표 규칙에 맞게 교정하지 못했습니다: {validation_error}"
                     ) from error
-        return []
+        return [], aggregate_usage, aggregate_latency
 
     def execute(
         self,
@@ -919,7 +888,14 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     failed_sheets.append({"sheet_name": sheet_name, "error": str(sheet_err)})
 
             # Phase 2: Call OpenAI Responses API in parallel across prepared sheets
-            def _call_vlm(ctx: Dict[str, Any]) -> Tuple[Dict[str, Any], List[LocalVlmTableDecisionDTO]]:
+            def _call_vlm(
+                ctx: Dict[str, Any],
+            ) -> Tuple[
+                Dict[str, Any],
+                List[LocalVlmTableDecisionDTO],
+                Dict[str, int],
+                float,
+            ]:
                 """
                 Analyze a prepared worksheet with the vision-language model.
                 
@@ -930,7 +906,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     Tuple[Dict[str, Any], List[LocalVlmTableDecisionDTO]]: The original worksheet context and the detected table decisions.
                 """
                 print(f"[Luna VLM] 시트 '{ctx['sheet_name']}' OpenAI VLM 호출 시작...", flush=True)
-                decisions = self._analyze_sheet(
+                decisions, usage, latency = self._analyze_sheet(
                     cfg,
                     ctx["sheet_name"],
                     ctx["sheet_bounds"],
@@ -940,7 +916,7 @@ class LunaVlmStructureDetectorModule(BaseModule):
                     ctx["cells"],
                 )
                 print(f"[Luna VLM] 시트 '{ctx['sheet_name']}' OpenAI VLM 응답 완료 ({len(decisions)}개 표 감지)", flush=True)
-                return ctx, decisions
+                return ctx, decisions, usage, latency
 
             max_workers = min(cfg.max_concurrency, len(prepared_sheets)) or 1
             print(f"[Luna VLM] {len(prepared_sheets)}개 시트 병렬 VLM 분석 시작 (스레드 {max_workers}개)...", flush=True)
@@ -957,6 +933,13 @@ class LunaVlmStructureDetectorModule(BaseModule):
                 }
             )
             tables_by_sheet: Dict[str, List[Dict[str, Any]]] = {}
+            aggregate_usage = {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "cached_tokens": 0,
+                "total_tokens": 0,
+            }
+            aggregate_latency = 0.0
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
                     executor.submit(_call_vlm, ctx): ctx
@@ -964,7 +947,12 @@ class LunaVlmStructureDetectorModule(BaseModule):
                 }
                 for future in concurrent.futures.as_completed(futures):
                     try:
-                        ctx, decisions = future.result()
+                        ctx, decisions, usage, latency = future.result()
+                        aggregate_usage["prompt_tokens"] += usage["prompt_tokens"]
+                        aggregate_usage["completion_tokens"] += usage["completion_tokens"]
+                        aggregate_usage["cached_tokens"] += usage["cached_tokens"]
+                        aggregate_usage["total_tokens"] += usage["total_tokens"]
+                        aggregate_latency += latency
                         s_name = ctx["sheet_name"]
                         v_sheet = ctx["value_sheet"]
                         s_layout = ctx["layout"]
@@ -998,6 +986,10 @@ class LunaVlmStructureDetectorModule(BaseModule):
                                 + len(failed_sheets),
                             }
                         )
+
+            self.last_usage = aggregate_usage
+            self.last_model = cfg.model
+            self.last_duration_seconds = aggregate_latency
 
             outputs = [
                 table

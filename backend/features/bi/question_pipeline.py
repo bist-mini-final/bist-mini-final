@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol
 
 from .extraction_models import BiMetricExtractionRequest, BiMetricExtractionResult
-from .models import BiMaterializationSource
+from .models import BiMaterializationSource, IndexId
 from .question_records import BiQuestionRecord
 
 
@@ -44,7 +44,7 @@ class PgVectorQuestionSourceResolver:
         source = BiMaterializationSource(
             file_name=str(metadata.get("file_name") or ""),
             workbook_hash=str(metadata.get("workbook_hash") or ""),
-            index_id=index_id,
+            index_id=IndexId(index_id),
         )
         self._sources[index_id] = source
         return self._require_matching_lineage(question, source)

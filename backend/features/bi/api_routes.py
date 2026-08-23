@@ -3,7 +3,6 @@ from typing import Annotated, Final
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     FastAPI,
     HTTPException,
     Path,
@@ -13,9 +12,11 @@ from fastapi import (
 from fastapi.responses import JSONResponse
 from starlette import status
 
+from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
+
 from .api_models import (
-    BiApiFailure,
     BiCompanyListResponse,
+    BiCompanySummary,
     BiDashboardPendingResponse,
     BiMaterializationAccepted,
 )
@@ -28,7 +29,6 @@ from .api_state import (
     with_refresh_state,
 )
 from .models import (
-    BiCompany,
     BiDashboardSnapshot,
     BiMaterializationJob,
     BiMaterializationRequest,
@@ -36,10 +36,11 @@ from .models import (
     JobId,
     MaterializationStatus,
 )
+from .postgres_store import BiPostgresStoreError
 from .question_batch import BiQuestionBatchPlan
 from .question_records import BiQuestionJobProgress
-from .snapshot_store import BiSnapshotStoreCorruption
-
+from .question_repository import BiQuestionRegistrationError
+from .question_repository_queries import BiQuestionRepositoryError
 
 COMPANY_NOT_FOUND: Final = "company not found"
 DASHBOARD_NOT_AVAILABLE: Final = "company dashboard is not available"
@@ -57,7 +58,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
     @router.get(
         "/companies",
         response_model=BiCompanyListResponse,
-        responses={500: {"model": BiApiFailure}},
+        responses={500: {"model": ApiErrorEnvelope}},
     )
     def list_companies() -> BiCompanyListResponse:
         companies: list[BiCompanySummary] = []
@@ -73,8 +74,8 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         response_model=BiDashboardSnapshot | BiDashboardPendingResponse,
         responses={
             202: {"model": BiDashboardPendingResponse},
-            404: {"model": BiApiFailure},
-            500: {"model": BiApiFailure},
+            404: {"model": ApiErrorEnvelope},
+            500: {"model": ApiErrorEnvelope},
         },
     )
     def get_dashboard(
@@ -87,15 +88,6 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
             raise HTTPException(status.HTTP_404_NOT_FOUND, COMPANY_NOT_FOUND)
         snapshot = services.store.get_current(typed_company_id)
         latest_job = services.store.get_latest_job(typed_company_id)
-        if (
-            snapshot is None
-            and latest_job is not None
-            and services.initial_snapshots is not None
-        ):
-            snapshot = services.initial_snapshots.materialize(
-                company,
-                latest_job.workbook_hash,
-            )
         if snapshot is None:
             if latest_job is None:
                 raise HTTPException(
@@ -113,21 +105,23 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         status_code=status.HTTP_202_ACCEPTED,
         responses={
             409: {
-                "model": BiApiFailure,
+                "model": ApiErrorEnvelope,
                 "description": MATERIALIZATION_ACTIVE,
             },
-            500: {"model": BiApiFailure},
+            500: {"model": ApiErrorEnvelope},
         },
     )
     def create_materialization(
         request: BiMaterializationRequest,
-        background_tasks: BackgroundTasks,
     ) -> BiMaterializationAccepted:
         existing = services.store.find_latest_job(
             request.company_id,
             request.source.workbook_hash,
         )
-        if existing is not None:
+        if (
+            existing is not None
+            and existing.status is not MaterializationStatus.FAILED
+        ):
             return accepted(existing)
         latest_job = services.store.get_latest_job(request.company_id)
         if latest_job is not None and is_active(latest_job.status):
@@ -145,22 +139,21 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
             started_at=now,
             updated_at=now,
         )
-        services.store.register_company(
-            BiCompany(
-                company_id=request.company_id,
-                display_name=request.display_name,
-            )
-        )
-        services.store.save_job(queued)
-        background_tasks.add_task(services.runner.materialize, request, job_id)
-        return accepted(queued)
+        try:
+            persisted = services.materializations.enqueue(request, queued)
+        except BiPostgresStoreError as error:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "BI Kubernetes queue is unavailable",
+            ) from error
+        return accepted(persisted)
 
     @router.get(
         "/materializations/{job_id}",
         response_model=BiMaterializationJob,
         responses={
-            404: {"model": BiApiFailure},
-            500: {"model": BiApiFailure},
+            404: {"model": ApiErrorEnvelope},
+            500: {"model": ApiErrorEnvelope},
         },
     )
     def get_materialization(job_id: IdentifierPath) -> BiMaterializationJob:
@@ -174,9 +167,9 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         response_model=BiQuestionJobProgress,
         status_code=status.HTTP_202_ACCEPTED,
         responses={
-            404: {"model": BiApiFailure},
-            409: {"model": BiApiFailure},
-            500: {"model": BiApiFailure},
+            404: {"model": ApiErrorEnvelope},
+            409: {"model": ApiErrorEnvelope},
+            500: {"model": ApiErrorEnvelope},
         },
     )
     def refresh_dashboard(company_id: IdentifierPath) -> BiQuestionJobProgress:
@@ -205,25 +198,31 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
             "question-job-"
             + sha256(identity.encode("utf-8")).hexdigest()[:24]
         )
-        return services.questions.queue_materialization_questions(
-            BiQuestionBatchPlan(
-                materialization=BiMaterializationRequest(
-                    company_id=company.company_id,
-                    display_name=company.display_name,
-                    source=snapshot.source,
-                ),
-                periods=snapshot.periods,
-                job_id=job_id,
-                created_at=created_at,
+        try:
+            return services.questions.queue_materialization_questions(
+                BiQuestionBatchPlan(
+                    materialization=BiMaterializationRequest(
+                        company_id=company.company_id,
+                        display_name=company.display_name,
+                        source=snapshot.source,
+                    ),
+                    periods=snapshot.periods,
+                    job_id=job_id,
+                    created_at=created_at,
+                )
             )
-        )
+        except (BiQuestionRepositoryError, BiQuestionRegistrationError) as error:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "BI question Kubernetes queue is unavailable",
+            ) from error
 
     @router.get(
         "/question-jobs/{job_id}",
         response_model=BiQuestionJobProgress,
         responses={
-            404: {"model": BiApiFailure},
-            500: {"model": BiApiFailure},
+            404: {"model": ApiErrorEnvelope},
+            500: {"model": ApiErrorEnvelope},
         },
     )
     def get_question_job(job_id: IdentifierPath) -> BiQuestionJobProgress:
@@ -235,33 +234,19 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
     return router
 
 
-def create_bi_app(services: BiApiServices) -> FastAPI:
-    application = FastAPI(
-        title="BI Materialization API",
-        version="1.0.0",
-        openapi_tags=[
-            {
-                "name": "BI",
-                "description": "지표 스냅샷 조회와 materialization 작업 관리",
-            }
-        ],
-    )
-    mount_bi_api(application, services)
-    return application
-
-
-def mount_bi_api(application: FastAPI, services: BiApiServices) -> None:
-    register_bi_exception_handlers(application)
-    application.include_router(create_bi_router(services), prefix="/api")
-
-
 def register_bi_exception_handlers(application: FastAPI) -> None:
-    @application.exception_handler(BiSnapshotStoreCorruption)
-    def handle_store_corruption(
+    @application.exception_handler(BiPostgresStoreError)
+    def handle_store_failure(
         _request: Request,
-        _error: BiSnapshotStoreCorruption,
+        _error: BiPostgresStoreError,
     ) -> JSONResponse:
         return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=BiApiFailure(detail="BI artifact is corrupted").model_dump(),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=ApiErrorEnvelope(
+                detail=ApiErrorDetail(
+                    code="BI_STORE_UNAVAILABLE",
+                    message="BI PostgreSQL store is unavailable",
+                    retryable=True,
+                )
+            ).model_dump(mode="json"),
         )

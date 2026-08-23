@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from backend.engine.orchestration import CompiledTaskNode, compile_task_plan
+from backend.engine.worker.main import execute_with_policy, run_one, runtime_services
 from backend.engine.workflows.models import (
     CanvasPosition,
     RunBatchState,
@@ -13,7 +14,6 @@ from backend.engine.workflows.models import (
     WorkflowRun,
     utc_now_iso,
 )
-from backend.engine.worker.main import execute_with_policy, run_one, runtime_services
 
 
 class WorkflowWorkerTests(unittest.TestCase):
@@ -26,9 +26,9 @@ class WorkflowWorkerTests(unittest.TestCase):
             values={"question_text": "삼성전자 매출"},
         )
         self.graph = WorkflowGraph(nodes=[self.node], edges=[])
-        self.run = WorkflowRun(
+        self.workflow_run = WorkflowRun(
             id="run-test-worker-1",
-            workflow_id="default",
+            workflow_id="rag_query",
             workflow_updated_at=utc_now_iso(),
             status="queued",
             created_at=utc_now_iso(),
@@ -65,7 +65,7 @@ class WorkflowWorkerTests(unittest.TestCase):
         with patch("backend.storage.db_manager.DatabaseManager.is_connected", return_value=True), \
              patch("backend.storage.db_manager.DatabaseManager.ensure_schema", return_value=True):
             services = runtime_services()
-            plan = compile_task_plan(self.run, services.module_registry)
+            plan = compile_task_plan(self.workflow_run, services.module_registry)
             self.assertEqual(len(plan), 1)
             self.assertIsInstance(plan[0], CompiledTaskNode)
             self.assertEqual(plan[0].node_id, "q1")

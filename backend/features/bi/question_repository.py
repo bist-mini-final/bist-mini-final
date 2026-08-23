@@ -7,6 +7,7 @@ from psycopg2.extras import Json, RealDictCursor, execute_values
 from backend.core.settings import PGVECTOR_URL
 from backend.storage.connection_pool import get_pooled_raw_connection
 
+from .question_claim_repository import PostgresBiQuestionClaimer
 from .question_records import (
     BiAnswerRecord,
     BiCompletedAnswerRecord,
@@ -19,8 +20,8 @@ from .question_records import (
     BiQuestionStatus,
     JobId,
     QuestionId,
+    WorkflowRunId,
 )
-from .question_claim_repository import PostgresBiQuestionClaimer
 from .question_repository_queries import (
     QUESTION_COLUMNS,
     BiQuestionRepositoryError,
@@ -86,7 +87,12 @@ class PostgresBiQuestionRepository:
                     execute_values(
                         cursor,
                         f"INSERT INTO bi_questions ({QUESTION_COLUMNS}) VALUES %s "
-                        "ON CONFLICT DO NOTHING",
+                        "ON CONFLICT (materialization_job_id, metric_id, period_id, question_version) "
+                        f"DO UPDATE SET status = '{BiQuestionStatus.QUEUED.value}', "
+                        "workflow_run_id = NULL, "
+                        "started_at = NULL, completed_at = NULL, "
+                        "updated_at = EXCLUDED.updated_at "
+                        f"WHERE bi_questions.status = '{BiQuestionStatus.FAILED.value}'",
                         values,
                     )
                     cursor.execute(
@@ -206,6 +212,7 @@ class PostgresBiQuestionRepository:
                     cursor.execute(
                         f"UPDATE bi_questions SET status = %s, completed_at = %s, "
                         "updated_at = %s WHERE question_id = %s AND status = %s "
+                        "AND workflow_run_id = %s "
                         f"RETURNING {QUESTION_COLUMNS}",
                         (
                             status.value,
@@ -213,6 +220,7 @@ class PostgresBiQuestionRepository:
                             answer.updated_at,
                             answer.question_id,
                             BiQuestionStatus.RUNNING.value,
+                            answer.workflow_run_id,
                         ),
                     )
                     row = cursor.fetchone()
@@ -261,6 +269,33 @@ class PostgresBiQuestionRepository:
                 reason=str(error),
             ) from error
         return question
+
+    def heartbeat(
+        self,
+        question_id: QuestionId,
+        workflow_run_id: WorkflowRunId,
+    ) -> bool:
+        try:
+            with get_pooled_raw_connection(self._database_url) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE bi_questions SET updated_at = NOW() "
+                        "WHERE question_id = %s AND workflow_run_id = %s "
+                        "AND status = %s",
+                        (
+                            question_id,
+                            workflow_run_id,
+                            BiQuestionStatus.RUNNING.value,
+                        ),
+                    )
+                    updated = cursor.rowcount == 1
+                connection.commit()
+        except psycopg2.Error as error:
+            raise BiQuestionRepositoryError(
+                operation="heartbeat",
+                reason=str(error),
+            ) from error
+        return updated
 
     def latest_answers(
         self,

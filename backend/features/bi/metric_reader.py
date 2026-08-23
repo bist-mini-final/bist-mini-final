@@ -3,7 +3,7 @@ from typing import Protocol, TypeAlias, assert_never, cast
 
 from pydantic import ValidationError
 
-from backend.providers.llm.chat_completion import ChatCompletionClient
+from backend.providers.openai_responses import OpenAIResponsesClient
 
 from .extraction_models import (
     BiMetricExtractionRequest,
@@ -13,15 +13,14 @@ from .extraction_models import (
     ReaderContractFailure,
 )
 
-
 JsonValue: TypeAlias = (
     str
     | int
     | float
     | bool
-    | None
     | list["JsonValue"]
     | dict[str, "JsonValue"]
+    | None
 )
 
 
@@ -67,8 +66,8 @@ class StructuredCompletionPort(Protocol):
     ) -> str: ...
 
 
-class ExistingChatCompletionAdapter:
-    def __init__(self, client: ChatCompletionClient) -> None:
+class BiStructuredCompletionAdapter:
+    def __init__(self, client: OpenAIResponsesClient) -> None:
         self._client = client
 
     def complete_structured(

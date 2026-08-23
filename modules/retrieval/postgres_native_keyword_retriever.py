@@ -60,7 +60,7 @@ from modules.common.base_module import (
 )
 from modules.common.config import DEFAULT_MIN_SCOPE_CONFIDENCE, DEFAULT_RETRIEVAL_TOP_K
 from modules.query.decomposer import SubqueriesDTO
-from modules.query.llm_query_router import LlmQueryRouterOutputDTO
+from modules.query.llm_query_router import LlmQueryRouterOutputDTO, RouterDecisionDTO
 from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
 from modules.retrieval.pgvector_retriever import (
     RankedSearchResultDTO,
@@ -76,7 +76,14 @@ class PostgresNativeKeywordRetrieverInputDTO(ModuleInputDTO):
     index_input: IndexOutputDTO = Field(
         description="pgvector Collection Loader가 전달한 대상 컬렉션 식별자"
     )
-    semantic_match: Optional[Union[SemanticQueryMatchOutput, LlmQueryRouterOutputDTO]] = Field(
+    semantic_match: Optional[
+        Union[
+            SemanticQueryMatchOutput,
+            LlmQueryRouterOutputDTO,
+            RouterDecisionDTO,
+            Dict[str, Any],
+        ]
+    ] = Field(
         default=None,
         description="선택적 시맨틱 라우터 또는 LLM 라우터 결과 (company_name 및 sheet_names 스코프 사전 필터링용)",
     )
@@ -97,19 +104,32 @@ class PostgresNativeKeywordRetrieverConfigDTO(ModuleConfigDTO):
     )
 
 
-# Backward compatibility alias
-PostgresNativeKeywordRetrieverExecutionDTO = PostgresNativeKeywordRetrieverInputDTO
-
-
 def _clean_tsquery_term(text: str) -> str:
-    """Clean query text into terms suitable for PostgreSQL plainto_tsquery."""
-    cleaned = re.sub(r"[^\w\s가-힣0-9]", " ", text)
+    """Build lexical terms from the value-bearing fields of a structured query."""
+    search_values: List[str] = []
+    structured = False
+    for segment in text.split("|"):
+        if ":" not in segment:
+            continue
+        key, value = segment.split(":", 1)
+        if key.strip().lower() not in {
+            "row header",
+            "column header",
+            "cell value",
+        }:
+            continue
+        structured = True
+        normalized_value = value.strip()
+        if normalized_value and normalized_value != "?":
+            search_values.append(normalized_value)
+    lexical_text = " ".join(search_values) if structured else text
+    cleaned = re.sub(r"[^\w\s가-힣0-9]", " ", lexical_text)
     tokens = [t.strip() for t in cleaned.split() if len(t.strip()) >= 1]
     return " ".join(tokens) if tokens else text.strip()
 
 
 def _escape_like_term(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return text.replace("!", "!!").replace("%", "!%").replace("_", "!_")
 
 
 class PostgresNativeKeywordRetrieverModule(BaseModule):
@@ -120,7 +140,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         label="PostgreSQL Native Keyword Retriever",
         category="Logic",
         description="PostgreSQL GIN 인덱스와 tsvector 풀텍스트 검색을 활용하여 수 밀리초 내에 초고속 키워드 검색을 수행합니다.",
-        inputs=["query_input", "index_input"],
+        inputs=["query_input", "index_input", "semantic_match"],
         outputs=["bm25_result"],
         config_fields=["top_k", "min_scope_confidence"],
         raw_output=True,
@@ -130,8 +150,8 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
     config_model = PostgresNativeKeywordRetrieverConfigDTO
     output_model = RankedSearchResultDTO
 
-    def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
-        self.pgvector_store = pgvector_store or PgVectorStore()
+    def __init__(self, pgvector_store: PgVectorStore) -> None:
+        self.pgvector_store = pgvector_store
 
     def execute(
         self,
@@ -147,7 +167,10 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         if not target_collections:
             target_collections = [raw_col_name]
         top_k = cfg.top_k
-        subqueries = input_data.query_input.subqueries
+        subqueries = [
+            item.text or item.to_serialized_query()
+            for item in input_data.query_input.items
+        ]
         query_context_dict = input_data.query_input.query_context.model_dump(mode="json")
         doc_context_dict = {
             "file_name": input_data.index_input.file_name,
@@ -194,7 +217,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
                         clean_company = sq_company.strip()
                         escaped_company = _escape_like_term(clean_company)
                         where_extra.append(
-                            "AND (cmetadata->>'company_name' ILIKE %s ESCAPE '\\\\' "
+                            "AND (cmetadata->>'company_name' ILIKE %s ESCAPE '!' "
                             "OR cmetadata->>'company_name' = %s)"
                         )
                         where_params.extend([f"%{escaped_company}%", clean_company])
@@ -232,9 +255,9 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
                     cur.execute(sql, full_params)
                     rows = cur.fetchall()
 
-                    # Fallback to relaxed search if scoped search yielded no results
+                    # Preserve recall by removing only metadata scope constraints.
                     if not rows and extra_sql:
-                        fallback_sql = """
+                        relaxed_sql = """
                             SELECT
                                 id,
                                 document,
@@ -252,7 +275,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
                             LIMIT %s;
                         """
                         cur.execute(
-                            fallback_sql,
+                            relaxed_sql,
                             (clean_q, target_collections, clean_q, top_k),
                         )
                         rows = cur.fetchall()

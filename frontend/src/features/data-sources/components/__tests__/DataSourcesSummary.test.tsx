@@ -22,7 +22,8 @@ describe('DataSourcesSummary', () => {
     expect(screen.getAllByText('0')).toHaveLength(2);
     expect(screen.getByText('총 벡터 임베딩 청크')).toBeInTheDocument();
     expect(screen.getByText('PostgreSQL 16')).toBeInTheDocument();
-    expect(screen.getByText('text-embedding-3-large')).toBeInTheDocument();
+    expect(screen.getByText('인덱스 미등록')).toBeInTheDocument();
+    expect(screen.getByText('인덱스 모델·차원 자동 동기화')).toBeInTheDocument();
   });
 
   it('renders correct collection and chunk aggregations', () => {
@@ -52,5 +53,7 @@ describe('DataSourcesSummary', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('500')).toBeInTheDocument();
     expect(screen.getByText('연결 대기 중')).toBeInTheDocument();
+    expect(screen.getByText('text-embedding-3-large')).toBeInTheDocument();
+    expect(screen.getByText('3072차원 · 질의 모델 자동 동기화')).toBeInTheDocument();
   });
 });

@@ -1,38 +1,28 @@
 import asyncio
 import json
-from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from anyio import to_thread
+from fastapi import APIRouter, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
-from backend.core.settings import CACHE_DIR, RUN_DIR, WORKFLOW_DIR
-from backend.engine.runtime.registry import ModuleRegistry
 from backend.engine.workflows import (
-    DagExecutionCancelled,
     DagExecutionError,
-    InteractiveWorkflowDispatcher,
-    ResultCache,
+    RunDispatcher,
     RunStore,
     WorkflowExecutionRequest,
     WorkflowExecutor,
     WorkflowSaveRequest,
     WorkflowStore,
 )
-from backend.storage.data_sources import INGESTION_WORKFLOW_IDS
-
-from .benchmark_routes import create_benchmark_router
 
 
 def create_workflow_router(
-    module_registry: ModuleRegistry,
-    workflow_dir: Optional[Path] = None,
-    run_dir: Optional[Path] = None,
-    cache_dir: Optional[Path] = None,
-    workflow_store: Optional[WorkflowStore] = None,
-    run_store: Optional[RunStore] = None,
-    workflow_executor: Optional[WorkflowExecutor] = None,
-    workflow_dispatcher: Optional[InteractiveWorkflowDispatcher] = None,
+    *,
+    workflow_store: WorkflowStore,
+    run_store: RunStore,
+    workflow_executor: WorkflowExecutor,
+    workflow_dispatcher: RunDispatcher,
 ) -> APIRouter:
     """
     Build a FastAPI router for workflow storage and run execution.
@@ -50,33 +40,6 @@ def create_workflow_router(
         APIRouter: Configured router for workflow and run management.
     """
     router = APIRouter(tags=["Workflows"])
-    workflow_store = workflow_store or WorkflowStore(workflow_dir or WORKFLOW_DIR)
-    db_mgr = getattr(module_registry, "db_manager", None)
-    run_store = run_store or RunStore(run_dir or RUN_DIR, db_manager=db_mgr)
-    workflow_executor = workflow_executor or WorkflowExecutor(
-        module_registry,
-        run_store,
-        ResultCache(cache_dir or CACHE_DIR),
-    )
-    workflow_dispatcher = workflow_dispatcher or InteractiveWorkflowDispatcher(
-        workflow_executor,
-        run_store,
-    )
-    router.include_router(create_benchmark_router(workflow_store, workflow_executor))
-
-    def require_interactive_workflow(workflow_id: str) -> None:
-        if workflow_id in INGESTION_WORKFLOW_IDS:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Excel 적재 워크플로는 Data Sources의 Kubernetes 작업 API로만 "
-                    "실행할 수 있습니다"
-                ),
-            )
-
-    def require_interactive_run(run_id: str) -> None:
-        require_interactive_workflow(run_store.load(run_id).workflow_id)
-
     @router.delete("/cache")
     def clear_runtime_cache():
         workflow_dispatcher.cancel_all()
@@ -92,18 +55,7 @@ def create_workflow_router(
 
     @router.get("/workflows")
     def list_workflows():
-        # ``default.json`` is the canonical starter workflow.  Its legacy
-        # document payload may say id="workflow", so normalize the public id
-        # to the filename-backed route id and never expose it twice.
-        default = workflow_store.load(WorkflowStore.DEFAULT_TEMPLATE_ID).model_copy(
-            update={"id": WorkflowStore.DEFAULT_TEMPLATE_ID}
-        )
-        workflows = [default]
-        workflows.extend(
-            item for item in workflow_store.list()
-            if item.id not in (WorkflowStore.DEFAULT_TEMPLATE_ID, WorkflowStore.ACTIVE_WORKFLOW_ID)
-        )
-        return {"workflows": workflows}
+        return {"workflows": workflow_store.list()}
 
     @router.get("/workflows/{workflow_id}")
     def get_workflow(workflow_id: str):
@@ -133,30 +85,48 @@ def create_workflow_router(
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
-    @router.post("/workflows/{workflow_id}/runs")
+    @router.post("/workflows/{workflow_id}/runs", status_code=202)
     def create_workflow_run(
         workflow_id: str,
         request: WorkflowExecutionRequest,
     ):
         try:
-            require_interactive_workflow(workflow_id)
+            if run_store.db_manager is None:
+                raise RuntimeError(
+                    "Kubernetes workflow 제출에는 PostgreSQL 연결이 필요합니다"
+                )
             workflow = workflow_store.load(workflow_id)
-            return workflow_executor.create_run(workflow, request)
+            run = workflow_executor.create_run(workflow, request)
+            workflow_dispatcher.submit(run.id)
+            return run_store.load_summary(run.id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"워크플로 {workflow_id}를 찾을 수 없습니다"
             ) from error
         except (DagExecutionError, ValueError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "WORKFLOW_QUEUE_UNAVAILABLE",
+                    "message": str(error),
+                    "retryable": True,
+                    "context": {"workflow_id": workflow_id},
+                },
+            ) from error
 
     @router.get("/runs")
-    def list_runs(workflow_id: Optional[str] = None):
-        return {"runs": run_store.list(workflow_id)}
+    def list_runs(
+        workflow_id: Optional[str] = None,
+        limit: int = Query(default=50, ge=1, le=200),
+    ):
+        return {"runs": run_store.list(workflow_id, limit)}
 
     @router.get("/runs/{run_id}")
     def get_run(run_id: str):
         try:
-            return run_store.load(run_id)
+            return run_store.load_summary(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
@@ -164,75 +134,130 @@ def create_workflow_router(
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
-    @router.post("/runs/{run_id}/execute-next")
-    def execute_next_batch(run_id: str):
-        try:
-            require_interactive_run(run_id)
-            return workflow_executor.execute_next_batch(run_id)
-        except FileNotFoundError as error:
-            raise HTTPException(
-                status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
-            ) from error
-        except DagExecutionCancelled as error:
-            raise HTTPException(status_code=409, detail=str(error)) from error
-        except DagExecutionError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-
-    @router.post("/runs/{run_id}/nodes/{node_id}/execute")
-    def execute_single_node(run_id: str, node_id: str):
-        try:
-            require_interactive_run(run_id)
-            return workflow_executor.execute_node(run_id, node_id)
-        except FileNotFoundError as error:
-            raise HTTPException(
-                status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
-            ) from error
-        except DagExecutionCancelled as error:
-            raise HTTPException(status_code=409, detail=str(error)) from error
-        except DagExecutionError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-
     @router.post("/runs/{run_id}/resume")
     def resume_run(run_id: str):
         try:
-            require_interactive_run(run_id)
-            return workflow_executor.resume(run_id)
+            workflow_dispatcher.submit(run_id, resume_failed=True)
+            return run_store.load_summary(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
             ) from error
-        except DagExecutionCancelled as error:
-            raise HTTPException(status_code=409, detail=str(error)) from error
         except DagExecutionError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "WORKFLOW_QUEUE_UNAVAILABLE",
+                    "message": str(error),
+                    "retryable": True,
+                    "context": {"run_id": run_id},
+                },
+            ) from error
 
     @router.post("/runs/{run_id}/cancel")
     def cancel_run(run_id: str):
         try:
-            require_interactive_run(run_id)
             return workflow_dispatcher.cancel(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
             ) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "WORKFLOW_QUEUE_UNAVAILABLE",
+                    "message": str(error),
+                    "retryable": True,
+                    "context": {"run_id": run_id},
+                },
+            ) from error
 
     @router.get("/runs/{run_id}/stream")
     async def stream_workflow_run(run_id: str, request: Request):
-        """Stream live DAG execution events for a workflow run using Server-Sent Events (SSE)."""
-        require_interactive_run(run_id)
+        """Observe a Kubernetes-owned run without executing work in the API."""
+        try:
+            await to_thread.run_sync(run_store.load_summary, run_id)
+        except FileNotFoundError as error:
+            raise HTTPException(
+                status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다"
+            ) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "WORKFLOW_QUEUE_UNAVAILABLE",
+                    "message": str(error),
+                    "retryable": True,
+                    "context": {"run_id": run_id},
+                },
+            ) from error
 
         async def event_generator():
+            previous_updated_at: Optional[str] = None
+            previous_node_statuses: dict[str, tuple[object, ...]] = {}
             try:
-                async for event in workflow_executor.execute_and_stream(run_id):
+                while True:
                     if await request.is_disconnected():
-                        workflow_dispatcher.cancel(run_id)
                         break
-                    yield {
-                        "event": event.get("event", "message"),
-                        "data": json.dumps(event.get("data", {}), ensure_ascii=False),
-                    }
+                    run = await to_thread.run_sync(run_store.load_summary, run_id)
+                    if previous_updated_at is None:
+                        yield {
+                            "event": "run_started",
+                            "data": json.dumps(
+                                {
+                                    "run_id": run.id,
+                                    "workflow_id": run.workflow_id,
+                                    "status": run.status,
+                                    "batches_count": len(run.batches),
+                                    "nodes_count": len(run.nodes),
+                                },
+                                ensure_ascii=False,
+                            ),
+                        }
+                    if run.updated_at != previous_updated_at:
+                        for node_id, node in run.nodes.items():
+                            fingerprint = (
+                                node.status,
+                                node.elapsed_ms,
+                                node.error,
+                                json.dumps(node.progress, sort_keys=True, default=str),
+                            )
+                            if previous_node_statuses.get(node_id) == fingerprint:
+                                continue
+                            previous_node_statuses[node_id] = fingerprint
+                            yield {
+                                "event": (
+                                    "node_completed"
+                                    if node.status in ("succeeded", "skipped")
+                                    else "node_failed"
+                                    if node.status == "failed"
+                                    else "node_progress"
+                                ),
+                                "data": json.dumps(
+                                    node.model_dump(mode="json"),
+                                    ensure_ascii=False,
+                                ),
+                            }
+                        previous_updated_at = run.updated_at
+                    if run.status in ("completed", "failed", "paused"):
+                        yield {
+                            "event": "run_completed",
+                            "data": json.dumps(
+                                {
+                                    "run_id": run.id,
+                                    "status": run.status,
+                                    "run": run.model_dump(mode="json"),
+                                },
+                                ensure_ascii=False,
+                            ),
+                        }
+                        break
+                    await asyncio.sleep(0.5)
             except asyncio.CancelledError:
-                workflow_dispatcher.cancel(run_id)
+                return
             except Exception as error:
                 yield {
                     "event": "error",

@@ -39,7 +39,7 @@ function validateWorkbook(file: File): string | null {
 export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedModel, setSelectedModel] = useState('text-embedding-3-large');
+  const [selectedModel, setSelectedModel] = useState('text-embedding-3-small');
   const [batchSize, setBatchSize] = useState(2048);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,7 +148,8 @@ export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
                   value={selectedModel}
                   onChange={(event) => setSelectedModel(event.target.value)}
                 >
-                  <option value="text-embedding-3-large">OpenAI text-embedding-3-large (3072D · 고정밀 표준)</option>
+                  <option value="text-embedding-3-small">OpenAI text-embedding-3-small (1536D · 저비용 기본)</option>
+                  <option value="text-embedding-3-large">OpenAI text-embedding-3-large (3072D · 고정밀)</option>
                 </select>
               </label>
               <label>

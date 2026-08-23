@@ -38,7 +38,7 @@ class PipelineBaseError(Exception):
 
 
 class ModuleExecutionError(PipelineBaseError):
-    """Raised when a pipeline module fails during execution (backward compatible)."""
+    """Raised when a pipeline module fails during execution."""
 
     def __init__(
         self,

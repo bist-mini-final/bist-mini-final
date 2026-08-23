@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
-from typing import assert_never
 
 from .catalog import (
     CATALOG_VERSION,
@@ -25,7 +24,9 @@ class BiQuestionBatchPlan:
     periods: tuple[BiPeriod, ...]
     job_id: JobId
     created_at: datetime
-    question_version: QuestionVersion = QuestionVersion(CATALOG_VERSION)
+    question_version: QuestionVersion = field(
+        default_factory=lambda: QuestionVersion(CATALOG_VERSION)
+    )
 
 
 def build_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
@@ -80,6 +81,8 @@ def build_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
                     )
             case DerivedMetricDefinition():
                 continue
-            case unreachable:
-                assert_never(unreachable)
+            case _:
+                raise TypeError(
+                    f"지원하지 않는 BI metric definition: {type(definition).__name__}"
+                )
     return BiQuestionBatch(questions=tuple(questions))

@@ -366,10 +366,6 @@ class ReaderOutputDTO(ModuleDTO):
     answer_json: AnswerDTO = Field(description="최종 답변 출력 포트")
 
 
-# Backward compatibility alias
-ReaderOutput = ReaderOutputDTO
-
-
 # ==============================================================================
 # 6. Module Implementation
 # ==============================================================================
@@ -399,11 +395,11 @@ class ReaderModule(BaseLLMModule):
 
     def __init__(
         self,
-        completion_client: Optional[Any] = None,
-        pgvector_store: Optional[PgVectorStore] = None,
+        completion_client: Any,
+        pgvector_store: PgVectorStore,
     ) -> None:
         super().__init__(completion_client=completion_client)
-        self.pgvector_store = pgvector_store or PgVectorStore()
+        self.pgvector_store = pgvector_store
 
     def execute(
         self,
@@ -427,7 +423,7 @@ class ReaderModule(BaseLLMModule):
         query_ctx = input_data.context_json.query_context
         doc_ctx = input_data.context_json.document_context
         question = query_ctx.question_text
-        context_blocks = list(input_data.context_json.items or input_data.context_json.context_blocks or [])
+        context_blocks = list(input_data.context_json.items)
 
         context_text = "\n\n".join(context_blocks)
         user_prompt = user_template.replace(
@@ -498,7 +494,6 @@ __all__ = [
     "ReaderConfigDTO",
     "ReaderInputDTO",
     "ReaderModule",
-    "ReaderOutput",
     "ReaderOutputDTO",
     "safe_calculate_expression",
 ]

@@ -673,10 +673,8 @@ export function ModuleSettingsModal({
                     ) ?? enumValues ?? (
                       fieldName === 'model'
                         ? [
-                            'BAAI/bge-large-en-v1.5',
                             'text-embedding-3-small',
                             'text-embedding-3-large',
-                            'text-embedding-ada-002',
                           ]
                         : undefined
                     );

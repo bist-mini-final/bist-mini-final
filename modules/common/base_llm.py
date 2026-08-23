@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from pydantic import BaseModel, Field
 
+from backend.providers.openai_pricing import calculate_openai_cost
 from modules.common.base_module import (
     BaseModule,
     DocumentContextDTO,
@@ -27,7 +28,6 @@ from modules.common.base_module import (
     QueryContextDTO,
     question_id_for,
 )
-from modules.common.config import DEFAULT_LLM_TOKEN_RATES
 from modules.common.exceptions import (
     DocumentParsingError,
     ModuleExecutionError,
@@ -50,33 +50,20 @@ class ApiUsageDTO(ModuleDTO):
     total_tokens: Optional[int] = Field(default=0, ge=0, description="전체 토큰 수")
 
 
-def calculate_openai_cost(
-    model: str,
-    prompt_tokens: int = 0,
-    completion_tokens: int = 0,
-    cached_tokens: int = 0,
-) -> float:
-    """Estimates OpenAI API cost in USD based on current model token rates."""
-    uncached = max(0, prompt_tokens - cached_tokens)
-    rates = DEFAULT_LLM_TOKEN_RATES
-    return (
-        uncached * rates["uncached_input_per_million"]
-        + cached_tokens * rates["cached_input_per_million"]
-        + completion_tokens * rates["output_per_million"]
-    ) / 1_000_000.0
-
-
 class BaseLLMModule(BaseModule):
     """Specialized base class providing 1-line structured output generation, token usage & cost tracking."""
 
-    def __init__(self, completion_client: Optional[Any] = None) -> None:
+    def __init__(self, completion_client: Any) -> None:
+        """Initialize with the Responses gateway owned by the composition root."""
         if completion_client is None:
-            from backend.providers.llm.chat_completion import ChatCompletionClient
-            self.completion_client = ChatCompletionClient()
-        else:
-            self.completion_client = completion_client
+            raise ValueError("BaseLLMModule에는 completion_client 주입이 필요합니다")
+        self.completion_client = completion_client
         self._tool_schema_cache: Dict[Tuple[str, ...], List[Dict[str, Any]]] = {}
         self._structured_schema_cache: Dict[Type[BaseModel], Dict[str, Any]] = {}
+        self.last_usage: Optional[Dict[str, int]] = None
+        self.last_model: Optional[str] = None
+        self.last_cost_usd: float = 0.0
+        self.last_duration_seconds: float = 0.0
 
     @staticmethod
     def _strict_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -110,6 +97,22 @@ class BaseLLMModule(BaseModule):
             total_tokens=usage_dict.get("total_tokens", 0) or 0,
         )
 
+    @staticmethod
+    def _response_prompt(
+        messages: List[Dict[str, Any]],
+    ) -> Tuple[Optional[str], List[Dict[str, Any]]]:
+        instructions: List[str] = []
+        input_items: List[Dict[str, Any]] = []
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content", "")
+            if role in {"system", "developer"}:
+                if isinstance(content, str) and content:
+                    instructions.append(content)
+                continue
+            input_items.append({"role": role, "content": content})
+        return "\n\n".join(instructions) or None, input_items
+
     def complete_structured(
         self,
         messages_or_prompt: Union[str, List[Dict[str, str]]],
@@ -117,7 +120,7 @@ class BaseLLMModule(BaseModule):
         model: str,
         system_prompt: Optional[str] = None,
     ) -> Tuple[T, ApiUsageDTO, float, float]:
-        """Calls LLM with json_object response format and parses directly into Pydantic model."""
+        """Call Responses with strict JSON Schema output and validate it as Pydantic."""
         if isinstance(messages_or_prompt, str):
             messages: List[Dict[str, str]] = []
             if system_prompt:
@@ -131,28 +134,32 @@ class BaseLLMModule(BaseModule):
         if response_schema is None:
             response_schema = self._strict_schema(response_model.model_json_schema())
             self._structured_schema_cache[response_model] = response_schema
-        res = self.completion_client.complete_with_metadata(
+        instructions, input_items = self._response_prompt(messages)
+        res = self.completion_client.create_response(
             model=model,
-            messages=messages,
-            response_format={
+            instructions=instructions,
+            input_items=input_items,
+            text_format={
                 "type": "json_schema",
-                "json_schema": {
-                    "name": schema_name,
-                    "strict": True,
-                    "schema": response_schema,
-                },
+                "name": schema_name,
+                "strict": True,
+                "schema": response_schema,
             },
         )
         parsed = response_model.model_validate_json(res.content.strip())
 
         usage = self._usage_from_result(res)
         cost = calculate_openai_cost(
-            model=model,
+            model_name=model,
             prompt_tokens=usage.prompt_tokens or 0,
             completion_tokens=usage.completion_tokens or 0,
             cached_tokens=usage.cached_tokens or 0,
         )
         latency = getattr(res, "latency_seconds", 0.0) or 0.0
+        self.last_usage = usage.model_dump(mode="json")
+        self.last_model = model
+        self.last_cost_usd = cost
+        self.last_duration_seconds = latency
         return parsed, usage, cost, latency
 
     def complete_text(
@@ -170,20 +177,26 @@ class BaseLLMModule(BaseModule):
         else:
             messages = messages_or_prompt
 
-        res = self.completion_client.complete_with_metadata(
+        instructions, input_items = self._response_prompt(messages)
+        res = self.completion_client.create_response(
             model=model,
-            messages=messages,
+            instructions=instructions,
+            input_items=input_items,
         )
         content = res.content.strip()
 
         usage = self._usage_from_result(res)
         cost = calculate_openai_cost(
-            model=model,
+            model_name=model,
             prompt_tokens=usage.prompt_tokens or 0,
             completion_tokens=usage.completion_tokens or 0,
             cached_tokens=usage.cached_tokens or 0,
         )
         latency = getattr(res, "latency_seconds", 0.0) or 0.0
+        self.last_usage = usage.model_dump(mode="json")
+        self.last_model = model
+        self.last_cost_usd = cost
+        self.last_duration_seconds = latency
         return content, usage, cost, latency
 
     def complete_agentic(
@@ -211,7 +224,24 @@ class BaseLLMModule(BaseModule):
             cache_key = tuple(tools_map)
             openai_tools = self._tool_schema_cache.get(cache_key)
             if openai_tools is None:
-                openai_tools = [convert_to_openai_tool(tool) for tool in tools_map.values()]
+                openai_tools = []
+                for tool in tools_map.values():
+                    converted = convert_to_openai_tool(tool)
+                    function = converted["function"]
+                    openai_tools.append(
+                        {
+                            "type": "function",
+                            "name": function["name"],
+                            "description": function.get("description", ""),
+                            "parameters": self._strict_schema(
+                                function.get("parameters") or {
+                                    "type": "object",
+                                    "properties": {},
+                                }
+                            ),
+                            "strict": True,
+                        }
+                    )
                 self._tool_schema_cache[cache_key] = openai_tools
 
         total_prompt_tokens = 0
@@ -221,13 +251,17 @@ class BaseLLMModule(BaseModule):
         total_cost = 0.0
         answer_text = ""
 
-        conv_messages = list(messages)
+        instructions, input_items = self._response_prompt(messages)
+        previous_response_id: Optional[str] = None
 
         for _ in range(max_iterations):
-            res = self.completion_client.complete_with_metadata(
+            res = self.completion_client.create_response(
                 model=model,
-                messages=conv_messages,
+                instructions=instructions,
+                input_items=input_items,
                 tools=openai_tools,
+                previous_response_id=previous_response_id,
+                store=True,
             )
 
             usage_dict = getattr(res, "usage", {}) or {}
@@ -240,29 +274,21 @@ class BaseLLMModule(BaseModule):
             total_cached_tokens += ca_tok
             total_reasoning_tokens += r_tok
             total_cost += calculate_openai_cost(
-                model=model,
+                model_name=model,
                 prompt_tokens=p_tok,
                 completion_tokens=c_tok,
                 cached_tokens=ca_tok,
             )
 
-            tool_calls = getattr(res, "tool_calls", None)
-            if not tool_calls:
+            function_calls = getattr(res, "function_calls", ())
+            if not function_calls:
                 answer_text = res.content
                 break
 
-            conv_messages.append(
-                {
-                    "role": "assistant",
-                    "content": res.content or None,
-                    "tool_calls": tool_calls,
-                }
-            )
-
-            for tc in tool_calls:
-                fn = tc.get("function", {})
-                fn_name = fn.get("name")
-                fn_args_raw = fn.get("arguments", "{}")
+            input_items = []
+            for function_call in function_calls:
+                fn_name = function_call.get("name")
+                fn_args_raw = function_call.get("arguments", "{}")
                 if isinstance(fn_args_raw, str):
                     try:
                         fn_args = json.loads(fn_args_raw)
@@ -280,17 +306,21 @@ class BaseLLMModule(BaseModule):
                 else:
                     tool_result_str = f"Unknown tool name: {fn_name}"
 
-                conv_messages.append(
+                input_items.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": tc.get("id"),
-                        "content": tool_result_str,
+                        "type": "function_call_output",
+                        "call_id": function_call.get("call_id"),
+                        "output": tool_result_str,
                     }
                 )
+            previous_response_id = res.response_id
         else:
-            res = self.completion_client.complete_with_metadata(
+            res = self.completion_client.create_response(
                 model=model,
-                messages=conv_messages,
+                instructions=instructions,
+                input_items=input_items,
+                previous_response_id=previous_response_id,
+                store=True,
             )
             answer_text = res.content
             usage_dict = getattr(res, "usage", {}) or {}
@@ -303,7 +333,7 @@ class BaseLLMModule(BaseModule):
             total_cached_tokens += ca_tok
             total_reasoning_tokens += r_tok
             total_cost += calculate_openai_cost(
-                model=model,
+                model_name=model,
                 prompt_tokens=p_tok,
                 completion_tokens=c_tok,
                 cached_tokens=ca_tok,

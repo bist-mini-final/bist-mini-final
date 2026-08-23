@@ -43,21 +43,22 @@ from __future__ import annotations
 # 1. Imports
 # ==============================================================================
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from modules.common.base_embedder import (
     BaseEmbeddingModule,
-    EmbeddingConfigDTO,
     EmbeddingVector,
     ModuleDefinition,
     ModuleDTO,
     ModuleInputDTO,
     QueryContextDTO,
 )
+from modules.common.base_module import ModuleConfigDTO
 from modules.common.config import DEFAULT_QUERY_EMBEDDING_BATCH_SIZE
 from modules.query.decomposer import SubqueriesDTO
+from modules.storage.pgvector_collection_loader import IndexOutputDTO
 
 logger = logging.getLogger(__name__)
 
@@ -66,28 +67,20 @@ logger = logging.getLogger(__name__)
 # 2. Query Embedder DTOs
 # ==============================================================================
 class EmbedderInputDTO(ModuleInputDTO):
-    """Decomposer output consumed directly or wrapped under query_input."""
+    """Subqueries plus the exact target index embedding contract."""
 
-    query_input: Optional[SubqueriesDTO] = None
-    subqueries: Optional[List[str]] = None
-    query_context: Optional[QueryContextDTO] = None
-
-    @model_validator(mode="after")
-    def populate_fields(self) -> "EmbedderInputDTO":
-        if self.query_input is not None:
-            if self.subqueries is None:
-                self.subqueries = self.query_input.subqueries
-            if self.query_context is None:
-                self.query_context = self.query_input.query_context
-        return self
+    query_input: SubqueriesDTO
+    index_input: IndexOutputDTO
 
 
-class EmbedderConfigDTO(EmbeddingConfigDTO):
-    """Configuration for query embedding module."""
+class EmbedderConfigDTO(ModuleConfigDTO):
+    """Operational query batching; model and dimension come from the index."""
 
-
-# Backward compatibility alias
-EmbedderExecutionDTO = EmbedderInputDTO
+    batch_size: int = Field(
+        default=DEFAULT_QUERY_EMBEDDING_BATCH_SIZE,
+        ge=1,
+        le=2048,
+    )
 
 
 class EmbeddingsDTO(ModuleDTO):
@@ -110,12 +103,12 @@ class EmbedderModule(BaseEmbeddingModule):
         type="embedder",
         label="Query Embedder",
         category="Logic",
-        description="분해된 서브쿼리 목록을 3072차원 고정밀 벡터로 1 RTT 일괄 변환합니다.",
-        inputs=["query_input", "input"],
-        outputs=["query_embeddings", "output"],
-        config_fields=["model"],
+        description="선택한 pgvector 인덱스와 동일한 모델·차원으로 서브쿼리를 1 RTT 일괄 변환합니다.",
+        inputs=["query_input", "index_input"],
+        outputs=["query_embeddings"],
+        config_fields=["batch_size"],
         raw_output=True,
-        version="8",
+        version="9",
     )
     input_model = EmbedderInputDTO
     config_model = EmbedderConfigDTO
@@ -127,21 +120,22 @@ class EmbedderModule(BaseEmbeddingModule):
         config: Optional[EmbedderConfigDTO] = None,
     ) -> Dict[str, Any]:
         cfg = config or EmbedderConfigDTO()
-        model_name = self.resolve_model(cfg)
-        expected_dimension = self.resolve_dimension(model_name=model_name, config=cfg)
-        batch_size = self.resolve_batch_size(config=cfg, default=DEFAULT_QUERY_EMBEDDING_BATCH_SIZE)
+        model_name = input_data.index_input.model
+        expected_dimension = input_data.index_input.dimension
+        batch_size = cfg.batch_size
 
-        subqueries = input_data.subqueries or []
-        if input_data.query_context:
-            query_context_dict = input_data.query_context.model_dump(mode="json")
-        else:
-            query_context_dict = {"question_id": "unknown", "question_text": ""}
+        query_context = input_data.query_input.query_context
+        query_context_dict = query_context.model_dump(mode="json")
+        subqueries = [
+            item.text or item.to_serialized_query()
+            for item in input_data.query_input.items
+        ]
 
         unique_subqueries = list(
             dict.fromkeys([sq.strip() for sq in subqueries if sq.strip()])
         )
-        if not unique_subqueries and input_data.query_context and input_data.query_context.question_text:
-            unique_subqueries = [input_data.query_context.question_text.strip()]
+        if not unique_subqueries and query_context.question_text:
+            unique_subqueries = [query_context.question_text.strip()]
 
         if not unique_subqueries:
             return {
@@ -164,22 +158,11 @@ class EmbedderModule(BaseEmbeddingModule):
         }
 
 
-# Backward compatibility aliases
-BatchQueryEmbedderConfigDTO = EmbedderConfigDTO
-BatchQueryEmbedderExecutionDTO = EmbedderExecutionDTO
-BatchQueryEmbedderInputDTO = EmbedderInputDTO
-BatchQueryEmbedderModule = EmbedderModule
-
 # ==============================================================================
 # 4. Exports
 # ==============================================================================
 __all__ = [
-    "BatchQueryEmbedderConfigDTO",
-    "BatchQueryEmbedderExecutionDTO",
-    "BatchQueryEmbedderInputDTO",
-    "BatchQueryEmbedderModule",
     "EmbedderConfigDTO",
-    "EmbedderExecutionDTO",
     "EmbedderInputDTO",
     "EmbedderModule",
     "EmbeddingVector",

@@ -65,7 +65,7 @@ from modules.common.base_module import (
 )
 from modules.common.config import DEFAULT_MIN_SCOPE_CONFIDENCE, DEFAULT_RETRIEVAL_TOP_K
 from modules.embedding.query_embedder import EmbeddingsDTO
-from modules.query.llm_query_router import LlmQueryRouterOutputDTO
+from modules.query.llm_query_router import LlmQueryRouterOutputDTO, RouterDecisionDTO
 from modules.query.semantic_query_matcher import SemanticQueryMatchOutput
 from modules.storage.pgvector_collection_loader import IndexOutputDTO
 
@@ -104,7 +104,14 @@ class PgVectorRetrieverInputDTO(ModuleInputDTO):
     index_input: IndexOutputDTO = Field(
         description="pgvector Collection Loader 또는 pgvector Index Writer가 생성한 인덱스 참조 DTO"
     )
-    semantic_match: Optional[Union[SemanticQueryMatchOutput, LlmQueryRouterOutputDTO]] = Field(
+    semantic_match: Optional[
+        Union[
+            SemanticQueryMatchOutput,
+            LlmQueryRouterOutputDTO,
+            RouterDecisionDTO,
+            Dict[str, Any],
+        ]
+    ] = Field(
         default=None,
         description="시맨틱 매처 또는 LLM 라우터 결과 (선택, 제공 시 SQL 메타데이터 사전 필터링 적용)",
     )
@@ -123,9 +130,6 @@ class PgVectorRetrieverConfigDTO(ModuleConfigDTO):
         le=1,
         description="시맨틱 스코프 적용을 위한 최소 신뢰도 임계값",
     )
-
-
-PgVectorRetrieverExecutionDTO = PgVectorRetrieverInputDTO
 
 
 # ==============================================================================
@@ -169,7 +173,7 @@ class PgVectorRetrieverModule(BaseModule):
         label="PostgreSQL pgvector Retriever",
         category="Logic",
         description="질의 임베딩으로 PostgreSQL 16 pgvector DB의 HNSW 코사인 인덱스를 실시간 검색하며 시맨틱 스코프가 제공되면 사전 필터링을 수행합니다.",
-        inputs=["query_input", "index_input"],
+        inputs=["query_input", "index_input", "semantic_match"],
         outputs=["dense_result"],
         config_fields=["top_k", "min_scope_confidence"],
         raw_output=True,
@@ -179,8 +183,8 @@ class PgVectorRetrieverModule(BaseModule):
     config_model = PgVectorRetrieverConfigDTO
     output_model = RankedSearchResultDTO
 
-    def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
-        self.pgvector_store = pgvector_store or PgVectorStore()
+    def __init__(self, pgvector_store: PgVectorStore) -> None:
+        self.pgvector_store = pgvector_store
 
     def execute(
         self,
@@ -315,7 +319,6 @@ class PgVectorRetrieverModule(BaseModule):
 # ==============================================================================
 __all__ = [
     "PgVectorRetrieverConfigDTO",
-    "PgVectorRetrieverExecutionDTO",
     "PgVectorRetrieverInputDTO",
     "PgVectorRetrieverModule",
     "RankedSearchCandidateDTO",

@@ -1,4 +1,4 @@
-"""PostgreSQL + pgvector Storage Layer utilizing LangChain standard interfaces."""
+"""Native psycopg storage adapter for PostgreSQL and pgvector."""
 
 from __future__ import annotations
 
@@ -14,16 +14,16 @@ import psycopg2.extras
 from langchain_core.documents import Document
 
 from backend.core.settings import PGVECTOR_URL
-from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.storage.embedding_artifacts import EmbeddingArtifactVectors
 from backend.storage.pgvector_binary_copy import copy_float32_artifact_documents
 from backend.storage.spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
     langchain_document_to_cell_item,
 )
+from modules.common.config import DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_MODEL
 
 from .connection_pool import get_pooled_raw_connection
-from .vector_store_factory import get_vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,6 @@ _CONCURRENT_OPTIMIZED_INDEX_NAMES = (
     "idx_langchain_pg_embedding_company_name",
     "idx_langchain_pg_embedding_sheet_name",
     "idx_langchain_pg_embedding_sheet_row",
-    "idx_langchain_pg_embedding_sheet_legacy_row",
     "idx_langchain_pg_embedding_collection_id",
     "idx_langchain_pg_embedding_hnsw_halfvec_3072",
     "idx_langchain_pg_embedding_hnsw_halfvec_1536",
@@ -75,11 +74,11 @@ def _is_numeric_vector_collection(candidate: Any) -> bool:
 
 def _escape_like_term(text: str) -> str:
     """Escape user-derived wildcard characters for a literal ILIKE substring."""
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return text.replace("!", "!!").replace("%", "!%").replace("_", "!_")
 
 
 class PgVectorStore:
-    """Manages vector indexes in PostgreSQL using LangChain PGVector."""
+    """Manage pgvector collections through the shared psycopg connection pool."""
 
     @staticmethod
     def index_id(artifact_id: str) -> str:
@@ -125,18 +124,107 @@ class PgVectorStore:
             self._collection_uuid_cache[collection_name] = resolved
         return resolved
 
+    def _create_collection(
+        self,
+        collection_name: str,
+        metadata: Dict[str, Any],
+    ) -> str:
+        collection_uuid = str(uuid4())
+        connection = self._raw_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO langchain_pg_collection (uuid, name, cmetadata)
+                    VALUES (%s, %s, %s)
+                    RETURNING uuid;
+                    """,
+                    (
+                        collection_uuid,
+                        collection_name,
+                        psycopg2.extras.Json(metadata),
+                    ),
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+        if row is None:
+            raise PgVectorStoreError(
+                f"pgvector 컬렉션 생성 결과가 비어 있습니다: {collection_name}"
+            )
+        resolved = str(UUID(str(row[0])))
+        with self._collection_uuid_lock:
+            self._collection_uuid_cache[collection_name] = resolved
+        return resolved
+
+    def _delete_collection(self, collection_name: str) -> None:
+        connection = self._raw_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM langchain_pg_collection WHERE name = %s;",
+                    (collection_name,),
+                )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+        with self._collection_uuid_lock:
+            self._collection_uuid_cache.pop(collection_name, None)
+
+    @staticmethod
+    def _vector_literal(vector: Sequence[float]) -> str:
+        return "[" + ",".join(str(float(value)) for value in vector) + "]"
+
+    def _insert_document_batch(
+        self,
+        collection_uuid: str,
+        documents: Sequence[Document],
+        vectors: Sequence[Sequence[float]],
+    ) -> None:
+        if len(documents) != len(vectors):
+            raise PgVectorStoreError("문서 배치와 벡터 배치의 크기가 일치하지 않습니다")
+        rows = [
+            (
+                str(uuid4()),
+                collection_uuid,
+                self._vector_literal(vector),
+                document.page_content,
+                psycopg2.extras.Json(document.metadata or {}),
+            )
+            for document, vector in zip(documents, vectors, strict=True)
+        ]
+        connection = self._raw_connection()
+        try:
+            with connection.cursor() as cursor:
+                psycopg2.extras.execute_values(
+                    cursor,
+                    """
+                    INSERT INTO langchain_pg_embedding
+                        (id, collection_id, embedding, document, cmetadata)
+                    VALUES %s
+                    """,
+                    rows,
+                    template="(%s, %s, %s::vector, %s, %s)",
+                    page_size=PGVECTOR_INSERT_BATCH_SIZE,
+                )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     @staticmethod
     def _collection_vector_index_name(collection_uuid: str, dimension: int) -> str:
         uuid_hex = UUID(collection_uuid).hex
         return f"idx_lc_hnsw_bq_c_{uuid_hex}_{dimension}"
-
-    @staticmethod
-    def _legacy_collection_vector_index_name(
-        collection_uuid: str,
-        dimension: int,
-    ) -> str:
-        uuid_hex = UUID(collection_uuid).hex
-        return f"idx_lc_hnsw_c_{uuid_hex}_{dimension}"
 
     def ensure_collection_vector_index(
         self,
@@ -154,20 +242,9 @@ class PgVectorStore:
                 f"HNSW 인덱스를 지원하지 않는 벡터 차원입니다: {dimension}"
             )
         index_name = self._collection_vector_index_name(collection_uuid, dimension)
-        legacy_index_name = self._legacy_collection_vector_index_name(
-            collection_uuid,
-            dimension,
-        )
         connection = self._read_connection()
         try:
             with connection.cursor() as cursor:
-                # A previous half-vector implementation was much larger and
-                # slower to build. It is safe to remove because this method
-                # recreates the query accelerator before publishing a staging
-                # collection.
-                cursor.execute(
-                    f'DROP INDEX CONCURRENTLY IF EXISTS "{legacy_index_name}";'
-                )
                 cursor.execute(
                     f"""
                     CREATE INDEX CONCURRENTLY IF NOT EXISTS "{index_name}"
@@ -190,17 +267,10 @@ class PgVectorStore:
         dimension: int,
     ) -> None:
         index_name = self._collection_vector_index_name(collection_uuid, dimension)
-        legacy_index_name = self._legacy_collection_vector_index_name(
-            collection_uuid,
-            dimension,
-        )
         connection = self._read_connection()
         try:
             with connection.cursor() as cursor:
                 cursor.execute(f'DROP INDEX CONCURRENTLY IF EXISTS "{index_name}";')
-                cursor.execute(
-                    f'DROP INDEX CONCURRENTLY IF EXISTS "{legacy_index_name}";'
-                )
         finally:
             connection.close()
 
@@ -218,7 +288,7 @@ class PgVectorStore:
             return False
 
     def get_db_info(self) -> Dict[str, Any]:
-        """Return connection details, versions, and LangChain collection statistics."""
+        """Return connection details, versions, and vector collection statistics."""
         raw_url = getattr(self, "database_url", PGVECTOR_URL).replace("postgresql+psycopg://", "postgresql://")
         parsed = urlparse(raw_url)
         safe_host = parsed.hostname or "localhost"
@@ -238,7 +308,7 @@ class PgVectorStore:
                     ext_row = cur.fetchone()
                     vector_version = ext_row[0] if ext_row else "not installed"
 
-                    # Check LangChain collection tables
+                    # The physical table names are retained for data compatibility.
                     cur.execute(
                         "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'langchain_pg_collection';"
                     )
@@ -261,7 +331,7 @@ class PgVectorStore:
                 "database": db_name,
                 "postgres_version": pg_version.split()[1] if pg_version else "16",
                 "pgvector_version": vector_version,
-                "framework": "LangChain",
+                "framework": "psycopg + pgvector",
                 "total_indexes": total_indexes,
                 "total_chunks": total_chunks,
             }
@@ -271,7 +341,7 @@ class PgVectorStore:
                 "host": safe_host,
                 "port": port,
                 "database": db_name,
-                "framework": "LangChain",
+                "framework": "psycopg + pgvector",
                 "error": str(err),
                 "total_indexes": 0,
                 "total_chunks": 0,
@@ -281,7 +351,7 @@ class PgVectorStore:
         self,
         index_id: str,
         documents: Sequence[Document],
-        model_name: str = "text-embedding-3-large",
+        model_name: str = DEFAULT_EMBEDDING_MODEL,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         metadata: Optional[Dict[str, Any]] = None,
         vectors: Optional[Any] = None,
@@ -310,7 +380,7 @@ class PgVectorStore:
             "file_name": meta_dict.get("file_name", ""),
             "workbook_hash": meta_dict.get("workbook_hash", ""),
             "model": meta_dict.get("model", model_name),
-            "dimension": meta_dict.get("dimension", 3072),
+            "dimension": meta_dict.get("dimension", DEFAULT_EMBEDDING_DIMENSION),
             "document_count": len(documents),
             "created_at": datetime.now(timezone.utc).isoformat(),
             "pipeline": meta_dict.get("pipeline", "luna_vlm_structured"),
@@ -343,19 +413,10 @@ class PgVectorStore:
         swap_suffix = uuid4().hex
         staging_name = f"{index_id}__staging__{swap_suffix}"
         retired_name = f"{index_id}__retired__{swap_suffix}"
-        store = get_vector_store(
-            collection_name=staging_name,
-            backend="pgvector",
-            model_name=model_name,
-            embedding_encoder=embedding_encoder,
-            collection_metadata=clean_meta,
-            database_url=self.database_url,
-        )
-
         # Build a private staging collection so the current queryable index
         # remains intact until every batch has been persisted successfully.
         try:
-            store.create_collection()
+            staging_uuid = self._create_collection(staging_name, clean_meta)
         except Exception as create_error:
             logger.error(
                 "pgvector 컬렉션('%s') 생성 실패: %s",
@@ -384,11 +445,6 @@ class PgVectorStore:
         batch_index = 0
         try:
             if isinstance(vectors, EmbeddingArtifactVectors):
-                staging_uuid = self._collection_uuid(staging_name)
-                if staging_uuid is None:
-                    raise PgVectorStoreError(
-                        "binary COPY 대상 스테이징 컬렉션을 찾을 수 없습니다"
-                    )
                 copy_connection = self._raw_connection()
                 try:
                     copy_float32_artifact_documents(
@@ -407,9 +463,10 @@ class PgVectorStore:
                 finally:
                     copy_connection.close()
             else:
-                # Compatibility path for generated embeddings and callers that
-                # supply regular Python vector sequences. Artifact-backed writes
-                # take the zero-float-object binary COPY path above.
+                if embedding_encoder is None:
+                    raise PgVectorStoreError(
+                        "동적 문서 임베딩에는 embedding_encoder 주입이 필요합니다"
+                    )
                 for batch_index, start in enumerate(
                     range(0, total_items, PGVECTOR_INSERT_BATCH_SIZE),
                     start=1,
@@ -417,20 +474,19 @@ class PgVectorStore:
                     stop = min(start + PGVECTOR_INSERT_BATCH_SIZE, total_items)
                     document_batch = list(documents[start:stop])
                     if use_precomputed_vectors and vectors is not None:
-                        vector_batch = vectors[start:stop]
-                        texts = [doc.page_content for doc in document_batch]
-                        metadatas = [doc.metadata for doc in document_batch]
-                        vec_list = [
-                            vector.tolist() if hasattr(vector, "tolist") else list(vector)
-                            for vector in vector_batch
+                        vector_batch = [
+                            [float(value) for value in vector]
+                            for vector in vectors[start:stop]
                         ]
-                        store.add_embeddings(
-                            texts=texts,
-                            embeddings=vec_list,
-                            metadatas=metadatas,
-                        )
                     else:
-                        store.add_documents(document_batch)
+                        vector_batch = embedding_encoder.encode(
+                            [document.page_content for document in document_batch]
+                        )
+                    self._insert_document_batch(
+                        staging_uuid,
+                        document_batch,
+                        vector_batch,
+                    )
                     if progress_callback is not None:
                         progress_callback(
                             {
@@ -443,7 +499,7 @@ class PgVectorStore:
         except Exception as error:
             # A failed write must not leave a queryable partial collection.
             try:
-                store.delete_collection()
+                self._delete_collection(staging_name)
             except Exception:
                 pass
             error_message = str(error)
@@ -464,7 +520,7 @@ class PgVectorStore:
         except Exception as index_error:
             staging_uuid = self._collection_uuid_cache.get(staging_name)
             try:
-                store.delete_collection()
+                self._delete_collection(staging_name)
             except Exception:
                 pass
             if staging_uuid is not None:
@@ -543,7 +599,7 @@ class PgVectorStore:
         except Exception as publish_error:
             staging_uuid = self._collection_uuid_cache.get(staging_name)
             try:
-                store.delete_collection()
+                self._delete_collection(staging_name)
             except Exception:
                 pass
             if staging_uuid is not None:
@@ -608,7 +664,7 @@ class PgVectorStore:
         """
         meta_dict = metadata or {}
         raw_items = meta_dict.get("items") or []
-        model_name = meta_dict.get("model", "text-embedding-3-large")
+        model_name = meta_dict.get("model", DEFAULT_EMBEDDING_MODEL)
         file_name = meta_dict.get("file_name", "")
         workbook_hash = meta_dict.get("workbook_hash", "")
         company_name = meta_dict.get("company_name", "")
@@ -639,7 +695,7 @@ class PgVectorStore:
 
     def list_indexes(self) -> List[Dict[str, Any]]:
         """
-        List all collections registered in the LangChain pgvector storage.
+        List all collections registered in the pgvector storage.
         
         Returns:
             List[Dict[str, Any]]: Collection summaries with metadata and document counts.
@@ -685,11 +741,11 @@ class PgVectorStore:
                 "workbook_hash": meta.get("workbook_hash", ""),
                 "company_name": meta.get("company_name", ""),
                 "ticker": meta.get("ticker", ""),
-                "model": meta.get("model", "text-embedding-3-large"),
-                "dimension": meta.get("dimension", 3072),
+                "model": meta.get("model", DEFAULT_EMBEDDING_MODEL),
+                "dimension": meta.get("dimension", DEFAULT_EMBEDDING_DIMENSION),
                 "document_count": count,
                 "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
-                "storage": "pgvector (LangChain)",
+                "storage": "PostgreSQL + pgvector",
                 "duration_seconds": meta.get("duration_seconds"),
                 "total_tokens": meta.get("total_tokens"),
                 "estimated_cost_usd": meta.get("estimated_cost_usd"),
@@ -795,10 +851,10 @@ class PgVectorStore:
             "company_name": meta.get("company_name", ""),
             "ticker": meta.get("ticker", ""),
             "model": meta.get("model", ""),
-            "dimension": meta.get("dimension", 3072),
+            "dimension": meta.get("dimension", DEFAULT_EMBEDDING_DIMENSION),
             "document_count": row[3],
             "created_at": meta.get("created_at") or datetime.now(timezone.utc).isoformat(),
-            "storage": "pgvector (LangChain)",
+            "storage": "PostgreSQL + pgvector",
             "duration_seconds": meta.get("duration_seconds"),
             "total_tokens": meta.get("total_tokens"),
             "estimated_cost_usd": meta.get("estimated_cost_usd"),
@@ -904,15 +960,6 @@ class PgVectorStore:
                             )
                             WHERE cmetadata->>'row_index' ~ '^\\d+$';
                             """,
-                            """
-                            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_sheet_legacy_row
-                            ON langchain_pg_embedding (
-                                (cmetadata->>'sheet_name'),
-                                ((substring(cmetadata->>'cell_coord' FROM '([0-9]+)$'))::int)
-                            )
-                            WHERE NOT COALESCE(cmetadata->>'row_index' ~ '^\\d+$', false)
-                              AND cmetadata->>'cell_coord' ~ '[0-9]+$';
-                            """,
                             "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_collection_id ON langchain_pg_embedding (collection_id);",
                             """
                             CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_langchain_pg_embedding_document_fts
@@ -996,7 +1043,7 @@ class PgVectorStore:
             with self._collection_uuid_lock:
                 self._collection_uuid_cache.pop(index_id, None)
             metadata = deleted_row[1] if isinstance(deleted_row[1], dict) else {}
-            dimension = int(metadata.get("dimension") or 3072)
+            dimension = int(metadata.get("dimension") or DEFAULT_EMBEDDING_DIMENSION)
             try:
                 self._drop_collection_vector_index(str(deleted_row[0]), dimension)
             except Exception:
@@ -1033,7 +1080,7 @@ class PgVectorStore:
                 with self._collection_uuid_lock:
                     self._collection_uuid_cache.pop(str(collection_name), None)
                 metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
-                dimension = int(metadata.get("dimension") or 3072)
+                dimension = int(metadata.get("dimension") or DEFAULT_EMBEDDING_DIMENSION)
                 try:
                     self._drop_collection_vector_index(
                         str(collection_uuid),
@@ -1053,18 +1100,20 @@ class PgVectorStore:
         self,
         index_id: str,
         query_text: str,
-        model_name: str = "text-embedding-3-large",
+        model_name: str = DEFAULT_EMBEDDING_MODEL,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         limit: int = 5,
     ) -> List[Tuple[float, Dict[str, Any]]]:
         """Perform similarity search with quantized HNSW candidates and exact reranking."""
         try:
-            from .vector_store_factory import LangChainEmbeddingAdapter
-            adapter = LangChainEmbeddingAdapter(
-                model_name=model_name,
-                encoder=embedding_encoder,
-            )
-            query_vector = adapter.embed_query(query_text)
+            if embedding_encoder is None:
+                raise PgVectorStoreError(
+                    "유사도 검색에는 embedding_encoder 주입이 필요합니다"
+                )
+            vectors = embedding_encoder.encode([query_text])
+            if not vectors:
+                raise PgVectorStoreError("검색 질의 임베딩 결과가 비어 있습니다")
+            query_vector = vectors[0]
             hits = self.similarity_search_by_vector_with_score(
                 collection_name=index_id,
                 embedding=query_vector,
@@ -1077,26 +1126,9 @@ class PgVectorStore:
                 results.append((similarity, cell_item))
             return results
         except Exception as search_err:
-            logger.warning(
-                "직접 halfvec 유사도 검색 실패 (%s), LangChain 폴백 사용: %s",
-                index_id,
-                search_err,
-            )
-            store = get_vector_store(
-                collection_name=index_id,
-                backend="pgvector",
-                model_name=model_name,
-                embedding_encoder=embedding_encoder,
-                database_url=getattr(self, "database_url", PGVECTOR_URL),
-            )
-            hits = store.similarity_search_with_score(query_text, k=limit)
-            results = []
-            for doc, score in hits:
-                # LangChain cosine distance is distance (0 = identical, 1 = orthogonal, 2 = opposite)
-                similarity = max(0.0, 1.0 - float(score))
-                cell_item = langchain_document_to_cell_item(doc, score=similarity)
-                results.append((similarity, cell_item))
-            return results
+            raise PgVectorStoreError(
+                f"PostgreSQL pgvector 유사도 검색 실패 ({index_id}): {search_err}"
+            ) from search_err
 
     def similarity_search_by_vector_with_score(
         self,
@@ -1120,7 +1152,7 @@ class PgVectorStore:
             List[Tuple[Any, float]]: Document and cosine-distance pairs, or an empty list when the collection does not exist.
         
         Raises:
-            PgVectorStoreError: If both direct and fallback searches fail.
+            PgVectorStoreError: If the direct indexed search fails.
         """
         conn = None
         dim = len(embedding) if hasattr(embedding, "__len__") else 0
@@ -1145,7 +1177,7 @@ class PgVectorStore:
                     clean_company = company_name.strip()
                     escaped_company = _escape_like_term(clean_company)
                     where_clauses.append(
-                        "(cmetadata->>'company_name' ILIKE %s ESCAPE '\\\\' "
+                        "(cmetadata->>'company_name' ILIKE %s ESCAPE '!' "
                         "OR cmetadata->>'company_name' = %s)"
                     )
                     params.extend([f"%{escaped_company}%", clean_company])
@@ -1221,29 +1253,9 @@ class PgVectorStore:
                 results.append((doc, float(dist) if dist is not None else 0.0))
             return results
         except Exception as error:
-            logger.warning(
-                "직접 SQL 벡터 유사도 검색 실패 (%s): %s",
-                collection_name,
-                error,
-                exc_info=True,
-            )
-            try:
-                store = get_vector_store(
-                    collection_name=collection_name,
-                    backend="pgvector",
-                    database_url=getattr(self, "database_url", PGVECTOR_URL),
-                )
-                return store.similarity_search_with_score_by_vector(embedding, k=k)
-            except Exception as fallback_error:
-                logger.warning(
-                    "폴백 PGVector 유사도 검색 실패 (%s): %s",
-                    collection_name,
-                    fallback_error,
-                    exc_info=True,
-                )
-                raise PgVectorStoreError(
-                    f"PostgreSQL pgvector 유사도 검색 실패 ({collection_name}): {fallback_error}"
-                ) from fallback_error
+            raise PgVectorStoreError(
+                f"PostgreSQL pgvector 유사도 검색 실패 ({collection_name}): {error}"
+            ) from error
         finally:
             if conn is not None:
                 try:
@@ -1302,7 +1314,7 @@ class PgVectorStore:
                     elif not workbook_hash and not company_name:
                         return []
 
-                # Legacy callers search matching cell IDs or coordinates. Structured
+                # Accept both stable cell IDs and user-facing coordinates. Structured
                 # references keep qualified company/sheet/coordinate pairs together.
                 extracted_coords = []
                 for cid in clean_ids:

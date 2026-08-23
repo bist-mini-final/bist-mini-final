@@ -28,6 +28,7 @@ Example:
 """
 
 from __future__ import annotations
+
 import json
 import logging
 from pathlib import Path
@@ -104,10 +105,6 @@ class QaExampleLoaderConfigDTO(ModuleConfigDTO):
         default=True,
         description="내장 예시 세트를 함께 포함할지 여부",
     )
-
-
-# Backward compatibility alias
-QaExampleLoaderExecutionDTO = QaExampleLoaderInputDTO
 
 
 class QaExampleItem(ModuleDTO):
@@ -213,7 +210,6 @@ __all__ = [
     "QA_EXAMPLES_DIR",
     "QaExampleItem",
     "QaExampleLoaderConfigDTO",
-    "QaExampleLoaderExecutionDTO",
     "QaExampleLoaderInputDTO",
     "QaExampleLoaderModule",
     "QaExampleLoaderOutput",

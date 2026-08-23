@@ -24,7 +24,7 @@ def create_spreadsheet_artifact_router(artifact_dir: Path) -> APIRouter:
     def get_sheet_artifact(
         workbook_hash: str,
         sheet_name: str,
-        layer: Literal["rendered", "typed", "docling"] = Query(default="rendered"),
+        layer: Literal["rendered", "typed"] = Query(default="rendered"),
     ):
         if not WORKBOOK_HASH_PATTERN.fullmatch(workbook_hash):
             raise HTTPException(status_code=422, detail="올바른 workbook hash가 아닙니다")

@@ -2165,24 +2165,6 @@
   color: #0e7490;
 }
 
-.spreadsheet-result-modal[data-kind="openpyxl"] .spreadsheet-result-modal__mark {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: #b45309;
-}
-
-.spreadsheet-result-modal[data-kind="bfs_llm"] .spreadsheet-result-modal__mark {
-  border-color: #99f6e4;
-  background: #f0fdfa;
-  color: #0f766e;
-}
-
-.spreadsheet-result-modal[data-kind="local_vlm"] .spreadsheet-result-modal__mark {
-  border-color: #c7d2fe;
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
 .spreadsheet-result-modal[data-kind="luna_vlm"] .spreadsheet-result-modal__mark {
   border-color: #c7d2fe;
   background: #eef2ff;
@@ -2200,18 +2182,6 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-
-.spreadsheet-result-modal[data-kind="openpyxl"] .spreadsheet-result-modal__eyebrow {
-  color: #b45309;
-}
-
-.spreadsheet-result-modal[data-kind="bfs_llm"] .spreadsheet-result-modal__eyebrow {
-  color: #0f766e;
-}
-
-.spreadsheet-result-modal[data-kind="local_vlm"] .spreadsheet-result-modal__eyebrow {
-  color: #4f46e5;
 }
 
 .spreadsheet-result-modal[data-kind="luna_vlm"] .spreadsheet-result-modal__eyebrow {
@@ -2447,11 +2417,6 @@
   border: 2px solid;
   border-radius: 0.14rem;
   background: rgb(255 255 255 / 68%);
-}
-
-.spreadsheet-result-toolbar__legend [data-region="table"] i {
-  border-color: #0891b2;
-  background: rgb(6 182 212 / 16%);
 }
 
 .spreadsheet-result-toolbar__legend [data-region="title"] i {
@@ -2998,15 +2963,6 @@ body.spreadsheet-result-is-resizing * {
   display: block;
 }
 
-.spreadsheet-result-box--table {
-  border-color: #0891b2;
-  background: rgb(6 182 212 / 12%);
-}
-
-.spreadsheet-result-box--table>span {
-  background: #0e7490;
-}
-
 .spreadsheet-result-region--title {
   border-color: #7c3aed;
   background: rgb(124 58 237 / 11%);
@@ -3473,4 +3429,3 @@ body.spreadsheet-result-is-resizing * {
 .benchmark-cache-summary small { color: #94a3b8; }
 .benchmark-router-metrics { margin-top: 9px; color: #2563eb; font-size: 11px; }
 @media (max-width: 520px) { .benchmark-workflow-grid { grid-template-columns: 1fr; } .benchmark-result-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-

@@ -12,18 +12,12 @@ import { NODE_COLORS, NODE_MODULE_TYPES } from '../config/pipeline';
 import { ModuleSettingsContext } from '../contexts/ModuleSettingsContext';
 import { CustomEdge } from './CustomEdge';
 import { ContextNode } from './CustomNodes/ContextNode';
-import { AdaptiveQueryDecomposerNode } from './CustomNodes/AdaptiveQueryDecomposerNode';
-import { BfsLlmStructureDetectorNode } from './CustomNodes/BfsLlmStructureDetectorNode';
 import { CellTextSerializerNode } from './CustomNodes/CellTextSerializerNode';
-import { ExhaustiveCellTextSerializerNode } from './CustomNodes/ExhaustiveCellTextSerializerNode';
 import { CellTextEmbedderNode } from './CustomNodes/CellTextEmbedderNode';
 import { DecomposerNode } from './CustomNodes/DecomposerNode';
-import { DirectQueryDecomposerNode } from './CustomNodes/DirectQueryDecomposerNode';
 import { EmbeddingNode } from './CustomNodes/EmbeddingNode';
-import { DoclingTableDetectorNode } from './CustomNodes/DoclingTableDetectorNode';
 import { GenericModuleNode } from './CustomNodes/GenericModuleNode';
 import { LunaVlmStructureDetectorNode } from './CustomNodes/LunaVlmStructureDetectorNode';
-import { OpenpyxlRegionDetectorNode } from './CustomNodes/OpenpyxlRegionDetectorNode';
 import { ProcessedFileSelectorNode } from './CustomNodes/ProcessedFileSelectorNode';
 import { PgVectorCollectionLoaderNode } from './CustomNodes/PgVectorCollectionLoaderNode';
 import { PgVectorRetrieverNode } from './CustomNodes/PgVectorRetrieverNode';
@@ -33,7 +27,6 @@ import { ReaderNode } from './CustomNodes/ReaderNode';
 import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
 import { SemanticQueryMatcherNode } from './CustomNodes/SemanticQueryMatcherNode';
 import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
-import { SemanticScopedDenseRetrieverNode } from './CustomNodes/SemanticScopedDenseRetrieverNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
 import { WorkflowLayersPanel } from './WorkflowLayersPanel';
 import type { WorkflowOption } from './Header';
@@ -50,6 +43,7 @@ interface PipelineCanvasProps {
   runs: WorkflowRun[];
   workflows: WorkflowOption[];
   activeWorkflowId: string;
+  readOnly: boolean;
   onSelectWorkflow: (id: string) => void;
   onCreateWorkflow: () => void;
   onDuplicateWorkflow: () => void;
@@ -64,6 +58,7 @@ export function PipelineCanvas({
   runs,
   workflows,
   activeWorkflowId,
+  readOnly,
   onSelectWorkflow,
   onCreateWorkflow,
   onDuplicateWorkflow,
@@ -74,9 +69,7 @@ export function PipelineCanvas({
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       queryNode: QueryNode,
-      direct_query_decomposer: DirectQueryDecomposerNode,
       decomposerNode: DecomposerNode,
-      adaptive_query_decomposer: AdaptiveQueryDecomposerNode,
       embeddingNode: EmbeddingNode,
       cell_text_embedder: CellTextEmbedderNode,
       pgvector_index_writer: PgVectorIndexWriterNode,
@@ -85,22 +78,22 @@ export function PipelineCanvas({
       rrf_fusion: RrfFusionNode,
       semantic_query_matcher: SemanticQueryMatcherNode,
       llm_query_router: LlmQueryRouterNode,
-      semantic_scoped_dense_retriever: SemanticScopedDenseRetrieverNode,
       contextNode: ContextNode,
       readerNode: ReaderNode,
       processed_file_selector: ProcessedFileSelectorNode,
-      bfs_llm_structure_detector: BfsLlmStructureDetectorNode,
       luna_vlm_structure_detector: LunaVlmStructureDetectorNode,
-      docling_table_detector: DoclingTableDetectorNode,
-      openpyxl_region_detector: OpenpyxlRegionDetectorNode,
       cell_text_serializer: CellTextSerializerNode,
-      exhaustive_cell_text_serializer: ExhaustiveCellTextSerializerNode,
       generic_module: GenericModuleNode,
     }),
     []
   );
   const edgeTypes = useMemo<EdgeTypes>(() => ({ customEdge: CustomEdge }), []);
-  const openModuleSettings = useCallback((nodeId: string) => setSettingsNodeId(nodeId), []);
+  const openModuleSettings = useCallback(
+    (nodeId: string) => {
+      if (!readOnly) setSettingsNodeId(nodeId);
+    },
+    [readOnly],
+  );
   const settingsNode = settingsNodeId
     ? graph.nodes.find((node) => node.id === settingsNodeId)
     : undefined;
@@ -117,20 +110,20 @@ export function PipelineCanvas({
     <ModuleSettingsContext.Provider value={openModuleSettings}>
       <section className="pipeline-canvas" data-palette-open={isPaletteOpen} aria-label="RAG 파이프라인 편집 캔버스">
         <div className="canvas-hint">
-          <span>휠로 확대 · 빈 영역 드래그로 이동</span>
+          <span>{readOnly ? '표준 Job · 편집하려면 워크플로를 복제하세요' : '휠로 확대 · 빈 영역 드래그로 이동'}</span>
         </div>
         <ReactFlow
           key={activeWorkflowId}
           nodes={graph.nodes}
           edges={graph.edges}
-          onNodesChange={graph.onNodesChange}
-          onEdgesChange={graph.onEdgesChange}
-          onConnect={graph.onConnect}
+          onNodesChange={readOnly ? undefined : graph.onNodesChange}
+          onEdgesChange={readOnly ? undefined : graph.onEdgesChange}
+          onConnect={readOnly ? undefined : graph.onConnect}
           connectOnClick
           onInit={graph.onInit}
           onMoveEnd={graph.onMoveEnd}
-          onDrop={graph.onDrop}
-          onDragOver={graph.onDragOver}
+          onDrop={readOnly ? undefined : graph.onDrop}
+          onDragOver={readOnly ? undefined : graph.onDragOver}
           onNodeClick={(_, node) => graph.selectNode(node.id)}
           selectionOnDrag
           selectionKeyCode="Shift"
@@ -143,7 +136,9 @@ export function PipelineCanvas({
           maxZoom={1.6}
           defaultEdgeOptions={{ type: 'customEdge' }}
           proOptions={{ hideAttribution: true }}
-          deleteKeyCode={['Backspace', 'Delete']}
+          nodesDraggable={!readOnly}
+          nodesConnectable={!readOnly}
+          deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
           edgesFocusable={true}
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cbd5e1" />
@@ -168,6 +163,7 @@ export function PipelineCanvas({
           onDeleteWorkflow={onDeleteWorkflow}
           onSelectNode={graph.selectNode}
           onDuplicateNode={graph.duplicateNode}
+          readOnly={readOnly}
         />
       </section>
       {settingsNode && settingsModule && (

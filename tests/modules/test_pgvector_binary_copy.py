@@ -103,12 +103,6 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
         Document(page_content="second", metadata={}, id="id-2"),
     ]
 
-    vector_backend = MagicMock()
-    monkeypatch.setattr(
-        store_module,
-        "get_vector_store",
-        MagicMock(return_value=vector_backend),
-    )
     binary_copy = MagicMock()
     monkeypatch.setattr(store_module, "copy_float32_artifact_documents", binary_copy)
 
@@ -119,7 +113,7 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
     publish_connection.cursor.return_value.__enter__.return_value = publish_cursor
 
     store = PgVectorStore("postgresql://unused")
-    cast(Any, store)._collection_uuid = MagicMock(
+    cast(Any, store)._create_collection = MagicMock(
         return_value="11111111-1111-1111-1111-111111111111"
     )
     cast(Any, store)._raw_connection = MagicMock(
@@ -138,7 +132,6 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
 
     binary_copy.assert_called_once()
     assert binary_copy.call_args.kwargs["vectors"] is vectors
-    vector_backend.add_embeddings.assert_not_called()
     copy_connection.commit.assert_called_once()
     publish_connection.commit.assert_called_once()
 
@@ -153,12 +146,6 @@ def test_binary_copy_failure_rolls_back_and_removes_staging_collection(
     artifact_id = "1" * 64
     artifact_store.put(artifact_id, [[0.1, 0.2]])
     vectors = artifact_store.vector_sequence(artifact_id, 1, 2)
-    vector_backend = MagicMock()
-    monkeypatch.setattr(
-        store_module,
-        "get_vector_store",
-        MagicMock(return_value=vector_backend),
-    )
     monkeypatch.setattr(
         store_module,
         "copy_float32_artifact_documents",
@@ -166,9 +153,10 @@ def test_binary_copy_failure_rolls_back_and_removes_staging_collection(
     )
     copy_connection = MagicMock()
     store = PgVectorStore("postgresql://unused")
-    cast(Any, store)._collection_uuid = MagicMock(
+    cast(Any, store)._create_collection = MagicMock(
         return_value="11111111-1111-1111-1111-111111111111"
     )
+    cast(Any, store)._delete_collection = MagicMock()
     cast(Any, store)._raw_connection = MagicMock(return_value=copy_connection)
 
     with pytest.raises(PgVectorStoreError, match="배치 적재 실패"):
@@ -181,4 +169,4 @@ def test_binary_copy_failure_rolls_back_and_removes_staging_collection(
         )
 
     copy_connection.rollback.assert_called_once()
-    vector_backend.delete_collection.assert_called_once()
+    cast(Any, store)._delete_collection.assert_called_once()

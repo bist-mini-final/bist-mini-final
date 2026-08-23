@@ -33,7 +33,3 @@ class BiMaterializationAccepted(BiContractModel):
     job_id: JobId
     status: MaterializationStatus
     published_snapshot_id: SnapshotId | None
-
-
-class BiApiFailure(BiContractModel):
-    detail: str

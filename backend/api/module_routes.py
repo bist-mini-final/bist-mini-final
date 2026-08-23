@@ -1,61 +1,12 @@
-from typing import Callable, Type
-
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
 
-from backend.engine.runtime.registry import ModuleRegistry
 from backend.cli.documentation.module_docs import render_module_markdown
-
-
-def _execution_handler(
-    module_registry: ModuleRegistry,
-    module_type: str,
-    request_model: Type[BaseModel],
-) -> Callable[..., object]:
-    """Build a statically typed FastAPI handler for one dynamic module class."""
-
-    def execute_module(request):
-        return module_registry.execute(
-            module_type,
-            request.input,
-            request.config,
-        )
-
-    execute_module.__name__ = f"execute_{module_type}"
-    execute_module.__doc__ = (
-        "Execute this module independently through its exact Input and Config DTOs."
-    )
-    execute_module.__annotations__ = {"request": request_model}
-    return execute_module
+from backend.engine.runtime.registry import ModuleRegistry
 
 
 def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
     router = APIRouter(tags=["Modules"])
-
-    for definition in module_registry.definitions():
-        module = module_registry.get(definition["type"])
-        module_doc = (module.__class__.__doc__ or module.__doc__ or "").strip()
-        description_text = (
-            f"### 📋 모듈 개요\n{definition.get('description', '')}\n\n"
-            f"{module_doc}\n\n"
-            "---\n"
-            "**📌 Input DTO 및 Config DTO는 Pydantic을 통해 독립 검증되며, 실행 결과는 정형 Output DTO JSON으로 반환됩니다.**"
-        ) if module_doc else definition.get("description", "")
-
-        router.add_api_route(
-            f"/modules/{definition['type']}/execute",
-            _execution_handler(
-                module_registry,
-                definition["type"],
-                module.request_model,
-            ),
-            methods=["POST"],
-            response_model=module.output_model,
-            operation_id=f"execute_module_{definition['type']}",
-            summary=f"{definition.get('label', definition['type'])} ({definition['type']})",
-            description=description_text,
-        )
 
     @router.get("/modules", summary="List registered module contracts")
     def get_modules():

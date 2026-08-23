@@ -1,4 +1,4 @@
-from typing import Final, Protocol, assert_never
+from typing import Final, Literal, Protocol, assert_never, cast
 
 from .catalog import METRIC_CATALOG, DerivedMetricDefinition, SourceMetricDefinition
 from .extraction_models import (
@@ -18,7 +18,6 @@ from .models import (
     UnavailableObservation,
     ValueKind,
 )
-
 
 MISSING_TOKENS: Final = frozenset(
     {"", "-", "NA", "N/A", "NM", "#PEND", "NULL"}
@@ -223,9 +222,20 @@ class BiMetricExtractionService:
         scale: AmountScale | None = None,
         notes: tuple[str, ...] = (),
     ) -> BiMetricExtractionResult:
+        if status is MetricStatus.AVAILABLE:
+            raise ValueError("available status requires AvailableObservation")
+        unavailable_status = cast(
+            Literal[
+                MetricStatus.MISSING,
+                MetricStatus.AMBIGUOUS,
+                MetricStatus.INVALID,
+                MetricStatus.NOT_MEANINGFUL,
+            ],
+            status,
+        )
         observation = UnavailableObservation(
             period_id=request.period_id,
-            status=status,
+            status=unavailable_status,
             raw_value=raw_value,
             evidence=evidence,
             notes=notes,

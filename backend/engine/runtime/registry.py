@@ -1,12 +1,14 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List
 
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
-from backend.providers.embeddings.factory import EmbeddingEncoder
-from backend.providers.llm.chat_completion import ChatCompletionClient
+from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.providers.openai_responses import OpenAIResponsesClient
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
+from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
+from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import BaseModule
 from modules.embedding.cell_text_embedder import CellTextEmbedderModule
 from modules.embedding.query_embedder import EmbedderModule
@@ -38,43 +40,35 @@ class ModuleRegistry(BaseModuleRegistry):
 
     def __init__(
         self,
-        completion_client: Optional[ChatCompletionClient] = None,
-        embedding_encoder: Optional[EmbeddingEncoder] = None,
-        embedding_artifact_store: Optional[EmbeddingArtifactStore] = None,
-        pgvector_store: Optional[PgVectorStore] = None,
-        db_manager: Optional[DatabaseManager] = None,
+        *,
+        completion_client: OpenAIResponsesClient,
+        embedding_encoder: EmbeddingEncoder,
+        embedding_artifact_store: EmbeddingArtifactStore,
+        pgvector_store: PgVectorStore,
+        db_manager: DatabaseManager,
         processed_dir: Path = PROCESSED_DATA_DIR,
         spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
-        shared_completion_client = completion_client or ChatCompletionClient()
-        embedding_artifacts = (
-            embedding_artifact_store or EmbeddingArtifactStore()
-        )
-        self.pgvector_store = pgvector_store or PgVectorStore()
-        self.db_manager = db_manager or DatabaseManager()
-        isolated_worker_spec: Optional[Dict[str, str]] = None
-        if completion_client is None and embedding_encoder is None:
-            isolated_worker_spec = {
-                "embedding_artifact_dir": str(embedding_artifacts.directory),
-                "processed_dir": str(processed_dir),
-                "spreadsheet_artifact_dir": str(spreadsheet_artifact_dir),
-            }
-        super().__init__(
-            embedding_artifacts,
-            isolated_worker_spec=isolated_worker_spec,
-        )
+        self.pgvector_store = pgvector_store
+        self.db_manager = db_manager
+        super().__init__(embedding_artifact_store)
+        workbook_catalog = WorkbookCatalog(processed_dir)
+        sheet_renderer = ExcelSheetRenderer()
         modules: List[BaseModule] = [
             QueryInputModule(),
-            DecomposerModule(completion_client=shared_completion_client),
-            LlmQueryRouterModule(completion_client=shared_completion_client),
-            SemanticQueryMatcherModule(encoder=embedding_encoder),
+            DecomposerModule(completion_client=completion_client),
+            LlmQueryRouterModule(completion_client=completion_client),
+            SemanticQueryMatcherModule(
+                encoder=embedding_encoder,
+                artifact_store=embedding_artifact_store,
+            ),
             EmbedderModule(encoder=embedding_encoder),
             CellTextEmbedderModule(
                 encoder=embedding_encoder,
-                artifact_store=embedding_artifacts,
+                artifact_store=embedding_artifact_store,
             ),
             PgVectorIndexWriterModule(
-                artifact_store=embedding_artifacts,
+                artifact_store=embedding_artifact_store,
                 db_manager=self.db_manager,
                 pgvector_store=self.pgvector_store,
                 embedding_encoder=embedding_encoder,
@@ -88,20 +82,23 @@ class ModuleRegistry(BaseModuleRegistry):
             PostgresNativeKeywordRetrieverModule(self.pgvector_store),
             RrfFusionModule(),
             PgContextExpanderModule(self.pgvector_store),
-            ReaderModule(shared_completion_client, self.pgvector_store),
-            ProcessedFileSelectorModule(processed_dir=processed_dir),
+            ReaderModule(completion_client, self.pgvector_store),
+            ProcessedFileSelectorModule(catalog=workbook_catalog),
             LunaVlmStructureDetectorModule(
-                processed_dir=processed_dir,
+                vision_client=completion_client,
+                catalog=workbook_catalog,
+                renderer=sheet_renderer,
                 artifact_dir=spreadsheet_artifact_dir,
             ),
-            CellTextSerializerModule(processed_dir=processed_dir),
+            CellTextSerializerModule(catalog=workbook_catalog),
             CompanyEntityExtractorModule(
-                processed_dir=processed_dir,
-                completion_client=shared_completion_client,
+                completion_client=completion_client,
                 pgvector_store=self.pgvector_store,
+                catalog=workbook_catalog,
             ),
             SheetMetadataPersistenceModule(
                 db_manager=self.db_manager,
+                catalog=workbook_catalog,
             ),
             QaExampleLoaderModule(),
         ]

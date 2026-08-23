@@ -80,21 +80,6 @@ class ContextDTO(ModuleDTO):
         description="Reader가 그대로 사용할 시트·행 단위 실제 셀 컨텍스트 블록 목록",
     )
 
-    # Backward compatibility properties & initializers
-    context_blocks: Optional[List[str]] = None
-    metrics: Optional[Dict[str, Any]] = None
-    top_k_used: Optional[int] = None
-    adjacent_radius: Optional[int] = None
-    context_characters: Optional[int] = None
-    block_count: Optional[int] = None
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.context_blocks and not self.items:
-            self.items = list(self.context_blocks)
-        if not self.context_blocks and self.items:
-            self.context_blocks = self.items
-
-
 class PgContextExpanderInputDTO(ModuleInputDTO):
     """Input contract containing retrieved search results."""
 
@@ -116,7 +101,7 @@ class PgContextExpanderConfigDTO(ModuleConfigDTO):
         default=None,
         ge=0,
         le=20,
-        description="하위 호환성을 위한 선택적 인접 행 반경 (기본 단일 행 확장)",
+        description="선택적 인접 행 반경 (기본 단일 행 확장)",
     )
     max_blocks: int = Field(
         default=DEFAULT_PG_MAX_BLOCKS,
@@ -124,12 +109,6 @@ class PgContextExpanderConfigDTO(ModuleConfigDTO):
         le=5000,
         description="LLM Reader로 전달할 최대 확장 셀 다큐먼트 개수",
     )
-
-
-# Standard Aliases
-ContextExpanderInputDTO = PgContextExpanderInputDTO
-ContextExpanderConfigDTO = PgContextExpanderConfigDTO
-ContextExpanderOutput = ContextDTO
 
 
 # ==============================================================================
@@ -188,9 +167,9 @@ class PgContextExpanderModule(BaseModule):
     config_model = PgContextExpanderConfigDTO
     output_model = ContextDTO
 
-    def __init__(self, pgvector_store: Optional[PgVectorStore] = None) -> None:
+    def __init__(self, pgvector_store: PgVectorStore) -> None:
         super().__init__()
-        self.pgvector_store = pgvector_store or PgVectorStore()
+        self.pgvector_store = pgvector_store
 
     def execute(
         self,
@@ -207,7 +186,6 @@ class PgContextExpanderModule(BaseModule):
                 "query_context": query_context_dict,
                 "document_context": doc_context_dict,
                 "items": ["[No context blocks available]"],
-                "context_blocks": ["[No context blocks available]"],
             }
 
         # Step 1: Collect candidate cell texts and extract sheet + row targets
@@ -307,12 +285,7 @@ class PgContextExpanderModule(BaseModule):
             "query_context": query_context_dict,
             "document_context": doc_context_dict,
             "items": context_blocks,
-            "context_blocks": context_blocks,
         }
-
-
-# Standard Module Alias
-ContextExpanderModule = PgContextExpanderModule
 
 
 # ==============================================================================
@@ -320,10 +293,6 @@ ContextExpanderModule = PgContextExpanderModule
 # ==============================================================================
 __all__ = [
     "ContextDTO",
-    "ContextExpanderConfigDTO",
-    "ContextExpanderInputDTO",
-    "ContextExpanderModule",
-    "ContextExpanderOutput",
     "DocumentContextDTO",
     "PgContextExpanderConfigDTO",
     "PgContextExpanderInputDTO",

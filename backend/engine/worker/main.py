@@ -3,24 +3,23 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-from functools import lru_cache
 import logging
 import os
 import signal
 import socket
-from threading import Event, Thread
 import time
+from contextlib import contextmanager
+from functools import lru_cache
 from typing import Generator, Optional
 
-from backend.core.settings import KUBERNETES_INGESTION_QUEUE
+from backend.bootstrap.container import RuntimeContainer
+from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
 from backend.engine.orchestration import compile_task_plan
-from backend.engine.runtime.services import (
-    WorkflowRuntimeServices,
-    create_workflow_runtime_services,
-)
-from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
+from backend.engine.runtime.services import WorkflowRuntimeServices
 from backend.engine.workflows.executor import DagExecutionCancelled
+from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
+
+from .lease import LeaseHeartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +29,16 @@ class ModuleTaskTimeout(TimeoutError):
 
 
 @lru_cache(maxsize=1)
-def runtime_services() -> WorkflowRuntimeServices:
-    """Build the unified workflow runtime once per one-shot Job pod."""
-    return create_workflow_runtime_services(
+def runtime_container() -> RuntimeContainer:
+    """Build the process-owned worker graph once per one-shot Job pod."""
+    return RuntimeContainer.create(
         initialize_schema=False,
         require_database=True,
     )
+
+
+def runtime_services() -> WorkflowRuntimeServices:
+    return runtime_container().services
 
 
 @contextmanager
@@ -89,26 +92,6 @@ def execute_with_policy(
                 time.sleep(retry_delay_seconds)
 
 
-def _heartbeat_loop(
-    services: WorkflowRuntimeServices,
-    run_id: str,
-    worker_id: str,
-    lease_token: str,
-    stop: Event,
-    interval_seconds: float,
-) -> None:
-    while not stop.wait(interval_seconds):
-        try:
-            if not services.db_manager.heartbeat_workflow_run(
-                run_id,
-                worker_id,
-                lease_token,
-            ):
-                return
-        except Exception:
-            logger.warning("워크플로 lease heartbeat 실패", exc_info=True)
-
-
 def _execute_claim(
     services: WorkflowRuntimeServices,
     claim: WorkflowRunLease,
@@ -129,19 +112,16 @@ def _execute_claim(
             stale_after_seconds=stale_after_seconds,
         ):
             with services.run_store.workflow_lease(run_id, lease_token):
-                stop = Event()
-                heartbeat = Thread(
-                    target=_heartbeat_loop,
-                    args=(
-                        services,
+                heartbeat = LeaseHeartbeat(
+                    lambda: services.db_manager.heartbeat_workflow_run(
                         run_id,
                         worker_id,
                         lease_token,
-                        stop,
-                        heartbeat_seconds,
                     ),
-                    name="workflow-lease-heartbeat",
-                    daemon=True,
+                    interval_seconds=heartbeat_seconds,
+                    thread_name="workflow-lease-heartbeat",
+                    logger=logger,
+                    failure_message="워크플로 lease heartbeat 실패",
                 )
                 heartbeat.start()
                 try:
@@ -169,8 +149,7 @@ def _execute_claim(
                     )
                     return run_id
                 finally:
-                    stop.set()
-                    heartbeat.join(timeout=heartbeat_seconds + 1)
+                    heartbeat.stop()
     except DagExecutionCancelled:
         logger.info("배치 run 취소 완료 (run=%s)", run_id)
         return run_id
@@ -230,7 +209,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--queue",
-        default=os.getenv("WORKFLOW_QUEUE", KUBERNETES_INGESTION_QUEUE),
+        default=os.getenv("WORKFLOW_QUEUE", KUBERNETES_WORKFLOW_QUEUE),
     )
     parser.add_argument(
         "--worker-id",
@@ -241,7 +220,12 @@ def main() -> int:
         level=os.getenv("LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    run_one(args.queue, args.worker_id)
+    try:
+        run_one(args.queue, args.worker_id)
+    finally:
+        if runtime_container.cache_info().currsize:
+            runtime_container().close()
+            runtime_container.cache_clear()
     return 0
 
 

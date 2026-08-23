@@ -64,7 +64,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from modules.common.base_llm import (
     BaseLLMModule,
@@ -76,7 +76,6 @@ from modules.common.base_llm import (
 )
 from modules.common.config import DEFAULT_LLM_MODEL
 from modules.query.llm_query_router import (
-    CompanyScopeItemDTO,
     LlmQueryRouterOutputDTO,
     RouterDecisionDTO,
 )
@@ -173,31 +172,6 @@ class SubqueriesDTO(ModuleDTO):
         description="구조화된 원자적 서브쿼리 객체 목록 (company, sheet, row_header, column_header, cell_value, text)",
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_subqueries_input(cls, data: Any) -> Any:
-        """subqueries 리스트가 전달될 경우 items 목록으로 자동 변환합니다."""
-        if isinstance(data, dict):
-            raw_items = data.get("items")
-            raw_subqueries = data.get("subqueries")
-            if not raw_items and raw_subqueries:
-                data["items"] = [
-                    SubqueryItem(text=sq) if isinstance(sq, str) else sq
-                    for sq in raw_subqueries
-                ]
-        return data
-
-    @property
-    def subqueries(self) -> List[str]:
-        """직렬화된 단일 셀 검색 서브쿼리 문자열 목록 (하위 호환 헬퍼 프로퍼티)."""
-        return [item.text or item.to_serialized_query() for item in self.items]
-
-
-# Backward compatibility aliases
-DecomposerOutputDTO = SubqueriesDTO
-DecomposerOutput = SubqueriesDTO
-
-
 # ==============================================================================
 # 4. Module Implementation
 # ==============================================================================
@@ -220,7 +194,7 @@ class DecomposerModule(BaseLLMModule):
         label="LLM Query Decomposer",
         category="Logic",
         description="사용자 질문을 원자 단위 셀 검색 서브쿼리들로 분해합니다.",
-        inputs=["input"],
+        inputs=["query_context", "semantic_match"],
         outputs=["output"],
         config_fields=["model", "system_prompt", "user_prompt_template"],
         raw_output=True,
@@ -243,7 +217,7 @@ class DecomposerModule(BaseLLMModule):
         match_raw = input_data.semantic_match
         match: Any = (
             match_raw.semantic_match
-            if hasattr(match_raw, "semantic_match")
+            if isinstance(match_raw, LlmQueryRouterOutputDTO)
             else match_raw
         )
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.core.settings import PROCESSED_DATA_DIR
-from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import ModuleExecutionError
 
@@ -84,7 +84,7 @@ def get_processed_file_info(
 
 def list_processed_files(
     processed_dir: Path = PROCESSED_DATA_DIR,
-    pgvector_store: Optional[PgVectorStore] = None,
+    pgvector_store: PgVectorStore | None = None,
 ) -> List[Dict[str, Any]]:
     """List processed source files with metadata and associated vector index identifiers.
     
@@ -98,6 +98,9 @@ def list_processed_files(
 
     if not processed_dir.exists():
         return []
+
+    if pgvector_store is None:
+        raise ValueError("list_processed_files에는 pgvector_store 주입이 필요합니다")
 
     index_ids_by_hash: Dict[str, List[str]] = {}
     for index in list_vector_indexes(pgvector_store):
@@ -189,18 +192,18 @@ def preview_excel_sheet(
 
 
 def list_vector_indexes(
-    pgvector_store: Optional[PgVectorStore] = None,
+    pgvector_store: PgVectorStore,
 ) -> List[Dict[str, Any]]:
     """List indexes directly from pgvector."""
 
-    store = pgvector_store or PgVectorStore()
-    return store.list_indexes() if store.is_connected() else []
+    return pgvector_store.list_indexes() if pgvector_store.is_connected() else []
 
 
 def get_vector_index_detail(
     index_id: str,
+    *,
+    pgvector_store: PgVectorStore,
     sample_items_count: int = 15,
-    pgvector_store: Optional[PgVectorStore] = None,
 ) -> Dict[str, Any]:
     """
     Retrieve metadata and sample cell documents for a vector index.
@@ -216,18 +219,17 @@ def get_vector_index_detail(
         ModuleExecutionError: If the pgvector database is unavailable.
     """
 
-    store = pgvector_store or PgVectorStore()
-    if not store.is_connected():
+    if not pgvector_store.is_connected():
         raise ModuleExecutionError(
             "pgvector 데이터베이스에 연결할 수 없습니다. "
             "Docker 컨테이너를 구동해주세요."
         )
-    return store.get_index_detail(index_id, limit=sample_items_count)
+    return pgvector_store.get_index_detail(index_id, limit=sample_items_count)
 
 
 def delete_vector_index(
     index_id: str,
-    pgvector_store: Optional[PgVectorStore] = None,
+    pgvector_store: PgVectorStore,
 ) -> bool:
     """
     Delete a pgvector collection.
@@ -239,18 +241,18 @@ def delete_vector_index(
     	bool: The deletion result.
     """
 
-    store = pgvector_store or PgVectorStore()
-    if not store.is_connected():
+    if not pgvector_store.is_connected():
         raise ModuleExecutionError("pgvector 데이터베이스에 연결할 수 없습니다")
-    return store.delete(index_id)
+    return pgvector_store.delete(index_id)
 
 
 def search_vector_index(
     index_id: str,
     query_text: str,
+    *,
+    pgvector_store: PgVectorStore,
+    embedding_encoder: EmbeddingEncoder,
     limit: int = 5,
-    pgvector_store: Optional[PgVectorStore] = None,
-    embedding_encoder: Optional[EmbeddingEncoder] = None,
 ) -> List[Dict[str, Any]]:
     """
     Search a vector index for documents similar to the provided query.
@@ -264,12 +266,11 @@ def search_vector_index(
     	List[Dict[str, Any]]: Search results containing similarity scores and document metadata.
     """
 
-    store = pgvector_store or PgVectorStore()
-    if not store.is_connected():
+    if not pgvector_store.is_connected():
         raise ModuleExecutionError("pgvector 데이터베이스에 연결할 수 없습니다")
 
     try:
-        detail = store.get_index_detail(index_id, limit=1)
+        detail = pgvector_store.get_index_detail(index_id, limit=1)
         model_name = detail.get("model")
         if not model_name:
             logger.warning(
@@ -292,7 +293,7 @@ def search_vector_index(
             f"인덱스 '{index_id}'의 모델 정보를 확인할 수 없습니다: {err}"
         ) from err
 
-    hits = store.search(
+    hits = pgvector_store.search(
         index_id,
         query_text=query_text,
         model_name=model_name,
@@ -310,7 +311,7 @@ def search_vector_index(
             "column_header": document.get("column_header", []),
             "cell_value": document.get("cell_value", ""),
             "text": document.get("text", ""),
-            "storage": "pgvector (LangChain)",
+            "storage": "PostgreSQL + pgvector",
         }
         for score, document in hits
     ]

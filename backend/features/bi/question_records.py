@@ -17,7 +17,6 @@ from .models import (
     PeriodId,
 )
 
-
 QuestionId = NewType("QuestionId", str)
 AnswerId = NewType("AnswerId", str)
 QuestionVersion = NewType("QuestionVersion", str)
@@ -87,6 +86,7 @@ class BiQuestionRecord(BiContractModel):
 class BiAnswerRecordBase(BiContractModel):
     answer_id: AnswerId = Field(pattern=IDENTIFIER_PATTERN)
     question_id: QuestionId = Field(pattern=IDENTIFIER_PATTERN)
+    workflow_run_id: WorkflowRunId = Field(pattern=IDENTIFIER_PATTERN)
     model_name: str | None = Field(default=None, min_length=1, max_length=128)
     latency_ms: int = Field(ge=0)
     prompt_tokens: int | None = Field(default=None, ge=0)

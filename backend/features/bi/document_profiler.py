@@ -23,7 +23,6 @@ from .profile_models import (
     BiProfileRetrievalRequest,
 )
 
-
 DOCUMENT_PERIOD_DISCOVERY_QUESTION: Final = (
     "이 문서에서 지표 조회에 사용할 수 있는 모든 서로 다른 FY 및 LTM 기간과 "
     "표시 단위를 찾아라. 최신 기간만 선택하거나 "

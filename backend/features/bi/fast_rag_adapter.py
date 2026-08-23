@@ -1,6 +1,18 @@
 from hashlib import sha256
 from typing import assert_never
 
+from modules.common.base_module import QueryContextDTO
+from modules.embedding.query_embedder import EmbeddingsDTO
+from modules.query.decomposer import SubqueriesDTO
+from modules.query.llm_query_router import (
+    LlmQueryRouterOutputDTO,
+    RouterDecisionDTO,
+)
+from modules.retrieval.context_expander import ContextDTO
+from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
+from modules.retrieval.rrf_fusion import RetrievalDTO
+from modules.storage.pgvector_collection_loader import IndexOutputDTO
+
 from .extraction_models import (
     BiContextCell,
     BiRetrievalRequest,
@@ -13,14 +25,7 @@ from .fast_rag_models import (
 )
 from .fast_rag_ports import ModuleRegistryPort, RankedCellStorePort
 from .profile_models import BiProfileRetrievalRequest
-from .rag_adapter import RagPipelineContractError
-from .rag_pipeline_models import (
-    RagEmbeddings,
-    RagIndex,
-    RagQueryContext,
-    RagRankedResult,
-    RagSubqueries,
-)
+from .rag_errors import RagPipelineContractError
 
 
 class FastRagPipelineAdapter:
@@ -39,23 +44,27 @@ class FastRagPipelineAdapter:
         request: BiRetrievalRequest | BiProfileRetrievalRequest,
     ) -> BiRetrievedContext:
         identity = self._identity(request)
-        query_context = RagQueryContext(
+        query_context = QueryContextDTO(
             question_id=self._question_id(identity.question),
             question_text=identity.question,
         )
-        subqueries = self._decompose(query_context)
-        embeddings = self._embed(subqueries)
-        index = self._index_reference(identity, embeddings)
-        ranked = self._retrieve_dense(embeddings, index)
-        self._require_lineage(identity, ranked)
-        cells = self._fetch_ranked_cells(identity, ranked)
+        semantic_match = self._route(query_context)
+        subqueries = self._decompose(query_context, semantic_match)
+        index = self._index_reference(identity)
+        embeddings = self._embed(subqueries, index)
+        dense = self._retrieve_dense(embeddings, index, semantic_match)
+        keyword = self._retrieve_keyword(subqueries, index, semantic_match)
+        retrieval = self._fuse(dense, keyword)
+        self._require_lineage(identity, retrieval)
+        context = self._expand(retrieval)
+        cells = self._fetch_ranked_cells(identity, retrieval)
 
         return BiRetrievedContext(
             request_id=identity.request_id,
             file_name=identity.file_name,
             workbook_hash=identity.workbook_hash,
             index_id=identity.index_id,
-            context_blocks=tuple(self._context_block(cell) for cell in cells),
+            context_blocks=tuple(context.items),
             cells=tuple(
                 BiContextCell(
                     cell_id=cell.cell_id,
@@ -97,61 +106,134 @@ class FastRagPipelineAdapter:
         digest = sha256(normalized.encode("utf-8")).hexdigest()[:16].upper()
         return f"QUERY-{digest}"
 
-    def _decompose(self, query_context: RagQueryContext) -> RagSubqueries:
+    def _route(self, query_context: QueryContextDTO) -> RouterDecisionDTO:
+        output = self._registry.execute(
+            "llm_query_router",
+            {"query_context": query_context.model_dump(mode="json")},
+            {"model": self._settings.decomposer_model},
+        )
+        return LlmQueryRouterOutputDTO.model_validate(output).semantic_match
+
+    def _decompose(
+        self,
+        query_context: QueryContextDTO,
+        semantic_match: RouterDecisionDTO,
+    ) -> SubqueriesDTO:
         output = self._registry.execute(
             "decomposer",
-            {"query_context": query_context.model_dump(mode="json")},
             {
-                "model": self._settings.decomposer_model,
-                "preset": self._settings.decomposer_preset,
+                "query_context": query_context.model_dump(mode="json"),
+                "semantic_match": semantic_match.model_dump(mode="json"),
             },
+            {"model": self._settings.decomposer_model},
         )
-        return RagSubqueries.model_validate(output)
+        return SubqueriesDTO.model_validate(output)
 
-    def _embed(self, subqueries: RagSubqueries) -> RagEmbeddings:
+    def _embed(
+        self,
+        subqueries: SubqueriesDTO,
+        index: IndexOutputDTO,
+    ) -> EmbeddingsDTO:
         output = self._registry.execute(
             "embedder",
-            subqueries.model_dump(mode="json"),
-            {"model": self._settings.embedding_model},
+            {
+                "query_input": subqueries.model_dump(mode="json"),
+                "index_input": index.model_dump(mode="json"),
+            },
+            {},
         )
-        return RagEmbeddings.model_validate(output)
+        return EmbeddingsDTO.model_validate(output)
 
     def _index_reference(
         self,
         identity: RetrievalIdentity,
-        embeddings: RagEmbeddings,
-    ) -> RagIndex:
-        first_embedding = next(iter(embeddings.items.values()), ())
-        if not first_embedding:
-            raise RagPipelineContractError(code="query_embeddings_missing")
-        return RagIndex(
+    ) -> IndexOutputDTO:
+        metadata = self._cell_store.get_index_metadata(identity.index_id)
+        if (
+            str(metadata.get("file_name") or "") != identity.file_name
+            or str(metadata.get("workbook_hash") or "") != identity.workbook_hash
+        ):
+            raise RagPipelineContractError(code="index_lineage_mismatch")
+        model = str(metadata.get("model") or "")
+        dimension = int(metadata.get("dimension") or 0)
+        if not model or dimension < 1:
+            raise RagPipelineContractError(code="index_embedding_contract_missing")
+        return IndexOutputDTO(
             index_id=identity.index_id,
             file_name=identity.file_name,
             workbook_hash=identity.workbook_hash,
-            model=self._settings.embedding_model,
-            dimension=len(first_embedding),
-            document_count=0,
+            model=model,
+            dimension=dimension,
+            document_count=int(metadata.get("document_count") or 0),
         )
 
     def _retrieve_dense(
         self,
-        embeddings: RagEmbeddings,
-        index: RagIndex,
-    ) -> RagRankedResult:
+        embeddings: EmbeddingsDTO,
+        index: IndexOutputDTO,
+        semantic_match: RouterDecisionDTO,
+    ) -> RankedSearchResultDTO:
         output = self._registry.execute(
             "pgvector_retriever",
             {
                 "query_input": embeddings.model_dump(mode="json"),
                 "index_input": index.model_dump(mode="json"),
+                "semantic_match": semantic_match.model_dump(mode="json"),
             },
             {"top_k": self._settings.retrieval_top_k},
         )
-        return RagRankedResult.model_validate(output)
+        return RankedSearchResultDTO.model_validate(output)
+
+    def _retrieve_keyword(
+        self,
+        subqueries: SubqueriesDTO,
+        index: IndexOutputDTO,
+        semantic_match: RouterDecisionDTO,
+    ) -> RankedSearchResultDTO:
+        output = self._registry.execute(
+            "postgres_native_keyword_retriever",
+            {
+                "query_input": subqueries.model_dump(mode="json"),
+                "index_input": index.model_dump(mode="json"),
+                "semantic_match": semantic_match.model_dump(mode="json"),
+            },
+            {"top_k": self._settings.retrieval_top_k},
+        )
+        return RankedSearchResultDTO.model_validate(output)
+
+    def _fuse(
+        self,
+        dense: RankedSearchResultDTO,
+        keyword: RankedSearchResultDTO,
+    ) -> RetrievalDTO:
+        output = self._registry.execute(
+            "rrf_fusion",
+            {
+                "dense_result": dense.model_dump(mode="json"),
+                "bm25_result": keyword.model_dump(mode="json"),
+            },
+            {
+                "rrf_k": self._settings.rrf_k,
+                "top_k": self._settings.fused_top_k,
+            },
+        )
+        return RetrievalDTO.model_validate(output)
+
+    def _expand(self, retrieval: RetrievalDTO) -> ContextDTO:
+        output = self._registry.execute(
+            "pg_context_expander",
+            {"retrieval_json": retrieval.model_dump(mode="json")},
+            {
+                "top_k": self._settings.fused_top_k,
+                "max_blocks": self._settings.context_cell_limit,
+            },
+        )
+        return ContextDTO.model_validate(output)
 
     @staticmethod
     def _require_lineage(
         identity: RetrievalIdentity,
-        ranked: RagRankedResult,
+        ranked: RetrievalDTO,
     ) -> None:
         if (
             ranked.document_context.file_name != identity.file_name
@@ -162,7 +244,7 @@ class FastRagPipelineAdapter:
     def _fetch_ranked_cells(
         self,
         identity: RetrievalIdentity,
-        ranked: RagRankedResult,
+        ranked: RetrievalDTO,
     ) -> tuple[RankedEvidenceCell, ...]:
         ranked_ids = list(dict.fromkeys(item.cell_id for item in ranked.items))
         if not ranked_ids:
@@ -192,10 +274,3 @@ class FastRagPipelineAdapter:
         if not selected:
             raise RagPipelineContractError(code="context_cells_missing")
         return selected
-
-    @staticmethod
-    def _context_block(cell: RankedEvidenceCell) -> str:
-        return (
-            f"Cell ID: {cell.cell_id} | Sheet: {cell.sheet_name} | "
-            f"Coordinate: {cell.cell_coord}\n{cell.source_text}"
-        )

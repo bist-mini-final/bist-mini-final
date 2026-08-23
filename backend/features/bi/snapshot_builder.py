@@ -32,6 +32,7 @@ from .models import (
     PeriodId,
     PeriodKind,
     RefreshStatus,
+    SnapshotId,
     SnapshotStatus,
     UnavailableObservation,
     ValueKind,
@@ -41,7 +42,6 @@ from .snapshot_projection import (
     project_build_input,
     project_refresh_input,
 )
-
 
 SERIES_STATUS_PRIORITY: Final = (
     MetricStatus.INVALID,
@@ -97,8 +97,10 @@ class BiSnapshotBuilder:
                         ].observation
                 case DerivedMetricDefinition():
                     continue
-                case unreachable:
-                    assert_never(unreachable)
+                case _:
+                    raise TypeError(
+                        f"지원하지 않는 BI metric definition: {type(definition).__name__}"
+                    )
 
         for period in projection.periods:
             period_id = period.period_id
@@ -202,7 +204,9 @@ class BiSnapshotBuilder:
                 FORMULA_VERSION,
             )
         )
-        snapshot_id = "snapshot-" + sha256(identity.encode("utf-8")).hexdigest()[:24]
+        snapshot_id = SnapshotId(
+            "snapshot-" + sha256(identity.encode("utf-8")).hexdigest()[:24]
+        )
         return BiDashboardSnapshot(
             schema_version=1,
             company=BiCompany(

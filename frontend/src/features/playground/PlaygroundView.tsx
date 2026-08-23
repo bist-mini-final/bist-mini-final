@@ -15,7 +15,8 @@ import { ModuleExecutionContext } from './contexts/ModuleExecutionContext';
 import { pipelineApi } from './services/api';
 import './playground.css';
 
-const DEFAULT_WORKFLOW_ID = 'default';
+const DEFAULT_WORKFLOW_ID = 'rag_query';
+const CANONICAL_WORKFLOW_IDS = new Set(['rag_query', 'excel_ingestion']);
 
 function PlaygroundWorkspace() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(
@@ -24,10 +25,7 @@ function PlaygroundWorkspace() {
   const modulePanel = useResizablePanel();
   const controller = usePipelineController();
 
-  // Workflow list + active selection (default = "default" json)
-  // Keep the canonical baseline selectable even while the workflow-list API is
-  // starting up or temporarily unavailable. Previously an API failure left the
-  // list empty, which also hid the selector entirely.
+  // Keep the canonical RAG job selectable while the API is starting.
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([
     { id: DEFAULT_WORKFLOW_ID, name: DEFAULT_WORKFLOW_ID },
   ]);
@@ -43,7 +41,7 @@ function PlaygroundWorkspace() {
     const controller = new AbortController();
     pipelineApi.listWorkflows(controller.signal).then(({ workflows: list }) => {
       const options: WorkflowOption[] = list.map((wf) => ({ id: wf.id, name: wf.name }));
-      // Ensure "default" is always first in the list
+      // Keep the primary RAG job first.
       options.sort((a, b) => {
         if (a.id === DEFAULT_WORKFLOW_ID) return -1;
         if (b.id === DEFAULT_WORKFLOW_ID) return 1;
@@ -51,8 +49,7 @@ function PlaygroundWorkspace() {
       });
       setWorkflows(options);
     }).catch(() => {
-      // The default option above remains available; a later refresh will add
-      // the saved RAG workflows as soon as the backend is reachable.
+      // The canonical RAG option remains available until the next refresh.
     });
     return () => controller.abort();
   }, []);
@@ -76,10 +73,7 @@ function PlaygroundWorkspace() {
     search: window.location.search,
     setQueryText: controller.setQueryText,
   });
-  // Use loose compatibility so that adding new nodes to the canvas does not
-  // wipe out the execution results of already-completed nodes.  New nodes have
-  // no entry in run.nodes and are therefore shown as idle by applyRun().
-  const currentRun = workflow.latestRunCompatibleWithGraph ? workflow.latestRun : null;
+  const currentRun = workflow.latestRunMatchesGraph ? workflow.latestRun : null;
   const progressedBatches = currentRun?.batches.filter(
     (batch) => batch.status !== 'pending'
   );
@@ -108,20 +102,17 @@ function PlaygroundWorkspace() {
     }
   };
 
-  const handleNodeExecute = async (nodeId: string) => {
+  const handleNodeExecute = async (_nodeId: string) => {
     controller.dismissError();
-    graph.clearNodeExecutionState(nodeId);
-    graph.resumeNodeExecution(nodeId);
     try {
-      await workflow.executeNode(
-        nodeId,
+      await workflow.executeAll(
         controller.queryText,
         controller.applyWorkflowRun
       );
     } catch (error: unknown) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
         controller.reportError(
-          error instanceof Error ? error.message : '선택한 모듈 실행에 실패했습니다.'
+          error instanceof Error ? error.message : 'Kubernetes 워크플로 실행에 실패했습니다.'
         );
       }
     }
@@ -195,6 +186,7 @@ function PlaygroundWorkspace() {
   };
 
   const handleRenameWorkflow = () => {
+    if (CANONICAL_WORKFLOW_IDS.has(activeWorkflowId)) return;
     const name = window.prompt('워크플로 이름을 입력하세요.', activeWorkflowName);
     if (!name?.trim() || name.trim() === activeWorkflowName) return;
     void pipelineApi.saveWorkflow(activeWorkflowId, name.trim(), graph.exportGraph())
@@ -203,7 +195,7 @@ function PlaygroundWorkspace() {
   };
 
   const handleDeleteWorkflow = () => {
-    if (activeWorkflowId === DEFAULT_WORKFLOW_ID || !window.confirm(`'${activeWorkflowName}' 워크플로를 삭제할까요?`)) return;
+    if (CANONICAL_WORKFLOW_IDS.has(activeWorkflowId) || !window.confirm(`'${activeWorkflowName}' 워크플로를 삭제할까요?`)) return;
     void pipelineApi.deleteWorkflow(activeWorkflowId)
       .then(async () => {
         await refreshWorkflows();
@@ -282,7 +274,13 @@ function PlaygroundWorkspace() {
           }}
           onToggleRun={() => void handleAutoRun()}
           saveStatus={workflow.saveStatus}
-          onSave={() => void workflow.saveNow().catch(() => undefined)}
+          onSave={() => {
+            if (workflow.isCanonicalWorkflow) {
+              handleDuplicateWorkflow();
+              return;
+            }
+            void workflow.saveNow().catch(() => undefined);
+          }}
           isClearingCache={workflow.isClearingCache}
           onClearCache={() => void handleClearCache()}
           metrics={runMetrics}
@@ -312,7 +310,11 @@ function PlaygroundWorkspace() {
             width={modulePanel.width}
             onResizeStart={modulePanel.startResize}
             onResizeBy={modulePanel.resizeBy}
-            onAddNode={(type) => {
+          onAddNode={(type) => {
+              if (workflow.isCanonicalWorkflow) {
+                controller.reportError('표준 Job은 읽기 전용입니다. 워크플로를 복제한 뒤 편집하세요.');
+                return;
+              }
               graph.addNode(type);
               if (!window.matchMedia('(min-width: 1024px)').matches) {
                 setIsPaletteOpen(false);
@@ -334,6 +336,7 @@ function PlaygroundWorkspace() {
             onOpenPalette={() => setIsPaletteOpen(true)}
             workflows={workflows}
             activeWorkflowId={activeWorkflowId}
+            readOnly={workflow.isCanonicalWorkflow}
             onSelectWorkflow={handleSelectWorkflow}
             onCreateWorkflow={handleCreateWorkflow}
             onDuplicateWorkflow={handleDuplicateWorkflow}

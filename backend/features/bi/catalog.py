@@ -5,7 +5,6 @@ from typing import Final, Mapping
 
 from .models import MetricId, ValueKind
 
-
 CATALOG_VERSION: Final = "1"
 FORMULA_VERSION: Final = "1"
 SOURCE_QUESTION_TEMPLATE: Final = (

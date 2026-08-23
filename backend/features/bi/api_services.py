@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from .materialization_models import BiCompanyIndexEntry, BiMaterializationOutcome
+from .materialization_models import BiCompanyIndexEntry
 from .materializer import ClockPort
 from .models import (
     BiCompany,
@@ -40,20 +40,12 @@ class BiApiStorePort(Protocol):
     ) -> BiMaterializationJob | None: ...
 
 
-class BiMaterializationRunnerPort(Protocol):
-    def materialize(
+class BiMaterializationQueuePort(Protocol):
+    def enqueue(
         self,
         request: BiMaterializationRequest,
-        job_id: JobId,
-    ) -> BiMaterializationOutcome: ...
-
-
-class BiInitialSnapshotPort(Protocol):
-    def materialize(
-        self,
-        company: BiCompany,
-        workbook_hash: str,
-    ) -> BiDashboardSnapshot | None: ...
+        job: BiMaterializationJob,
+    ) -> BiMaterializationJob: ...
 
 
 class BiQuestionApiPort(Protocol):
@@ -71,7 +63,6 @@ class BiQuestionApiPort(Protocol):
 @dataclass(frozen=True, slots=True)
 class BiApiServices:
     store: BiApiStorePort
-    runner: BiMaterializationRunnerPort
+    materializations: BiMaterializationQueuePort
     clock: ClockPort
     questions: BiQuestionApiPort
-    initial_snapshots: BiInitialSnapshotPort | None = None

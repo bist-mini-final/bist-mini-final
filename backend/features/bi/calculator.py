@@ -11,7 +11,6 @@ from .models import (
     UnavailableObservation,
 )
 
-
 HUNDRED: Final = Decimal("100")
 UNAVAILABLE_PRIORITY: Final = (
     MetricStatus.INVALID,
@@ -146,8 +145,8 @@ def _calculate_ratio(
                 ),
                 inputs,
             )
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise TypeError("ratio inputs were not narrowed to available observations")
 
 
 def calculate_revenue_yoy_growth(
@@ -182,8 +181,8 @@ def calculate_revenue_yoy_growth(
                 ),
                 inputs,
             )
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise TypeError("growth inputs were not narrowed to available observations")
 
 
 def calculate_operating_margin(
@@ -222,8 +221,8 @@ def calculate_free_cash_flow(
                 ),
                 inputs,
             )
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise TypeError("cash-flow inputs were not narrowed to available observations")
 
 
 def calculate_total_debt(
@@ -239,8 +238,8 @@ def calculate_total_debt(
             return unavailable
         case None:
             pass
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise TypeError("debt inputs were not narrowed to available observations")
 
     inputs = components.observations()
     period_id = components.short_term_debt.period_id
@@ -263,8 +262,8 @@ def calculate_total_debt(
                 ),
                 inputs,
             )
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise TypeError("total-debt inputs were not narrowed to available observations")
 
 
 def calculate_net_debt(
@@ -285,5 +284,5 @@ def calculate_net_debt(
                 DerivedValue(total_debt.period_id, formula_id, debt - cash),
                 inputs,
             )
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise TypeError("net-debt inputs were not narrowed to available observations")

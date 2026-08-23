@@ -45,7 +45,7 @@ from typing import Any, Dict, Optional
 from pydantic import Field
 
 from backend.core.settings import PROCESSED_DATA_DIR
-from backend.providers.embeddings.factory import EmbeddingEncoder
+from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PGVECTOR_INSERT_BATCH_SIZE, PgVectorStore
@@ -106,15 +106,15 @@ class PgVectorIndexWriterModule(BaseModule):
 
     def __init__(
         self,
-        artifact_store: Optional[EmbeddingArtifactStore] = None,
-        db_manager: Optional[DatabaseManager] = None,
-        pgvector_store: Optional[PgVectorStore] = None,
+        artifact_store: EmbeddingArtifactStore,
+        db_manager: DatabaseManager,
+        pgvector_store: PgVectorStore,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
     ) -> None:
-        self.artifact_store = artifact_store or EmbeddingArtifactStore()
-        self.db_manager = db_manager or DatabaseManager()
-        self.pgvector_store = pgvector_store or PgVectorStore()
+        self.artifact_store = artifact_store
+        self.db_manager = db_manager
+        self.pgvector_store = pgvector_store
         self.embedding_encoder = embedding_encoder
         self.processed_dir = processed_dir.resolve()
 

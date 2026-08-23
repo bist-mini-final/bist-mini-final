@@ -30,7 +30,7 @@ export interface JsonSchema {
 export interface ModuleDefinition {
   type: ModuleType;
   label: string;
-  category: 'Source' | 'Logic' | 'Transform' | 'Output';
+  category: string;
   description: string;
   inputs: string[];
   outputs: string[];
@@ -152,7 +152,7 @@ export interface WorkflowRun {
   workflow_updated_at: string;
   status: RunStatus;
   orchestration?: {
-    backend: 'direct' | 'kubernetes';
+    backend: 'kubernetes';
     deployment_name: string | null;
     external_run_id: string | null;
     submission_attempt: number;

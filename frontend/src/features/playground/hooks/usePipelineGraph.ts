@@ -11,12 +11,19 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import {
-  createInitialEdges,
-  createInitialNodes,
   MODULE_NODE_TYPES,
   NODE_COLORS,
   NODE_MODULE_TYPES,
 } from '../config/pipeline';
+import { nodeModuleType } from '../adapters/reactFlowGraph';
+import { collectDescendantNodeIds, summarizeDag } from '../domain/graph';
+import {
+  moduleConfigDefaults,
+  moduleInputDefaults,
+  numericRecord,
+  objectConfig,
+  resolveTargetInput,
+} from '../domain/moduleDefaults';
 import type {
   ModuleDefinition,
   ModuleType,
@@ -38,209 +45,6 @@ const BRANCH_COLORS: Record<string, string> = {
   generated: '#16a34a',
   cached: '#2563eb',
 };
-const FALLBACK_BRANCH_OUTPUTS: Partial<Record<ModuleType, Record<string, string>>> = {
-  query_input: {
-    generated: 'query_context',
-    cached: 'cached_answer',
-  },
-};
-
-const LEGACY_CONFIG_INPUT_FIELDS: Partial<Record<ModuleType, string[]>> = {
-  processed_file_selector: ['file_name'],
-  qa_example_loader: ['file_name'],
-};
-
-function migrateLegacyConnections(graph: WorkflowGraph): WorkflowGraph {
-  const nodes = graph.nodes.map((node) => {
-    const migratedFields = LEGACY_CONFIG_INPUT_FIELDS[node.module_type] ?? [];
-    const config = { ...node.config };
-    const values = { ...node.values };
-    migratedFields.forEach((field) => {
-      if (values[field] === undefined && config[field] !== undefined) {
-        values[field] = config[field];
-      }
-      delete config[field];
-    });
-    return { ...node, config, values };
-  });
-  const moduleTypeByNodeId = new Map(
-    nodes.map((node) => [node.id, node.module_type])
-  );
-  const seenConnections = new Set<string>();
-  const edges: WorkflowGraph['edges'] = [];
-
-  for (const edge of graph.edges) {
-    const sourceType = moduleTypeByNodeId.get(edge.source);
-    const targetType = moduleTypeByNodeId.get(edge.target);
-    // A node can be deleted before ReactFlow emits its connected-edge removal.
-    // Never keep that stale edge in a saved graph or send it to DAG validation.
-    if (!sourceType || !targetType) continue;
-    if (sourceType === 'query_input' && targetType === 'reader') {
-      continue;
-    }
-    let sourceOutput = edge.source_output;
-    let targetInput = edge.target_input;
-
-    if (sourceType === 'query_input' && targetType === 'decomposer') {
-      if (!sourceOutput || sourceOutput === 'question_text') sourceOutput = 'query_context';
-      if (!targetInput || targetInput === 'question_text') targetInput = 'query_context';
-    }
-
-    if (targetInput === 'input' && targetType === 'bm25_retriever') {
-      if (sourceType === 'decomposer') targetInput = 'query_input';
-      if (sourceType === 'cell_text_serializer') targetInput = 'document_input';
-    }
-    if (targetInput === 'input' && targetType === 'dense_retriever') {
-      if (sourceType === 'embedder') targetInput = 'query_input';
-      if (sourceType === 'vector_index_writer') targetInput = 'index_input';
-    }
-
-    const migratedEdge = {
-      ...edge,
-      source_output: sourceOutput,
-      target_input: targetInput,
-    };
-    const connectionKey = JSON.stringify([
-      migratedEdge.source,
-      migratedEdge.target,
-      migratedEdge.source_output ?? null,
-      migratedEdge.target_input ?? null,
-      migratedEdge.source_branch ?? null,
-    ]);
-    if (seenConnections.has(connectionKey)) continue;
-    seenConnections.add(connectionKey);
-    edges.push(migratedEdge);
-  }
-
-  return { ...graph, nodes, edges };
-}
-
-function objectConfig(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function nodeModuleType(node: Pick<Node, 'type' | 'data'> | undefined): ModuleType | undefined {
-  const explicitType = node?.data.moduleType;
-  return typeof explicitType === 'string'
-    ? explicitType as ModuleType
-    : NODE_MODULE_TYPES[node?.type ?? ''];
-}
-
-function numericRecord(value: unknown): Record<string, number> {
-  return Object.fromEntries(
-    Object.entries(objectConfig(value)).filter(
-      (entry): entry is [string, number] => typeof entry[1] === 'number'
-    )
-  );
-}
-
-function moduleConfigDefaults(definition: ModuleDefinition | undefined): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(definition?.config_schema.properties ?? {}).flatMap(([field, schema]) =>
-      schema.default === undefined ? [] : [[field, schema.default]]
-    )
-  );
-}
-
-function moduleInputDefaults(definition: ModuleDefinition | undefined): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(definition?.input_schema.properties ?? {}).flatMap(([field, schema]) =>
-      schema.default === undefined ? [] : [[field, schema.default]]
-    )
-  );
-}
-
-function resolveTargetInput(
-  definition: ModuleDefinition | undefined,
-  declaredInput: unknown,
-): string | undefined {
-  if (
-    typeof declaredInput === 'string'
-    && definition?.inputs.includes(declaredInput)
-  ) {
-    return declaredInput;
-  }
-  return definition?.inputs.length === 1 ? definition.inputs[0] : undefined;
-}
-
-const LEGACY_DECOMPOSER_SYSTEM_PROMPT_PREFIX = 'You are an expert financial DB query planner.';
-const LEGACY_DECOMPOSER_USER_PROMPT = 'Decompose the following financial question into atomic subqueries:\nQuestion: {question}';
-
-function moduleConfig(nodeType: string | undefined, value: unknown): Record<string, unknown> {
-  const config = objectConfig(value);
-  if (
-    NODE_MODULE_TYPES[nodeType ?? ''] === 'decomposer'
-    && typeof config.system_prompt === 'string'
-    && config.system_prompt.startsWith(LEGACY_DECOMPOSER_SYSTEM_PROMPT_PREFIX)
-    && config.user_prompt_template === LEGACY_DECOMPOSER_USER_PROMPT
-  ) {
-    const current = { ...config };
-    delete current.system_prompt;
-    delete current.user_prompt_template;
-    return current;
-  }
-  return config;
-}
-
-function collectDescendantNodeIds(rootNodeId: string, graphEdges: Edge[]): Set<string> {
-  const collected = new Set([rootNodeId]);
-  const queue = [rootNodeId];
-
-  while (queue.length > 0) {
-    const sourceNodeId = queue.shift();
-    graphEdges.forEach((edge) => {
-      if (edge.source !== sourceNodeId || collected.has(edge.target)) return;
-      collected.add(edge.target);
-      queue.push(edge.target);
-    });
-  }
-  return collected;
-}
-
-function summarizeDag(nodes: Node[], edges: Edge[]) {
-  if (nodes.length === 0) return { batchCount: 0, hasCycle: false };
-
-  const nodeIds = new Set(nodes.map((node) => node.id));
-  const indegree = new Map(nodes.map((node) => [node.id, 0]));
-  const outgoing = new Map(nodes.map((node) => [node.id, [] as string[]]));
-  const dependencies = new Set<string>();
-
-  edges.forEach((edge) => {
-    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) return;
-    const dependency = `${edge.source}\u0000${edge.target}`;
-    if (dependencies.has(dependency)) return;
-    dependencies.add(dependency);
-    indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
-    outgoing.get(edge.source)?.push(edge.target);
-  });
-
-  let currentBatch = nodes
-    .map((node) => node.id)
-    .filter((nodeId) => indegree.get(nodeId) === 0);
-  let processedCount = 0;
-  let batchCount = 0;
-
-  while (currentBatch.length > 0) {
-    batchCount += 1;
-    processedCount += currentBatch.length;
-    const nextBatch: string[] = [];
-
-    currentBatch.forEach((nodeId) => {
-      outgoing.get(nodeId)?.forEach((targetId) => {
-        const nextIndegree = (indegree.get(targetId) ?? 0) - 1;
-        indegree.set(targetId, nextIndegree);
-        if (nextIndegree === 0) nextBatch.push(targetId);
-      });
-    });
-    currentBatch = nextBatch;
-  }
-
-  const hasCycle = processedCount !== nodes.length;
-  return { batchCount: hasCycle ? 0 : batchCount, hasCycle };
-}
-
 export function usePipelineGraph(options: PipelineGraphOptions) {
   const {
     queryText,
@@ -261,9 +65,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     (nodeType?: string, explicitModuleType?: ModuleType) => {
       const moduleType = explicitModuleType ?? NODE_MODULE_TYPES[nodeType ?? ''];
       const definition = modules.find((module) => module.type === moduleType);
-      const branchOutputs = definition?.branch_outputs
-        ?? FALLBACK_BRANCH_OUTPUTS[moduleType]
-        ?? {};
+      const branchOutputs = definition?.branch_outputs ?? {};
       const shared = {
         queryText,
         setQueryText,
@@ -279,12 +81,9 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
 
   const [nodes, setNodes, _onNodesChange] = useNodesState<Node>(
-    createInitialNodes().map((node) => ({
-      ...node,
-      data: { ...node.data, ...sharedNodeData(node.type) },
-    }))
+    []
   );
-  const [edges, setEdges, _onEdgesChange] = useEdgesState(createInitialEdges());
+  const [edges, setEdges, _onEdgesChange] = useEdgesState<Edge>([]);
 
   const onNodesChange = useCallback<typeof _onNodesChange>(
     (changes) => {
@@ -408,7 +207,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       return {
         ...existing,
         ...sharedNodeData(nodeType, explicitModuleType),
-        config: moduleConfig(nodeType, existing.config),
+        config: objectConfig(existing.config),
         values: objectConfig(existing.values),
         onConfigChange: (patch: Record<string, unknown>) => updateNodeConfig(nodeId, patch),
         onValuesChange: (patch: Record<string, unknown>) => updateNodeValues(nodeId, patch),
@@ -606,7 +405,7 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     setViewport(nextViewport);
   }, []);
 
-  const exportGraph = useCallback((): WorkflowGraph => migrateLegacyConnections({
+  const exportGraph = useCallback((): WorkflowGraph => ({
     nodes: nodes.flatMap((node) => {
       const moduleType = nodeModuleType(node);
       if (!moduleType) return [];
@@ -661,20 +460,19 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
 
   const replaceGraph = useCallback(
     (graph: WorkflowGraph) => {
-      const migratedGraph = migrateLegacyConnections(graph);
-      const savedQuery = migratedGraph.nodes.find(
+      const savedQuery = graph.nodes.find(
         (workflowNode) => workflowNode.module_type === 'query_input'
       )?.values?.query;
       setQueryText(typeof savedQuery === 'string' ? savedQuery : '');
 
       stoppedNodeIdsRef.current = new Set(
-        migratedGraph.nodes
+        graph.nodes
           .filter((workflowNode) => workflowNode.ui?.execution_stopped === true)
           .map((workflowNode) => workflowNode.id)
       );
 
       setNodes(
-        migratedGraph.nodes.map((workflowNode) => {
+        graph.nodes.map((workflowNode) => {
           const nodeType = MODULE_NODE_TYPES[workflowNode.module_type] ?? 'generic_module';
           return {
             id: workflowNode.id,
@@ -693,12 +491,12 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
         })
       );
       setEdges(
-        migratedGraph.edges.map((workflowEdge): Edge => {
-          const targetNode = migratedGraph.nodes.find((node) => node.id === workflowEdge.target);
+        graph.edges.map((workflowEdge): Edge => {
+          const targetNode = graph.nodes.find((node) => node.id === workflowEdge.target);
           const targetDefinition = modules.find(
             (module) => module.type === targetNode?.module_type
           );
-          const sourceNode = migratedGraph.nodes.find((node) => node.id === workflowEdge.source);
+          const sourceNode = graph.nodes.find((node) => node.id === workflowEdge.source);
           const sourceDefinition = modules.find(
             (module) => module.type === sourceNode?.module_type
           );
@@ -730,11 +528,11 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
           };
         })
       );
-      viewportRef.current = migratedGraph.viewport;
-      setViewport(migratedGraph.viewport);
+      viewportRef.current = graph.viewport;
+      setViewport(graph.viewport);
       window.requestAnimationFrame(() => {
-        void instanceRef.current?.setViewport(migratedGraph.viewport);
-        migratedGraph.nodes.forEach((workflowNode) => updateNodeInternals(workflowNode.id));
+        void instanceRef.current?.setViewport(graph.viewport);
+        graph.nodes.forEach((workflowNode) => updateNodeInternals(workflowNode.id));
       });
     },
     [decorateNodeData, modules, setEdges, setNodes, setQueryText, updateNodeInternals]

@@ -44,7 +44,6 @@ from typing import Any, ClassVar, Dict, List, Literal, Optional
 import openpyxl
 from pydantic import BaseModel, Field, model_validator
 
-from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_llm import (
@@ -161,14 +160,13 @@ class CompanyEntityExtractorModule(BaseLLMModule):
 
     def __init__(
         self,
-        catalog: WorkbookCatalog | None = None,
-        processed_dir: Path = PROCESSED_DATA_DIR,
-        completion_client: Optional[Any] = None,
-        pgvector_store: Optional[PgVectorStore] = None,
+        completion_client: Any,
+        pgvector_store: PgVectorStore,
+        catalog: WorkbookCatalog,
     ) -> None:
         super().__init__(completion_client=completion_client)
-        self.catalog = catalog or WorkbookCatalog(processed_dir)
-        self.pgvector_store = pgvector_store or PgVectorStore()
+        self.catalog = catalog
+        self.pgvector_store = pgvector_store
 
     @staticmethod
     def _heuristic(file_name: str) -> Dict[str, Any]:
@@ -287,13 +285,9 @@ class CompanyEntityExtractorModule(BaseLLMModule):
         }
 
 
-# Backward compatibility alias
-CompanyEntityExtractorExecutionDTO = CompanyEntityExtractorInputDTO
-
 __all__ = [
     "COMPANY_EXTRACTION_SYSTEM_PROMPT",
     "CompanyEntityExtractorConfigDTO",
-    "CompanyEntityExtractorExecutionDTO",
     "CompanyEntityExtractorInputDTO",
     "CompanyEntityExtractorModule",
     "CompanyEntityExtractorOutputDTO",

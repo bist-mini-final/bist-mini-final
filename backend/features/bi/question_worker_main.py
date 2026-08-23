@@ -2,19 +2,21 @@ import os
 import socket
 from uuid import uuid4
 
-from backend.providers.llm.chat_completion import ChatCompletionClient
-from backend.engine.runtime.registry import ModuleRegistry
+from backend.bootstrap.container import RuntimeContainer
 
 from .composition import create_bi_question_worker
+from .database_schema import ensure_bi_schema
 from .question_records import WorkflowRunId
 
 
-def main() -> int:
-    completion_client = ChatCompletionClient()
-    registry = ModuleRegistry(
-        completion_client=completion_client,
+def _run(container: RuntimeContainer) -> int:
+    completion_client = container.completion_client
+    registry = container.services.module_registry
+    ensure_bi_schema(registry.db_manager.database_url)
+    worker = create_bi_question_worker(
+        registry,
+        completion_client,
     )
-    worker = create_bi_question_worker(registry, completion_client)
     kubernetes_job_name = os.getenv("KUBERNETES_JOB_NAME")
     worker_id = WorkflowRunId(
         kubernetes_job_name
@@ -29,6 +31,11 @@ def main() -> int:
             f"finished with {completed.status.value}"
         )
     return 0
+
+
+def main() -> int:
+    with RuntimeContainer.create(require_database=True) as container:
+        return _run(container)
 
 
 if __name__ == "__main__":

@@ -8,10 +8,6 @@ from pydantic import ValidationError
 
 from backend.core.telemetry import trace_node_execution
 from backend.engine.runtime.registry_base import BaseModuleRegistry
-from backend.engine.runtime.worker import (
-    CancellableModuleWorker,
-    ModuleWorkerCancelled,
-)
 from modules.common.base_module import ModuleExecutionError
 
 from .history import compact_history_value
@@ -47,7 +43,6 @@ class WorkflowExecutor:
         module_registry: BaseModuleRegistry,
         run_store: RunStore,
         result_cache: ResultCache,
-        module_worker: Any = None,
     ) -> None:
         self.module_registry = module_registry
         self.run_store = run_store
@@ -56,14 +51,6 @@ class WorkflowExecutor:
         self._cancellation_lock = Lock()
         self._active_run_ids: Set[str] = set()
         self._cancelled_run_ids: Set[str] = set()
-        worker_spec = module_registry.isolated_worker_spec
-        self._module_worker = (
-            module_worker
-            if module_worker is not None
-            else CancellableModuleWorker(worker_spec)
-            if worker_spec is not None
-            else None
-        )
 
     def validate_graph(self, graph: WorkflowGraph) -> List[List[str]]:
         if not graph.nodes:
@@ -165,7 +152,7 @@ class WorkflowExecutor:
         
         Parameters:
             workflow (WorkflowDocument): Workflow definition to execute.
-            request (WorkflowExecutionRequest): Runtime inputs, configuration overrides, cache settings, and optional run inheritance settings.
+            request (WorkflowExecutionRequest): Runtime inputs, configuration overrides, and cache settings.
         
         Returns:
             WorkflowRun: The newly created and persisted workflow run.
@@ -217,52 +204,6 @@ class WorkflowExecutor:
             for node_id in node_ids
         }
 
-        # Collect node states to inherit from a previous run when only new nodes
-        # have been added.  Only nodes that (a) still exist in the new graph with
-        # the same module_type and config, and (b) completed successfully are
-        # copied so that upstream branch checks pass for the new node.
-        inherited_states: Dict[str, RunNodeState] = {}
-        if request.inherit_from_run_id:
-            try:
-                prev_run = self.run_store.load(request.inherit_from_run_id)
-                # Build a lookup of the new graph's nodes
-                new_node_map = {
-                    node.id: node for node in execution_graph.nodes
-                }
-                new_edge_set = {
-                    (e.source, e.target, e.source_output, e.target_input, e.source_branch)
-                    for e in execution_graph.edges
-                }
-                prev_edge_set = {
-                    (e.source, e.target, e.source_output, e.target_input, e.source_branch)
-                    for e in prev_run.graph.edges
-                }
-                for prev_node in prev_run.graph.nodes:
-                    new_node = new_node_map.get(prev_node.id)
-                    if new_node is None:
-                        continue  # node was removed — skip
-                    if new_node.module_type != prev_node.module_type:
-                        continue  # module type changed — skip
-                    if new_node.config != prev_node.config:
-                        continue  # config changed — skip
-                    if new_node.values != prev_node.values:
-                        continue  # source/runtime values changed — skip
-                    # Check that all edges touching this node are still present
-                    prev_node_edges = {
-                        e for e in prev_edge_set
-                        if e[0] == prev_node.id or e[1] == prev_node.id
-                    }
-                    if not prev_node_edges.issubset(new_edge_set):
-                        continue  # edges changed — skip
-                    prev_state = prev_run.nodes.get(prev_node.id)
-                    if prev_state is None:
-                        continue
-                    if prev_state.status not in ("succeeded", "skipped"):
-                        continue  # only inherit terminal states
-                    inherited_states[prev_node.id] = prev_state
-            except (FileNotFoundError, ValueError):
-                pass  # ignore missing / corrupt previous run
-
         run = WorkflowRun(
             id=f"run-{uuid4().hex}",
             workflow_id=workflow.id,
@@ -276,134 +217,15 @@ class WorkflowExecutor:
                 for index, node_ids in enumerate(batches)
             ],
             nodes={
-                node.id: (
-                    inherited_states[node.id].model_copy(
-                        update={"batch_index": batch_index_by_node[node.id]}
-                    )
-                    if node.id in inherited_states
-                    else RunNodeState(
-                        node_id=node.id,
-                        module_type=node.module_type,
-                        batch_index=batch_index_by_node[node.id],
-                    )
+                node.id: RunNodeState(
+                    node_id=node.id,
+                    module_type=node.module_type,
+                    batch_index=batch_index_by_node[node.id],
                 )
                 for node in execution_graph.nodes
             },
         )
-        # When inheriting, update the run status to reflect already-completed
-        # nodes so the run is not stuck in 'queued' with completed batches.
-        if inherited_states:
-            self._refresh_run_status(run)
         return self.run_store.save(run)
-
-    def execute_next_batch(self, run_id: str) -> WorkflowRun:
-        with self._execution_lock:
-            return self._run_cancellable(run_id, self._execute_next_batch)
-
-    async def execute_and_stream(self, run_id: str):
-        """Asynchronously execute remaining batches in the DAG and yield live event dicts."""
-        import asyncio
-
-        loop = asyncio.get_running_loop()
-
-        self._raise_if_cancelled(run_id)
-        run = self.run_store.load(run_id)
-        yield {
-            "event": "run_started",
-            "data": {
-                "run_id": run.id,
-                "workflow_id": run.workflow_id,
-                "status": run.status,
-                "batches_count": len(run.batches),
-                "nodes_count": len(run.nodes),
-            },
-        }
-
-        while run.status in ("queued", "running", "paused"):
-            self._raise_if_cancelled(run_id)
-            next_batch = next(
-                (
-                    b
-                    for b in run.batches
-                    if b.status not in ("succeeded", "skipped")
-                ),
-                None,
-            )
-            if next_batch is None:
-                break
-
-            yield {
-                "event": "batch_started",
-                "data": {
-                    "batch_index": next_batch.index,
-                    "node_ids": next_batch.node_ids,
-                },
-            }
-
-            def _step():
-                return self.execute_next_batch(run_id)
-
-            try:
-                run = await loop.run_in_executor(None, _step)
-            except Exception as exc:
-                yield {
-                    "event": "error",
-                    "data": {"error": str(exc), "run_id": run_id},
-                }
-                raise
-
-            for node_id in next_batch.node_ids:
-                node_state = run.nodes.get(node_id)
-                if node_state:
-                    yield {
-                        "event": (
-                            "node_completed"
-                            if node_state.status in ("succeeded", "skipped")
-                            else "node_failed"
-                        ),
-                        "data": {
-                            "node_id": node_id,
-                            "module_type": node_state.module_type,
-                            "status": node_state.status,
-                            "cache_hit": node_state.cache_hit,
-                            "elapsed_ms": node_state.elapsed_ms,
-                            "cost_usd": node_state.cost_usd,
-                            "usage": node_state.usage,
-                            "output": node_state.output,
-                            "error": node_state.error,
-                        },
-                    }
-
-            yield {
-                "event": "batch_completed",
-                "data": {
-                    "batch_index": next_batch.index,
-                    "status": next_batch.status,
-                },
-            }
-
-            if run.status in ("completed", "failed"):
-                break
-
-        yield {
-            "event": "run_completed",
-            "data": {
-                "run_id": run.id,
-                "status": run.status,
-                "run": run.model_dump(mode="json"),
-            },
-        }
-
-    def execute_node(self, run_id: str, node_id: str) -> WorkflowRun:
-        """Execute exactly one requested node and invalidate only its descendants."""
-
-        with self._execution_lock:
-            return self._run_cancellable(
-                run_id,
-                lambda active_run_id: self._execute_single_node(
-                    active_run_id, node_id
-                ),
-            )
 
     def execute_scheduled_node(self, run_id: str, node_id: str) -> WorkflowRun:
         """Execute one orchestration-owned node without invalidating descendants.
@@ -451,11 +273,11 @@ class WorkflowExecutor:
             state.skip_reason = skip_reason
             state.completed_at = utc_now_iso()
             self._refresh_run_status(run)
-            return self.run_store.save(run)
+            return self.run_store.save_node(run, node_id)
 
         try:
             self._execute_node(run, node, state)
-        except (DagExecutionCancelled, ModuleWorkerCancelled):
+        except DagExecutionCancelled:
             raise
         except Exception as error:
             state.status = "failed"
@@ -469,165 +291,12 @@ class WorkflowExecutor:
             )
             state.completed_at = utc_now_iso()
             self._refresh_run_status(run)
-            self.run_store.save(run)
+            self.run_store.save_node(run, node_id)
             # The batch worker owns retry/failure policy, so preserve it.
             raise
 
         self._refresh_run_status(run)
-        return self.run_store.save(run)
-
-    def _execute_single_node(self, run_id: str, node_id: str) -> WorkflowRun:
-        """
-        Execute a node and its downstream dependents as a standalone run segment.
-        
-        Parameters:
-            run_id (str): Identifier of the workflow run.
-            node_id (str): Identifier of the node to execute.
-        
-        Returns:
-            WorkflowRun: The persisted workflow run after execution.
-        
-        Raises:
-            DagExecutionError: If the node is unknown or cannot currently be executed.
-            DagExecutionCancelled: If execution is cancelled.
-            ModuleWorkerCancelled: If the execution worker is cancelled.
-        """
-        self._raise_if_cancelled(run_id)
-        run = self.run_store.load(run_id)
-        self._recover_interrupted_state(run)
-        graph_nodes = {node.id: node for node in run.graph.nodes}
-        node = graph_nodes.get(node_id)
-        if node is None:
-            raise DagExecutionError(f"실행할 노드를 찾을 수 없습니다: {node_id}")
-
-        should_execute, unavailable_reason = self._should_execute_node(run, node)
-        if not should_execute:
-            raise DagExecutionError(
-                f"노드 {node_id}을 단독 실행할 수 없습니다: {unavailable_reason}"
-            )
-
-        affected_node_ids = {node_id, *self._descendant_node_ids(run, node_id)}
-        for affected_node_id in affected_node_ids:
-            self._reset_node_state(run.nodes[affected_node_id])
-
-        state = run.nodes[node_id]
-        batch = run.batches[state.batch_index]
-        started_at = utc_now_iso()
-        run.status = "running"
-        batch.status = "running"
-        batch.started_at = started_at
-        batch.completed_at = None
-        self.run_store.save(run)
-
-        try:
-            self._execute_node(run, node, state)
-        except (DagExecutionCancelled, ModuleWorkerCancelled):
-            raise
-        except (DagExecutionError, ValidationError, ModuleExecutionError) as error:
-            state.status = "failed"
-            state.outcome = "failed"
-            state.error = self._format_error(error)
-            state.completed_at = utc_now_iso()
-        except Exception as error:  # keep the run inspectable on unexpected failures
-            state.status = "failed"
-            state.outcome = "failed"
-            state.error = self._format_error(error, include_type=True)
-            state.completed_at = utc_now_iso()
-
-        self._refresh_run_status(run)
-        return self.run_store.save(run)
-
-
-    def _execute_next_batch(self, run_id: str) -> WorkflowRun:
-        """
-        Execute the next incomplete batch of a workflow run.
-        
-        Returns:
-        	WorkflowRun: The updated workflow run after batch execution.
-        """
-        self._raise_if_cancelled(run_id)
-        run = self.run_store.load(run_id)
-        self._recover_interrupted_state(run)
-        if run.status == "completed":
-            return run
-        if run.status == "failed":
-            raise DagExecutionError(
-                "실패한 실행입니다. resume API로 실패 노드를 재시도해 주세요"
-            )
-
-        batch = next(
-            (candidate for candidate in run.batches if candidate.status != "completed"),
-            None,
-        )
-        if batch is None:
-            run.status = "completed"
-            return self.run_store.save(run)
-
-        run.status = "running"
-        batch.status = "running"
-        batch.started_at = batch.started_at or utc_now_iso()
-        self.run_store.save(run)
-
-        graph_nodes = {node.id: node for node in run.graph.nodes}
-        batch_failed = False
-        for node_id in batch.node_ids:
-            self._raise_if_cancelled(run_id)
-            state = run.nodes[node_id]
-            if state.status in ("succeeded", "skipped"):
-                continue
-            node = graph_nodes[node_id]
-            should_execute, skip_reason = self._should_execute_node(run, node)
-            if not should_execute:
-                state.status = "skipped"
-                state.outcome = None
-                state.skip_reason = skip_reason
-                state.completed_at = utc_now_iso()
-                self.run_store.save(run)
-                continue
-            try:
-                self._execute_node(run, node, state)
-            except (DagExecutionCancelled, ModuleWorkerCancelled):
-                raise
-            except (DagExecutionError, ValidationError, ModuleExecutionError) as error:
-                state.status = "failed"
-                state.outcome = "failed"
-                state.error = self._format_error(error)
-                state.completed_at = utc_now_iso()
-                batch_failed = True
-            except Exception as error:  # keep the run inspectable on unexpected failures
-                state.status = "failed"
-                state.outcome = "failed"
-                state.error = self._format_error(error, include_type=True)
-                state.completed_at = utc_now_iso()
-                batch_failed = True
-            self.run_store.save(run)
-
-        batch.completed_at = utc_now_iso()
-        if batch_failed:
-            batch.status = "failed"
-            run.status = "failed"
-        else:
-            batch.status = "completed"
-            run.status = (
-                "completed"
-                if all(
-                    item.status in ("succeeded", "failed", "skipped")
-                    for item in run.nodes.values()
-                )
-                else "queued"
-            )
-        return self.run_store.save(run)
-
-    def execute_all(self, run_id: str) -> WorkflowRun:
-        with self._execution_lock:
-            return self._run_cancellable(run_id, self._execute_all)
-
-    def _execute_all(self, run_id: str) -> WorkflowRun:
-        run = self.run_store.load(run_id)
-        while run.status not in ("completed", "failed"):
-            self._raise_if_cancelled(run_id)
-            run = self._execute_next_batch(run_id)
-        return run
+        return self.run_store.save_node(run, node_id)
 
     @staticmethod
     def _reset_node_state(state: RunNodeState) -> None:
@@ -654,18 +323,6 @@ class WorkflowExecutor:
         state.progress = {}
 
     @staticmethod
-    def _descendant_node_ids(run: WorkflowRun, node_id: str) -> Set[str]:
-        """Return the identifiers of all nodes downstream from the specified node using networkx."""
-        import networkx as nx
-
-        graph_dag = nx.DiGraph()
-        for edge in run.graph.edges:
-            graph_dag.add_edge(edge.source, edge.target)
-        if node_id in graph_dag:
-            return set(nx.descendants(graph_dag, node_id))
-        return set()
-
-    @staticmethod
     def _refresh_run_status(run: WorkflowRun) -> None:
         completed_statuses = {"succeeded", "skipped"}
         for batch in run.batches:
@@ -689,13 +346,21 @@ class WorkflowExecutor:
         elif any(state.status == "failed" for state in states):
             run.status = "failed"
         elif all(state.status in completed_statuses for state in states):
-            run.status = "completed"
+            source_node_ids = {edge.source for edge in run.graph.edges}
+            sink_node_ids = set(run.nodes) - source_node_ids
+            run.status = (
+                "completed"
+                if any(
+                    run.nodes[node_id].status == "succeeded"
+                    for node_id in sink_node_ids
+                )
+                else "failed"
+            )
         else:
-            run.status = "queued"
-
-    def resume(self, run_id: str) -> WorkflowRun:
-        with self._execution_lock:
-            return self._run_cancellable(run_id, self._resume)
+            # A claimed worker remains the owner between node transitions.
+            # Returning to ``queued`` here makes KEDA count the live run as new
+            # backlog and creates an unnecessary no-op Job.
+            run.status = "running" if run.status == "running" else "queued"
 
     def prepare_resume(self, run_id: str) -> WorkflowRun:
         """Reset failed/paused state and persist it without executing the run.
@@ -705,24 +370,15 @@ class WorkflowExecutor:
         """
 
         with self._execution_lock:
+            self.run_store.clear_cancel_request(run_id)
+            with self._cancellation_lock:
+                self._cancelled_run_ids.discard(run_id)
             return self._prepare_resume(run_id)
 
     def request_cancel(self, run_id: str) -> bool:
         """Signal cancellation without waiting for the execution lock."""
 
         return self._request_cancel(run_id)
-
-    def cancel_run(self, run_id: str) -> WorkflowRun:
-        """Signal cancellation before waiting for the execution lock."""
-
-        self._request_cancel(run_id)
-        with self._execution_lock:
-            try:
-                run = self._persist_cancelled_run(run_id)
-            finally:
-                with self._cancellation_lock:
-                    self._cancelled_run_ids.discard(run_id)
-            return run
 
     def clear_runtime_cache(self) -> Dict[str, int]:
         """Clear reusable results and run history without deleting workflows."""
@@ -740,10 +396,6 @@ class WorkflowExecutor:
                 with self._cancellation_lock:
                     self._cancelled_run_ids.clear()
 
-    def _resume(self, run_id: str) -> WorkflowRun:
-        self._prepare_resume(run_id)
-        return self._execute_all(run_id)
-
     def _prepare_resume(self, run_id: str) -> WorkflowRun:
         run = self.run_store.load(run_id)
         failed_node_ids = {
@@ -751,21 +403,45 @@ class WorkflowExecutor:
             for node_id, state in run.nodes.items()
             if state.status == "failed"
         }
-        for node_id in failed_node_ids:
-            state = run.nodes[node_id]
-            state.status = "pending"
-            state.error = None
-            state.outcome = None
-            state.skip_reason = None
-            state.started_at = None
-            state.completed_at = None
+        reset_node_ids = set(failed_node_ids)
+
+        # Kubernetes executes one topological generation as a parallel batch.
+        # When one task fails, the scheduler can mark still-runnable siblings as
+        # skipped. They and their non-terminal descendants must be made
+        # claimable again, otherwise a resumed run can finish without producing
+        # its terminal output.
         for batch in run.batches:
             if any(node_id in failed_node_ids for node_id in batch.node_ids):
+                reset_node_ids.update(
+                    node_id
+                    for node_id in batch.node_ids
+                    if run.nodes[node_id].status != "succeeded"
+                )
+
+        outgoing: Dict[str, Set[str]] = defaultdict(set)
+        for edge in run.graph.edges:
+            outgoing[edge.source].add(edge.target)
+        pending_ancestors = list(reset_node_ids)
+        while pending_ancestors:
+            node_id = pending_ancestors.pop()
+            for descendant_id in outgoing.get(node_id, set()):
+                descendant = run.nodes[descendant_id]
+                if (
+                    descendant_id not in reset_node_ids
+                    and descendant.status != "succeeded"
+                ):
+                    reset_node_ids.add(descendant_id)
+                    pending_ancestors.append(descendant_id)
+
+        for node_id in reset_node_ids:
+            self._reset_node_state(run.nodes[node_id])
+        for batch in run.batches:
+            if any(node_id in reset_node_ids for node_id in batch.node_ids):
                 batch.status = "pending"
                 batch.started_at = None
                 batch.completed_at = None
-        if run.status not in ("completed",):
-            run.status = "queued"
+        if reset_node_ids:
+            self._refresh_run_status(run)
         return self.run_store.save(run)
 
     def _execute_node(
@@ -795,7 +471,7 @@ class WorkflowExecutor:
 
         import time
 
-        from backend.providers.llm.cost import calculate_openai_cost
+        from backend.providers.openai_pricing import calculate_openai_cost
 
         t_start = time.perf_counter()
         state.status = "running"
@@ -862,24 +538,15 @@ class WorkflowExecutor:
                 node.module_type,
                 state.batch_index,
             ) as _span:
-                if self._module_worker is None:
-                    module.set_progress_callback(persist_progress)
-                    try:
-                        output = self.module_registry.execute(
-                            node.module_type,
-                            input_payload,
-                            validated_config,
-                        )
-                    finally:
-                        module.set_progress_callback(None)
-                else:
-                    output = self._module_worker.execute(
+                module.set_progress_callback(persist_progress)
+                try:
+                    output = self.module_registry.execute(
                         node.module_type,
                         input_payload,
                         validated_config,
-                        run.id,
-                        progress_callback=persist_progress,
                     )
+                finally:
+                    module.set_progress_callback(None)
             self._raise_if_cancelled(run.id)
             if cache_enabled:
                 self.result_cache.put(cache_key, output)
@@ -945,29 +612,17 @@ class WorkflowExecutor:
                         cached_tokens=node_usage["cached_tokens"],
                     )
 
-        worker_metadata = (
-            getattr(self._module_worker, "last_metadata", {})
-            if self._module_worker is not None and not state.cache_hit
-            else {}
-        )
         module_usage = (
             getattr(module, "last_usage", None) if not state.cache_hit else None
         )
         raw_u = (
             module_usage
             if isinstance(module_usage, Mapping)
-            else worker_metadata.get("usage")
-            if isinstance(worker_metadata, Mapping)
             else None
         )
         if node_usage is None and isinstance(raw_u, Mapping):
             model_used = (
                 getattr(module, "last_model", "")
-                or (
-                    worker_metadata.get("model", "")
-                    if isinstance(worker_metadata, Mapping)
-                    else ""
-                )
                 or validated_config.get("model")
                 or ""
             )
@@ -987,7 +642,6 @@ class WorkflowExecutor:
 
         state.cost_usd = node_cost
         state.usage = node_usage
-        self.run_store.save(run)
 
     def _run_cancellable(self, run_id: str, operation) -> WorkflowRun:
         with self._cancellation_lock:
@@ -995,7 +649,7 @@ class WorkflowExecutor:
             self._active_run_ids.add(run_id)
         try:
             return operation(run_id)
-        except (DagExecutionCancelled, ModuleWorkerCancelled) as error:
+        except DagExecutionCancelled as error:
             self._persist_cancelled_run(run_id)
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다") from error
         finally:
@@ -1007,19 +661,12 @@ class WorkflowExecutor:
             is_active = run_id in self._active_run_ids
             if is_active:
                 self._cancelled_run_ids.add(run_id)
-        worker_cancelled = (
-            bool(self._module_worker.cancel(run_id))
-            if self._module_worker is not None
-            else False
-        )
-        return is_active or worker_cancelled
+        return is_active
 
     def _request_cancel_all(self) -> None:
         with self._cancellation_lock:
             active_run_ids = set(self._active_run_ids)
             self._cancelled_run_ids.update(active_run_ids)
-        if self._module_worker is not None:
-            self._module_worker.reset()
 
     def _raise_if_cancelled(self, run_id: str) -> None:
         with self._cancellation_lock:
@@ -1102,8 +749,25 @@ class WorkflowExecutor:
             | set(run.runtime_inputs.get(node.id, {}))
             | set(edges_by_input)
         )
+        # A raw object connected to the conventional ``input`` port is merged
+        # into a structured target DTO by ``_assemble_input``.  Account for the
+        # source DTO fields here as well; otherwise a valid typed-object edge is
+        # incorrectly skipped before input assembly can validate it.
+        if not module.definition.raw_input:
+            for target_input, alternatives in edges_by_input.items():
+                if target_input != "input":
+                    continue
+                for edge in alternatives:
+                    source_node = node_by_id[edge.source]
+                    source_module = self.module_registry.get(
+                        source_node.module_type
+                    )
+                    if source_module.definition.raw_output:
+                        supplied_inputs.update(source_module.output_model.model_fields)
         missing_inputs = [
-            port for port in module.definition.inputs if port not in supplied_inputs
+            field
+            for field in module.required_input_fields
+            if field not in supplied_inputs
         ]
         if missing_inputs:
             return (
@@ -1252,26 +916,6 @@ class WorkflowExecutor:
                 f"모듈 {target_module.type}에 입력 포트 {target_input}이 없습니다"
             )
         return source_output, target_input
-
-    def _recover_interrupted_state(self, run: WorkflowRun) -> None:
-        """Restore interrupted workflow execution state to pending or queued status and persist the changes."""
-        changed = False
-        for state in run.nodes.values():
-            if state.status == "running":
-                state.status = "pending"
-                state.error = None
-                state.outcome = None
-                state.skip_reason = None
-                changed = True
-        for batch in run.batches:
-            if batch.status == "running":
-                batch.status = "pending"
-                changed = True
-        if run.status == "running":
-            run.status = "queued"
-            changed = True
-        if changed:
-            self.run_store.save(run)
 
     @staticmethod
     def _format_error(error: Exception, *, include_type: bool = False) -> str:

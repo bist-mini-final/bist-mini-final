@@ -15,13 +15,12 @@
 - 수백 줄에 달하는 하드코딩 정적 동의어 사전, thesaurus 테이블, 과거 질의 캐시 등의 불투명한 임시 패치는 금지합니다.
 - 모든 자연어 쿼리 분석 및 원자적 서브쿼리 확장은 **최신 LLM 프롬프트와 Pydantic 모델**을 통해 결정론적으로 수행합니다.
 
-### 1.3 `BaseLLMModule` / `BaseEmbedderModule` 기반 호출 단일화
-### 1.3 `BaseLLMModule` / `BaseEmbedderModule` 기반 부모-자식 계층 분리 및 호출 단일화
+### 1.3 `BaseLLMModule` / `BaseEmbeddingModule` 기반 호출 단일화
 - LLM 호출, Pydantic JSON 파싱, 멀티턴 도구 호출 루프(Tool Calling Loop), 토큰 사용량 집계, OpenAI 비용 계산, 지연 시간 측정을 자식 모듈마다 수십 줄씩 반복 작성하지 않습니다.
-- **부모 클래스(`BaseLLMModule`, `BaseEmbedderModule`)의 책임**:
+- **부모 클래스(`BaseLLMModule`, `BaseEmbeddingModule`)의 책임**:
   - `self.complete_structured(...)` : 1-shot 구조화 생성, Pydantic 파싱, 토큰/비용/지연 집계
   - `self.complete_text(...)` : 1-shot 텍스트 생성, 토큰/비용/지연 집계
-  - `self.complete_agentic(...)` : LangChain BaseTool 멀티턴 에이전틱 도구 루프, 도구 자동 invoke, 에러 피드백, 턴 누적 토큰/비용/지연 일괄 집계
+  - `self.complete_agentic(...)` : 공식 Responses API의 stateful 멀티턴 도구 루프, 도구 자동 invoke, 에러 피드백, 턴 누적 토큰/비용/지연 일괄 집계
   - `self.encode_texts(...)` / `self.encode_batches_streaming(...)` : 배치 임베딩, 차원 검증, 스트리밍 진행 보고
 - **자식 모듈의 책임**:
   - 오직 자신만의 고유한 Pydantic DTO 선언, 프롬프트 템플릿, 도메인 Tool 정의 및 부모 메서드 1줄 호출만 수행합니다.
@@ -144,9 +143,11 @@ class MyLogicModule(BaseModule):
 - `backend/main.py`의 전역 핸들러(`@app.exception_handler(PipelineBaseError)`)가 모든 파이프라인 에러를 표준화된 JSON 규격으로 클라이언트에 응답합니다:
   ```json
   {
-    "error_code": "PROVIDER_API_ERROR",
-    "message": "모듈 [embedder] 외부 API 호출 실패: Rate limit exceeded",
-    "module_type": "embedder",
-    "details": { "provider": "openai" }
+    "detail": {
+      "code": "PROVIDER_API_ERROR",
+      "message": "외부 모델 호출에 실패했습니다.",
+      "retryable": true,
+      "context": { "module_type": "embedder" }
+    }
   }
   ```

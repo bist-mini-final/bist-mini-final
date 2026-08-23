@@ -6,67 +6,29 @@ import type {
   VectorIndexDetail,
   VectorIndexInfo,
 } from '../types';
-
-class DataSourceApiError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message);
-    this.name = 'DataSourceApiError';
-  }
-}
+import {
+  requestJson as httpJson,
+  requestResponse,
+} from '../../../shared/api/httpClient';
 
 async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    let detail = `요청 실패 (${response.status})`;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      if (typeof body.detail === 'string') detail = body.detail;
-    } catch {
-      // fallback
-    }
-    throw new DataSourceApiError(detail, response.status);
-  }
-  return response.json() as Promise<T>;
+  return httpJson<T>(url, { signal });
 }
 
 async function postJson<T>(url: string, payload: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, {
+  return httpJson<T>(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    json: payload,
     signal,
   });
-  if (!response.ok) {
-    let detail = `요청 실패 (${response.status})`;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      if (typeof body.detail === 'string') detail = body.detail;
-    } catch {
-      // fallback
-    }
-    throw new DataSourceApiError(detail, response.status);
-  }
-  return response.json() as Promise<T>;
 }
 
 async function patchJson<T>(url: string, payload: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, {
+  return httpJson<T>(url, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    json: payload,
     signal,
   });
-  if (!response.ok) {
-    let detail = `요청 실패 (${response.status})`;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      if (typeof body.detail === 'string') detail = body.detail;
-    } catch {
-      // fallback
-    }
-    throw new DataSourceApiError(detail, response.status);
-  }
-  return response.json() as Promise<T>;
 }
 
 /**
@@ -76,28 +38,17 @@ async function patchJson<T>(url: string, payload: unknown, signal?: AbortSignal)
  * @returns The parsed response data
  */
 async function deleteJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, {
+  return httpJson<T>(url, {
     method: 'DELETE',
     signal,
-  });
-  if (!response.ok) {
-    let detail = `삭제 실패 (${response.status})`;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      if (typeof body.detail === 'string') detail = body.detail;
-    } catch {
-      // fallback
-    }
-    throw new DataSourceApiError(detail, response.status);
-  }
-  return response.json() as Promise<T>;
+  }, '삭제 실패');
 }
 
 export const dataSourceApi = {
   async uploadFile(
     file: File,
     autoIngest: boolean = true,
-    model: string = 'text-embedding-3-large',
+    model: string = 'text-embedding-3-small',
     batchSize: number = 2048,
     signal?: AbortSignal
   ): Promise<{
@@ -107,26 +58,15 @@ export const dataSourceApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(
+    const response = await requestResponse(
       `/api/data-sources/files/upload?auto_ingest=${autoIngest}&model=${encodeURIComponent(model)}&batch_size=${batchSize}`,
       {
         method: 'POST',
         body: formData,
         signal,
-      }
+      },
+      '업로드 실패',
     );
-
-    if (!response.ok) {
-      let detail = `업로드 실패 (${response.status})`;
-      try {
-        const body = (await response.json()) as { detail?: string };
-        if (typeof body.detail === 'string') detail = body.detail;
-      } catch {
-        // fallback
-      }
-      throw new DataSourceApiError(detail, response.status);
-    }
-
     return response.json();
   },
 

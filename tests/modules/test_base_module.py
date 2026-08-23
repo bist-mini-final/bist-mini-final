@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import Field
 
-from backend.providers.llm.chat_completion import ChatCompletionResult
+from backend.providers.openai_responses import OpenAIResponseResult
 from modules.common.base_llm import BaseLLMModule, calculate_openai_cost
 from modules.common.base_module import (
     BaseModule,
@@ -83,7 +83,8 @@ def test_base_module_auto_execution_dto():
 
 def test_base_llm_module_complete_structured():
     mock_client = MagicMock()
-    mock_client.complete_with_metadata.return_value = ChatCompletionResult(
+    mock_client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_test",
         content='{"result": "mocked_answer"}',
         usage={"prompt_tokens": 10, "completion_tokens": 20},
         latency_seconds=0.15,
@@ -92,10 +93,8 @@ def test_base_llm_module_complete_structured():
     llm_module = DummyLLMModule(completion_client=mock_client)
     res = llm_module.run({"text": "query"})
     assert res == {"result": "mocked_answer"}
-    response_format = mock_client.complete_with_metadata.call_args.kwargs[
-        "response_format"
-    ]
-    schema = response_format["json_schema"]["schema"]
+    response_format = mock_client.create_response.call_args.kwargs["text_format"]
+    schema = response_format["schema"]
     assert response_format["type"] == "json_schema"
     assert schema["additionalProperties"] is False
     assert schema["required"] == ["result"]

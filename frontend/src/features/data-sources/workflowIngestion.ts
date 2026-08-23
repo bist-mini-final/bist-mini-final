@@ -5,7 +5,6 @@ import {
   Database,
   FileSpreadsheet,
   Rows3,
-  Shuffle,
   Sparkles,
 } from 'lucide-react';
 import type { WorkflowRun } from '../playground/types';
@@ -31,11 +30,6 @@ const MODULE_VIEW: Record<
     category: 'Transform',
     icon: Rows3,
   },
-  exhaustive_cell_text_serializer: {
-    name: '전수 셀 직렬화 (Exhaustive Serializer)',
-    category: 'Transform',
-    icon: Shuffle,
-  },
   cell_text_embedder: {
     name: '셀 문서 임베딩 (Cell Text Embedder)',
     category: 'Logic / Embedder',
@@ -55,11 +49,6 @@ const MODULE_VIEW: Record<
     name: '시트 메타데이터 저장 (Sheet Metadata Persistence)',
     category: 'Storage / DB',
     icon: Rows3,
-  },
-  index_company_persistence: {
-    name: '인덱스 기업명 저장 (Index Company Persistence)',
-    category: 'Storage / DB',
-    icon: Database,
   },
 };
 
@@ -267,7 +256,7 @@ export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRun
   const selectorNode = run.graph.nodes.find((node) => node.module_type === 'processed_file_selector');
   const selectorInput = selectorNode ? run.runtime_inputs[selectorNode.id] : undefined;
   const embedderNode = run.graph.nodes.find((node) => node.module_type === 'cell_text_embedder');
-  const model = String(embedderNode?.config.model || job.index?.model || 'text-embedding-3-large');
+  const model = String(embedderNode?.config.model || job.index?.model || 'text-embedding-3-small');
   const batchSize = Number(embedderNode?.config.batch_size || job.index?.batch_size || 2048);
   const lunaOutput = job.luna_output || job.index?.luna_output;
 
@@ -298,7 +287,7 @@ export function pipelineFromIngestionJob(job: IngestionJobResponse): PipelineRun
     modules,
     lunaOutput: lunaOutput || undefined,
     scheduler: {
-      backend: run.orchestration?.backend || 'direct',
+      backend: run.orchestration?.backend || 'kubernetes',
       deploymentName: run.orchestration?.deployment_name || undefined,
       externalRunId: run.orchestration?.external_run_id || undefined,
       workerActive: job.worker_active,

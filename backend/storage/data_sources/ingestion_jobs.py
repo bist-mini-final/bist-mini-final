@@ -7,7 +7,6 @@ workflow run identified here.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -23,13 +22,10 @@ from backend.engine.workflows import (
     WorkflowStore,
 )
 from backend.storage.pgvector_store import PgVectorStore
+from modules.common.config import DEFAULT_EMBEDDING_MODEL
 
-logger = logging.getLogger(__name__)
-
-
-INGESTION_WORKFLOW_IDS = frozenset(
-    {"indexing_pgvector", "indexing_pgvector_exhaustive"}
-)
+INGESTION_WORKFLOW_ID = "excel_ingestion"
+INGESTION_WORKFLOW_IDS = frozenset({INGESTION_WORKFLOW_ID})
 
 
 class IngestionRequest(BaseModel):
@@ -40,18 +36,17 @@ class IngestionRequest(BaseModel):
         description="data/source_files/ 내 대상 Excel 파일명",
     )
     model: str = Field(
-        default="text-embedding-3-large",
-        description="임베딩 모델 (예: text-embedding-3-large, BAAI/bge-large-en-v1.5)",
+        default=DEFAULT_EMBEDDING_MODEL,
+        description="문서 임베딩 모델 (기본값: text-embedding-3-small)",
     )
     variant_mode: Literal["header_only", "header_with_value", "both"] = Field(
         default="both",
         description="직렬화 형태 (header_only, header_with_value, both)",
     )
-    structure_mode: Literal["auto", "luna_vlm", "exhaustive"] = Field(
+    structure_mode: Literal["auto", "luna_vlm"] = Field(
         default="auto",
         description=(
-            "구조화 모드 (auto: Luna VLM 감지 후 직렬화, "
-            "luna_vlm: 강제 VLM, exhaustive: 전수 직렬화)"
+            "구조화 모드 (auto: Luna VLM 감지 후 직렬화, luna_vlm: 강제 VLM)"
         ),
     )
     sheet_names: Optional[List[str]] = Field(
@@ -92,18 +87,9 @@ class IngestionJobService:
         self.workflow_executor = workflow_executor
         self.workflow_dispatcher = workflow_dispatcher
 
-    def recover_pending(self) -> int:
-        try:
-            return self.workflow_dispatcher.recover_pending(INGESTION_WORKFLOW_IDS)
-        except Exception as error:
-            logger.warning("Ingestion jobs recover_pending 실패: %s", error)
-            return 0
-
     @staticmethod
-    def workflow_id_for(request: IngestionRequest) -> str:
-        if request.structure_mode == "exhaustive":
-            return "indexing_pgvector_exhaustive"
-        return "indexing_pgvector"
+    def workflow_id_for(_request: IngestionRequest) -> str:
+        return INGESTION_WORKFLOW_ID
 
     def create_run(self, request: IngestionRequest) -> WorkflowRun:
         """Persist a queued run but do not execute work in the API process."""
@@ -119,10 +105,7 @@ class IngestionJobService:
                 if request.sheet_names is not None:
                     selector_input["sheet_names"] = request.sheet_names
                 runtime_inputs[node.id] = selector_input
-            elif node.module_type in {
-                "cell_text_serializer",
-                "exhaustive_cell_text_serializer",
-            }:
+            elif node.module_type == "cell_text_serializer":
                 config_overrides[node.id] = {
                     "variant_mode": request.variant_mode,
                 }
@@ -156,7 +139,7 @@ class IngestionJobService:
         run = self.create_run(request)
         self.workflow_dispatcher.submit(run.id)
         # Return the queue-aware snapshot so the first HTTP response already
-        # renders KEDA waiting state instead of the pre-submit direct default.
+        # renders the durable KEDA waiting state before the worker claims it.
         return self.run_store.load_summary(run.id)
 
     @staticmethod
@@ -170,6 +153,13 @@ class IngestionJobService:
             output = run.nodes[node.id].output
             if isinstance(output, dict):
                 return output
+        return None
+
+    @staticmethod
+    def node_state(run: WorkflowRun, module_type: str) -> Optional[Any]:
+        for node in run.graph.nodes:
+            if node.module_type == module_type:
+                return run.nodes.get(node.id)
         return None
 
     def target_index_id(self, run: WorkflowRun) -> Optional[str]:
@@ -217,6 +207,20 @@ class IngestionJobService:
         if include_index:
             writer_output = self.node_output(run, "pgvector_index_writer")
             embedder_output = self.node_output(run, "cell_text_embedder") or {}
+            embedder_state = self.node_state(run, "cell_text_embedder")
+            embedder_usage = (
+                embedder_state.usage
+                if embedder_state is not None and embedder_state.usage is not None
+                else {}
+            )
+            embedder_node = next(
+                (
+                    node
+                    for node in run.graph.nodes
+                    if node.module_type == "cell_text_embedder"
+                ),
+                None,
+            )
             company_output = self.node_output(run, "company_entity_extractor") or {}
             if writer_output is not None:
                 index = {
@@ -224,15 +228,33 @@ class IngestionJobService:
                     "company_name": company_output.get("display_name")
                     or company_output.get("company_name"),
                     "ticker": company_output.get("ticker"),
-                    "duration_seconds": embedder_output.get("duration_seconds"),
-                    "total_tokens": embedder_output.get("total_tokens"),
-                    "estimated_cost_usd": embedder_output.get("estimated_cost_usd"),
+                    "duration_seconds": embedder_output.get("duration_seconds")
+                    or (
+                        embedder_state.elapsed_ms / 1000
+                        if embedder_state is not None
+                        and embedder_state.elapsed_ms is not None
+                        else None
+                    ),
+                    "total_tokens": embedder_output.get("total_tokens")
+                    or embedder_usage.get("total_tokens"),
+                    "estimated_cost_usd": embedder_output.get("estimated_cost_usd")
+                    if embedder_output.get("estimated_cost_usd") is not None
+                    else (
+                        embedder_state.cost_usd
+                        if embedder_state is not None
+                        else None
+                    ),
                     "estimated_cost_krw": embedder_output.get("estimated_cost_krw"),
-                    "batch_size": embedder_output.get("batch_size"),
+                    "batch_size": embedder_output.get("batch_size")
+                    or (
+                        embedder_node.config.get("batch_size")
+                        if embedder_node is not None
+                        else None
+                    ),
                     "sheet_names": selector_output.get("sheet_names", []),
                     "tables": (structure_output or {}).get("tables", []),
                     "luna_output": luna_output,
-                    "storage": "pgvector (LangChain)",
+                    "storage": "PostgreSQL + pgvector",
                 }
         failed_state = next(
             (state for state in run.nodes.values() if state.status == "failed"),
@@ -312,9 +334,6 @@ class IngestionJobService:
             if writer_output and writer_output.get("index_id") == index_id:
                 return summary
         raise FileNotFoundError(index_id)
-
-    def ensure_submitted(self, run: WorkflowRun) -> None:
-        self.workflow_dispatcher.ensure_submitted(run.id, run)
 
     def resume(self, run_id: str) -> WorkflowRun:
         run = self.load(run_id)

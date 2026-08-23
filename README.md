@@ -1,103 +1,96 @@
-# BIST Mini Final - RAG Pipeline & BI Visualizer
+# BIST Mini Final — RAG Pipeline & BI Visualizer
 
-복잡한 재무제표 엑셀 스프레드시트 구조 분석, 멀티모달 VLM 테이블 감지, pgvector 기반 하이브리드 검색(Dense + Sparse RRF), 에이전틱 리더 및 BI 메트릭 분석 대시보드를 제공하는 엔드투엔드 RAG 파이프라인 시스템입니다.
+재무 스프레드시트 구조 분석, Luna VLM 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 근거 기반 응답, BI 스냅샷과 RAG 벤치마크를 제공하는 Kubernetes-first 시스템입니다.
 
----
+제품 기능과 완료 조건의 기준은 [제품 및 기능 명세](docs/specs/README.md)입니다.
 
-## 🚀 빠른 시작 가이드 (Quick Start)
+## 실행 구조
 
-### 1. 환경 설정 (Prerequisites)
+- `modules/`는 19개 계산 단위와 Pydantic 입출력 계약의 단일 소스입니다.
+- `jobs/`는 module port를 연결하는 canonical DAG와 worker entrypoint의 단일 소스입니다.
+- FastAPI는 계약 검증, PostgreSQL 큐 제출, compact 조회와 SSE 관찰만 수행합니다.
+- 실제 계산은 KEDA가 확장하는 Kubernetes Job에서만 수행합니다.
+- `workflow-core`, `bi-materialization`, `bi-question`, `benchmark` 네 큐가 서로 독립적으로 확장됩니다.
+- run, lease, BI, benchmark 상태와 결과는 PostgreSQL에 영속화됩니다.
+- LLM/VLM은 하나의 OpenAI Responses API client와 keep-alive connection pool을 공유하며 structured output과 tool continuation은 공식 Responses 계약을 사용합니다.
+- canonical workflow는 `rag_query`, `excel_ingestion` 두 개이며 UI에서는 읽기 전용으로 제공됩니다.
 
-- **Python**: `3.11+` (패키지 관리자: [`uv`](https://github.com/astral-sh/uv) 권장)
-- **Node.js**: `v18+` (NPM `v9+`)
-- **PostgreSQL**: `pgvector` 확장이 활성화된 DB (`localhost:5432/rag_flow`)
+## 빠른 시작
+
+필수 도구는 Python 3.11+, `uv`, Node.js 20+, Docker, k3d, kubectl, Helm입니다.
 
 ```bash
-# 환경 변수 설정
 cp .env.example .env
-# .env 파일에 OPENAI_API_KEY 및 PGVECTOR_URL을 입력합니다.
+# .env에 OPENAI_API_KEY와 PGVECTOR_URL을 설정
+
+uv sync --frozen
+cd frontend && npm ci && cd ..
+
+# PostgreSQL 스키마, k3d, KEDA, worker image와 4개 ScaledJob 준비
+./deploy/kubernetes/local.sh all
 ```
 
----
-
-### 2. 백엔드 실행 (Backend)
+API와 frontend 개발 서버는 별도 터미널에서 실행합니다.
 
 ```bash
-# 의존성 동기화 (uv 사용)
-uv sync
-
-# FastAPI 백엔드 서버 실행 (포트: 8765)
 uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
 ```
 
-- **Swagger API Docs**: [http://localhost:8765/docs](http://localhost:8765/docs)
-- **ReDoc**: [http://localhost:8765/redoc](http://localhost:8765/redoc)
-
----
-
-### 3. 프론트엔드 실행 (Frontend)
-
 ```bash
 cd frontend
-
-# 의존성 설치
-npm install
-
-# Vite 개발 서버 실행 (포트: 5173)
 npm run dev
 ```
 
-- **웹 대시보드 UI**: [http://localhost:5173](http://localhost:5173)
+- UI: [http://localhost:5173](http://localhost:5173)
+- OpenAPI: [http://localhost:8765/docs](http://localhost:8765/docs)
+- Kubernetes 상태: `./deploy/kubernetes/local.sh status`
 
----
+API 서버만 실행하면 계약 조회와 화면 개발은 가능하지만, PostgreSQL/KEDA worker가 없을 때 실행 제출은 명시적으로 `503`을 반환하며 로컬 계산으로 폴백하지 않습니다.
 
-## 🧪 테스트 실행 (Testing)
+## 검증
 
-### 백엔드 테스트 (Pytest)
 ```bash
-# 전체 테스트 실행 (모듈 단위/통합 테스트 + BI 스위트)
-uv run pytest
+uv run ruff check modules backend jobs tests
+uv run pyright
+uv run pytest -q
 
-# 모듈 단위 및 파이프라인 통합 테스트 실행
-uv run pytest tests/modules -v
-
-# 특정 모듈 단위 테스트 실행 (예: Decomposer)
-uv run pytest tests/modules/test_decomposer.py -v
-```
-
-### 프론트엔드 테스트 (Vitest)
-```bash
 cd frontend
-npm test
+npm run test
+npm run build
 ```
 
----
+Kubernetes manifest는 다음 명령으로 렌더링할 수 있습니다.
 
-## 📂 프로젝트 구조 (Architecture)
-
+```bash
+uv run python deploy/kubernetes/scripts/render.py \
+  --max-replicas 4 \
+  --connection-hash aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ```
+
+요구사항별 자동·통합·운영 검증은 [검증 매트릭스](docs/specs/VERIFICATION_MATRIX.md)를 따릅니다.
+
+## 프로젝트 구조
+
+```text
 bist-mini-final/
-├── modules/                  # 19개 표준 RAG 단위 모듈 (Single Source of Truth)
-│   ├── common/               # BaseModule, BaseLLMModule, BaseEmbedderModule
-│   ├── embedding/            # Query & Cell Text Embedders
-│   ├── query/                # QueryInput, Decomposer, Router, Matcher
-│   ├── reader/               # Agentic Reader & Tools
-│   ├── retrieval/            # Dense/Sparse Retriever, RRF Fusion, Expander
-│   └── storage/              # File Selector, Metadata Persistence, PG Loader/Writer
-├── jobs/                     # 선언적 파이프라인 Job 조합 레시피 (Pure Compositions)
-│   ├── excel_ingestion.py    # 엑셀 구조화 및 pgvector 인덱싱 Job 정의
-│   ├── bi_materialization.py # BI 재무제표 메트릭 분석 Job 정의
-│   └── rag_pipeline.py       # 하이브리드 RAG 질의응답 파이프라인 Job 정의
-├── backend/                  # FastAPI 백엔드 & 공통 런타임 엔진
-│   ├── api/                  # REST API 라우터 (Producer)
-│   ├── bi/                   # BI 메트릭 분석 및 대시보드 스냅샷 스토어
-│   ├── engine/               # PipelineRunner (인메모리 모듈 실행기)
-│   │   └── worker/           # 쿠버네티스 워커 런타임 (Consumer: DB Lease & Heartbeat)
-│   └── storage/              # PostgreSQL pgvector 스토어 및 아티팩트
-├── frontend/                 # React, Vite, TailwindCSS, XYFlow 시각화 UI
-├── deploy/                   # 배포 및 인프라 (Docker, KEDA ScaledJob, Kubernetes)
-│   ├── docker/               # Dockerfile.worker
-│   └── kubernetes/           # KEDA ScaledJob, Deployment, Ingress 매니페스트
-└── tests/                    # 테스트 스위트
-    └── modules/              # 모듈/파이프라인/워커/Job 단위 테스트
+├── modules/                       # 계산 모듈과 Pydantic 계약
+├── jobs/                          # canonical DAG/worker JobDefinition
+│   ├── excel_ingestion.py
+│   ├── rag_pipeline.py
+│   ├── bi_materialization.py      # materialization + question worker
+│   └── benchmark.py
+├── backend/
+│   ├── api/                       # 제출·조회·SSE control plane
+│   ├── engine/
+│   │   ├── workflows/             # DAG validation, run state, executor
+│   │   ├── orchestration/         # PostgreSQL/Kubernetes dispatcher
+│   │   └── worker/                # workflow-core consumer
+│   ├── features/
+│   │   ├── bi/                    # BI queues, workers, snapshots
+│   │   └── benchmark/             # benchmark queue, worker, results
+│   └── storage/                   # PostgreSQL, pgvector, shared artifacts
+├── frontend/                      # React/Vite/XYFlow UI
+├── deploy/                        # Docker, k3d, KEDA ScaledJobs
+├── docs/specs/                    # 제품·기능·API·Job·검증 명세
+└── tests/modules/                 # module/job/queue/API contract tests
 ```

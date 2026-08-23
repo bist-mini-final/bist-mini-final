@@ -28,7 +28,8 @@ class PostgresBiQuestionClaimer:
                     cursor.execute(
                         "WITH candidate AS ("
                         "SELECT question_id FROM bi_questions "
-                        "WHERE status = %s "
+                        "WHERE status = %s OR (status = %s AND "
+                        "updated_at < %s - (180 * INTERVAL '1 second')) "
                         "ORDER BY created_at, question_id "
                         "FOR UPDATE SKIP LOCKED LIMIT 1"
                         ") UPDATE bi_questions AS question "
@@ -40,6 +41,8 @@ class PostgresBiQuestionClaimer:
                         "RETURNING question.*",
                         (
                             BiQuestionStatus.QUEUED.value,
+                            BiQuestionStatus.RUNNING.value,
+                            command.claimed_at,
                             BiQuestionStatus.RUNNING.value,
                             command.workflow_run_id,
                             command.claimed_at,

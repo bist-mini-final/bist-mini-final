@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -6,7 +7,8 @@ from typing import Final, Protocol, assert_never
 
 from pydantic import ValidationError
 
-from backend.providers.llm.chat_completion import ChatCompletionError
+from backend.engine.worker.lease import LeaseHeartbeat
+from backend.providers.openai_responses import OpenAIResponsesError
 from modules.common.exceptions import ModuleExecutionError
 
 from .extraction_models import BiMetricExtractionResult
@@ -20,14 +22,15 @@ from .question_records import (
     BiFailedAnswerRecord,
     BiQuestionClaim,
     BiQuestionRecord,
+    QuestionId,
     WorkflowRunId,
 )
-from .rag_adapter import RagPipelineContractError
-
+from .rag_errors import RagPipelineContractError
 
 BI_WORKER_MODEL: Final = "gpt-5.6-luna"
+logger = logging.getLogger(__name__)
 BiPipelineFailure = (
-    ChatCompletionError
+    OpenAIResponsesError
     | ModuleExecutionError
     | ValidationError
     | BiQuestionSourceError
@@ -42,6 +45,12 @@ class BiQuestionWorkerServicePort(Protocol):
     ) -> BiQuestionRecord | None: ...
 
     def save_answer(self, answer: BiAnswerRecord) -> BiQuestionRecord: ...
+
+    def heartbeat(
+        self,
+        question_id: QuestionId,
+        workflow_run_id: WorkflowRunId,
+    ) -> bool: ...
 
 
 class BiQuestionWorkerPipelinePort(Protocol):
@@ -94,22 +103,43 @@ class BiQuestionWorker:
         if question is None:
             return None
 
+        workflow_run_id = question.workflow_run_id
+        if workflow_run_id is None:
+            raise RuntimeError("claimed BI question has no workflow_run_id")
+
+        heartbeat = LeaseHeartbeat(
+            lambda: self._service.heartbeat(
+                question.question_id,
+                workflow_run_id,
+            ),
+            interval_seconds=30,
+            thread_name=f"bi-question-heartbeat-{question.question_id}",
+            logger=logger,
+            failure_message=(
+                f"BI question heartbeat failed (question_id={question.question_id})"
+            ),
+        )
+        heartbeat.start()
+
         started = self._clock.monotonic()
         try:
-            result = self._pipeline.execute(question)
-        except (
-            ChatCompletionError,
-            ModuleExecutionError,
-            ValidationError,
-            BiQuestionSourceError,
-            RagPipelineContractError,
-        ) as error:
-            timing = self._timing(claimed_at, started)
-            answer = self._failed_answer(question, error, timing)
-        else:
-            timing = self._timing(claimed_at, started)
-            answer = self._completed_answer(question, result, timing)
-        return self._service.save_answer(answer)
+            try:
+                result = self._pipeline.execute(question)
+            except (
+                OpenAIResponsesError,
+                ModuleExecutionError,
+                ValidationError,
+                BiQuestionSourceError,
+                RagPipelineContractError,
+            ) as error:
+                timing = self._timing(claimed_at, started)
+                answer = self._failed_answer(question, error, timing)
+            else:
+                timing = self._timing(claimed_at, started)
+                answer = self._completed_answer(question, result, timing)
+            return self._service.save_answer(answer)
+        finally:
+            heartbeat.stop()
 
     def _completed_answer(
         self,
@@ -130,6 +160,7 @@ class BiQuestionWorker:
         return BiCompletedAnswerRecord(
             answer_id=self._answer_id(question),
             question_id=question.question_id,
+            workflow_run_id=self._workflow_run_id(question),
             outcome=BiAnswerOutcome.COMPLETED,
             answer_text=answer_text,
             result=result,
@@ -153,8 +184,8 @@ class BiQuestionWorker:
                 code=code
             ):
                 error_code = code
-            case ChatCompletionError():
-                error_code = "chat_completion_failed"
+            case OpenAIResponsesError():
+                error_code = "openai_response_failed"
             case ModuleExecutionError():
                 error_code = "pipeline_module_failed"
             case ValidationError():
@@ -165,6 +196,7 @@ class BiQuestionWorker:
         return BiFailedAnswerRecord(
             answer_id=self._answer_id(question),
             question_id=question.question_id,
+            workflow_run_id=self._workflow_run_id(question),
             outcome=BiAnswerOutcome.FAILED,
             error_code=error_code,
             error_message=message[:2_000],
@@ -193,3 +225,9 @@ class BiQuestionWorker:
     def _answer_id(question: BiQuestionRecord) -> AnswerId:
         digest = sha256(str(question.question_id).encode("utf-8")).hexdigest()
         return AnswerId("answer-" + digest[:24])
+
+    @staticmethod
+    def _workflow_run_id(question: BiQuestionRecord) -> WorkflowRunId:
+        if question.workflow_run_id is None:
+            raise RuntimeError("claimed BI question has no workflow_run_id")
+        return question.workflow_run_id

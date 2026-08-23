@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Protocol, assert_never
 
-from backend.providers.llm.chat_completion import ChatCompletionError
-from modules.common.exceptions import ModuleExecutionError
 from pydantic import ValidationError
+
+from backend.providers.openai_responses import OpenAIResponsesError
+from modules.common.exceptions import ModuleExecutionError
 
 from .catalog import METRIC_CATALOG, SourceMetricDefinition
 from .extraction_models import BiMetricExtractionResult
@@ -11,7 +12,6 @@ from .materialization_models import (
     BiDocumentProfile,
     BiMaterializationOutcome,
     BiProfilingFailure,
-    BiProfilingResult,
     BiSnapshotBuildInput,
 )
 from .materializer import BiDocumentProfilerPort, ClockPort
@@ -30,7 +30,7 @@ from .question_batch import BiQuestionBatchPlan
 from .question_records import BiQuestionJobProgress
 from .question_repository import BiQuestionRegistrationError
 from .question_repository_queries import BiQuestionRepositoryError
-from .rag_adapter import RagPipelineContractError
+from .rag_errors import RagPipelineContractError
 from .snapshot_builder import BiSnapshotBuilder
 
 
@@ -87,7 +87,7 @@ class BiQueuedMaterializer:
         try:
             profile_result = self._services.profiler.profile(request)
         except (
-            ChatCompletionError,
+            OpenAIResponsesError,
             ModuleExecutionError,
             ValidationError,
             RagPipelineContractError,
@@ -135,6 +135,7 @@ class BiQueuedMaterializer:
             return self._failed(extracting, error, snapshot)
         queued = extracting.model_copy(
             update={
+                "status": MaterializationStatus.MATERIALIZING,
                 "total_requests": progress.total_questions,
                 "updated_at": self._services.clock.now(),
                 "message": f"지표 질문 {progress.total_questions}건을 병렬 처리 중입니다.",
@@ -190,8 +191,8 @@ class BiQueuedMaterializer:
     ) -> BiMaterializationOutcome:
         if isinstance(error, RagPipelineContractError):
             code = error.code
-        elif isinstance(error, ChatCompletionError):
-            code = "chat_completion_failed"
+        elif isinstance(error, OpenAIResponsesError):
+            code = "openai_response_failed"
         elif isinstance(error, ModuleExecutionError):
             code = "pipeline_module_failed"
         elif isinstance(error, ValidationError):

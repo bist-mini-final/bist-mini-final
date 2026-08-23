@@ -40,7 +40,6 @@ Example:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import re
 from typing import Any, Dict, List, Literal, Optional
 
@@ -48,7 +47,6 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from pydantic import Field
 
-from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.spreadsheets.cell_visibility import worksheet_visible
 from backend.storage.spreadsheets.structured_cell_text import (
     SERIALIZATION_VERSION,
@@ -87,10 +85,6 @@ class CellTextSerializerConfigDTO(ModuleConfigDTO):
         default=DEFAULT_SERIALIZER_VARIANT_MODE,
         description="생성할 검색 문서 변형 (header_only, header_with_value, 또는 both)",
     )
-
-
-# Backward compatibility alias
-CellTextSerializerExecutionDTO = CellTextSerializerInputDTO
 
 
 class CellTextDocumentDTO(ModuleDTO):
@@ -132,10 +126,9 @@ class CellTextSerializerModule(BaseModule):
 
     def __init__(
         self,
-        catalog: WorkbookCatalog | None = None,
-        processed_dir: Path = PROCESSED_DATA_DIR,
+        catalog: WorkbookCatalog,
     ) -> None:
-        self.catalog = catalog or WorkbookCatalog(processed_dir)
+        self.catalog = catalog
 
     @staticmethod
     def _region(
@@ -389,7 +382,6 @@ class CellTextSerializerModule(BaseModule):
 __all__ = [
     "CellTextDocumentDTO",
     "CellTextSerializerConfigDTO",
-    "CellTextSerializerExecutionDTO",
     "CellTextSerializerInputDTO",
     "CellTextSerializerModule",
     "CellTextSerializerOutput",

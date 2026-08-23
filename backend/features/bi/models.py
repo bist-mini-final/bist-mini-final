@@ -6,7 +6,6 @@ from typing import Annotated, Final, Literal, NewType
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_core import PydanticCustomError
 
-
 IDENTIFIER_PATTERN: Final = r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
 WORKBOOK_HASH_PATTERN: Final = r"^[a-f0-9]{64}$"
 

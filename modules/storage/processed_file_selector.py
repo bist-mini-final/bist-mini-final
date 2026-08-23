@@ -28,12 +28,10 @@ from __future__ import annotations
 # 1. Imports & Logger Setup
 # ==============================================================================
 import logging
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import (
     BaseModule,
@@ -110,10 +108,9 @@ class ProcessedFileSelectorModule(BaseModule):
 
     def __init__(
         self,
-        catalog: WorkbookCatalog | None = None,
-        processed_dir: Path = PROCESSED_DATA_DIR,
+        catalog: WorkbookCatalog,
     ) -> None:
-        self.catalog = catalog or WorkbookCatalog(processed_dir)
+        self.catalog = catalog
 
     def contract(self) -> Dict[str, Any]:
         contract = super().contract()

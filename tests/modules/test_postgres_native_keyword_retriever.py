@@ -8,6 +8,8 @@ from modules.retrieval.postgres_native_keyword_retriever import (
     PostgresNativeKeywordRetrieverConfigDTO,
     PostgresNativeKeywordRetrieverInputDTO,
     PostgresNativeKeywordRetrieverModule,
+    _clean_tsquery_term,
+    _escape_like_term,
 )
 from modules.storage.pgvector_collection_loader import IndexOutputDTO
 
@@ -52,3 +54,16 @@ def test_postgres_native_keyword_retriever_execution():
     assert len(res["items"]) == 1
     assert res["items"][0]["cell_id"] == "c1"
     assert res["items"][0]["rank"] == 1
+    scoped_sql = mock_cursor.execute.call_args_list[0].args[0]
+    assert "ESCAPE '!'" in scoped_sql
+
+
+def test_like_scope_escaping_uses_one_character_escape() -> None:
+    assert _escape_like_term("A!B%_Corp") == "A!!B!%!_Corp"
+
+
+def test_structured_keyword_query_uses_metric_and_period_only() -> None:
+    assert _clean_tsquery_term(
+        "Company: Codex Low Cost Test Corp | Sheet: 손익계산서 | "
+        "Row Header: Revenue | Column Header: FY2025 | Cell Value: ?"
+    ) == "Revenue FY2025"

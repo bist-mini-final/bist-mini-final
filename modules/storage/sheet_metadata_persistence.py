@@ -48,12 +48,10 @@ from __future__ import annotations
 # 1. Imports & Logger Setup
 # ==============================================================================
 import logging
-from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union, cast
 
 from pydantic import Field
 
-from backend.core.settings import PROCESSED_DATA_DIR
 from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import (
     BaseModule,
@@ -119,14 +117,13 @@ class SheetMetadataPersistenceModule(BaseModule):
 
     def __init__(
         self,
-        db_manager: Any = None,
-        catalog: WorkbookCatalog | None = None,
-        processed_dir: Path = PROCESSED_DATA_DIR,
+        db_manager: Any,
+        catalog: WorkbookCatalog,
     ) -> None:
-        """Initialize the module with an optional database manager and workbook catalog."""
+        """Initialize with dependencies owned by the runtime composition root."""
         super().__init__()
         self._db_manager = db_manager
-        self.catalog = catalog or WorkbookCatalog(processed_dir)
+        self.catalog = catalog
 
     def execute(
         self,
@@ -134,14 +131,12 @@ class SheetMetadataPersistenceModule(BaseModule):
         config: Optional[EmptyModuleConfigDTO] = None,
     ) -> Dict[str, Any]:
         """Persist workbook sheet metadata and detected tables for the selected visible sheets."""
-        from backend.storage.db_manager import DatabaseManager
-
         structure = input_data.structure_input
         index = input_data.index_input
         if structure.workbook_hash != index.workbook_hash:
             raise ModuleExecutionError("구조 분석과 인덱스의 workbook_hash가 다릅니다")
 
-        database = self._db_manager or DatabaseManager()
+        database = self._db_manager
         if not database.is_connected():
             raise StorageError("시트 메타데이터를 저장할 DB에 연결할 수 없습니다")
 
@@ -177,7 +172,7 @@ class SheetMetadataPersistenceModule(BaseModule):
                 for sheet_name in workbook.sheetnames:
                     worksheet = workbook[sheet_name]
                     if worksheet.max_row is None or worksheet.max_column is None:
-                        worksheet.calculate_dimension()
+                        cast(Any, worksheet).calculate_dimension(force=True)
                     sheet_dimensions[sheet_name] = (
                         worksheet.max_row or 0,
                         worksheet.max_column or 0,

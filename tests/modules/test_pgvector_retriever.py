@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import QueryContextDTO
 from modules.embedding.query_embedder import EmbeddingsDTO
 from modules.retrieval.pgvector_retriever import (
@@ -45,3 +46,50 @@ def test_dense_retrieval_preserves_top_k_per_subquery():
     assert res["items"][0]["cell_id"] == "cell_1"
     assert res["items"][0]["matched_subquery"] == "subquery_1"
     assert res["items"][0]["rank"] == 1
+
+
+def test_direct_dense_sql_uses_single_character_like_escape():
+    class Cursor:
+        def __init__(self) -> None:
+            self.sql = ""
+            self.params = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def execute(self, sql, params):
+            self.sql = sql
+            self.params = list(params)
+
+        def fetchall(self):
+            return []
+
+    class Connection:
+        def __init__(self, cursor: Cursor) -> None:
+            self._cursor = cursor
+
+        def cursor(self):
+            return self._cursor
+
+        def close(self):
+            return None
+
+    cursor = Cursor()
+    store = PgVectorStore()
+    store._collection_uuid_cache["idx-test"] = (
+        "00000000-0000-0000-0000-000000000001"
+    )
+    store._read_connection = lambda: Connection(cursor)  # type: ignore[method-assign]
+
+    result = store.similarity_search_by_vector_with_score(
+        "idx-test",
+        [0.1, 0.2],
+        company_name="A!B%_Corp",
+    )
+
+    assert result == []
+    assert "ESCAPE '!'" in cursor.sql
+    assert "%A!!B!%!_Corp%" in cursor.params

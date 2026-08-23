@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import Field, field_validator
 from pydantic_core import PydanticCustomError
 
+from .extraction_models import BiMetricExtractionResult
 from .models import (
     AmountScale,
     BiCompany,
@@ -13,11 +14,9 @@ from .models import (
     BiMaterializationJob,
     BiMaterializationRequest,
     BiPeriod,
-    CompanyId,
     JobId,
     SnapshotId,
 )
-from .extraction_models import BiMetricExtractionResult
 
 
 class BiDocumentProfile(BiContractModel):
@@ -80,7 +79,3 @@ class BiCompanyIndexEntry(BiContractModel):
         default=None,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
     )
-
-
-class BiCompanyIndex(BiContractModel):
-    companies: dict[CompanyId, BiCompanyIndexEntry] = Field(default_factory=dict)

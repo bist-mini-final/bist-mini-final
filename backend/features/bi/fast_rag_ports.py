@@ -11,6 +11,8 @@ class ModuleRegistryPort(Protocol):
 
 
 class RankedCellStorePort(Protocol):
+    def get_index_metadata(self, index_id: str) -> Mapping[str, Any]: ...
+
     def fetch_cells_by_metadata(
         self,
         cell_identifiers: list[str],

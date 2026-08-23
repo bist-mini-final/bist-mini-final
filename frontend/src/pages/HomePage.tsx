@@ -45,8 +45,8 @@ export function HomePage() {
             엑셀 구조화부터 지능형 금융 RAG까지
           </h1>
           <p>
-            비정형 스프레드시트의 셀 구조를 VLM으로 분석하고, 3072차원 고밀도 pgvector 인덱스와
-            인메모리 DAG 파이프라인을 통해 초고속 재무 분석 및 답변을 제공합니다.
+            비정형 스프레드시트의 셀 구조를 VLM으로 분석하고, 인덱스별 차원이 보장된 pgvector와
+            Kubernetes DAG 파이프라인으로 빠른 재무 분석 및 근거 기반 답변을 제공합니다.
           </p>
         </div>
       </section>
@@ -113,7 +113,7 @@ export function HomePage() {
 
                 <div className="ds-preview-connector">
                   <span className="ds-preview-connector__pill">
-                    <Sparkles size={9} /> 3072D
+                    <Sparkles size={9} /> INDEX-BOUND
                   </span>
                   <ArrowRight size={14} />
                 </div>

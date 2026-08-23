@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+import logging
+import os
+import socket
+from datetime import UTC, datetime
+from time import sleep
+from uuid import uuid4
+
+from backend.bootstrap.container import RuntimeContainer
+from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
+from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
+from backend.engine.worker.lease import LeaseHeartbeat
+from backend.engine.workflows import DagExecutionCancelled
+from backend.features.benchmark.service import (
+    BenchmarkRequest,
+    execute_benchmark_comparison,
+)
+
+from .postgres_store import BenchmarkPostgresStore
+
+logger = logging.getLogger(__name__)
+
+
+def _run(container: RuntimeContainer) -> int:
+    services = container.services
+    store = BenchmarkPostgresStore(services.db_manager.database_url)
+    worker_id = (
+        os.getenv("KUBERNETES_JOB_NAME")
+        or f"{socket.gethostname()}-{uuid4().hex[:12]}"
+    )
+    claimed = store.claim_next(worker_id, datetime.now(UTC))
+    if claimed is None:
+        print("benchmark queue empty")
+        return 0
+
+    dispatcher = KubernetesQueueDispatcher(
+        services.workflow_executor,
+        services.run_store,
+        KUBERNETES_WORKFLOW_QUEUE,
+    )
+    heartbeat = LeaseHeartbeat(
+        lambda: store.heartbeat(claimed.job_id, worker_id),
+        interval_seconds=30,
+        thread_name=f"benchmark-heartbeat-{claimed.job_id}",
+        logger=logger,
+        failure_message=f"benchmark heartbeat failed (job_id={claimed.job_id})",
+    )
+    heartbeat.start()
+
+    def await_permission() -> None:
+        announced_pause = False
+        while True:
+            cancel_requested, pause_requested = store.control(
+                claimed.job_id,
+                worker_id,
+            )
+            if cancel_requested:
+                raise DagExecutionCancelled("벤치마크 실행이 중지되었습니다")
+            if not pause_requested:
+                if announced_pause:
+                    store.mark_running(claimed.job_id, worker_id)
+                return
+            if not announced_pause:
+                store.mark_paused(claimed.job_id, worker_id)
+                announced_pause = True
+            sleep(0.25)
+
+    def update(progress: dict[str, object]) -> None:
+        if not store.update_progress(claimed.job_id, worker_id, progress):
+            raise RuntimeError("benchmark worker lease changed")
+
+    current = claimed.current_payload or {}
+    resume_active = None
+    if (
+        claimed.active_run_id is not None
+        and isinstance(current.get("workflow_id"), str)
+        and isinstance(current.get("case_id"), str)
+    ):
+        resume_active = (
+            str(current["workflow_id"]),
+            str(current["case_id"]),
+            claimed.active_run_id,
+        )
+
+    try:
+        result = execute_benchmark_comparison(
+            BenchmarkRequest.model_validate(claimed.request_payload),
+            services.workflow_store,
+            services.workflow_executor,
+            dispatcher,
+            update,
+            await_permission,
+            claimed.result_rows,
+            resume_active,
+        )
+        completed_at = datetime.now(UTC)
+        result_record = {
+            "id": f"benchmark-{claimed.job_id.removeprefix('benchmark-job-')}",
+            "saved_at": completed_at.isoformat(),
+            **result,
+        }
+        await_permission()
+        if not store.finish_completed(
+            claimed.job_id,
+            worker_id,
+            result_record,
+            completed_at,
+        ):
+            raise RuntimeError("benchmark completion lease changed")
+    except DagExecutionCancelled:
+        store.finish_cancelled(claimed.job_id, worker_id, datetime.now(UTC))
+        return 0
+    except Exception as error:
+        logger.exception("benchmark worker failed (job_id=%s)", claimed.job_id)
+        store.finish_failed(
+            claimed.job_id,
+            worker_id,
+            str(error) or type(error).__name__,
+            datetime.now(UTC),
+        )
+        return 1
+    finally:
+        heartbeat.stop()
+
+    print(f"benchmark {claimed.job_id} completed")
+    return 0
+
+
+def main() -> int:
+    with RuntimeContainer.create(require_database=True) as container:
+        return _run(container)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

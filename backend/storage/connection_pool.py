@@ -1,4 +1,4 @@
-"""Singleton psycopg2 connection pool for PostgreSQL/pgvector access."""
+"""Process-owned psycopg2 connection pools keyed by PostgreSQL URL."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Optional
+from typing import Any
 
 import psycopg2
 import psycopg2.extensions
@@ -23,53 +23,77 @@ def _pool_size(name: str, default: int) -> int:
         return default
 
 
-_MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 10)
-_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 100))
-
-_pool: Optional[psycopg2.pool.ThreadedConnectionPool] = None
-_pool_url: Optional[str] = None
-_lock = threading.Lock()
-
+_MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 2)
+_MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 10))
 
 def _normalize_url(database_url: str) -> str:
     """Strip SQLAlchemy dialect prefix so psycopg2 can parse the URL."""
     return database_url.replace("postgresql+psycopg://", "postgresql://")
 
 
-def get_pool(database_url: str) -> psycopg2.pool.ThreadedConnectionPool:
-    """Return the process-wide connection pool, creating it on first call.
+class ConnectionPoolRegistry:
+    """Own one reusable pool per normalized database URL.
 
-    The pool is re-created automatically when *database_url* changes
-    (e.g. during tests that swap DB URLs).
+    A connection test against a second database must not close the production
+    pool while requests are using it. Pool ownership therefore belongs to this
+    registry rather than to whichever caller most recently requested a URL.
     """
-    global _pool, _pool_url
-    normalized = _normalize_url(database_url)
-    if _pool is None or _pool_url != normalized:
-        with _lock:
-            if _pool is None or _pool_url != normalized:
-                if _pool is not None:
-                    try:
-                        _pool.closeall()
-                    except Exception:
-                        pass
-                _pool = psycopg2.pool.ThreadedConnectionPool(
-                    _MIN_CONN,
-                    _MAX_CONN,
-                    normalized,
-                    connect_timeout=10,
-                    options=(
-                        "-c hnsw.iterative_scan=strict_order "
-                        "-c hnsw.max_scan_tuples=20000 "
-                        "-c hnsw.ef_search=40"
-                    ),
-                )
-                _pool_url = normalized
-                logger.info(
-                    "psycopg2 connection pool initialised (min=%d, max=%d)",
-                    _MIN_CONN,
-                    _MAX_CONN,
-                )
-    return _pool
+
+    def __init__(self) -> None:
+        self._pools: dict[str, psycopg2.pool.ThreadedConnectionPool] = {}
+        self._lock = threading.Lock()
+
+    def get(self, database_url: str) -> psycopg2.pool.ThreadedConnectionPool:
+        normalized = _normalize_url(database_url)
+        existing = self._pools.get(normalized)
+        if existing is not None:
+            return existing
+
+        with self._lock:
+            existing = self._pools.get(normalized)
+            if existing is not None:
+                return existing
+            created = psycopg2.pool.ThreadedConnectionPool(
+                _MIN_CONN,
+                _MAX_CONN,
+                normalized,
+                connect_timeout=10,
+                options=(
+                    "-c hnsw.iterative_scan=strict_order "
+                    "-c hnsw.max_scan_tuples=20000 "
+                    "-c hnsw.ef_search=40"
+                ),
+            )
+            self._pools[normalized] = created
+            logger.info(
+                "psycopg2 connection pool initialised (min=%d, max=%d)",
+                _MIN_CONN,
+                _MAX_CONN,
+            )
+            return created
+
+    def close(self, database_url: str | None = None) -> None:
+        """Close one URL pool, or every owned pool when no URL is supplied."""
+        with self._lock:
+            if database_url is None:
+                pools = list(self._pools.values())
+                self._pools.clear()
+            else:
+                pool = self._pools.pop(_normalize_url(database_url), None)
+                pools = [pool] if pool is not None else []
+        for pool in pools:
+            try:
+                pool.closeall()
+            except Exception as error:
+                logger.warning("Error closing connection pool: %s", error)
+
+
+_POOL_REGISTRY = ConnectionPoolRegistry()
+
+
+def get_pool(database_url: str) -> psycopg2.pool.ThreadedConnectionPool:
+    """Return the stable process pool associated with ``database_url``."""
+    return _POOL_REGISTRY.get(database_url)
 
 
 class PooledConnectionWrapper:
@@ -178,16 +202,6 @@ def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) 
             time.sleep(0.02)
 
 
-def close_pool() -> None:
-    """Close all connections in the process-wide pool gracefully."""
-    global _pool, _pool_url
-    with _lock:
-        if _pool is not None:
-            try:
-                _pool.closeall()
-                logger.info("psycopg2 connection pool closed gracefully")
-            except Exception as e:
-                logger.warning("Error closing connection pool: %s", e)
-            finally:
-                _pool = None
-                _pool_url = None
+def close_pool(database_url: str | None = None) -> None:
+    """Close one registered pool, or all process-owned pools."""
+    _POOL_REGISTRY.close(database_url)

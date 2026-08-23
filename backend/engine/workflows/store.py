@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import logging
@@ -24,6 +25,8 @@ from .models import (
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 _EXTERNAL_RUN_ID_UNSET = object()
+_ARTIFACT_KEY = "_workflow_artifact"
+_ARTIFACT_THRESHOLD_BYTES = 128 * 1024
 
 
 def _atomic_write_text(path: Path, content: str) -> None:
@@ -156,57 +159,54 @@ class JsonModelStore(Generic[ModelType]):
 
 
 class WorkflowStore:
-    ACTIVE_WORKFLOW_ID = "workflow"
-    DEFAULT_TEMPLATE_ID = "default"
-
     def __init__(self, directory: Path) -> None:
         self._store = JsonModelStore(directory, WorkflowDocument)
 
     def save(
         self, workflow_id: str, request: WorkflowSaveRequest
     ) -> WorkflowDocument:
-        node_ids = {node.id for node in request.graph.nodes}
-        # Keep a stale client-side edge from making the whole workflow invalid.
-        # This also repairs documents produced by older canvas versions.
-        graph = request.graph.model_copy(
-            update={
-                "edges": [
-                    edge
-                    for edge in request.graph.edges
-                    if edge.source in node_ids and edge.target in node_ids
-                ]
-            }
-        )
+        from backend.engine.job_catalog import canonical_workflow
+
+        if canonical_workflow(workflow_id) is not None:
+            raise ValueError(
+                f"canonical workflow는 jobs 정의에서만 변경할 수 있습니다: {workflow_id}"
+            )
         document = WorkflowDocument(
             id=_validate_identifier(workflow_id),
             name=request.name,
             updated_at=utc_now_iso(),
-            graph=graph,
+            graph=request.graph,
         )
         return self._store.write(workflow_id, document)
 
     def load(self, workflow_id: str) -> WorkflowDocument:
-        try:
-            return self._store.load(workflow_id)
-        except FileNotFoundError:
-            if workflow_id != self.ACTIVE_WORKFLOW_ID:
-                raise
-            template = self._store.load(self.DEFAULT_TEMPLATE_ID)
-            return template.model_copy(update={"id": self.ACTIVE_WORKFLOW_ID})
+        from backend.engine.job_catalog import canonical_workflow
+
+        canonical = canonical_workflow(workflow_id)
+        if canonical is not None:
+            return canonical
+        return self._store.load(workflow_id)
 
     def list(self) -> List[WorkflowDocument]:
-        documents: List[WorkflowDocument] = []
+        from backend.engine.job_catalog import canonical_workflows
+
+        documents: List[WorkflowDocument] = list(canonical_workflows())
+        canonical_ids = {document.id for document in documents}
         for path in sorted(self._store.directory.glob("*.json")):
             doc = WorkflowDocument.model_validate_json(path.read_text(encoding="utf-8"))
             # Always use the filename stem as the id so the UI shows actual filenames
             if doc.id != path.stem:
                 doc = doc.model_copy(update={"id": path.stem})
+            if doc.id in canonical_ids:
+                continue
             documents.append(doc)
         return documents
 
     def delete(self, workflow_id: str) -> None:
-        if workflow_id in (self.ACTIVE_WORKFLOW_ID, self.DEFAULT_TEMPLATE_ID):
-            raise ValueError("The current/default workflow cannot be deleted")
+        from backend.engine.job_catalog import canonical_workflow
+
+        if canonical_workflow(workflow_id) is not None:
+            raise ValueError("canonical/current workflow는 삭제할 수 없습니다")
         self._store.delete(workflow_id)
 
 
@@ -218,6 +218,11 @@ class RunStore:
 
     def __init__(self, directory: Optional[Path] = None, db_manager: Optional[Any] = None) -> None:
         self.directory = directory
+        self._artifact_directory = (
+            directory / "artifacts" if directory is not None else None
+        )
+        if self._artifact_directory is not None:
+            self._artifact_directory.mkdir(parents=True, exist_ok=True)
         self._memory_runs: Dict[str, WorkflowRun] = {}
         self._memory_lock = Lock()
         self._lease_context: ContextVar[Optional[tuple[str, str]]] = ContextVar(
@@ -230,6 +235,83 @@ class RunStore:
             and getattr(db_manager, "is_connected", lambda: False)()
             else None
         )
+
+    def _externalize_output(self, run_id: str, node_id: str, value: Any) -> Any:
+        """Store large JSON output once on the shared volume and return a DB ref."""
+
+        if value is None or self._artifact_directory is None:
+            return value
+        serialized = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        if len(serialized) < _ARTIFACT_THRESHOLD_BYTES:
+            return value
+        digest = hashlib.sha256(serialized).hexdigest()
+        path = self._artifact_directory / f"{run_id}.{node_id}.{digest}.json.gz"
+        if not path.is_file():
+            temporary = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+            try:
+                with gzip.open(temporary, "wb", compresslevel=3) as target:
+                    target.write(serialized)
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return {
+            _ARTIFACT_KEY: {
+                "file": path.name,
+                "sha256": digest,
+                "bytes": len(serialized),
+            }
+        }
+
+    def _hydrate_output(self, value: Any) -> Any:
+        if not isinstance(value, dict) or set(value) != {_ARTIFACT_KEY}:
+            return value
+        metadata = value.get(_ARTIFACT_KEY)
+        if not isinstance(metadata, dict) or self._artifact_directory is None:
+            return value
+        file_name = metadata.get("file")
+        digest = metadata.get("sha256")
+        if not isinstance(file_name, str) or not isinstance(digest, str):
+            return value
+        path = self._artifact_directory / Path(file_name).name
+        with gzip.open(path, "rb") as source:
+            serialized = source.read()
+        if hashlib.sha256(serialized).hexdigest() != digest:
+            raise ValueError(f"워크플로 output artifact 해시가 일치하지 않습니다: {path.name}")
+        return json.loads(serialized)
+
+    def _database_copy(
+        self,
+        run: WorkflowRun,
+        node_ids: Optional[Collection[str]] = None,
+    ) -> WorkflowRun:
+        selected = set(node_ids) if node_ids is not None else set(run.nodes)
+        nodes = {
+            node_id: state.model_copy(
+                deep=False,
+                update={
+                    "output": self._externalize_output(run.id, node_id, state.output)
+                },
+            )
+            if node_id in selected
+            else state
+            for node_id, state in run.nodes.items()
+        }
+        return run.model_copy(deep=False, update={"nodes": nodes})
+
+    def _hydrate_run(self, run: WorkflowRun) -> WorkflowRun:
+        hydrated = {
+            node_id: state.model_copy(
+                deep=False,
+                update={"output": self._hydrate_output(state.output)},
+            )
+            for node_id, state in run.nodes.items()
+        }
+        return run.model_copy(deep=False, update={"nodes": hydrated})
 
     @contextmanager
     def workflow_lease(self, run_id: str, lease_token: str) -> Iterator[None]:
@@ -274,9 +356,15 @@ class RunStore:
         lease_token = self._lease_token_for(run.id)
         if self.db_manager is not None:
             try:
-                self.db_manager.save_workflow_run(run, lease_token=lease_token)
+                self.db_manager.save_workflow_run(
+                    self._database_copy(run),
+                    lease_token=lease_token,
+                )
             except Exception as error:
                 logger.warning("DB에 WorkflowRun 저장 실패 (run_id=%s): %s", run.id, error)
+                raise RuntimeError(
+                    "WorkflowRun을 PostgreSQL에 저장할 수 없습니다"
+                ) from error
         return run
 
     def save_progress(self, run: WorkflowRun, node_id: str) -> WorkflowRun:
@@ -302,6 +390,30 @@ class RunStore:
                 )
         return run
 
+    def save_node(self, run: WorkflowRun, node_id: str) -> WorkflowRun:
+        """Persist one terminal node transition without rewriting the full run."""
+
+        run.updated_at = utc_now_iso()
+        with self._memory_lock:
+            self._memory_runs[run.id] = run
+        if self.db_manager is not None:
+            try:
+                database_run = self._database_copy(run, (node_id,))
+                self.db_manager.save_workflow_node_state(
+                    database_run,
+                    node_id,
+                    lease_token=self._lease_token_for(run.id),
+                )
+            except Exception as error:
+                logger.warning(
+                    "DB에 WorkflowRun 노드 저장 실패 (run_id=%s, node_id=%s): %s",
+                    run.id,
+                    node_id,
+                    error,
+                )
+                raise
+        return run
+
     def enqueue(
         self,
         run_id: str,
@@ -316,13 +428,18 @@ class RunStore:
             raise RuntimeError(
                 "Kubernetes 배치 큐에는 PostgreSQL 연결이 필요합니다"
             )
-        enqueued = self.db_manager.enqueue_workflow_run(
-            run_id,
-            queue_name,
-            submission_attempt=submission_attempt,
-            submitted_at=submitted_at,
-            priority=priority,
-        )
+        try:
+            enqueued = self.db_manager.enqueue_workflow_run(
+                run_id,
+                queue_name,
+                submission_attempt=submission_attempt,
+                submitted_at=submitted_at,
+                priority=priority,
+            )
+        except Exception as error:
+            raise RuntimeError(
+                "WorkflowRun을 Kubernetes PostgreSQL 큐에 넣을 수 없습니다"
+            ) from error
         if enqueued is False:
             return False
         with self._memory_lock:
@@ -344,7 +461,12 @@ class RunStore:
                 self._memory_runs[run_id].updated_at = utc_now_iso()
         if self.db_manager is None:
             return True
-        return bool(self.db_manager.request_workflow_cancel(run_id))
+        try:
+            return bool(self.db_manager.request_workflow_cancel(run_id))
+        except Exception as error:
+            raise RuntimeError(
+                "WorkflowRun 취소 요청을 PostgreSQL에 저장할 수 없습니다"
+            ) from error
 
     def is_cancel_requested(self, run_id: str) -> bool:
         """Check the cross-process cancellation flag."""
@@ -355,32 +477,71 @@ class RunStore:
             return False
         return bool(self.db_manager.is_workflow_cancel_requested(run_id))
 
+    def clear_cancel_request(self, run_id: str) -> None:
+        """Clear durable and process-local cancellation before an explicit resume."""
+
+        if self.db_manager is not None:
+            try:
+                self.db_manager.clear_workflow_cancel_request(run_id)
+            except Exception as error:
+                raise RuntimeError(
+                    "WorkflowRun 취소 상태를 PostgreSQL에서 초기화할 수 없습니다"
+                ) from error
+        with self._memory_lock:
+            run = self._memory_runs.get(run_id)
+            if run is not None and run.status == "paused":
+                run.status = "queued"
+
     def load(self, run_id: str) -> WorkflowRun:
         """Load a complete workflow run by its identifier."""
-        with self._memory_lock:
-            if run_id in self._memory_runs:
-                return self._memory_runs[run_id]
+        # A worker holding the lease owns the freshest in-process graph. API
+        # processes do not: always refresh their cross-process view from DB.
+        if self._lease_token_for(run_id) is not None:
+            with self._memory_lock:
+                if run_id in self._memory_runs:
+                    return self._memory_runs[run_id]
 
         if self.db_manager is not None:
             try:
                 data = self.db_manager.get_workflow_run(run_id)
                 if data is not None:
-                    run = WorkflowRun.model_validate(data)
+                    run = self._hydrate_run(WorkflowRun.model_validate(data))
                     with self._memory_lock:
                         self._memory_runs[run_id] = run
                     return run
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 로드 실패 (run_id=%s): %s", run_id, error)
 
+        with self._memory_lock:
+            if run_id in self._memory_runs:
+                return self._memory_runs[run_id]
+
         raise FileNotFoundError(f"실행 {run_id}를 찾을 수 없습니다")
 
     def load_summary(self, run_id: str) -> WorkflowRun:
         """Load a compact run snapshot."""
+        if self.db_manager is not None:
+            try:
+                data = self.db_manager.get_workflow_run_summary(run_id)
+                if data is not None:
+                    run = WorkflowRun.model_validate(data)
+                    with self._memory_lock:
+                        local = self._memory_runs.get(run_id)
+                        if local is None or run.updated_at >= local.updated_at:
+                            self._memory_runs[run_id] = run
+                    return run
+            except Exception as error:
+                logger.warning(
+                    "DB에서 WorkflowRun 요약 로드 실패 (run_id=%s): %s",
+                    run_id,
+                    error,
+                )
         return self._summary(self.load(run_id))
 
     def list_summaries(
         self,
         workflow_id: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> List[WorkflowRun]:
         """List compact run snapshots from memory and DB."""
         with self._memory_lock:
@@ -392,7 +553,10 @@ class RunStore:
 
         if self.db_manager is not None:
             try:
-                records = self.db_manager.list_workflow_run_summaries(workflow_id)
+                records = self.db_manager.list_workflow_run_summaries(
+                    workflow_id,
+                    limit=limit,
+                )
                 database_runs = [
                     WorkflowRun.model_validate(record) for record in records
                 ]
@@ -401,14 +565,24 @@ class RunStore:
                     existing = merged.get(run.id)
                     if existing is None or run.updated_at >= existing.updated_at:
                         merged[run.id] = run
-                return list(merged.values())
+                ordered = sorted(
+                    merged.values(),
+                    key=lambda run: run.updated_at,
+                    reverse=True,
+                )
+                return ordered[:limit] if limit is not None else ordered
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 요약 목록 조회 실패: %s", error)
 
-        return local_runs
+        ordered = sorted(local_runs, key=lambda run: run.updated_at, reverse=True)
+        return ordered[:limit] if limit is not None else ordered
 
-    def list(self, workflow_id: Optional[str] = None) -> List[WorkflowRun]:
-        return self.list_summaries(workflow_id)
+    def list(
+        self,
+        workflow_id: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List[WorkflowRun]:
+        return self.list_summaries(workflow_id, limit)
 
     def list_pending(
         self,
@@ -443,6 +617,10 @@ class RunStore:
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 삭제 실패 (run_id=%s): %s", run_id, error)
 
+        if self._artifact_directory is not None:
+            for path in self._artifact_directory.glob(f"{run_id}.*.json.gz"):
+                path.unlink(missing_ok=True)
+
         return existed or db_deleted
 
     def clear(self) -> int:
@@ -461,6 +639,9 @@ class RunStore:
         # Also clean up any leftover json files if directory exists
         if self.directory and self.directory.is_dir():
             for path in self.directory.glob("*.json"):
+                path.unlink(missing_ok=True)
+        if self._artifact_directory and self._artifact_directory.is_dir():
+            for path in self._artifact_directory.glob("*.json.gz"):
                 path.unlink(missing_ok=True)
 
         return count if count > 0 else db_cleared

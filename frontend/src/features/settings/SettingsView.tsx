@@ -143,7 +143,7 @@ export function SettingsView() {
             <Server size={19} className="text-emerald-600" />
             <div>
               <h3>PostgreSQL 16 + pgvector 데이터베이스</h3>
-              <span>LangChain 공식 표준 벡터 스키마 연동</span>
+              <span>PostgreSQL/pgvector native 저장 계층</span>
             </div>
           </div>
           <button
@@ -225,7 +225,7 @@ export function SettingsView() {
 
         {/* PostgreSQL URL & Docker Command Box */}
         <div className="settings-url-box">
-          <label>PostgreSQL 연결 접속 URL (SQLAlchemy / psycopg)</label>
+          <label>PostgreSQL 연결 접속 URL (psycopg)</label>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <code style={{ flex: 1 }}>{dbUrl}</code>
             <button
@@ -270,12 +270,12 @@ export function SettingsView() {
         <div className="settings-config-table">
           <div className="settings-config-row">
             <div>
-              <p className="font-semibold text-slate-800">질문 분해 임베딩 모델</p>
+              <p className="font-semibold text-slate-800">질의 임베딩 계약</p>
               <p className="text-xs text-slate-500">
-                단일 질문을 구조화된 서브 쿼리로 변환하고 임베딩 벡터를 생성합니다.
+                선택한 pgvector 인덱스와 동일한 모델·차원으로 질의 벡터를 생성합니다.
               </p>
             </div>
-            <span className="settings-badge font-mono">text-embedding-3-large</span>
+            <span className="settings-badge font-mono">INDEX-BOUND</span>
           </div>
 
           <div className="settings-config-row">

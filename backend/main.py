@@ -8,6 +8,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from anyio import to_thread
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -15,15 +16,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from backend.api.error_mapping import error_envelope, http_error_envelope
 from backend.api.router import create_api_router
+from backend.bootstrap.container import ApplicationContainer
 from backend.core.settings import (
-    BENCHMARK_DIR,
     DATABASE_URL,
     DEV_CORS_ORIGINS,
     DIST_DIR,
     PROJECT_DIR,
 )
-from backend.engine.runtime.registry import ModuleRegistry
 from backend.features.bi.api_routes import register_bi_exception_handlers
 from backend.storage.connection_pool import close_pool, get_pool
 from modules.common.exceptions import PipelineBaseError
@@ -43,7 +44,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("=" * 60)
 
     # 1. Ensure runtime directories exist
-    BENCHMARK_DIR.mkdir(parents=True, exist_ok=True)
     (PROJECT_DIR / "data").mkdir(parents=True, exist_ok=True)
 
     # 2. Warm up Database Connection Pool
@@ -63,17 +63,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             exc,
         )
 
-    # 3. Inspect Module Registry
+    container: ApplicationContainer = app.state.container
+    available_modules = container.runtime.services.module_registry.list_modules()
+    logger.info(
+        "📦 Registered %d pipeline modules: %s",
+        len(available_modules),
+        ", ".join(module.definition.type for module in available_modules[:6])
+        + ("..." if len(available_modules) > 6 else ""),
+    )
     try:
-        registry = ModuleRegistry()
-        available_modules = registry.list_modules()
-        logger.info(
-            "📦 Registered %d pipeline modules: %s",
-            len(available_modules),
-            ", ".join(m.definition.type for m in available_modules[:6]) + ("..." if len(available_modules) > 6 else ""),
-        )
-    except Exception as exc:
-        logger.error("❌ Failed to inspect module registry: %s", exc)
+        recovered = await to_thread.run_sync(container.recover_pending_runs)
+        if recovered:
+            logger.info("미완료 Kubernetes run %d개를 큐에 복구했습니다", recovered)
+    except Exception:
+        logger.warning("Kubernetes run 큐 복구 실패", exc_info=True)
 
     elapsed = time.time() - start_time
     logger.info("✨ Application initialization complete in %.3fs.", elapsed)
@@ -83,6 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown sequence
     logger.info("🛑 Shutting down backend application...")
     try:
+        container.close()
         close_pool()
         logger.info("🔌 Database connection pools closed cleanly.")
     except Exception as exc:
@@ -128,34 +132,37 @@ def register_global_exception_handlers(application: FastAPI) -> None:
 
     @application.exception_handler(PipelineBaseError)
     async def pipeline_exception_handler(request: Request, exc: PipelineBaseError) -> JSONResponse:
+        payload = exc.to_dict()
         return JSONResponse(
             status_code=exc.status_code,
-            content=exc.to_dict(),
+            content=error_envelope(
+                code=str(payload["error_code"]),
+                message=str(payload["message"]),
+                retryable=exc.status_code >= 500,
+                context={
+                    "module_type": payload.get("module_type"),
+                    **(payload.get("details") or {}),
+                },
+            ),
         )
 
     @application.exception_handler(ValidationError)
     async def validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content={
-                "error_code": "VALIDATION_ERROR",
-                "message": "데이터 유효성 검증에 실패했습니다.",
-                "module_type": None,
-                "details": {"errors": exc.errors(include_url=False)},
-            },
+            content=error_envelope(
+                code="VALIDATION_ERROR",
+                message="데이터 유효성 검증에 실패했습니다.",
+                context={"errors": exc.errors(include_url=False)},
+            ),
         )
 
     @application.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-        detail_msg = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "error_code": "HTTP_ERROR",
-                "message": detail_msg,
-                "module_type": None,
-                "details": {"status_code": exc.status_code},
-            },
+            content=http_error_envelope(exc.detail, exc.status_code),
+            headers=exc.headers,
         )
 
     @application.exception_handler(Exception)
@@ -163,26 +170,26 @@ def register_global_exception_handlers(application: FastAPI) -> None:
         logger.error("Unhandled global server exception: %s", exc, exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={
-                "error_code": "INTERNAL_SERVER_ERROR",
-                "message": "서버 내부 오류가 발생했습니다.",
-                "module_type": None,
-                "details": {"error": str(exc)},
-            },
+            content=error_envelope(
+                code="INTERNAL_SERVER_ERROR",
+                message="서버 내부 오류가 발생했습니다.",
+                retryable=True,
+            ),
         )
 
 
 # ==============================================================================
 # 4. Application Factory
 # ==============================================================================
-def create_app() -> FastAPI:
+def create_app(container: ApplicationContainer | None = None) -> FastAPI:
+    shared_container = container or ApplicationContainer.create()
     application = FastAPI(
         title="RAG Pipeline Visualizer API",
         version="2.0.0",
         description=(
-            "독립 실행 가능한 RAG·스프레드시트 모듈과 DTO 기반 워크플로 API입니다. "
-            "각 모듈 실행 엔드포인트는 Input/Config/Output Pydantic 스키마를 "
-            "Swagger에 직접 노출합니다."
+            "RAG·스프레드시트 모듈 계약과 Kubernetes 기반 비동기 워크플로 "
+            "API입니다. Input/Config/Output Pydantic 스키마와 실행 상태를 "
+            "Swagger에 노출합니다."
         ),
         openapi_tags=[
             {
@@ -191,7 +198,7 @@ def create_app() -> FastAPI:
             },
             {
                 "name": "Modules",
-                "description": "모듈 계약 조회와 모듈별 독립 JSON 실행",
+                "description": "워크플로 구성에 사용하는 모듈 계약 조회",
             },
             {
                 "name": "Workflows",
@@ -207,6 +214,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
+    application.state.container = shared_container
 
     # 1. Middlewares
     application.add_middleware(
@@ -254,7 +262,7 @@ def create_app() -> FastAPI:
             )
 
     # 4. API Routers
-    application.include_router(create_api_router())
+    application.include_router(create_api_router(shared_container))
 
     # 5. Static Assets & SPA Fallback
     assets_dir = DIST_DIR / "assets"

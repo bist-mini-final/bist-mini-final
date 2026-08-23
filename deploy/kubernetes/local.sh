@@ -3,10 +3,10 @@ set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${DEPLOY_DIR}/../.." && pwd)"
+PROJECT_PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 export PATH="${PROJECT_ROOT}/.tools/bin:${PATH}"
 CLUSTER_NAME="${K3D_CLUSTER_NAME:-bist-local}"
 NAMESPACE="bist-batch"
-QUEUE_NAME="${KUBERNETES_INGESTION_QUEUE:-excel-ingestion}"
 WORKER_IMAGE="${KUBERNETES_WORKER_IMAGE:-bist-workflow-worker:local}"
 KEDA_VERSION="${KEDA_VERSION:-2.20.2}"
 ACTION="${1:-all}"
@@ -23,19 +23,18 @@ check_tools() {
   require_command k3d
   require_command kubectl
   require_command helm
-  require_command python3
   if ! docker info >/dev/null 2>&1; then
     echo "Docker daemon이 실행 중이 아닙니다." >&2
     exit 1
   fi
-  if [[ ! -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
-    echo ".venv가 없습니다. 먼저 .venv를 생성하고 의존성을 설치하세요 (예: uv venv && uv pip install -r backend/requirements.txt)" >&2
+  if [[ ! -x "${PROJECT_PYTHON}" ]]; then
+    echo ".venv가 없습니다. 먼저 uv sync로 잠금 의존성을 설치하세요." >&2
     exit 1
   fi
 }
 
 env_value() {
-  "${PROJECT_ROOT}/.venv/bin/python" - "$PROJECT_ROOT" "$1" <<'PY'
+  "${PROJECT_PYTHON}" - "$PROJECT_ROOT" "$1" <<'PY'
 import sys
 from pathlib import Path
 import dotenv
@@ -52,14 +51,10 @@ config_value() {
   echo "${current_value:-${configured_value:-${default_value}}}"
 }
 
-load_configuration() {
-  QUEUE_NAME="$(config_value KUBERNETES_INGESTION_QUEUE excel-ingestion)"
-}
-
 database_is_local() {
   local pg_url
   pg_url="$(config_value PGVECTOR_URL postgresql://postgres:postgres@localhost:5432/rag_flow)"
-  "${PROJECT_ROOT}/.venv/bin/python" - "${pg_url}" <<'PY'
+  "${PROJECT_PYTHON}" - "${pg_url}" <<'PY'
 import sys
 from urllib.parse import urlsplit
 host = (urlsplit(sys.argv[1]).hostname or "").lower()
@@ -77,7 +72,7 @@ start_database() {
   fi
   (
     cd "${PROJECT_ROOT}"
-    .venv/bin/python -c \
+    "${PROJECT_PYTHON}" -c \
       "from backend.storage.db_manager import DatabaseManager; assert DatabaseManager().ensure_schema()"
   )
 }
@@ -140,7 +135,7 @@ build_worker() {
 
 cluster_database_url() {
   local source_url="$1"
-  "${PROJECT_ROOT}/.venv/bin/python" - "$source_url" <<'PY'
+  "${PROJECT_PYTHON}" - "$source_url" <<'PY'
 import sys
 from urllib.parse import urlsplit, urlunsplit
 parts = urlsplit(sys.argv[1])
@@ -164,7 +159,7 @@ apply_workload() {
   openai_key="$(config_value OPENAI_API_KEY '')"
   openai_base="$(config_value OPENAI_BASE_URL https://api.openai.com/v1)"
   cluster_pg_url="$(cluster_database_url "${pg_url}")"
-  connection_hash="$("${PROJECT_ROOT}/.venv/bin/python" - "${cluster_pg_url}" <<'PY'
+  connection_hash="$("${PROJECT_PYTHON}" - "${cluster_pg_url}" <<'PY'
 import hashlib
 import sys
 print(hashlib.sha256(sys.argv[1].encode("utf-8")).hexdigest())
@@ -179,13 +174,13 @@ PY
       -o jsonpath='{.metadata.annotations.bist\.ai/connection-hash}')"
   fi
   configured_max_jobs="$(env_value KUBERNETES_MAX_JOBS)"
-  max_jobs="${KUBERNETES_MAX_JOBS:-${configured_max_jobs:-$(python3 "${DEPLOY_DIR}/scripts/capacity.py")}}"
+  max_jobs="${KUBERNETES_MAX_JOBS:-${configured_max_jobs:-$("${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/capacity.py")}}"
 
   kubectl apply -f "${DEPLOY_DIR}/manifests/00-namespace.yaml"
   if database_is_local; then
     database_endpoint="$(docker inspect bist-pgvector \
       --format "{{(index .NetworkSettings.Networks \"k3d-${CLUSTER_NAME}\").IPAddress}}")"
-    python3 "${DEPLOY_DIR}/scripts/render_database.py" \
+    "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/render_database.py" \
       --endpoint "${database_endpoint}" | kubectl apply -f -
   else
     kubectl delete service bist-pgvector -n "${NAMESPACE}" --ignore-not-found
@@ -197,9 +192,8 @@ PY
     --from-literal=OPENAI_API_KEY="${openai_key}" \
     --from-literal=OPENAI_BASE_URL="${openai_base}" \
     --dry-run=client -o yaml | kubectl apply -f -
-  python3 "${DEPLOY_DIR}/scripts/render.py" \
+  "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/render.py" \
     --max-replicas "${max_jobs}" \
-    --queue "${QUEUE_NAME}" \
     --image "${WORKER_IMAGE}" \
     --connection-hash "${connection_hash}" \
     --cpu-request "$(config_value KUBERNETES_JOB_CPU_REQUEST 1000m)" \
@@ -219,7 +213,7 @@ PY
 
 show_status() {
   kubectl config use-context "k3d-${CLUSTER_NAME}" >/dev/null 2>&1 || true
-  python3 "${DEPLOY_DIR}/scripts/capacity.py" --details
+  "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/capacity.py" --details
   k3d cluster list
   kubectl get pods -n keda 2>/dev/null || true
   kubectl get scaledjobs,jobs,pods -n "${NAMESPACE}" 2>/dev/null || true
@@ -229,24 +223,20 @@ show_status() {
 case "${ACTION}" in
   check)
     check_tools
-    load_configuration
     ;;
   cluster)
     check_tools
-    load_configuration
     start_database
     ensure_cluster
     install_control_plane
     ;;
   build)
     check_tools
-    load_configuration
     ensure_cluster
     build_worker
     ;;
   deploy)
     check_tools
-    load_configuration
     start_database
     ensure_cluster
     install_control_plane
@@ -254,7 +244,6 @@ case "${ACTION}" in
     ;;
   all)
     check_tools
-    load_configuration
     start_database
     ensure_cluster
     install_control_plane
@@ -264,7 +253,6 @@ case "${ACTION}" in
     ;;
   restart)
     check_tools
-    load_configuration
     k3d cluster stop "${CLUSTER_NAME}" || true
     k3d cluster start "${CLUSTER_NAME}"
     kubectl config use-context "k3d-${CLUSTER_NAME}" >/dev/null

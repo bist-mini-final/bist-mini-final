@@ -2,7 +2,6 @@
 
 from modules.embedding.cell_text_embedder import (
     CellTextEmbedderConfigDTO,
-    CellTextEmbedderExecutionDTO,
     CellTextEmbedderInputDTO,
     CellTextEmbedderModule,
     CellTextEmbeddingsDTO,
@@ -10,7 +9,6 @@ from modules.embedding.cell_text_embedder import (
 )
 from modules.embedding.query_embedder import (
     EmbedderConfigDTO,
-    EmbedderExecutionDTO,
     EmbedderInputDTO,
     EmbedderModule,
     EmbeddingsDTO,
@@ -21,14 +19,12 @@ __all__ = [
     # Query Embedder
     "EmbedderInputDTO",
     "EmbedderConfigDTO",
-    "EmbedderExecutionDTO",
     "EmbeddingVector",
     "EmbeddingsDTO",
     "EmbedderModule",
     # Cell Text Embedder
     "CellTextEmbedderInputDTO",
     "CellTextEmbedderConfigDTO",
-    "CellTextEmbedderExecutionDTO",
     "EmbeddedCellTextDocumentDTO",
     "CellTextEmbeddingsDTO",
     "CellTextEmbedderModule",

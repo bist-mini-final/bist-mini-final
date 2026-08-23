@@ -1,6 +1,18 @@
-import type { ModulePresentation, ModuleType } from '../types';
+import type { ModuleDefinition, ModulePresentation, ModuleType } from '../types';
 
-export const MODULE_CATEGORIES = ['Source', 'Logic', 'Transform', 'Output'] as const;
+const PREFERRED_CATEGORY_ORDER = [
+  'Source',
+  'Logic',
+  'Transform',
+  'Storage / DB',
+  'Output',
+] as const;
+
+export function orderedModuleCategories(modules: ModuleDefinition[]): string[] {
+  const available = new Set(modules.map((module) => module.category));
+  const preferred = PREFERRED_CATEGORY_ORDER.filter((category) => available.delete(category));
+  return [...preferred, ...Array.from(available).sort()];
+}
 
 /** UI-only metadata. Labels, descriptions, and I/O contracts come from the backend. */
 export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>> = {
@@ -15,7 +27,6 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   semantic_query_matcher: { icon: 'Route', color: '#7c3aed' },
   llm_query_router: { icon: 'Bot', color: '#c026d3' },
   rrf_fusion: { icon: 'Merge', color: '#059669' },
-  context: { icon: 'Maximize2', color: '#d97706' },
   pg_context_expander: { icon: 'Maximize2', color: '#d97706' },
   reader: { icon: 'Sparkles', color: '#e11d48' },
   processed_file_selector: { icon: 'FileSpreadsheet', color: '#107c41' },
@@ -23,6 +34,5 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   company_entity_extractor: { icon: 'Building2', color: '#7c3aed' },
   cell_text_serializer: { icon: 'Rows3', color: '#7c3aed' },
   sheet_metadata_persistence: { icon: 'TableProperties', color: '#d97706' },
-  index_company_persistence: { icon: 'Building2', color: '#7c3aed' },
   qa_example_loader: { icon: 'MessageSquare', color: '#d97706' },
 };

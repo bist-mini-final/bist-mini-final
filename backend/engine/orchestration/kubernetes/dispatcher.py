@@ -23,6 +23,9 @@ class KubernetesQueueDispatcher:
 
     def submit(self, run_id: str, *, resume_failed: bool = False) -> bool:
         run = self.run_store.load_summary(run_id)
+        if resume_failed and run.status in ("failed", "paused"):
+            self.executor.prepare_resume(run_id)
+            run = self.run_store.load_summary(run_id)
         if run.status == "completed":
             return False
         if (
@@ -32,7 +35,7 @@ class KubernetesQueueDispatcher:
             and run.status in ("queued", "running")
         ):
             return False
-        if resume_failed or run.status in ("failed", "paused"):
+        if run.status in ("failed", "paused"):
             self.executor.prepare_resume(run_id)
             run = self.run_store.load_summary(run_id)
 
@@ -44,21 +47,6 @@ class KubernetesQueueDispatcher:
             submitted_at=utc_now_iso(),
         )
         return enqueued
-
-    def ensure_submitted(
-        self,
-        run_id: str,
-        run: Optional[WorkflowRun] = None,
-    ) -> None:
-        run = run or self.run_store.load_summary(run_id)
-        if run.status not in ("queued", "running"):
-            return
-        if (
-            run.orchestration.backend != "kubernetes"
-            or run.orchestration.deployment_name != self.queue_name
-            or run.orchestration.submitted_at is None
-        ):
-            self.submit(run_id)
 
     def cancel(self, run_id: str) -> WorkflowRun:
         if not self.run_store.request_cancel(run_id):
@@ -86,7 +74,7 @@ class KubernetesQueueDispatcher:
         workflow_ids: Optional[Collection[str]] = None,
         max_recoveries: int = 100,
     ) -> int:
-        """Migrate unowned pending runs; leased/stale runs recover via DB leases."""
+        """Enqueue unowned current-schema runs; stale leases recover in PostgreSQL."""
 
         allowed = set(workflow_ids) if workflow_ids is not None else None
         recovered = 0

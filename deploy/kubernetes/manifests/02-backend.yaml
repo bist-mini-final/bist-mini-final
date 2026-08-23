@@ -59,6 +59,14 @@ spec:
               port: 8765
             initialDelaySeconds: 15
             periodSeconds: 20
+          volumeMounts:
+            - name: bist-data
+              mountPath: /app/data
+      volumes:
+        - name: bist-data
+          hostPath:
+            path: /mnt/bist-data
+            type: Directory
 ---
 apiVersion: v1
 kind: Service

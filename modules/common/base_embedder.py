@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Mapping, Optional
 
 from pydantic import Field
 
+from backend.providers.openai_pricing import calculate_openai_cost
+
 if TYPE_CHECKING:
     pass
 from modules.common.base_module import (
@@ -31,7 +33,6 @@ from modules.common.base_module import (
 from modules.common.config import (
     DEFAULT_EMBEDDING_DIMENSION,
     DEFAULT_EMBEDDING_MODEL,
-    DEFAULT_EMBEDDING_RATE_PER_MILLION,
     DEFAULT_EXCHANGE_RATE_KRW_PER_USD,
 )
 
@@ -48,7 +49,6 @@ def get_expected_dimension(model_name: Optional[str] = None) -> int:
     exact_dimensions = {
         "text-embedding-3-large": 3072,
         "text-embedding-3-small": 1536,
-        "text-embedding-ada-002": 1536,
     }
     if normalized in exact_dimensions:
         return exact_dimensions[normalized]
@@ -61,16 +61,13 @@ def get_expected_dimension(model_name: Optional[str] = None) -> int:
     return DEFAULT_EMBEDDING_DIMENSION
 
 
-get_model_dimension = get_expected_dimension  # Backwards compatibility alias
-
-
 def calculate_embedding_cost(
     model: str = DEFAULT_EMBEDDING_MODEL,
     total_tokens: int = 0,
     exchange_rate: float = DEFAULT_EXCHANGE_RATE_KRW_PER_USD,
 ) -> Dict[str, float]:
     """Calculate USD and KRW costs for embedding token usage."""
-    cost_usd = (total_tokens / 1_000_000.0) * DEFAULT_EMBEDDING_RATE_PER_MILLION
+    cost_usd = calculate_openai_cost(model, total_tokens)
     cost_krw = cost_usd * exchange_rate
     return {
         "cost_usd": round(cost_usd, 6),
@@ -115,23 +112,20 @@ class EmbeddingConfigDTO(ModuleConfigDTO):
         return get_expected_dimension(self.model)
 
 
-# Backwards compatibility alias
-BaseEmbeddingConfigDTO = EmbeddingConfigDTO
-
-
 # ==============================================================================
 # 3. Base Embedding Module
 # ==============================================================================
 
-class BaseEmbedderModule(BaseModule):
+class BaseEmbeddingModule(BaseModule):
     """Base class for all embedding modules managing encoder lifecycle, model resolution,
     batching, token & cost tracking, progress reporting, and strict vector dimension validation.
     """
 
-    def __init__(self, encoder: Optional[Any] = None) -> None:
+    def __init__(self, encoder: Any) -> None:
         super().__init__()
+        if encoder is None:
+            raise ValueError("BaseEmbeddingModule에는 encoder 주입이 필요합니다")
         self.encoder = encoder
-        self._encoders: Dict[str, Any] = {}
         self.last_usage: Optional[Dict[str, Any]] = None
         self.last_model: Optional[str] = None
         self.last_dimension: Optional[int] = None
@@ -178,18 +172,9 @@ class BaseEmbedderModule(BaseModule):
         return default
 
     def _encoder_for(self, model_name: str) -> Any:
-        """Resolve an encoder through both local and process-wide model caches."""
-        from backend.providers.embeddings.factory import get_embedding_encoder
-
-        cached = self._encoders.get(model_name)
-        if cached is not None:
-            return cached
-        encoder = get_embedding_encoder(
-            model_name,
-            override_encoder=self.encoder,
-        )
-        self._encoders[model_name] = encoder
-        return encoder
+        """Return the encoder injected by the process composition root."""
+        del model_name
+        return self.encoder
 
     def validate_vectors(
         self,
@@ -375,16 +360,9 @@ class BaseEmbedderModule(BaseModule):
         }
 
 
-# Canonical and convenience aliases
-BaseEmbeddingModule = BaseEmbedderModule
-BaseEmbedder = BaseEmbedderModule
-
 __all__ = [
     "DEFAULT_EMBEDDING_DIMENSION",
     "DEFAULT_EMBEDDING_MODEL",
-    "BaseEmbedder",
-    "BaseEmbedderModule",
-    "BaseEmbeddingConfigDTO",
     "BaseEmbeddingModule",
     "BaseModule",
     "DocumentContextDTO",

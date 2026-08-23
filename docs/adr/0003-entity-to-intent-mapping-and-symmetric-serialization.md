@@ -62,7 +62,7 @@ flowchart TD
 
 ### B. 데이터 구조 및 직렬화 표준 사양
 
-#### 1. DTO 계약 사양 ([modules/query/semantic_query_matcher.py](file:///Users/pileuszu/Repos/bist-mini-final/modules/query/semantic_query_matcher.py))
+#### 1. DTO 계약 사양 ([modules/query/semantic_query_matcher.py](../../modules/query/semantic_query_matcher.py))
 ```python
 class CompanyScopeItemDTO(ModuleDTO):
     raw_mention: str = Field(description="질문 내 원본 기업 언급 (예: '삼전', '비스텔리젼스')")

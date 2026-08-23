@@ -34,8 +34,8 @@ export const CellTextEmbedderNode = ({ data, selected }: CellTextEmbedderNodePro
       bodyClassName="space-y-2.5"
     >
       <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-3 py-2.5 text-[10px] text-slate-600">
-        <span className="block truncate" title={data.config?.model ?? 'text-embedding-3-large'}>
-          {data.config?.model ?? 'text-embedding-3-large'}
+        <span className="block truncate" title={data.config?.model ?? 'text-embedding-3-small'}>
+          {data.config?.model ?? 'text-embedding-3-small'}
         </span>
         <span className="block">Batch {data.config?.batch_size ?? 64}</span>
       </div>

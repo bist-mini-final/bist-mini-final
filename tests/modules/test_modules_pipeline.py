@@ -1,8 +1,7 @@
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.engine.runtime.registry import ModuleRegistry
-from backend.providers.llm.chat_completion import ChatCompletionResult
+from backend.providers.openai_responses import OpenAIResponseResult
 from modules.embedding.query_embedder import EmbedderInputDTO, EmbeddingsDTO
 from modules.query.decomposer import DecomposerInputDTO, SubqueriesDTO
 from modules.query.query_input import QueryInputDTO
@@ -14,16 +13,17 @@ from modules.retrieval.pgvector_retriever import (
 )
 from modules.retrieval.rrf_fusion import RrfFusionInputDTO
 from modules.storage.pgvector_collection_loader import IndexOutputDTO
+from tests.modules.registry_factory import create_test_registry
 
 
 def test_clean_19_modules_registration():
-    registry = ModuleRegistry()
+    registry = create_test_registry()
     defs = registry.definitions()
     assert len(defs) == 19
 
 
 def test_end_to_end_query_reader_pipeline():
-    registry = ModuleRegistry()
+    registry = create_test_registry()
 
     # 1. QueryInput
     qi = registry.get("query_input")
@@ -32,7 +32,8 @@ def test_end_to_end_query_reader_pipeline():
 
     # 2. Decomposer (BaseLLMModule)
     mock_llm = MagicMock()
-    mock_llm.complete_with_metadata.return_value = ChatCompletionResult(
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_pipeline_decomposer",
         content='{"items": [{"company": "삼성전자", "sheet": "손익계산서", "row_header": "영업이익", "column_header": "2023", "cell_value": "?"}, {"company": "삼성전자", "sheet": "손익계산서", "row_header": "영업이익", "column_header": "2024", "cell_value": "?"}]}',
         usage={"prompt_tokens": 15, "completion_tokens": 35},
         latency_seconds=0.1,
@@ -47,7 +48,20 @@ def test_end_to_end_query_reader_pipeline():
     mock_encoder.encode.return_value = [[0.1] * 3072, [0.2] * 3072]
     embedder = cast(Any, registry.get("embedder"))
     embedder.encoder = mock_encoder
-    res_emb = embedder.run(EmbedderInputDTO(query_input=SubqueriesDTO.model_validate(res_dec)))
+    dummy_index = IndexOutputDTO(
+        index_id="samsung_2023",
+        file_name="samsung.xlsx",
+        workbook_hash="hash123",
+        model="text-embedding-3-large",
+        dimension=3072,
+        document_count=1000,
+    )
+    res_emb = embedder.run(
+        EmbedderInputDTO(
+            query_input=SubqueriesDTO.model_validate(res_dec),
+            index_input=dummy_index,
+        )
+    )
     assert len(res_emb["items"]) == 2
 
     # 4. PgVectorRetriever
@@ -59,14 +73,6 @@ def test_end_to_end_query_reader_pipeline():
     mock_store.similarity_search_by_vector_with_score.return_value = [(mock_doc, 0.1)]
     retriever.pgvector_store = mock_store
 
-    dummy_index = IndexOutputDTO(
-        index_id="samsung_2023",
-        file_name="samsung.xlsx",
-        workbook_hash="hash123",
-        model="text-embedding-3-large",
-        dimension=3072,
-        document_count=1000,
-    )
     res_dense = retriever.run(
         PgVectorRetrieverInputDTO(
             query_input=EmbeddingsDTO(query_context=res_qi["query_context"], items=res_emb["items"]),
@@ -113,11 +119,12 @@ def test_end_to_end_query_reader_pipeline():
     }
     pg_expander.pgvector_store = mock_store
     res_ctx = pg_expander.run({"retrieval_json": res_rrf})
-    assert len(res_ctx["context_blocks"]) == 3
+    assert len(res_ctx["items"]) == 3
 
     # 7. Integrated Agentic Reader
     mock_reader_llm = MagicMock()
-    mock_reader_llm.complete_with_metadata.return_value = ChatCompletionResult(
+    mock_reader_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_pipeline_reader",
         content="삼성전자의 2023년 영업이익은 6조 5,670억원이며, 2024년 영업이익은 35조원입니다. 2023년 대비 2024년 영업이익 증가율은 432.97% 증가하였습니다. [Sheet: 손익계산서 | Cell: E60, F60]",
         usage={"prompt_tokens": 80, "completion_tokens": 40},
         latency_seconds=0.2,

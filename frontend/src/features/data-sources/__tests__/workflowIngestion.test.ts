@@ -7,7 +7,7 @@ describe('pipelineFromIngestionJob', () => {
     const job = {
       job_id: 'run-partial',
       status: 'running',
-      workflow_id: 'indexing_pgvector',
+      workflow_id: 'excel_ingestion',
       worker_active: true,
       index: null,
       luna_output: {
@@ -17,9 +17,9 @@ describe('pipelineFromIngestionJob', () => {
         tables: [{ sheet_name: 'Key_Stats' }],
       },
       run: {
-        schema_version: 1,
+        schema_version: 2,
         id: 'run-partial',
-        workflow_id: 'indexing_pgvector',
+        workflow_id: 'excel_ingestion',
         workflow_updated_at: '2026-08-19T00:00:00Z',
         status: 'running',
         created_at: '2026-08-19T00:00:00Z',
@@ -110,14 +110,14 @@ describe('pipelineFromIngestionJob', () => {
     const job = {
       job_id: 'run-missing-node',
       status: 'running',
-      workflow_id: 'indexing_pgvector',
+      workflow_id: 'excel_ingestion',
       worker_active: true,
       index: null,
       luna_output: null,
       run: {
-        schema_version: 1,
+        schema_version: 2,
         id: 'run-missing-node',
-        workflow_id: 'indexing_pgvector',
+        workflow_id: 'excel_ingestion',
         workflow_updated_at: '2026-08-19T00:00:00Z',
         status: 'running',
         created_at: '2026-08-19T00:00:00Z',

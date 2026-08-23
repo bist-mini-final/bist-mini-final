@@ -5,7 +5,8 @@ FROM python:3.11-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_ROOT_USER_ACTION=ignore
+    PIP_ROOT_USER_ACTION=ignore \
+    PATH="/app/.venv/bin:${PATH}"
 
 WORKDIR /app
 
@@ -19,10 +20,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN groupadd -r appuser -g 1000 \
     && useradd -r -u 1000 -g appuser appuser
 
-COPY backend/requirements.txt ./requirements.txt
+COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
-    python -m pip install --upgrade pip \
-    && python -m pip install -r requirements.txt
+    python -m pip install uv==0.12.5 \
+    && uv sync --frozen --no-dev --no-install-project
 
 COPY backend ./backend
 COPY modules ./modules

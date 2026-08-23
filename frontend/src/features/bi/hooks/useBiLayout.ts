@@ -64,29 +64,19 @@ function readGridSize(
   return constrainBiCardGridSize(cardId, breakpoint, { w, h });
 }
 
-function readRowId(value: unknown, y: number, legacyRowIds: Map<number, string>): string {
-  if (typeof value === 'string' && value.trim()) return value;
-  const existing = legacyRowIds.get(y);
-  if (existing) return existing;
-  const rowId = `row-migrated-${legacyRowIds.size + 1}`;
-  legacyRowIds.set(y, rowId);
-  return rowId;
-}
-
 function normalizeLayout(value: unknown): StoredLayout {
   if (!isUnknownRecord(value)) return DEFAULT_LAYOUT;
   const candidate = value;
-  if ((candidate.schemaVersion !== 1 && candidate.schemaVersion !== 2 && candidate.schemaVersion !== 3)
-    || !Array.isArray(candidate.cards)) {
+  if (candidate.schemaVersion !== 3 || !Array.isArray(candidate.cards)) {
     return DEFAULT_LAYOUT;
   }
 
   const seen = new Set<BiCardId>();
-  const legacyRowIds = new Map<number, string>();
   const cards = candidate.cards.flatMap((item) => {
     if (!isUnknownRecord(item)) return [];
     const card = item;
     if (!isBiCardId(card.cardId) || seen.has(card.cardId)) return [];
+    if (typeof card.rowId !== 'string' || !card.rowId.trim()) return [];
     seen.add(card.cardId);
     const definition = getCardDefinition(card.cardId);
     const fallback = DEFAULT_CARD_LAYOUT.find((item) => item.cardId === card.cardId);
@@ -96,7 +86,7 @@ function normalizeLayout(value: unknown): StoredLayout {
     const y = readGridCoordinate(card.y, fallback?.y ?? 0);
     return [{
       cardId: card.cardId,
-      rowId: readRowId(candidate.schemaVersion === 3 ? card.rowId : null, y, legacyRowIds),
+      rowId: card.rowId,
       size,
       x,
       y,

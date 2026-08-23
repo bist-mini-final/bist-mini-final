@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Dict, Literal
+from typing import Literal
 
 # ==============================================================================
 # 1. Embedding Models & Dimensionality
 # ==============================================================================
-DEFAULT_EMBEDDING_MODEL: str = "text-embedding-3-large"
-DEFAULT_EMBEDDING_DIMENSION: int = 3072
+DEFAULT_EMBEDDING_MODEL: str = "text-embedding-3-small"
+DEFAULT_EMBEDDING_DIMENSION: int = 1536
 DEFAULT_CELL_EMBEDDING_BATCH_SIZE: int = 2048
 DEFAULT_QUERY_EMBEDDING_BATCH_SIZE: int = 128
 
-DEFAULT_EMBEDDING_RATE_PER_MILLION: float = 0.13
 DEFAULT_EXCHANGE_RATE_KRW_PER_USD: float = 1400.0
 
 
@@ -25,13 +24,6 @@ DEFAULT_ROUTER_MODEL: str = DEFAULT_LLM_MODEL
 DEFAULT_READER_MODEL: str = DEFAULT_LLM_MODEL
 DEFAULT_REFINER_MODEL: str = DEFAULT_LLM_MODEL
 DEFAULT_ENTITY_EXTRACTOR_MODEL: str = DEFAULT_LLM_MODEL
-
-DEFAULT_LLM_TOKEN_RATES: Dict[str, float] = {
-    "uncached_input_per_million": 2.50,
-    "cached_input_per_million": 1.25,
-    "output_per_million": 10.0,
-}
-
 
 # ==============================================================================
 # 3. Semantic Routing & Matching Defaults

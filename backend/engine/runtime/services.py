@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from backend.core.settings import (
     CACHE_DIR,
@@ -22,13 +22,13 @@ from backend.core.settings import (
 )
 from backend.engine.workflows.executor import WorkflowExecutor
 from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
-from backend.providers.embeddings.factory import EmbeddingEncoder
-from backend.providers.llm.chat_completion import ChatCompletionClient
+from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.providers.openai_responses import OpenAIResponsesClient
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 
-from .registry_base import BaseModuleRegistry
+from .registry import ModuleRegistry
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class WorkflowRuntimeServices:
 
     pgvector_store: PgVectorStore
     db_manager: DatabaseManager
-    module_registry: BaseModuleRegistry
+    module_registry: ModuleRegistry
     workflow_store: WorkflowStore
     run_store: RunStore
     workflow_executor: WorkflowExecutor
@@ -45,6 +45,8 @@ class WorkflowRuntimeServices:
 
 def create_workflow_runtime_services(
     *,
+    completion_client: OpenAIResponsesClient,
+    embedding_encoder: EmbeddingEncoder,
     workflow_dir: Path = WORKFLOW_DIR,
     run_dir: Path = RUN_DIR,
     cache_dir: Path = CACHE_DIR,
@@ -52,13 +54,10 @@ def create_workflow_runtime_services(
     embedding_artifact_dir: Path = EMBEDDING_ARTIFACT_DIR,
     spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     vector_index_dir: Path = VECTOR_INDEX_DIR,
-    completion_client: Optional[ChatCompletionClient] = None,
-    embedding_encoder: Optional[EmbeddingEncoder] = None,
     pgvector_store: Optional[PgVectorStore] = None,
     db_manager: Optional[DatabaseManager] = None,
     initialize_schema: bool = True,
     require_database: bool = False,
-    registry_factory: Optional[Callable[..., BaseModuleRegistry]] = None,
 ) -> WorkflowRuntimeServices:
     """Build one consistent workflow runtime for an API or worker process."""
 
@@ -70,15 +69,9 @@ def create_workflow_runtime_services(
         raise RuntimeError("PostgreSQL 워크플로 스키마를 초기화할 수 없습니다")
 
     pg_store = pgvector_store or PgVectorStore(database.database_url)
-    if registry_factory is None:
-        # Keep the full application registry out of the ingestion worker's
-        # import and startup path.
-        from .registry import ModuleRegistry
-
-        registry_factory = ModuleRegistry
-    registry = registry_factory(
-        completion_client,
-        embedding_encoder,
+    registry = ModuleRegistry(
+        completion_client=completion_client,
+        embedding_encoder=embedding_encoder,
         embedding_artifact_store=EmbeddingArtifactStore(embedding_artifact_dir),
         pgvector_store=pg_store,
         db_manager=database,

@@ -15,6 +15,7 @@ interface SummaryProps {
 export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
   const totalChunks = indexes.reduce((sum, idx) => sum + (idx.document_count || 0), 0);
   const models = Array.from(new Set(indexes.map((i) => i.model).filter(Boolean)));
+  const dimensions = Array.from(new Set(indexes.map((i) => i.dimension).filter(Boolean)));
 
   return (
     <section className="ds-summary-grid">
@@ -69,10 +70,14 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
           </span>
         </div>
         <div className="ds-summary-card__value ds-summary-card__value--text">
-          {models.length > 0 ? models[0].split('/').pop() : 'text-embedding-3-large'}
+          {models.length > 0 ? models[0].split('/').pop() : '인덱스 미등록'}
         </div>
         <small className="ds-summary-card__caption">
-          {models.length > 1 ? `외 ${models.length - 1}개 모델 사용 중` : '3072차원 고밀도 벡터 공간'}
+          {models.length > 1
+            ? `외 ${models.length - 1}개 모델 사용 중`
+            : dimensions.length > 0
+              ? `${dimensions.join(' / ')}차원 · 질의 모델 자동 동기화`
+              : '인덱스 모델·차원 자동 동기화'}
         </small>
       </div>
     </section>

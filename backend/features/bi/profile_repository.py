@@ -15,7 +15,6 @@ from .materialization_models import (
 )
 from .models import BiMaterializationRequest
 
-
 PROFILE_VERSION: Final = "5"
 
 
@@ -97,8 +96,8 @@ class PostgresBiDocumentProfileRepository:
                         "VALUES (%s, %s, %s, %s, %s, %s, %s) "
                         "ON CONFLICT (company_id, workbook_hash, index_id, profile_version) "
                         "DO NOTHING",
-                        self._identity(request)
-                        + (
+                        (
+                            *self._identity(request),
                             Json(profile.model_dump(mode="json")),
                             saved_at,
                             saved_at,

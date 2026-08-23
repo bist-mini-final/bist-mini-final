@@ -17,7 +17,7 @@ from typing import Any, Sequence
 
 from pydantic import ValidationError
 
-from backend.engine.runtime.registry import ModuleRegistry
+from backend.bootstrap.container import RuntimeContainer
 from modules.common.base_module import ModuleExecutionError, ModuleExecutionRequestDTO
 
 
@@ -53,7 +53,8 @@ def _write_json(value: Any, stream) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    registry = ModuleRegistry()
+    container = RuntimeContainer.create(initialize_schema=False)
+    registry = container.services.module_registry
     try:
         if args.contract:
             _write_json(registry.definition(args.module_type), sys.stdout)
@@ -80,6 +81,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             sys.stderr,
         )
         return 2
+    finally:
+        container.close()
 
 
 if __name__ == "__main__":

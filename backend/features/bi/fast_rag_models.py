@@ -7,9 +7,9 @@ from .models import BiContractModel
 
 class FastRagPipelineSettings(BiContractModel):
     decomposer_model: str = "gpt-5.6-luna"
-    decomposer_preset: str = "luna_decomposer"
-    embedding_model: str = "text-embedding-3-large"
     retrieval_top_k: int = Field(default=100, gt=0, le=10_000)
+    rrf_k: int = Field(default=60, gt=0, le=1_000)
+    fused_top_k: int = Field(default=100, gt=0, le=1_000)
     context_cell_limit: int = Field(default=100, gt=0, le=1_000)
 
 

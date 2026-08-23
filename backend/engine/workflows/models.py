@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Annotated, Any, Dict, List, Literal, Mapping, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
 ExecutionBranch = str
@@ -9,10 +9,7 @@ OutputBranch = str
 NodeStatus = Literal["pending", "running", "succeeded", "failed", "skipped"]
 RunStatus = Literal["queued", "running", "paused", "completed", "failed"]
 BatchStatus = Literal["pending", "running", "completed", "failed"]
-OrchestratorBackend = Literal[
-    "direct",
-    "kubernetes",
-]
+OrchestratorBackend = Literal["kubernetes"]
 
 
 def utc_now_iso() -> str:
@@ -66,52 +63,6 @@ class WorkflowGraph(StrictModel):
     edges: List[WorkflowEdge] = Field(default_factory=list)
     viewport: CanvasViewport = Field(default_factory=CanvasViewport)
 
-    @model_validator(mode="before")
-    @classmethod
-    def migrate_query_lineage_edges(cls, value: Any) -> Any:
-        """Upgrade legacy Query→Reader/Cache fan-out to carried query context."""
-
-        if not isinstance(value, Mapping):
-            return value
-        raw_nodes = value.get("nodes", [])
-        if not isinstance(raw_nodes, list):
-            return value
-        module_by_id = {
-            (
-                node.get("id")
-                if isinstance(node, Mapping)
-                else getattr(node, "id", None)
-            ): (
-                node.get("module_type")
-                if isinstance(node, Mapping)
-                else getattr(node, "module_type", None)
-            )
-            for node in raw_nodes
-        }
-        migrated_edges = []
-        for raw_edge in value.get("edges", []):
-            edge = (
-                dict(raw_edge)
-                if isinstance(raw_edge, Mapping)
-                else raw_edge.model_dump()
-                if isinstance(raw_edge, BaseModel)
-                else None
-            )
-            if edge is None:
-                migrated_edges.append(raw_edge)
-                continue
-            source_type = module_by_id.get(edge.get("source"))
-            target_type = module_by_id.get(edge.get("target"))
-            if source_type == "query_input" and target_type == "reader":
-                continue
-            if source_type == "query_input" and target_type == "decomposer":
-                if edge.get("source_output") in {None, "question_text"}:
-                    edge["source_output"] = "query_context"
-                if edge.get("target_input") in {None, "question_text"}:
-                    edge["target_input"] = "query_context"
-            migrated_edges.append(edge)
-        return {**value, "edges": migrated_edges}
-
 
 class WorkflowSaveRequest(StrictModel):
     name: str = Field(default="Untitled workflow", min_length=1, max_length=160)
@@ -119,7 +70,7 @@ class WorkflowSaveRequest(StrictModel):
 
 
 class WorkflowDocument(StrictModel):
-    schema_version: int = 1
+    schema_version: Literal[2] = 2
     id: str = Field(pattern=IDENTIFIER_PATTERN)
     name: str
     updated_at: str
@@ -137,13 +88,6 @@ class WorkflowExecutionRequest(StrictModel):
     )
     use_cache: bool = True
     cache_only_module_types: Optional[List[str]] = None
-    inherit_from_run_id: Optional[str] = Field(
-        default=None,
-        description=(
-            "기존 실행의 완료된 노드 상태를 새 실행으로 복사합니다. "
-            "새 노드를 추가해도 이전 결과를 유지하기 위해 사용합니다."
-        ),
-    )
 
 
 class RunNodeState(StrictModel):
@@ -178,7 +122,7 @@ class RunBatchState(StrictModel):
 class RunOrchestrationState(StrictModel):
     """External scheduler identity projected into the product run model."""
 
-    backend: OrchestratorBackend = "direct"
+    backend: OrchestratorBackend = "kubernetes"
     deployment_name: Optional[str] = None
     external_run_id: Optional[str] = None
     submission_attempt: int = Field(default=0, ge=0)
@@ -186,7 +130,7 @@ class RunOrchestrationState(StrictModel):
 
 
 class WorkflowRun(StrictModel):
-    schema_version: int = 1
+    schema_version: Literal[2] = 2
     id: str = Field(pattern=IDENTIFIER_PATTERN)
     workflow_id: str = Field(pattern=IDENTIFIER_PATTERN)
     workflow_updated_at: str
