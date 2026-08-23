@@ -101,6 +101,7 @@ const CompanyListApiSchema = z.object({
   companies: z.array(z.object({
     company_id: z.string().min(1),
     display_name: z.string().min(1),
+    source: MaterializationSourceApiSchema.nullable(),
     current_snapshot_id: z.string().nullable(),
     snapshot_status: SnapshotStatusSchema.nullable(),
     refresh_status: RefreshStatusSchema,
@@ -110,6 +111,11 @@ const CompanyListApiSchema = z.object({
   companies: value.companies.map((company) => ({
     companyId: company.company_id,
     displayName: company.display_name,
+    source: company.source ? {
+      fileName: company.source.file_name,
+      workbookHash: company.source.workbook_hash,
+      indexId: company.source.index_id,
+    } : null,
     currentSnapshotId: company.current_snapshot_id,
     snapshotStatus: company.snapshot_status,
     refreshStatus: company.refresh_status,

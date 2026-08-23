@@ -113,7 +113,11 @@ export function BiCardShell(props: BiCardShellProps) {
       ) : (
         <div className="bi-card__state-panel" data-state={props.viewModel.state}>
           <strong>{props.viewModel.stateLabel}</strong>
-          <span>원본 값과 단위를 확인한 뒤 차트를 표시합니다.</span>
+          <span>
+            {props.viewModel.state === 'ambiguous'
+              ? `${props.viewModel.primaryLabel}: ${props.viewModel.primaryValue}`
+              : '원본 값과 단위를 확인한 뒤 차트를 표시합니다.'}
+          </span>
         </div>
       )}
 

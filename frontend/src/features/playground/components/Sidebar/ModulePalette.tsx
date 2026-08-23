@@ -1,4 +1,4 @@
-import type { CSSProperties, DragEvent, KeyboardEvent, PointerEvent } from 'react';
+import { useMemo, type CSSProperties, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import {
   ArchiveRestore,
   Binary,
@@ -31,7 +31,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { MODULE_CATEGORIES, MODULE_PRESENTATION } from '../../config/modules';
+import { MODULE_PRESENTATION, orderedModuleCategories } from '../../config/modules';
 import type { ModuleDefinition, ModuleType } from '../../types';
 import { MODULE_PANEL_MAX_WIDTH, MODULE_PANEL_MIN_WIDTH } from '../../hooks/useResizablePanel';
 
@@ -97,6 +97,7 @@ export function ModulePalette({
     onResizeBy(event.key === 'ArrowLeft' ? -16 : 16);
   };
   const paletteStyle: PaletteStyle = { '--module-palette-width': `${width}px` };
+  const categories = useMemo(() => orderedModuleCategories(modules), [modules]);
 
   return (
     <aside
@@ -124,7 +125,7 @@ export function ModulePalette({
       </div>
 
       <div className="module-palette__list">
-        {MODULE_CATEGORIES.map((category) => {
+        {categories.map((category) => {
           const categoryModules = modules.filter((module) => module.category === category);
           return (
             <section key={category} className="module-group">

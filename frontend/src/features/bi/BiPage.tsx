@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Landmark } from 'lucide-react';
 import { BiDashboardGrid } from './components/BiDashboardGrid';
 import { BiDataState } from './components/BiDataState';
@@ -48,16 +48,16 @@ export function BiPage() {
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [evidenceCardId, setEvidenceCardId] = useState<BiCardId | null>(null);
   const layout = useBiLayout();
-  const dashboardController = useBiDashboard(selectedCompanyId);
+  const resolvedCompanyId = companiesState.status === 'ready'
+    ? companiesState.companies.some((company) => company.companyId === selectedCompanyId)
+      ? selectedCompanyId
+      : companiesState.companies[0]?.companyId ?? ''
+    : selectedCompanyId;
+  const selectedCompany = companiesState.status === 'ready'
+    ? companiesState.companies.find((candidate) => candidate.companyId === resolvedCompanyId) ?? null
+    : null;
+  const dashboardController = useBiDashboard(selectedCompany);
   const dashboardState = dashboardController.state;
-
-  useEffect(() => {
-    if (companiesState.status !== 'ready' || companiesState.companies.length === 0) return;
-    if (companiesState.companies.some((company) => company.companyId === selectedCompanyId)) return;
-    const firstCompanyId = companiesState.companies[0]?.companyId ?? '';
-    setSelectedCompanyId(firstCompanyId);
-    if (firstCompanyId) storeSelectedCompanyId(firstCompanyId);
-  }, [companiesState, selectedCompanyId]);
 
   if (companiesState.status === 'loading') {
     return <BiDataState tone="loading" title="BI 데이터를 불러오는 중입니다" message="등록된 기업 목록을 확인하고 있습니다." />;
@@ -68,23 +68,51 @@ export function BiPage() {
   if (companiesState.companies.length === 0) {
     return <BiDataState tone="empty" title="등록된 기업이 없습니다" message="인덱싱 완료 후 BI materialization을 시작하면 대시보드가 표시됩니다." />;
   }
+  const companyTabs = companiesState.companies.map((company) => ({
+    id: company.companyId,
+    name: company.displayName,
+  }));
+  const companySelector = (
+    <div className="bi-company-section">
+      <div className="bi-section-heading">
+        <Landmark size={17} aria-hidden="true" />
+        <h2>기업 선택</h2>
+      </div>
+      <CompanyTabs
+        companies={companyTabs}
+        selectedId={resolvedCompanyId}
+        onSelect={(companyId) => {
+          setSelectedCompanyId(companyId);
+          storeSelectedCompanyId(companyId);
+        }}
+      />
+    </div>
+  );
   if (dashboardState.status === 'idle' || dashboardState.status === 'loading') {
-    return <BiDataState tone="loading" title="대시보드를 불러오는 중입니다" message="게시된 지표 스냅샷을 확인하고 있습니다." />;
+    return <BiDataState tone="loading" title="대시보드를 불러오는 중입니다" message="게시된 지표 스냅샷을 확인하고 있습니다.">{companySelector}</BiDataState>;
   }
   if (dashboardState.status === 'pending') {
-    return <BiDataState tone="loading" title="지표 스냅샷을 생성하고 있습니다" message={dashboardState.job.message ?? '완료된 스냅샷이 게시되면 대시보드를 볼 수 있습니다.'} />;
+    return <BiDataState tone="loading" title="지표 스냅샷을 생성하고 있습니다" message={dashboardState.job.message ?? '완료된 스냅샷이 게시되면 대시보드를 볼 수 있습니다.'}>{companySelector}</BiDataState>;
   }
   if (dashboardState.status === 'error') {
-    return <BiDataState tone="error" title="대시보드를 표시할 수 없습니다" message={dashboardState.message} />;
+    return (
+      <BiDataState
+        tone="error"
+        title="대시보드를 표시할 수 없습니다"
+        message={dashboardState.message}
+        actionLabel={selectedCompany?.source ? '스냅샷 다시 생성' : undefined}
+        onAction={selectedCompany?.source
+          ? () => { void dashboardController.retryMaterialization(); }
+          : undefined}
+      >
+        {companySelector}
+      </BiDataState>
+    );
   }
 
   const dashboard = dashboardState.dashboard;
   const isRefreshing = dashboard.refresh.status !== 'idle'
     && dashboard.refresh.status !== 'failed';
-  const companyTabs = companiesState.companies.map((company) => ({
-    id: company.companyId,
-    name: company.displayName,
-  }));
   const evidenceCard = evidenceCardId ? getCardDefinition(evidenceCardId) : null;
   const evidenceViewModel = evidenceCard ? buildCardViewModel({
     definition: evidenceCard,
@@ -104,20 +132,7 @@ export function BiPage() {
       <BiPageNotice refresh={dashboard.refresh} />
 
       <div className="bi-page__workspace">
-        <div className="bi-company-section">
-          <div className="bi-section-heading">
-            <Landmark size={17} aria-hidden="true" />
-            <h2>기업 선택</h2>
-          </div>
-          <CompanyTabs
-            companies={companyTabs}
-            selectedId={selectedCompanyId}
-            onSelect={(companyId) => {
-              setSelectedCompanyId(companyId);
-              storeSelectedCompanyId(companyId);
-            }}
-          />
-        </div>
+        {companySelector}
 
         <BiToolbar
           periodOptions={PERIOD_OPTIONS}

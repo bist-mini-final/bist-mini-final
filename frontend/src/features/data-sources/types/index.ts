@@ -1,4 +1,4 @@
-import type { WorkflowRun } from '../../playground/types';
+import type { WorkflowRun } from '../../../shared/workflows/types';
 
 export interface VectorIndexInfo {
   index_id: string;

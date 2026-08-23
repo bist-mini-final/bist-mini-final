@@ -1,67 +1,12 @@
-from typing import Callable, Type
-
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
-from pydantic import ValidationError
 
-from ..documentation.module_docs import render_module_markdown
-from ..modules.base import ModuleExecutionError
-from ..runtime.registry import ModuleRegistry
-
-
-def _execution_handler(
-    module_registry: ModuleRegistry,
-    module_type: str,
-    request_model: Type[BaseModel],
-) -> Callable[..., object]:
-    """Build a statically typed FastAPI handler for one dynamic module class."""
-
-    def execute_module(request):
-        try:
-            return module_registry.execute(
-                module_type,
-                request.input,
-                request.config,
-            )
-        except ValidationError as error:
-            raise HTTPException(
-                status_code=422,
-                detail=error.errors(include_url=False),
-            ) from error
-        except ModuleExecutionError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-
-    execute_module.__name__ = f"execute_{module_type}"
-    execute_module.__doc__ = (
-        "Execute this module independently through its exact Input and Config DTOs."
-    )
-    execute_module.__annotations__ = {"request": request_model}
-    return execute_module
+from backend.cli.documentation.module_docs import render_module_markdown
+from backend.engine.runtime.registry import ModuleRegistry
 
 
 def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
     router = APIRouter(tags=["Modules"])
-
-    for definition in module_registry.definitions():
-        module = module_registry.get(definition["type"])
-        router.add_api_route(
-            f"/modules/{definition['type']}/execute",
-            _execution_handler(
-                module_registry,
-                definition["type"],
-                module.request_model,
-            ),
-            methods=["POST"],
-            response_model=module.output_model,
-            operation_id=f"execute_module_{definition['type']}",
-            summary=f"Execute {definition['label']}",
-            description=(
-                f"{definition['description']}\n\n"
-                "Input DTO and Config DTO are validated independently. "
-                "The response is the module's Output DTO JSON."
-            ),
-        )
 
     @router.get("/modules", summary="List registered module contracts")
     def get_modules():

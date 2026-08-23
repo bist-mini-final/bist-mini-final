@@ -7,6 +7,11 @@ describe('BI API schemas', () => {
       companies: [{
         company_id: 'acme',
         display_name: 'ACME',
+        source: {
+          file_name: 'acme.xlsx',
+          workbook_hash: 'a'.repeat(64),
+          index_id: 'index-acme',
+        },
         current_snapshot_id: 'snapshot-1',
         snapshot_status: 'ready',
         refresh_status: 'idle',
@@ -17,6 +22,11 @@ describe('BI API schemas', () => {
     expect(response.companies[0]).toEqual({
       companyId: 'acme',
       displayName: 'ACME',
+      source: {
+        fileName: 'acme.xlsx',
+        workbookHash: 'a'.repeat(64),
+        indexId: 'index-acme',
+      },
       currentSnapshotId: 'snapshot-1',
       snapshotStatus: 'ready',
       refreshStatus: 'idle',

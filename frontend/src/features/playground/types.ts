@@ -1,8 +1,14 @@
-/** Backend-owned module identifier. Unknown types render with GenericModuleNode. */
-export type ModuleType = string;
+import type { ModuleType, OutputBranch } from '../../shared/workflows/types';
 
-type ExecutionBranch = 'generated' | 'cached' | 'failed';
-export type OutputBranch = Exclude<ExecutionBranch, 'failed'>;
+export type {
+  ModuleType,
+  OutputBranch,
+  RunStatus,
+  WorkflowDocument,
+  WorkflowGraph,
+  WorkflowRun,
+  WorkflowViewport,
+} from '../../shared/workflows/types';
 
 export interface JsonSchema {
   $ref?: string;
@@ -30,7 +36,7 @@ export interface JsonSchema {
 export interface ModuleDefinition {
   type: ModuleType;
   label: string;
-  category: 'Source' | 'Logic' | 'Transform' | 'Output';
+  category: string;
   description: string;
   inputs: string[];
   outputs: string[];
@@ -65,106 +71,6 @@ export interface ModuleDefinition {
 export interface ModulePresentation {
   icon: string;
   color: string;
-}
-
-interface WorkflowPosition {
-  x: number;
-  y: number;
-}
-
-export interface WorkflowViewport extends WorkflowPosition {
-  zoom: number;
-}
-
-interface WorkflowNode {
-  id: string;
-  module_type: ModuleType;
-  position: WorkflowPosition;
-  config: Record<string, unknown>;
-  values?: Record<string, unknown>;
-  ui?: {
-    width?: number | null;
-    height?: number | null;
-    execution_stopped?: boolean;
-    column_widths?: Record<string, number>;
-  };
-}
-
-interface WorkflowEdge {
-  id: string;
-  source: string;
-  target: string;
-  source_output?: string;
-  target_input?: string;
-  source_branch?: OutputBranch;
-}
-
-export interface WorkflowGraph {
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-  viewport: WorkflowViewport;
-}
-
-export interface WorkflowDocument {
-  schema_version: number;
-  id: string;
-  name: string;
-  updated_at: string;
-  graph: WorkflowGraph;
-}
-
-type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed';
-type RunNodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
-
-interface RunNodeState {
-  node_id: string;
-  module_type: ModuleType;
-  batch_index: number;
-  status: RunNodeStatus;
-  input_payload: unknown;
-  config_payload: Record<string, unknown>;
-  output: unknown;
-  error: string | null;
-  cache_key: string | null;
-  cache_hit: boolean;
-  outcome: ExecutionBranch | null;
-  skip_reason: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  elapsed_ms?: number | null;
-  cost_usd?: number | null;
-  usage?: Record<string, number> | null;
-  progress?: Record<string, unknown>;
-}
-
-interface RunBatchState {
-  index: number;
-  node_ids: string[];
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  started_at: string | null;
-  completed_at: string | null;
-}
-
-export interface WorkflowRun {
-  schema_version: number;
-  id: string;
-  workflow_id: string;
-  workflow_updated_at: string;
-  status: RunStatus;
-  orchestration?: {
-    backend: 'direct' | 'kubernetes';
-    deployment_name: string | null;
-    external_run_id: string | null;
-    submission_attempt: number;
-    submitted_at: string | null;
-  };
-  created_at: string;
-  updated_at: string;
-  graph: WorkflowGraph;
-  runtime_inputs: Record<string, Record<string, unknown>>;
-  use_cache: boolean;
-  batches: RunBatchState[];
-  nodes: Record<string, RunNodeState>;
 }
 
 export interface BenchmarkCase {

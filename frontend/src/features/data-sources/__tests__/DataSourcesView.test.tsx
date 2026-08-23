@@ -9,7 +9,7 @@ function ingestionJob(
   return {
     job_id: jobId,
     status,
-    workflow_id: 'indexing_pgvector',
+    workflow_id: 'excel_ingestion',
     run: {} as IngestionJobResponse['run'],
     index: null,
     worker_active: status === 'running',

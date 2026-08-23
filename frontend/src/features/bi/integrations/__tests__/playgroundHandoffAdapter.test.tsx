@@ -1,20 +1,10 @@
-import { renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildBiPlaygroundHandoffUrl,
   parseBiPlaygroundHandoff,
   useBiPlaygroundHandoff,
 } from '../playgroundHandoffAdapter';
-
-const mocks = vi.hoisted(() => ({
-  listIndexes: vi.fn(),
-}));
-
-vi.mock('../../../data-sources/services/dataSourceApi', () => ({
-  dataSourceApi: {
-    listIndexes: mocks.listIndexes,
-  },
-}));
 
 const context = {
   companyId: 'acme',
@@ -32,10 +22,6 @@ const search = new URL(
 ).search;
 
 describe('BI Playground handoff adapter', () => {
-  beforeEach(() => {
-    mocks.listIndexes.mockReset();
-  });
-
   it('round-trips validated dashboard context through search parameters', () => {
     expect(parseBiPlaygroundHandoff(search)).toEqual(context);
   });
@@ -44,11 +30,9 @@ describe('BI Playground handoff adapter', () => {
     expect(parseBiPlaygroundHandoff('?company_id=acme&workbook_hash=not-a-hash')).toBeNull();
   });
 
-  it('applies the question and verified file and index only after the workflow is ready', async () => {
+  it('applies the question and verified file only after the workflow is ready', () => {
     const setQueryText = vi.fn();
     const updateFile = vi.fn();
-    const updateIndex = vi.fn();
-    mocks.listIndexes.mockResolvedValue([{ index_id: context.indexId }]);
 
     const options = {
       modules: [{
@@ -66,12 +50,6 @@ describe('BI Playground handoff adapter', () => {
             onValuesChange: updateFile,
           },
         },
-        {
-          data: {
-            moduleType: 'pgvector_collection_loader',
-            onValuesChange: updateIndex,
-          },
-        },
       ],
       search,
       setQueryText,
@@ -84,25 +62,16 @@ describe('BI Playground handoff adapter', () => {
 
     expect(setQueryText).not.toHaveBeenCalled();
     expect(updateFile).not.toHaveBeenCalled();
-    expect(updateIndex).not.toHaveBeenCalled();
 
     rerender({ ready: true });
 
     expect(setQueryText).toHaveBeenCalledWith(context.question);
     expect(updateFile).toHaveBeenCalledWith({ file_name: context.fileName });
-    await waitFor(() => {
-      expect(updateIndex).toHaveBeenCalledWith({
-        collection_name: context.indexId,
-        collection_names: [context.indexId],
-      });
-    });
   });
 
-  it('keeps existing node selections when the file and index are unavailable', async () => {
+  it('does not change the file node when the handed-off file is unavailable', () => {
     const setQueryText = vi.fn();
     const updateFile = vi.fn();
-    const updateIndex = vi.fn();
-    mocks.listIndexes.mockResolvedValue([{ index_id: 'another-index' }]);
 
     renderHook(() => useBiPlaygroundHandoff({
       modules: [{
@@ -120,12 +89,6 @@ describe('BI Playground handoff adapter', () => {
             onValuesChange: updateFile,
           },
         },
-        {
-          data: {
-            moduleType: 'pgvector_collection_loader',
-            onValuesChange: updateIndex,
-          },
-        },
       ],
       ready: true,
       search,
@@ -134,7 +97,5 @@ describe('BI Playground handoff adapter', () => {
 
     expect(setQueryText).toHaveBeenCalledWith(context.question);
     expect(updateFile).not.toHaveBeenCalled();
-    await waitFor(() => expect(mocks.listIndexes).toHaveBeenCalledOnce());
-    expect(updateIndex).not.toHaveBeenCalled();
   });
 });

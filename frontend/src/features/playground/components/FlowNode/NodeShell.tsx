@@ -312,7 +312,7 @@ export function NodeShell({
                 ? state === 'active'
                   ? `${title} 실행 정지`
                   : `${title} 결과 숨기기`
-                : `${title} 단독 실행`
+                : `${title}에서 Kubernetes 워크플로 실행`
             }
             title={
               isStopMode
@@ -323,7 +323,7 @@ export function NodeShell({
                 ? '입력 연결이 필요합니다 (상류 모듈과 선을 연결하세요)'
                 : !isInputReady
                   ? '상류 모듈의 실행 결과가 필요합니다'
-                : `${title} 단독 실행`
+                : `${title}에서 전체 Kubernetes 워크플로 실행`
             }
           >
             {isStopMode

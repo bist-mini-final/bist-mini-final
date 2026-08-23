@@ -658,6 +658,99 @@
   background: #c7d2fe;
 }
 
+/* BI Dashboard preview in HomePage */
+.dashboard-preview {
+  position: relative;
+  height: 14rem;
+  overflow: hidden;
+  border-bottom: 1px solid #ede9fe;
+  background-color: #faf5ff;
+  background-image: radial-gradient(#ddd6fe 0.85px, transparent 0.85px);
+  background-size: 16px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-glow--violet-one {
+  top: -5rem;
+  left: 2rem;
+  background: #ddd6fe;
+}
+
+.preview-glow--violet-two {
+  bottom: -6rem;
+  right: 2rem;
+  background: #fae8ff;
+}
+
+.bi-preview-container {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem;
+  width: 100%;
+  max-width: 490px;
+}
+
+.bi-preview-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e9d5ff;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 10px 25px -15px rgba(107, 33, 168, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.bi-preview-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6b21a8;
+}
+
+.bi-preview-card__header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bi-preview-card__badge {
+  font-size: 0.58rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 4px;
+  background: #f3e8ff;
+  color: #7e22ce;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bi-preview-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  height: 2.8rem;
+  background: #faf5ff;
+  border-radius: 4px;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #f3e8ff;
+}
+
+.bi-preview-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, #a855f7 0%, #7c3aed 100%);
+}
+
 .ds-preview-container {
   position: relative;
   z-index: 2;
@@ -848,6 +941,8 @@
 .planned-preview--blue { background: #f3f7fb; color: #6281a0; }
 .planned-preview--amber { background: #fbf8f0; color: #a2844e; }
 .planned-preview--violet { background: #f7f5fa; color: #87779d; }
+.planned-preview--indigo { background: #eef2ff; color: #4f46e5; }
+.planned-preview--cyan { background: #ecfeff; color: #0891b2; }
 
 .planned-preview::before,
 .planned-preview::after {
@@ -895,6 +990,8 @@
 .workspace-card__icon--blue { background: #eaf2fa; color: #557da4; }
 .workspace-card__icon--amber { background: #f8f0dc; color: #967536; }
 .workspace-card__icon--violet { background: #f0eafa; color: #8067a4; }
+.workspace-card__icon--indigo { background: #e0e7ff; color: #4338ca; }
+.workspace-card__icon--cyan { background: #cffafe; color: #0e7490; }
 
 .workspace-card__footer > div {
   display: flex;

@@ -17,8 +17,16 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
   const series = getChartSeries(dashboard, METRICS);
   const latest = data[data.length - 1];
   const composition = [
-    { name: '부채', value: Math.max(latest?.values.total_liabilities ?? 0, 0), fill: 'url(#bi-scale-liability-gradient)' },
-    { name: '자본', value: Math.max(latest?.values.total_equity ?? 0, 0), fill: 'url(#bi-scale-equity-gradient)' },
+    {
+      name: '부채',
+      value: Math.max(latest?.values.total_liabilities ?? 0, 0),
+      fill: 'url(#bi-scale-liability-gradient)',
+    },
+    {
+      name: '자본',
+      value: Math.max(latest?.values.total_equity ?? 0, 0),
+      fill: 'url(#bi-scale-equity-gradient)',
+    },
   ];
   const compositionTotal = composition.reduce((sum, item) => sum + item.value, 0);
   const chartData = data.map((point) => ({ ...point, totalAssets: point.values.total_assets }));

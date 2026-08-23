@@ -1,244 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pipelineApi, ApiError } from '../services/api';
+import {
+  executionDefinitionFingerprint,
+  executionRunMatchesRequest,
+  mergeRunNodeUpdate,
+  workflowRuntimeInputs,
+} from '../domain/execution';
 import type {
   SaveStatus,
   WorkflowGraph,
   WorkflowRun,
 } from '../types';
 
-const DEFAULT_WORKFLOW_ID = 'workflow';
-
 interface WorkflowGraphBridge {
   exportGraph: () => WorkflowGraph;
   replaceGraph: (graph: WorkflowGraph) => void;
   applyRun: (run: WorkflowRun) => void;
+  restoreRuntimeInputs: (run: WorkflowRun) => void;
   clearExecutionState: () => void;
 }
 
-function runInputs(
-  graph: WorkflowGraph,
-  query: string
-): Record<string, Record<string, unknown>> {
-  return Object.fromEntries(
-    graph.nodes
-      .filter((node) => node.module_type === 'query_input')
-      .map((node) => [
-        node.id,
-        { query },
-      ])
-  );
-}
+const CANONICAL_WORKFLOW_IDS = new Set(['rag_query', 'excel_ingestion']);
 
-function executionFingerprint(graph: WorkflowGraph): string {
-  return JSON.stringify({
-    nodes: (graph.nodes ?? []).map(({ id, module_type, config, values }) => ({
-      id,
-      module_type,
-      config: config ?? {},
-      values: values ?? {},
-    })),
-    edges: (graph.edges ?? []).map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      source_output: edge.source_output ?? null,
-      target_input: edge.target_input ?? null,
-      source_branch: edge.source_branch ?? null,
-    })),
-  });
-}
-
-function executionRunMatchesRequest(
-  run: WorkflowRun,
-  graph: WorkflowGraph,
-  query: string,
-): boolean {
-  return executionFingerprint(run.graph) === executionFingerprint(graph)
-    && JSON.stringify(run.runtime_inputs) === JSON.stringify(runInputs(graph, query));
-}
-
-function executionRunCompatibleWithGraph(
-  run: WorkflowRun,
-  graph: WorkflowGraph
-): boolean {
-  const currentNodeById = new Map(
-    (graph.nodes ?? []).map((n) => [n.id, n])
-  );
-  const currentEdgeSet = new Set(
-    (graph.edges ?? []).map((e) =>
-      JSON.stringify([
-        e.id,
-        e.source,
-        e.target,
-        e.source_output ?? null,
-        e.target_input ?? null,
-        e.source_branch ?? null,
-      ])
-    )
-  );
-
-  for (const runNode of run.graph.nodes) {
-    const currentNode = currentNodeById.get(runNode.id);
-    if (!currentNode) return false;
-    if (currentNode.module_type !== runNode.module_type) return false;
-    if (JSON.stringify(currentNode.config ?? {}) !== JSON.stringify(runNode.config ?? {})) return false;
-    if (JSON.stringify(currentNode.values ?? {}) !== JSON.stringify(runNode.values ?? {})) return false;
-  }
-
-  for (const runEdge of run.graph.edges) {
-    const key = JSON.stringify([
-      runEdge.id,
-      runEdge.source,
-      runEdge.target,
-      runEdge.source_output ?? null,
-      runEdge.target_input ?? null,
-      runEdge.source_branch ?? null,
-    ]);
-    if (!currentEdgeSet.has(key)) return false;
-  }
-
-  return true;
-}
-
-function markNextBatchRunning(run: WorkflowRun): WorkflowRun {
-  const retryingFailure = run.status === 'failed';
-  const nextBatch = run.batches.find((batch) =>
-    retryingFailure ? batch.status === 'failed' : batch.status === 'pending'
-  );
-  if (!nextBatch) return run;
-
-  const startedAt = new Date().toISOString();
-  const runningNodeIds = new Set(
-    retryingFailure
-      ? nextBatch.node_ids.filter((nodeId) => run.nodes[nodeId]?.status === 'failed')
-      : nextBatch.node_ids
-  );
-  return {
-    ...run,
-    status: 'running',
-    updated_at: startedAt,
-    batches: run.batches.map((batch) =>
-      batch.index === nextBatch.index
-        ? { ...batch, status: 'running', started_at: startedAt }
-        : batch
-    ),
-    nodes: Object.fromEntries(
-      Object.entries(run.nodes).map(([nodeId, node]) => [
-        nodeId,
-        runningNodeIds.has(nodeId)
-          ? {
-              ...node,
-              status: 'running',
-              error: null,
-              skip_reason: null,
-              started_at: startedAt,
-              completed_at: null,
-            }
-          : node,
-      ])
-    ),
-  };
-}
-
-function descendantNodeIds(graph: WorkflowGraph, nodeId: string): Set<string> {
-  const outgoing = new Map<string, string[]>();
-  graph.edges.forEach((edge) => {
-    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
-  });
-  const descendants = new Set<string>();
-  const pending = [...(outgoing.get(nodeId) ?? [])];
-  while (pending.length > 0) {
-    const candidate = pending.pop();
-    if (!candidate || descendants.has(candidate)) continue;
-    descendants.add(candidate);
-    pending.push(...(outgoing.get(candidate) ?? []));
-  }
-  return descendants;
-}
-
-function markNodeRunning(run: WorkflowRun, nodeId: string): WorkflowRun {
-  const selectedNode = run.nodes[nodeId];
-  if (!selectedNode) return run;
-  const startedAt = new Date().toISOString();
-  const descendants = descendantNodeIds(run.graph, nodeId);
-  const resetNodeIds = new Set([nodeId, ...descendants]);
-  const nodes = Object.fromEntries(
-    Object.entries(run.nodes).map(([candidateId, node]) => {
-      if (!resetNodeIds.has(candidateId)) return [candidateId, node];
-      if (candidateId === nodeId) {
-        return [candidateId, {
-          ...node,
-          status: 'running',
-          input_payload: null,
-          output: null,
-          error: null,
-          cache_key: null,
-          cache_hit: false,
-          outcome: null,
-          skip_reason: null,
-          started_at: startedAt,
-          completed_at: null,
-        }];
-      }
-      return [candidateId, {
-        ...node,
-        status: 'pending',
-        input_payload: null,
-        output: null,
-        error: null,
-        cache_key: null,
-        cache_hit: false,
-        outcome: null,
-        skip_reason: null,
-        started_at: null,
-        completed_at: null,
-      }];
-    })
-  ) as WorkflowRun['nodes'];
-
-  return {
-    ...run,
-    status: 'running',
-    updated_at: startedAt,
-    nodes,
-    batches: run.batches.map((batch) => {
-      if (batch.index === selectedNode.batch_index) {
-        return {
-          ...batch,
-          status: 'running',
-          started_at: startedAt,
-          completed_at: null,
-        };
-      }
-      if (batch.node_ids.some((candidateId) => descendants.has(candidateId))) {
-        return {
-          ...batch,
-          status: 'pending',
-          completed_at: null,
-        };
-      }
-      return batch;
-    }),
-  };
-}
-
-async function executeNextOrResume(
-  run: WorkflowRun,
-  signal: AbortSignal
-): Promise<WorkflowRun> {
-  if (run.status === 'failed') {
-    return pipelineApi.resumeRun(run.id, signal);
-  }
-  try {
-    return await pipelineApi.executeNextBatch(run.id, signal);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 422) {
-      const persistedRun = await pipelineApi.getRun(run.id, signal);
-      if (persistedRun.status === 'failed') {
-        return pipelineApi.resumeRun(run.id, signal);
-      }
+async function pollRun(runId: string, signal: AbortSignal): Promise<WorkflowRun> {
+  while (true) {
+    const run = await pipelineApi.getRun(runId, signal);
+    if (run.status === 'completed' || run.status === 'failed' || run.status === 'paused') {
+      return run;
     }
-    throw error;
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        window.clearTimeout(timeout);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      const timeout = window.setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, 500);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
   }
 }
 
@@ -269,16 +69,17 @@ export function useWorkflowPersistence(
   const [isExecuting, setIsExecuting] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const executionController = useRef<AbortController | null>(null);
-  const stableRunRef = useRef<WorkflowRun | null>(null);
+  const latestRunRef = useRef<WorkflowRun | null>(null);
   const runtimeMutationEpoch = useRef(0);
   const latestRunMatchesGraph = Boolean(
-    latestRun && executionFingerprint(latestRun.graph) === executionFingerprint(currentGraph)
+    latestRun
+      && executionDefinitionFingerprint(latestRun.graph)
+        === executionDefinitionFingerprint(currentGraph)
   );
-  const latestRunCompatibleWithGraph = Boolean(
-    latestRun && executionRunCompatibleWithGraph(latestRun, currentGraph)
-  );
+  const isCanonicalWorkflow = CANONICAL_WORKFLOW_IDS.has(activeWorkflowId);
 
   const applyRun = useCallback((run: WorkflowRun) => {
+    latestRunRef.current = run;
     setLatestRun(run);
     setRuns((currentRuns) =>
       [run, ...currentRuns.filter((candidate) => candidate.id !== run.id)]
@@ -298,28 +99,17 @@ export function useWorkflowPersistence(
     // Cancel any running execution when switching workflows
     executionController.current?.abort();
     executionController.current = null;
-    stableRunRef.current = null;
     setIsExecuting(false);
     setReady(false);
     setLatestRun(null);
+    latestRunRef.current = null;
     setRuns([]);
 
     const load = async () => {
       setSaveStatus('loading');
       try {
-        let workflow;
-        try {
-          workflow = await pipelineApi.getWorkflow(activeWorkflowId, controller.signal);
-          graphRef.current.replaceGraph(workflow.graph);
-        } catch (error: unknown) {
-          if (!(error instanceof ApiError && error.status === 404 && activeWorkflowId === DEFAULT_WORKFLOW_ID)) throw error;
-          workflow = await pipelineApi.saveWorkflow(
-            activeWorkflowId,
-            activeWorkflowName,
-            graphRef.current.exportGraph(),
-            controller.signal
-          );
-        }
+        const workflow = await pipelineApi.getWorkflow(activeWorkflowId, controller.signal);
+        graphRef.current.replaceGraph(workflow.graph);
 
         const response = await pipelineApi.getRuns(activeWorkflowId, controller.signal);
         const sortedRuns = response.runs
@@ -327,7 +117,10 @@ export function useWorkflowPersistence(
           .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
         setRuns(sortedRuns);
         const mostRecentRun = sortedRuns[0];
-        if (mostRecentRun) applyRun(mostRecentRun);
+        if (mostRecentRun) {
+          graphRef.current.restoreRuntimeInputs(mostRecentRun);
+          applyRun(mostRecentRun);
+        }
         setLastSavedAt(workflow.updated_at);
         setSaveStatus('saved');
         setReady(true);
@@ -344,12 +137,14 @@ export function useWorkflowPersistence(
   const saveNow = useCallback(async (signal?: AbortSignal) => {
     setSaveStatus('saving');
     try {
-      const workflow = await pipelineApi.saveWorkflow(
-        activeWorkflowId,
-        activeWorkflowName,
-        graphRef.current.exportGraph(),
-        signal
-      );
+      const workflow = isCanonicalWorkflow
+        ? await pipelineApi.getWorkflow(activeWorkflowId, signal)
+        : await pipelineApi.saveWorkflow(
+            activeWorkflowId,
+            activeWorkflowName,
+            graphRef.current.exportGraph(),
+            signal
+          );
       setLastSavedAt(workflow.updated_at);
       setSaveStatus('saved');
       return workflow;
@@ -359,10 +154,10 @@ export function useWorkflowPersistence(
       }
       throw error;
     }
-  }, [activeWorkflowId, activeWorkflowName]);
+  }, [activeWorkflowId, activeWorkflowName, isCanonicalWorkflow]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || isCanonicalWorkflow) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void saveNow(controller.signal).catch(() => undefined);
@@ -371,21 +166,22 @@ export function useWorkflowPersistence(
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [graphFingerprint, ready, saveNow]);
+  }, [graphFingerprint, isCanonicalWorkflow, ready, saveNow]);
 
   const createRun = useCallback(
-    async (query: string, signal: AbortSignal, inheritFromRunId?: string) => {
-      const workflow = await saveNow(signal);
+    async (query: string, signal: AbortSignal) => {
+      const workflow = isCanonicalWorkflow
+        ? await pipelineApi.getWorkflow(activeWorkflowId, signal)
+        : await saveNow(signal);
       const run = await pipelineApi.createRun(
         activeWorkflowId,
-        runInputs(workflow.graph, query),
-        signal,
-        inheritFromRunId
+        workflowRuntimeInputs(workflow.graph, query),
+        signal
       );
       applyRun(run);
       return run;
     },
-    [applyRun, saveNow, activeWorkflowId]
+    [activeWorkflowId, applyRun, isCanonicalWorkflow, saveNow]
   );
 
   const executeAll = useCallback(
@@ -399,7 +195,7 @@ export function useWorkflowPersistence(
       setIsExecuting(true);
       try {
         const currentExecutionGraph = graphRef.current.exportGraph();
-        const currentRuntimeInputs = runInputs(currentExecutionGraph, query);
+        const currentRuntimeInputs = workflowRuntimeInputs(currentExecutionGraph, query);
         let run = latestRun &&
           (latestRun.status === 'queued' ||
             latestRun.status === 'running' ||
@@ -409,49 +205,42 @@ export function useWorkflowPersistence(
           && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs)
           ? latestRun
           : await createRun(query, controller.signal);
+        if (run.status === 'failed' || run.status === 'paused') {
+          run = await pipelineApi.resumeRun(run.id, controller.signal);
+        }
         applyRun(run);
         onBatch?.(run);
-        if (run.status === 'failed') {
-          const stableRun = run;
-          const runningRun = markNextBatchRunning(run);
-          stableRunRef.current = stableRun;
-          applyRun(runningRun);
-          onBatch?.(runningRun);
-          try {
-            run = await executeNextOrResume(run, controller.signal);
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              applyRun(stableRun);
-              onBatch?.(stableRun);
-            }
-            throw error;
-          } finally {
-            if (executionController.current === controller) {
-              stableRunRef.current = null;
-            }
-          }
+        try {
+          run = await pipelineApi.streamRun(
+            run.id,
+            (event) => {
+              if (
+                event.event === 'node_progress'
+                || event.event === 'node_completed'
+                || event.event === 'node_failed'
+              ) {
+                const nodeUpdate = event.data;
+                if (nodeUpdate?.node_id) {
+                  const current = latestRunRef.current;
+                  if (!current) return;
+                  const updated = mergeRunNodeUpdate(current, nodeUpdate);
+                  applyRun(updated);
+                  onBatch?.(updated);
+                }
+              } else if (event.event === 'run_completed' && event.data?.run) {
+                applyRun(event.data.run);
+                onBatch?.(event.data.run);
+              }
+            },
+            controller.signal
+          );
           applyRun(run);
           onBatch?.(run);
-        }
-        while (run.status === 'queued' || run.status === 'running' || run.status === 'paused') {
-          const stableRun = run;
-          const runningRun = markNextBatchRunning(run);
-          stableRunRef.current = stableRun;
-          applyRun(runningRun);
-          onBatch?.(runningRun);
-          try {
-            run = await executeNextOrResume(run, controller.signal);
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              applyRun(stableRun);
-              onBatch?.(stableRun);
-            }
-            throw error;
-          } finally {
-            if (executionController.current === controller) {
-              stableRunRef.current = null;
-            }
-          }
+        } catch (streamError) {
+          if (controller.signal.aborted) throw streamError;
+          // The Kubernetes Job is durable. A dropped SSE connection only
+          // changes observation transport; never execute modules in-browser/API.
+          run = await pollRun(run.id, controller.signal);
           applyRun(run);
           onBatch?.(run);
         }
@@ -468,124 +257,11 @@ export function useWorkflowPersistence(
     [applyRun, createRun, latestRun]
   );
 
-  const executeNext = useCallback(
-    async (query: string, onBatch?: (run: WorkflowRun) => void) => {
-      executionController.current?.abort();
-      const controller = new AbortController();
-      executionController.current = controller;
-      setIsExecuting(true);
-      try {
-        const currentExecutionGraph = graphRef.current.exportGraph();
-        let run = latestRun &&
-          executionRunMatchesRequest(latestRun, currentExecutionGraph, query)
-          ? latestRun
-          : null;
-        if (!run || run.status === 'completed') {
-          run = await createRun(query, controller.signal);
-        }
-        if (run.status === 'queued' || run.status === 'running' || run.status === 'paused' || run.status === 'failed') {
-          const stableRun = run;
-          const runningRun = markNextBatchRunning(run);
-          stableRunRef.current = stableRun;
-          applyRun(runningRun);
-          onBatch?.(runningRun);
-          try {
-            run = await executeNextOrResume(run, controller.signal);
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              applyRun(stableRun);
-              onBatch?.(stableRun);
-            }
-            throw error;
-          } finally {
-            if (executionController.current === controller) {
-              stableRunRef.current = null;
-            }
-          }
-        }
-        applyRun(run);
-        onBatch?.(run);
-        return run;
-      } finally {
-        if (!controller.signal.aborted) setIsExecuting(false);
-        if (executionController.current === controller) executionController.current = null;
-      }
-    },
-    [applyRun, createRun, latestRun]
-  );
-
-  const executeNode = useCallback(
-    async (
-      nodeId: string,
-      query: string,
-      onUpdate?: (run: WorkflowRun) => void
-    ) => {
-      executionController.current?.abort();
-      const controller = new AbortController();
-      executionController.current = controller;
-      setIsExecuting(true);
-      try {
-        const currentExecutionGraph = graphRef.current.exportGraph();
-        const currentRuntimeInputs = runInputs(currentExecutionGraph, query);
-        const strictMatch = latestRun
-          && executionFingerprint(latestRun.graph) === executionFingerprint(currentExecutionGraph)
-          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs);
-        const looseMatch = !strictMatch
-          && latestRun
-          && executionRunCompatibleWithGraph(latestRun, currentExecutionGraph)
-          && JSON.stringify(latestRun.runtime_inputs) === JSON.stringify(currentRuntimeInputs);
-        let run: WorkflowRun;
-        if (strictMatch && latestRun) {
-          run = latestRun;
-        } else if (looseMatch && latestRun) {
-          run = await createRun(query, controller.signal, latestRun.id);
-        } else {
-          run = await createRun(query, controller.signal);
-        }
-
-        const stableRun = run;
-        const runningRun = markNodeRunning(run, nodeId);
-        stableRunRef.current = stableRun;
-        applyRun(runningRun);
-        onUpdate?.(runningRun);
-        try {
-          run = await pipelineApi.executeNode(run.id, nodeId, controller.signal);
-        } catch (error) {
-          if (!controller.signal.aborted) {
-            applyRun(stableRun);
-            onUpdate?.(stableRun);
-          }
-          throw error;
-        } finally {
-          if (executionController.current === controller) {
-            stableRunRef.current = null;
-          }
-        }
-
-        applyRun(run);
-        onUpdate?.(run);
-        const selectedState = run.nodes[nodeId];
-        if (selectedState?.status === 'failed') {
-          throw new Error(selectedState.error ?? '선택한 모듈 실행에 실패했습니다.');
-        }
-        return run;
-      } finally {
-        if (!controller.signal.aborted) setIsExecuting(false);
-        if (executionController.current === controller) executionController.current = null;
-      }
-    },
-    [applyRun, createRun, latestRun]
-  );
-
   const cancelExecution = useCallback(() => {
     const epoch = ++runtimeMutationEpoch.current;
     const runId = latestRun?.id;
     executionController.current?.abort();
     executionController.current = null;
-    if (stableRunRef.current) {
-      applyRun(stableRunRef.current);
-      stableRunRef.current = null;
-    }
     setIsExecuting(false);
     if (runId) {
       void pipelineApi.cancelRun(runId).then((run) => {
@@ -599,7 +275,6 @@ export function useWorkflowPersistence(
     const runId = latestRun?.id;
     executionController.current?.abort();
     executionController.current = null;
-    stableRunRef.current = null;
     setIsExecuting(false);
     setIsClearingCache(true);
     try {
@@ -613,6 +288,7 @@ export function useWorkflowPersistence(
       const result = await pipelineApi.clearCache();
       if (runtimeMutationEpoch.current !== epoch) return result;
       setLatestRun(null);
+      latestRunRef.current = null;
       setRuns([]);
       graphRef.current.clearExecutionState();
       return result;
@@ -630,13 +306,11 @@ export function useWorkflowPersistence(
     latestRun,
     runs,
     latestRunMatchesGraph,
-    latestRunCompatibleWithGraph,
+    isCanonicalWorkflow,
     isExecuting,
     isClearingCache,
     saveNow,
     executeAll,
-    executeNext,
-    executeNode,
     cancelExecution,
     clearCache,
   };

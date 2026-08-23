@@ -55,6 +55,7 @@ export interface BiMaterializationAccepted {
 }
 
 export interface BiCompanySummary extends BiCompany {
+  readonly source: BiMaterializationSource | null;
   readonly currentSnapshotId: string | null;
   readonly snapshotStatus: SnapshotStatus | null;
   readonly refreshStatus: RefreshStatus;

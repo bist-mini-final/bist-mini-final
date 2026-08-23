@@ -18,12 +18,9 @@ import {
   Grid2X2,
   ListTree,
   Minus,
-  Network,
   Plus,
   Rows3,
   ScanSearch,
-  ScanText,
-  TableProperties,
   Type,
   X,
   type LucideIcon,
@@ -73,40 +70,6 @@ interface InspectorMeta {
 }
 
 const INSPECTOR_META: Record<SpreadsheetInspectorKind, InspectorMeta> = {
-  docling: {
-    title: 'Docling 테이블 감지 결과',
-    description: '원본 시트와 Docling 주석 이미지를 전환하며 감지한 테이블 경계를 확인합니다.',
-    icon: ScanSearch,
-    layers: [
-      { value: 'docling', label: 'Docling 주석' },
-      { value: 'rendered', label: '원본 시트' },
-    ],
-    defaultLayer: 'docling',
-  },
-  openpyxl: {
-    title: 'OpenPyXL 영역 분류 결과',
-    description: '셀 서식과 값 밀도로 분류한 제목·열 헤더·행 헤더·데이터 영역을 확인합니다.',
-    icon: TableProperties,
-    layers: [{ value: 'rendered', label: '영역 분류' }],
-    defaultLayer: 'rendered',
-  },
-  bfs_llm: {
-    title: 'BFS + LLM 테이블 구조 식별 결과',
-    description: 'BFS 표 경계, LLM이 결정한 영역과 좌표 기반 계층 헤더를 함께 확인합니다.',
-    icon: Network,
-    layers: [{ value: 'rendered', label: 'BFS + LLM' }],
-    defaultLayer: 'rendered',
-  },
-  local_vlm: {
-    title: 'Local VLM 테이블 구조 식별 결과',
-    description: '셀 타입 오버레이와 원본 시트를 전환하며 멀티모달 구조 판단을 확인합니다.',
-    icon: ScanText,
-    layers: [
-      { value: 'typed', label: '셀 타입 오버레이' },
-      { value: 'rendered', label: '원본 시트' },
-    ],
-    defaultLayer: 'typed',
-  },
   luna_vlm: {
     title: 'Luna 전체 시트 구조 식별 결과',
     description: '후보 영역 없이 전체 시트를 분석한 결과를 셀 타입 오버레이와 원본 좌표에서 확인합니다.',
@@ -211,8 +174,8 @@ export function SpreadsheetResultModal({
     ?? sheetTables[0]
     ?? null;
   const totalRegions = parsed?.tables.reduce((count, table) => count + table.regions.length, 0) ?? 0;
-  const supportsClassificationBoxes = kind !== 'docling';
-  const supportsCellTypeColors = kind === 'local_vlm' || kind === 'luna_vlm';
+  const supportsClassificationBoxes = true;
+  const supportsCellTypeColors = true;
   const imageUrl = parsed && selectedSheet
     ? pipelineApi.spreadsheetArtifactUrl(
         parsed.workbookHash,
@@ -353,7 +316,7 @@ export function SpreadsheetResultModal({
           <div className="spreadsheet-result-modal__summary">
             <span>{parsed.sheetNames.length} sheets</span>
             <span>{parsed.tables.length} tables</span>
-            {kind !== 'docling' && <span>{totalRegions} regions</span>}
+            <span>{totalRegions} regions</span>
           </div>
           <button
             ref={closeButtonRef}
@@ -384,20 +347,6 @@ export function SpreadsheetResultModal({
             <strong title={parsed.fileName}>{parsed.fileName}</strong>
             <code>{parsed.workbookHash.slice(0, 12)}</code>
           </div>
-          {meta.layers.length > 1 && !supportsCellTypeColors && (
-            <div className="spreadsheet-result-toolbar__layers" role="group" aria-label="검사 이미지 레이어">
-              {meta.layers.map((layer) => (
-                <button
-                  key={layer.value}
-                  type="button"
-                  data-active={imageLayer === layer.value ? 'true' : 'false'}
-                  onClick={() => setImageLayer(layer.value)}
-                >
-                  {layer.label}
-                </button>
-              ))}
-            </div>
-          )}
           {(supportsClassificationBoxes || supportsCellTypeColors) && (
             <div className="spreadsheet-result-toolbar__view-options" role="group" aria-label="결과 보기 옵션">
               <span>보기</span>
@@ -428,26 +377,20 @@ export function SpreadsheetResultModal({
             </div>
           )}
           <div className="spreadsheet-result-toolbar__legend" aria-label="영역 색상 범례">
-            {kind === 'docling' ? (
-              <span data-region="table"><i /> 테이블</span>
-            ) : (
+            {showClassificationBoxes && (
               <>
-                {showClassificationBoxes && (
-                  <>
-                    <span data-region="title"><i /> 제목</span>
-                    <span data-region="column"><i /> 열 헤더</span>
-                    <span data-region="row"><i /> 행 헤더</span>
-                    <span data-region="data"><i /> 데이터</span>
-                  </>
-                )}
-                {supportsCellTypeColors && showCellTypeColors && (
-                  <>
-                    <span data-cell-type="text"><i /> 텍스트</span>
-                    <span data-cell-type="number"><i /> 숫자</span>
-                    <span data-cell-type="date"><i /> 날짜</span>
-                    <span data-cell-type="formula"><i /> 수식</span>
-                  </>
-                )}
+                <span data-region="title"><i /> 제목</span>
+                <span data-region="column"><i /> 열 헤더</span>
+                <span data-region="row"><i /> 행 헤더</span>
+                <span data-region="data"><i /> 데이터</span>
+              </>
+            )}
+            {showCellTypeColors && (
+              <>
+                <span data-cell-type="text"><i /> 텍스트</span>
+                <span data-cell-type="number"><i /> 숫자</span>
+                <span data-cell-type="date"><i /> 날짜</span>
+                <span data-cell-type="formula"><i /> 수식</span>
               </>
             )}
           </div>
@@ -606,25 +549,7 @@ export function SpreadsheetResultModal({
                       fitImage(image.naturalWidth, image.naturalHeight);
                     }}
                   />
-                  {showClassificationBoxes && kind === 'docling' && imageLayer === 'rendered' && sheetTables.map((table) => {
-                    if (!table.bbox_px) return null;
-                    const [x1, y1, x2, y2] = table.bbox_px;
-                    const active = selectedTable ? spreadsheetTableKey(table) === spreadsheetTableKey(selectedTable) : false;
-                    return (
-                      <button
-                        key={spreadsheetTableKey(table)}
-                        type="button"
-                        className="spreadsheet-result-box spreadsheet-result-box--table"
-                        data-active={active ? 'true' : 'false'}
-                        style={{ left: x1, top: y1, width: x2 - x1, height: y2 - y1 }}
-                        onClick={() => setSelectedTableKey(spreadsheetTableKey(table))}
-                        aria-label={`Table ${table.table_index} ${table.excel_range}`}
-                      >
-                        <span>Table {table.table_index} · {table.excel_range}</span>
-                      </button>
-                    );
-                  })}
-                  {showClassificationBoxes && kind !== 'docling' && sheetTables.flatMap((table) =>
+                  {showClassificationBoxes && sheetTables.flatMap((table) =>
                     table.regions.map((region) => {
                       const [x1, y1, x2, y2] = region.bbox_px;
                       const active = selectedTable ? spreadsheetTableKey(table) === spreadsheetTableKey(selectedTable) : false;

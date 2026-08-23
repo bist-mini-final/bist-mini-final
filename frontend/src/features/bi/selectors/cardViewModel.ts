@@ -46,7 +46,15 @@ const STATE_LABELS: Readonly<Record<CardState, string>> = {
 };
 
 function getCardState(definition: BiCardDefinition, metrics: BiDashboardSnapshot['metrics']): CardState {
+  const primaryStatus = metrics[definition.primaryMetric]?.status ?? 'missing';
   const statuses = definition.requiredMetrics.map((metricId) => metrics[metricId]?.status ?? 'missing');
+
+  // If the primary metric has available data, allow the chart to render (ready or partial)
+  if (primaryStatus === 'available') {
+    const allAvailable = statuses.every((status) => status === 'available');
+    return allAvailable ? 'ready' : 'partial';
+  }
+
   if (statuses.includes('invalid')) return 'invalid';
   if (statuses.includes('ambiguous')) return 'ambiguous';
   const availableCount = statuses.filter((status) => status === 'available').length;
@@ -62,6 +70,7 @@ function getSeries(metrics: BiDashboardSnapshot['metrics'], metricId: MetricId):
 function getUnitLabel(series: MetricSeries | null): string {
   if (!series) return '단위 없음';
   if (series.valueKind === 'percent') return '%';
+  if (!series.currency || !series.scale) return '단위 확인 필요';
   return series.currency === 'KRW' && series.scale === 'millions' ? '원본 단위: 백만원' : '원본 단위 유지';
 }
 

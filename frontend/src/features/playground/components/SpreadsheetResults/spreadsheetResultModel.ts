@@ -1,4 +1,4 @@
-export type SpreadsheetInspectorKind = 'docling' | 'openpyxl' | 'bfs_llm' | 'local_vlm' | 'luna_vlm';
+export type SpreadsheetInspectorKind = 'luna_vlm';
 export type SpreadsheetRegionKind = 'title' | 'column_header' | 'row_header' | 'data';
 
 interface SpreadsheetCellBounds {

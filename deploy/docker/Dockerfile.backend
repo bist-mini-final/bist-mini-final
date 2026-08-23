@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    PATH="/app/.venv/bin:${PATH}"
+
+WORKDIR /app
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r appuser -g 1000 \
+    && useradd -r -u 1000 -g appuser appuser
+
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -m pip install uv==0.12.5 \
+    && uv sync --frozen --no-dev --no-install-project
+
+COPY backend ./backend
+COPY modules ./modules
+COPY jobs ./jobs
+COPY data/workflows ./data/workflows
+RUN mkdir -p \
+    /app/data/runs \
+    /app/data/cache \
+    /app/data/source_files \
+    /app/data/vector_db \
+    /app/data/artifacts/embeddings \
+    /app/data/artifacts/spreadsheets \
+    && python -m compileall -q /app/backend /app/modules /app/jobs \
+    && chown -R appuser:appuser /app/data
+
+USER appuser
+
+EXPOSE 8765
+
+ENTRYPOINT ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8765"]

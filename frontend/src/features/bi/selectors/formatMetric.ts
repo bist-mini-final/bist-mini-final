@@ -5,7 +5,11 @@ const PERCENT_FORMATTER = new Intl.NumberFormat('ko-KR', { maximumFractionDigits
 
 export function formatMetricValue(series: MetricSeries, observation: MetricObservation | null): string {
   if (!observation) return '데이터 없음';
-  if (observation.status === 'ambiguous') return '확인 필요';
+  if (observation.status === 'ambiguous') {
+    return observation.rawValue
+      ? `${observation.rawValue} (단위 확인 필요)`
+      : '확인 필요';
+  }
   if (observation.status === 'invalid') return '검증 실패';
   if (observation.status === 'not_meaningful') return '의미 없음';
   if (observation.status === 'missing') return '데이터 없음';

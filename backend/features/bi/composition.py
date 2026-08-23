@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Final
+
+from backend.providers.openai_responses import OpenAIResponsesClient
+
+from .api_services import BiApiServices
+from .document_profiler import BiDocumentProfiler
+from .extraction import BiMetricExtractionService
+from .fast_rag_adapter import FastRagPipelineAdapter
+from .materializer import SystemClock
+from .metric_reader import BiMetricReader, BiStructuredCompletionAdapter
+from .postgres_store import PostgresBiStore
+from .profile_repository import (
+    PersistedBiDocumentProfiler,
+    PostgresBiDocumentProfileRepository,
+)
+from .profile_sheet_catalog import (
+    PostgresBiProfileEvidenceRetriever,
+    PostgresBiProfileSheetCatalog,
+)
+from .question_pipeline import BiQuestionPipeline, PgVectorQuestionSourceResolver
+from .question_repository import PostgresBiQuestionRepository
+from .question_service import BiQuestionService
+from .question_snapshot import (
+    BiPublishingQuestionService,
+    BiQuestionSnapshotMaterializer,
+    BiQuestionSnapshotMaterializerServices,
+)
+from .question_snapshot_repository import PostgresBiQuestionSnapshotRepository
+from .question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
+from .question_batch_worker import (
+    BiQuestionBatchWorker,
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MAX_WORKERS,
+    SystemBiQuestionBatchWorkerClock,
+)
+from .queued_materializer import BiQueuedMaterializer, BiQueuedMaterializerServices
+
+if TYPE_CHECKING:
+    from backend.engine.runtime.registry import ModuleRegistry
+
+
+BI_READER_MODEL: Final = "gpt-5.6-luna"
+
+
+def create_bi_services(
+    registry: ModuleRegistry,
+) -> BiApiServices:
+    clock = SystemClock()
+    store = PostgresBiStore(registry.db_manager.database_url)
+    questions = create_bi_question_service()
+    return BiApiServices(
+        store=store,
+        materializations=store,
+        clock=clock,
+        questions=questions,
+    )
+
+
+def create_bi_materialization_runner(
+    registry: ModuleRegistry,
+    completion_client: OpenAIResponsesClient,
+) -> BiQueuedMaterializer:
+    clock = SystemClock()
+    store = PostgresBiStore(registry.db_manager.database_url)
+    completion = BiStructuredCompletionAdapter(completion_client)
+    profiles = PostgresBiDocumentProfileRepository()
+    profiler = PersistedBiDocumentProfiler(
+        BiDocumentProfiler(
+            PostgresBiProfileEvidenceRetriever(),
+            completion,
+            BI_READER_MODEL,
+            PostgresBiProfileSheetCatalog(),
+        ),
+        profiles,
+        clock,
+    )
+    return BiQueuedMaterializer(
+        BiQueuedMaterializerServices(
+            profiler=profiler,
+            questions=create_bi_question_service(),
+            store=store,
+            clock=clock,
+        )
+    )
+
+
+def create_bi_question_pipeline(
+    registry: ModuleRegistry,
+    completion_client: OpenAIResponsesClient,
+) -> BiQuestionPipeline:
+    pgvector_store = registry.pgvector_store
+    retriever = FastRagPipelineAdapter(registry, pgvector_store)
+    completion = BiStructuredCompletionAdapter(completion_client)
+    extractor = BiMetricExtractionService(
+        retriever,
+        BiMetricReader(completion, BI_READER_MODEL),
+    )
+    return BiQuestionPipeline(
+        extractor,
+        PgVectorQuestionSourceResolver(pgvector_store),
+    )
+
+
+def create_bi_question_service() -> BiQuestionService:
+    return BiQuestionService(PostgresBiQuestionRepository())
+
+
+def create_bi_question_worker(
+    registry: ModuleRegistry,
+    completion_client: OpenAIResponsesClient,
+) -> BiQuestionWorker:
+    service = create_bi_question_service()
+    store = PostgresBiStore(registry.db_manager.database_url)
+    snapshot_materializer = BiQuestionSnapshotMaterializer(
+        BiQuestionSnapshotMaterializerServices(
+            questions=service,
+            answers=PostgresBiQuestionSnapshotRepository(),
+            store=store,
+            clock=SystemClock(),
+        )
+    )
+    return BiQuestionWorker(
+        BiPublishingQuestionService(service, snapshot_materializer),
+        create_bi_question_pipeline(registry, completion_client),
+        SystemBiQuestionWorkerClock(),
+    )
+
+
+def create_bi_question_batch_worker(
+    registry: ModuleRegistry,
+    completion_client: OpenAIResponsesClient,
+    *,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    max_workers: int = DEFAULT_MAX_WORKERS,
+) -> BiQuestionBatchWorker:
+    """Build a batch question worker that claims *batch_size* questions and
+    processes them concurrently using up to *max_workers* threads.
+
+    Snapshot refresh (publish_snapshot) is triggered per-question through the
+    same :class:`BiPublishingQuestionService` used by the single-question worker
+    so no changes to the snapshot pipeline are required.
+    """
+    service = create_bi_question_service()
+    store = PostgresBiStore(registry.db_manager.database_url)
+    snapshot_materializer = BiQuestionSnapshotMaterializer(
+        BiQuestionSnapshotMaterializerServices(
+            questions=service,
+            answers=PostgresBiQuestionSnapshotRepository(),
+            store=store,
+            clock=SystemClock(),
+        )
+    )
+    publishing_service = BiPublishingQuestionService(service, snapshot_materializer)
+    return BiQuestionBatchWorker(
+        publishing_service,
+        create_bi_question_pipeline(registry, completion_client),
+        SystemBiQuestionBatchWorkerClock(),
+        batch_size=batch_size,
+        max_workers=max_workers,
+    )

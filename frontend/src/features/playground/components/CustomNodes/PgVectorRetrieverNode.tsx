@@ -36,7 +36,7 @@ export const PgVectorRetrieverNode = ({ data, selected }: PgVectorRetrieverNodeP
       selected={selected}
       width={data.nodeWidth ?? 360}
       onWidthChange={data.onNodeWidthChange}
-      inputPorts={['query_input', 'index_input']}
+      inputPorts={['query_input']}
       outputBranches={['dense_result']}
       bodyClassName="space-y-2.5"
     >

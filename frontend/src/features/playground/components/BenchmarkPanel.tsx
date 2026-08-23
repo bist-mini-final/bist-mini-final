@@ -14,18 +14,10 @@ const DEFAULT_CASES: BenchmarkCase[] = [
   { id: 't6-revenue-2026', question: 'IBM의 2026년 예상 매출은 얼마로 잡혀 있나요?', expected_numbers: [71183.3116], expected_target: 'get_ibm_key_financials', expected_sheets: ['Income_Statement'], expected_plan: { metrics: ['revenue'], periods: [2026] } },
 ];
 
-const WORKFLOW_HINTS: Record<string, string> = {
-  default: 'pgvector 기준선: LLM 분해 + BM25/Dense RRF',
-  rag9_semantic_entry_hybrid: 'pgvector: 앞단 시맨틱 라우팅 + Adaptive 분해',
-  rag10_semantic_scoped_hybrid: 'pgvector: 정답셋 기반 분해 + 조건부 시트 범위 Dense 검색',
-  rag11_template_slot_hybrid: 'pgvector: 지표·기간 슬롯 템플릿 + 안전 LLM 폴백',
+const isBenchmarkWorkflow = (workflow: WorkflowDocument) => {
+  const moduleTypes = new Set(workflow.graph.nodes.map((node) => node.module_type));
+  return moduleTypes.has('query_input') && moduleTypes.has('decomposer');
 };
-const BENCHMARK_WORKFLOW_IDS = new Set([
-  'default',
-  'rag9_semantic_entry_hybrid',
-  'rag10_semantic_scoped_hybrid',
-  'rag11_template_slot_hybrid',
-]);
 const DEFAULT_QUESTIONS_TEXT = DEFAULT_CASES.map((item) => item.question).join('\n');
 const normalizeQuestion = (question: string) => question.trim().replace(/\s+/g, ' ');
 const DEFAULT_CASE_BY_QUESTION = new Map(DEFAULT_CASES.map((item) => [normalizeQuestion(item.question), item]));
@@ -70,9 +62,7 @@ export function BenchmarkPanel({ isOpen, onClose }: BenchmarkPanelProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<BenchmarkJob | null>(null);
   const running = jobId !== null;
-  // The older RAG1~8 graphs use the removed local-vector data source. Keep
-  // comparisons restricted to the three pgvector-equivalent methods.
-  const ragWorkflows = useMemo(() => workflows.filter((workflow) => BENCHMARK_WORKFLOW_IDS.has(workflow.id)), [workflows]);
+  const ragWorkflows = useMemo(() => workflows.filter(isBenchmarkWorkflow), [workflows]);
   const knownCases = useMemo(() => new Map(
     [...DEFAULT_CASES, ...benchmarkSets.flatMap((item) => item.cases)]
       .map((item) => [normalizeQuestion(item.question), item] as const),
@@ -85,7 +75,7 @@ export function BenchmarkPanel({ isOpen, onClose }: BenchmarkPanelProps) {
         pipelineApi.getWorkflows(),
         pipelineApi.getBenchmarkSets(),
       ]);
-      const ragItems = items.filter((item) => BENCHMARK_WORKFLOW_IDS.has(item.id));
+      const ragItems = items.filter(isBenchmarkWorkflow);
       setWorkflows(ragItems);
       setSelected(ragItems.map((item) => item.id));
       setBenchmarkSets(sets);
@@ -174,7 +164,7 @@ export function BenchmarkPanel({ isOpen, onClose }: BenchmarkPanelProps) {
     <aside className="benchmark-panel" role="dialog" aria-modal="true" aria-label="RAG 성능 비교" onMouseDown={(event) => event.stopPropagation()}>
       <header className="benchmark-panel__header"><span><BarChart3 size={18} /> RAG 성능 비교</span><button type="button" onClick={onClose} aria-label="성능 비교 닫기"><X size={18} /></button></header>
       <p className="benchmark-panel__intro">동일 질문을 순차 실행해 정확도, <b>백엔드 노드 실행 시간</b>, 토큰, 비용을 비교합니다. 대기열·브라우저 통신 시간은 시간 지표에서 제외됩니다.</p>
-      <section className="benchmark-section"><div className="benchmark-section__title"><span>비교 대상</span><small>{selected.length}개 선택</small></div><p className="benchmark-panel__intro">기본 선택: DEFAULT_BASELINE ↔ RAG_9_SEMANTIC_ENTRY_HYBRID. RAG_9은 앞단 시맨틱 처리 효과를 기준선과 비교합니다.</p><div className="benchmark-workflow-grid">{ragWorkflows.map((workflow) => { const active = selected.includes(workflow.id); return <button type="button" key={workflow.id} className="benchmark-workflow-card" data-selected={active} onClick={() => toggle(workflow.id)}><i>{active && <Check size={13} strokeWidth={3} />}</i><strong>{workflow.name}</strong><small>{WORKFLOW_HINTS[workflow.id] ?? workflow.id}</small></button>; })}</div>{isLoadingWorkflows && <p className="benchmark-workflow-state">워크플로를 불러오는 중…</p>}{!isLoadingWorkflows && !ragWorkflows.length && <div className="benchmark-workflow-state">비교 가능한 워크플로가 없습니다. <button type="button" onClick={() => void loadWorkflows()}>다시 불러오기</button></div>}</section>
+      <section className="benchmark-section"><div className="benchmark-section__title"><span>비교 대상</span><small>{selected.length}개 선택</small></div><p className="benchmark-panel__intro">서버가 제공한 현재 워크플로 중 Query Input과 Decomposer가 연결된 RAG만 표시합니다. 비교하려면 기준 워크플로를 복제해 변형을 만드세요.</p><div className="benchmark-workflow-grid">{ragWorkflows.map((workflow) => { const active = selected.includes(workflow.id); return <button type="button" key={workflow.id} className="benchmark-workflow-card" data-selected={active} onClick={() => toggle(workflow.id)}><i>{active && <Check size={13} strokeWidth={3} />}</i><strong>{workflow.name}</strong><small>{workflow.id}</small></button>; })}</div>{isLoadingWorkflows && <p className="benchmark-workflow-state">워크플로를 불러오는 중…</p>}{!isLoadingWorkflows && !ragWorkflows.length && <div className="benchmark-workflow-state">비교 가능한 워크플로가 없습니다. <button type="button" onClick={() => void loadWorkflows()}>다시 불러오기</button></div>}</section>
       <section className="benchmark-section benchmark-cases"><div className="benchmark-section__title"><span>질문 세트</span><small>{casesFromLines(questionsText, knownCases).length}문항 · 한 줄당 하나</small></div><div className="benchmark-mode">{benchmarkSets.filter((set) => set.id === 'semantic-decomposition-core-6' || set.id === 'semantic-safety-holdout-30').map((set) => <button type="button" key={set.id} data-selected={mode === set.id} onClick={() => selectBenchmarkSet(set)}>{set.name}</button>)}<button type="button" data-selected={mode === 'lines'} onClick={() => setMode('lines')}>직접 편집</button><button type="button" className="benchmark-reset-questions" onClick={() => { setMode('semantic-decomposition-core-6'); setQuestionsText(DEFAULT_QUESTIONS_TEXT); }}>기본값 복원</button></div><label className="benchmark-question-editor"><span>비교할 질문 <small>각 줄이 하나의 실행입니다</small></span><textarea className="benchmark-json" value={questionsText} onChange={(event) => { setQuestionsText(event.target.value); setMode('lines'); }} rows={8} placeholder={'질문 하나\n질문 둘\n질문 셋'} aria-label="한 줄당 하나의 질문" spellCheck={false} /></label><p className="benchmark-panel__intro">안전성 홀드아웃은 카탈로그 비중복 질문으로 route precision·coverage·기권 정확도와 plan precision·unsafe reuse를 측정합니다.</p></section>
       {job && <section className="benchmark-progress" aria-live="polite"><div className="benchmark-section__title"><span>{job.status === 'cancelling' ? '중지 요청 중…' : job.status === 'cancelled' ? '실행 중지됨' : job.status === 'pausing' ? '현재 문항 완료 후 일시 중지…' : job.status === 'paused' ? '일시 중지됨' : '실행 진행 상황'}</span><small>{job.completed} / {job.total}</small></div><div className="benchmark-progress__bar"><i style={{ width: `${job.total ? (job.completed / job.total) * 100 : 0}%` }} /></div>{job.current && <p className="benchmark-progress__current"><b>{job.current.workflow_id}</b> · {job.current.question || '다음 작업 준비 중'}</p>}{job.active_run && <RunDetails run={job.active_run} title="현재 실행 중인 노드" />}{!job.active_run && job.last_run && <RunDetails run={job.last_run} title="직전 실행 결과" />}<ol className="benchmark-progress__logs">{job.logs.slice().reverse().map((log, index) => <li key={`${log.at}-${index}`} data-event={log.event}><time>{new Date(log.at).toLocaleTimeString()}</time><span>{log.event === 'started' ? '실행 준비' : log.event === 'running' ? '실행 중' : log.event === 'completed' ? (log.error ? `실패: ${log.error}` : '완료') : log.event === 'paused' ? '일시 중지됨' : log.event === 'resumed' ? '다시 시작됨' : log.event === 'pausing' ? '일시 중지 요청' : '중지 요청'}</span><b>{log.workflow_id ?? '비교기'}</b><em>{log.question ?? ''}</em></li>)}</ol></section>}
       <label className="benchmark-cache-option"><span><b>실행 범위</b><small>검색 전 모드는 라우팅·분해까지만 실행하고 시트·지표·기간 정확도를 채점합니다.</small></span><select value={executionScope} onChange={(event) => setExecutionScope(event.target.value as typeof executionScope)} disabled={running}><option value="pre_retrieval">검색 전까지만 (빠른 중간 평가)</option><option value="full">전체 RAG (최종 답변 평가)</option></select></label>

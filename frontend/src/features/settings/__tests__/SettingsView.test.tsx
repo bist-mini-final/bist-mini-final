@@ -109,7 +109,7 @@ describe('SettingsView', () => {
 
     fireEvent.click(copyCmdBtn);
     expect(writeTextMock).toHaveBeenCalledWith(
-      'docker compose -f docker-compose.db.yml up -d'
+      'docker compose -f deploy/db/docker-compose.yml up -d'
     );
     await waitFor(() => {
       expect(screen.getByText('복사됨!')).toBeInTheDocument();

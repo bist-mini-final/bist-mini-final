@@ -41,7 +41,18 @@ export function selectRepresentativeObservation(
   periods: readonly BiPeriod[],
 ): MetricObservation | null {
   const observations = selectObservations(series, periods);
-  const available = observations.filter((observation) => observation.status === 'available');
-  return available[available.length - 1] ?? observations[observations.length - 1] ?? null;
+  const availableInRange = observations.filter(
+    (observation) => observation.status === 'available',
+  );
+  if (availableInRange.length > 0) {
+    return availableInRange[availableInRange.length - 1];
+  }
+  const allAvailable = series.observations.filter(
+    (observation) => observation.status === 'available',
+  );
+  if (allAvailable.length > 0) {
+    return allAvailable[allAvailable.length - 1];
+  }
+  return observations[observations.length - 1] ?? null;
 }
 

@@ -7,9 +7,9 @@ describe('APP_ROUTES registry', () => {
     expect(paths).toContain('/');
     expect(paths).toContain('/playground');
     expect(paths).toContain('/data-sources');
-    expect(paths).toContain('/evaluations');
     expect(paths).toContain('/dashboard');
     expect(paths).toContain('/settings');
+    expect(paths).not.toContain('/evaluations');
   });
 
   it('has ready status for core pages', () => {

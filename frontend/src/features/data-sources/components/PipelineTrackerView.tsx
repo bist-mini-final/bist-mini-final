@@ -576,7 +576,7 @@ export function PipelineTrackerView({
                 <span>적재 스토리지</span>
               </div>
               <div className="ds-hud-metric-value" style={{ color: '#15803d', fontSize: '0.78rem' }}>
-                pgvector (LangChain)
+                PostgreSQL + pgvector
               </div>
             </div>
 

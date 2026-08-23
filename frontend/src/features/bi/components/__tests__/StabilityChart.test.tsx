@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_FIXTURES } from '../../fixtures/dashboardFixtures';
+import { DASHBOARD_FIXTURES } from '../../../../test/fixtures/biDashboardFixtures';
 import type { BiDashboardSnapshot, MetricId, MetricSeries } from '../../types';
 import { StabilityChart } from '../charts/StabilityChart';
 

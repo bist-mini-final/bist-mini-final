@@ -3,7 +3,7 @@ import { formatMetricValue } from '../formatMetric';
 import { selectPeriods, selectObservations, selectRepresentativeObservation } from '../periods';
 import { buildCardViewModel } from '../cardViewModel';
 import { getCardDefinition, CARD_REGISTRY } from '../../config/cardRegistry';
-import { DASHBOARD_FIXTURES } from '../../fixtures/dashboardFixtures';
+import { DASHBOARD_FIXTURES } from '../../../../test/fixtures/biDashboardFixtures';
 import type { BiPeriod, MetricObservation, MetricSeries } from '../../types';
 
 describe('BI Selectors & ViewModel', () => {
@@ -116,6 +116,11 @@ describe('BI Selectors & ViewModel', () => {
         notes: [],
       };
       expect(formatMetricValue(mockSeries, ambiguousObs)).toBe('확인 필요');
+
+      expect(formatMetricValue(mockSeries, {
+        ...ambiguousObs,
+        rawValue: '120',
+      })).toBe('120 (단위 확인 필요)');
     });
   });
 

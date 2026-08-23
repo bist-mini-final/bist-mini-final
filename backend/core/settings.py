@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+
 import dotenv
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
@@ -13,7 +14,6 @@ DIST_DIR = PROJECT_DIR / "dist"
 WORKFLOW_DIR = PROJECT_DIR / "data" / "workflows"
 RUN_DIR = PROJECT_DIR / "data" / "runs"
 CACHE_DIR = PROJECT_DIR / "data" / "cache"
-BENCHMARK_DIR = PROJECT_DIR / "data" / "benchmarks"
 
 
 def _positive_int_environment(name: str, default: int) -> int:
@@ -27,20 +27,17 @@ def _positive_int_environment(name: str, default: int) -> int:
     return value
 
 
-PLAYGROUND_MAX_CONCURRENCY = _positive_int_environment(
-    "PLAYGROUND_MAX_CONCURRENCY",
-    4,
-)
-KUBERNETES_INGESTION_QUEUE = os.getenv(
-    "KUBERNETES_INGESTION_QUEUE",
-    "excel-ingestion",
+KUBERNETES_WORKFLOW_QUEUE = os.getenv(
+    "KUBERNETES_WORKFLOW_QUEUE",
+    "workflow-core",
 )
 
 # PostgreSQL + pgvector Configuration
-PGVECTOR_URL = os.getenv(
-    "PGVECTOR_URL",
-    os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/rag_flow"),
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    os.getenv("PGVECTOR_URL", "postgresql://postgres:postgres@localhost:5432/rag_flow"),
 )
+PGVECTOR_URL = DATABASE_URL
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() in ("true", "1", "yes")
 
 SIMILARITY_THRESHOLD = 0.95
