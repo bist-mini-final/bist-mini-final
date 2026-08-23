@@ -8,7 +8,7 @@ from .models import MetricId, ValueKind
 CATALOG_VERSION: Final = "1"
 FORMULA_VERSION: Final = "1"
 SOURCE_QUESTION_TEMPLATE: Final = (
-    "Find the reported value of '{metric_label}' for {period_label} in this financial document. "
+    "Find the reported value of '{metric_label}' (aliases: {metric_aliases}) on sheet {statement_hint} for {period_label} in this financial document. "
     "Do not compute or infer; extract the exact numerical value, currency, scale, and supporting cell_id."
 )
 
@@ -69,7 +69,7 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         MetricId.REVENUE: SourceMetricDefinition(
             MetricId.REVENUE, "매출", "Total Revenue", "기업이 상품과 서비스 판매로 얻은 수익", ValueKind.AMOUNT, _PRIMARY,
             ("매출", "매출액", "영업수익"), ("Total Revenue", "Revenue", "Sales", "IQ_TOTAL_REV", "IQ_REV"),
-            ("Income Statement", "Key Statistics", "Financials"), ("Total Revenue", "Revenue", "Sales"),
+            ("Income_Statement", "Key_Stats"), ("Total Revenue", "Revenue", "Sales"),
             ("Other Revenue",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.REVENUE_YOY_GROWTH: DerivedMetricDefinition(
@@ -79,7 +79,7 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         MetricId.OPERATING_INCOME: SourceMetricDefinition(
             MetricId.OPERATING_INCOME, "영업이익", "Operating Income", "본업에서 발생한 이익", ValueKind.AMOUNT, _PRIMARY,
             ("영업이익",), ("Operating Income", "Operating Profit", "EBIT", "IQ_OPER_INC", "IQ_EBIT"),
-            ("Income Statement", "Key Statistics", "Financials"), ("Operating Income", "Operating Profit", "EBIT"),
+            ("Income_Statement", "Key_Stats"), ("Operating Income", "Operating Profit", "EBIT"),
             ("Adjusted EBIT",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.OPERATING_MARGIN: DerivedMetricDefinition(
@@ -88,8 +88,8 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         ),
         MetricId.NET_INCOME: SourceMetricDefinition(
             MetricId.NET_INCOME, "순이익", "Net Income", "모든 비용과 세금을 반영한 이익", ValueKind.AMOUNT, _PRIMARY,
-            ("순이익", "당기순이익"), ("Net Income", "Net Earnings", "IQ_NI", "IQ_NI_CF"),
-            ("Income Statement", "Cash Flow", "Financials"), ("Net Income", "Net Earnings"),
+            ("순이익", "당기순이익"), ("Net Income", "Net Earnings", "IQ_NI", "IQ_NI_CF", "IQ_NET_INC"),
+            ("Cash_Flow", "Income_Statement", "Key_Stats"), ("Net Income", "Net Earnings"),
             ("Net Income Attributable to NCI",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.NET_MARGIN: DerivedMetricDefinition(
@@ -99,13 +99,13 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         MetricId.OPERATING_CASH_FLOW: SourceMetricDefinition(
             MetricId.OPERATING_CASH_FLOW, "영업현금흐름", "Cash from Ops.", "영업활동에서 창출된 현금", ValueKind.AMOUNT, _PRIMARY,
             ("영업현금흐름", "영업활동현금흐름"), ("Cash from Ops.", "Cash from Operations", "Operating Cash Flow", "CFO", "IQ_CASH_OPER"),
-            ("Cash Flow Statement", "Cash Flow", "Financials"), ("Cash from Ops.", "Cash from Operations", "Operating Cash Flow"),
+            ("Cash_Flow",), ("Cash from Ops.", "Cash from Operations", "Operating Cash Flow"),
             (), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.CAPITAL_EXPENDITURE: SourceMetricDefinition(
             MetricId.CAPITAL_EXPENDITURE, "CapEx", "Capital Expenditure", "유형 및 무형자산 취득을 위한 지출", ValueKind.AMOUNT, _PRIMARY,
             ("자본적지출", "설비투자"), ("Capital Expenditure", "Capital Expenditures", "CapEx", "IQ_CAPEX"),
-            ("Cash Flow Statement", "Cash Flow", "Key Statistics", "Financials"), ("Capital Expenditure", "CapEx"),
+            ("Cash_Flow", "Key_Stats"), ("Capital Expenditure", "CapEx"),
             ("Capital Expenditure Proceeds",), SignPolicy.OUTFLOW_NEGATIVE, _SOURCE,
         ),
         MetricId.FREE_CASH_FLOW: DerivedMetricDefinition(
@@ -115,32 +115,32 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         MetricId.CASH_AND_SHORT_TERM_INVESTMENTS: SourceMetricDefinition(
             MetricId.CASH_AND_SHORT_TERM_INVESTMENTS, "현금 및 단기투자자산", "Total Cash & ST Investments", "즉시 활용 가능한 현금성 자산", ValueKind.AMOUNT,
             _PRIMARY, ("현금 및 단기투자자산", "현금성자산"),
-            ("Total Cash & ST Investments", "Cash and Short-Term Investments", "Cash And Equivalents", "Short Term Investments", "IQ_CASH_ST_INVEST"),
-            ("Balance Sheet", "Financials"), ("Total Cash & ST Investments", "Cash and Short-Term Investments", "Cash And Equivalents"),
+            ("Total Cash & ST Investments", "Cash and Short-Term Investments", "Cash And Equivalents", "Short Term Investments", "IQ_CASH_ST_INVEST", "IQ_CASH_EQUIV"),
+            ("Balance_Sheet",), ("Total Cash & ST Investments", "Cash and Short-Term Investments", "Cash And Equivalents"),
             ("Restricted Cash",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.SHORT_TERM_DEBT: SourceMetricDefinition(
             MetricId.SHORT_TERM_DEBT, "단기차입금", "Short-term Borrowings", "1년 이내 상환할 차입금", ValueKind.AMOUNT, _AUXILIARY,
             ("단기차입금",), ("Short-term Borrowings", "Short-Term Debt", "IQ_ST_DEBT"),
-            ("Balance Sheet",), ("Short-term Borrowings", "Short-Term Debt"),
+            ("Balance_Sheet", "Capital_Structure_Summary"), ("Short-term Borrowings", "Short-Term Debt"),
             ("Current Portion of Long-Term Debt",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.CURRENT_PORTION_OF_LONG_TERM_DEBT: SourceMetricDefinition(
             MetricId.CURRENT_PORTION_OF_LONG_TERM_DEBT, "유동성 장기부채", "Current Portion of Long Term Debt", "1년 이내 만기가 도래하는 장기차입금", ValueKind.AMOUNT,
             _AUXILIARY, ("유동성 장기부채",), ("Current Portion of Long Term Debt", "Current Portion of Long-Term Debt", "IQ_CURRENT_PORT_DEBT"),
-            ("Balance Sheet",), ("Current Portion of Long Term Debt", "Current Portion of Long-Term Debt"),
+            ("Balance_Sheet",), ("Current Portion of Long Term Debt", "Current Portion of Long-Term Debt"),
             ("Short-Term Debt",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.LONG_TERM_DEBT: SourceMetricDefinition(
             MetricId.LONG_TERM_DEBT, "장기차입금", "Long-Term Debt", "1년 이후 상환할 차입금", ValueKind.AMOUNT, _AUXILIARY,
             ("장기차입금",), ("Long-Term Debt", "Total Long Term Debt", "Long-Term Borrowings", "IQ_LT_DEBT"),
-            ("Balance Sheet",), ("Long-Term Debt", "Total Long Term Debt", "Long-Term Borrowings"),
+            ("Balance_Sheet",), ("Long-Term Debt", "Total Long Term Debt", "Long-Term Borrowings"),
             ("Current Portion of Long-Term Debt",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.TOTAL_DEBT: FallbackMetricDefinition(
             MetricId.TOTAL_DEBT, "총차입금", "Total Debt", "이자 비용이 발생하는 전체 차입금", ValueKind.AMOUNT, _PRIMARY,
             ("총차입금", "총부채성차입금"), ("Total Debt", "Total Debt Issued", "Gross Debt", "IQ_TOTAL_DEBT"),
-            ("Balance Sheet", "Key Statistics"), ("Total Debt", "Total Debt Issued", "Gross Debt"),
+            ("Balance_Sheet", "Key_Stats"), ("Total Debt", "Total Debt Issued", "Gross Debt"),
             ("Total Liabilities",), SignPolicy.AS_REPORTED, _SOURCE, "total_debt_components",
             (MetricId.SHORT_TERM_DEBT, MetricId.CURRENT_PORTION_OF_LONG_TERM_DEBT, MetricId.LONG_TERM_DEBT),
         ),
@@ -150,18 +150,18 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         ),
         MetricId.TOTAL_ASSETS: SourceMetricDefinition(
             MetricId.TOTAL_ASSETS, "총자산", "Total Assets", "기업이 보유한 전체 자산", ValueKind.AMOUNT, _PRIMARY,
-            ("총자산",), ("Total Assets", "Assets", "IQ_TOTAL_ASSETS"), ("Balance Sheet", "Financials"), ("Total Assets", "Assets"),
+            ("총자산",), ("Total Assets", "Assets", "IQ_TOTAL_ASSETS"), ("Balance_Sheet",), ("Total Assets", "Assets"),
             ("Average Total Assets",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.TOTAL_LIABILITIES: SourceMetricDefinition(
             MetricId.TOTAL_LIABILITIES, "총부채", "Total Liabilities", "기업이 부담하는 전체 부채", ValueKind.AMOUNT, _PRIMARY,
-            ("총부채",), ("Total Liabilities", "Liabilities", "IQ_TOTAL_LIAB"), ("Balance Sheet", "Financials"), ("Total Liabilities", "Liabilities"),
+            ("총부채",), ("Total Liabilities", "Liabilities", "IQ_TOTAL_LIAB"), ("Balance_Sheet",), ("Total Liabilities", "Liabilities"),
             ("Total Debt",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
         MetricId.TOTAL_EQUITY: SourceMetricDefinition(
             MetricId.TOTAL_EQUITY, "총자본", "Total Equity", "자산에서 부채를 제외한 주주 지분", ValueKind.AMOUNT, _PRIMARY,
-            ("총자본", "자본총계"), ("Total Equity", "Total Common Equity", "Shareholders' Equity", "Stockholders' Equity", "IQ_TOTAL_EQUITY"),
-            ("Balance Sheet", "Financials"), ("Total Equity", "Total Common Equity", "Shareholders' Equity"),
+            ("총자본", "자본총계"), ("Total Equity", "Total Common Equity", "Shareholders' Equity", "Stockholders' Equity", "IQ_TOTAL_EQUITY", "IQ_TOTAL_COMMON_EQUITY"),
+            ("Balance_Sheet", "Key_Stats"), ("Total Equity", "Total Common Equity", "Shareholders' Equity"),
             ("Average Total Equity",), SignPolicy.AS_REPORTED, _SOURCE,
         ),
     }
