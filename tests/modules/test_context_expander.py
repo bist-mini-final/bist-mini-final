@@ -153,3 +153,56 @@ def test_context_expander_restores_values_hidden_by_header_only_variants() -> No
     )
 
     assert any("Cell Value: 120" in item for item in result["items"])
+    assert "cells" in result
+    assert len(result["cells"]) >= 1
+
+
+def test_context_expander_collects_expanded_cell_metadata() -> None:
+    store = MagicMock()
+    store.fetch_rows_cells.return_value = {
+        50: [
+            {
+                "col_index": 5,
+                "cell_coord": "E50",
+                "sheet_name": "Balance_Sheet",
+                "cell_value": "4957",
+                "cell_id": "BS Cell E50",
+                "source_text": "Sheet: Balance_Sheet | Total Assets | 2014-12-31 | Cell Value: 4957",
+            },
+            {
+                "col_index": 6,
+                "cell_coord": "F50",
+                "sheet_name": "Balance_Sheet",
+                "cell_value": "5468",
+                "cell_id": "BS Cell F50",
+                "source_text": "Sheet: Balance_Sheet | Total Assets | 2015-12-31 | Cell Value: 5468",
+            },
+        ]
+    }
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(question_id="q1", question_text="Total Assets"),
+        document_context=DocumentContextDTO(
+            file_name="sample.xlsx",
+            workbook_hash="hash-1",
+            index_id="idx-1",
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="idx-1",
+                cell_id="BS Cell E50",
+                rrf_score=0.9,
+                text="Total Assets",
+                matched_subquery="Total Assets",
+            )
+        ],
+    )
+
+    result = PgContextExpanderModule(store).run(
+        PgContextExpanderInputDTO(retrieval_json=retrieval)
+    )
+
+    assert "cells" in result
+    coords = {c["cell_coord"] for c in result["cells"]}
+    assert "E50" in coords
+    assert "F50" in coords
