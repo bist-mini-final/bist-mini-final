@@ -3,14 +3,45 @@ services:
     image: pgvector/pgvector:pg16
     container_name: bist-pgvector
     restart: unless-stopped
+    shm_size: 4g
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-rag_flow}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "127.0.0.1:${PGVECTOR_PORT:-5432}:5432"
+      - "0.0.0.0:${PGVECTOR_PORT:-5432}:5432"
     volumes:
-      - pgvector_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "listen_addresses=*"
+      - "-c"
+      - "shared_buffers=4GB"
+      - "-c"
+      - "work_mem=64MB"
+      - "-c"
+      - "maintenance_work_mem=1GB"
+      - "-c"
+      - "effective_cache_size=8GB"
+      - "-c"
+      - "max_parallel_workers_per_gather=4"
+      - "-c"
+      - "max_parallel_maintenance_workers=4"
+      - "-c"
+      - "max_parallel_workers=8"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "wal_buffers=64MB"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+      - "-c"
+      - "max_connections=200"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_flow}"]
       interval: 5s
@@ -18,5 +49,6 @@ services:
       retries: 5
 
 volumes:
-  pgvector_data:
-    driver: local
+  pgdata:
+    external: true
+

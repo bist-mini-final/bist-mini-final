@@ -15,7 +15,9 @@ const METRICS = ['operating_cash_flow', 'capital_expenditure', 'free_cash_flow']
 export function CashFlowChart({ dashboard, range, size }: CashFlowChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);
-  const latest = data[data.length - 1];
+  const latest = [...data].reverse().find(
+    (pt) => pt.values.operating_cash_flow !== null && pt.values.operating_cash_flow !== undefined
+  ) ?? data[data.length - 1];
   const operatingCashFlow = latest?.values.operating_cash_flow ?? 0;
   const capitalExpenditure = latest?.values.capital_expenditure ?? 0;
   const freeCashFlow = latest?.values.free_cash_flow ?? 0;

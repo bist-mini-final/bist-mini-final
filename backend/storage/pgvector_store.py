@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import datetime, timezone
 from numbers import Real
@@ -1677,40 +1678,62 @@ class PgVectorStore:
                             id,
                             document,
                             cmetadata,
-                            (cmetadata->>'row_index')::int AS resolved_row_index,
+                            COALESCE(
+                                CASE WHEN cmetadata->>'row_index' ~ '^\\d+$' THEN (cmetadata->>'row_index')::int ELSE NULL END,
+                                NULLIF(regexp_replace(cmetadata->>'cell_coord', '[^0-9]', '', 'g'), '')::int
+                            ) AS resolved_row_index,
                             CASE
                                 WHEN cmetadata->>'col_index' ~ '^\\d+$'
                                     THEN (cmetadata->>'col_index')::int
                                 ELSE NULL
                             END AS resolved_col_index,
                             ROW_NUMBER() OVER (
-                                PARTITION BY (cmetadata->>'row_index')::int
+                                PARTITION BY COALESCE(
+                                    CASE WHEN cmetadata->>'row_index' ~ '^\\d+$' THEN (cmetadata->>'row_index')::int ELSE NULL END,
+                                    NULLIF(regexp_replace(cmetadata->>'cell_coord', '[^0-9]', '', 'g'), '')::int
+                                ),
+                                cmetadata->>'cell_coord'
                                 ORDER BY
+                                    CASE WHEN cmetadata->>'variant' = 'header_with_value' THEN 0 ELSE 1 END,
                                     CASE WHEN cmetadata->>'col_index' ~ '^\\d+$' THEN (cmetadata->>'col_index')::int ELSE 99999 END,
                                     id
-                            ) AS row_rank
+                            ) AS coord_rank
                         FROM langchain_pg_embedding
-                        WHERE cmetadata->>'row_index' ~ '^\\d+$'
-                          AND (cmetadata->>'row_index')::int = ANY(%s)
-                          {scope_sql}
+                        WHERE (
+                            (cmetadata->>'row_index' ~ '^\\d+$' AND (cmetadata->>'row_index')::int = ANY(%s))
+                            OR
+                            (NULLIF(regexp_replace(cmetadata->>'cell_coord', '[^0-9]', '', 'g'), '') ~ '^\\d+$'
+                             AND (NULLIF(regexp_replace(cmetadata->>'cell_coord', '[^0-9]', '', 'g'), ''))::int = ANY(%s))
+                        )
+                        {scope_sql}
                     )
                     SELECT id, document, cmetadata, resolved_row_index, resolved_col_index
                     FROM filtered_rows
-                    WHERE row_rank <= %s
+                    WHERE coord_rank = 1
                     ORDER BY resolved_row_index,
-                             resolved_col_index ASC NULLS LAST,
+                             cmetadata->>'cell_coord',
                              id;
                 """
                 params = [
                     *cte_params,
                     unique_rows,
+                    unique_rows,
                     *scope_params,
-                    max(1, limit_per_row),
                 ]
                 cur.execute(query_sql, tuple(params))
                 results: Dict[int, List[Dict[str, Any]]] = {}
+                from openpyxl.utils.cell import column_index_from_string
                 for cid, doc, meta, resolved_row, resolved_col in cur.fetchall():
                     cmetadata = meta if isinstance(meta, dict) else {}
+                    col_idx = resolved_col
+                    if col_idx is None and cmetadata.get("cell_coord"):
+                        col_match = re.match(r"^([A-Za-z]+)", cmetadata.get("cell_coord", ""))
+                        if col_match:
+                            try:
+                                col_idx = column_index_from_string(col_match.group(1))
+                            except Exception:
+                                pass
+
                     results.setdefault(int(resolved_row), []).append(
                         {
                             "cell_id": cid or cmetadata.get("cell_id", ""),
@@ -1720,10 +1743,14 @@ class PgVectorStore:
                             "row_header": cmetadata.get("row_header", []),
                             "column_header": cmetadata.get("column_header", []),
                             "row_index": resolved_row,
-                            "col_index": resolved_col,
+                            "col_index": col_idx,
                             "source_text": doc or "",
                         }
                     )
+                # Sort each row's cells by col_index ascending
+                for r_idx, r_cells in results.items():
+                    r_cells.sort(key=lambda c: (c.get("col_index") is None, c.get("col_index") or 0))
+                    results[r_idx] = r_cells[: max(1, limit_per_row)]
                 return results
         except Exception as err:
             logger.warning("fetch_rows_cells 실패: %s", err)
