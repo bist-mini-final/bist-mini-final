@@ -41,7 +41,7 @@ export function ProfitabilityChart({ dashboard, range, size }: ProfitabilityChar
             connectNulls={false}
             isAnimationActive={false}
           >
-            <LabelList dataKey="operatingMargin" position="top" formatter={(value) => typeof value === 'number' ? `${value}%` : ''} fill={CHART_COLORS.neutral} fontSize={9} />
+            <LabelList dataKey="operatingMargin" position="top" formatter={(value) => typeof value === 'number' ? `${value.toFixed(1)}%` : ''} fill={CHART_COLORS.neutral} fontSize={9} />
           </Line>
           <Line
             type="monotone"
@@ -55,7 +55,7 @@ export function ProfitabilityChart({ dashboard, range, size }: ProfitabilityChar
             connectNulls={false}
             isAnimationActive={false}
           >
-            <LabelList dataKey="netMargin" position="bottom" formatter={(value) => typeof value === 'number' ? `${value}%` : ''} fill={CHART_COLORS.neutral} fontSize={9} />
+            <LabelList dataKey="netMargin" position="bottom" formatter={(value) => typeof value === 'number' ? `${value.toFixed(1)}%` : ''} fill={CHART_COLORS.neutral} fontSize={9} />
           </Line>
         </LineChart>
       </ResponsiveContainer>

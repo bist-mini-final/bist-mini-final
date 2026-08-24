@@ -32,12 +32,13 @@ class PostgresBiQuestionSnapshotRepository:
             with get_pooled_raw_connection(self._database_url) as connection:
                 with connection.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute(
-                        "SELECT q.metric_id, q.period_id, a.answer_payload "
+                        "SELECT DISTINCT ON (q.metric_id, q.period_id) "
+                        "q.metric_id, q.period_id, a.answer_payload "
                         "FROM bi_questions q "
                         "JOIN bi_answers a ON a.question_id = q.question_id "
                         "WHERE q.materialization_job_id = %s "
                         "AND q.status = %s AND a.outcome = %s "
-                        "ORDER BY q.metric_id, q.period_id",
+                        "ORDER BY q.metric_id, q.period_id, a.created_at DESC",
                         (
                             job_id,
                             BiQuestionStatus.COMPLETED.value,
