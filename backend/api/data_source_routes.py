@@ -274,11 +274,38 @@ def create_data_source_router(
         target = processed_dir / safe_filename
         if not target.is_file():
             raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+
+        # Compute workbook hash to identify associated indexes
+        workbook_hash: Optional[str] = None
+        suffix = target.suffix.lower()
+        if suffix in _HASHED_FILE_SUFFIXES:
+            try:
+                workbook_hash = _sha256_file(target)
+            except Exception as error:
+                logger.warning("파일 해시 계산 실패 (인덱스 정리 건너뜀): %s", error)
+
         try:
             target.unlink()
         except Exception as error:
             raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
-        return {"status": "success", "message": f"{safe_filename} 파일이 삭제되었습니다."}
+
+        # Clean up associated vector indexes
+        deleted_indexes = 0
+        if workbook_hash and pgvector_store.is_connected():
+            try:
+                deleted_indexes = pgvector_store.delete_by_workbook_hash(workbook_hash)
+            except Exception as error:
+                logger.warning(
+                    "연관된 벡터 인덱스 정리 중 오류 발생 (파일은 삭제됨): %s",
+                    error,
+                    exc_info=True,
+                )
+
+        return {
+            "status": "success",
+            "message": f"{safe_filename} 파일이 삭제되었습니다.",
+            "deleted_indexes": deleted_indexes,
+        }
 
     @router.get(
         "/indexes",
@@ -333,10 +360,18 @@ def create_data_source_router(
         index_id: str = FastPath(..., description="삭제할 pgvector 컬렉션 ID"),
     ) -> Dict[str, Any]:
         """Drop a vector index collection and its embeddings from the database."""
-        success = delete_vector_index(index_id, pgvector_store=pgvector_store)
-        if not success:
-            raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없거나 삭제에 실패했습니다.")
-        return {"status": "success", "message": f"{index_id} 인덱스가 삭제되었습니다."}
+        try:
+            success = delete_vector_index(index_id, pgvector_store=pgvector_store)
+            if not success:
+                raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없습니다.")
+            return {"status": "success", "message": f"{index_id} 인덱스가 삭제되었습니다."}
+        except HTTPException:
+            raise
+        except Exception as error:
+            raise HTTPException(
+                status_code=500,
+                detail=f"인덱스 삭제 중 오류 발생: {error}",
+            ) from error
 
     @router.post(
         "/indexes/{index_id}/search",
@@ -351,13 +386,19 @@ def create_data_source_router(
         if body is None:
             raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:
-            return search_vector_index(
+            results = search_vector_index(
                 index_id=index_id,
                 query_text=body.query,
                 pgvector_store=pgvector_store,
                 embedding_encoder=embedding_encoder,
                 limit=body.limit,
             )
+            return {
+                "index_id": index_id,
+                "query": body.query,
+                "results": results,
+                "total_results": len(results),
+            }
         except Exception as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
 
