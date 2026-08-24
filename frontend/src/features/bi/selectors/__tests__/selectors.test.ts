@@ -145,6 +145,60 @@ describe('BI Selectors & ViewModel', () => {
       expect(all.length).toBe(6);
     });
 
+    it('handles periods with null endDate safely', () => {
+      const periodsWithNullEndDates: readonly BiPeriod[] = [
+        { periodId: 'fy2021', kind: 'fy', label: '2021', sourceLabel: '2021', endDate: null, ordinal: 1 },
+        { periodId: 'fy2022', kind: 'fy', label: '2022', sourceLabel: '2022', endDate: null, ordinal: 2 },
+        { periodId: 'ltm', kind: 'ltm', label: 'LTM', sourceLabel: 'LTM', endDate: null, ordinal: 3 },
+      ];
+      const result = selectPeriods(periodsWithNullEndDates, '최근 3개');
+      expect(result.map((p) => p.periodId)).toEqual(['fy2021', 'fy2022', 'ltm']);
+    });
+
+    it('uses date ordering when available, falls back to ordinal when dates are null', () => {
+      // Scenario: Mixed null/non-null endDates to verify date vs ordinal comparison
+      const periodsWithMixedNulls: readonly BiPeriod[] = [
+        { periodId: 'fy2020', kind: 'fy', label: '2020', sourceLabel: '2020', endDate: '2020-12-31', ordinal: 1 },
+        { periodId: 'fy2021', kind: 'fy', label: '2021', sourceLabel: '2021', endDate: '2021-12-31', ordinal: 2 },
+        { periodId: 'fy2022', kind: 'fy', label: '2022', sourceLabel: '2022', endDate: null, ordinal: 3 },
+        { periodId: 'ltm', kind: 'ltm', label: 'LTM', sourceLabel: 'LTM', endDate: '2021-06-30', ordinal: 4 },
+      ];
+      // fy2020: endDate 2020-12-31 <= LTM endDate 2021-06-30 → historical (by date)
+      // fy2021: endDate 2021-12-31 > LTM endDate 2021-06-30 → future (by date)
+      // fy2022: null endDate → fallback to ordinal (3 <= 4) → historical (by ordinal)
+      // Result maintains ordinal order: fy2020(1), fy2022(3), ltm(4)
+      const result = selectPeriods(periodsWithMixedNulls, '최근 5개');
+      expect(result.map((p) => p.periodId)).toEqual(['fy2020', 'fy2022', 'ltm']);
+
+      // Verify fy2021 is excluded (future) and fy2022 is included (historical via ordinal)
+      expect(result.find((p) => p.periodId === 'fy2021')).toBeUndefined();
+      const fy2022Index = result.findIndex((p) => p.periodId === 'fy2022');
+      const ltmIndex = result.findIndex((p) => p.periodId === 'ltm');
+      expect(fy2022Index).toBeLessThan(ltmIndex);
+    });
+
+    it('correctly orders periods when date order differs from ordinal order', () => {
+      // Scenario: ordinals in reverse chronological order, but dates determine classification
+      const periodsDateVsOrdinal: readonly BiPeriod[] = [
+        { periodId: 'fy2020', kind: 'fy', label: '2020', sourceLabel: '2020', endDate: '2020-12-31', ordinal: 5 },
+        { periodId: 'fy2021', kind: 'fy', label: '2021', sourceLabel: '2021', endDate: '2021-12-31', ordinal: 4 },
+        { periodId: 'fy2022', kind: 'fy', label: '2022', sourceLabel: '2022', endDate: '2022-12-31', ordinal: 3 },
+        { periodId: 'ltm', kind: 'ltm', label: 'LTM', sourceLabel: 'LTM', endDate: '2023-06-30', ordinal: 1 },
+      ];
+      // Date comparison determines all FY periods are historical (endDate <= 2023-06-30)
+      // But output maintains ordinal order: sorted by ordinal [ltm(1), fy2022(3), fy2021(4), fy2020(5)]
+      // historicalFy = [fy2022, fy2021, fy2020] in ordinal order
+      // slice(-3) takes last 3 → [fy2022, fy2021, fy2020]
+      const result = selectPeriods(periodsDateVsOrdinal, '최근 3개');
+      expect(result.map((p) => p.periodId)).toEqual(['fy2022', 'fy2021', 'fy2020', 'ltm']);
+
+      // Verify all FY are classified as historical and maintain ordinal order
+      const ltmIndex = result.findIndex((p) => p.periodId === 'ltm');
+      expect(ltmIndex).toBe(result.length - 1);
+      expect(result[0].periodId).toBe('fy2022'); // lowest ordinal among FY
+      expect(result[2].periodId).toBe('fy2020'); // highest ordinal among FY
+    });
+
     it('selects observations and representative observation', () => {
       const observations = selectObservations(mockSeries, mockPeriods);
       expect(observations.length).toBeGreaterThan(0);
