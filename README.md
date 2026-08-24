@@ -1,96 +1,258 @@
 # BIST Mini Final — RAG Pipeline & BI Visualizer
 
-재무 스프레드시트 구조 분석, Luna VLM 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 근거 기반 응답, BI 스냅샷과 RAG 벤치마크를 제공하는 Kubernetes-first 시스템입니다.
+재무 스프레드시트 구조 분석, Luna VLM 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 근거 기반 응답, BI 대시보드 스냅샷 및 RAG 벤치마크를 제공하는 엔터프라이즈 RAG & BI 플랫폼입니다.
 
-제품 기능과 완료 조건의 기준은 [제품 및 기능 명세](docs/specs/README.md)입니다.
+---
 
-## 실행 구조
+## 1. 시스템 아키텍처 및 큐 구조
 
-- `modules/`는 19개 계산 단위와 Pydantic 입출력 계약의 단일 소스입니다.
-- `jobs/`는 module port를 연결하는 canonical DAG와 worker entrypoint의 단일 소스입니다.
-- FastAPI는 계약 검증, PostgreSQL 큐 제출, compact 조회와 SSE 관찰만 수행합니다.
-- 실제 계산은 KEDA가 확장하는 Kubernetes Job에서만 수행합니다.
-- `workflow-core`, `bi-materialization`, `bi-question`, `benchmark` 네 큐가 서로 독립적으로 확장됩니다.
-- run, lease, BI, benchmark 상태와 결과는 PostgreSQL에 영속화됩니다.
-- LLM/VLM은 하나의 OpenAI Responses API client와 keep-alive connection pool을 공유하며 structured output과 tool continuation은 공식 Responses 계약을 사용합니다.
-- canonical workflow는 `rag_query`, `excel_ingestion` 두 개이며 UI에서는 읽기 전용으로 제공됩니다.
+```text
+[Frontend: React/Vite/XYFlow]
+        │ (HTTP / SSE)
+        ▼
+[Control Plane: FastAPI Backend (:8765)]
+        │
+        ├── PostgreSQL & pgvector (DB, Embeddings, Queue Tables)
+        │     ├── bi_materialization_jobs / bi_questions / bi_answers
+        │     ├── workflow_runs / workflow_leases
+        │     └── benchmark_runs / benchmark_results
+        │
+        ▼ (KEDA Trigger & Autoscaling)
+[Kubernetes Worker Pods / ScaledJobs]
+        ├── workflow-core worker (RAG & Ingestion DAG 실행)
+        ├── bi-materialization runner (지표 프로파일링 & 질문 생성)
+        ├── bi-question batch worker (OpenAI Responses LLM 병렬 지표 추출)
+        └── benchmark worker (파이프라인 평가 & 스코어링)
+```
 
-## 빠른 시작
+- **`modules/`**: 19개 파이프라인 모듈 및 Pydantic v2 계약의 단일 소스(Single Source of Truth).
+- **`jobs/`**: 모듈 간 DAG 파이프라인 정의 및 배치 워커 엔트리포인트.
+- **FastAPI Control Plane**: API 계약 검증, DB 큐 등록, 스냅샷/이슈 조회, SSE 실시간 스트리밍 제공.
+- **KEDA ScaledJobs**: 4개 독립 큐(`workflow-core`, `bi-materialization`, `bi-question`, `benchmark`)에 쌓인 작업량에 따라 워커 Pod를 0부터 수평 자동 확장(HPA).
 
-필수 도구는 Python 3.11+, `uv`, Node.js 20+, Docker, k3d, kubectl, Helm입니다.
+---
+
+## 2. Docker 환경 설정 및 실행 가이드
+
+### 2.1 사전 요구사항
+- Docker Desktop 또는 Docker Engine (v24.0+)
+- Docker Compose v2 (Compose V2 플러그인)
+- 4GB 이상의 메모리 할당 (PostgreSQL shared buffers 권장)
+
+### 2.2 PostgreSQL + pgvector 컨테이너 설정 (`deploy/compose/docker-compose.yml`)
+
+고성능 벡터 검색 및 대규모 시계열 셀 저장을 위해 최적화된 pg16 pgvector 컨테이너를 사용합니다.
+
+```yaml
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: bist-pgvector
+    restart: unless-stopped
+    shm_size: 4g
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rag_flow}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "0.0.0.0:${PGVECTOR_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c", "listen_addresses=*"
+      - "-c", "shared_buffers=4GB"
+      - "-c", "work_mem=64MB"
+      - "-c", "maintenance_work_mem=1GB"
+      - "-c", "effective_cache_size=8GB"
+      - "-c", "max_parallel_workers_per_gather=4"
+      - "-c", "max_parallel_maintenance_workers=4"
+      - "-c", "max_parallel_workers=8"
+      - "-c", "effective_io_concurrency=200"
+      - "-c", "random_page_cost=1.1"
+      - "-c", "wal_buffers=64MB"
+      - "-c", "min_wal_size=1GB"
+      - "-c", "max_wal_size=4GB"
+      - "-c", "max_connections=200"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_flow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    external: true
+```
+
+#### 볼륨 생성 및 컨테이너 기동:
+```bash
+# 1. 외장 볼륨 생성 (데이터 영속성 보장)
+docker volume create pgdata
+
+# 2. pgvector 컨테이너 시작
+docker compose -f deploy/compose/docker-compose.yml up -d
+
+# 3. 컨테이너 상태 및 헬스체크 확인
+docker compose -f deploy/compose/docker-compose.yml ps
+```
+
+### 2.3 Docker 이미지 빌드 (`deploy/docker/`)
 
 ```bash
-cp .env.example .env
-# .env에 OPENAI_API_KEY와 PGVECTOR_URL을 설정
+# Backend Control Plane 이미지 빌드
+docker build -t bist-backend:local -f deploy/docker/Dockerfile.backend .
 
-uv sync --frozen
-cd frontend && npm ci && cd ..
+# Kubernetes / Worker 이미지 빌드
+docker build -t bist-workflow-worker:local -f deploy/docker/Dockerfile.worker .
 
-# PostgreSQL 스키마, k3d, KEDA, worker image와 4개 ScaledJob 준비
+# Frontend UI 이미지 빌드
+docker build -t bist-frontend:local -f deploy/docker/Dockerfile.frontend ./frontend
+```
+
+---
+
+## 3. Kubernetes (k3d & KEDA) 환경 설정 및 배포 가이드
+
+### 3.1 필수 도구
+- `k3d` (v5.6+)
+- `kubectl` (v1.28+)
+- `helm` (v3.12+)
+
+### 3.2 로컬 클러스터 및 KEDA 원클릭 배포 (`deploy/kubernetes/local.sh`)
+
+`local.sh` 스크립트를 통해 로컬 k3d 클러스터 구성부터 KEDA 설치, 네임스페이스(`bist-batch`), 시크릿, ScaledJob 배포까지 일괄 구성할 수 있습니다:
+
+```bash
+# 1. 전체 인프라 원클릭 배포 (Cluster, KEDA, Worker Image, Manifests)
 ./deploy/kubernetes/local.sh all
+
+# 2. 클러스터 및 큐 상태 점검
+./deploy/kubernetes/local.sh status
+
+# 3. 특정 컴포넌트 개별 실행 시:
+./deploy/kubernetes/local.sh cluster   # k3d 클러스터 생성
+./deploy/kubernetes/local.sh keda      # KEDA 설치
+./deploy/kubernetes/local.sh image     # 워커 도커 이미지 빌드 및 k3d import
+./deploy/kubernetes/local.sh render    # K8s manifest 동적 렌더링
+./deploy/kubernetes/local.sh apply     # ScaledJob 및 Secret 적용
+./deploy/kubernetes/local.sh down      # 클러스터 및 리소스 정리
 ```
 
-API와 frontend 개발 서버는 별도 터미널에서 실행합니다.
+### 3.3 KEDA ScaledJob 스케일링 설정 (`deploy/kubernetes/manifests/scaledjob.yaml`)
 
+KEDA는 PostgreSQL의 대기 질문 및 작업 큐를 주기적으로 폴링(3s)하여 Worker Pod를 0개에서 최대 16개까지 자동 증설합니다:
+
+- **`workflow-core-scaler`**: `workflow_runs` 테이블의 `status = 'queued'` 건수에 따라 워커 확장.
+- **`bi-materialization-scaler`**: `bi_materialization_jobs` 테이블의 `status = 'queued'` 건수 기반 확장.
+- **`bi-question-scaler`**: `bi_questions` 테이블의 대기 질문(`status = 'queued'`) 건수 기반 대규모 병렬 추출 확장 (ScaleTarget: 16).
+- **`benchmark-scaler`**: `benchmark_runs` 테이블의 `status = 'queued'` 평가 작업 기반 확장.
+
+```yaml
+# ScaledJob 매니페스트 예시 (bi-question 워커)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: bi-question-worker
+  namespace: bist-batch
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        containers:
+          - name: worker
+            image: bist-workflow-worker:local
+            command: ["python", "-m", "backend.features.bi.question_worker_main"]
+            envFrom:
+              - secretRef:
+                  name: bist-secrets
+  pollingInterval: 3
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  maxReplicaCount: 16
+  triggers:
+    - type: postgresql
+      metadata:
+        connectionFromEnv: PGVECTOR_URL
+        query: "SELECT COUNT(*) FROM bi_questions WHERE status = 'queued'"
+        targetQueryValue: "16"
+```
+
+---
+
+## 4. 로컬 개발 환경 빠른 시작
+
+### 4.1 환경 변수 설정 (`.env`)
+루트 디렉토리에 `.env` 파일을 구성합니다:
+
+```env
+OPENAI_API_KEY=sk-proj-your-api-key-here
+PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+```
+
+### 4.2 의존성 설치
 ```bash
+# Python 백엔드 및 모듈 의존성 설치
+uv sync --frozen
+
+# Frontend 의존성 설치
+cd frontend
+npm ci
+cd ..
+```
+
+### 4.3 서버 기동
+```bash
+# Terminal 1: Backend FastAPI Control Plane
 uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
-```
 
-```bash
+# Terminal 2: Frontend React UI
 cd frontend
 npm run dev
 ```
 
-- UI: [http://localhost:5173](http://localhost:5173)
-- OpenAPI: [http://localhost:8765/docs](http://localhost:8765/docs)
-- Kubernetes 상태: `./deploy/kubernetes/local.sh status`
+- **웹 대시보드 UI**: [http://localhost:5173](http://localhost:5173)
+- **FastAPI OpenAPI 문서**: [http://localhost:8765/docs](http://localhost:8765/docs)
 
-API 서버만 실행하면 계약 조회와 화면 개발은 가능하지만, PostgreSQL/KEDA worker가 없을 때 실행 제출은 명시적으로 `503`을 반환하며 로컬 계산으로 폴백하지 않습니다.
+---
 
-## 검증
+## 5. 테스트 및 품질 검증
 
 ```bash
+# 백엔드 Python 테스트 & 린트
+uv run pytest tests/
 uv run ruff check modules backend jobs tests
 uv run pyright
-uv run pytest -q
 
+# 프론트엔드 테스트 & 빌드
 cd frontend
-npm run test
+npm test
 npm run build
 ```
 
-Kubernetes manifest는 다음 명령으로 렌더링할 수 있습니다.
+---
 
-```bash
-uv run python deploy/kubernetes/scripts/render.py \
-  --max-replicas 4 \
-  --connection-hash aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-```
-
-요구사항별 자동·통합·운영 검증은 [검증 매트릭스](docs/specs/VERIFICATION_MATRIX.md)를 따릅니다.
-
-## 프로젝트 구조
+## 6. 디렉토리 구조
 
 ```text
 bist-mini-final/
-├── modules/                       # 계산 모듈과 Pydantic 계약
-├── jobs/                          # canonical DAG/worker JobDefinition
-│   ├── excel_ingestion.py
-│   ├── rag_pipeline.py
-│   ├── bi_materialization.py      # materialization + question worker
-│   └── benchmark.py
+├── modules/                       # RAG 파이프라인 단일 소스 모듈 (Retriever, Expander, Reader 등)
+├── jobs/                          # canonical DAG 파이프라인 및 배치 엔트리포인트
 ├── backend/
-│   ├── api/                       # 제출·조회·SSE control plane
-│   ├── engine/
-│   │   ├── workflows/             # DAG validation, run state, executor
-│   │   ├── orchestration/         # PostgreSQL/Kubernetes dispatcher
-│   │   └── worker/                # workflow-core consumer
+│   ├── api/                       # FastAPI 라우트, 스키마, SSE 스트리밍
+│   ├── bootstrap/                 # 의존성 주입 컨테이너
+│   ├── engine/                    # DAG 실행 엔진 및 워커
 │   ├── features/
-│   │   ├── bi/                    # BI queues, workers, snapshots
-│   │   └── benchmark/             # benchmark queue, worker, results
-│   └── storage/                   # PostgreSQL, pgvector, shared artifacts
-├── frontend/                      # React/Vite/XYFlow UI
-├── deploy/                        # Docker, k3d, KEDA ScaledJobs
-├── docs/specs/                    # 제품·기능·API·Job·검증 명세
-└── tests/modules/                 # module/job/queue/API contract tests
+│   │   ├── bi/                    # BI 카탈로그, 질문 생성기, 공식 계산기, 스냅샷
+│   │   └── benchmark/             # RAG 벤치마크 및 지표 평가
+│   └── storage/                   # PostgreSQL 커넥션 풀, pgvector 저장소
+├── frontend/                      # React 18, TypeScript, TailwindCSS, Recharts
+├── deploy/
+│   ├── compose/                   # Docker Compose (pgvector 전용 인프라)
+│   ├── docker/                    # Dockerfiles (backend, worker, frontend)
+│   └── kubernetes/                # k3d 스크립트, KEDA ScaledJob 매니페스트
+└── docs/specs/                    # 아키텍처 및 검증 명세서
 ```
+
