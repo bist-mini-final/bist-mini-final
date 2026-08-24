@@ -56,14 +56,14 @@ def _sha256_file(path: Path) -> str:
 
 
 class SearchRequestDTO(BaseModel):
-    """Request payload for vector search within a specific index."""
+    """특정 벡터 인덱스 대상 즉시 유사도 검색 요청 DTO."""
 
     query: str = Field(min_length=1, description="검색할 질문 또는 텍스트")
     limit: int = Field(default=5, ge=1, le=50, description="반환할 최대 결과 수")
 
 
 class UpdateIndexCompanyRequestDTO(BaseModel):
-    """Request payload for updating the company name bound to an index."""
+    """벡터 인덱스 바인딩 기업명 수정 요청 DTO."""
 
     company_name: str = Field(
         min_length=1,
@@ -84,23 +84,8 @@ def create_data_source_router(
     workflow_executor: WorkflowExecutor,
     workflow_dispatcher: RunDispatcher,
 ) -> APIRouter:
-    """Compose database, file, vector-index, and ingestion adapters under 'Data Sources'.
-
-    Args:
-        processed_dir: Path to directory containing source Excel spreadsheets.
-        embedding_encoder: Text embedder for live query search.
-        pgvector_store: pgvector client for vector queries and index inspection.
-        connection_probe: Diagnostics probe for PostgreSQL health.
-        db_manager: Database manager for source file metadata.
-        workflow_store: Workflow definition store.
-        run_store: Run execution store.
-        workflow_executor: Ingestion workflow executor.
-        workflow_dispatcher: Batch queue dispatcher.
-
-    Returns:
-        Configured APIRouter for all Data Source operations.
-    """
-    router = APIRouter(prefix="/data-sources", tags=["Data Sources"])
+    """데이터 소스(파일, DB, pgvector 인덱스, 인덱싱 작업) 관리를 위한 FastAPI 라우터 생성."""
+    router = APIRouter(prefix="/data-sources", tags=["데이터 소스 관리"])
     ingestion_jobs = IngestionJobService(
         workflow_store,
         run_store,
@@ -122,7 +107,7 @@ def create_data_source_router(
         description="`data/source_files`에 업로드된 엑셀 파일 목록, 크기, 해시 및 인덱싱 상태를 조회합니다.",
     )
     def get_files() -> Dict[str, Any]:
-        """List all processed source files with indexing statuses."""
+        """업로드된 원본 스프레드시트 파일 목록 및 인덱싱 상태를 반환합니다."""
         files = list_processed_files(processed_dir, pgvector_store)
         return {"files": files, "total": len(files)}
 
@@ -136,7 +121,7 @@ def create_data_source_router(
         sheet_name: Optional[str] = Query(default=None, description="특정 시트명 (기본값: 첫 번째 시트)"),
         max_rows: int = Query(default=15, ge=1, le=50, description="미리볼 최대 행 수"),
     ) -> Dict[str, Any]:
-        """Preview raw cell values from an uploaded Excel spreadsheet."""
+        """업로드된 엑셀 파일의 원시 셀 데이터를 미리보기 형식으로 반환합니다."""
         try:
             return preview_excel_sheet(
                 filename,
@@ -158,7 +143,7 @@ def create_data_source_router(
         model: str = Query(default=DEFAULT_EMBEDDING_MODEL, description="사용할 텍스트 임베딩 모델"),
         batch_size: int = Query(default=2048, ge=1, le=2048, description="임베딩 배치 크기"),
     ) -> Dict[str, Any]:
-        """Upload a source spreadsheet and optionally enqueue an automated ingestion run."""
+        """새로운 엑셀 파일을 업로드하고 옵션에 따라 비동기 인덱싱 작업을 등록합니다."""
         if not file.filename:
             raise HTTPException(status_code=400, detail="유효한 파일명이 필요합니다.")
 
@@ -250,7 +235,7 @@ def create_data_source_router(
     def download_file(
         filename: str = FastPath(..., description="다운로드할 파일명"),
     ) -> FileResponse:
-        """Download an uploaded source file directly."""
+        """업로드된 원본 스프레드시트 파일을 직접 다운로드합니다."""
         safe_filename = Path(filename).name
         target = processed_dir / safe_filename
         if not target.is_file():
@@ -269,7 +254,7 @@ def create_data_source_router(
     def remove_file(
         filename: str = FastPath(..., description="삭제할 파일명"),
     ) -> Dict[str, Any]:
-        """Delete a source file and drop its associated vector index collection."""
+        """업로드된 원본 파일을 삭제하고 연결된 pgvector 벡터 인덱스를 제거합니다."""
         safe_filename = Path(filename).name
         target = processed_dir / safe_filename
         if not target.is_file():
@@ -313,7 +298,7 @@ def create_data_source_router(
         description="PostgreSQL에 생성된 모든 워크북 벡터 인덱스 컬렉션, 청크 수, 차원, 기업명을 조회합니다.",
     )
     def get_indexes() -> Dict[str, Any]:
-        """List all available vector index collections."""
+        """생성된 모든 pgvector 벡터 인덱스 컬렉션 목록을 반환합니다."""
         indexes = list_vector_indexes(pgvector_store)
         return {"indexes": indexes, "total": len(indexes)}
 
@@ -325,7 +310,7 @@ def create_data_source_router(
     def get_index_detail(
         index_id: str = FastPath(..., description="pgvector 컬렉션 ID"),
     ) -> Dict[str, Any]:
-        """Get schema and document statistics for a single vector index collection."""
+        """단일 벡터 인덱스 컬렉션의 메타데이터 및 청크 통계를 반환합니다."""
         detail = get_vector_index_detail(index_id, pgvector_store=pgvector_store)
         if detail is None:
             raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없습니다.")
@@ -340,7 +325,7 @@ def create_data_source_router(
         index_id: str = FastPath(..., description="수정할 pgvector 컬렉션 ID"),
         body: UpdateIndexCompanyRequestDTO = None,  # type: ignore[assignment]
     ) -> Dict[str, Any]:
-        """Update the bound company name for a specific vector index collection."""
+        """특정 벡터 인덱스 컬렉션에 바인딩된 기업명을 업데이트합니다."""
         if body is None:
             raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         new_name = body.company_name.strip()
@@ -359,7 +344,7 @@ def create_data_source_router(
     def remove_index(
         index_id: str = FastPath(..., description="삭제할 pgvector 컬렉션 ID"),
     ) -> Dict[str, Any]:
-        """Drop a vector index collection and its embeddings from the database."""
+        """데이터베이스에서 특정 벡터 인덱스 컬렉션 및 임베딩을 완전히 삭제합니다."""
         try:
             success = delete_vector_index(index_id, pgvector_store=pgvector_store)
             if not success:
@@ -382,7 +367,7 @@ def create_data_source_router(
         index_id: str = FastPath(..., description="검색 대상 pgvector 컬렉션 ID"),
         body: SearchRequestDTO = None,  # type: ignore[assignment]
     ) -> Any:
-        """Execute a dense vector similarity search within a specific index."""
+        """지정된 인덱스 내에서 쿼리 임베딩을 통한 밀집 벡터 유사도 검색을 수행합니다."""
         if body is None:
             raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:

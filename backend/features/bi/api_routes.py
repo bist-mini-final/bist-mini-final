@@ -128,14 +128,14 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.get(
         "/companies",
-        tags=["BI Company & Overview"],
+        tags=["BI 기업 목록 및 개요"],
         response_model=BiCompanyListResponse,
         summary="BI 등록 기업 목록 및 대시보드 상태 조회",
         description="인덱싱된 전체 기업 목록, 바인딩된 워크북 정보, 최신 머티리얼라이제이션 스냅샷 상태를 반환합니다.",
         responses={500: {"model": ApiErrorEnvelope}},
     )
     def list_companies() -> BiCompanyListResponse:
-        """List all companies available in the BI database with active snapshot summaries."""
+        """인덱싱된 전체 기업 목록 및 활성 스냅샷 요약 정보를 반환합니다."""
         entries = services.store.list_companies()
         if not entries:
             return BiCompanyListResponse(companies=())
@@ -156,7 +156,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.get(
         "/companies/{company_id}/dashboard",
-        tags=["BI Dashboard Snapshots"],
+        tags=["BI 대시보드 스냅샷"],
         response_model=BiDashboardSnapshot | BiDashboardPendingResponse,
         summary="기업별 최신 BI 대시보드 스냅샷 조회",
         description=(
@@ -173,7 +173,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         company_id: IdentifierPath,
         response: Response,
     ) -> BiDashboardSnapshot | BiDashboardPendingResponse:
-        """Fetch the current published BI dashboard snapshot for a specific company."""
+        """특정 기업의 발행된 BI 대시보드 완성형 스냅샷을 반환합니다."""
         typed_company_id = CompanyId(company_id)
         company = services.store.get_company(typed_company_id)
         if company is None:
@@ -193,7 +193,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.post(
         "/materializations",
-        tags=["BI Materialization Jobs"],
+        tags=["BI 머티리얼라이제이션 작업"],
         response_model=BiMaterializationAccepted,
         status_code=status.HTTP_202_ACCEPTED,
         summary="BI 머티리얼라이제이션 작업 큐 등록",
@@ -212,7 +212,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
     def create_materialization(
         request: BiMaterializationRequest,
     ) -> BiMaterializationAccepted:
-        """Enqueue a background materialization job to extract BI metrics and formulas."""
+        """BI 메트릭 및 공식 추출을 위한 백그라운드 머티리얼라이제이션 작업을 큐에 등록합니다."""
         existing = services.store.find_latest_job(request.company_id)
         if existing is not None and existing.status is not MaterializationStatus.FAILED:
             if existing.workbook_hash == request.source.workbook_hash:
@@ -243,7 +243,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.get(
         "/materializations/{job_id}",
-        tags=["BI Materialization Jobs"],
+        tags=["BI 머티리얼라이제이션 작업"],
         response_model=BiMaterializationJob,
         summary="머티리얼라이제이션 작업 상태 조회",
         description="진행 중이거나 완료된 머티리얼라이제이션 작업의 진행 건수, 상태, 에러 메시지를 조회합니다.",
@@ -253,7 +253,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         },
     )
     def get_materialization(job_id: IdentifierPath) -> BiMaterializationJob:
-        """Get the current execution progress of a materialization job."""
+        """머티리얼라이제이션 작업의 현재 실행 진행 상태를 반환합니다."""
         job = services.store.get_job(JobId(job_id))
         if job is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, JOB_NOT_FOUND)
@@ -261,13 +261,13 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.get(
         "/materializations/{job_id}/stream",
-        tags=["BI Materialization Jobs"],
+        tags=["BI 머티리얼라이제이션 작업"],
         summary="머티리얼라이제이션 SSE 실시간 진행 스트리밍",
         description="지표 프로파일링 및 질문 생성 진행률을 SSE 이벤트로 실시간 스트리밍합니다.",
         responses={404: {"model": ApiErrorEnvelope}},
     )
     async def stream_materialization(job_id: IdentifierPath, request: Request):
-        """Stream real-time progress events for an active materialization job."""
+        """활성 머티리얼라이제이션 작업의 실시간 진행 이벤트를 스트리밍합니다."""
         try:
             initial = load_materialization(job_id)
         except LookupError as error:
@@ -307,7 +307,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.post(
         "/companies/{company_id}/refresh",
-        tags=["BI Questions & Calculations"],
+        tags=["BI 지표 질문 및 배치 계산"],
         response_model=BiQuestionJobProgress,
         status_code=status.HTTP_202_ACCEPTED,
         summary="기존 대시보드 지표 일괄 재계산 요청",
@@ -319,7 +319,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         },
     )
     def refresh_dashboard(company_id: IdentifierPath) -> BiQuestionJobProgress:
-        """Enqueue question extraction batch to refresh metric observations."""
+        """대시보드 지표 관측값을 갱신하기 위해 질문 추출 배치를 큐에 등록합니다."""
         typed_company_id = CompanyId(company_id)
         company = services.store.get_company(typed_company_id)
         if company is None:
@@ -366,7 +366,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.get(
         "/question-jobs/{job_id}",
-        tags=["BI Questions & Calculations"],
+        tags=["BI 지표 질문 및 배치 계산"],
         response_model=BiQuestionJobProgress,
         summary="BI 지표 질문 배치 작업 진행률 조회",
         description="병렬 처리 중인 대기(queued), 진행(running), 완료(completed), 실패(failed) 질문 건수를 반환합니다.",
@@ -376,7 +376,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         },
     )
     def get_question_job(job_id: IdentifierPath) -> BiQuestionJobProgress:
-        """Get the progress counts for a parallel question execution job."""
+        """병렬 질문 배치 작업의 진행 건수 집계를 반환합니다."""
         progress = services.questions.get_job_progress(JobId(job_id))
         if progress is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, QUESTION_JOB_NOT_FOUND)
@@ -384,13 +384,13 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
 
     @router.get(
         "/question-jobs/{job_id}/stream",
-        tags=["BI Questions & Calculations"],
+        tags=["BI 지표 질문 및 배치 계산"],
         summary="BI 지표 질문 배치 진행 SSE 스트리밍",
         description="지표 질문 처리 진행 상태를 실시간 Server-Sent Events로 구독합니다.",
         responses={404: {"model": ApiErrorEnvelope}},
     )
     async def stream_question_job(job_id: IdentifierPath, request: Request):
-        """Stream progress events for a parallel question execution job."""
+        """병렬 질문 배치 작업의 실시간 진행 이벤트를 스트리밍합니다."""
         try:
             initial = load_question_progress(job_id)
         except LookupError as error:
