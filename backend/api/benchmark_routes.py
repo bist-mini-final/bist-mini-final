@@ -160,10 +160,10 @@ def create_benchmark_router(
     def cancel_benchmark_job(
         job_id: str = FastPath(..., description="취소할 벤치마크 작업 ID"),
     ) -> Dict[str, Any]:
-        """실행 중인 벤치마크 작업을 취소합니다."""
+        """대기 중이거나 실행 중인 벤치마크 작업을 취소합니다."""
         existing = load_job(job_id)
         if existing["status"] in {"completed", "cancelled", "failed"}:
-            raise HTTPException(status_code=409, detail="이미 완료되었거나 취소된 벤치마크 작업입니다.")
+            raise HTTPException(status_code=409, detail="이미 완료, 취소 또는 실패한 벤치마크 작업입니다.")
         try:
             job = benchmark_store.request_cancel(job_id)
         except BenchmarkStoreError as error:
