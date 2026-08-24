@@ -86,7 +86,7 @@ BI_QUESTION_JOB = WorkerJobDefinition(
     worker_entrypoint="backend.features.bi.question_worker_main:main",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="bi-question",
-        # batch_size=16 × 최대 90초/질문 + 여유 = 2700 초
+        # batch_size=16 x 최대 90초/질문 + 여유 = 2700 초
         active_deadline_seconds=2700,
         pending_query="""
             SELECT COUNT(*) FROM bi_questions
