@@ -123,9 +123,11 @@ def create_workflow_router(
     )
     def save_workflow(
         workflow_id: str = FastPath(..., description="저장할 워크플로 식별자"),
-        request: WorkflowSaveRequest = ...,
+        request: WorkflowSaveRequest = None,  # type: ignore[assignment]
     ) -> Any:
         """Save or update a DAG workflow definition."""
+        if request is None:
+            raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:
             return workflow_store.save(workflow_id, request)
         except ValueError as error:
@@ -162,9 +164,11 @@ def create_workflow_router(
     )
     def create_workflow_run(
         workflow_id: str = FastPath(..., description="실행할 워크플로 식별자"),
-        request: WorkflowExecutionRequest = ...,
+        request: WorkflowExecutionRequest = None,  # type: ignore[assignment]
     ) -> Any:
         """Enqueue a new workflow execution run."""
+        if request is None:
+            raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:
             if run_store.db_manager is None:
                 raise RuntimeError(
@@ -262,7 +266,7 @@ def create_workflow_router(
     )
     def cancel_run(
         run_id: str = FastPath(..., description="취소할 실행 ID"),
-    ) -> Dict[str, Any]:
+    ) -> Any:
         """Cancel an in-progress workflow run."""
         try:
             return workflow_dispatcher.cancel(run_id)
@@ -292,7 +296,7 @@ def create_workflow_router(
     )
     async def stream_workflow_run(
         run_id: str = FastPath(..., description="스트리밍을 구독할 실행 ID"),
-        request: Request = ...,
+        request: Request = None,  # type: ignore[assignment]
     ) -> EventSourceResponse:
         """Observe a Kubernetes-owned run without executing work in the API."""
         try:

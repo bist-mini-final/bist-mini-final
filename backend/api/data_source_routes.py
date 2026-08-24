@@ -299,7 +299,7 @@ def create_data_source_router(
         index_id: str = FastPath(..., description="pgvector 컬렉션 ID"),
     ) -> Dict[str, Any]:
         """Get schema and document statistics for a single vector index collection."""
-        detail = get_vector_index_detail(pgvector_store, index_id)
+        detail = get_vector_index_detail(index_id, pgvector_store=pgvector_store)
         if detail is None:
             raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없습니다.")
         return detail
@@ -311,13 +311,15 @@ def create_data_source_router(
     )
     def update_index_company(
         index_id: str = FastPath(..., description="수정할 pgvector 컬렉션 ID"),
-        body: UpdateIndexCompanyRequestDTO = ...,
+        body: UpdateIndexCompanyRequestDTO = None,  # type: ignore[assignment]
     ) -> Dict[str, Any]:
         """Update the bound company name for a specific vector index collection."""
+        if body is None:
+            raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         new_name = body.company_name.strip()
         if not new_name:
             raise HTTPException(status_code=422, detail="기업명은 비어있을 수 없습니다.")
-        success = pgvector_store.update_index_company_name(index_id, new_name)
+        success = pgvector_store.update_index_company(index_id, new_name)
         if not success:
             raise HTTPException(status_code=404, detail=f"인덱스 {index_id}를 찾을 수 없습니다.")
         return {"status": "success", "index_id": index_id, "company_name": new_name}
@@ -331,7 +333,7 @@ def create_data_source_router(
         index_id: str = FastPath(..., description="삭제할 pgvector 컬렉션 ID"),
     ) -> Dict[str, Any]:
         """Drop a vector index collection and its embeddings from the database."""
-        success = delete_vector_index(pgvector_store, index_id)
+        success = delete_vector_index(index_id, pgvector_store=pgvector_store)
         if not success:
             raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없거나 삭제에 실패했습니다.")
         return {"status": "success", "message": f"{index_id} 인덱스가 삭제되었습니다."}
@@ -343,15 +345,17 @@ def create_data_source_router(
     )
     def search_index(
         index_id: str = FastPath(..., description="검색 대상 pgvector 컬렉션 ID"),
-        body: SearchRequestDTO = ...,
-    ) -> Dict[str, Any]:
+        body: SearchRequestDTO = None,  # type: ignore[assignment]
+    ) -> Any:
         """Execute a dense vector similarity search within a specific index."""
+        if body is None:
+            raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:
             return search_vector_index(
-                pgvector_store,
-                embedding_encoder,
-                index_id,
-                query=body.query,
+                index_id=index_id,
+                query_text=body.query,
+                pgvector_store=pgvector_store,
+                embedding_encoder=embedding_encoder,
                 limit=body.limit,
             )
         except Exception as error:
