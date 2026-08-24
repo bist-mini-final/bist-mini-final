@@ -23,26 +23,34 @@ from modules.embedding.query_embedder import EmbeddingsDTO, RoutedEmbeddingDTO
 
 
 class RankedSearchCandidateDTO(ModuleDTO):
-    rank: int = Field(ge=1)
-    index_id: str = Field(min_length=1)
-    cell_id: str = Field(min_length=1)
-    score: float
-    text: str
-    matched_subquery: str
+    """Dense vector retrieval candidate representing a matched spreadsheet cell."""
+
+    rank: int = Field(ge=1, description="유사도 순위 (1부터 시작)")
+    index_id: str = Field(min_length=1, description="검색된 pgvector 컬렉션 ID")
+    cell_id: str = Field(min_length=1, description="고유 셀 식별자 (Sheet!Coord)")
+    score: float = Field(..., description="코사인 유사도 또는 벡터 거리 점수")
+    text: str = Field(..., description="직렬화된 셀 텍스트 (Company, Sheet, Row, Col, Value)")
+    matched_subquery: str = Field(..., description="매칭된 원본 서브쿼리 텍스트")
 
 
 class RankedSearchResultDTO(ModuleDTO):
-    query_context: QueryContextDTO
-    document_context: DocumentContextDTO
-    items: List[RankedSearchCandidateDTO]
+    """Top-K ranked spreadsheet cell search results."""
+
+    query_context: QueryContextDTO = Field(..., description="원본 질문 컨텍스트")
+    document_context: DocumentContextDTO = Field(..., description="문서 및 인덱스 메타데이터")
+    items: List[RankedSearchCandidateDTO] = Field(default_factory=list, description="랭킹된 셀 후보 목록")
 
 
 class PgVectorRetrieverInputDTO(ModuleInputDTO):
-    query_input: EmbeddingsDTO
+    """Input payload containing routed query embeddings."""
+
+    query_input: EmbeddingsDTO = Field(..., description="임베딩된 서브쿼리 및 라우팅된 컬렉션 벡터 목록")
 
 
 class PgVectorRetrieverConfigDTO(ModuleConfigDTO):
-    top_k: int = Field(default=DEFAULT_RETRIEVAL_TOP_K, gt=0, le=10000)
+    """Configuration options for dense vector retrieval."""
+
+    top_k: int = Field(default=DEFAULT_RETRIEVAL_TOP_K, gt=0, le=10000, description="각 서브쿼리당 검색할 상위 셀 수 (Top-K)")
 
 
 def _document_context(embeddings: EmbeddingsDTO) -> DocumentContextDTO:
