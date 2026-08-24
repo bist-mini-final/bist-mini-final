@@ -20,7 +20,7 @@ from backend.engine.runtime.registry import ModuleRegistry
 # Pydantic Response DTOs for OpenAPI & ReDoc Schema Documentation
 # ==============================================================================
 class ModuleContractSummary(BaseModel):
-    """Canonical metadata and port definition for a pipeline module."""
+    """RAG 파이프라인 모듈 메타데이터 및 입출력 포트 정의 DTO."""
 
     type: str = Field(..., description="고유 모듈 식별자 (예: 'decomposer', 'reader')")
     label: str = Field(..., description="UI 팔레트 표시용 사람이 읽을 수 있는 이름")
@@ -34,7 +34,7 @@ class ModuleContractSummary(BaseModel):
 
 
 class ModuleListResponse(BaseModel):
-    """Response containing all registered pipeline module contracts."""
+    """등록된 전체 파이프라인 모듈 계약 목록 응답 DTO."""
 
     modules: List[Dict[str, Any]] = Field(
         ...,
@@ -43,7 +43,7 @@ class ModuleListResponse(BaseModel):
 
 
 class ModuleCategoryGroup(BaseModel):
-    """Categorized grouping of pipeline modules."""
+    """아키텍처 계층별 모듈 분류 그룹 DTO."""
 
     category: str = Field(..., description="카테고리명 (Query, Embedding, Retrieval 등)")
     count: int = Field(..., description="해당 카테고리에 속한 모듈 수")
@@ -52,7 +52,7 @@ class ModuleCategoryGroup(BaseModel):
 
 
 class ModuleCategoriesResponse(BaseModel):
-    """Response containing modules grouped by architectural categories."""
+    """아키텍처 카테고리별 모듈 그룹 목록 응답 DTO."""
 
     categories: List[ModuleCategoryGroup] = Field(
         ...,
@@ -61,7 +61,7 @@ class ModuleCategoriesResponse(BaseModel):
 
 
 class ModuleDetailResponse(BaseModel):
-    """Detailed contract and full JSON schemas for a single pipeline module."""
+    """단일 파이프라인 모듈의 상세 포트 계약 및 전체 JSON 스키마 응답 DTO."""
 
     type: str = Field(..., description="모듈 식별자")
     label: str = Field(..., description="모듈 레이블")
@@ -76,7 +76,7 @@ class ModuleDetailResponse(BaseModel):
 
 
 class AllModuleSchemasResponse(BaseModel):
-    """All input, config, and output schemas for every registered module."""
+    """전체 등록 모듈의 입력/설정/출력 JSON 스키마 응답 DTO."""
 
     schemas: Dict[str, Dict[str, Any]] = Field(
         ...,
@@ -88,15 +88,8 @@ class AllModuleSchemasResponse(BaseModel):
 # Router Factory
 # ==============================================================================
 def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
-    """Create and configure the FastAPI router for pipeline module discovery.
-
-    Args:
-        module_registry: The active runtime ModuleRegistry containing all 19 module instances.
-
-    Returns:
-        Configured APIRouter with fully documented OpenAPI endpoints.
-    """
-    router = APIRouter(tags=["Modules Catalog & Schemas"])
+    """파이프라인 모듈 탐색 및 스키마 조회를 위한 FastAPI 라우터 생성."""
+    router = APIRouter(tags=["모듈 카탈로그 및 스키마"])
 
     @router.get(
         "/modules",
@@ -108,7 +101,7 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
         ),
     )
     def get_modules() -> Dict[str, Any]:
-        """Return palette metadata and canonical DTO schemas for every registered module."""
+        """등록된 모든 모듈의 팔레트 메타데이터 및 정형 DTO 스키마를 반환합니다."""
         return {"modules": module_registry.definitions()}
 
     @router.get(
@@ -121,7 +114,7 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
         ),
     )
     def get_module_categories() -> Dict[str, Any]:
-        """Return pipeline modules grouped by their functional categories."""
+        """파이프라인 모듈을 기능별 카테고리로 그룹화하여 반환합니다."""
         all_defs = module_registry.definitions()
         grouped: Dict[str, List[Dict[str, Any]]] = {}
         for definition in all_defs:
@@ -149,7 +142,7 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
         ),
     )
     def get_all_module_schemas() -> Dict[str, Any]:
-        """Return the JSON schema dictionary for all registered modules."""
+        """모든 등록된 모듈의 JSON 스키마 사전을 일괄 반환합니다."""
         schemas_map: Dict[str, Dict[str, Any]] = {}
         for definition in module_registry.definitions():
             m_type = definition["type"]
@@ -174,7 +167,7 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
     def get_module(
         module_type: str = Path(..., description="모듈 식별자 (예: 'decomposer', 'reader')"),
     ) -> Dict[str, Any]:
-        """Return exact Input, Config, Output, branch, and execution schemas for one module."""
+        """단일 모듈의 입력, 설정, 출력 및 실행 스키마를 반환합니다."""
         try:
             return module_registry.definition(module_type)
         except KeyError as error:
@@ -195,7 +188,7 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
     def get_module_docs(
         module_type: str = Path(..., description="모듈 식별자 (예: 'decomposer', 'reader')"),
     ) -> str:
-        """Render Markdown usage guide from the same Pydantic models used for execution."""
+        """모듈의 Pydantic DTO 구조로부터 마크다운 사용 가이드를 동적 렌더링합니다."""
         try:
             return render_module_markdown(module_registry.get(module_type))
         except KeyError as error:

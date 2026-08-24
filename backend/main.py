@@ -183,52 +183,52 @@ def register_global_exception_handlers(application: FastAPI) -> None:
 # 4. Custom OpenAPI with ReDoc Hierarchical x-tagGroups & External Modules Schema
 # ==============================================================================
 def custom_openapi_schema(app: FastAPI) -> Dict[str, Any]:
-    """Generate comprehensive OpenAPI schema containing x-tagGroups and all external modules' Pydantic DTOs."""
+    """x-tagGroups 계층 구조와 전체 외부 파이프라인 모듈의 Pydantic DTO 스키마를 포함하는 OpenAPI 스키마 생성."""
     if app.openapi_schema:
         return app.openapi_schema
 
     openapi_schema = get_openapi(
-        title="BIST Enterprise RAG & BI Visualizer API",
+        title="BIST 엔터프라이즈 RAG 파이프라인 & BI 엔진 API",
         version="2.0.0",
         description=(
-            "### 🏢 BIST Mini Final — Enterprise RAG Pipeline & BI Engine\n\n"
-            "재무 스프레드시트 구조 분석, **Luna VLM 테이블 감지**, **PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF)**, "
-            "근거 기반 응답 생성, **BI 대시보드 지표 추출** 및 **RAG 파이프라인 벤치마크 평가**를 위한 엔터프라이즈 REST API입니다.\n\n"
-            "#### 📂 아키텍처 계층 및 모듈 구성\n"
-            "- **`modules/`**: 19개 RAG 파이프라인 모듈 및 Pydantic v2 계약의 단일 소스(Single Source of Truth)\n"
-            "- **`jobs/`**: 모듈 간 DAG 파이프라인 정의 및 배치 워커 엔트리포인트\n"
-            "- **FastAPI Control Plane**: API 계약 검증, DB 큐 등록, 스냅샷 조회, SSE 실시간 스트리밍 제공\n"
-            "- **KEDA ScaledJobs**: 4개 독립 큐(`workflow-core`, `bi-materialization`, `bi-question`, `benchmark`) 기반 수평 자동 확장\n"
+            "### 🏢 BIST Mini Final — 엔터프라이즈 RAG 파이프라인 및 BI 엔진\n\n"
+            "재무 스프레드시트 구조 분석, **Luna VLM 비정형 표 감지**, **PostgreSQL/pgvector 하이브리드 검색 (Dense + FTS + RRF)**, "
+            "근거 기반 수식 답변 생성, **BI 대시보드 지표 추출** 및 **RAG 파이프라인 벤치마크 평가**를 위한 엔터프라이즈 REST API 명세서입니다.\n\n"
+            "#### 📂 아키텍처 계층 및 시스템 구성\n"
+            "- **`modules/`**: 19개 RAG 파이프라인 모듈 및 Pydantic v2 계약의 단일 소스 (Single Source of Truth)\n"
+            "- **`jobs/`**: 선언적 DAG 파이프라인 레시피 및 전용 배치 워커 엔트리포인트\n"
+            "- **FastAPI Control Plane**: API 계약 검증, PostgreSQL 큐 등록, 스냅샷 영속화, SSE 실시간 스트리밍 제공\n"
+            "- **KEDA ScaledJobs**: 4개 독립 큐(`workflow-core`, `bi-materialization`, `bi-question`, `benchmark`) 기반 쿠버네티스 수평 자동 확장\n"
         ),
         routes=app.routes,
     )
 
-    # 1. ReDoc Hierarchical x-tagGroups Definition
+    # 1. ReDoc 계층형 사이드바 x-tagGroups 정의 (완전 한글화)
     openapi_schema["x-tagGroups"] = [
         {
-            "name": "1. System & Infrastructure",
-            "tags": ["Health & Probes", "Data Sources", "Spreadsheet Artifacts"],
+            "name": "1. 시스템 및 인프라",
+            "tags": ["시스템 헬스 & 프로브", "데이터 소스 관리", "스프레드시트 렌더 아티팩트"],
         },
         {
-            "name": "2. RAG Pipeline Modules (modules/*)",
-            "tags": ["Modules Catalog & Schemas"],
+            "name": "2. RAG 파이프라인 모듈",
+            "tags": ["모듈 카탈로그 및 스키마"],
         },
         {
-            "name": "3. Workflow DAG Execution",
-            "tags": ["Workflow Definitions", "Workflow Runs & SSE Streams"],
+            "name": "3. DAG 워크플로 엔진",
+            "tags": ["워크플로 정의 관리", "워크플로 실행 및 실시간 스트림"],
         },
         {
-            "name": "4. BI Dashboard & Analytics Engine",
+            "name": "4. BI 대시보드 및 분석 엔진",
             "tags": [
-                "BI Company & Overview",
-                "BI Dashboard Snapshots",
-                "BI Materialization Jobs",
-                "BI Questions & Calculations",
+                "BI 기업 목록 및 개요",
+                "BI 대시보드 스냅샷",
+                "BI 머티리얼라이제이션 작업",
+                "BI 지표 질문 및 배치 계산",
             ],
         },
         {
-            "name": "5. RAG Evaluation & Benchmark",
-            "tags": ["Benchmark Runs & Scoring"],
+            "name": "5. RAG 벤치마크 평가",
+            "tags": ["벤치마크 실행 및 채점"],
         },
     ]
 
@@ -271,53 +271,53 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     """Create and configure the FastAPI application instance."""
     shared_container = container or ApplicationContainer.create()
     application = FastAPI(
-        title="BIST Enterprise RAG & BI Visualizer API",
+        title="BIST 엔터프라이즈 RAG 파이프라인 & BI 엔진 API",
         version="2.0.0",
         description="RAG·스프레드시트 모듈 계약과 Kubernetes 기반 비동기 워크플로 API",
         openapi_tags=[
             {
-                "name": "Health & Probes",
-                "description": "쿠버네티스 Liveness/Readiness 프로브 및 시스템 상태 진단",
+                "name": "시스템 헬스 & 프로브",
+                "description": "쿠버네티스 Liveness/Readiness 프로브 및 백엔드 서비스 상태 진단 엔드포인트",
             },
             {
-                "name": "Data Sources",
-                "description": "스프레드시트 엑셀 파일 업로드, 다운로드, 미리보기 및 pgvector 인덱스 컬렉션 관리",
+                "name": "데이터 소스 관리",
+                "description": "재무제표 엑셀 파일 업로드, 다운로드, 시트 미리보기, 데이터베이스 연결 테스트 및 pgvector 인덱스 컬렉션 관리",
             },
             {
-                "name": "Spreadsheet Artifacts",
-                "description": "Luna VLM 및 구조 감지 엔진이 생성한 고해상도 시트 렌더링 이미지 아티팩트 서빙",
+                "name": "스프레드시트 렌더 아티팩트",
+                "description": "Luna VLM 시각 구조 감지 엔진이 생성한 고해상도 시트 렌더링(rendered) 및 셀 타입 마스킹(typed) PNG 이미지 서빙",
             },
             {
-                "name": "Modules Catalog & Schemas",
-                "description": "`modules/` 디렉토리에 위치한 19개 RAG 파이프라인 모듈의 포트 계약 및 Pydantic DTO 스키마 카탈로그",
+                "name": "모듈 카탈로그 및 스키마",
+                "description": "`modules/` 디렉토리에 위치한 19개 RAG 파이프라인 모듈의 포트 계약, 입출력 정의 및 Pydantic DTO 스키마 조회",
             },
             {
-                "name": "Workflow Definitions",
-                "description": "XYFlow 기반 DAG 파이프라인 노드/엣지 토폴로지 정의 저장, 수정 및 삭제",
+                "name": "워크플로 정의 관리",
+                "description": "XYFlow 기반 DAG 파이프라인 노드와 엣지 토폴로지 정의의 생성, 조회, 수정 및 삭제",
             },
             {
-                "name": "Workflow Runs & SSE Streams",
-                "description": "Kubernetes KEDA 큐 기반 비동기 워크플로 실행, 재개, 취소 및 Server-Sent Events 실시간 스트리밍",
+                "name": "워크플로 실행 및 실시간 스트림",
+                "description": "PostgreSQL 큐 및 KEDA 기반 비동기 DAG 워크플로 실행, 재개, 취소 및 Server-Sent Events 실시간 실행 텔레메트리 스트리밍",
             },
             {
-                "name": "BI Company & Overview",
-                "description": "인덱싱된 기업 목록 및 최신 BI 대시보드 지표 머티리얼라이제이션 상태 요약",
+                "name": "BI 기업 목록 및 개요",
+                "description": "인덱싱된 기업 목록, 바인딩된 원본 스프레드시트 정보 및 최신 BI 대시보드 머티리얼라이제이션 상태 요약",
             },
             {
-                "name": "BI Dashboard Snapshots",
-                "description": "기업별 재무 지표 시계열, 검증 이슈, 계산 공식 및 근거 셀 링크가 포함된 완성형 BI 대시보드 스냅샷",
+                "name": "BI 대시보드 스냅샷",
+                "description": "기업별 18개 재무 지표 시계열, 공식 계산 결과, 출처 셀 링크 및 데이터 검증 이슈가 포함된 완성형 BI 대시보드 스냅샷",
             },
             {
-                "name": "BI Materialization Jobs",
-                "description": "스프레드시트 프로파일링 및 질문 생성 머티리얼라이제이션 백그라운드 작업 관리",
+                "name": "BI 머티리얼라이제이션 작업",
+                "description": "스프레드시트 구조 프로파일링 및 지표 질문 생성 머티리얼라이제이션 백그라운드 작업 관리 및 진행 상태 스트리밍",
             },
             {
-                "name": "BI Questions & Calculations",
-                "description": "OpenAI Responses LLM을 통한 병렬 재무 지표 추출 질문 배치 실행 및 실시간 진행률",
+                "name": "BI 지표 질문 및 배치 계산",
+                "description": "OpenAI Responses LLM을 통한 병렬 재무 지표 추출 질문 배치 실행, 재계산 요청 및 실시간 진행률 구독",
             },
             {
-                "name": "Benchmark Runs & Scoring",
-                "description": "사전 정의된 골든 데이터셋 기반 RAG 파이프라인 정확도/비용/지연 시간 평가 및 벤치마크",
+                "name": "벤치마크 실행 및 채점",
+                "description": "사전 정의된 골든 데이터셋 기반 RAG 파이프라인 정확도, LLM 비용, 응답 지연 시간 평가 및 채점 결과 조회",
             },
         ],
         docs_url="/docs",
@@ -346,12 +346,12 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     # 3. Health Check & Kubernetes Probes
     @application.get(
         "/healthz",
-        tags=["Health & Probes"],
+        tags=["시스템 헬스 & 프로브"],
         summary="전체 시스템 헬스 상태 확인",
         description="백엔드 서비스 활성화 여부, 버전, 타임스탬프를 반환합니다.",
     )
     def health_check() -> dict:
-        """Return system health status."""
+        """시스템 헬스 상태와 버전 정보를 반환합니다."""
         return {
             "status": "healthy",
             "timestamp": time.time(),
@@ -361,22 +361,22 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
 
     @application.get(
         "/livez",
-        tags=["Health & Probes"],
+        tags=["시스템 헬스 & 프로브"],
         summary="Kubernetes Liveness Probe",
         description="Pod가 정상 실행 중인지 확인하는 쿠버네티스 라이브니스 프로브입니다.",
     )
     def liveness_probe() -> dict:
-        """Kubernetes liveness probe endpoint."""
+        """쿠버네티스 라이브니스 프로브 응답을 반환합니다."""
         return {"status": "alive"}
 
     @application.get(
         "/readyz",
-        tags=["Health & Probes"],
+        tags=["시스템 헬스 & 프로브"],
         summary="Kubernetes Readiness Probe",
         description="PostgreSQL DB 커넥션 풀 연결 상태를 검증하는 쿠버네티스 레디니스 프로브입니다.",
     )
     def readiness_probe() -> JSONResponse:
-        """Kubernetes readiness probe checking PostgreSQL connectivity."""
+        """쿠버네티스 레디니스 프로브로 PostgreSQL 연결 상태를 점검합니다."""
         try:
             pool = get_pool(DATABASE_URL)
             conn = pool.getconn()
