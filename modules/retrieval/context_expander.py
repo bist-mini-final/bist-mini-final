@@ -209,7 +209,7 @@ class PgContextExpanderModule(BaseModule):
                 "items": ["[No context blocks available]"],
             }
 
-        # Step 1: Collect candidate cell texts and extract sheet + row targets
+        # Step 1: Collect candidate cell targets
         context_blocks: List[str] = []
         seen_blocks: Set[str] = set()
         expanded_cells: List[Dict[str, Any]] = []
@@ -217,7 +217,8 @@ class PgContextExpanderModule(BaseModule):
 
         for candidate in retrieval_items:
             t = candidate.text.strip()
-            if t and t not in seen_blocks:
+            # Only add raw candidate text if it contains a real numeric value, not '?'
+            if t and "Cell Value: ?" not in t and t not in seen_blocks:
                 seen_blocks.add(t)
                 context_blocks.append(t)
             _, sheet, _, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
