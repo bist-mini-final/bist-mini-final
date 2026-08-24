@@ -22,8 +22,8 @@ class BiCompanySummary(BiContractModel):
     display_name: str = Field(..., description="기업 표시명 (예: '현대모비스', '삼성전자')")
     source: BiMaterializationSource | None = Field(default=None, description="바인딩된 엑셀 파일 및 인덱스 정보")
     current_snapshot_id: SnapshotId | None = Field(default=None, description="발행된 최신 대시보드 스냅샷 ID")
-    snapshot_status: SnapshotStatus | None = Field(default=None, description="스냅샷 상태 (published, draft 등)")
-    refresh_status: RefreshStatus = Field(..., description="지표 질문 재계산 상태 (idle, running, failed 등)")
+    snapshot_status: SnapshotStatus | None = Field(default=None, description="스냅샷 상태 (ready, partial)")
+    refresh_status: RefreshStatus = Field(..., description="지표 질문 재계산 상태 (idle, queued, indexing, profiling, extracting, materializing, failed)")
     updated_at: datetime | None = Field(default=None, description="최종 갱신 일시")
 
 
