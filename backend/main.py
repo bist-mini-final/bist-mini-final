@@ -233,7 +233,7 @@ def custom_openapi_schema(app: FastAPI) -> Dict[str, Any]:
     ]
 
     # 2. Inject External modules/* Pydantic DTO Schemas into components/schemas
-    container: ApplicationContainer = getattr(app.state, "container", None)
+    container: ApplicationContainer | None = getattr(app.state, "container", None)
     if container is not None:
         schemas = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
         try:
