@@ -60,7 +60,27 @@ class FastRagPipelineAdapter:
         retrieval = self._fuse(dense, keyword)
         self._require_lineage(identity, retrieval)
         context = self._expand(retrieval)
-        cells = self._fetch_ranked_cells(identity, retrieval)
+        ranked_cells = self._fetch_ranked_cells(identity, retrieval)
+
+        all_cells: list[RankedEvidenceCell] = list(ranked_cells)
+        seen_coords = {(c.sheet_name, c.cell_coord) for c in ranked_cells}
+
+        for raw_c in getattr(context, "cells", []):
+            if isinstance(raw_c, dict):
+                sheet = str(raw_c.get("sheet_name") or "")
+                coord = str(raw_c.get("cell_coord") or "")
+                cid = str(raw_c.get("cell_id") or f"{sheet} Cell {coord}")
+                stext = str(raw_c.get("source_text") or "")
+                if sheet and coord and (sheet, coord) not in seen_coords:
+                    seen_coords.add((sheet, coord))
+                    all_cells.append(
+                        RankedEvidenceCell(
+                            cell_id=cid,
+                            sheet_name=sheet,
+                            cell_coord=coord,
+                            source_text=stext,
+                        )
+                    )
 
         return BiRetrievedContext(
             request_id=identity.request_id,
@@ -75,7 +95,7 @@ class FastRagPipelineAdapter:
                     cell_coord=cell.cell_coord,
                     source_text=cell.source_text,
                 )
-                for cell in cells
+                for cell in all_cells[: self._settings.context_cell_limit]
             ),
         )
 

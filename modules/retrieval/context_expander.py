@@ -79,6 +79,10 @@ class ContextDTO(ModuleDTO):
         default_factory=list,
         description="Reader가 그대로 사용할 시트·행 단위 실제 셀 컨텍스트 블록 목록",
     )
+    cells: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Reader 및 다운스트림에서 증거로 사용할 수 있는 확장 셀들의 메타데이터 목록",
+    )
 
 class PgContextExpanderInputDTO(ModuleInputDTO):
     """Input contract containing retrieved search results."""
@@ -205,15 +209,31 @@ class PgContextExpanderModule(BaseModule):
                 "items": ["[No context blocks available]"],
             }
 
-        # Step 1: Collect candidate cell texts and extract sheet + row targets
+        # Step 1: Collect candidate cell targets
         context_blocks: List[str] = []
         seen_blocks: Set[str] = set()
+        expanded_cells: List[Dict[str, Any]] = []
+        seen_cell_coords: Set[Tuple[str, str]] = set()
 
         for candidate in retrieval_items:
             t = candidate.text.strip()
-            if t and t not in seen_blocks:
+            # Only add raw candidate text if it contains a real numeric value, not '?'
+            if t and "Cell Value: ?" not in t and t not in seen_blocks:
                 seen_blocks.add(t)
                 context_blocks.append(t)
+            _, sheet, _, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
+            coord_match = re.search(r"([A-Za-z]+)(\d+)", candidate.cell_id)
+            coord_str = coord_match.group(0) if coord_match else ""
+            if sheet and coord_str and (sheet, coord_str) not in seen_cell_coords:
+                seen_cell_coords.add((sheet, coord_str))
+                expanded_cells.append(
+                    {
+                        "cell_id": candidate.cell_id,
+                        "sheet_name": sheet,
+                        "cell_coord": coord_str,
+                        "source_text": candidate.text,
+                    }
+                )
 
         # Step 2: Target the exact rows for all candidate cells
         target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
@@ -288,6 +308,21 @@ class PgContextExpanderModule(BaseModule):
                             seen_blocks.add(raw_text)
                             context_blocks.append(raw_text)
 
+                        coord = cell.get("cell_coord") or ""
+                        s_name = cell.get("sheet_name") or sheet
+                        if coord and s_name and (s_name, coord) not in seen_cell_coords:
+                            seen_cell_coords.add((s_name, coord))
+                            cid = cell.get("cell_id") or f"{s_name} Cell {coord}"
+                            expanded_cells.append(
+                                {
+                                    "cell_id": cid,
+                                    "sheet_name": s_name,
+                                    "cell_coord": coord,
+                                    "source_text": raw_text,
+                                    "cell_value": actual_value,
+                                }
+                            )
+
                         if len(context_blocks) >= cfg.max_blocks:
                             break
                     if len(context_blocks) >= cfg.max_blocks:
@@ -301,6 +336,7 @@ class PgContextExpanderModule(BaseModule):
             "query_context": query_context_dict,
             "document_context": doc_context_dict,
             "items": context_blocks,
+            "cells": expanded_cells,
         }
 
 
