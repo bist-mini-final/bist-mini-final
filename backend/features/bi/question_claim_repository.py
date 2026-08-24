@@ -36,9 +36,9 @@ class PostgresBiQuestionClaimer:
         PostgreSQL does not allow FOR UPDATE with window functions in the same
         query block.  We work around this with two CTE steps:
 
-        1. ``locked``   – SELECT FOR UPDATE SKIP LOCKED to atomically reserve N
+        1. ``locked``   - SELECT FOR UPDATE SKIP LOCKED to atomically reserve N
                           question_ids without window functions.
-        2. ``numbered`` – Apply ROW_NUMBER() to the already-locked IDs so each
+        2. ``numbered`` - Apply ROW_NUMBER() to the already-locked IDs so each
                           row gets a unique ``workflow_run_id`` suffix.
 
         This satisfies the UNIQUE constraint on ``workflow_run_id`` while keeping

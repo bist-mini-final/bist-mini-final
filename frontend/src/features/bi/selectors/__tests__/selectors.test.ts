@@ -145,6 +145,16 @@ describe('BI Selectors & ViewModel', () => {
       expect(all.length).toBe(6);
     });
 
+    it('handles periods with null endDate safely', () => {
+      const periodsWithNullEndDates: readonly BiPeriod[] = [
+        { periodId: 'fy2021', kind: 'fy', label: '2021', sourceLabel: '2021', endDate: null, ordinal: 1 },
+        { periodId: 'fy2022', kind: 'fy', label: '2022', sourceLabel: '2022', endDate: null, ordinal: 2 },
+        { periodId: 'ltm', kind: 'ltm', label: 'LTM', sourceLabel: 'LTM', endDate: null, ordinal: 3 },
+      ];
+      const result = selectPeriods(periodsWithNullEndDates, '최근 3개');
+      expect(result.map((p) => p.periodId)).toEqual(['fy2021', 'fy2022', 'ltm']);
+    });
+
     it('selects observations and representative observation', () => {
       const observations = selectObservations(mockSeries, mockPeriods);
       expect(observations.length).toBeGreaterThan(0);

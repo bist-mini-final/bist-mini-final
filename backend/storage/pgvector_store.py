@@ -1571,7 +1571,6 @@ class PgVectorStore:
         results = []
         for r in rows:
             _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
-            resolved_cell_id = cell_id or f"{sheet_name} Cell {cell_coord}"
             if isinstance(row_header, str):
                 try:
                     row_header = json.loads(row_header)
