@@ -9,6 +9,7 @@ import type {
   ValueKind,
 } from '../types';
 import { selectObservations, selectPeriods } from './periods';
+import { formatAmountValue } from './formatMetric';
 
 export interface BiChartPoint {
   readonly periodId: string;
@@ -85,19 +86,21 @@ export function getChartSeries(
   });
 }
 
-export function formatChartValue(value: number | null, valueKind: ValueKind): string {
+export function formatChartValue(
+  value: number | null,
+  valueKind: ValueKind,
+  unit: Pick<MetricSeries, 'currency' | 'scale'> | null = null,
+): string {
   if (value === null) return '데이터 없음';
   if (valueKind === 'percent') return `${COMPACT_NUMBER.format(value)}%`;
-  const absolute = Math.abs(value);
-  if (absolute >= 1_000_000) return `${COMPACT_NUMBER.format(value / 1_000_000)}조원`;
-  if (absolute >= 100) return `${COMPACT_NUMBER.format(value / 100)}억원`;
-  return `${COMPACT_NUMBER.format(value)}백만원`;
+  return formatAmountValue(value, unit);
 }
 
-export function formatChartAxis(value: number, valueKind: ValueKind): string {
+export function formatChartAxis(
+  value: number,
+  valueKind: ValueKind,
+  unit: Pick<MetricSeries, 'currency' | 'scale'> | null = null,
+): string {
   if (valueKind === 'percent') return `${COMPACT_NUMBER.format(value)}%`;
-  const absolute = Math.abs(value);
-  if (absolute >= 1_000_000) return `${COMPACT_NUMBER.format(value / 1_000_000)}조`;
-  if (absolute >= 100) return `${COMPACT_NUMBER.format(value / 100)}억`;
-  return COMPACT_NUMBER.format(value);
+  return formatAmountValue(value, unit, true);
 }

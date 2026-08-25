@@ -1,6 +1,8 @@
 from collections import Counter
+from dataclasses import replace
 from typing import Protocol
 
+from .current_periods import select_current_periods
 from .question_batch import BiQuestionBatchPlan, build_question_batch
 from .question_records import (
     BiAnswerRecord,
@@ -16,6 +18,15 @@ from .question_records import (
     QuestionId,
     WorkflowRunId,
 )
+
+
+def build_current_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
+    return build_question_batch(
+        replace(
+            plan,
+            periods=select_current_periods(plan.periods, plan.created_at),
+        )
+    )
 
 
 def summarize_questions(
@@ -89,7 +100,7 @@ class BiQuestionService:
         self,
         plan: BiQuestionBatchPlan,
     ) -> tuple[BiQuestionRecord, ...]:
-        return self.register_questions(build_question_batch(plan))
+        return self.register_questions(build_current_question_batch(plan))
 
     def queue_materialization_questions(
         self,

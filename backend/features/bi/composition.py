@@ -19,6 +19,12 @@ from .profile_sheet_catalog import (
     PostgresBiProfileEvidenceRetriever,
     PostgresBiProfileSheetCatalog,
 )
+from .question_batch_worker import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MAX_WORKERS,
+    BiQuestionBatchWorker,
+    SystemBiQuestionBatchWorkerClock,
+)
 from .question_pipeline import BiQuestionPipeline, PgVectorQuestionSourceResolver
 from .question_repository import PostgresBiQuestionRepository
 from .question_service import BiQuestionService
@@ -29,12 +35,6 @@ from .question_snapshot import (
 )
 from .question_snapshot_repository import PostgresBiQuestionSnapshotRepository
 from .question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
-from .question_batch_worker import (
-    BiQuestionBatchWorker,
-    DEFAULT_BATCH_SIZE,
-    DEFAULT_MAX_WORKERS,
-    SystemBiQuestionBatchWorkerClock,
-)
 from .queued_materializer import BiQueuedMaterializer, BiQueuedMaterializerServices
 
 if TYPE_CHECKING:
@@ -119,6 +119,7 @@ def create_bi_question_worker(
             answers=PostgresBiQuestionSnapshotRepository(),
             store=store,
             clock=SystemClock(),
+            profiles=PostgresBiDocumentProfileRepository(),
         )
     )
     return BiQuestionWorker(
@@ -150,6 +151,7 @@ def create_bi_question_batch_worker(
             answers=PostgresBiQuestionSnapshotRepository(),
             store=store,
             clock=SystemClock(),
+            profiles=PostgresBiDocumentProfileRepository(),
         )
     )
     publishing_service = BiPublishingQuestionService(service, snapshot_materializer)

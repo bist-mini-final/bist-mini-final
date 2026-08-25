@@ -15,7 +15,7 @@ from .materialization_models import (
 )
 from .models import BiMaterializationRequest
 
-PROFILE_VERSION: Final = "5"
+PROFILE_VERSION: Final = "7"
 
 
 class BiProfileClockPort(Protocol):

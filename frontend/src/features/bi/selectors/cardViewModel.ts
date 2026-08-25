@@ -71,7 +71,8 @@ function getUnitLabel(series: MetricSeries | null): string {
   if (!series) return '단위 없음';
   if (series.valueKind === 'percent') return '%';
   if (!series.currency || !series.scale) return '단위 확인 필요';
-  return series.currency === 'KRW' && series.scale === 'millions' ? '원본 단위: 백만원' : '원본 단위 유지';
+  if (series.currency === 'KRW' && series.scale === 'millions') return '원본 단위: 백만원';
+  return `원본 단위: ${series.currency} ${series.scale}`;
 }
 
 export function buildCardViewModel(input: CardViewModelInput): BiCardViewModel {

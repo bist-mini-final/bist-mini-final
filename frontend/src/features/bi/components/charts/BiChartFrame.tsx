@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { TooltipContentProps, TooltipValueType } from 'recharts';
 import type { BiChartPoint, BiChartSeriesMeta } from '../../selectors/chartViewModel';
 import { formatChartValue } from '../../selectors/chartViewModel';
-import type { ValueKind } from '../../types';
+import type { MetricSeries, ValueKind } from '../../types';
 
 interface BiChartFrameProps {
   readonly title: string;
@@ -10,6 +10,7 @@ interface BiChartFrameProps {
   readonly data: readonly BiChartPoint[];
   readonly series: readonly BiChartSeriesMeta[];
   readonly valueKind: ValueKind;
+  readonly unit?: Pick<MetricSeries, 'currency' | 'scale'> | null;
   readonly controls?: ReactNode;
   readonly children: ReactNode;
 }
@@ -17,6 +18,7 @@ interface BiChartFrameProps {
 interface BiChartTooltipProps extends TooltipContentProps<TooltipValueType, number | string> {
   readonly data: readonly BiChartPoint[];
   readonly valueKind: ValueKind;
+  readonly unit?: Pick<MetricSeries, 'currency' | 'scale'> | null;
 }
 
 export function BiChartTooltip(props: BiChartTooltipProps) {
@@ -31,7 +33,7 @@ export function BiChartTooltip(props: BiChartTooltipProps) {
         {props.payload.map((item) => {
           const numericValue = typeof item.value === 'number' ? item.value : Number(item.value);
           const value = Number.isFinite(numericValue)
-            ? formatChartValue(numericValue, props.valueKind)
+            ? formatChartValue(numericValue, props.valueKind, props.unit ?? null)
             : '데이터 없음';
           return <li key={`${String(item.name)}-${String(item.dataKey)}`}><span>{item.name}</span><b>{value}</b></li>;
         })}
@@ -62,7 +64,7 @@ export function BiChartFrame(props: BiChartFrameProps) {
             <tr key={point.periodId}>
               <th>{point.periodLabel}</th>
               {props.series.map((item) => (
-                <td key={item.metricId}>{formatChartValue(point.values[item.metricId] ?? null, props.valueKind)}</td>
+                <td key={item.metricId}>{formatChartValue(point.values[item.metricId] ?? null, props.valueKind, props.unit ?? null)}</td>
               ))}
             </tr>
           ))}

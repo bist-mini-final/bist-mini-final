@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 from typing import Final, Protocol
 
@@ -19,17 +20,25 @@ from .models import (
     PeriodId,
 )
 from .profile_models import (
-    BiDocumentProfileReaderResponse,
+    BiPeriodDiscoveryReaderResponse,
     BiPeriodReaderPayload,
     BiProfileRetrievalRequest,
+    BiUnitDiscoveryReaderResponse,
 )
 
 DOCUMENT_PERIOD_DISCOVERY_QUESTION: Final = (
-    "이 문서에서 지표 조회에 사용할 수 있는 모든 서로 다른 FY 및 LTM 기간과 "
-    "표시 단위를 찾아라. 최신 기간만 선택하거나 "
+    "이 문서에서 지표 조회에 사용할 수 있는 모든 서로 다른 FY 및 LTM 기간을 "
+    "찾아라. 최신 기간만 선택하거나 "
     "같은 종류의 기간을 합치지 마라."
 )
-PROFILE_QUESTIONS: Final = (DOCUMENT_PERIOD_DISCOVERY_QUESTION,)
+DOCUMENT_UNIT_DISCOVERY_QUESTION: Final = (
+    "이 문서의 재무 금액 지표에 적용되는 통화와 원본 표시 배율을 찾아라. "
+    "문서에 명시된 통화 및 단위 표기만 사용하고 추정하거나 환산하지 마라."
+)
+PROFILE_QUESTIONS: Final = (
+    DOCUMENT_PERIOD_DISCOVERY_QUESTION,
+    DOCUMENT_UNIT_DISCOVERY_QUESTION,
+)
 
 
 class ProfileRetrievalPort(Protocol):
@@ -78,51 +87,57 @@ class BiDocumentProfiler:
             )
         context = self._merge_contexts(contexts)
 
-        payload = json.dumps(
+        evidence_payload = [
+            {
+                "cell_id": cell.cell_id,
+                "sheet_name": cell.sheet_name,
+                "cell_coord": cell.cell_coord,
+                "source_text": cell.source_text,
+            }
+            for cell in context.cells
+        ]
+        period_payload = json.dumps(
             {
                 "request_id": request_id,
                 "question": DOCUMENT_PERIOD_DISCOVERY_QUESTION,
-                "allowed_evidence_cells": [
-                    {
-                        "cell_id": cell.cell_id,
-                        "sheet_name": cell.sheet_name,
-                        "cell_coord": cell.cell_coord,
-                        "source_text": cell.source_text,
-                    }
-                    for cell in context.cells
-                ],
+                "allowed_evidence_cells": evidence_payload,
                 "context_blocks": context.context_blocks,
             },
             ensure_ascii=False,
         )
-        raw_response = self._client.complete_structured(
-            model=self._model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "재무 문서의 기간과 표시 단위를 구조화한다. "
-                        "allowed_evidence_cells의 cell_id만 근거로 사용하고 "
-                        "각 기간은 별도 항목으로 반환하며 발견되지 않은 정보는 null로 둔다. "
-                        "currency는 반드시 ISO 4217 3자리 대문자 코드만 사용하라 "
-                        "(예: KRW, USD, EUR, JPY, GBP). "
-                        "통화를 특정할 수 없거나 문서에 명시되지 않은 경우 반드시 null을 반환하라. "
-                        "'Won', 'Dollar', '$', 'USD Dollar' 등 비표준 형식은 절대 사용 금지."
-                    ),
-                },
-                {"role": "user", "content": payload},
-            ],
-            schema_name="bi_document_profile",
-            json_schema=BiDocumentProfileReaderResponse.model_json_schema(),
+        unit_payload = json.dumps(
+            {
+                "request_id": request_id,
+                "question": DOCUMENT_UNIT_DISCOVERY_QUESTION,
+                "allowed_evidence_cells": evidence_payload,
+                "context_blocks": context.context_blocks,
+            },
+            ensure_ascii=False,
         )
         try:
-            response = BiDocumentProfileReaderResponse.model_validate_json(raw_response)
+            with ThreadPoolExecutor(
+                max_workers=2,
+                thread_name_prefix="bi-document-profile",
+            ) as executor:
+                period_future = executor.submit(
+                    self._complete_period_discovery,
+                    period_payload,
+                )
+                unit_future = executor.submit(
+                    self._complete_unit_discovery,
+                    unit_payload,
+                )
+                period_response = period_future.result()
+                unit_response = unit_future.result()
         except ValidationError:
             return BiProfilingFailure(
                 code="invalid_profile_payload",
                 message="document profile did not match the structured contract",
             )
-        if response.request_id != request_id:
+        if (
+            period_response.request_id != request_id
+            or unit_response.request_id != request_id
+        ):
             return BiProfilingFailure(
                 code="profile_identity_mismatch",
                 message="document profile response does not match the request",
@@ -130,22 +145,22 @@ class BiDocumentProfiler:
 
         period_evidence_ids = tuple(
             cell_id
-            for item in response.periods
+            for item in period_response.periods
             for cell_id in item.evidence_cell_ids
         )
         evidence = self._trusted_evidence(
             context,
-            period_evidence_ids + response.evidence_cell_ids,
+            period_evidence_ids + unit_response.evidence_cell_ids,
         )
         relevant_sheets = tuple(dict.fromkeys(item.sheet_name for item in evidence))
         try:
             return BiDocumentProfile(
                 periods=tuple(
                     self._canonical_period(item.period)
-                    for item in response.periods
+                    for item in period_response.periods
                 ),
-                currency=response.currency,
-                scale=response.scale,
+                currency=unit_response.currency,
+                scale=unit_response.scale,
                 relevant_sheets=relevant_sheets,
                 evidence=evidence,
             )
@@ -154,6 +169,53 @@ class BiDocumentProfiler:
                 code="invalid_profile_payload",
                 message="document profile did not match the structured contract",
             )
+
+    def _complete_period_discovery(
+        self,
+        payload: str,
+    ) -> BiPeriodDiscoveryReaderResponse:
+        raw_response = self._client.complete_structured(
+            model=self._model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "재무 문서의 기간을 구조화한다. "
+                        "allowed_evidence_cells의 cell_id만 근거로 사용하고 "
+                        "각 기간은 별도 항목으로 반환한다."
+                    ),
+                },
+                {"role": "user", "content": payload},
+            ],
+            schema_name="bi_period_discovery",
+            json_schema=BiPeriodDiscoveryReaderResponse.model_json_schema(),
+        )
+        return BiPeriodDiscoveryReaderResponse.model_validate_json(raw_response)
+
+    def _complete_unit_discovery(
+        self,
+        payload: str,
+    ) -> BiUnitDiscoveryReaderResponse:
+        raw_response = self._client.complete_structured(
+            model=self._model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "재무 문서의 금액 통화와 표시 배율을 구조화한다. "
+                        "allowed_evidence_cells의 cell_id만 근거로 사용한다. "
+                        "문서에 명시된 표기만 사용하고 환산하거나 추정하지 않는다. "
+                        "currency는 ISO 4217 3자리 대문자 코드만 사용한다. "
+                        "근거의 '$' 또는 '$M' 표기는 USD로 정규화한다. "
+                        "통화 또는 배율을 특정할 수 없으면 해당 필드를 null로 반환한다."
+                    ),
+                },
+                {"role": "user", "content": payload},
+            ],
+            schema_name="bi_unit_discovery",
+            json_schema=BiUnitDiscoveryReaderResponse.model_json_schema(),
+        )
+        return BiUnitDiscoveryReaderResponse.model_validate_json(raw_response)
 
     @staticmethod
     def _request_id(request: BiMaterializationRequest) -> str:
@@ -257,7 +319,10 @@ class BiDocumentProfiler:
                 request_id=request_id,
                 source=request.source,
                 sheet_name=sheet_name,
-                question=DOCUMENT_PERIOD_DISCOVERY_QUESTION,
+                question=(
+                    f"{DOCUMENT_PERIOD_DISCOVERY_QUESTION} "
+                    f"{DOCUMENT_UNIT_DISCOVERY_QUESTION}"
+                ),
             )
             for sheet_name in self._sheet_catalog.list_sheets(request.source)
         )
