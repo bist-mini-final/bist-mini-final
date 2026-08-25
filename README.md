@@ -32,16 +32,172 @@
 
 ---
 
-## 2. Docker 환경 설정 및 실행 가이드
+## 2. 원클릭 개발 환경 및 Kubernetes (k3d & KEDA) 배포 가이드
 
-### 2.1 사전 요구사항
-- Docker Desktop 또는 Docker Engine (v24.0+)
-- Docker Compose v2 (Compose V2 플러그인)
-- 4GB 이상의 메모리 할당 (PostgreSQL shared buffers 권장)
+### 2.1 원클릭 일괄 설치 및 클러스터 구동 (`deploy/kubernetes/local.sh`)
 
-### 2.2 PostgreSQL + pgvector 컨테이너 설정 (`deploy/compose/docker-compose.yml`)
+`./deploy/kubernetes/local.sh all` 명령어 한 줄로 **필수 개발도구 자동 감지 및 설치부터 k3d 클러스터 구성, KEDA 오토스케일러, 워커 이미지 빌드/임포트, DB 스키마 동기화, KEDA ScaledJob 배포까지 모든 과정이 자동으로 완료**됩니다:
 
-고성능 벡터 검색 및 대규모 시계열 셀 저장을 위해 최적화된 pg16 pgvector 컨테이너를 사용합니다.
+```bash
+# 1. 전체 인프라 및 개발 도구 원클릭 일괄 설치 & 배포
+./deploy/kubernetes/local.sh all
+
+# 2. 클러스터 및 큐 상태 점검
+./deploy/kubernetes/local.sh status
+```
+
+> **`local.sh` 자동화 범위:**
+> - 미설치 도구 자동 감지 및 자동 설치 (`k3d`, `kubectl`, `helm`, `uv`, `node`)
+> - Python 가상환경 및 잠금 의존성 자동 동기화 (`uv sync --frozen`)
+> - Docker 데몬 자동 실행 확인
+> - PostgreSQL DB 스키마 및 pgvector 확장 자동 검증
+> - k3d 로컬 클러스터 (`bist-local`) 생성 및 KEDA v2.20.2 / Metrics Server 설치
+> - 파이프라인 워커 이미지 빌드 및 클러스터 자동 임포트
+> - 네임스페이스(`bist-batch`), 시크릿(`bist-batch-env`), 4종 ScaledJob 매니페스트 동적 렌더링 및 적용
+
+#### 특정 단계별 개별 제어 명령어:
+```bash
+./deploy/kubernetes/local.sh setup-tools # 개발 도구 및 가상환경만 설치
+./deploy/kubernetes/local.sh cluster     # k3d 클러스터 & KEDA 설치
+./deploy/kubernetes/local.sh build       # 워커 이미지 빌드 및 k3d import
+./deploy/kubernetes/local.sh deploy      # ScaledJob 및 Secret 적용
+./deploy/kubernetes/local.sh status      # 클러스터, Pod, ScaledJob 상태 확인
+./deploy/kubernetes/local.sh logs        # 워커 Pod 실시간 로그 출력
+./deploy/kubernetes/local.sh down        # 로컬 클러스터 정지
+./deploy/kubernetes/local.sh destroy     # 로컬 클러스터 완전 삭제
+```
+
+---
+
+### 2.2 필수/권장 도구 목록 및 수동 설치 (참고용)
+
+도구를 직접 수동으로 설치하고자 할 경우 아래 표와 명령어를 참고하세요.
+
+| 도구 | 권장 버전 | 용도 | macOS (Homebrew) | Linux / 기타 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Docker** | 24.0+ | 컨테이너 엔진 및 런타임 | Docker Desktop / OrbStack | Docker Engine |
+| **k3d** | v5.6+ | Docker 위에서 구동되는 경량 k3s 클러스터 관리 | `brew install k3d` | `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh \| bash` |
+| **kubectl** | v1.28+ | Kubernetes 클러스터 CLI | `brew install kubectl` | `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl` |
+| **helm** | v3.12+ | KEDA 및 Metrics Server 설치용 패키지 매니저 | `brew install helm` | `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \| bash` |
+| **uv** | 0.4+ | 초고속 Python 가상환경 및 패키지 관리자 | `brew install uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Node.js** | 18.0+ | React 프론트엔드 빌드 및 개발 서버 | `brew install node` | `nvm install 20` |
+
+#### macOS 원클릭 일괄 설치 (Homebrew):
+```bash
+brew install k3d kubectl helm uv node
+```
+
+#### Windows (WSL2 / Winget):
+```powershell
+winget install Docker.DockerDesktop Rancher.k3d Kubernetes.kubectl Helm.Helm astral-sh.uv OpenJS.NodeJS
+```
+
+---
+
+### 2.3 KEDA ScaledJob 스케일링 설정 (`deploy/kubernetes/manifests/scaledjob.yaml`)
+
+KEDA는 PostgreSQL의 대기 질문 및 작업 큐를 주기적으로 폴링(3s)하여 Worker Pod를 0개에서 최대 16개(시스템 자원 비례)까지 자동 증설합니다:
+
+- **`workflow-core-scaler`**: `workflow_runs` 테이블의 `status = 'queued'` 건수에 따라 워커 확장.
+- **`bi-materialization-scaler`**: `bi_materialization_jobs` 테이블의 `status = 'queued'` 건수 기반 확장.
+- **`bi-question-scaler`**: `bi_questions` 테이블의 대기 질문(`status = 'queued'`) 건수 기반 대규모 병렬 추출 확장 (ScaleTarget: 16).
+- **`benchmark-scaler`**: `benchmark_runs` 테이블의 `status = 'queued'` 평가 작업 기반 확장.
+
+```yaml
+# ScaledJob 매니페스트 예시 (bi-question 워커)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: bi-question-worker
+  namespace: bist-batch
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        containers:
+          - name: worker
+            image: bist-workflow-worker:local
+            command: ["python", "-m", "backend.features.bi.question_worker_main"]
+            envFrom:
+              - secretRef:
+                  name: bist-secrets
+  pollingInterval: 3
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  maxReplicaCount: 16
+  triggers:
+    - type: postgresql
+      metadata:
+        connectionFromEnv: PGVECTOR_URL
+        query: "SELECT COUNT(*) FROM bi_questions WHERE status = 'queued'"
+        targetQueryValue: "16"
+```
+
+---
+
+## 3. 로컬 서비스 실행 가이드
+
+### 3.1 환경 변수 설정 (`.env`)
+루트 디렉토리에 `.env` 파일을 구성합니다:
+
+```env
+OPENAI_API_KEY=sk-proj-your-api-key-here
+PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+```
+
+### 3.2 의존성 설치
+```bash
+# Python 백엔드 및 모듈 의존성 설치
+uv sync --frozen
+
+# Frontend 의존성 설치
+cd frontend
+npm ci
+cd ..
+```
+
+### 3.3 서버 기동
+```bash
+# Terminal 1: Backend FastAPI Control Plane
+uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+
+# Terminal 2: Frontend React UI
+cd frontend
+npm run dev
+```
+
+- **웹 대시보드 UI**: [http://localhost:5173](http://localhost:5173)
+- **FastAPI OpenAPI 문서**: [http://localhost:8765/docs](http://localhost:8765/docs)
+
+---
+
+### 3.4 테스트 및 품질 검증
+
+```bash
+# 백엔드 Python 테스트 & 린트
+uv run pytest tests/
+uv run ruff check modules backend jobs tests
+uv run pyright
+
+# 프론트엔드 테스트 & 빌드
+cd frontend
+npm test
+npm run build
+```
+
+---
+
+## 4. (선택 사항) 로컬 pgvector 컨테이너 및 Docker 단독 빌드
+
+> [!NOTE]
+> **외부 PostgreSQL / 클라우드 DB(Supabase, Neon, RDS 등)를 사용하거나 이미 로컬에 실행 중인 DB가 있다면 본 섹션은 건너뛰셔도 무방합니다.**  
+> `.env`의 `PGVECTOR_URL`에 해당 DB 주소만 적어주시면 `./deploy/kubernetes/local.sh`가 이를 자동 감지하여 처리합니다.
+
+### 4.1 로컬 PostgreSQL + pgvector 컨테이너 설정 (`deploy/compose/docker-compose.yml`)
+
+로컬에 pgvector가 설치되어 있지 않거나 독립된 로컬 전용 DB 컨테이너가 필요한 경우 사용합니다.
 
 ```yaml
 services:
@@ -85,7 +241,7 @@ volumes:
     external: true
 ```
 
-#### 볼륨 생성 및 컨테이너 기동:
+#### 로컬 pgvector 컨테이너 기동:
 ```bash
 # 1. 외장 볼륨 생성 (데이터 영속성 보장)
 docker volume create pgdata
@@ -97,7 +253,7 @@ docker compose -f deploy/compose/docker-compose.yml up -d
 docker compose -f deploy/compose/docker-compose.yml ps
 ```
 
-### 2.3 Docker 이미지 빌드 (`deploy/docker/`)
+### 4.2 Docker 이미지 수동 빌드 (`deploy/docker/`)
 
 ```bash
 # Backend Control Plane 이미지 빌드
@@ -112,129 +268,7 @@ docker build -t bist-frontend:local -f deploy/docker/Dockerfile.frontend ./front
 
 ---
 
-## 3. Kubernetes (k3d & KEDA) 환경 설정 및 배포 가이드
-
-### 3.1 필수 도구
-- `k3d` (v5.6+)
-- `kubectl` (v1.28+)
-- `helm` (v3.12+)
-
-### 3.2 로컬 클러스터 및 KEDA 원클릭 배포 (`deploy/kubernetes/local.sh`)
-
-`local.sh` 스크립트를 통해 로컬 k3d 클러스터 구성부터 KEDA 설치, 네임스페이스(`bist-batch`), 시크릿, ScaledJob 배포까지 일괄 구성할 수 있습니다:
-
-```bash
-# 1. 전체 인프라 원클릭 배포 (Cluster, KEDA, Worker Image, Manifests)
-./deploy/kubernetes/local.sh all
-
-# 2. 클러스터 및 큐 상태 점검
-./deploy/kubernetes/local.sh status
-
-# 3. 특정 컴포넌트 개별 실행 시:
-./deploy/kubernetes/local.sh cluster   # k3d 클러스터 생성
-./deploy/kubernetes/local.sh keda      # KEDA 설치
-./deploy/kubernetes/local.sh image     # 워커 도커 이미지 빌드 및 k3d import
-./deploy/kubernetes/local.sh render    # K8s manifest 동적 렌더링
-./deploy/kubernetes/local.sh apply     # ScaledJob 및 Secret 적용
-./deploy/kubernetes/local.sh down      # 클러스터 및 리소스 정리
-```
-
-### 3.3 KEDA ScaledJob 스케일링 설정 (`deploy/kubernetes/manifests/scaledjob.yaml`)
-
-KEDA는 PostgreSQL의 대기 질문 및 작업 큐를 주기적으로 폴링(3s)하여 Worker Pod를 0개에서 최대 16개까지 자동 증설합니다:
-
-- **`workflow-core-scaler`**: `workflow_runs` 테이블의 `status = 'queued'` 건수에 따라 워커 확장.
-- **`bi-materialization-scaler`**: `bi_materialization_jobs` 테이블의 `status = 'queued'` 건수 기반 확장.
-- **`bi-question-scaler`**: `bi_questions` 테이블의 대기 질문(`status = 'queued'`) 건수 기반 대규모 병렬 추출 확장 (ScaleTarget: 16).
-- **`benchmark-scaler`**: `benchmark_runs` 테이블의 `status = 'queued'` 평가 작업 기반 확장.
-
-```yaml
-# ScaledJob 매니페스트 예시 (bi-question 워커)
-apiVersion: keda.sh/v1alpha1
-kind: ScaledJob
-metadata:
-  name: bi-question-worker
-  namespace: bist-batch
-spec:
-  jobTargetRef:
-    template:
-      spec:
-        containers:
-          - name: worker
-            image: bist-workflow-worker:local
-            command: ["python", "-m", "backend.features.bi.question_worker_main"]
-            envFrom:
-              - secretRef:
-                  name: bist-secrets
-  pollingInterval: 3
-  successfulJobsHistoryLimit: 5
-  failedJobsHistoryLimit: 5
-  maxReplicaCount: 16
-  triggers:
-    - type: postgresql
-      metadata:
-        connectionFromEnv: PGVECTOR_URL
-        query: "SELECT COUNT(*) FROM bi_questions WHERE status = 'queued'"
-        targetQueryValue: "16"
-```
-
----
-
-## 4. 로컬 개발 환경 빠른 시작
-
-### 4.1 환경 변수 설정 (`.env`)
-루트 디렉토리에 `.env` 파일을 구성합니다:
-
-```env
-OPENAI_API_KEY=sk-proj-your-api-key-here
-PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
-ENVIRONMENT=development
-LOG_LEVEL=INFO
-```
-
-### 4.2 의존성 설치
-```bash
-# Python 백엔드 및 모듈 의존성 설치
-uv sync --frozen
-
-# Frontend 의존성 설치
-cd frontend
-npm ci
-cd ..
-```
-
-### 4.3 서버 기동
-```bash
-# Terminal 1: Backend FastAPI Control Plane
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
-
-# Terminal 2: Frontend React UI
-cd frontend
-npm run dev
-```
-
-- **웹 대시보드 UI**: [http://localhost:5173](http://localhost:5173)
-- **FastAPI OpenAPI 문서**: [http://localhost:8765/docs](http://localhost:8765/docs)
-
----
-
-## 5. 테스트 및 품질 검증
-
-```bash
-# 백엔드 Python 테스트 & 린트
-uv run pytest tests/
-uv run ruff check modules backend jobs tests
-uv run pyright
-
-# 프론트엔드 테스트 & 빌드
-cd frontend
-npm test
-npm run build
-```
-
----
-
-## 6. 디렉토리 구조
+## 5. 디렉토리 구조
 
 ```text
 bist-mini-final/
@@ -255,4 +289,3 @@ bist-mini-final/
 │   └── kubernetes/                # k3d 스크립트, KEDA ScaledJob 매니페스트
 └── docs/specs/                    # 아키텍처 및 검증 명세서
 ```
-
