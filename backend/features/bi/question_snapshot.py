@@ -64,7 +64,8 @@ class BiQuestionSnapshotProfilePort(Protocol):
     def get(
         self,
         request: BiMaterializationRequest,
-    ) -> BiDocumentProfile | None: """
+    ) -> BiDocumentProfile | None:
+        """
         Retrieve the document profile associated with a materialization request.
         
         Parameters:
@@ -80,7 +81,8 @@ class BiQuestionSnapshotMaterializerPort(Protocol):
     def materialize_if_terminal(
         self,
         job_id: JobId,
-    ) -> BiDashboardSnapshot | None: """
+    ) -> BiDashboardSnapshot | None:
+        """
         Materialize and publish a dashboard snapshot when a materialization job is terminal.
         
         Parameters:
