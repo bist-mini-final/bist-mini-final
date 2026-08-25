@@ -80,7 +80,7 @@ describe('BiPage Component', () => {
   it('renders API-backed company tabs and default cards', async () => {
     render(<BiPage />);
 
-    expect(await screen.findByRole('heading', { name: '기업 Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'BIST 데모 주식회사 Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'BIST 데모 주식회사' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '그린랩스' })).toBeInTheDocument();
     expect(screen.getByText('매출 및 성장')).toBeInTheDocument();
@@ -94,12 +94,13 @@ describe('BiPage Component', () => {
   it('loads the selected company dashboard from the API service', async () => {
     render(<BiPage />);
 
-    await screen.findByRole('heading', { name: '기업 Dashboard' });
+    await screen.findByRole('heading', { name: 'BIST 데모 주식회사 Dashboard' });
     const greenLabsTab = screen.getByRole('tab', { name: '그린랩스' });
     fireEvent.click(greenLabsTab);
 
     await waitFor(() => expect(fetchBiDashboard).toHaveBeenCalledWith('green-labs', expect.any(AbortSignal)));
     expect(await screen.findByRole('tab', { name: '그린랩스' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: '그린랩스 Dashboard' })).toBeInTheDocument();
     expect(screen.getAllByText('그린랩스').length).toBeGreaterThanOrEqual(2);
   });
 
