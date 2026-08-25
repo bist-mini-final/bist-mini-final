@@ -21,15 +21,8 @@ def _safe_sheet_name(value: str) -> str:
 
 
 def create_spreadsheet_artifact_router(artifact_dir: Path) -> APIRouter:
-    """Serve read-only spreadsheet render artifacts for result inspection.
-
-    Args:
-        artifact_dir: Root directory where Luna VLM spreadsheet rendering artifacts are stored.
-
-    Returns:
-        Configured APIRouter for spreadsheet image retrieval.
-    """
-    router = APIRouter(tags=["Spreadsheet Artifacts"])
+    """Luna VLM 및 구조 감지 엔진의 스프레드시트 렌더링 이미지 아티팩트 서빙 라우터 생성."""
+    router = APIRouter(tags=["스프레드시트 렌더 아티팩트"])
 
     @router.get(
         "/spreadsheet-artifacts/{workbook_hash}/sheets/{sheet_name}",
@@ -53,7 +46,7 @@ def create_spreadsheet_artifact_router(artifact_dir: Path) -> APIRouter:
             description="이미지 레이어 종류 ('rendered': 원본 서식 렌더링, 'typed': 셀 타입 시각화)",
         ),
     ) -> FileResponse:
-        """Fetch a rendered spreadsheet PNG artifact for visual UI inspection."""
+        """UI 시각 검사를 위한 스프레드시트 렌더링 PNG 아티팩트 이미지를 반환합니다."""
         if not WORKBOOK_HASH_PATTERN.fullmatch(workbook_hash):
             raise HTTPException(status_code=422, detail="올바른 workbook hash가 아닙니다.")
         safe_sheet_name = _safe_sheet_name(sheet_name)
