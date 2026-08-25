@@ -16,7 +16,7 @@ export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: Bi
     <header className="bi-header">
       <div className="bi-header__title-group">
         <span className="bi-header__eyebrow">COMPANY DASHBOARD</span>
-        <h1 id="bi-page-title">기업 Dashboard</h1>
+        <h1 id="bi-page-title">{dashboard.company.displayName} Dashboard</h1>
         <p>기업의 핵심 재무 흐름을 쉬운 구조로 살펴보는 <span>작업 공간입니다.</span></p>
       </div>
 
