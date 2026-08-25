@@ -8,6 +8,15 @@ interface BiHeaderProps {
   readonly onRefresh: () => void;
 }
 
+/**
+ * Renders the dashboard header with snapshot status, company details, reporting period, and refresh controls.
+ *
+ * @param dashboard - The company and snapshot data displayed in the header
+ * @param periodLabel - The label for the selected reporting period
+ * @param isRefreshing - Whether a data refresh is in progress
+ * @param onRefresh - Callback invoked to refresh the dashboard data
+ * @returns The dashboard header element
+ */
 export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
   const generatedAt = dashboard.snapshot.generatedAt.slice(0, 16).replace('T', ' ').split('-').join('.');
@@ -16,7 +25,7 @@ export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: Bi
     <header className="bi-header">
       <div className="bi-header__title-group">
         <span className="bi-header__eyebrow">COMPANY DASHBOARD</span>
-        <h1 id="bi-page-title">기업 Dashboard</h1>
+        <h1 id="bi-page-title">{dashboard.company.displayName} Dashboard</h1>
         <p>기업의 핵심 재무 흐름을 쉬운 구조로 살펴보는 <span>작업 공간입니다.</span></p>
       </div>
 

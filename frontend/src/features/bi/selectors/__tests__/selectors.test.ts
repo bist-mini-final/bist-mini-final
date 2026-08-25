@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatMetricValue } from '../formatMetric';
+import { formatChartAxis, formatChartValue } from '../chartViewModel';
 import { selectPeriods, selectObservations, selectRepresentativeObservation } from '../periods';
 import { buildCardViewModel } from '../cardViewModel';
 import { getCardDefinition, CARD_REGISTRY } from '../../config/cardRegistry';
@@ -143,6 +144,38 @@ describe('BI Selectors & ViewModel', () => {
 
       const all = selectPeriods(mockPeriods, '전체');
       expect(all.length).toBe(6);
+    });
+
+    it('formats USD millions without converting them to KRW hundred-millions', () => {
+      const usdSeries: MetricSeries = {
+        ...mockSeries,
+        currency: 'USD',
+        scale: 'millions',
+      };
+      const observation: MetricObservation = {
+        periodId: 'fy2025',
+        rawValue: '67535',
+        normalizedValue: '67535',
+        status: 'available',
+        evidence: [],
+        notes: [],
+      };
+
+      expect(formatMetricValue(usdSeries, observation)).toBe('$67,535M');
+      expect(formatChartValue(67535, 'amount', usdSeries)).toBe('$67,535M');
+      expect(formatChartAxis(127243, 'amount', usdSeries)).toBe('$127,243M');
+      expect(formatChartValue(-1600, 'amount', usdSeries)).toBe('-$1,600M');
+    });
+
+    it('keeps FY periods when source dates are unavailable', () => {
+      const periodsWithMissingDates: readonly BiPeriod[] = [
+        { periodId: 'fy2023', kind: 'fy', label: '2023', sourceLabel: '2023', endDate: null, ordinal: 1 },
+        { periodId: 'fy2024', kind: 'fy', label: '2024', sourceLabel: '2024', endDate: '2024-12-31', ordinal: 2 },
+        { periodId: 'ltm', kind: 'ltm', label: 'LTM', sourceLabel: 'LTM', endDate: null, ordinal: 3 },
+      ];
+
+      expect(selectPeriods(periodsWithMissingDates, '전체').map((period) => period.periodId))
+        .toEqual(['fy2023', 'fy2024', 'ltm']);
     });
 
     it('handles periods with null endDate safely', () => {

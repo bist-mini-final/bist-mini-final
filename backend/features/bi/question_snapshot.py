@@ -4,10 +4,11 @@ from typing import Protocol, assert_never
 
 from .catalog import METRIC_CATALOG, SourceMetricDefinition
 from .extraction_models import BiMetricExtractionResult
-from .materialization_models import BiSnapshotRefreshInput
+from .materialization_models import BiDocumentProfile, BiSnapshotRefreshInput
 from .models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
+    BiMaterializationRequest,
     CompanyId,
     JobId,
     MaterializationStatus,
@@ -59,11 +60,41 @@ class BiQuestionSnapshotClockPort(Protocol):
     def now(self) -> datetime: ...
 
 
+class BiQuestionSnapshotProfilePort(Protocol):
+    def get(
+        self,
+        request: BiMaterializationRequest,
+    ) -> BiDocumentProfile | None:
+        """
+        Retrieve the document profile associated with a materialization request.
+        
+        Parameters:
+        	request (BiMaterializationRequest): Request identifying the company and source document.
+        
+        Returns:
+        	BiDocumentProfile | None: The matching document profile, or `None` when unavailable.
+        """
+        ...
+
+
 class BiQuestionSnapshotMaterializerPort(Protocol):
     def materialize_if_terminal(
         self,
         job_id: JobId,
-    ) -> BiDashboardSnapshot | None: ...
+    ) -> BiDashboardSnapshot | None:
+        """
+        Materialize and publish a dashboard snapshot when a materialization job is terminal.
+        
+        Parameters:
+            job_id (JobId): Identifier of the materialization job.
+        
+        Returns:
+            BiDashboardSnapshot | None: The published snapshot, or `None` when the job is unavailable, still in progress, or the current snapshot cannot be retrieved.
+        
+        Raises:
+            BiQuestionSnapshotDataError: If terminal-job questions are missing, have inconsistent lineage, or lack required completed answers.
+        """
+        ...
 
 
 class BiQuestionWorkerServicePort(Protocol):
@@ -98,6 +129,7 @@ class BiQuestionSnapshotMaterializerServices:
     answers: BiQuestionSnapshotAnswerPort
     store: BiQuestionSnapshotStorePort
     clock: BiQuestionSnapshotClockPort
+    profiles: BiQuestionSnapshotProfilePort | None = None
 
 
 class BiQuestionSnapshotMaterializer:
@@ -108,6 +140,18 @@ class BiQuestionSnapshotMaterializer:
         self,
         job_id: JobId,
     ) -> BiDashboardSnapshot | None:
+        """
+        Materialize a terminal question job into a published dashboard snapshot.
+        
+        Parameters:
+        	job_id (JobId): Identifier of the question job to materialize.
+        
+        Returns:
+        	BiDashboardSnapshot | None: The published snapshot, or `None` when the job is unavailable, still active, or has no current snapshot.
+        
+        Raises:
+        	BiQuestionSnapshotDataError: If a terminal job has no questions or its questions do not match the current snapshot lineage.
+        """
         progress = self._services.questions.get_job_progress(job_id)
         if progress is None or progress.queued_questions or progress.running_questions:
             return None
@@ -119,6 +163,16 @@ class BiQuestionSnapshotMaterializer:
         if base is None:
             return None
         self._require_matching_lineage(questions, base)
+        request = BiMaterializationRequest(
+            company_id=base.company.company_id,
+            display_name=base.company.display_name,
+            source=base.source,
+        )
+        profile = (
+            self._services.profiles.get(request)
+            if self._services.profiles is not None
+            else None
+        )
 
         completed = {
             (result.metric_id, result.period_id): result
@@ -145,6 +199,7 @@ class BiQuestionSnapshotMaterializer:
                 job_id=job_id,
                 extracted=extracted,
                 generated_at=self._services.clock.now(),
+                profile=profile,
             )
         )
         self._services.store.publish(snapshot)
