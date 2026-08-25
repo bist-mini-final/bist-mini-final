@@ -4,33 +4,127 @@ set -euo pipefail
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${DEPLOY_DIR}/../.." && pwd)"
 PROJECT_PYTHON="${PROJECT_ROOT}/.venv/bin/python"
-export PATH="${PROJECT_ROOT}/.tools/bin:${PATH}"
+export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PROJECT_ROOT}/.tools/bin:${PATH}"
 CLUSTER_NAME="${K3D_CLUSTER_NAME:-bist-local}"
 NAMESPACE="bist-batch"
 WORKER_IMAGE="${KUBERNETES_WORKER_IMAGE:-bist-workflow-worker:local}"
 KEDA_VERSION="${KEDA_VERSION:-2.20.2}"
 ACTION="${1:-all}"
 
-require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "필수 명령을 찾을 수 없습니다: $1" >&2
+has_command() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+ensure_docker() {
+  if ! has_command docker; then
+    if [[ "$(uname -s)" == "Darwin" ]] && has_command brew; then
+      echo "⚡ Docker Desktop을 설치합니다..."
+      brew install --cask docker
+    else
+      echo "❌ Docker가 설치되어 있지 않습니다. Docker Desktop 또는 Docker Engine을 먼저 설치해주세요." >&2
+      exit 1
+    fi
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      echo "⏳ Docker 데몬이 실행 중이지 않습니다. Docker 데스크톱 앱을 시작합니다..."
+      open -g -a Docker || open -g -a OrbStack || true
+      for i in {1..30}; do
+        if docker info >/dev/null 2>&1; then
+          echo "✅ Docker 데몬 준비 완료."
+          return 0
+        fi
+        sleep 2
+      done
+    fi
+    echo "❌ Docker daemon이 실행 중이 아닙니다. Docker를 실행한 후 다시 시도하세요." >&2
     exit 1
   fi
 }
 
-check_tools() {
-  require_command docker
-  require_command k3d
-  require_command kubectl
-  require_command helm
-  if ! docker info >/dev/null 2>&1; then
-    echo "Docker daemon이 실행 중이 아닙니다." >&2
-    exit 1
+ensure_uv() {
+  if ! has_command uv; then
+    echo "⚡ uv 가 설치되어 있지 않아 자동으로 설치합니다..."
+    if has_command brew; then
+      brew install uv
+    else
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:${PATH}"
+    fi
   fi
+}
+
+ensure_k3d() {
+  if ! has_command k3d; then
+    echo "⚡ k3d 가 설치되어 있지 않아 자동으로 설치합니다..."
+    if has_command brew; then
+      brew install k3d
+    else
+      curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+    fi
+  fi
+}
+
+ensure_kubectl() {
+  if ! has_command kubectl; then
+    echo "⚡ kubectl 이 설치되어 있지 않아 자동으로 설치합니다..."
+    if has_command brew; then
+      brew install kubectl
+    else
+      local arch="$(uname -m)"
+      [[ "$arch" == "x86_64" ]] && arch="amd64"
+      [[ "$arch" == "aarch64" ]] && arch="arm64"
+      local os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+      mkdir -p "${PROJECT_ROOT}/.tools/bin"
+      curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/${os}/${arch}/kubectl"
+      chmod +x kubectl
+      mv kubectl "${PROJECT_ROOT}/.tools/bin/kubectl"
+    fi
+  fi
+}
+
+ensure_helm() {
+  if ! has_command helm; then
+    echo "⚡ helm 이 설치되어 있지 않아 자동으로 설치합니다..."
+    if has_command brew; then
+      brew install helm
+    else
+      curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+      chmod 700 get_helm.sh
+      ./get_helm.sh --no-sudo || true
+      rm -f get_helm.sh
+    fi
+  fi
+}
+
+ensure_node() {
+  if ! has_command node || ! has_command npm; then
+    echo "⚡ Node.js / npm 이 설치되어 있지 않습니다..."
+    if has_command brew; then
+      brew install node
+    else
+      echo "⚠️ Node.js 18+ 설치가 필요합니다. (예: nvm install 20)" >&2
+    fi
+  fi
+}
+
+ensure_python_venv() {
   if [[ ! -x "${PROJECT_PYTHON}" ]]; then
-    echo ".venv가 없습니다. 먼저 uv sync로 잠금 의존성을 설치하세요." >&2
-    exit 1
+    echo "⚡ .venv 가 없습니다. uv sync --frozen 으로 가상환경을 생성합니다..."
+    ensure_uv
+    (cd "${PROJECT_ROOT}" && uv sync --frozen)
   fi
+}
+
+check_tools() {
+  ensure_docker
+  ensure_uv
+  ensure_k3d
+  ensure_kubectl
+  ensure_helm
+  ensure_node
+  ensure_python_venv
 }
 
 env_value() {
@@ -221,7 +315,7 @@ show_status() {
 }
 
 case "${ACTION}" in
-  check)
+  setup-tools|check)
     check_tools
     ;;
   cluster)
@@ -277,7 +371,7 @@ case "${ACTION}" in
     k3d cluster delete "${CLUSTER_NAME}" || true
     ;;
   *)
-    echo "사용법: $0 {check|cluster|build|deploy|all|restart|status|logs|down|destroy}" >&2
+    echo "사용법: $0 {setup-tools|check|cluster|build|deploy|all|restart|status|logs|down|destroy}" >&2
     exit 2
     ;;
 esac

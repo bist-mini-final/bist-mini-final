@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from anyio import open_file, to_thread
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import Path as FastPath
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -55,11 +56,15 @@ def _sha256_file(path: Path) -> str:
 
 
 class SearchRequestDTO(BaseModel):
+    """Request payload for vector search within a specific index."""
+
     query: str = Field(min_length=1, description="검색할 질문 또는 텍스트")
     limit: int = Field(default=5, ge=1, le=50, description="반환할 최대 결과 수")
 
 
 class UpdateIndexCompanyRequestDTO(BaseModel):
+    """Request payload for updating the company name bound to an index."""
+
     company_name: str = Field(
         min_length=1,
         max_length=200,
@@ -79,7 +84,22 @@ def create_data_source_router(
     workflow_executor: WorkflowExecutor,
     workflow_dispatcher: RunDispatcher,
 ) -> APIRouter:
-    """Compose database, file, vector-index, and ingestion adapters."""
+    """Compose database, file, vector-index, and ingestion adapters under 'Data Sources'.
+
+    Args:
+        processed_dir: Path to directory containing source Excel spreadsheets.
+        embedding_encoder: Text embedder for live query search.
+        pgvector_store: pgvector client for vector queries and index inspection.
+        connection_probe: Diagnostics probe for PostgreSQL health.
+        db_manager: Database manager for source file metadata.
+        workflow_store: Workflow definition store.
+        run_store: Run execution store.
+        workflow_executor: Ingestion workflow executor.
+        workflow_dispatcher: Batch queue dispatcher.
+
+    Returns:
+        Configured APIRouter for all Data Source operations.
+    """
     router = APIRouter(prefix="/data-sources", tags=["Data Sources"])
     ingestion_jobs = IngestionJobService(
         workflow_store,
@@ -88,18 +108,35 @@ def create_data_source_router(
         workflow_dispatcher,
     )
     router.include_router(create_database_router(pgvector_store, connection_probe))
+    router.include_router(
+        create_ingestion_router(
+            ingestion_jobs,
+            run_store=run_store,
+            pgvector_store=pgvector_store,
+        )
+    )
 
-    @router.get("/files")
-    def get_files() -> dict[str, Any]:
+    @router.get(
+        "/files",
+        summary="업로드된 스프레드시트 원본 파일 목록 조회",
+        description="`data/source_files`에 업로드된 엑셀 파일 목록, 크기, 해시 및 인덱싱 상태를 조회합니다.",
+    )
+    def get_files() -> Dict[str, Any]:
+        """List all processed source files with indexing statuses."""
         files = list_processed_files(processed_dir, pgvector_store)
         return {"files": files, "total": len(files)}
 
-    @router.get("/files/{filename}/preview")
+    @router.get(
+        "/files/{filename}/preview",
+        summary="엑셀 시트 데이터 미리보기",
+        description="지정된 엑셀 파일의 시트 목록 및 상위 N개 행의 원시 셀 데이터를 조회합니다.",
+    )
     def preview_file(
-        filename: str,
-        sheet_name: str | None = Query(default=None),
-        max_rows: int = Query(default=15, ge=1, le=50),
-    ) -> dict[str, Any]:
+        filename: str = FastPath(..., description="조회할 파일명 (예: 'sample.xlsx')"),
+        sheet_name: Optional[str] = Query(default=None, description="특정 시트명 (기본값: 첫 번째 시트)"),
+        max_rows: int = Query(default=15, ge=1, le=50, description="미리볼 최대 행 수"),
+    ) -> Dict[str, Any]:
+        """Preview raw cell values from an uploaded Excel spreadsheet."""
         try:
             return preview_excel_sheet(
                 filename,
@@ -110,15 +147,20 @@ def create_data_source_router(
         except Exception as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
 
-    @router.post("/files/upload")
+    @router.post(
+        "/files/upload",
+        summary="스프레드시트 파일 업로드 및 자동 인덱싱",
+        description="새로운 엑셀(.xlsx, .xlsm) 파일을 업로드하고 옵션에 따라 즉시 Kubernetes 인덱싱 큐에 등록합니다.",
+    )
     async def upload_file(
-        file: UploadFile = File(...),
-        auto_ingest: bool = Query(default=True),
-        model: str = Query(default=DEFAULT_EMBEDDING_MODEL),
-        batch_size: int = Query(default=2048, ge=1, le=2048),
-    ) -> dict[str, Any]:
+        file: UploadFile = File(..., description="업로드할 엑셀 스프레드시트 파일"),
+        auto_ingest: bool = Query(default=True, description="업로드 완료 후 자동 인덱싱 실행 여부"),
+        model: str = Query(default=DEFAULT_EMBEDDING_MODEL, description="사용할 텍스트 임베딩 모델"),
+        batch_size: int = Query(default=2048, ge=1, le=2048, description="임베딩 배치 크기"),
+    ) -> Dict[str, Any]:
+        """Upload a source spreadsheet and optionally enqueue an automated ingestion run."""
         if not file.filename:
-            raise HTTPException(status_code=400, detail="유효한 파일명이 필요합니다")
+            raise HTTPException(status_code=400, detail="유효한 파일명이 필요합니다.")
 
         safe_filename = Path(file.filename).name
         destination = processed_dir / safe_filename
@@ -133,7 +175,7 @@ def create_data_source_router(
                     if size_bytes > MAX_UPLOAD_SIZE_BYTES:
                         raise HTTPException(
                             status_code=413,
-                            detail="파일 크기는 500MB를 초과할 수 없습니다",
+                            detail="파일 크기는 500MB를 초과할 수 없습니다.",
                         )
                     digest.update(chunk)
                     await buffer.write(chunk)
@@ -169,8 +211,8 @@ def create_data_source_router(
                 logger.warning("업로드 파일 DB 메타데이터 저장 실패: %s", error)
 
         suffix = destination.suffix.casefold()
-        ingestion_job: dict[str, Any] | None = None
-        ingestion_error: str | None = None
+        ingestion_job: Optional[Dict[str, Any]] = None
+        ingestion_error: Optional[str] = None
         if auto_ingest and suffix in _WORKBOOK_SUFFIXES:
             try:
                 request = IngestRequestDTO(
@@ -200,112 +242,164 @@ def create_data_source_router(
             "error": ingestion_error,
         }
 
-    @router.get("/files/{filename}/download")
-    def download_file(filename: str) -> FileResponse:
+    @router.get(
+        "/files/{filename}/download",
+        summary="스프레드시트 원본 파일 다운로드",
+        description="서버에 저장된 원본 엑셀 파일을 다운로드합니다.",
+    )
+    def download_file(
+        filename: str = FastPath(..., description="다운로드할 파일명"),
+    ) -> FileResponse:
+        """Download an uploaded source file directly."""
         safe_filename = Path(filename).name
         target = processed_dir / safe_filename
         if not target.is_file():
-            raise HTTPException(status_code=404, detail="다운로드할 파일을 찾을 수 없습니다")
+            raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
         return FileResponse(
-            path=target,
-            media_type="application/octet-stream",
+            target,
             filename=safe_filename,
+            media_type="application/octet-stream",
         )
 
-    @router.delete("/files/{filename}")
-    def delete_file(
-        filename: str,
-        cascade_indexes: bool = Query(default=True),
-    ) -> dict[str, Any]:
+    @router.delete(
+        "/files/{filename}",
+        summary="업로드된 스프레드시트 파일 및 인덱스 삭제",
+        description="파일을 디스크에서 제거하고 관련된 pgvector 벡터 인덱스 컬렉션도 함께 정리합니다.",
+    )
+    def remove_file(
+        filename: str = FastPath(..., description="삭제할 파일명"),
+    ) -> Dict[str, Any]:
+        """Delete a source file and drop its associated vector index collection."""
         safe_filename = Path(filename).name
         target = processed_dir / safe_filename
-        workbook_hash = _sha256_file(target) if target.is_file() else None
-        if target.is_file():
-            target.unlink()
+        if not target.is_file():
+            raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
 
-        if db_manager.is_connected():
-            db_manager.delete_source_file(workbook_hash or safe_filename)
+        # Compute workbook hash to identify associated indexes
+        workbook_hash: Optional[str] = None
+        suffix = target.suffix.lower()
+        if suffix in _HASHED_FILE_SUFFIXES:
+            try:
+                workbook_hash = _sha256_file(target)
+            except Exception as error:
+                logger.warning("파일 해시 계산 실패 (인덱스 정리 건너뜀): %s", error)
+
+        try:
+            target.unlink()
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
+
+        # Clean up associated vector indexes
         deleted_indexes = 0
-        if cascade_indexes and workbook_hash and pgvector_store.is_connected():
-            deleted_indexes = pgvector_store.delete_by_workbook_hash(workbook_hash)
+        if workbook_hash and pgvector_store.is_connected():
+            try:
+                deleted_indexes = pgvector_store.delete_by_workbook_hash(workbook_hash)
+            except Exception as error:
+                logger.warning(
+                    "연관된 벡터 인덱스 정리 중 오류 발생 (파일은 삭제됨): %s",
+                    error,
+                    exc_info=True,
+                )
+
         return {
             "status": "success",
-            "deleted_file": safe_filename,
-            "cascade_indexes_deleted": deleted_indexes,
+            "message": f"{safe_filename} 파일이 삭제되었습니다.",
+            "deleted_indexes": deleted_indexes,
         }
 
-    @router.get("/indexes")
-    def get_indexes() -> dict[str, Any]:
+    @router.get(
+        "/indexes",
+        summary="생성된 pgvector 벡터 인덱스 컬렉션 목록 조회",
+        description="PostgreSQL에 생성된 모든 워크북 벡터 인덱스 컬렉션, 청크 수, 차원, 기업명을 조회합니다.",
+    )
+    def get_indexes() -> Dict[str, Any]:
+        """List all available vector index collections."""
         indexes = list_vector_indexes(pgvector_store)
         return {"indexes": indexes, "total": len(indexes)}
 
-    @router.get("/indexes/{index_id}")
-    def get_index(index_id: str) -> dict[str, Any]:
-        try:
-            return get_vector_index_detail(
-                index_id,
-                sample_items_count=20,
-                pgvector_store=pgvector_store,
-            )
-        except Exception as error:
-            raise HTTPException(status_code=404, detail=str(error)) from error
+    @router.get(
+        "/indexes/{index_id}",
+        summary="단일 pgvector 벡터 인덱스 상세 정보 조회",
+        description="지정된 인덱스의 통계, 연결된 시트 목록, 임베딩 차원, 생성 일자를 조회합니다.",
+    )
+    def get_index_detail(
+        index_id: str = FastPath(..., description="pgvector 컬렉션 ID"),
+    ) -> Dict[str, Any]:
+        """Get schema and document statistics for a single vector index collection."""
+        detail = get_vector_index_detail(index_id, pgvector_store=pgvector_store)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없습니다.")
+        return detail
 
-    @router.patch("/indexes/{index_id}")
-    @router.put("/indexes/{index_id}/company")
+    @router.put(
+        "/indexes/{index_id}/company",
+        summary="벡터 인덱스 바인딩 기업명 수정",
+        description="인덱스에 부여된 기업명을 수정하여 BI 및 질의 라우팅 매칭 정확도를 높입니다.",
+    )
     def update_index_company(
-        index_id: str,
-        request: UpdateIndexCompanyRequestDTO,
-    ) -> dict[str, Any]:
-        if not pgvector_store.is_connected():
-            raise HTTPException(
-                status_code=503,
-                detail="pgvector 데이터베이스에 연결할 수 없습니다",
-            )
-        try:
-            return pgvector_store.update_index_company(
-                index_id,
-                request.company_name,
-            )
-        except Exception as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
+        index_id: str = FastPath(..., description="수정할 pgvector 컬렉션 ID"),
+        body: UpdateIndexCompanyRequestDTO = None,  # type: ignore[assignment]
+    ) -> Dict[str, Any]:
+        """Update the bound company name for a specific vector index collection."""
+        if body is None:
+            raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
+        new_name = body.company_name.strip()
+        if not new_name:
+            raise HTTPException(status_code=422, detail="기업명은 비어있을 수 없습니다.")
+        success = pgvector_store.update_index_company(index_id, new_name)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"인덱스 {index_id}를 찾을 수 없습니다.")
+        return {"status": "success", "index_id": index_id, "company_name": new_name}
 
-    @router.delete("/indexes/{index_id}")
-    def remove_index(index_id: str) -> dict[str, Any]:
+    @router.delete(
+        "/indexes/{index_id}",
+        summary="pgvector 벡터 인덱스 컬렉션 삭제",
+        description="지정된 벡터 인덱스 컬렉션과 저장된 셀 임베딩 데이터를 DB에서 완전히 삭제합니다.",
+    )
+    def remove_index(
+        index_id: str = FastPath(..., description="삭제할 pgvector 컬렉션 ID"),
+    ) -> Dict[str, Any]:
+        """Drop a vector index collection and its embeddings from the database."""
         try:
-            if not delete_vector_index(index_id, pgvector_store):
-                raise HTTPException(
-                    status_code=404,
-                    detail="삭제할 인덱스가 존재하지 않습니다",
-                )
-            return {"status": "success", "deleted_index_id": index_id}
+            success = delete_vector_index(index_id, pgvector_store=pgvector_store)
+            if not success:
+                raise HTTPException(status_code=404, detail="인덱스를 찾을 수 없습니다.")
+            return {"status": "success", "message": f"{index_id} 인덱스가 삭제되었습니다."}
         except HTTPException:
             raise
         except Exception as error:
-            raise HTTPException(status_code=500, detail=str(error)) from error
+            raise HTTPException(
+                status_code=500,
+                detail=f"인덱스 삭제 중 오류 발생: {error}",
+            ) from error
 
-    @router.post("/indexes/{index_id}/search")
-    def test_search(index_id: str, request: SearchRequestDTO) -> dict[str, Any]:
+    @router.post(
+        "/indexes/{index_id}/search",
+        summary="단일 벡터 인덱스 대상 즉시 유사도 검색 테스트",
+        description="질문 문자열을 즉시 임베딩하여 지정된 인덱스 내 상위 K개 셀 텍스트를 검색합니다.",
+    )
+    def search_index(
+        index_id: str = FastPath(..., description="검색 대상 pgvector 컬렉션 ID"),
+        body: SearchRequestDTO = None,  # type: ignore[assignment]
+    ) -> Any:
+        """Execute a dense vector similarity search within a specific index."""
+        if body is None:
+            raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:
-            hits = search_vector_index(
-                index_id,
-                query_text=request.query,
-                limit=request.limit,
+            results = search_vector_index(
+                index_id=index_id,
+                query_text=body.query,
                 pgvector_store=pgvector_store,
                 embedding_encoder=embedding_encoder,
+                limit=body.limit,
             )
+            return {
+                "index_id": index_id,
+                "query": body.query,
+                "results": results,
+                "total_results": len(results),
+            }
         except Exception as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return {
-            "index_id": index_id,
-            "query": request.query,
-            "results": hits,
-            "total_results": len(hits),
-        }
 
-    router.include_router(
-        create_ingestion_router(ingestion_jobs, run_store, pgvector_store)
-    )
     return router
-
-
-__all__ = ["create_data_source_router"]
