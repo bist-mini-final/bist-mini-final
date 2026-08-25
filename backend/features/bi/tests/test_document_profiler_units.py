@@ -6,6 +6,7 @@ from threading import Barrier
 from backend.features.bi.document_profiler import BiDocumentProfiler
 from backend.features.bi.extraction_models import BiContextCell, BiRetrievedContext
 from backend.features.bi.materialization_models import BiDocumentProfile
+from backend.features.bi.metric_reader import JsonValue
 from backend.features.bi.models import (
     AmountScale,
     BiMaterializationRequest,
@@ -65,7 +66,7 @@ class ConcurrentProfileClient:
         model: str,
         messages: list[dict[str, str]],
         schema_name: str,
-        json_schema: dict[str, object],
+        json_schema: dict[str, JsonValue],
     ) -> str:
         """
         Return schema-specific structured profile data for the concurrent test request.
