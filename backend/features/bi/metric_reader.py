@@ -95,6 +95,16 @@ class BiMetricReader:
         request: BiMetricExtractionRequest,
         context: BiRetrievedContext,
     ) -> MetricReaderResult:
+        """
+        Extract one metric for one reporting period from the retrieved context.
+        
+        Parameters:
+            request (BiMetricExtractionRequest): Identifies the metric and reporting period to extract.
+            context (BiRetrievedContext): Provides the allowed evidence cells and contextual blocks.
+        
+        Returns:
+            MetricReaderResult: The validated extraction result, or a reader contract failure when the response payload is invalid.
+        """
         payload = json.dumps(
             {
                 "request": {

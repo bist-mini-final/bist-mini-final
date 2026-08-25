@@ -21,6 +21,12 @@ interface BiChartTooltipProps extends TooltipContentProps<TooltipValueType, numb
   readonly unit?: Pick<MetricSeries, 'currency' | 'scale'> | null;
 }
 
+/**
+ * Renders chart series values and evidence details for an active tooltip.
+ *
+ * @param props - Tooltip state, chart data, and value-formatting context
+ * @returns The rendered tooltip content, or `null` when the tooltip has no data
+ */
 export function BiChartTooltip(props: BiChartTooltipProps) {
   if (!props.active || props.payload.length === 0) return null;
   const point = props.data.find((candidate) => candidate.periodLabel === String(props.label ?? ''));
@@ -43,6 +49,12 @@ export function BiChartTooltip(props: BiChartTooltipProps) {
   );
 }
 
+/**
+ * Renders a titled chart section with controls, visualization content, and an accessible data table.
+ *
+ * @param props - Chart metadata, series definitions, data points, formatting options, controls, and visualization content.
+ * @returns The rendered chart frame.
+ */
 export function BiChartFrame(props: BiChartFrameProps) {
   return (
     <section className="bi-chart-frame" aria-label={props.title}>

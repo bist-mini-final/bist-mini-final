@@ -23,6 +23,17 @@ AS_OF = datetime(2026, 8, 24, tzinfo=UTC)
 
 
 def period(period_id: str, end_date: date | None, ordinal: int) -> BiPeriod:
+    """
+    Create a business-intelligence period from its identifier and metadata.
+    
+    Parameters:
+        period_id (str): Period identifier; identifiers beginning with ``ltm-`` are classified as LTM periods.
+        end_date (date | None): Period end date, if available.
+        ordinal (int): Ordering value for the period.
+    
+    Returns:
+        BiPeriod: The constructed period.
+    """
     return BiPeriod(
         period_id=PeriodId(period_id),
         kind=PeriodKind.LTM if period_id.startswith("ltm-") else PeriodKind.FY,
@@ -34,6 +45,12 @@ def period(period_id: str, end_date: date | None, ordinal: int) -> BiPeriod:
 
 
 def materialization() -> BiMaterializationRequest:
+    """
+    Create a test materialization request with fixed company, workbook, and index metadata.
+    
+    Returns:
+        BiMaterializationRequest: A materialization request for the test company and workbook.
+    """
     return BiMaterializationRequest(
         company_id=CompanyId("company-test"),
         display_name="Test Company",

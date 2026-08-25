@@ -12,6 +12,14 @@ interface CashFlowChartProps {
 
 const METRICS = ['operating_cash_flow', 'capital_expenditure', 'free_cash_flow'] as const;
 
+/**
+ * Renders operating cash flow, capital expenditure, and free cash flow visualizations.
+ *
+ * @param dashboard - Dashboard data containing cash-flow metrics
+ * @param range - Period range to display
+ * @param size - Chart size configuration
+ * @returns The cash-flow chart dashboard
+ */
 export function CashFlowChart({ dashboard, range, size }: CashFlowChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);

@@ -12,6 +12,13 @@ interface FinancialScaleChartProps {
 
 const METRICS = ['total_assets', 'total_liabilities', 'total_equity'] as const;
 
+/**
+ * Renders a chart showing asset composition and total-asset trends.
+ *
+ * @param dashboard - Dashboard data used to build the chart.
+ * @param range - Period range displayed in the chart.
+ * @param size - Chart size configuration.
+ */
 export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);

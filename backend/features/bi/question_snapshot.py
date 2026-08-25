@@ -64,14 +64,35 @@ class BiQuestionSnapshotProfilePort(Protocol):
     def get(
         self,
         request: BiMaterializationRequest,
-    ) -> BiDocumentProfile | None: ...
+    ) -> BiDocumentProfile | None: """
+        Retrieve the document profile associated with a materialization request.
+        
+        Parameters:
+        	request (BiMaterializationRequest): Request identifying the company and source document.
+        
+        Returns:
+        	BiDocumentProfile | None: The matching document profile, or `None` when unavailable.
+        """
+        ...
 
 
 class BiQuestionSnapshotMaterializerPort(Protocol):
     def materialize_if_terminal(
         self,
         job_id: JobId,
-    ) -> BiDashboardSnapshot | None: ...
+    ) -> BiDashboardSnapshot | None: """
+        Materialize and publish a dashboard snapshot when a materialization job is terminal.
+        
+        Parameters:
+            job_id (JobId): Identifier of the materialization job.
+        
+        Returns:
+            BiDashboardSnapshot | None: The published snapshot, or `None` when the job is unavailable, still in progress, or the current snapshot cannot be retrieved.
+        
+        Raises:
+            BiQuestionSnapshotDataError: If terminal-job questions are missing, have inconsistent lineage, or lack required completed answers.
+        """
+        ...
 
 
 class BiQuestionWorkerServicePort(Protocol):
@@ -117,6 +138,18 @@ class BiQuestionSnapshotMaterializer:
         self,
         job_id: JobId,
     ) -> BiDashboardSnapshot | None:
+        """
+        Materialize a terminal question job into a published dashboard snapshot.
+        
+        Parameters:
+        	job_id (JobId): Identifier of the question job to materialize.
+        
+        Returns:
+        	BiDashboardSnapshot | None: The published snapshot, or `None` when the job is unavailable, still active, or has no current snapshot.
+        
+        Raises:
+        	BiQuestionSnapshotDataError: If a terminal job has no questions or its questions do not match the current snapshot lineage.
+        """
         progress = self._services.questions.get_job_progress(job_id)
         if progress is None or progress.queued_questions or progress.running_questions:
             return None

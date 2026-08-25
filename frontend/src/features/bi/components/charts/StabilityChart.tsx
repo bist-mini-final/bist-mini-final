@@ -13,6 +13,14 @@ interface StabilityChartProps {
 
 const METRICS = ['cash_and_short_term_investments', 'total_debt', 'net_debt'] as const;
 
+/**
+ * Renders a financial stability chart comparing cash, total debt, and net debt.
+ *
+ * @param dashboard - Dashboard snapshot containing the financial metrics
+ * @param range - Period range used for the chart data
+ * @param size - Card size used to configure the chart layout
+ * @returns The stability chart component
+ */
 export function StabilityChart({ dashboard, range, size }: StabilityChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);

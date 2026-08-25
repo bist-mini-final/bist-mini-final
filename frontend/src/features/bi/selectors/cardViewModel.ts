@@ -67,6 +67,12 @@ function getSeries(metrics: BiDashboardSnapshot['metrics'], metricId: MetricId):
   return metrics[metricId] ?? null;
 }
 
+/**
+ * Formats the display label for a metric series unit.
+ *
+ * @param series - The metric series whose unit should be labeled
+ * @returns The localized unit label, or a message indicating that the unit is unavailable or requires confirmation
+ */
 function getUnitLabel(series: MetricSeries | null): string {
   if (!series) return '단위 없음';
   if (series.valueKind === 'percent') return '%';
@@ -75,6 +81,12 @@ function getUnitLabel(series: MetricSeries | null): string {
   return `원본 단위: ${series.currency} ${series.scale}`;
 }
 
+/**
+ * Builds the rendered view model for a BI card.
+ *
+ * @param input - The card definition, dashboard metrics, period range, and card size
+ * @returns The card state, formatted metric values, period rows, unit label, and evidence
+ */
 export function buildCardViewModel(input: CardViewModelInput): BiCardViewModel {
   const { definition, dashboard, range, size } = input;
   const selectedPeriods = selectPeriods(dashboard.periods, range);
