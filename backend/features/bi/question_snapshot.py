@@ -4,10 +4,11 @@ from typing import Protocol, assert_never
 
 from .catalog import METRIC_CATALOG, SourceMetricDefinition
 from .extraction_models import BiMetricExtractionResult
-from .materialization_models import BiSnapshotRefreshInput
+from .materialization_models import BiDocumentProfile, BiSnapshotRefreshInput
 from .models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
+    BiMaterializationRequest,
     CompanyId,
     JobId,
     MaterializationStatus,
@@ -59,6 +60,13 @@ class BiQuestionSnapshotClockPort(Protocol):
     def now(self) -> datetime: ...
 
 
+class BiQuestionSnapshotProfilePort(Protocol):
+    def get(
+        self,
+        request: BiMaterializationRequest,
+    ) -> BiDocumentProfile | None: ...
+
+
 class BiQuestionSnapshotMaterializerPort(Protocol):
     def materialize_if_terminal(
         self,
@@ -98,6 +106,7 @@ class BiQuestionSnapshotMaterializerServices:
     answers: BiQuestionSnapshotAnswerPort
     store: BiQuestionSnapshotStorePort
     clock: BiQuestionSnapshotClockPort
+    profiles: BiQuestionSnapshotProfilePort | None = None
 
 
 class BiQuestionSnapshotMaterializer:
@@ -119,6 +128,16 @@ class BiQuestionSnapshotMaterializer:
         if base is None:
             return None
         self._require_matching_lineage(questions, base)
+        request = BiMaterializationRequest(
+            company_id=base.company.company_id,
+            display_name=base.company.display_name,
+            source=base.source,
+        )
+        profile = (
+            self._services.profiles.get(request)
+            if self._services.profiles is not None
+            else None
+        )
 
         completed = {
             (result.metric_id, result.period_id): result
@@ -145,6 +164,7 @@ class BiQuestionSnapshotMaterializer:
                 job_id=job_id,
                 extracted=extracted,
                 generated_at=self._services.clock.now(),
+                profile=profile,
             )
         )
         self._services.store.publish(snapshot)

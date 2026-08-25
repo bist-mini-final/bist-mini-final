@@ -15,8 +15,9 @@ const METRICS = ['revenue'] as const;
 export function RevenueChart({ dashboard, range, size }: RevenueChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);
+  const unit = dashboard.metrics.revenue ?? null;
   return (
-    <BiChartFrame title="매출 추이" description="기간별 값과 변화 방향을 함께 표시합니다." data={data} series={series} valueKind="amount">
+    <BiChartFrame title="매출 추이" description="기간별 값과 변화 방향을 함께 표시합니다." data={data} series={series} valueKind="amount" unit={unit}>
       <div className="bi-chart-layout bi-revenue-chart">
         <div className="bi-chart-plot">
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -29,7 +30,7 @@ export function RevenueChart({ dashboard, range, size }: RevenueChartProps) {
               </defs>
               <XAxis dataKey="periodLabel" tickLine={false} axisLine={false} minTickGap={18} />
               <YAxis hide domain={['dataMin', 'dataMax']} />
-              <Tooltip content={(tooltipProps) => <BiChartTooltip {...tooltipProps} data={data} valueKind="amount" />} />
+              <Tooltip content={(tooltipProps) => <BiChartTooltip {...tooltipProps} data={data} valueKind="amount" unit={unit} />} />
               <Area
                 type="monotone"
                 dataKey={(point) => point.values.revenue ?? null}
@@ -50,7 +51,7 @@ export function RevenueChart({ dashboard, range, size }: RevenueChartProps) {
           {data.map((point) => (
             <div key={point.periodId}>
               <span>{point.periodLabel}</span>
-              <strong>{formatChartValue(point.values.revenue ?? null, 'amount')}</strong>
+              <strong>{formatChartValue(point.values.revenue ?? null, 'amount', unit)}</strong>
             </div>
           ))}
         </div>

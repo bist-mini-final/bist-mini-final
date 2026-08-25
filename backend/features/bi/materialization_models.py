@@ -71,6 +71,7 @@ class BiSnapshotRefreshInput:
     job_id: JobId
     extracted: tuple[BiMetricExtractionResult, ...]
     generated_at: datetime
+    profile: BiDocumentProfile | None = None
 
 
 class BiCompanyIndexEntry(BiContractModel):
