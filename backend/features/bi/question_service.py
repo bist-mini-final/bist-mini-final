@@ -21,6 +21,15 @@ from .question_records import (
 
 
 def build_current_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
+    """
+    Build a question batch using the periods current at the plan's creation time.
+    
+    Parameters:
+        plan (BiQuestionBatchPlan): The batch plan whose periods determine the question batch.
+    
+    Returns:
+        BiQuestionBatch: The question batch for the selected current periods.
+    """
     return build_question_batch(
         replace(
             plan,
@@ -33,6 +42,16 @@ def summarize_questions(
     job_id: JobId,
     questions: tuple[BiQuestionRecord, ...],
 ) -> BiQuestionJobProgress:
+    """
+    Summarize question statuses for a job.
+    
+    Parameters:
+    	job_id (JobId): Identifier of the job.
+    	questions (tuple[BiQuestionRecord, ...]): Questions whose statuses are counted.
+    
+    Returns:
+    	BiQuestionJobProgress: Progress summary containing the total and status-specific question counts.
+    """
     counts = Counter(question.status for question in questions)
     return BiQuestionJobProgress(
         job_id=job_id,
@@ -100,12 +119,29 @@ class BiQuestionService:
         self,
         plan: BiQuestionBatchPlan,
     ) -> tuple[BiQuestionRecord, ...]:
+        """Register questions for the periods current at the plan's creation time.
+        
+        Parameters:
+        	plan (BiQuestionBatchPlan): The batch plan used to build the questions.
+        
+        Returns:
+        	tuple[BiQuestionRecord, ...]: The registered question records.
+        """
         return self.register_questions(build_current_question_batch(plan))
 
     def queue_materialization_questions(
         self,
         plan: BiQuestionBatchPlan,
     ) -> BiQuestionJobProgress:
+        """
+        Queue materialization questions for a batch plan and summarize their progress.
+        
+        Parameters:
+            plan (BiQuestionBatchPlan): Batch plan used to register the questions.
+        
+        Returns:
+            BiQuestionJobProgress: Progress summary for the plan's job.
+        """
         questions = self.register_materialization_questions(plan)
         return summarize_questions(plan.job_id, questions)
 

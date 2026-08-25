@@ -21,6 +21,13 @@ const CURRENCY_SYMBOL: Readonly<Record<string, string>> = {
   JPY: '¥',
 };
 
+/**
+ * Formats a Korean won amount using a magnitude-appropriate Korean unit.
+ *
+ * @param baseValue - The amount in won before unit conversion
+ * @param axis - Whether to omit the `원` suffix for an axis label
+ * @returns The formatted amount with a Korean unit and optional `원` suffix
+ */
 function formatKrwAmount(baseValue: number, axis: boolean): string {
   const absolute = Math.abs(baseValue);
   if (absolute >= 1_000_000_000_000) {
@@ -38,6 +45,14 @@ function formatKrwAmount(baseValue: number, axis: boolean): string {
   return `${AMOUNT_FORMATTER.format(baseValue)}${axis ? '' : '원'}`;
 }
 
+/**
+ * Formats an amount using an international currency symbol or currency code and scale suffix.
+ *
+ * @param value - The amount to format
+ * @param currency - The currency identifier
+ * @param scale - The scale applied to the amount
+ * @returns The formatted amount with a negative sign when applicable
+ */
 function formatInternationalAmount(
   value: number,
   currency: string,
@@ -50,6 +65,14 @@ function formatInternationalAmount(
   return `${sign}${currency} ${formatted}`;
 }
 
+/**
+ * Formats an amount according to its currency, scale, and display context.
+ *
+ * @param value - The amount to format.
+ * @param unit - The currency and scale used to interpret the amount.
+ * @param axis - Whether to format the value for an axis label.
+ * @returns The formatted amount, including currency or scale indicators when available.
+ */
 export function formatAmountValue(
   value: number,
   unit: Pick<MetricSeries, 'currency' | 'scale'> | null,
@@ -67,6 +90,13 @@ export function formatAmountValue(
   return formatInternationalAmount(value, unit.currency, unit.scale);
 }
 
+/**
+ * Formats an observation for display according to the series value kind and status.
+ *
+ * @param series - The metric series that defines the value format.
+ * @param observation - The observation to format, or `null` when no observation is available.
+ * @returns The formatted observation text, including status messages for unavailable or invalid values.
+ */
 export function formatMetricValue(series: MetricSeries, observation: MetricObservation | null): string {
   if (!observation) return '데이터 없음';
   if (observation.status === 'ambiguous') {

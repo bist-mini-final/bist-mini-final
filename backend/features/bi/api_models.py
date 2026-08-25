@@ -39,6 +39,15 @@ class BiCompanyListResponse(BiContractModel):
         cls,
         companies: tuple[BiCompanySummary, ...],
     ) -> tuple[BiCompanySummary, ...]:
+        """
+        Filter companies to those eligible for inclusion in the dashboard list.
+        
+        Parameters:
+            companies (tuple[BiCompanySummary, ...]): Company summaries to evaluate.
+        
+        Returns:
+            tuple[BiCompanySummary, ...]: Company summaries that should appear in the dashboard list.
+        """
         return tuple(company for company in companies if _should_list_company(company))
 
 
@@ -57,6 +66,15 @@ class BiMaterializationAccepted(BiContractModel):
 
 
 def _should_list_company(company: BiCompanySummary) -> bool:
+    """
+    Determine whether a company should appear in the dashboard list.
+    
+    Parameters:
+        company (BiCompanySummary): Company summary to evaluate.
+    
+    Returns:
+        bool: `true` if the company has a ready snapshot or an active refresh, `false` otherwise.
+    """
     match company.snapshot_status:
         case SnapshotStatus.READY:
             return True

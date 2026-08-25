@@ -12,6 +12,16 @@ def company_summary(
     snapshot_status: SnapshotStatus | None,
     refresh_status: RefreshStatus,
 ) -> BiCompanySummary:
+    """
+    Create a test company summary with the specified snapshot and refresh statuses.
+    
+    Parameters:
+    	snapshot_status (SnapshotStatus | None): The company's snapshot status.
+    	refresh_status (RefreshStatus): The company's refresh status.
+    
+    Returns:
+    	BiCompanySummary: A company summary populated with fixed test metadata and the specified statuses.
+    """
     return BiCompanySummary(
         company_id=CompanyId("company-test"),
         display_name="Test Company",
@@ -64,6 +74,13 @@ def test_hides_company_when_dashboard_is_not_ready_or_generating(
     snapshot_status: SnapshotStatus | None,
     refresh_status: RefreshStatus,
 ) -> None:
+    """
+    Verify that a company is excluded when its dashboard snapshot is unavailable and generation is inactive or has failed.
+    
+    Parameters:
+    	snapshot_status (SnapshotStatus | None): The dashboard snapshot status.
+    	refresh_status (RefreshStatus): The snapshot refresh status.
+    """
     summary = company_summary(snapshot_status, refresh_status)
 
     response = BiCompanyListResponse(companies=(summary,))

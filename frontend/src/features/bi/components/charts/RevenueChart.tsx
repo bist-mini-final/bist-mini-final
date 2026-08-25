@@ -12,6 +12,13 @@ interface RevenueChartProps {
 
 const METRICS = ['revenue'] as const;
 
+/**
+ * Renders a revenue trend chart with period labels and formatted values.
+ *
+ * @param dashboard - Dashboard containing the revenue metric configuration
+ * @param range - Period range displayed in the chart
+ * @param size - Chart size configuration
+ */
 export function RevenueChart({ dashboard, range, size }: RevenueChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);

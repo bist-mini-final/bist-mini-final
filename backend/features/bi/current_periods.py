@@ -10,6 +10,16 @@ def select_current_periods(
     periods: tuple[BiPeriod, ...],
     as_of: datetime,
 ) -> tuple[BiPeriod, ...]:
+    """
+    Select historical fiscal-year and last-twelve-month periods as of a given date.
+    
+    Parameters:
+    	periods (tuple[BiPeriod, ...]): Candidate periods to evaluate.
+    	as_of (datetime): Date used to determine period eligibility.
+    
+    Returns:
+    	tuple[BiPeriod, ...]: Up to five most recent fiscal-year periods followed by the most recent last-twelve-month period.
+    """
     cutoff = as_of.date()
     fiscal_periods: list[BiPeriod] = []
     ltm_periods: list[BiPeriod] = []

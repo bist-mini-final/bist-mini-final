@@ -18,11 +18,28 @@ from backend.features.bi.profile_models import BiProfileRetrievalRequest
 
 class SingleSheetCatalog:
     def list_sheets(self, source: BiMaterializationSource) -> tuple[str, ...]:
+        """Return the available sheet names for a materialization source.
+        
+        Parameters:
+        	source (BiMaterializationSource): The materialization source to inspect.
+        
+        Returns:
+        	tuple[str, ...]: The available sheet names.
+        """
         return ("Key_Stats",)
 
 
 class UnitEvidenceRetriever:
     def retrieve(self, request: BiProfileRetrievalRequest) -> BiRetrievedContext:
+        """
+        Return unit-scale evidence for the Key_Stats sheet.
+        
+        Parameters:
+        	request (BiProfileRetrievalRequest): Request containing the source and request metadata.
+        
+        Returns:
+        	BiRetrievedContext: Context containing the Key_Stats!B2 evidence that FY2025 data is reported in millions.
+        """
         cell = BiContextCell(
             cell_id="Key_Stats Cell B2",
             sheet_name="Key_Stats",
@@ -50,6 +67,19 @@ class ConcurrentProfileClient:
         schema_name: str,
         json_schema: dict[str, object],
     ) -> str:
+        """
+        Return schema-specific structured profile data for the concurrent test request.
+        
+        Parameters:
+            messages (list[dict[str, str]]): Messages containing the request identifier.
+            schema_name (str): Discovery schema to respond to.
+        
+        Returns:
+            str: JSON containing period or unit metadata and its evidence cell.
+        
+        Raises:
+            AssertionError: If the schema is not supported.
+        """
         self._barrier.wait()
         request_id = json.loads(messages[-1]["content"])["request_id"]
         if schema_name == "bi_period_discovery":

@@ -8,6 +8,15 @@ interface BiHeaderProps {
   readonly onRefresh: () => void;
 }
 
+/**
+ * Renders the dashboard header with snapshot status, company details, reporting period, and refresh controls.
+ *
+ * @param dashboard - The company and snapshot data displayed in the header
+ * @param periodLabel - The label for the selected reporting period
+ * @param isRefreshing - Whether a data refresh is in progress
+ * @param onRefresh - Callback invoked to refresh the dashboard data
+ * @returns The dashboard header element
+ */
 export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
   const generatedAt = dashboard.snapshot.generatedAt.slice(0, 16).replace('T', ' ').split('-').join('.');

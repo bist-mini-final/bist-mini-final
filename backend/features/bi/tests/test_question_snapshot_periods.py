@@ -37,6 +37,17 @@ REFRESH_JOB_ID = JobId("job-refresh")
 
 
 def period(period_id: str, year: int, kind: PeriodKind) -> BiPeriod:
+    """
+    Create a business intelligence period with a year-end date and matching identifier metadata.
+    
+    Parameters:
+        period_id (str): Identifier and label for the period.
+        year (int): Year used for the period's end date and ordinal.
+        kind (PeriodKind): Period classification.
+    
+    Returns:
+        BiPeriod: The configured business intelligence period.
+    """
     return BiPeriod(
         period_id=PeriodId(period_id),
         kind=kind,
@@ -48,6 +59,12 @@ def period(period_id: str, year: int, kind: PeriodKind) -> BiPeriod:
 
 
 def materialization() -> BiMaterializationRequest:
+    """
+    Create a test materialization request with fixed company and workbook source metadata.
+    
+    Returns:
+        BiMaterializationRequest: A materialization request for the test company and workbook.
+    """
     return BiMaterializationRequest(
         company_id=CompanyId("company-test"),
         display_name="Test Company",
@@ -64,6 +81,12 @@ class QuestionStore:
         self._question = question
 
     def get_job_progress(self, job_id: JobId) -> BiQuestionJobProgress | None:
+        """
+        Provide the failed progress state for a question job.
+        
+        Returns:
+        	BiQuestionJobProgress: Progress showing one failed question and no queued, running, or completed questions.
+        """
         return BiQuestionJobProgress(
             job_id=job_id,
             total_questions=1,
@@ -79,6 +102,7 @@ class QuestionStore:
 
 class AnswerStore:
     def completed_results(self, job_id: JobId) -> tuple[()]:
+        """Return no completed results for the specified job."""
         return ()
 
 
@@ -88,6 +112,11 @@ class SnapshotStore:
         self.published: BiDashboardSnapshot | None = None
 
     def get_current(self, company_id: CompanyId) -> BiDashboardSnapshot | None:
+        """Retrieve the current dashboard snapshot for a company.
+        
+        Returns:
+            BiDashboardSnapshot | None: The current snapshot, or `None` if unavailable.
+        """
         return self._current
 
     def publish(self, snapshot: BiDashboardSnapshot) -> None:

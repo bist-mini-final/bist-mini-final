@@ -76,6 +76,12 @@ export function buildChartPoints(input: ChartViewModelInput): readonly BiChartPo
   });
 }
 
+/**
+ * Builds chart series metadata for metrics available in the dashboard.
+ *
+ * @param metricIds - Identifiers of the metrics to include, in display order
+ * @returns Metadata for each available metric
+ */
 export function getChartSeries(
   dashboard: BiDashboardSnapshot,
   metricIds: readonly MetricId[],
@@ -86,6 +92,14 @@ export function getChartSeries(
   });
 }
 
+/**
+ * Formats a chart value according to its value kind and unit.
+ *
+ * @param value - The value to format, or `null` when data is unavailable
+ * @param valueKind - The kind of value being formatted
+ * @param unit - Optional currency and scale information for amount values
+ * @returns The formatted value, or `데이터 없음` when the value is `null`
+ */
 export function formatChartValue(
   value: number | null,
   valueKind: ValueKind,
@@ -96,6 +110,14 @@ export function formatChartValue(
   return formatAmountValue(value, unit);
 }
 
+/**
+ * Formats a chart axis value according to its metric kind and unit.
+ *
+ * @param value - The value to format
+ * @param valueKind - The kind of metric represented by the value
+ * @param unit - Optional currency and scale information for amount formatting
+ * @returns The formatted axis value
+ */
 export function formatChartAxis(
   value: number,
   valueKind: ValueKind,
