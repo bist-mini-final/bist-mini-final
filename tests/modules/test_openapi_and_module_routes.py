@@ -26,11 +26,11 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         tag_groups = data["x-tagGroups"]
         group_names = [group["name"] for group in tag_groups]
 
-        self.assertIn("1. System & Infrastructure", group_names)
-        self.assertIn("2. RAG Pipeline Modules (modules/*)", group_names)
-        self.assertIn("3. Workflow DAG Execution", group_names)
-        self.assertIn("4. BI Dashboard & Analytics Engine", group_names)
-        self.assertIn("5. RAG Evaluation & Benchmark", group_names)
+        self.assertIn("1. 시스템 및 인프라", group_names)
+        self.assertIn("2. RAG 파이프라인 모듈", group_names)
+        self.assertIn("3. DAG 워크플로 엔진", group_names)
+        self.assertIn("4. BI 대시보드 및 분석 엔진", group_names)
+        self.assertIn("5. RAG 벤치마크 평가", group_names)
 
     def test_openapi_schemas_contain_external_module_dtos(self) -> None:
         """Verify that components.schemas contains Pydantic DTOs from modules/."""
