@@ -64,10 +64,13 @@ WITH (
 
 ---
 
-## 4. 메모리 격리 및 진행률 콜백 (Bounded Memory & Progress Telemetry)
+## 4. 메모리 격리 및 SSE 실시간 진행률 스트리밍 (Memory Isolation & SSE Telemetry)
 
-- **`memoryview` 세그먼트 풀링**: 수 기가바이트의 대형 워크북이라도 전체를 메모리에 올리지 않고, `batch_size=1000` 단위로 분할하여 고정 32MB 이하의 상한선 메모리(Bounded Memory) 내에서 스트리밍 처리.
-- **실시간 프로그레스 스트리밍**: `progress_callback({"processed": count, "total": total})`을 통해 KEDA 및 프론트엔드로 인덱싱 진척도 전달.
+- **`memoryview` 세그먼트 풀링**: 수만 행의 대형 워크북이라도 전체를 메모리에 올리지 않고, `batch_size=1000` 단위로 분할하여 고정 32MB 이하의 상한선 메모리(Bounded Memory) 내에서 스트리밍 처리.
+- **실시간 SSE 프로그레스 이벤트 (`Server-Sent Events`)**:
+  - `progress_callback({"processed": count, "total": total, "percent": 45.2})`가 비동기 SSE 이벤트 버스로 발행됩니다.
+  - **React 프론트엔드 UI ([BP-402], [BP-601])**: `EventSource` (`GET /api/workflows/runs/{id}/stream`)를 통해 사용자 화면의 프로그레스 바가 0ms 지연으로 실시간 갱신됩니다.
+  - **내장 관제 대시보드 ([BP-104 Section 4])**: 관리자 화면(`GET /jobs`)에 워커의 바이너리 인제스천 속도 및 진행률이 실시간 텔레메트리로 표시됩니다.
 
 ---
 
