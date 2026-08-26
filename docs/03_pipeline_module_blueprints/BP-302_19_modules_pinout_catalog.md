@@ -4,9 +4,36 @@
 
 ---
 
-## 1. 3단계 클래스 상속 계층 및 종합 핀아웃 규격 (3-Tier Inheritance Architecture)
+## 1. 3단계 클래스 상속 계층 및 종합 핀아웃 규격 (3-Tier Inheritance & Pinout Architecture)
 
-모든 모듈은 최상위 추상 클래스 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)을 정점으로 하며, LLM 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 19개 구체 모듈로 상속됩니다.
+모든 모듈은 최상위 추상 클래스 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)을 정점으로 하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스 및 **100% 비동기 논블로킹 실행 계약(`execute_async`)**을 준수합니다.
+
+---
+
+### 1.1 표준 비동기 모듈 입출력 핀아웃 계약 (Async Pinout Interface Protocol)
+
+각 모듈은 엄격한 Pydantic 스키마를 통해 입출력 계약(Contract)을 체결하며, 파이프라인 런타임은 이 핀아웃을 기반으로 DAG 결선 유효성을 100% 사전 검증합니다:
+
+```mermaid
+graph LR
+    subgraph ModuleContract ["표준 비동기 모듈 인터페이스 (Async Pinout Interface)"]
+        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.execute_async()"]
+        CFG["Config Pins (ModuleConfigDTO)"] --> MOD
+        MOD --> OUT["Output Pins (Pydantic OutputDTO)"]
+        MOD --> ERR["Error Envelope (ModuleExecutionError)"]
+    end
+```
+
+* **Input Pins (`input_model`)**: 이전 노드의 출력을 주입받는 Pydantic 입력 DTO (타입 검증 자동 수행)
+* **Config Pins (`config_model`)**: 모델명(`model`), 임계값(`top_k`), 타임아웃 등 모듈별 런타임 제어 설정값
+* **Output Pins (`output_model`)**: 후속 노드로 전달되는 결정론적 Pydantic 출력 DTO
+* **Error Envelope (`exceptions.py`)**: Pydantic 검증 실패 또는 Provider API 에러 시 표준 에러 엔벨로프로 즉시 래핑
+
+---
+
+### 1.2 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
+
+LLM 호출, 프롬프트 엔지니어링, 에이전트 도구 루프 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 19개 구체 모듈로 상속됩니다:
 
 ```mermaid
 classDiagram
