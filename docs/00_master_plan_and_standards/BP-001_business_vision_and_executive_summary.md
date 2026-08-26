@@ -26,7 +26,7 @@ flowchart TD
     subgraph SolutionSpace ["bist-mini-final 엔터프라이즈 솔루션"]
         S1["Luna VLM (GPT-5.6) 비전 기반 2D 표 기하학 바운딩박스 검출"]
         S2["무손실 고정소수점 (Decimal) 40+ 전사 재무 지표 및 듀퐁 수식 엔진"]
-        S3["PostgreSQL pgvector Binary COPY 3072d 고속 주입 (5,400+ v/s)"]
+        S3["PostgreSQL pgvector Binary COPY 3072d 고속 대량 주입 파이프라인"]
         S4["모든 생성 수치에 원천 시트/셀 좌표 영구 바인딩 (100% Audit Trail)"]
     end
 
@@ -43,20 +43,22 @@ flowchart TD
 | **2. 2-Tier 분산 실행 런타임** | Tier 1 (인메모리 Fast RAG <100ms) + Tier 2 (K8s KEDA 배치 큐) | 실시간 대화형 챗봇 응답과 수백 개 시트의 대규모 지표 색인을 완벽히 격리 |
 | **3. 무손실 금융 수식 계산** | `decimal.Decimal` 고정소수점 연산 + `ROUND_HALF_UP` 표준화 | 재무 비율 및 듀퐁 3단계 분해 공식에서 부동소수점 오차 0.000% 달성 |
 | **4. 100% 감사 추적성 보장** | 원천 엑셀 셀 좌표(`cell_id`) 영구 메타데이터 바인딩 | 대시보드 및 챗봇 답변의 모든 숫자를 클릭 한 번으로 원본 시트 위치에서 하이라이트 |
-| **5. 초고속 벡터 적재 인프라** | PostgreSQL 네이티브 `Binary COPY` 파이프라인 | 초당 5,400+ 벡터 벌크 주입으로 기존 `INSERT` 대비 45배 이상 처리량 가속 |
+| **5. 초고속 벡터 적재 인프라** | PostgreSQL 네이티브 `Binary COPY` 파이프라인 | 네이티브 Binary 스트리밍으로 SQL 파싱 오버헤드 배제 및 벌크 I/O 성능 극대화 |
 
 ---
 
-## 3. 정량적 벤치마크 실측 성능 요약 (Key Performance Metrics)
+## 3. 정량적 벤치마크 평가 계획 및 목표 KPI (Quantitative Evaluation Plan & Target KPIs)
 
-| 평가 메트릭 (Metric) | 목표치 (Target) | 실측 성능 (Measured) | 달성 여부 및 상세 설명 |
-| :--- | :---: | :---: | :--- |
-| **Exact Match (EM) 정확도** | $\ge 95.0\%$ | **96.8%** | ✅ 목표 초과 달성 (수치, 단위, 통화 완벽 일치) |
-| **Ground-Truth Cell Recall@5**| $\ge 98.0\%$ | **98.4%** | ✅ 목표 초과 달성 (상위 5개 후보 내 정답 셀 포함) |
-| **Fast RAG P95 Latency** | $< 500\text{ms}$ | **340ms** | ✅ 초고속 응답 (인메모리 바인딩 및 2D 표 문맥 확장) |
-| **Binary COPY 적재 속도** | $> 3,000\text{ v/s}$ | **5,400+ vectors/sec** | ✅ 기존 다중 `INSERT` 대비 **45배 I/O 가속** |
-| **재무 수식 환각률 (Hallucination)** | $0.0\%$ | **0.0%** | ✅ `Decimal` 무손실 연산 및 출처 셀 100% 바인딩 |
-| **아키텍처 계약 위반율** | $0\text{건}$ | **0건 (100% Pass)** | ✅ AST 정적 검사 통과 (Zero Architecture Drift) |
+향후 파이프라인 개발 및 최적화 완료 후 [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md) 벤치마크 하네스를 통해 실제 측정할 핵심 목표 지표입니다:
+
+| 평가 영역 (Evaluation Dimension) | 핵심 메트릭 (Metric) | 목표치 (Target KPI) | 측정 방식 및 기준 |
+| :--- | :--- | :---: | :--- |
+| **수치 및 단위 정확도** | **Exact Match (EM)** | $\ge 95.0\%$ | Ground-Truth 정답과 생성된 수치, 단위, 통화의 100% 일치율 |
+| **검색 재현율** | **Ground-Truth Cell Recall@5** | $\ge 98.0\%$ | 정답 근거 셀이 상위 5개 RRF 검색 후보에 포함되는 비율 |
+| **응답 지연시간** | **Fast RAG P95 Latency** | $< 500\text{ms}$ | 인메모리 포트 바인딩 기반 단일 질의응답 95백분위 처리 시간 |
+| **벌크 색인 속도** | **pgvector 적재 속도** | $> 3,000\text{ v/s}$ | PostgreSQL `Binary COPY` 스트리밍 기반 초당 벡터 주입량 |
+| **회계 수식 신뢰성** | **Hallucination Rate** | $0.0\%$ | 무손실 `Decimal` 연산 적용을 통한 산술 오차 및 허위 수치 인용 0건 |
+| **아키텍처 불변식** | **Contract Violation** | $0\text{건}$ | AST 정적 분석(`test_architecture_contracts.py`)을 통한 레이어 침범 0건 |
 
 ---
 
