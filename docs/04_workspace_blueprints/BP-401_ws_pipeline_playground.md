@@ -68,3 +68,6 @@ flowchart TB
    - To-Be: 컴포넌트별 CSS Modules 또는 Tailwind CSS v4 유틸리티 클래스로 분할 리팩토링.
 2. **템플릿 프리셋 갤러리**:
    - "기본 하이브리드 RAG", "VLM 엑셀 인덱싱 파이프라인", "재무 비율 직접 계산" 등 사전 정의된 원클릭 DAG 프리셋 로더 추가.
+3. **노드 설정 인스펙터 & 파라미터 튜너 패널 활성화 (`NodeConfigInspector`)**:
+   - **As-Is**: 노드 클릭 시 실행 트레이스 패널(`TracePanel`)만 연동되고, 모듈의 런타임 설정 파라미터(`ModuleConfigDTO`, 예: `model`, `top_k`, `temperature`)를 직접 수정할 수 있는 `NodeConfigInspector` 사이드 패널이 열리지 않음.
+   - **To-Be**: 노드 선택 시 백엔드 `GET /api/modules/{module_type}/schema`로부터 Pydantic Config JSON Schema를 동적으로 조회하여 폼 컨트롤러를 자동 렌더링하고 실시간 파라미터 오버라이드 및 노드 상태에 즉시 반영.
