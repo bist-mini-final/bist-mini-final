@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { RotateCcw, X } from 'lucide-react';
+import { useModalDialog } from './useModalDialog';
 
 interface ResetLayoutDialogProps {
   readonly onConfirm: () => void;
@@ -7,11 +7,7 @@ interface ResetLayoutDialogProps {
 }
 
 export function ResetLayoutDialog({ onConfirm, onClose }: ResetLayoutDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (dialogRef.current && !dialogRef.current.open) dialogRef.current.showModal();
-  }, []);
+  const dialogRef = useModalDialog();
 
   return (
     <dialog
@@ -38,4 +34,3 @@ export function ResetLayoutDialog({ onConfirm, onClose }: ResetLayoutDialogProps
     </dialog>
   );
 }
-
