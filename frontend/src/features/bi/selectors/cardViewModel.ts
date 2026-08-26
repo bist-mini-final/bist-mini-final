@@ -48,6 +48,11 @@ const STATE_LABELS: Readonly<Record<CardState, string>> = {
 function getCardState(definition: BiCardDefinition, metrics: BiDashboardSnapshot['metrics']): CardState {
   const primaryStatus = metrics[definition.primaryMetric]?.status ?? 'missing';
   const statuses = definition.requiredMetrics.map((metricId) => metrics[metricId]?.status ?? 'missing');
+  const availableCount = statuses.filter((status) => status === 'available').length;
+
+  if (definition.id === 'financial_health_heatmap' && availableCount > 0) {
+    return availableCount === statuses.length ? 'ready' : 'partial';
+  }
 
   // If the primary metric has available data, allow the chart to render (ready or partial)
   if (primaryStatus === 'available') {
@@ -57,7 +62,6 @@ function getCardState(definition: BiCardDefinition, metrics: BiDashboardSnapshot
 
   if (statuses.includes('invalid')) return 'invalid';
   if (statuses.includes('ambiguous')) return 'ambiguous';
-  const availableCount = statuses.filter((status) => status === 'available').length;
   if (availableCount === 0) return 'missing';
   if (availableCount < statuses.length) return 'partial';
   return 'ready';

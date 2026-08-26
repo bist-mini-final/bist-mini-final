@@ -7,10 +7,45 @@ import {
   fetchBiMaterializationJob,
   fetchBiQuestionJob,
   refreshBiDashboard,
+  resetBiDashboard,
   streamBiMaterializationJob,
 } from '../../services/api';
 
 const fetchMock = vi.fn<typeof fetch>();
+
+const dashboardPayload = {
+  schema_version: 1,
+  company: { company_id: 'acme', display_name: 'ACME' },
+  source: {
+    file_name: 'acme.xlsx',
+    workbook_hash: 'a'.repeat(64),
+    index_id: 'index-acme',
+  },
+  snapshot: {
+    snapshot_id: 'snapshot-recalculated',
+    workbook_hash: 'a'.repeat(64),
+    status: 'ready',
+    generated_at: '2026-08-25T00:00:00Z',
+    catalog_version: '2',
+    formula_version: '2',
+  },
+  refresh: {
+    status: 'idle',
+    job_id: 'recalculation-test',
+    started_at: null,
+    message: null,
+  },
+  periods: [{
+    period_id: 'fy-2025',
+    kind: 'fy',
+    label: 'FY2025',
+    source_label: 'FY2025',
+    end_date: '2025-12-31',
+    ordinal: 2025,
+  }],
+  metrics: {},
+  issues: [],
+};
 
 describe('BI API service', () => {
   beforeEach(() => {
@@ -184,7 +219,26 @@ describe('BI API service', () => {
     expect(statuses).toEqual(['extracting', 'ready']);
   });
 
-  it('queues and reads a single-question dashboard refresh job', async () => {
+  it('recalculates a dashboard without queueing a question job', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(dashboardPayload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    const result = await refreshBiDashboard(
+      'acme',
+      new AbortController().signal,
+    );
+
+    expect(result.snapshot.snapshotId).toBe('snapshot-recalculated');
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    if (!(request instanceof Request)) return;
+    expect(request.method).toBe('POST');
+    expect(new URL(request.url).pathname).toBe('/api/bi/companies/acme/refresh');
+  });
+
+  it('resets and reads a question regeneration job', async () => {
     const progress = {
       job_id: 'question-job-refresh',
       total_questions: 26,
@@ -204,7 +258,7 @@ describe('BI API service', () => {
       }));
 
     const signal = new AbortController().signal;
-    const queued = await refreshBiDashboard('acme', signal);
+    const queued = await resetBiDashboard('acme', signal);
     const current = await fetchBiQuestionJob(queued.jobId, signal);
 
     expect(queued.totalQuestions).toBe(26);
@@ -215,7 +269,7 @@ describe('BI API service', () => {
     expect(second).toBeInstanceOf(Request);
     if (!(first instanceof Request) || !(second instanceof Request)) return;
     expect(first.method).toBe('POST');
-    expect(new URL(first.url).pathname).toBe('/api/bi/companies/acme/refresh');
+    expect(new URL(first.url).pathname).toBe('/api/bi/companies/acme/reset');
     expect(new URL(second.url).pathname).toBe(
       '/api/bi/question-jobs/question-job-refresh',
     );
