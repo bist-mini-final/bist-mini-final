@@ -89,3 +89,18 @@ uv run pytest tests/
 uv run ruff check .
 uv run pyright
 ```
+
+---
+
+## 5. 리팩토링 타깃 (Refactoring Targets)
+
+1. **신규 기능 및 모듈 추가 시 단위 테스트 동반 확장 (Test Suite Co-Evolution)**:
+   - **원칙**: 향후 신규 파이프라인 모듈(예: `DocumentProfilerModule`, `FinancialCalculatorModule`)이나 신규 비즈니스 기능(AI 챗봇 세션, 다중 기업 비교, 반정밀도 양자화 등) 추가 시, 반드시 **모듈별 독립 단위 테스트(`tests/modules/test_*.py`)와 입출력 Pydantic 핀아웃 계약 검증 테스트를 의무적으로 동반 추가**합니다.
+   - **AST 아키텍처 규칙 확장**: 신규 레이어나 컴포넌트가 추가될 때마다 `test_architecture_contracts.py`에 불변식(Layer Inversion 차단 규칙)을 즉시 갱신하여 아키텍처 드리프트를 0%로 유지합니다.
+   - **벤치마크 데이터셋 동기화**: 신규 도메인 수식 및 시나리오에 대한 Ground-Truth 정답 Q&A 데이터셋을 확충하여 릴리즈 전 회귀(Regression) 여부를 정량 검증합니다.
+2. **비동기 E2E 통합 테스트 자동화 (Full-Cycle Test Harness)**:
+   - As-Is: 개별 모듈 및 도메인 단위 테스트 위주.
+   - To-Be: FastAPI HTTP 호출 ➡️ 분산 워커 큐 디스패치 ➡️ PostgreSQL pgvector Binary COPY ➡️ SSE 스트리밍 수신까지 이어지는 엔드투엔드 비동기 통합 테스트 스위트 구축.
+3. **GitHub Actions CI/CD 검증 파이프라인 연동**:
+   - 모든 PR 및 커밋 푸시 시 `AST 검증` + `단위 테스트` + `Pyright 타입 검사` + `Ruff 린트`를 병렬 자동 실행하여 머지 전 무결성을 자동 보장.
+
