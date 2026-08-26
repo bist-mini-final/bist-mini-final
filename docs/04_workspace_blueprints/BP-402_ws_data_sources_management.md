@@ -46,7 +46,7 @@ graph TD
 
 1. 사용자가 워크북 선택 후 **"pgvector 색인 생성"** 버튼 클릭.
 2. 백엔드 `POST /api/data-sources/ingest` 호출 -> Luna VLM 감지 -> 직렬화 -> 임베딩 -> Binary COPY 일괄 실행.
-3. **Database Connection Probe**: 우측 상단 인디케이터가 PostgreSQL 및 pgvector 확장의 정상 가동 여부(`SELECT 1`, `vector_cosine_ops` 인덱스 상태)를 SSE 헬스 스트림(`/api/system/health/stream`)을 통해 실시간 수신하여 표시 (Zero HTTP Polling).
+3. **Database Connection Probe**: 우측 상단 인디케이터가 페이지 진입(Mount) 시 `GET /api/data-sources/probe`를 단 1회 호출하여 PostgreSQL 및 pgvector 정상 가동 여부를 확인 및 표시 (주기적 폴링 없음, 필요 시 새로고침 버튼으로 1회 재조회).
 
 ---
 
