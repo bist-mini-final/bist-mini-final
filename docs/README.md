@@ -145,11 +145,12 @@ gantt
 
 ## 6. 청사진 네비게이션 맵 (Master Blueprint Matrix)
 
-본 설계서는 **8대 도메인, 총 21개의 정밀 엔지니어링 규격서**로 구성되어 있습니다:
+본 설계서는 **8대 도메인, 총 22개의 정밀 엔지니어링 규격서**로 구성되어 있습니다:
 
 | 영역 | 문서 코드 | 문서명 및 핵심 내용 | 주요 대상 코드 / 리팩토링 타깃 |
 | :--- | :--- | :--- | :--- |
-| **00. 표준 및 컨벤션** | [BP-001](file:///c:/Repos/bist-mini-final/docs/00_standards/BP-001_code_style_and_conventions.md) | **엔지니어링 코드 컨벤션 & 구현 표준 규격서**<br>Pydantic DTO 완전 타입화, 제로 예외 보일러플레이트, 무이모티콘 & Lucide SVG 표준 | [`.agents/rules/code-style-guide.md`](file:///c:/Repos/bist-mini-final/.agents/rules/code-style-guide.md), [`modules/common/`](file:///c:/Repos/bist-mini-final/modules/common/) |
+| **00. 마스터 계획 & 표준** | [BP-001](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_executive_summary_and_business_plan.md) | **엔터프라이즈 재무 RAG 사업계획서 & 종합 기술 설계서**<br>사업 배경, 5대 유즈케이스, 정량 벤치마크 실측치, R&R, 타임라인 | [`docs/README.md`](file:///c:/Repos/bist-mini-final/docs/README.md), 전사 기획서 |
+| | [BP-002](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_code_style_and_conventions.md) | **엔지니어링 코드 컨벤션 & 구현 표준 규격서**<br>Pydantic DTO 완전 타입화, 제로 예외 보일러플레이트, 무이모티콘 & Lucide SVG 표준 | [`.agents/rules/code-style-guide.md`](file:///c:/Repos/bist-mini-final/.agents/rules/code-style-guide.md), [`modules/common/`](file:///c:/Repos/bist-mini-final/modules/common/) |
 | **01. 코어 아키텍처** | [BP-101](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md) | **시스템 전체 배치도 & 2-Tier 런타임 토폴로지**<br>전체 아키텍처, 런타임 분기, DI 컨테이너 | [`backend/bootstrap/container.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py), [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py) |
 | | [BP-102](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-102_backend_layered_architecture.md) | **백엔드 7단계 계층 설계도 & 인터페이스 결합도**<br>Presentation ~ Storage 레이어 격리 및 DIP 규칙 | [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/features/`](file:///c:/Repos/bist-mini-final/backend/features/), [`backend/storage/`](file:///c:/Repos/bist-mini-final/backend/storage/) |
 | | [BP-103](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | **분산 락, 임차권(Lease) & 경합 회복 시퀀스**<br>Worker Lease 토큰 및 고아 작업 회복 FSM | [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py) |
@@ -158,7 +159,7 @@ gantt
 | | [BP-202](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) | **Luna VLM 이미지 렌더링 & 표 바운딩박스 검출**<br>Pillow 이미지 렌더링, GPT-5.6 Luna 구조 추론 | [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py) |
 | | [BP-203](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | **대용량 바이너리 COPY & pgvector 인덱싱**<br>초당 5,000+ 벡터 주입 고속 파이프라인 및 HNSW | [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py) |
 | **03. 파이프라인 모듈** | [BP-301](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | **DAG 토폴로지 실행기 & 상태머신(FSM)**<br>위상 정렬, 노드 상태 전이, 에러 바운더리 격리 | [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py) |
-| | [BP-302](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_19_modules_pinout_catalog.md) | **21개 모듈 입출력 핀아웃(Pinout) 카탈로그**<br>21개 단품 모듈별 Input/Output/Config 핀 규격서 | [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py) |
+| | [BP-302](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md) | **21개 모듈 입출력 핀아웃(Pinout) 카탈로그**<br>21개 단품 모듈별 Input/Output/Config 핀 규격서 | [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py) |
 | | [BP-303](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | **Dense + Sparse + RRF 융합 & 셀 확장 회로**<br>pgvector + BM25 tsvector + RRF($k=60$) + 2D Context | [`modules/retrieval/`](file:///c:/Repos/bist-mini-final/modules/retrieval/) |
 | **04. 워크스페이스** | [BP-401](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md) | **[구현됨] Pipeline Playground 워크스페이스**<br>React Flow 캔버스, 노드 커넥터, SSE 스트림 바인딩 | [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/) |
 | | [BP-402](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-402_ws_data_sources_management.md) | **[구현됨] Data Sources Management 워크스페이스**<br>시트 뷰어, VLM 바운딩박스 오버레이, 색인 관리기 | [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/) |
@@ -182,9 +183,10 @@ flowchart TD
     START(["📘 마스터 청사진 시작 (docs/README.md)"])
 
     subgraph TrackA ["🚀 Track A: 제품 & 풀스택 기능 흐름 (Product & UI Track)"]
-        A1["BP-001: 구현 표준 & 디자인 토큰"] --> A2["BP-101: 시스템 전체 토폴로지"]
-        A2 --> A3["BP-401 ~ BP-405: 5대 워크스페이스"]
-        A3 --> A4["BP-601: React SPA 결선도 & 라우트"]
+        A1["BP-001: 사업계획서 & 종합 설계서"] --> A2["BP-002: 구현 표준 & 디자인 토큰"]
+        A2 --> A3["BP-101: 시스템 전체 토폴로지"]
+        A3 --> A4["BP-401 ~ BP-405: 5대 워크스페이스"]
+        A4 --> A5["BP-601: React SPA 결선도 & 라우트"]
     end
 
     subgraph TrackB ["⚙️ Track B: 데이터 & 파이프라인 심층 흐름 (Data & Pipeline Track)"]
@@ -205,7 +207,7 @@ flowchart TD
 
 | 독자 역할 및 목적 | 권장 읽기 순서 (Document Navigation Journey) | 핵심 획득 역량 및 이해 목표 |
 | :--- | :--- | :--- |
-| **🚀 풀스택 / 프론트엔드 개발자** | `README` ➡️ [`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_standards/BP-001_code_style_and_conventions.md) ➡️ [`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md) ➡️ [`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)~[`405`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-405_ws_company_comparison.md) ➡️ [`BP-601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | • UI/UX 디자인 시스템 토큰 및 무이모티콘 규격 습득<br>• 5대 워크스페이스별 컴포넌트 구조 및 React SPA 라우팅 흐름 이해 |
+| **🚀 풀스택 / 프론트엔드 개발자** | `README` ➡️ [`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_executive_summary_and_business_plan.md) ➡️ [`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_code_style_and_conventions.md) ➡️ [`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md) ➡️ [`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)~[`405`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-405_ws_company_comparison.md) ➡️ [`BP-601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | • UI/UX 디자인 시스템 토큰 및 무이모티콘 규격 습득<br>• 5대 워크스페이스별 컴포넌트 구조 및 React SPA 라우팅 흐름 이해 |
 | **⚙️ AI 엔지니어 / 백엔드 개발자** | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)~[`203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) ➡️ [`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)~[`303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) ➡️ [`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)~[`503`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-503_database_erd_and_ddl.md) | • 엑셀 셀 좌표 파싱, Luna VLM 및 pgvector 3072d 고속 주입 원리<br>• 21개 파이프라인 모듈 Pinout 규격 및 Dense+Sparse+RRF 융합 수식 습득 |
 | **🏗️ 시스템 아키텍트 / DevOps** | [`BP-102`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-102_backend_layered_architecture.md) ➡️ [`BP-103`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md) ➡️ [`BP-104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) ➡️ [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md) | • 7계층 Screaming Architecture 및 3-Level 분산 락/임차권 모델 검증<br>• K8s KEDA 배치 큐잉, 실시간 관제 및 AST 정적 계약 검증 체계 확보 |
 
