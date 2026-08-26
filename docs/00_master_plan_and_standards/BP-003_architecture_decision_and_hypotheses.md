@@ -24,12 +24,24 @@ flowchart TD
 
 ## 2. 6대 핵심 아키텍처 가설 및 트레이드오프 분석
 
-### 🔬 [Hypothesis 1] 비전 VLM 표 기하학 감지 vs 순수 텍스트 줄글 청킹
-* **가설 (Hypothesis)**: 재무 엑셀은 병합 헤더와 상하 분산 단위가 많아, 시각적 비전 모델(Luna VLM)로 2D 바운딩박스를 먼저 추출하고 `header_with_value`로 직렬화하는 것이 줄글 청킹보다 행-열 교차 의미를 온전히 보존할 것이다.
-* **아키텍처 대조군 비교 (Trade-off Analysis)**:
-  * 대조군 A (Raw Text Chunking): 줄글 청킹 시 계층 헤더 분절 및 단위 정보 유실 극심.
-  * 대조군 B (Markdown Table Parsing `|---|`): 단순 마크다운 변환 시 병합 셀 처리 불가 및 다단 헤더 왜곡.
-  * **채택안 (Luna VLM + `header_with_value`)**: 이미지 래스터라이징 기반 표 바운딩박스 검출 후 `Company | Sheet | Row Header | Col Header | Value | Unit` 단일 정규 직렬화.
+### 🔬 [Hypothesis 1] 비전 VLM 표 기하학 감지 vs 4대 대조군 (줄글, 마크다운, BFS, Docling)
+* **가설 (Hypothesis)**: 재무 엑셀은 병합 헤더, 상하 분산 단위, 빈 셀 갭(Blank Gap)이 복잡하게 얽혀 있어, 순수 텍스트 줄글이나 좌표 탐색 알고리즘(BFS), 범용 문서 파서(Docling)보다 **시각적 비전 모델(Luna VLM)로 2D 표 기하 바운딩박스를 먼저 검출하고 `header_with_value`로 직렬화**하는 것이 행-열 교차 의미와 회계 계층을 가장 온전히 보존할 것이다.
+* **아키텍처 4대 대조군 심층 트레이드오프 비교 (Trade-off Analysis)**:
+  * **대조군 A (Raw Text Chunking / 단순 줄글 청킹)**:
+    * 엑셀 셀을 순차적 텍스트로 단순 청킹.
+    * 🛑 **한계**: 2차원 교차 기하 구조 파괴, 계층 헤더 분절, 상하/좌우 수치 및 단위(`단위: 백만원`) 완전 유실.
+  * **대조군 B (Markdown Table Parsing `|---|` / 기본 마크다운 테이블 변환)**:
+    * 오픈소스 엑셀 변환기를 통해 마크다운 표로 변환.
+    * 🛑 **한계**: 복합 병합 셀(Merged Cells) 복원 불가, 다단 계층 헤더 분절, 수십 개 열 존재 시 토큰 길이 폭증 및 LLM 컨텍스트 윈도우 낭비.
+  * **대조군 C (BFS 그래프 탐색 휴리스틱 / BFS Coordinate Traversal)**:
+    * OpenPyXL 셀 좌표 그리드에서 비어있지 않은 셀을 시작 노드로 인접 유효 셀을 BFS(너비 우선 탐색)로 클러스터링하여 표 경계 추정.
+    * 🛑 **한계**: 재무제표 특유의 빈 셀(Blank/Null Gap), 점선 요약 행, 서식 공백에서 탐색이 조기 중단(Early Stop)되거나, 시각적으로 분리된 여러 보조표를 하나의 거대 표로 오병합(Over-merging)하는 구조적 휴리스틱 한계 발생.
+  * **대조군 D (Docling + OpenPyXL 하이브리드 파싱 / Docling Layout Parsing)**:
+    * IBM Docling 등 최신 문서 레이아웃 파서와 OpenPyXL 좌표를 결합하여 구조 추출.
+    * 🛑 **한계**: 일반 PDF/보고서 본문 표에는 유효하나, 다중 시트 회계 엑셀(`.xlsx`) 내 다층 병합 헤더(예: `[2023년] -> [연결/별도] -> [매출액/영업이익]`)의 부모-자식 트리 관계 추론에 실패하고 단위 스케일 앵커링이 왜곡됨.
+  * **최종 채택안 (Proposed: Luna VLM 2D 이미지 래스터라이징 + 표 기하학 바운딩박스 검출 + `header_with_value` 단일 정규 직렬화)**:
+    * Pillow 엑셀 시트 래스터라이징 ➡️ GPT-5.6 Luna VLM을 통한 2D 시각적 바운딩박스(표 경계, 다계층 헤더, 데이터 영역) 1-Shot 검출 ➡️ OpenPyXL 정밀 좌표 매핑 ➡️ `Company | Sheet | Row Header | Col Header | Value | Unit` 단일 정규 직렬화.
+    * 사람이 엑셀을 육안으로 보듯 2D 시각적 맥락을 완벽 보존하며 병합 셀, 빈 셀 갭, 다층 단위를 100% 무결하게 복원.
 * **아키텍처 결정**: **Luna VLM 2D 표 기하 감지 및 `header_with_value` 단일 직렬화 공식 채택 ([`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md), [`BP-202`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md))**.
 
 ---
