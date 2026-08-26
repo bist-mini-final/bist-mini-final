@@ -13,9 +13,11 @@ erDiagram
     langchain_pg_collection ||--o{ langchain_pg_embedding : "groups"
     source_files ||--o{ bi_profiles : "profiles"
     bi_profiles ||--o{ bi_profile_sheets : "includes"
-    bi_profiles ||--o{ bi_metrics : "extracts"
     bi_profiles ||--o{ bi_question_snapshots : "materializes"
-    workflow_runs ||--o{ bi_question_snapshots : "executes"
+    
+    workflow_runs ||--o{ bi_question_snapshots : "executes (BI)"
+    workflow_runs ||--o{ source_files : "executes (Ingestion)"
+    workflow_runs ||--o{ benchmark_runs : "executes (Benchmark)"
 
     source_files {
         varchar file_id PK
@@ -61,6 +63,7 @@ erDiagram
         varchar lease_token
         varchar status
         int priority
+        boolean cancel_requested
         jsonb inputs
         jsonb outputs
         jsonb error
@@ -89,7 +92,30 @@ erDiagram
         jsonb evidence_cells
         timestamptz materialized_at
     }
+
+    benchmark_runs {
+        varchar run_id PK
+        varchar dataset_id
+        numeric accuracy_score
+        numeric latency_avg_ms
+        jsonb evaluation_summary
+        timestamptz evaluated_at
+    }
 ```
+
+---
+
+### 1.1 `workflow_runs` 범용 워크플로우 실행 원장 매트릭스 (Universal Workflow Ledger)
+
+`workflow_runs` 테이블은 특정 비즈니스(BI)에 국한되지 않고, **시스템 내의 모든 비동기 DAG 실행, 인제스천 파이프라인, 벤치마크 평가 및 샌드박스 실험 이력을 총괄하는 단일 중앙 원장(Single Central Ledger)**입니다:
+
+| 워크플로우 유형 | `workflow_id` 식별자 | `queue_name` | 주요 실행 내용 및 입출력 (`inputs` / `outputs`) | 연계 워크스페이스 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Playground DAG 실험** | `wf-interactive-playground` | `workflow-core` | • 21개 모듈 임의 2D 결선 그래프 비동기 실행<br>• `inputs`: 사용자 질의, 노드별 파라미터<br>• `outputs`: 각 노드별 중간 산출물 맵 | **Pipeline Playground**<br>([`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)) |
+| **엑셀 인제스천 파이프라인** | `wf-excel-ingestion` | `workflow-ingest` | • Luna VLM 표 감지, 직렬화, 3072d 임베딩, Binary COPY<br>• `inputs`: `file_id`, `sheet_names`<br>• `outputs`: `persisted_vectors_count`, `artifact_id` | **Data Sources**<br>([`BP-402`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-402_ws_data_sources_management.md)) |
+| **재무 BI 자동 분석** | `wf-financial-bi-analytics` | `workflow-bi` | • 프로파일링(기간/단위 탐색) ➡️ 40+ 지표 질의 ➡️ 수식 계산<br>• `inputs`: `company_name`, `workbook_hash`<br>• `outputs`: 기간별 40개 파생비율 및 스냅샷 ID | **Financial BI**<br>([`BP-403`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md)) |
+| **정확도 벤치마크 평가** | `wf-accuracy-benchmark` | `workflow-benchmark` | • Ground-Truth Q&A 데이터셋 대량 배치 평가<br>• `inputs`: `dataset_path`, `target_pipeline_config`<br>• `outputs`: Recall@K, Exact Match율, 평균 레이턴시 | **Benchmark Workspace** |
+| **AI 챗봇 추론 세션** | `wf-ai-chatbot-session` | `workflow-fast` | • 사용자 멀티턴 금융 질의에 대한 Fast RAG 및 에이전틱 리즈너 실행<br>• `inputs`: `session_id`, `user_prompt`<br>• `outputs`: 생성 답변, 인용 셀 목록 | **AI Chatbot Workspace** |
 
 ---
 
