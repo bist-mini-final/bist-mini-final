@@ -71,6 +71,16 @@
 | `POST`| `/api/benchmarks/run` | Ground-Truth 데이터셋 기반 정확도 벤치마크 실행 | `BenchmarkRunRequest` -> `BenchmarkRunResult` |
 | `GET` | `/api/benchmarks/runs/{run_id}` | 벤치마크 점수(Accuracy, Recall@K, Latency) 조회 | `BenchmarkEvaluationReport` |
 
+### [Group 6: 시스템 관리 및 K8s 잡 관제 포털 (`/admin`, `/api/admin`)]
+
+| Method | Endpoint | 설명 | Request / Response |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/admin/jobs` | 백엔드 내장 K8s 배치 잡 & 워커 실시간 관제 대시보드 | HTML / SPA 대시보드 (200 OK) |
+| `GET` | `/api/admin/jobs` | 현재 K8s 활성 워커 Pod 목록 및 Lease 락 상태 조회 | `List[K8sWorkerPodStatusDTO]` |
+| `GET` | `/api/admin/jobs/stream` | K8s Pod 스케일아웃 및 라이프사이클 SSE 실시간 스트림 | `text/event-stream` (Pod Events) |
+| `GET` | `/api/admin/jobs/{pod_name}/logs` | 특정 워커 Pod의 컨테이너 표준 출력(stdout) 실시간 로그 스트림 | `text/event-stream` (Log Lines) |
+| `POST`| `/api/admin/jobs/{run_id}/cancel` | 고아/응답 없는 작업 강제 회수 및 Lease 반환 | `{"status": "cancelled", "released_lease": true}` |
+
 ---
 
 ## 3. 리팩토링 타깃 (Refactoring Targets)
