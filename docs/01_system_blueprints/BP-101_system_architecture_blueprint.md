@@ -141,9 +141,9 @@ sequenceDiagram
 
 ---
 
-## 3. 부트스트랩 DI 컨테이너 구성 (Bootstrap Container Wireframing)
+## 3. 부트스트랩 DI 컨테이너 구성 (Bootstrap DI Container Architecture)
 
-애플리케이션은 [`ApplicationContainer`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py#L106-L140) 단일 진입점을 통해 모든 하위 의존성을 조립합니다.
+애플리케이션은 [`ApplicationContainer`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py#L106-L140) 단일 진입점(Composition Root)을 통해 모든 하위 의존성을 조립하고, 프로세스 수명주기 동안 핵심 자원의 **싱글톤(Singleton) 생명주기를 전담 관리**합니다.
 
 ```mermaid
 classDiagram
@@ -177,9 +177,60 @@ classDiagram
         +EmbeddingArtifactStore embedding_artifact_store
     }
 
-    ApplicationContainer *-- RuntimeContainer
-    RuntimeContainer *-- WorkflowRuntimeServices
+    ApplicationContainer *-- RuntimeContainer : 소유 및 수명주기 위임
+    RuntimeContainer *-- WorkflowRuntimeServices : 순수 실행 엔진 번들 소유
 ```
+
+---
+
+### 3.1 부트스트랩(Bootstrap)과 싱글톤 관리 원칙
+
+1. **부트스트랩(Bootstrap)의 정의**:
+   - 서버 시동(FastAPI `lifespan startup`) 시점에 환경 변수 로드, DB 커넥션 풀 초기화, AI 모델 클라이언트 생성, 19개 파이프라인 모듈 등록을 **단 한 곳의 조립 루트(`backend/bootstrap/container.py`)에서 일괄 실행**하여 애플리케이션을 즉시 동작 가능한 상태로 준비시키는 초기화 과정입니다.
+2. **컨테이너 기반 싱글톤(Container-Managed Singleton)**:
+   - 전역 변수(`global`)나 하드코딩 싱글톤 패턴을 배제하고, `ApplicationContainer`가 DB 커넥션 풀, OpenAI 클라이언트, 19개 모듈 인스턴스를 **메모리에 단 1회만 생성하여 보관**합니다.
+   - 모든 HTTP/WebSocket 요청은 이 컨테이너로부터 의존성을 주입(DI)받아 재사용함으로써 불필요한 객체 생성 비용을 0으로 억제하고 커넥션 풀 고갈을 방지합니다.
+
+---
+
+### 3.2 3대 DI 컨테이너 상세 명세 및 계층 배치 이유
+
+#### 1. `ApplicationContainer` (최상위 웹 프로세스 전용 루트)
+* **운영 위치**: 오직 **FastAPI 메인 웹 서버 프로세스(`backend/main.py`)**에서만 단 1개 인스턴스화됩니다.
+* **소유 필드 및 컴포넌트**:
+  - `runtime: RuntimeContainer`: 하위 AI 프로바이더 및 DAG 실행 엔진을 묶고 있는 공유 런타임 브리지.
+  - `workflow_dispatcher: KubernetesQueueDispatcher`: 실행 요청이 대규모 비동기 작업(Tier 2)일 때 PostgreSQL 큐에 등록하고 KEDA 워커를 트리거하는 분산 큐 디스패처.
+  - `bi_services: BiApiServices`: 40+ 전사 재무 지표 산출, 듀퐁 분석, 기업 프로파일 조회를 전담하는 도메인 서비스.
+  - `recover_pending_runs() -> int`: 서버 비정상 재부팅 시 DB에 멈춰있던 고아(`QUEUED`/`RUNNING`) 작업을 감지하여 큐로 자동 재발송하거나 안전하게 정리.
+  - `close() -> None`: 서버 셧다운(`lifespan shutdown`) 시 분산 큐 리스너를 취소하고 하위 런타임 리소스를 우아하게 해제(Graceful Shutdown).
+* **계층 배치 이유**:
+  - Worker Pod에는 불필요한 **"FastAPI 웹 전용 오케스트레이션, 도메인 비즈니스 서비스, 서버 기동/종료 라이프사이클 관리 책임"**을 최상위 웹 계층에 완벽히 격리하기 위함입니다.
+
+#### 2. `RuntimeContainer` (웹 & KEDA 워커 공통 AI/인프라 브리지)
+* **운영 위치**: **FastAPI 웹 서버**와 **KEDA Worker Pod(`backend/engine/worker/main.py`)** 양쪽 모두에서 생성 및 공유됩니다.
+* **소유 필드 및 컴포넌트**:
+  - `openai_provider: OpenAIProvider`: OpenAI API 통신을 위한 기본 HTTP 클라이언트 및 API 키 관리자.
+  - `completion_client: OpenAIResponsesClient`: GPT-5.6 Luna LLM/VLM 모델을 기반으로 텍스트 및 Pydantic 구조화 생성을 1-shot/Agentic으로 호출하는 단일 클라이언트.
+  - `embedding_encoder: OpenAIEmbeddingEncoder`: `text-embedding-3-large` (3072차원) 고차원 벡터 임베딩 인코더.
+  - `services: WorkflowRuntimeServices`: 실제 DAG 파이프라인을 실행하는 핵심 서비스 번들.
+  - `paths: RuntimePaths`: `/data/cache`, `/data/artifacts`, `/data/runs` 등 디스크 파일 시스템 절대 경로 싱글톤.
+  - `pgvector_probe: PgVectorConnectionProbe`: PostgreSQL 및 3072d pgvector 확장 연결 상태를 검증하는 헬스 프로브.
+  - `_owns_openai_provider: bool`: 프로세스 종료 시 OpenAI 클라이언트 연결 풀을 안전하게 닫을 소유권 플래그.
+* **계층 배치 이유**:
+  - 웹 프로세스와 백그라운드 워커 프로세스가 **100% 동일한 AI 모델(GPT-5.6 Luna / 3072d)과 물리 파일 경로 설정**을 갖도록 보장하여, **"웹에서는 정상인데 워커 Pod에서는 모델이나 경로가 달라 파이프라인이 깨지는 워커 드리프트(Worker Drift)" 현상을 원천 차단**합니다.
+
+#### 3. `WorkflowRuntimeServices` (순수 DAG 실행 엔진 & 데이터 스토리지 번들)
+* **운영 위치**: 웹과 워커 환경에 상관없이 **실제 19개 모듈로 구성된 DAG 파이프라인을 조립하고 실행하는 최소 단위 객체 그래프**.
+* **소유 필드 및 컴포넌트**:
+  - `module_registry: ModuleRegistry`: 19개 순수 RAG 파이프라인 모듈(질의분해, 하이브리드 검색, VLM 감지, 수식 리더 등)의 싱글톤 인스턴스 카탈로그.
+  - `workflow_executor: WorkflowExecutor`: DAG 노드 위상 정렬(Kahn's Algorithm), 순환 의존성 검사, `asyncio.TaskGroup` 기반 비동기 병렬 실행을 총괄하는 코어 엔진.
+  - `pgvector_store: PgVectorStore`: PostgreSQL 16 + pgvector (3072d HNSW 코사인 유사도 검색 및 Binary COPY 대량 색인) 전담 어댑터.
+  - `db_manager: DatabaseManager`: PostgreSQL 비동기 커넥션 풀(`AsyncConnectionPool`) 및 트랜잭션 관리자.
+  - `workflow_store: WorkflowStore`: 사용자가 저장한 DAG 그래프 JSON 문서의 영속 저장소.
+  - `run_store: RunStore`: 개별 실행 인스턴스(`workflow_runs`)의 FSM 상태 전이(RUNNING, COMPLETED, FAILED) 및 노드별 실행 결과 트레이스 저장소.
+  - `embedding_artifact_store: EmbeddingArtifactStore`: 엑셀 시트별 직렬화 텍스트 및 3072d 벡터 바이너리 아티팩트 디스크 저장소.
+* **계층 배치 이유**:
+  - 외부 프레임워크나 API를 전혀 모르는 **순수 불변 데이터 클래스(`@dataclass(frozen=True)`)**로 설계하여, 단위 테스트 시 이 번들만 가짜 Mock 객체로 교체하면 **DB나 K8s 없이도 19개 모듈 파이프라인 전체를 100% 완벽하게 격리 테스트(Unit Testing)**할 수 있습니다.
 
 ---
 
