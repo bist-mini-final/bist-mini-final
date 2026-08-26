@@ -6,6 +6,7 @@ import {
   fetchBiCompanies,
   fetchBiDashboard,
   refreshBiDashboard,
+  resetBiDashboard,
   streamBiMaterializationJob,
   streamBiQuestionJob,
 } from '../../services/api';
@@ -15,6 +16,7 @@ vi.mock('../../services/api', async (importOriginal) => ({
   fetchBiCompanies: vi.fn(),
   fetchBiDashboard: vi.fn(),
   refreshBiDashboard: vi.fn(),
+  resetBiDashboard: vi.fn(),
   streamBiMaterializationJob: vi.fn(),
   streamBiQuestionJob: vi.fn(),
 }));
@@ -35,7 +37,8 @@ describe('BiPage Component', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.mocked(fetchBiCompanies).mockResolvedValue(companyResponse);
-    vi.mocked(refreshBiDashboard).mockResolvedValue({
+    vi.mocked(refreshBiDashboard).mockResolvedValue(DASHBOARD_FIXTURES[0]);
+    vi.mocked(resetBiDashboard).mockResolvedValue({
       jobId: 'question-job-refresh',
       totalQuestions: 10,
       queuedQuestions: 10,
@@ -89,6 +92,23 @@ describe('BiPage Component', () => {
     expect(screen.getByText('재무 안정성')).toBeInTheDocument();
     expect(screen.getByText('재무 규모')).toBeInTheDocument();
     expect(fetchBiCompanies).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the snapshot update time in Korea time', async () => {
+    vi.mocked(fetchBiDashboard).mockResolvedValue({
+      kind: 'snapshot',
+      dashboard: {
+        ...DASHBOARD_FIXTURES[0],
+        snapshot: {
+          ...DASHBOARD_FIXTURES[0].snapshot,
+          generatedAt: '2026-08-26T00:17:29.703424Z',
+        },
+      },
+    });
+
+    render(<BiPage />);
+
+    expect(await screen.findByText('2026.08.26 09:17')).toBeInTheDocument();
   });
 
   it('loads the selected company dashboard from the API service', async () => {
@@ -158,13 +178,32 @@ describe('BiPage Component', () => {
   it('starts a refresh from the current validated snapshot source', async () => {
     // Given
     render(<BiPage />);
-    const refreshButton = await screen.findByRole('button', { name: /데이터 갱신/i });
+    const refreshButton = await screen.findByRole('button', { name: /대시보드 갱신/i });
 
     // When
     fireEvent.click(refreshButton);
 
     // Then
     await waitFor(() => expect(refreshBiDashboard).toHaveBeenCalledWith(
+      DASHBOARD_FIXTURES[0].company.companyId,
+      expect.any(AbortSignal),
+    ));
+  });
+
+  it('requires confirmation before replacing dashboard questions and answers', async () => {
+    render(<BiPage />);
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: '데이터 초기화 및 재생성',
+    }));
+    expect(screen.getByRole('heading', {
+      name: 'BIST 데모 주식회사 데이터를 다시 만들까요?',
+    })).toBeInTheDocument();
+    expect(resetBiDashboard).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '삭제 후 재생성' }));
+
+    await waitFor(() => expect(resetBiDashboard).toHaveBeenCalledWith(
       DASHBOARD_FIXTURES[0].company.companyId,
       expect.any(AbortSignal),
     ));
