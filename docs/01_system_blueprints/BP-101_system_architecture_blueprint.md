@@ -9,108 +9,68 @@
 `bist-mini-final` 시스템은 비정형 스프레드시트 분석, 대규모 임베딩 색인, DAG 기반 RAG 실행, 그리고 실시간 재무 BI 대시보드를 통합 처리하기 위해 설계된 **엔터프라이즈 멀티 티어 하이브리드 아키텍처**를 가집니다.
 
 ```mermaid
-flowchart TD
-    %% 1. 클라이언트 요청 계층
-    subgraph L1_Client ["1. 클라이언트 워크스페이스 요청 계층 (Frontend SPA)"]
-        UI_PLAY["Pipeline Playground<br>(실시간 단일 노드 / DAG 실험)"]
-        UI_CHAT["[Planned] AI Financial Chatbot<br>(대화형 재무 질의응답)"]
-        UI_BI["Financial BI & Company Comp<br>(단건 지표 조회 / 전사 산출)"]
-        UI_INGEST["Data Sources Management<br>(엑셀 업로드 & VLM 색인 요청)"]
-        UI_BENCH["Benchmark Evaluation<br>(정답지 기반 대량 평가 요청)"]
+graph TB
+    subgraph ClientTier ["1. Client & Workspace Tier (React 18 SPA)"]
+        WS_PLAY["Pipeline Playground (DAG Lab)"]
+        WS_CHAT["[Planned] AI Financial Chatbot"]
+        WS_BI["Financial BI & Company Comparison"]
+        WS_DS["Data Sources (VLM Sheet Viewer)"]
+        WS_BENCH["Benchmark Evaluation"]
     end
 
-    %% 2. 게이트웨이 및 API 라우팅
-    subgraph L2_Gateway ["2. 게이트웨이 & API 컨트롤러 계층 (FastAPI)"]
-        INGRESS["Kubernetes Ingress (bist-mini-ingress : 포트 8080 단일 진입점)"]
-        ROUTER["FastAPI APIRouter (/api/* 라우팅 및 DTO 스키마 검증)"]
-        CONTAINER["ApplicationContainer (DI 조립 및 생명주기 관리)"]
+    subgraph GatewayTier ["2. Gateway & API Tier (Kubernetes & FastAPI)"]
+        INGRESS["Kubernetes Ingress (bist-mini-ingress : 8080)"]
+        ROUTER["FastAPI Router & DTO Validation (/api/*)"]
+        CONTAINER["ApplicationContainer (DI Composition Root)"]
         INGRESS --> ROUTER --> CONTAINER
     end
 
-    %% 3. 도메인 서비스 및 오케스트레이터 계층
-    subgraph L3_Domain ["3. 도메인 서비스 계층 (Business Logic & Flow Orchestration)"]
-        FAST_RAG["FastRagPipelineAdapter<br>(챗봇/BI 전용 경량 RAG 오케스트레이터)"]
-        BI_SVC["BiApiServices & Calculator<br>(40+ 재무 비율 산출 및 프로파일러)"]
-        INGEST_SVC["IngestionCoordinator<br>(엑셀 VLM 분석 및 색인 작업 조율)"]
-        BENCH_SVC["BenchmarkService<br>(정답 데이터셋 로드 및 배치 평가 조율)"]
+    subgraph DomainTier ["3. Domain Services Tier"]
+        FAST_RAG["FastRagPipelineAdapter (Chatbot/BI Orchestrator)"]
+        BI_SVC["BiApiServices & DuPont Calculator"]
+        INGEST_COORD["IngestionCoordinator (Excel & VLM Manager)"]
+        BENCH_SVC["BenchmarkService (Evaluation Runner)"]
     end
 
-    %% 4. 2-Tier 실행 호스트 분기 계층
-    subgraph L4_Hosts ["4. 2-Tier 파이프라인 조합 및 실행 호스트 (Execution Hosts)"]
-        subgraph Tier1_Host ["Tier 1: 동기식 인메모리 제로 I/O 엔진 (<100ms)"]
-            T1_EXEC["WorkflowExecutor<br>(FastAPI 프로세스 내 RAM 메모리 버스 고속 DAG 실행)"]
+    subgraph RuntimeTier ["4. 2-Tier Execution Runtime Hosts"]
+        subgraph T1_Box ["Tier 1: Fast In-Memory Host (<100ms)"]
+            T1_EXEC["WorkflowExecutor (Zero-I/O In-Memory Context Bus)"]
         end
-        subgraph Tier2_Host ["Tier 2: 비동기식 분산 배치 큐 엔진 (KEDA ScaledJob)"]
-            DISPATCHER["KubernetesQueueDispatcher<br>(workflow_runs 테이블 작업 큐잉)"]
-            KEDA_QUEUE["KEDA Queue Trigger & Autoscaler<br>(대기열 감지 후 워커 Pod 동적 프로비저닝)"]
-            WORKER_PODS["Standalone Worker Pods<br>(backend/engine/worker/main.py - Lease 분산락)"]
+        subgraph T2_Box ["Tier 2: KEDA Distributed Batch Host"]
+            DISPATCHER["KubernetesQueueDispatcher"]
+            KEDA_QUEUE["KEDA Trigger (workflow-core Queue)"]
+            WORKER_PODS["Workflow Worker Pods (WorkerLease Locked)"]
             DISPATCHER --> KEDA_QUEUE --> WORKER_PODS
         end
     end
 
-    %% 5. 순수 파이프라인 모듈 코어 (동적으로 조립되는 DAG 파이프라인)
-    subgraph L5_DAGs ["5. 파이프라인 모듈 코어 (modules/* - 동적 결선 및 실행)"]
-        subgraph DAG_RAG ["(A) 하이브리드 RAG 질의응답 파이프라인"]
-            M_DEC["Decomposer / Router<br>(원자적 분해 & 라우팅)"]
-            M_RET["PgVector (Dense) ∥ TSVector (Sparse)<br>(3072d Cosine + BM25 병렬 검색)"]
-            M_FUS["RrfFusion (k=60) & ContextExpander<br>(순위 융합 및 2D 그리드 셀 문맥 확장)"]
-            M_READ["ReaderModule<br>(수식 검증 및 근거 기반 답변 생성)"]
-            M_DEC --> M_RET --> M_FUS --> M_READ
-        end
+    subgraph ModularCore ["5. Modular Pipeline Core (modules/* - 19 Building Blocks)"]
+        M_QUERY["Query Processing (Input, Decomposer, Router, Matcher)"]
+        M_RETRIEVE["Hybrid Retrieval (DataScope, PgVector, TSVector, RRF, Expander)"]
+        M_VISION["Vision & Ingestion (Rasterizer, Luna VLM, Serializer, IndexWriter)"]
+        M_REASON["Reasoning & Generation (ReaderModule)"]
+    end
 
-        subgraph DAG_INGEST ["(B) 엑셀 비전 구조 분석 및 대량 색인 파이프라인"]
-            M_VLM["Sheet Image Rasterizer + Luna VLM<br>(GPT-5.6 Luna 표 바운딩박스 검출)"]
-            M_SER["CellTextSerializer<br>(2D 그리드 셀 계층 직렬화)"]
-            M_EMB["CellTextEmbedder<br>(3072차원 배치 임베딩 아티팩트 생성)"]
-            M_COPY["PgVectorIndexWriter<br>(PostgreSQL Binary COPY 초고속 색인)"]
-            M_VLM --> M_SER --> M_EMB --> M_COPY
+    subgraph InfraTier ["6. AI Models & Storage Persistence Tier"]
+        subgraph AI_PROV ["AI Provider Tier"]
+            OAI_LLM["OpenAIResponsesClient (GPT-5.6 Luna LLM/VLM)"]
+            OAI_EMB["OpenAIEmbeddingEncoder (text-embedding-3-large 3072d)"]
+        end
+        subgraph PERSIST ["Persistence Tier"]
+            PG_VEC["PostgreSQL 16 + pgvector (3072d HNSW & TSVector GIN)"]
+            PG_META["PostgreSQL Relational Tables (Runs, Leases, Profiles)"]
+            DISK_FS["Spreadsheet & Embedding Artifact Storage (/data)"]
         end
     end
 
-    %% 6. 외부 AI 프로바이더 및 물리 영속성 계층
-    subgraph L6_Infra ["6. AI 모델 프로바이더 & 물리 저장소 계층 (Infra & Storage)"]
-        subgraph AI_PROV ["AI & Model Provider Ports"]
-            OAI_LLM["OpenAIResponsesClient<br>(GPT-5.6 Luna 추론 및 비전 엔진)"]
-            OAI_EMB["OpenAIEmbeddingEncoder<br>(text-embedding-3-large 3072d)"]
-        end
-        subgraph PERSIST ["PostgreSQL 16 + pgvector & Disk"]
-            PG_VEC["langchain_pg_embedding<br>(3072d HNSW 벡터 + GIN TSVector)"]
-            PG_META["PostgreSQL Tables<br>(runs, leases, profiles, snapshots)"]
-            DISK_FS["Artifact Storage<br>(.xlsx 원본, 시트 PNG, 임베딩 .bin)"]
-        end
-    end
-
-    %% === 실시간 호출 및 처리 흐름 배선 (Invocation Pathways) ===
-    
-    %% [경로 1: 빠른 인터랙티브 / 실시간 질의 경로 (Fast Path - Tier 1)]
-    UI_PLAY -->|"(1-a) 동기 DAG 실험"| INGRESS
-    UI_CHAT -->|"(1-b) 대화 질의"| INGRESS
-    UI_BI -->|"(1-c) 단건 재무 질문"| INGRESS
-    CONTAINER -->|"(2-a) 인메모리 위임"| FAST_RAG
-    FAST_RAG -->|"(3-a) 즉시 실행 호출"| T1_EXEC
-    T1_EXEC -->|"(4-a) RAG DAG 조립 및 구동"| DAG_RAG
-
-    %% [경로 2: 중량 배치 / 대용량 비동기 큐 경로 (Batch Path - Tier 2)]
-    UI_INGEST -->|"(1-d) 엑셀 색인 요청"| INGRESS
-    UI_BENCH -->|"(1-e) 벤치마크 평가 요청"| INGRESS
-    CONTAINER -->|"(2-b) 비동기 배치 위임"| INGEST_SVC
-    CONTAINER -->|"(2-c) 대량 평가 위임"| BENCH_SVC
-    INGEST_SVC -->|"(3-b) 작업 디스패치"| DISPATCHER
-    BENCH_SVC -->|"(3-c) 작업 디스패치"| DISPATCHER
-    WORKER_PODS -->|"(4-b) 색인 DAG 조립 및 구동"| DAG_INGEST
-    WORKER_PODS -->|"(4-c) RAG DAG 대량 구동"| DAG_RAG
-
-    %% [모듈과 AI/DB 인프라 간 I/O 연계]
-    M_DEC & M_READ & M_VLM -->|LLM / VLM API 호출| OAI_LLM
-    M_EMB & M_RET -->|3072d 임베딩 생성| OAI_EMB
-    M_RET -->|HNSW 코사인 & BM25 검색| PG_VEC
-    M_COPY -->|Binary COPY 초고속 적재| PG_VEC
-    DISPATCHER & WORKER_PODS -->|상태 기록 & 분산 Lease 락| PG_META
-    M_VLM & M_EMB -->|파일 읽기 & 아티팩트 I/O| DISK_FS
-    
-    %% [진척도 역방향 스트리밍]
-    DISPATCHER -.->|"(5) SSE 스트림 실시간 중계"| ROUTER
-    ROUTER -.->|SSE Events| UI_INGEST & UI_BENCH
+    ClientTier --> INGRESS
+    CONTAINER --> DomainTier
+    DomainTier --> T1_EXEC
+    DomainTier --> DISPATCHER
+    T1_EXEC --> ModularCore
+    WORKER_PODS --> ModularCore
+    ModularCore --> AI_PROV
+    ModularCore --> PERSIST
 ```
 
 ---
