@@ -45,16 +45,18 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     autonumber
-    participant W as Worker Process (Pod)
-    participant HB as LeaseHeartbeat Thread
-    participant DB as PostgreSQL DBManager (workflow_runs)
+    participant W as Worker Engine (Main Flow)
+    participant HB as Background Heartbeat Task
+    participant SSE as SSE Streamer (Hub)
+    participant Client as React Client (UI)
+    participant DB as PostgreSQL (workflow_runs)
 
-    Note over W,DB: 1. 후보 작업 비차단 락 획득 (Level 1)
+    Note over W,DB: 1. 후보 작업 비차단 락 획득 (Level 1: SKIP LOCKED)
     W->>DB: claim_workflow_run_candidate(queue_name, worker_id)
     DB->>DB: SELECT run_id FROM workflow_runs ... FOR UPDATE SKIP LOCKED
-    DB-->>W: WorkflowRunLease(run_id="run-123", token="uuid-token-gen1")
+    DB-->>W: WorkflowRunLease(run_id="run-123", token="uuid-gen1")
 
-    Note over W,DB: 2. PostgreSQL Advisory Lock 획득 (Level 2)
+    Note over W,DB: 2. PostgreSQL Advisory Lock 획득 (Level 2: 세션 분산 락)
     W->>DB: pg_try_advisory_lock(hashtext('workflow_run:' || run_id))
     alt Advisory Lock 획득 실패 (다른 프로세스 소유 중)
         W->>W: 후보 제외 목록 추가 후 다음 후보 탐색
@@ -63,22 +65,42 @@ sequenceDiagram
         W->>DB: finalize_workflow_run_claim(run_id, token, worker_id)
         DB->>DB: UPDATE workflow_runs SET status='running', lease_token=token, heartbeat_at=NOW()
         
-        Note over W,HB: 4. 백그라운드 하트비트 스레드 기동 (5초 주기)
-        W->>HB: LeaseHeartbeat.start()
-        loop 매 interval_seconds (5초)
-            HB->>DB: renew_lease_heartbeat(run_id, token)
-            DB->>DB: UPDATE workflow_runs SET heartbeat_at=NOW() WHERE run_id=... AND lease_token=token
+        Note over W,HB: 4. 백그라운드 하트비트 비동기 태스크 가동 (메인 루프 비간섭)
+        W->>HB: asyncio.create_task(heartbeat_loop(run_id, token, interval=5s))
+        
+        par 메인 파이프라인 실행 & ⚡ 실시간 SSE 즉시 스트리밍 (0ms 지연)
+            W->>W: Module 1 (Decomposer) execute_async()
+            W->>SSE: emit('node_completed', node='decomposer')
+            SSE-->>Client: ⚡ SSE Event 수신 (UI 프로그레스 바 즉시 갱신)
+            
+            W->>W: Module 2 (PgVectorRetriever) execute_async() (대기 없이 즉시 연속 실행!)
+            W->>SSE: emit('node_completed', node='retriever')
+            SSE-->>Client: ⚡ SSE Event 수신
+        and 백그라운드 세대 갱신 (워커 돌연사 감지용)
+            loop 5초 주기
+                HB->>DB: UPDATE workflow_runs SET heartbeat_at=NOW() WHERE run_id=... AND lease_token=token
+            end
         end
 
-        Note over W: 5. 파이프라인 실제 실행
-        W->>W: WorkflowExecutor.run(dag, inputs)
-
-        Note over W,HB: 6. 정상 종료 및 락 해제
-        W->>HB: LeaseHeartbeat.stop()
+        Note over W,DB: 5. 정상 종료 및 락 해제
+        W->>HB: heartbeat_task.cancel()
         W->>DB: mark_workflow_completed(run_id, token, outputs)
         W->>DB: pg_advisory_unlock(...)
+        W->>SSE: emit('run_completed', outputs)
+        SSE-->>Client: 최종 결과 수신 및 화면 렌더링
     end
 ```
+
+---
+
+### 2.1 실시간 SSE 스트리밍과 백그라운드 Lease 하트비트의 역할 분담 (Zero-Bottleneck Architecture)
+
+1. **실시간 모듈 진행 통보 (SSE Push ➡️ 지연 시간 0ms)**:
+   - 각 파이프라인 모듈(노드)이 완료되는 즉시 SSE 이벤트 버스로 `node_completed`, `progress`를 발행합니다.
+   - 다음 모듈 실행과 클라이언트 화면 갱신은 **하트비트 주기(5초)를 전혀 기다리지 않고 0.00ms 만에 즉시 연속 실행**됩니다.
+2. **백그라운드 임차권 하트비트 (Lease Liveness ➡️ 워커 돌연사 방어)**:
+   - 모듈 실행 흐름과 완전히 격리된 별도의 비동기 태스크(`asyncio.create_task`)에서 **5초마다 DB의 `heartbeat_at` 타임스탬프 1개만 가볍게 갱신**합니다.
+   - 워커 Pod가 메모리 부족(OOM)이나 노드 장애로 `SIGKILL` 증발하여 SSE 에러조차 못 보내고 사망했을 때, **다른 워커가 30초 무응답을 감지하여 고아 작업을 안전하게 회수하기 위한 순수 인프라 안전장치**입니다.
 
 ---
 
