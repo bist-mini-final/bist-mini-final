@@ -6,7 +6,7 @@
 
 ## 1. 인프라 배치 토폴로지 (Infrastructure Topology)
 
-`bist-mini-final`은 로컬 개발(Local k3d Cluster)부터 클라우드 프로덕션 Kubernetes 환경까지 동일한 매니페스트로 오케스트레이션되도록 설계되어 있습니다.
+`bist-mini-final`은 로컬 개발(Local k3d Cluster / docker-compose)부터 클라우드 프로덕션 Kubernetes 환경까지 동일한 아키텍처 원칙으로 오케스트레이션되도록 설계되어 있습니다.
 
 ```mermaid
 graph TB
@@ -53,52 +53,7 @@ graph TB
 
 ---
 
-## 2. KEDA ScaledJob 자동 확장 메커니즘 (KEDA ScaledJob Specs)
-
-PostgreSQL 대기열 테이블 `workflow_runs`의 미처리 큐 개수에 따라 워커 Pod를 0개에서 최대 `KUBERNETES_MAX_JOBS`까지 동적으로 스케일아웃합니다.
-
-### ScaledJob 매니페스트 발췌 (`deploy/kubernetes/manifests/scaledjob.yaml`)
-```yaml
-apiVersion: keda.sh/v1alpha1
-kind: ScaledJob
-metadata:
-  name: workflow-worker-scaler
-  namespace: bist-batch
-spec:
-  jobTargetRef:
-    template:
-      spec:
-        restartPolicy: Never
-        containers:
-        - name: worker
-          image: bist-workflow-worker:local
-          command: ["python", "-m", "backend.engine.worker.main"]
-          resources:
-            requests:
-              cpu: 1000m
-              memory: 2Gi
-            limits:
-              cpu: "2"
-              memory: 3Gi
-  pollingInterval: 5
-  successfulJobsHistoryLimit: 5
-  failedJobsHistoryLimit: 10
-  maxReplicaCount: 8
-  triggers:
-  - type: postgresql
-    metadata:
-      dbOwner: postgres
-      host: bist-postgres
-      port: "5432"
-      userName: postgres
-      passwordFromEnv: PG_PASSWORD
-      query: "SELECT COUNT(*) FROM workflow_runs WHERE status = 'queued' AND available_at <= NOW();"
-      targetQueryValue: "1"
-```
-
----
-
-## 3. 베이직 환경 적응형 로컬 배포 파이프라인 (Adaptive Zero-Config Deployment)
+## 2. 베이직 환경 적응형 로컬 배포 파이프라인 (Adaptive Zero-Config Deployment)
 
 아무런 개발 도구(Docker, k3d, kubectl, helm 등)가 설치되어 있지 않은 **완전 순정(Fresh/Bare-Metal) OS 환경에서도 배포 실패 없이 구동**될 수 있도록, **5단계 사전 진단(Pre-Flight Diagnostics) ➡️ 제로-컨피그 자가 설치(Self-Bootstrapping) ➡️ 2-Track 배포 전략**을 구현합니다.
 
@@ -139,7 +94,7 @@ flowchart TD
 
 ---
 
-### 3.1 5대 Pre-Flight 사전 진단 및 자가 치료(Self-Bootstrapping) 원칙
+### 2.1 5대 Pre-Flight 사전 진단 및 자가 치료(Self-Bootstrapping) 원칙
 
 | 진단 항목 | 발생 가능한 문제점 (Risk) | 자동 복구 및 자가 설치 동작 (Self-Healing) |
 | :--- | :--- | :--- |
@@ -151,7 +106,7 @@ flowchart TD
 
 ---
 
-### 3.2 제로-디펜던시 환경별 다중 Fallback 설치 매트릭스 (All-Case Tool Installation Matrix)
+### 2.2 제로-디펜던시 환경별 다중 Fallback 설치 매트릭스 (All-Case Tool Installation Matrix)
 
 새로운 순정 환경에는 패키지 매니저(`brew`, `winget`)나 기본 다운로더(`curl`, `wget`)조차 설치되어 있지 않을 수 있으므로, **다단계 폴백 체인(Fallback Chain)**을 통해 어떤 극한 환경에서도 100% 설치를 완수합니다:
 
@@ -196,7 +151,7 @@ flowchart TD
 
 ---
 
-### 3.3 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
+### 2.3 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
 
 1. **Track A (권장): Kubernetes + KEDA 분산 클러스터 (`deploy/kubernetes/local.sh all` 또는 `local.ps1 all`)**
    - 실제 운영 환경과 100% 동일하게 로컬 k3d 클러스터를 생성하고, KEDA 오토스케일러와 Ingress Controller를 통한 엔터프라이즈 멀티 티어 배포를 검증합니다.
@@ -205,7 +160,7 @@ flowchart TD
 
 ---
 
-### 3.4 선택적 DB 프로비저닝 (External Managed DB 기본값 vs Internal StatefulSet 선택)
+### 2.4 선택적 DB 프로비저닝 (External Managed DB 기본값 vs Internal StatefulSet 선택)
 
 엔터프라이즈 프로덕션 환경과의 일치성을 위해 **외부 관리형 DB(External Managed PostgreSQL + pgvector) 연결이 기본값(Default)**으로 동작하며, 별도 DB가 없는 환경을 위해 **내장 DB 컨테이너 기동은 선택 옵션(Optional)**으로 제공됩니다:
 
@@ -216,6 +171,51 @@ flowchart TD
 | **DB 컨테이너** | **내부 DB 컨테이너 생성 스킵** (5432 포트 충돌 및 메모리 낭비 0) | K8s `bist-postgres` StatefulSet 자동 기동 (PVC 10Gi) |
 | **연결 바인딩** | 제공된 외부 DB 접속 정보(`Secret`/`ConfigMap`)를 백엔드/워커에 주입 | 클러스터 내부 서비스 DNS (`bist-postgres:5432`) 주입 |
 | **KEDA 트리거** | 외부 DB `workflow_runs` 테이블을 원격 폴링하여 오토스케일링 | 내부 DB 큐 카운트 감지 |
+
+---
+
+## 3. KEDA ScaledJob 이벤트 기반 자동 확장 메커니즘 (KEDA ScaledJob Specs)
+
+PostgreSQL 대기열 테이블 `workflow_runs`의 미처리 큐 개수에 따라 워커 Pod를 0개에서 최대 `KUBERNETES_MAX_JOBS`까지 동적으로 스케일아웃합니다.
+
+### ScaledJob 매니페스트 발췌 (`deploy/kubernetes/manifests/scaledjob.yaml`)
+```yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: workflow-worker-scaler
+  namespace: bist-batch
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+        - name: worker
+          image: bist-workflow-worker:local
+          command: ["python", "-m", "backend.engine.worker.main"]
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+  pollingInterval: 5
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 10
+  maxReplicaCount: 8
+  triggers:
+  - type: postgresql
+    metadata:
+      dbOwner: postgres
+      host: bist-postgres
+      port: "5432"
+      userName: postgres
+      passwordFromEnv: PG_PASSWORD
+      query: "SELECT COUNT(*) FROM workflow_runs WHERE status = 'queued' AND available_at <= NOW();"
+      targetQueryValue: "1"
+```
 
 ---
 
