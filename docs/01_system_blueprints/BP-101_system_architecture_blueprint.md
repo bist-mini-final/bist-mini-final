@@ -39,10 +39,10 @@ graph TB
     end
 
     subgraph RuntimeTier ["5. 2-Tier Execution Runtime Tier"]
-        subgraph T1_Box ["Tier 1: Synchronous In-Memory Engine (<100ms)"]
-            T1_EXEC["WorkflowExecutor (Zero-I/O In-Memory Context Bus)"]
+        subgraph T1_Box ["Tier 1: Async In-Memory Non-Blocking Engine (<100ms)"]
+            T1_EXEC["WorkflowExecutor (asyncio EventLoop + In-Memory Bus)"]
         end
-        subgraph T2_Box ["Tier 2: Asynchronous Distributed Batch Engine"]
+        subgraph T2_Box ["Tier 2: Distributed Batch Queue Engine"]
             DISPATCHER["KubernetesQueueDispatcher"]
             KEDA_QUEUE["KEDA Trigger (workflow-core Queue)"]
             WORKER_PODS["Workflow Worker Pods (WorkerLease Locked)"]
@@ -74,7 +74,7 @@ graph TB
 
 ## 2. 2-Tier 런타임 분기 알고리즘 (2-Tier Execution Routing)
 
-파이프라인 실행 요청은 지연시간 요건(Latency Requirement)과 작업 부하량(Workload Mass)에 따라 동기 인메모리 런타임과 비동기 KEDA 큐 분산 워커 런타임으로 분기됩니다.
+파이프라인 실행 요청은 지연시간 요건(Latency Requirement)과 작업 부하량(Workload Mass)에 따라 **Tier 1 (비동기 논블로킹 인메모리 런타임)**과 **Tier 2 (KEDA 분산 배치 큐 런타임)**으로 명확히 분기됩니다.
 
 ```mermaid
 sequenceDiagram
@@ -83,16 +83,16 @@ sequenceDiagram
     participant API as FastAPI APIRouter (/api/workflows/run)
     participant SSE as SSE Streamer (/api/workflows/runs/{id}/stream)
     participant Disp as KubernetesQueueDispatcher
-    participant T1 as Tier 1 In-Memory Engine
+    participant T1 as Tier 1 Async In-Memory Engine
     participant KEDA as Tier 2 KEDA Queue
     participant Worker as KEDA Worker Pods
     participant DB as PostgreSQL (Runs & Leases)
 
     User->>API: POST /api/workflows/run (DAG Definition + Inputs + async_execution flag)
-    alt async_execution == False (인터랙티브 디버깅 / Playground 단일 스텝)
-        API->>T1: WorkflowExecutor.run_pipeline_sync(dag, inputs)
-        T1->>T1: 위상 정렬 및 In-Memory 메모리 버스 전달
-        T1-->>API: PipelineRunResult (Latency < 100ms)
+    alt async_execution == False (인터랙티브 디버깅 / Playground / Fast RAG / 챗봇)
+        API->>T1: await WorkflowExecutor.run_pipeline_async(dag, inputs)
+        T1->>T1: asyncio 논블로킹 위상 정렬 및 In-Memory 버스 실행
+        T1-->>API: PipelineRunResult (Latency < 100ms, Non-Blocking)
         API-->>User: 200 OK + Instant Result Payload
     else async_execution == True (대용량 엑셀 VLM, BI Materialization, 벤치마크)
         API->>Disp: KubernetesQueueDispatcher.dispatch(run_id, payload)
@@ -125,18 +125,18 @@ sequenceDiagram
 
 | 워크스페이스 / 기능 영역 | 구체적 기능 (Feature) | 실행 방식 (Execution Tier) | 담당 핵심 컴포넌트 / 모듈 | 트리거 API / 진입점 | 평균 지연시간 (Latency) | 통신 & 상태 모니터링 방식 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Pipeline Playground** (실험실/샌드박스) | 단일 노드 인터랙티브 테스트 | **Tier 1 (동기 인메모리)** | `WorkflowExecutor.run_node_sync` | `POST /api/workflows/node/run` | `< 100ms` | HTTP 즉시 반환 |
-| | 인터랙티브 DAG 전체 실험/실행 | **Tier 1 (동기 인메모리)** | `WorkflowExecutor.run_pipeline_sync` | `POST /api/workflows/run` | `100ms ~ 1.5s` | HTTP 즉시 반환 / 제로 I/O |
-| **AI 금융 챗봇** (예정) | 대화형 멀티턴 재무 RAG 세션 | **Tier 1 (동기 인메모리)** | `FastRagPipelineAdapter`, `ChatbotSession` | `WS /api/chatbot/ws` | `100ms ~ 500ms` | **WebSocket 양방향 스트리밍** (토큰/중단 제어) |
-| **Data Sources** | 워크북 목록 & 시트 그리드 조회 | **Tier 1 (동기 인메모리)** | `WorkbookCatalog`, `OpenPyXL` | `GET /api/data-sources/files` | `< 50ms` | HTTP 즉시 반환 |
-| | Luna VLM 표 감지 & pgvector 색인 | **Tier 2 (비동기 KEDA 큐)** | `LunaVlmStructureDetector`, `PgVectorBinaryCopy` | `POST /api/data-sources/ingest` | `5s ~ 40s` | KEDA Worker & SSE 진척도 스트림 |
-| | DB / pgvector 연결 상태 프로브 | **Tier 1 (동기 인메모리)** | `PgVectorConnectionProbe` | `GET /api/data-sources/probe` | `< 10ms` | 페이지 진입 시 1회성 HTTP 조회 (수동 새로고침) |
-| **Financial BI** | 기업 프로파일 & 메트릭 조회 | **Tier 1 (동기 인메모리)** | `DocumentProfiler`, `ProfileRepository` | `GET /api/bi/profiles` | `< 50ms` | HTTP 즉시 반환 |
-| | 단건 재무 질의응답 (Fast RAG) | **Tier 1 (동기 인메모리)** | `FastRagPipelineAdapter` | `POST /api/bi/questions/answer` | `200ms ~ 500ms` | HTTP 즉시 반환 |
-| | 40+ 전사 지표 일괄 산출 (Materialize)| **Tier 2 (비동기 KEDA 큐)** | `QuestionBatchWorkerMain`, `BiCalculator` | `POST /api/bi/materialize` | `10s ~ 60s` | DB 스냅샷 & SSE 스트림 |
-| **기업 비교** (예정) | 다중 기업 듀퐁 분석 & 레이더 차트 | **Tier 1 (동기 인메모리)** | `QuestionSnapshotRepository`, `Normalizer` | `POST /api/bi/comparison` | `< 100ms` | HTTP 즉시 반환 |
-| **K8s 잡 관제 (`/jobs`)** | 워커 Pod 라이프사이클 & 콘솔 로그 | **Tier 1 (동기 인메모리)** | `KubernetesJobWatcher` | `WS /api/jobs/ws` | `< 50ms` | **WebSocket 양방향 터미널 스트림** |
-| **Benchmark** | 정답지 기반 대량 정확도 평가 | **Tier 2 (비동기 KEDA 큐)** | `BenchmarkWorkerMain`, `BenchmarkService` | `POST /api/benchmarks/run` | `30s ~ 3min` | SSE 진척도 & 리포트 |
+| **Pipeline Playground** (실험실/샌드박스) | 단일 노드 인터랙티브 테스트 | **Tier 1 (비동기 인메모리)** | `WorkflowExecutor.run_node_async` | `POST /api/workflows/node/run` | `< 100ms` | HTTP 즉시 반환 (Non-Blocking) |
+| | 인터랙티브 DAG 전체 실험/실행 | **Tier 1 (비동기 인메모리)** | `WorkflowExecutor.run_pipeline_async` | `POST /api/workflows/run` | `100ms ~ 1.5s` | HTTP 즉시 반환 / 제로 I/O |
+| **AI 금융 챗봇** (예정) | 대화형 멀티턴 재무 RAG 세션 | **Tier 1 (비동기 인메모리)** | `FastRagPipelineAdapter`, `ChatbotSession` | `WS /api/chatbot/ws` | `100ms ~ 500ms` | **WebSocket 양방향 스트리밍** (토큰/중단 제어) |
+| **Data Sources** | 워크북 목록 & 시트 그리드 조회 | **Tier 1 (비동기 인메모리)** | `WorkbookCatalog`, `OpenPyXL` | `GET /api/data-sources/files` | `< 50ms` | HTTP 즉시 반환 |
+| | Luna VLM 표 감지 & pgvector 색인 | **Tier 2 (분산 배치 큐)** | `LunaVlmStructureDetector`, `PgVectorBinaryCopy` | `POST /api/data-sources/ingest` | `5s ~ 40s` | KEDA Worker & SSE 진척도 스트림 |
+| | DB / pgvector 연결 상태 프로브 | **Tier 1 (비동기 인메모리)** | `PgVectorConnectionProbe` | `GET /api/data-sources/probe` | `< 10ms` | 페이지 진입 시 1회성 HTTP 조회 (수동 새로고침) |
+| **Financial BI** | 기업 프로파일 & 메트릭 조회 | **Tier 1 (비동기 인메모리)** | `DocumentProfiler`, `ProfileRepository` | `GET /api/bi/profiles` | `< 50ms` | HTTP 즉시 반환 |
+| | 단건 재무 질의응답 (Fast RAG) | **Tier 1 (비동기 인메모리)** | `FastRagPipelineAdapter` | `POST /api/bi/questions/answer` | `200ms ~ 500ms` | HTTP 즉시 반환 |
+| | 40+ 전사 지표 일괄 산출 (Materialize)| **Tier 2 (분산 배치 큐)** | `QuestionBatchWorkerMain`, `BiCalculator` | `POST /api/bi/materialize` | `10s ~ 60s` | DB 스냅샷 & SSE 스트림 |
+| **기업 비교** (예정) | 다중 기업 듀퐁 분석 & 레이더 차트 | **Tier 1 (비동기 인메모리)** | `QuestionSnapshotRepository`, `Normalizer` | `POST /api/bi/comparison` | `< 100ms` | HTTP 즉시 반환 |
+| **K8s 잡 관제 (`/jobs`)** | 워커 Pod 라이프사이클 & 콘솔 로그 | **Tier 1 (비동기 인메모리)** | `KubernetesJobWatcher` | `WS /api/jobs/ws` | `< 50ms` | **WebSocket 양방향 터미널 스트림** |
+| **Benchmark** | 정답지 기반 대량 정확도 평가 | **Tier 2 (분산 배치 큐)** | `BenchmarkWorkerMain`, `BenchmarkService` | `POST /api/benchmarks/run` | `30s ~ 3min` | SSE 진척도 & 리포트 |
 
 ---
 
