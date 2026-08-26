@@ -234,6 +234,58 @@ classDiagram
 
 ---
 
+### 3.3 To-Be DI 컨테이너 리팩토링 아키텍처 (Target Architecture Blueprint)
+
+향후 신규 도메인 서비스(챗봇, 기업 비교, 벤치마크) 확장 및 서버 기동 속도 최적화를 위해 아래의 **3대 개선 구조**를 적용합니다:
+
+```mermaid
+classDiagram
+    class ApplicationContainer {
+        +InfrastructureContainer infrastructure
+        +DomainServicesContainer domain_services
+        +KubernetesQueueDispatcher workflow_dispatcher
+        +create() ApplicationContainer
+        +close() void
+    }
+
+    class DomainServicesContainer {
+        +BiApiServices bi_services
+        +ChatbotService chatbot_service
+        +CompanyComparisonService comparison_service
+        +BenchmarkService benchmark_service
+    }
+
+    class InfrastructureContainer {
+        +OpenAIResponsesClient completion_client
+        +EmbeddingEncoder embedding_encoder
+        +PipelineExecutionEngine pipeline_engine
+        +RuntimePaths paths
+        +PgVectorConnectionProbe pgvector_probe
+    }
+
+    class PipelineExecutionEngine {
+        +LazyModuleRegistry module_registry
+        +WorkflowExecutor workflow_executor
+        +PgVectorStore pgvector_store
+        +DatabaseManager db_manager
+    }
+
+    ApplicationContainer *-- InfrastructureContainer
+    ApplicationContainer *-- DomainServicesContainer
+    InfrastructureContainer *-- PipelineExecutionEngine
+```
+
+1. **네이밍 직관화**:
+   - `RuntimeContainer` ➡️ **`InfrastructureContainer`** (AI Provider, DB Pool, Paths 등 외부 인프라 전담)
+   - `WorkflowRuntimeServices` ➡️ **`PipelineExecutionEngine`** (19개 모듈, DAG 실행기, 스토어 등 순수 파이프라인 엔진 전담)
+2. **`DomainServicesContainer` 하위 분리**:
+   - `ApplicationContainer`에 비즈니스 서비스를 하드코딩하지 않고, `DomainServicesContainer`로 독립 분리하여 신규 서비스 추가 시 OCP(개방-폐쇄) 원칙 준수.
+3. **4대 도메인 팩토리 & 지연 로딩 레지스트리 (`LazyModuleRegistry`)**:
+   - 19개 모듈을 4대 도메인 팩토리(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`, `ReaderModulesFactory`)로 분리.
+   - 서버 부팅 시 19개 객체를 미리 만들지 않고 팩토리 레시피(`register_factory`)만 등록 후, 실제 파이프라인 실행 시 **최초 1회만 인스턴스화(Lazy Singleton)**하여 기동 지연시간을 500ms ➡️ 20ms로 단축.
+
+---
+
 ## 4. 리팩토링 타깃 및 기술 부채 (Refactoring Targets & Debts)
 
 ### As-Is 분석 및 기술 부채
@@ -254,5 +306,5 @@ classDiagram
        async def execute(self, command: RunWorkflowCommand) -> WorkflowExecutionHandle: ...
    ```
    - `AsyncInMemoryExecutionAdapter`와 `KubernetesQueueExecutionAdapter`로 구현 분리.
-3. **모듈 팩토리(Module Factory) 레이어 도입**:
-   - 19개 모듈을 카테고리별(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`)로 팩토리화하여 동적 로딩 가능하도록 분리.
+3. **지연 생성 모듈 팩토리(Lazy Module Factory) 레이어 도입**:
+   - 19개 모듈을 4대 카테고리별(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`, `ReaderModulesFactory`)로 팩토리화하고 지연 로딩(`LazyModuleRegistry`)을 적용하여 메모리 오버헤드 최소화 및 단위 테스트 격리.
