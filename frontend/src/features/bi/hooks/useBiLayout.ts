@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_CARD_LAYOUT, getCardDefinition, isBiCardId } from '../config/cardRegistry';
+import {
+  CARD_REGISTRY,
+  DEFAULT_CARD_LAYOUT,
+  DEFAULT_HIDDEN_CARD_IDS,
+  getCardDefinition,
+  isBiCardId,
+} from '../config/cardRegistry';
 import {
   applyBiCardRows,
   constrainBiCardGridSize,
@@ -36,7 +42,7 @@ interface BiLayoutController extends StoredLayout {
 const DEFAULT_LAYOUT: StoredLayout = {
   schemaVersion: 3,
   cards: DEFAULT_CARD_LAYOUT,
-  hiddenCardIds: [],
+  hiddenCardIds: DEFAULT_HIDDEN_CARD_IDS,
 };
 
 function isAllowedSize(cardId: BiCardId, value: unknown): value is CardSize {
@@ -102,8 +108,8 @@ function normalizeLayout(value: unknown): StoredLayout {
   const uniqueHidden = [...new Set(hiddenCardIds)];
   const accountedFor = new Set([...cards.map((card) => card.cardId), ...uniqueHidden]);
   if (accountedFor.size === 0) return DEFAULT_LAYOUT;
-  const newCardIds = DEFAULT_CARD_LAYOUT
-    .map((card) => card.cardId)
+  const newCardIds = CARD_REGISTRY
+    .map((card) => card.id)
     .filter((cardId) => !accountedFor.has(cardId));
   return {
     schemaVersion: 3,
@@ -190,7 +196,11 @@ export function useBiLayout(): BiLayoutController {
   const resetLayout = () => {
     window.localStorage.removeItem(STORAGE_KEY);
     skipNextPersist.current = true;
-    setLayout({ schemaVersion: 3, cards: [...DEFAULT_CARD_LAYOUT], hiddenCardIds: [] });
+    setLayout({
+      schemaVersion: 3,
+      cards: [...DEFAULT_CARD_LAYOUT],
+      hiddenCardIds: [...DEFAULT_HIDDEN_CARD_IDS],
+    });
   };
 
   return { ...layout, canMoveCard, moveCard, replaceCards, hideCard, restoreCard, resetLayout };

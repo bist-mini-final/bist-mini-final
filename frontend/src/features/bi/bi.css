@@ -13,6 +13,18 @@
   --bi-chart-neutral: #64746b;
   --bi-chart-outflow: #b7791f;
   --bi-chart-grid: #dce7e1;
+  --bi-health-strong-positive-bg: #bfe8d0;
+  --bi-health-strong-positive-text: #175c35;
+  --bi-health-positive-bg: #dcf1e4;
+  --bi-health-positive-text: #2f6d49;
+  --bi-health-neutral-bg: #e7ebe8;
+  --bi-health-neutral-text: #526158;
+  --bi-health-negative-bg: #f9ded6;
+  --bi-health-negative-text: #98523f;
+  --bi-health-strong-negative-bg: #f1c4b8;
+  --bi-health-strong-negative-text: #873527;
+  --bi-health-na-bg: #ecefed;
+  --bi-health-na-text: #5f6863;
   width: min(100%, var(--bi-page-max));
   max-inline-size: 100%;
   margin-inline: auto;
@@ -149,7 +161,30 @@
   font-weight: 750;
 }
 
-.bi-refresh-button:disabled { cursor: wait; opacity: 0.68; }
+.bi-header__data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.bi-data-reset-button {
+  display: inline-flex;
+  min-block-size: 2.75rem;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--bi-danger-text) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding-inline: 0.8rem;
+  color: var(--bi-danger-text);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.bi-refresh-button:disabled,
+.bi-data-reset-button:disabled { cursor: wait; opacity: 0.68; }
 .bi-refresh-button__spinner { animation: bi-spin 700ms linear infinite; }
 
 .bi-data-state {
@@ -648,6 +683,68 @@
 .bi-chart-tooltip li span { color: var(--text-muted); }
 .bi-chart-tooltip small { display: block; margin-top: 0.45rem; color: var(--brand-700); font-size: 0.62rem; }
 
+.bi-health-heatmap {
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.45rem;
+}
+
+.bi-health-heatmap__legend {
+  display: flex;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.65rem;
+}
+
+.bi-health-heatmap__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bi-health-heatmap__legend span::before {
+  inline-size: 0.65rem;
+  block-size: 0.65rem;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.18rem;
+  background: var(--bi-health-na-bg);
+  content: '';
+}
+
+.bi-health-heatmap__legend [data-trend='strong-improvement']::before { background: var(--bi-health-strong-positive-bg); }
+.bi-health-heatmap__legend [data-trend='improvement']::before { background: var(--bi-health-positive-bg); }
+.bi-health-heatmap__legend [data-trend='stable']::before { background: var(--bi-health-neutral-bg); }
+.bi-health-heatmap__legend [data-trend='decline']::before { background: var(--bi-health-negative-bg); }
+.bi-health-heatmap__legend [data-trend='strong-decline']::before { background: var(--bi-health-strong-negative-bg); }
+
+.bi-health-heatmap__chart {
+  min-inline-size: 0;
+  min-block-size: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.bi-health-heatmap__chart > div {
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.bi-health-heatmap__chart svg {
+  display: block;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+.bi-health-heatmap__chart [data-trend] { cursor: default; }
+
 .bi-visually-hidden {
   position: absolute !important;
   inline-size: 1px !important;
@@ -706,6 +803,7 @@
 .bi-dialog__actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
 .bi-dialog__actions button { gap: 0.35rem; padding-inline: 0.9rem; }
 .bi-dialog__confirm { border-color: var(--brand-600) !important; background: var(--brand-600) !important; color: var(--surface) !important; }
+.bi-dialog__danger { border-color: var(--bi-danger-text) !important; background: var(--bi-danger-text) !important; color: var(--surface) !important; }
 .bi-card-library, .bi-evidence-list { display: grid; gap: 0.5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
 .bi-card-library li, .bi-evidence-list li { display: flex; min-inline-size: 0; align-items: center; justify-content: space-between; gap: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; }
 .bi-card-library li > div, .bi-evidence-list li > div { display: grid; min-inline-size: 0; gap: 0.25rem; }
@@ -721,6 +819,7 @@
 @media (max-width: 1279px) {
   .bi-header { flex-direction: column; }
   .bi-header__summary { inline-size: 100%; justify-items: start; }
+  .bi-header__data-actions { justify-content: flex-start; }
 }
 
 @media (max-width: 900px) {
