@@ -48,7 +48,7 @@ flowchart TB
     subgraph ProviderTier ["5. AI & Model Provider Tier"]
         OAI_LLM["OpenAIResponsesClient (GPT-5.6 Luna)"]
         OAI_VLM["Luna VLM (GPT-5.6 Luna Visual Engine)"]
-        OAI_EMB["OpenAIEmbeddingEncoder (text-embedding-3-small 1536d)"]
+        OAI_EMB["OpenAIEmbeddingEncoder (text-embedding-3-large 3072d)"]
         BGE_EMB["BgeEmbeddingEncoder (Local ONNX/PyTorch Fallback)"]
     end
 

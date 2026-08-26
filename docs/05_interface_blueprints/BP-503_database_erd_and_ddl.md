@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS langchain_pg_collection (
 CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
     id VARCHAR PRIMARY KEY,
     collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
-    embedding VECTOR(1536),
+    embedding VECTOR(3072),
     document VARCHAR NOT NULL,
     cmetadata JSONB NOT NULL DEFAULT '{}'
 );

@@ -15,7 +15,7 @@ flowchart TD
     QUERY["사용자 질의 (User Financial Query)"] --> SCOPE["PgVectorDataScopeModule (기업/시트/연도 필터 생성)"]
     
     subgraph ParallelRetrieval ["병렬 검색 계층 (Parallel Retrieval Layer)"]
-        SCOPE --> DENSE["1. PgVectorRetrieverModule<br>(1536d Cosine Similarity ANN)"]
+        SCOPE --> DENSE["1. PgVectorRetrieverModule<br>(3072d Cosine Similarity ANN)"]
         SCOPE --> SPARSE["2. PostgresNativeKeywordRetrieverModule<br>(TSVector BM25 Full-Text Search)"]
     end
 
