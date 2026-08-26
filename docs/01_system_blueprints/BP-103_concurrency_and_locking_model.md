@@ -6,17 +6,37 @@
 
 ## 1. 분산 동시성 제어 개요 (Concurrency Architecture)
 
-Kubernetes 환경에서 여러 Worker Pod가 동일한 `workflow_runs` 대기열을 병렬로 소비할 때 **중복 실행(Double Execution), 레이스 컨디션(Race Condition), 그리고 워커 비정상 종료(Worker Crash)로 인한 작업 유실/고아(Orphan) 현상**을 방지하기 위해 3중 안전 분산 락킹 프로토콜을 구현합니다.
+Kubernetes 환경에서 수십 개의 Worker Pod가 단일 PostgreSQL `workflow_runs` 작업 대기열을 병렬로 소비할 때 발생할 수 있는 **4대 치명적 동시성 문제(Thundering Herd, 중복 실행, 좀비 덮어쓰기, 고아 작업)**를 원천 차단하기 위해 **3중 동시성 안전 분산 락킹 프로토콜(Triple Safety Locking)**을 구현합니다.
 
 ```mermaid
 flowchart TD
-    subgraph SafetyLevel ["3중 동시성 안전 계층 (Triple Safety Locking)"]
-        L1["Level 1: DB 행 수준 비차단 락 (FOR UPDATE SKIP LOCKED)"]
-        L2["Level 2: 세션 수준 분산 락 (PostgreSQL pg_try_advisory_lock)"]
-        L3["Level 3: 동적 세대 임차권 (WorkflowRunLease Token & LeaseHeartbeat)"]
-        L1 --> L2 --> L3
+    subgraph L1 ["Level 1: DB 행 수준 비차단 락 (FOR UPDATE SKIP LOCKED)"]
+        P1["🛑 방어: Thundering Herd 및 작업 인출 대기 블로킹 방지"]
+        M1["💡 원리: 다른 워커가 선점한 행은 대기 없이 0.1ms 만에 건너뛰고 다음 작업 획득"]
     end
+
+    subgraph L2 ["Level 2: 세션 분산 자문 락 (pg_try_advisory_lock)"]
+        P2["🛑 방어: 트랜잭션 커밋 후 장기 실행 중(In-Flight) 경합 및 프로세스 크래시 데드락 방지"]
+        M2["💡 원리: 워커 TCP 세션과 바인딩되어, 워커 Pod가 OOM으로 죽으면 DB가 0초 만에 락 자동 반환"]
+    end
+
+    subgraph L3 ["Level 3: 동적 세대 임차권 (Lease Token & Heartbeat)"]
+        P3["🛑 방어: 좀비 워커의 늦은 덮어쓰기(Split-Brain) 및 고아(Stalled) 작업 방치 방지"]
+        M3["💡 원리: UUID 세대 토큰 검증 + 5초 주기 하트비트로 30초 무응답 시 자동 회수"]
+    end
+
+    L1 --> L2 --> L3
 ```
+
+---
+
+### 1.1 3중 동시성 안전 계층별 해결 문제 및 방어 매트릭스 (Problem-Solution Matrix)
+
+| 안전 계층 (Level) | 핵심 기술 및 프로토콜 | 🛑 해결하는 핵심 문제점 (Problem) | 💡 동작 원리 및 아키텍처 보장 (Guarantee) |
+| :--- | :--- | :--- | :--- |
+| **Level 1: 인출 경합 방지**<br>(Row-Level Non-Blocking) | `SELECT ... FOR UPDATE SKIP LOCKED` | • **Thundering Herd 병목**<br>• **워커 프로세스 전체 블로킹**<br>• **동일 작업 중복 인출(Double Claim)** | 여러 워커가 동시에 큐를 폴링해도, 다른 워커가 잠근 행을 대기하지 않고 **즉시 건너뛰어(Skip) 0.1ms 만에 다음 빈 작업을 획득**하므로 락 대기 시간 0초 달성 및 완전 수평 확장. |
+| **Level 2: 실행 중 상호 배제**<br>(Session-Level Advisory Lock) | `pg_try_advisory_lock(hashtext(...))` | • **트랜잭션 종료 후 실행 중 경합**<br>• **Redis 분산락 만료/TTL 데드락**<br>• **워커 OOM 크래시 시 락 잔존** | Level 1의 행 락은 `COMMIT` 즉시 풀리지만, Advisory Lock은 **파이프라인 실행(10~60초) 내내 세션 수준에서 유지**됨. 워커 Pod가 OOM/SIGKILL로 죽으면 **PostgreSQL 서버가 즉시 락을 0초 만에 자동 해제**하여 데드락 완전 배제. |
+| **Level 3: 스플릿 브레인 방어**<br>(Generation Token & Heartbeat) | `WorkflowRunLease` (UUID) & `LeaseHeartbeat` (5초 주기) | • **지연된 좀비 워커의 결과 덮어쓰기**<br>• **네트워크 파티션 Split-Brain**<br>• **무한 대기 고아(Orphaned) 작업** | 작업 인출 시 고유한 UUID 세대 토큰을 발급. 지연된 구형 워커가 뒤늦게 결과를 쓰려 해도 `WHERE run_id = :id AND lease_token = :token` 불일치로 **DB 단에서 덮어쓰기 원천 거부(Rows Affected=0)**. 30초 무응답 시 다른 워커가 안전하게 회수. |
 
 ---
 
