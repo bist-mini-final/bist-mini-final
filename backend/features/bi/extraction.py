@@ -4,16 +4,19 @@ from .catalog import METRIC_CATALOG, DerivedMetricDefinition, SourceMetricDefini
 from .extraction_models import (
     BiMetricExtractionRequest,
     BiMetricExtractionResult,
+    BiMetricExtractionStatusError,
     BiMetricReaderResponse,
     BiRetrievalRequest,
     BiRetrievedContext,
     MetricReaderResult,
     ReaderContractFailure,
 )
+from .materialization_models import BiDocumentProfile
 from .models import (
     AmountScale,
     AvailableObservation,
     BiEvidence,
+    BiMaterializationSource,
     MetricStatus,
     UnavailableObservation,
     ValueKind,
@@ -36,14 +39,23 @@ class MetricReaderPort(Protocol):
     ) -> MetricReaderResult: ...
 
 
+class BiMetricUnitProfilePort(Protocol):
+    def get_for_source(
+        self,
+        source: BiMaterializationSource,
+    ) -> BiDocumentProfile | None: ...
+
+
 class BiMetricExtractionService:
     def __init__(
         self,
         retriever: ExistingRagRetrievalPort,
         reader: MetricReaderPort,
+        profiles: BiMetricUnitProfilePort,
     ) -> None:
         self._retriever = retriever
         self._reader = reader
+        self._profiles = profiles
 
     def extract(
         self,
@@ -129,8 +141,17 @@ class BiMetricExtractionService:
                 )
             if response.normalized_value is None:
                 return self._invalid(request, value_kind, "available_value_missing")
+            currency = response.currency
+            scale = response.scale
             if value_kind is ValueKind.AMOUNT and (
-                response.currency is None or response.scale is None
+                currency is None or scale is None
+            ):
+                profile = self._profiles.get_for_source(request.source)
+                if profile is not None:
+                    currency = currency or profile.currency
+                    scale = scale or profile.scale
+            if value_kind is ValueKind.AMOUNT and (
+                currency is None or scale is None
             ):
                 return self._unavailable(
                     request,
@@ -152,8 +173,8 @@ class BiMetricExtractionService:
                 metric_id=request.metric_id,
                 period_id=request.period_id,
                 value_kind=value_kind,
-                currency=response.currency,
-                scale=response.scale,
+                currency=currency,
+                scale=scale,
                 observation=observation,
             )
 
@@ -225,7 +246,7 @@ class BiMetricExtractionService:
         notes: tuple[str, ...] = (),
     ) -> BiMetricExtractionResult:
         if status is MetricStatus.AVAILABLE:
-            raise ValueError("available status requires AvailableObservation")
+            raise BiMetricExtractionStatusError(status)
         unavailable_status = cast(
             Literal[
                 MetricStatus.MISSING,

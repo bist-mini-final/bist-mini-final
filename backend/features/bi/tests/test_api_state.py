@@ -43,6 +43,20 @@ def test_lists_company_when_ready_snapshot_exists() -> None:
 
 @pytest.mark.parametrize(
     "refresh_status",
+    (RefreshStatus.IDLE, RefreshStatus.FAILED),
+)
+def test_lists_company_when_partial_snapshot_exists(
+    refresh_status: RefreshStatus,
+) -> None:
+    summary = company_summary(SnapshotStatus.PARTIAL, refresh_status)
+
+    response = BiCompanyListResponse(companies=(summary,))
+
+    assert response.companies == (summary,)
+
+
+@pytest.mark.parametrize(
+    "refresh_status",
     (
         RefreshStatus.QUEUED,
         RefreshStatus.INDEXING,
@@ -66,8 +80,6 @@ def test_lists_company_when_snapshot_generation_is_active(
     (
         (None, RefreshStatus.IDLE),
         (None, RefreshStatus.FAILED),
-        (SnapshotStatus.PARTIAL, RefreshStatus.IDLE),
-        (SnapshotStatus.PARTIAL, RefreshStatus.FAILED),
     ),
 )
 def test_hides_company_when_dashboard_is_not_ready_or_generating(
