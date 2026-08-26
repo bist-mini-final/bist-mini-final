@@ -90,30 +90,65 @@ spec:
 
 ---
 
-## 3. 원클릭 로컬 배포 파이프라인 (`local.sh` Sequence)
+## 3. 베이직 환경 적응형 로컬 배포 파이프라인 (Adaptive Zero-Config Deployment)
 
-개발자는 [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh) 스크립트를 통해 원클릭으로 로컬 k3d 클러스터 생성, 이미지 빌드, DB 마이그레이션, KEDA 배포를 일괄 수행할 수 있습니다.
+아무런 개발 도구(Docker, k3d, kubectl, helm 등)가 설치되어 있지 않은 **완전 순정(Fresh/Bare-Metal) OS 환경에서도 배포 실패 없이 구동**될 수 있도록, **5단계 사전 진단(Pre-Flight Diagnostics) ➡️ 제로-컨피그 자가 설치(Self-Bootstrapping) ➡️ 2-Track 배포 전략**을 구현합니다.
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor Dev as Developer
-    participant Script as local.sh
-    participant K3D as k3d Cluster (bist-local)
-    participant DOCKER as Docker Engine
-    participant K8S as kubectl & KEDA
+flowchart TD
+    START["🚀 배포 스크립트 실행<br>(./deploy/kubernetes/local.sh all 또는 local.ps1)"] --> PREFLIGHT{"1. Pre-Flight 환경 진단"}
 
-    Dev->>Script: ./deploy/kubernetes/local.sh all
-    Script->>DOCKER: ensure_docker & ensure_k3d
-    Script->>K3D: k3d cluster create bist-local --port 8080:80@loadbalancer
-    Script->>DOCKER: docker build -f deploy/docker/Dockerfile.backend -t bist-backend:local .
-    Script->>DOCKER: docker build -f deploy/docker/Dockerfile.frontend -t bist-frontend:local .
-    Script->>DOCKER: docker build -f deploy/docker/Dockerfile.worker -t bist-workflow-worker:local .
-    Script->>K3D: k3d image import bist-backend:local bist-frontend:local bist-workflow-worker:local
-    Script->>K8S: helm install keda kedacore/keda --namespace keda
-    Script->>K8S: kubectl apply -f deploy/kubernetes/manifests/
-    Script-->>Dev: ✅ Deployment Complete! Access at http://localhost:8080
+    subgraph PreflightChecks ["5대 Pre-Flight 진단 항목"]
+        C1["① OS & 쉘 환경 감지 (Win / Mac / Linux)"]
+        C2["② 하드웨어 리소스 진단 (RAM >= 4GB, Disk >= 10GB)"]
+        C3["③ 포트 충돌 검사 (Port 8080, 5432 점유 여부)"]
+        C4["④ Docker 엔진 설치 및 데몬 기동 여부 검증"]
+        C5["⑤ CLI 도구 존재 여부 (k3d, kubectl, helm, uv)"]
+    end
+
+    PREFLIGHT --> PreflightChecks
+    PreflightChecks --> AUTO_INSTALL["2. 제로-글로벌 도구 자동 설치<br>(호스트 오염 없이 .tools/bin 로컬 격리 다운로드)"]
+
+    AUTO_INSTALL --> TRACK_DECISION{"3. 배포 트랙 선택"}
+
+    subgraph TrackA ["Track A: Full Kubernetes 모드 (표준 KEDA 클러스터)"]
+        A1["k3d 클러스터 생성 (bist-local)"] --> A2["로컬 컨테이너 이미지 빌드"]
+        A2 --> A3["KEDA Operator Helm 설치"]
+        A3 --> A4["Ingress & ScaledJob 매니페스트 적용"]
+    end
+
+    subgraph TrackB ["Track B: Zero-K8s 경량 모드 (저사양/K8s 미지원 환경 Fallback)"]
+        B1["docker-compose.yml 1-Click 구동"]
+        B2["Nginx + FastAPI + PostgreSQL + Worker 컨테이너 일체 기동"]
+    end
+
+    TRACK_DECISION -- "K8s 지원 환경 (기본값)" --> TrackA
+    TRACK_DECISION -- "K8s 비활성 / 경량 실행" --> TrackB
+
+    TrackA --> READY["✅ 배포 완료! http://localhost:8080 즉시 접속"]
+    TrackB --> READY
 ```
+
+---
+
+### 3.1 5대 Pre-Flight 사전 진단 및 자가 치료(Self-Bootstrapping) 원칙
+
+| 진단 항목 | 발생 가능한 문제점 (Risk) | 자동 복구 및 자가 설치 동작 (Self-Healing) |
+| :--- | :--- | :--- |
+| **① OS & 쉘 호환성** | Windows 환경에서 bash `.sh` 미지원 | Windows 전용 **PowerShell 배포기(`deploy/kubernetes/local.ps1`)**와 POSIX bash(`local.sh`)를 듀얼 제공하여 크로스 플랫폼 지원. |
+| **② 하드웨어 리소스** | 메모리 부족으로 K8s Pod OOM 크래시 | 가용 RAM을 사전 검사하여 4GB 미만일 경우 경고 알림 및 **경량 Track B(docker-compose) 전환 권고**. |
+| **③ 포트 충돌 검사** | 기존 8080, 5432 포트 중복 점유 | 포트 충돌 감지 시 에러로 죽지 않고 환경 변수(`PORT=8081`)로 대체 포트 자동 바인딩 제안. |
+| **④ Docker 엔진 검증** | Docker 미설치 또는 데몬 정지 | • Mac/Linux: Homebrew/패키지 매니저 안내 및 데몬 백그라운드 기동 대기 (`docker info` 루프).<br>• Docker 없을 시 사용자 친화적 가이드 출력 후 중단. |
+| **⑤ K8s CLI 도구 자동화** | `k3d`, `kubectl`, `helm` 미설치 | **시스템 전역(Global)을 오염시키지 않고**, 프로젝트 로컬 디렉토리([`.tools/bin/`](file:///c:/Repos/bist-mini-final/.tools/bin/))에 단독 실행 바이너리를 자동 curl 다운로드하여 `PATH`에 임시 등록. |
+
+---
+
+### 3.2 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
+
+1. **Track A (권장): Kubernetes + KEDA 분산 클러스터 (`deploy/kubernetes/local.sh all`)**
+   - 실제 운영 환경과 100% 동일하게 로컬 k3d 클러스터를 생성하고, KEDA 오토스케일러와 Ingress Controller를 통한 엔터프라이즈 멀티 티어 배포를 검증합니다.
+2. **Track B (대체): Zero-K8s 경량 Docker-Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
+   - K8s를 구동하기 어려운 저사양 노트북이나 CI 파이프라인에서 k3d 설치 없이 **동일한 프론트엔드/백엔드/PostgreSQL/워커 스택을 즉시 구동**하는 Fallback 트랙을 완벽히 보장합니다.
 
 ---
 
