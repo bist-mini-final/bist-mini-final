@@ -184,7 +184,9 @@
 }
 
 .bi-refresh-button:disabled,
-.bi-data-reset-button:disabled { cursor: wait; opacity: 0.68; }
+.bi-data-reset-button:disabled,
+.bi-refresh-button[aria-disabled='true'],
+.bi-data-reset-button[aria-disabled='true'] { cursor: wait; opacity: 0.68; }
 .bi-refresh-button__spinner { animation: bi-spin 700ms linear infinite; }
 
 .bi-data-state {
@@ -379,6 +381,7 @@
 }
 
 .bi-tool-button:disabled,
+.bi-tool-button[aria-disabled='true'],
 .bi-card__actions button:disabled { cursor: not-allowed; opacity: 0.48; }
 
 .bi-toolbar__layout-label {
@@ -809,7 +812,6 @@
 .bi-card-library li > div, .bi-evidence-list li > div { display: grid; min-inline-size: 0; gap: 0.25rem; }
 .bi-card-library strong, .bi-evidence-list strong { font-size: 0.76rem; }
 .bi-card-library span, .bi-evidence-list span { color: var(--text-muted); font-size: 0.68rem; line-height: 1.45; }
-.bi-evidence-list a { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--brand-700); font-size: 0.68rem; font-weight: 750; }
 .bi-card-library button { flex: none; gap: 0.3rem; padding-inline: 0.65rem; }
 
 .bi-page button:focus-visible,
