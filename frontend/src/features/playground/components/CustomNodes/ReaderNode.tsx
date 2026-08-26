@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { getExecutionNodeState, NodeShell } from '../FlowNode/NodeShell';
 import { unwrapModuleOutput } from '../../adapters/moduleOutput';
-import { MarkdownAnswer } from '../MarkdownAnswer';
+import { MarkdownAnswer, normalizeMarkdownTables } from '../MarkdownAnswer';
 
 const MODEL_OPTIONS = [
   { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna · 효율 중심' },
@@ -63,7 +63,7 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
     data.executionOutput ?? data.output,
     'answer_json',
   ) ?? {};
-  const answerText = outputPayload.answer ?? outputPayload.answer_markdown ?? '';
+  const answerText = normalizeMarkdownTables(outputPayload.answer ?? outputPayload.answer_markdown ?? '');
   const latency = outputPayload.latency_seconds;
   const cost = outputPayload.estimated_cost_usd;
   const tokens = outputPayload.api_usage?.total_tokens;

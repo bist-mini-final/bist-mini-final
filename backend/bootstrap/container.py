@@ -22,6 +22,7 @@ from backend.engine.runtime.services import (
 )
 from backend.features.bi.api_services import BiApiServices
 from backend.features.bi.composition import create_bi_services
+from backend.features.chatbot.suggestions import ChatSuggestionService
 from backend.providers.embeddings.openai import OpenAIEmbeddingEncoder
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.openai_provider import OpenAIProvider
@@ -109,6 +110,7 @@ class ApplicationContainer:
     runtime: RuntimeContainer
     workflow_dispatcher: KubernetesQueueDispatcher
     bi_services: BiApiServices
+    chat_suggestions: ChatSuggestionService
 
     @classmethod
     def create(
@@ -124,17 +126,22 @@ class ApplicationContainer:
             KUBERNETES_WORKFLOW_QUEUE,
         )
         registry = services.module_registry
+        bi_services = create_bi_services(registry)
         return cls(
             runtime=shared_runtime,
             workflow_dispatcher=dispatcher,
-            bi_services=create_bi_services(registry),
+            bi_services=bi_services,
+            chat_suggestions=ChatSuggestionService(services.db_manager, bi_services),
         )
 
     def recover_pending_runs(self) -> int:
         return self.workflow_dispatcher.recover_pending()
 
     def close(self) -> None:
-        self.workflow_dispatcher.cancel_all()
+        # Kubernetes runs are durable and may outlive this API process.  In
+        # particular, Uvicorn's development reloader calls close() on every
+        # code change; cancelling here would turn an unrelated reload into a
+        # user-visible "질문 처리가 중지되었습니다" failure.
         self.runtime.close()
 
 

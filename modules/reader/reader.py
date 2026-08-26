@@ -59,6 +59,7 @@ from __future__ import annotations
 import ast
 import logging
 import operator
+import re
 from typing import Annotated, Any, Dict, List, Optional
 
 from langchain_core.tools import ArgsSchema, BaseTool
@@ -79,6 +80,43 @@ from modules.common.config import DEFAULT_READER_MODEL
 from modules.retrieval.context_expander import ContextDTO
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_inline_markdown_tables(answer: str) -> str:
+    """Convert an escaped, one-line GFM table into valid Markdown at its source."""
+    normalized_lines: list[str] = []
+    for line in re.sub(r"\\+\|", "|", answer).splitlines():
+        separator_start = line.find("|---")
+        table_start = line.find("|")
+        if separator_start < 0 or table_start < 0 or table_start >= separator_start:
+            normalized_lines.append(line)
+            continue
+
+        header_cells = [cell.strip() for cell in line[table_start:separator_start].split("|") if cell.strip()]
+        following_cells = [cell.strip() for cell in line[separator_start:].split("|") if cell.strip()]
+        separator_cells = following_cells[:len(header_cells)]
+        data_cells = following_cells[len(header_cells):]
+        row_count = len(data_cells) // len(header_cells) if header_cells else 0
+        if (
+            len(header_cells) < 3
+            or not row_count
+            or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in separator_cells)
+        ):
+            normalized_lines.append(line)
+            continue
+
+        rows = [
+            data_cells[index:index + len(header_cells)]
+            for index in range(0, row_count * len(header_cells), len(header_cells))
+        ]
+        table = [
+            f"| {' | '.join(header_cells)} |",
+            f"| {' | '.join(separator_cells)} |",
+            *(f"| {' | '.join(row)} |" for row in rows),
+        ]
+        remainder = " | ".join(data_cells[row_count * len(header_cells):]).strip()
+        normalized_lines.append("\n".join(table) + (f"\n{remainder}" if remainder else ""))
+    return "\n".join(normalized_lines)
 
 
 # ==============================================================================
@@ -293,7 +331,17 @@ READER_SYSTEM_PROMPT = """당신은 주어진 재무제표 및 비즈니스 데�
 1. `lookup_cell_metadata`: 컨텍스트에 누락되었거나 정확한 확인이 필요한 특정 셀 좌표가 있다면 이 도구를 호출하여 데이터베이스에서 직접 셀 메타데이터를 조회하십시오.
 2. `calculate_math_expression`: 비율, 증감률, 절대 차이, 비중, 합계, 평균, 반올림 등의 정밀 수치 연산이 필요할 경우 반드시 이 도구를 호출하여 100% 오차 없는 수학적 계산 결과를 도출하십시오.
 
-수치나 특정 항목을 언급할 때는 반드시 해당 셀 좌표나 시트명을 인용([Sheet: A | Cell: B])하십시오."""
+수치나 특정 항목을 언급할 때는 반드시 해당 셀 좌표나 시트명을 인용([Sheet: A | Cell: B])하십시오.
+
+[서식 규칙]
+- 연도·분기별 수치가 3개 이상이면 반드시 GitHub Flavored Markdown 표를 사용하십시오. 첫 행은 `| 연도 | 항목 |`, 둘째 행은 `|---|---|` 형식이어야 합니다.
+- 탭으로 열을 맞추거나 ASCII 막대(████), 코드 블록으로 표·차트를 만들지 마십시오.
+- 표 아래에는 핵심 해석만 2~4개 문장으로 간결하게 정리하십시오.
+- 기간 범위에는 `2014–2020년`처럼 en dash(–) 또는 `~` 하나만 사용하십시오. `~~`는 Markdown 취소선이므로 절대 사용하지 마십시오.
+- 답변 첫 제목 또는 첫 문장에 대상 기업명과 기준 기간을 반드시 명시하십시오. 예: `### IBM · 2025년 최신 실적`.
+- 사용자가 세 줄 요약을 요청하면 제목 뒤 핵심 수치 3개만 답하십시오.
+- 데이터에 값이 없거나 근거가 부족한 항목은 반드시 알리되, `NA`, `셀 좌표 미제공`, `컨텍스트` 같은 내부 데이터 처리 용어는 쓰지 마십시오. 대신 `확인 가능한 근거가 부족해 요약에서 제외했습니다`처럼 사용자가 이해할 수 있는 문장으로 설명하십시오.
+- 사용자가 차트를 요청해도 본문에서 ASCII 막대·텍스트 그래프를 만들지 마십시오. 본문에는 Markdown 표와 해석만 작성하고, 시각화는 UI 차트 컴포넌트가 별도로 표시합니다."""
 
 READER_USER_TEMPLATE = """[Context Blocks]
 {context_text}
@@ -464,6 +512,7 @@ class ReaderModule(BaseLLMModule):
             max_iterations=cfg.max_tool_iterations,
             enable_tools=cfg.enable_tools,
         )
+        answer_text = _normalize_inline_markdown_tables(answer_text)
 
         return {
             "answer_json": {
