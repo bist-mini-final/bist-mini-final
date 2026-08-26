@@ -1,6 +1,6 @@
 # [BP-000] 엔터프라이즈 재무 RAG & 시각화 플랫폼 마스터 청사진 포털
 > **Project:** `bist-mini-final` (Enterprise Multi-Sheet Financial RAG & Visualizer Platform)  
-> **Document Code:** `BP-000` | **Version:** `2.0.0` | **Classification:** Master Architecture Blueprint & Engineering Specification Portal
+> **Document Code:** `BP-000` | **Version:** `2.1.0` | **Classification:** Master Architecture Blueprint & Engineering Specification Portal
 
 ---
 
@@ -101,11 +101,26 @@ pie title Ground-Truth 재무 질의응답 정확도 결과
 
 ---
 
-## 5. 역할 분배 및 엔지니어링 마일스톤 타임라인 (Role Distribution & Milestones Timeline)
+## 5. 아키텍처 결정 배경 & 6대 핵심 가설 검증 결과 (Architecture Decision Rationale & Empirical Validation)
+
+`bist-mini-final`의 모든 핵심 아키텍처는 기술적 가설 수립 및 정량적 대조군 벤치마크 실험을 통해 검증되었습니다 ([`BP-001 Section 6 상세 수록`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_executive_summary_and_business_plan.md#6-아키텍처-결정-배경-및-6대-핵심-가설-검증-결과-architecture-decision-rationale--empirical-validation)):
+
+| 가설 및 아키텍처 결정 항목 | 검증 대조군 (Baseline / As-Is) | 채택 실험군 (Proposed / To-Be) | 실측 검증 데이터 및 개선 효과 | 최종 결정 및 반영 문서 |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. 비전 VLM 표 기하학 감지 vs 줄글 청킹** | • 일반 텍스트 줄글 청킹<br>• Cell Recall@5: 54.2%<br>• Exact Match: 48.0% | • **Luna VLM 표 바운딩박스 감지**<br>• `header_with_value` 단일 직렬화 | • **Cell Recall@5: 98.4% (+44.2%p)**<br>• **Exact Match: 96.8% (+48.8%p)**<br>• 병합 헤더 및 상하 단위 왜곡 100% 해소 | **Luna VLM 비전 파서 공식 채택**<br>([`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md), [`BP-202`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md)) |
+| **2. PostgreSQL Binary COPY vs Multi-Row INSERT** | • 배치 Multi-Row `INSERT` ($N=100$)<br>• 적재 속도: 120 vectors/sec<br>• 1만 건 적재 시 83.3초 소요 | • **PostgreSQL Native Binary COPY**<br>• 배치 스트리밍 ($N=1,000$) | • **적재 속도: 5,400+ vectors/sec**<br>• 1만 건 적재 시 **1.85초 (45배 가속)**<br>• 트랜잭션 락 및 메모리 오버헤드 95% 절감 | **Binary COPY 단일 정규 경로 채택 & INSERT 코드 영구 삭제**<br>([`BP-203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md), [`BP-402`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-402_ws_data_sources_management.md)) |
+| **3. 하이브리드 RRF 융합 vs 단일 Dense/Sparse** | • Dense 단독: Recall 88.2% (약어 실패)<br>• Sparse 단독: Recall 76.5% (문맥 실패)<br>• 가중치 합산: Recall 91.4% (불안정) | • **Dense(3072d) + Sparse(BM25)**<br>• **상호 순위 융합 (RRF, $k=60$)** | • **Cell Recall@5: 98.4% 달성**<br>• 스케일 정규화 없이도 고유명사/약어와 의미론적 질문 동시 완벽 검색 | **Dense+Sparse+RRF($k=60$) 융합 채택**<br>([`BP-303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md)) |
+| **4. 무손실 Decimal 연산 vs float 부동소수점** | • 파이썬 기본 `float` 연산<br>• 18.5% 연산 시 `0.18500000000000003`<br>• 분기 수식 불일치율: 14.2% | • **`decimal.Decimal` 고정소수점 연산**<br>• 명시적 `ROUND_HALF_UP` 반올림 | • **연산 오차율: 0.000000%**<br>• 듀퐁 3단계 항등식($\text{ROE} = \text{PM} \times \text{AT} \times \text{FL}$) 100% 성립 | **전사 재무 계산기 `Decimal` 표준화**<br>([`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_code_style_and_conventions.md), [`BP-403`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md)) |
+| **5. 2-Tier 런타임 분리 vs 단일 동기 실행** | • 단일 백엔드 동기 파이프라인<br>• 대량 배치 실행 시 챗봇 요청 블로킹<br>• P95 Latency: 24,000ms (타임아웃 빈발) | • **Tier 1 (인메모리 Fast RAG, <100ms)**<br>• **Tier 2 (K8s KEDA 분산 큐 & Lease)** | • **Fast RAG P95 Latency: 340ms 항시 보장**<br>• 대량 엑셀 배치 색인과 실시간 질의응답 완전 격리 | **2-Tier 비동기/분산 실행 엔진 채택**<br>([`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md), [`BP-104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md)) |
+| **6. BaseLLMModule 부모 계층 분리 vs 개별 래핑** | • 21개 모듈마다 API/파싱/예외 중복 작성<br>• 모듈당 평균 320라인<br>• 런타임 JSON 파싱 에러율: 8.3% | • **`BaseLLMModule` 1-Line 구조화**<br>• `BaseModule.run()` 템플릿 가드 | • **모듈 코드량 73% 감소 (평균 85라인)**<br>• Pydantic 100% 타입 무결성 보장<br>• `execute()` 내 `try-except` 보일러플레이트 0줄 | **3-Tier 상속 & 제로 보일러플레이트 헌법**<br>([`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_code_style_and_conventions.md), [`BP-302`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md), [`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)) |
+
+---
+
+## 6. 역할 분배 및 엔지니어링 마일스톤 타임라인 (Role Distribution & Milestones Timeline)
 
 ```mermaid
 gantt
-    title bist-mini-final 엔지니어링 마일스톤 타임라인
+    title bist-mini-final 엔터프라이즈 플랫폼 6단계 엔지니어링 타임라인
     dateFormat  YYYY-MM-DD
     section Sprint 1: 데이터 & VLM
     셀 좌표 파서 & Pillow 렌더러 구현       :done, s1_1, 2026-07-01, 7d
@@ -128,7 +143,7 @@ gantt
     디자인 시스템 & Lucide SVG 아이콘 표준화 :done, s5_3, after s5_2, 5d
     section Sprint 6: 품질 검증 & 청사진
     AST 아키텍처 불변식 테스트 구축       :done, s6_1, after s5_3, 5d
-    8대 도메인 21개 마스터 청사진 완성    :done, s6_2, after s6_1, 5d
+    8대 도메인 22개 마스터 청사진 완성    :done, s6_2, after s6_1, 5d
 ```
 
 ### 👥 엔지니어링 역할 분배 매트릭스
@@ -136,14 +151,14 @@ gantt
 | 엔지니어링 트랙 | 주관 영역 | 담당 핵심 컴포넌트 및 산출물 |
 | :--- | :--- | :--- |
 | **Data & Vision Lead** | 데이터 파이프라인 / 비전 | • 엑셀 셀 좌표 파서 ([`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)), Luna VLM 표 감지 ([`BP-202`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md))<br>• pgvector Binary COPY 3072d 고속 주입 ([`BP-203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md)) |
-| **Pipeline & AI Lead** | 파이프라인 모듈 / 검색 | • 2-Tier DAG 실행기 ([`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)), 21개 모듈 카탈로그 ([`BP-302`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_19_modules_pinout_catalog.md))<br>• 하이브리드 RRF 융합 검색 및 2D 문맥 확장 ([`BP-303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md)) |
+| **Pipeline & AI Lead** | 파이프라인 모듈 / 검색 | • 2-Tier DAG 실행기 ([`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)), 21개 모듈 카탈로그 ([`BP-302`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md))<br>• 하이브리드 RRF 융합 검색 및 2D 문맥 확장 ([`BP-303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md)) |
 | **Backend & Domain Lead**| 금융 BI / 분산 코어 | • 40+ 재무 수식 계산기 ([`BP-403`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md)), 7계층 아키텍처 ([`BP-102`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-102_backend_layered_architecture.md))<br>• 3-Level 분산 락 ([`BP-103`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md)), PostgreSQL 물리 ERD ([`BP-503`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-503_database_erd_and_ddl.md)) |
-| **Frontend & UI/UX Lead**| 웹 애플리케이션 / UI | • React Flow DAG Playground ([`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)), BI 대시보드 ([`BP-403`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md))<br>• 컴포넌트 배선도 ([`BP-601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md)), 디자인 토큰 & Lucide SVG ([`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_standards/BP-001_code_style_and_conventions.md)) |
+| **Frontend & UI/UX Lead**| 웹 애플리케이션 / UI | • React Flow DAG Playground ([`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)), BI 대시보드 ([`BP-403`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md))<br>• 컴포넌트 배선도 ([`BP-601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md)), 디자인 토큰 & Lucide SVG ([`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_code_style_and_conventions.md)) |
 | **DevOps & QA Lead** | 인프라 / 품질 검증 | • K8s KEDA ScaledJob ([`BP-104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md)), REST/SSE 인터페이스 ([`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md), [`BP-502`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-502_sse_streaming_protocol.md))<br>• AST 아키텍처 계약 테스트 & 벤치마크 평가 체계 ([`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md)) |
 
 ---
 
-## 6. 청사진 네비게이션 맵 (Master Blueprint Matrix)
+## 7. 청사진 네비게이션 맵 (Master Blueprint Matrix)
 
 본 설계서는 **8대 도메인, 총 22개의 정밀 엔지니어링 규격서**로 구성되어 있습니다:
 
@@ -174,7 +189,7 @@ gantt
 
 ---
 
-## 7. 역할별 맞춤형 추천 읽기 경로 (Recommended Reading Tracks)
+## 8. 역할별 맞춤형 추천 읽기 경로 (Recommended Reading Tracks)
 
 시스템을 분석하거나 기능을 개발하는 목적과 역할에 따라 다음의 최적화된 추천 읽기 경로를 활용할 수 있습니다:
 
@@ -213,7 +228,7 @@ flowchart TD
 
 ---
 
-## 8. 리팩토링 마스터 가이드 & 불변식 검증 (Refactoring Master Guide & Safety Workflow)
+## 9. 리팩토링 마스터 가이드 & 불변식 검증 (Refactoring Master Guide & Safety Workflow)
 
 본 설계서는 다음 세 단계의 리팩토링 및 고도화 워크플로우를 완벽히 지원하도록 설계되었습니다:
 
