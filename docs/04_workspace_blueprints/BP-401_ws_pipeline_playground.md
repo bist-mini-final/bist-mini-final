@@ -30,7 +30,7 @@ flowchart TB
     CTX --> ADAPTER
     ADAPTER --> API_CLIENT
     API_CLIENT -->|POST /api/workflows/run| BACKEND["FastAPI /api/workflows"]
-    BACKEND -.->|SSE Stream /api/workflows/runs/{id}/stream| API_CLIENT
+    BACKEND -.->|"SSE Stream: /api/workflows/runs/:id/stream"| API_CLIENT
     API_CLIENT --> SSE_BAR
     API_CLIENT --> TRACE_PANEL
 ```
