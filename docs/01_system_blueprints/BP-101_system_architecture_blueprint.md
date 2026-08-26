@@ -9,80 +9,69 @@
 `bist-mini-final` 시스템은 비정형 스프레드시트 분석, 대규모 임베딩 색인, DAG 기반 RAG 실행, 그리고 실시간 재무 BI 대시보드를 통합 처리하기 위해 설계된 **엔터프라이즈 멀티 티어 하이브리드 아키텍처**를 가집니다.
 
 ```mermaid
-flowchart TB
-    subgraph ClientTier ["1. Client & Presentation Tier (React 18 + Vite)"]
-        UI_PLAY["Playground WS (Interactive DAG Builder)"]
-        UI_DS["Data Sources WS (VLM Sheet Viewer)"]
-        UI_BI["Financial BI WS (Recharts Dashboard)"]
-        UI_CHAT["[Planned] AI Financial Chatbot WS"]
-        UI_COMP["[Planned] Company Comparison WS"]
+flowchart TD
+    classDef client fill:#f8fafc,stroke:#3b82f6,stroke-width:2px,color:#0f172a;
+    classDef gateway fill:#f8fafc,stroke:#6366f1,stroke-width:2px,color:#0f172a;
+    classDef domain fill:#f8fafc,stroke:#10b981,stroke-width:2px,color:#0f172a;
+    classDef runtime fill:#f8fafc,stroke:#f59e0b,stroke-width:2px,color:#0f172a;
+    classDef modules fill:#f8fafc,stroke:#ec4899,stroke-width:2px,color:#0f172a;
+    classDef infra fill:#f8fafc,stroke:#64748b,stroke-width:2px,color:#0f172a;
+
+    subgraph Tier1_UI ["1. 클라이언트 & 워크스페이스 계층 (React 18 + Vite SPA)"]
+        WS1["Pipeline Playground<br>(React Flow 2D DAG)"]:::client
+        WS2["Data Sources<br>(VLM Sheet Viewer)"]:::client
+        WS3["Financial BI<br>(Recharts Dashboard)"]:::client
+        WS4["[Planned] Financial Chatbot<br>(Fast RAG Conversational)"]:::client
+        WS5["[Planned] Company Comparison<br>(DuPont & Cross Matrix)"]:::client
     end
 
-    subgraph GatewayTier ["2. Gateway & API Ingress Tier"]
-        INGRESS["Kubernetes Ingress (Nginx / Traefik)"]
-        CORS["CORS & RequestObservabilityMiddleware"]
-        FASTAPI["FastAPI App (backend/main.py)"]
+    subgraph Tier2_GW ["2. 게이트웨이 & API 라우팅 계층"]
+        INGRESS["Kubernetes Ingress (bist-mini-ingress : 포트 80/443 라우팅 & CORS)"]:::gateway
+        FASTAPI["FastAPI App (ApplicationContainer, REST API & SSE Event Stream)"]:::gateway
+        INGRESS --> FASTAPI
     end
 
-    subgraph ModularCore ["3. Pure Modular Pipeline Core (modules/* - Independent Building Blocks)"]
-        direction TB
-        M_QUERY["Query Processing Modules<br>(QueryInput, Decomposer, Router, SemanticMatcher)"]
-        M_EMB["Embedding & Indexing Modules<br>(QueryEmbedder, CellTextEmbedder, IndexWriter)"]
-        M_RET["Retrieval & Fusion Modules<br>(DataScope, PgVectorRetriever, KeywordRetriever, RrfFusion, ContextExpander)"]
-        M_GEN["Generation & Reasoning Modules<br>(ReaderModule)"]
-        M_VIS["Vision & Preprocessing Modules<br>(FileSelector, LunaVlmDetector, Serializer, EntityExtractor)"]
+    subgraph Tier3_SVC ["3. 도메인 서비스 계층 (Business Logic & QA Engines)"]
+        BI_SVC["BiApiServices<br>(재무제표 프로파일러 & 40+ 지표 엔진)"]:::domain
+        CHAT_SVC["[Planned] ChatbotService<br>(대화 세션 & Fast RAG 조율)"]:::domain
+        COMP_SVC["[Planned] CompanyComparisonService<br>(엔티티 정규화 & 듀퐁 분석)"]:::domain
+        BM_SVC["BenchmarkService<br>(Ground-Truth Q&A 정확도 평가)"]:::domain
     end
 
-    subgraph RuntimeTier ["4. 2-Tier Composition & Execution Hosts"]
-        direction TB
-        subgraph Tier1 ["Tier 1 Host: Synchronous In-Memory Host (FastAPI Web Process)"]
-            T1_EXEC["WorkflowExecutor (DAG Topology Runner & Zero-I/O In-Memory Bus)"]
+    subgraph Tier4_HOST ["4. 2-Tier 파이프라인 조합 및 실행 호스트 (Execution Hosts)"]
+        direction LR
+        HOST_T1["Tier 1: 동기 인메모리 호스트<br>WorkflowExecutor (FastAPI 프로세스 내 제로 I/O 고속 DAG 실행, <100ms)"]:::runtime
+        HOST_T2["Tier 2: 분산 배치 큐 호스트<br>KEDA ScaledJob + Worker Pods (workflow-core 큐 기반 비동기 분산 실행)"]:::runtime
+    end
+
+    subgraph Tier5_MOD ["5. 순수 파이프라인 모듈 코어 (modules/* - 19개 독립 부품 블록)"]
+        direction LR
+        M1["질의 처리 모듈군<br>(Input, Decomposer, Router, Matcher)"]:::modules
+        M2["임베딩/색인 모듈군<br>(QueryEmbedder, CellEmbedder, IndexWriter)"]:::modules
+        M3["하이브리드 검색 모듈군<br>(DataScope, PgVector, Keyword, RRF, Expander)"]:::modules
+        M4["추론/생성 모듈군<br>(ReaderModule)"]:::modules
+        M5["비전/전처리 모듈군<br>(FileSelector, LunaVLM, Serializer, Extractor)"]:::modules
+    end
+
+    subgraph Tier6_INFRA ["6. AI 모델 프로바이더 & 영속성 인프라 계층"]
+        direction LR
+        subgraph AI_BOX ["AI Provider Ports & Adapters"]
+            LLM["OpenAI Responses (GPT-5.6 Luna)"]:::infra
+            VLM["Luna VLM (GPT-5.6 Luna Vision)"]:::infra
+            EMB["EmbeddingEncoder (3072 dim)"]:::infra
         end
-        subgraph Tier2 ["Tier 2 Host: Distributed Batch Host (KEDA ScaledJob Worker Pods)"]
-            K8S_DISP["KubernetesQueueDispatcher"]
-            KEDA["KEDA ScaledJob / Celery Queue: workflow-core"]
-            WORKER_PODS["Standalone Worker Containers (backend/engine/worker/main.py)"]
-            K8S_DISP --> KEDA --> WORKER_PODS
+        subgraph DB_BOX ["PostgreSQL 16 + pgvector Storage"]
+            PG_VEC["pgvector (HNSW Index: 3072d)"]:::infra
+            PG_FTS["PostgreSQL Native FTS (TSVector BM25)"]:::infra
+            POOL["Thread-Safe ConnectionPool (2~10)"]:::infra
         end
     end
 
-    subgraph ServiceDomain ["5. Domain Services Tier (Business & Evaluation Engines)"]
-        BI_SVC["BiApiServices (Document Profiler & Metric Engine)"]
-        CHAT_SVC["[Planned] ChatbotService (Session & Fast RAG Orchestrator)"]
-        COMP_SVC["[Planned] CompanyComparisonService (Multi-Entity Normalizer & DuPont Engine)"]
-        BM_SVC["BenchmarkService (Evaluation & Ground Truth QA)"]
-        WF_SVC["WorkflowRuntimeServices (Run Store & History)"]
-    end
-
-    subgraph ProviderTier ["6. AI & Model Provider Tier"]
-        OAI_LLM["OpenAIResponsesClient (GPT-5.6 Luna)"]
-        OAI_VLM["Luna VLM (GPT-5.6 Luna Visual Engine)"]
-        OAI_EMB["OpenAIEmbeddingEncoder (text-embedding-3-large 3072d)"]
-        BGE_EMB["BgeEmbeddingEncoder (Local ONNX/PyTorch Fallback)"]
-    end
-
-    subgraph StorageTier ["7. Persistence & Storage Tier"]
-        PG_POOL["Thread-Safe ConnectionPool (Min: 2, Max: 10)"]
-        PG_CORE["PostgreSQL 16 Engine"]
-        PG_VEC["pgvector (HNSW Index: m=16, ef_construction=64)"]
-        PG_FTS["PostgreSQL Native FTS (TSVector & GIN Index)"]
-        DISK_STORE["Artifact File System (/data/artifacts, /data/runs)"]
-        PG_POOL --> PG_CORE
-        PG_CORE --> PG_VEC
-        PG_CORE --> PG_FTS
-    end
-
-    ClientTier --> INGRESS --> CORS --> FASTAPI
-    FASTAPI --> ServiceDomain
-    ServiceDomain --> Tier1
-    ServiceDomain --> Tier2
-    
-    Tier1 -->|Dynamically Composes & Executes| ModularCore
-    WORKER_PODS -->|Dynamically Composes & Executes| ModularCore
-
-    ModularCore --> ProviderTier
-    ModularCore --> StorageTier
-    ServiceDomain --> StorageTier
+    Tier1_UI --> INGRESS
+    FASTAPI --> Tier3_SVC
+    Tier3_SVC --> Tier4_HOST
+    Tier4_HOST -->|동적 DAG 그래프 결선 및 실행| Tier5_MOD
+    Tier5_MOD --> Tier6_INFRA
 ```
 
 ---
