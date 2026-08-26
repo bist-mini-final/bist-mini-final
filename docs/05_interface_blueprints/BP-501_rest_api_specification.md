@@ -97,6 +97,61 @@
 
 ---
 
+## 2. 전역 예외 처리 계층 및 표준 에러 응답 규격 (Global Exception Hierarchy & Error Envelope)
+
+개별 비즈니스 로직과 모듈 코드의 가독성을 극대화하기 위해, **모듈 내부의 불필요한 `try-except` 보일러플레이트를 전면 배제(Zero Exception Boilerplate)**하고 최상위 `BaseModule.run()` 및 FastAPI 전역 핸들러가 에러를 일원화하여 포착·응답합니다:
+
+```mermaid
+flowchart TD
+    subgraph ExceptionHierarchy ["도메인 예외 계층 구조 (PipelineBaseError)"]
+        BASE["PipelineBaseError (HTTP 500 / 기본 에러)"]
+        EXEC["ModuleExecutionError (HTTP 422 / 모듈 실행 실패)"]
+        VAL["ModuleValidationError (HTTP 422 / 입력·설정 검증 실패)"]
+        API["ProviderApiError (HTTP 502 / LLM·임베딩 외부 API 장애)"]
+        STORAGE["StorageError (HTTP 500 / DB, pgvector, 아티팩트 I/O 장애)"]
+        DOC["DocumentParsingError (HTTP 422 / 엑셀, VLM 구조 파싱 실패)"]
+
+        BASE --> EXEC
+        BASE --> VAL
+        BASE --> API
+        BASE --> STORAGE
+        BASE --> DOC
+    end
+```
+
+---
+
+### 2.1 단일 표준 전역 에러 응답 규격 (Standard Error Envelope)
+
+모든 REST API 엔드포인트에서 예외 발생 시, 클라이언트(프론트엔드)는 일관된 JSON 에러 스키마를 수신합니다:
+
+```json
+{
+  "error_code": "PROVIDER_API_ERROR",
+  "message": "모듈 [reader] 외부 API 호출 실패: Rate limit exceeded",
+  "module_type": "reader",
+  "status_code": 502,
+  "details": {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "retry_after_seconds": 5
+  },
+  "timestamp": "2026-08-26T16:00:00.000Z"
+}
+```
+
+---
+
+### 2.2 비즈니스 로직 순수성 및 제로 보일러플레이트 원칙 (Zero Exception Boilerplate Policy)
+
+| 핵심 원칙 | 설계 및 구현 표준 |
+| :--- | :--- |
+| **비즈니스 로직 순수성** | `modules/*.execute()` 및 `backend/features/bi/*.py` 내부에는 `try-except` 예외 포장 코드를 일절 작성하지 않고, **순수 비즈니스 연산/수식/변환 코드만 간결하게 유지**합니다. |
+| **템플릿 메서드 자동 가드** | 부모 클래스인 `BaseModule.run()`이 실행 중 발생하는 Pydantic 검증 에러, 네트워크 타임아웃, DB 커넥션 단절을 자동으로 감지하여 표준 도메인 예외(`ProviderApiError`, `ModuleValidationError`)로 변환합니다. |
+| **FastAPI 전역 인터셉터** | `backend/main.py`의 `@app.exception_handler(PipelineBaseError)`가 모든 도메인 예외를 일괄 가로채어 적절한 HTTP 상태 코드(422, 500, 502)와 표준 Error Envelope로 응답합니다. |
+
+---
+
 ## 3. 리팩토링 타깃 (Refactoring Targets)
 
 1. **FastAPI 의존성 주입(`Depends`) 표준화**:
@@ -104,3 +159,4 @@
    - To-Be: `def get_bi_services(container: ApplicationContainer = Depends(get_container)) -> BiApiServices:` 표준 `Depends` 패턴으로 전면 리팩토링.
 2. **API 버저닝 경로 도입**:
    - `/api/v1/workflows`, `/api/v1/bi` 형식의 URI 네임스페이스 버저닝 적용.
+

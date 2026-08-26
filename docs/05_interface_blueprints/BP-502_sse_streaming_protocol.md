@@ -83,7 +83,7 @@ sequenceDiagram
   ```
 
 ### 4. `event: node_failed`
-- **발행 시점**: 모듈 실행 중 예외 또는 타임아웃 발생 시.
+- **발행 시점**: 모듈 실행 중 예외 또는 타임아웃 발생 시 ([BP-501 전역 에러 규격] 연동).
 - **Payload Schema**:
   ```json
   {
@@ -91,14 +91,20 @@ sequenceDiagram
     "node_id": "node_vlm_detector",
     "status": "failed",
     "error": {
-      "code": "VLM_TIMEOUT",
-      "message": "OpenAI Vision API 응답 시간 초과 (40s)"
+      "error_code": "PROVIDER_API_ERROR",
+      "message": "모듈 [structure.luna_vlm_structure_detector] 외부 API 호출 실패: Timeout after 40s",
+      "module_type": "structure.luna_vlm_structure_detector",
+      "status_code": 502,
+      "details": {
+        "provider": "openai",
+        "model": "gpt-5.6-luna"
+      }
     }
   }
   ```
 
 ### 5. `event: run_finished`
-- **발행 시점**: 모든 배치가 종료되거나 에러로 인해 조기 중단되었을 때.
+- **발행 시점**: 모든 배치가 성공적으로 완료되었을 때.
 - **Payload Schema**:
   ```json
   {
@@ -107,6 +113,20 @@ sequenceDiagram
     "total_elapsed_ms": 2850.4,
     "completed_nodes": 8,
     "failed_nodes": 0
+  }
+  ```
+
+### 6. `event: run_failed`
+- **발행 시점**: 의존성 노드 실패로 전체 파이프라인이 조기 중단되었을 때.
+- **Payload Schema**:
+  ```json
+  {
+    "run_id": "run-a1b2c3d4",
+    "status": "failed",
+    "total_elapsed_ms": 1420.1,
+    "failed_node_id": "node_vlm_detector",
+    "error_code": "PROVIDER_API_ERROR",
+    "message": "파이프라인 실행 중단: 필수 선행 노드(node_vlm_detector) 실행 실패"
   }
   ```
 
