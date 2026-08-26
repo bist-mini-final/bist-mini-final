@@ -8,7 +8,7 @@
 
 수십만 개의 스프레드시트 셀 임베딩을 PostgreSQL `INSERT` 문이나 ORM 객체 매핑으로 주입하면 Python 인터프리터의 float 객체 생성 오버헤드와 네트워크 직렬화 병목으로 인해 막대한 지연이 발생합니다.
 
-`bist-mini-final`은 **PostgreSQL 네이티브 Binary COPY 프로토콜**을 직접 바이트 스트림 수준에서 구현하여 **초당 5,000+ 개 이상의 1536차원 벡터를 실시간 주입**합니다.
+`bist-mini-final`은 **PostgreSQL 네이티브 Binary COPY 프로토콜**을 직접 바이트 스트림 수준에서 구현하여 **초당 5,000+ 개 이상의 3072차원 벡터를 실시간 주입**합니다.
 
 ```mermaid
 flowchart LR
@@ -32,7 +32,7 @@ flowchart LR
 | Tuple 1: FieldCount(2B) = 5                                           |
 |   - Field 0 (id): Len(4B) + UUID/VARCHAR bytes                        |
 |   - Field 1 (collection_id): Len(4B) + UUID bytes (16B)               |
-|   - Field 2 (embedding): Len(4B) + Dim(2B) + Flags(2B) + Float32[1536]|
+|   - Field 2 (embedding): Len(4B) + Dim(2B) + Flags(2B) + Float32[3072]|
 |   - Field 3 (document): Len(4B) + UTF-8 Text bytes                    |
 |   - Field 4 (cmetadata): Len(4B) + JSONB bytes                        |
 +-----------------------------------------------------------------------+
@@ -74,7 +74,7 @@ WITH (
 ## 5. 리팩토링 타깃 (Refactoring Targets)
 
 1. **Halfvec (fp16) 및 양자화(IVF-PQ) 지원**:
-   - As-Is: Full float32 (1536차원 = 6,144 바이트/행).
+   - As-Is: Full float32 (3072차원 = 12,288 바이트/행).
    - To-Be: pgvector 0.7+ `halfvec` (16비트 부동소수점) 지원 추가로 인덱스 메모리 사용량 50% 절감.
 2. **동적 파티셔닝(Partitioned Tables)**:
    - 기업별(`company_name`), 회계연도별 파티셔닝 테이블로 분할하여 멀티테넌트 대규모 데이터 색인 최적화.

@@ -22,7 +22,7 @@ flowchart TD
 
     subgraph Storage ["Storage & Persistence Layer (BP-503)"]
         BCP --> PG["PostgreSQL 16 + pgvector"]
-        PG --> HNSW["HNSW Vector Index (1536 dim)"]
+        PG --> HNSW["HNSW Vector Index (3072 dim)"]
         PG --> FTS["Native TSVector Full-Text Index"]
     end
 

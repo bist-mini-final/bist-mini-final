@@ -53,10 +53,10 @@ graph LR
 ### [Group B: 임베딩 및 색인 모듈 (Embedding & Indexing)]
 
 #### 5. `EmbedderModule` (`embedding.query_embedder`)
-- **역할**: 텍스트 질의를 1536차원 부동소수점 벡터로 변환.
+- **역할**: 텍스트 질의를 3072차원 부동소수점 벡터로 변환.
 - **Input Pins**: `query: str`
 - **Output Pins**: `query_embedding: List[float]`, `dimension: int`
-- **Config Pins**: `model: str = "text-embedding-3-small"`
+- **Config Pins**: `model: str = "text-embedding-3-large"`
 
 #### 6. `CellTextEmbedderModule` (`embedding.cell_text_embedder`)
 - **역할**: 직렬화된 엑셀 셀 청크 리스트를 일괄 배치 임베딩하여 아티팩트 버퍼 생성.
@@ -80,7 +80,7 @@ graph LR
 - **Output Pins**: `filter_criteria: Dict[str, Any]`
 
 #### 9. `PgVectorRetrieverModule` (`retrieval.pgvector_retriever`)
-- **역할**: 1536차원 HNSW 코사인 유사도 기반 Dense 벡터 검색.
+- **역할**: 3072차원 HNSW 코사인 유사도 기반 Dense 벡터 검색.
 - **Input Pins**: `query_embedding: List[float]`, `filter_criteria: Optional[Dict]`, `top_k: int = 10`
 - **Output Pins**: `dense_results: List[RetrievedChunk]`
 - **Config Pins**: `top_k: int = 10`, `similarity_threshold: float = 0.5`
