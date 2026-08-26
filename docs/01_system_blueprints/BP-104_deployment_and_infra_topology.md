@@ -138,14 +138,59 @@ flowchart TD
 | **① OS & 쉘 호환성** | Windows 환경에서 bash `.sh` 미지원 | Windows 전용 **PowerShell 배포기(`deploy/kubernetes/local.ps1`)**와 POSIX bash(`local.sh`)를 듀얼 제공하여 크로스 플랫폼 지원. |
 | **② 하드웨어 리소스** | 메모리 부족으로 K8s Pod OOM 크래시 | 가용 RAM을 사전 검사하여 4GB 미만일 경우 경고 알림 및 **경량 Track B(docker-compose) 전환 권고**. |
 | **③ 포트 충돌 검사** | 기존 8080, 5432 포트 중복 점유 | 포트 충돌 감지 시 에러로 죽지 않고 환경 변수(`PORT=8081`)로 대체 포트 자동 바인딩 제안. |
-| **④ Docker 엔진 검증** | Docker 미설치 또는 데몬 정지 | • Mac/Linux: Homebrew/패키지 매니저 안내 및 데몬 백그라운드 기동 대기 (`docker info` 루프).<br>• Docker 없을 시 사용자 친화적 가이드 출력 후 중단. |
-| **⑤ K8s CLI 도구 자동화** | `k3d`, `kubectl`, `helm` 미설치 | **시스템 전역(Global)을 오염시키지 않고**, 프로젝트 로컬 디렉토리([`.tools/bin/`](file:///c:/Repos/bist-mini-final/.tools/bin/))에 단독 실행 바이너리를 자동 curl 다운로드하여 `PATH`에 임시 등록. |
+| **④ Docker 엔진 검증** | Docker 미설치 또는 데몬 정지 | OS별 다중 Fallback(winget, curl 쉘, direct DMG/EXE 다운로드)을 통해 설치 가이드 및 데몬 기동 루프 실행. |
+| **⑤ K8s CLI 도구 자동화** | `k3d`, `kubectl`, `helm` 미설치 | **패키지 매니저 유무와 무관하게**, 공식 정적 바이너리(Static Binary)를 프로젝트 로컬 디렉토리([`.tools/bin/`](file:///c:/Repos/bist-mini-final/.tools/bin/))에 자동 다운로드하여 `PATH`에 격리 바인딩. |
 
 ---
 
-### 3.2 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
+### 3.2 제로-디펜던시 환경별 다중 Fallback 설치 매트릭스 (All-Case Tool Installation Matrix)
 
-1. **Track A (권장): Kubernetes + KEDA 분산 클러스터 (`deploy/kubernetes/local.sh all`)**
+새로운 순정 환경에는 패키지 매니저(`brew`, `winget`)나 기본 다운로더(`curl`, `wget`)조차 설치되어 있지 않을 수 있으므로, **다단계 폴백 체인(Fallback Chain)**을 통해 어떤 극한 환경에서도 100% 설치를 완수합니다:
+
+```mermaid
+flowchart TD
+    subgraph DownloaderFallback ["1. 다운로더 도구 폴백 체인 (Download Tool Fallback)"]
+        D1{"curl 존재하는가?"}
+        D2{"wget 존재하는가?"}
+        D3{"python3 (urllib) 존재하는가?"}
+        D4["OS 네이티브 패키지 관리자로 curl 설치 (apt/dnf/apk/zypper)"]
+        D_WIN["Windows: PowerShell 네이티브 Invoke-WebRequest 사용 (외부도구 0개 요구)"]
+
+        D1 -- Yes --> EXEC_CURL["curl로 바이너리 다운로드"]
+        D1 -- No --> D2
+        D2 -- Yes --> EXEC_WGET["wget으로 바이너리 다운로드"]
+        D2 -- No --> D3
+        D3 -- Yes --> EXEC_PY["Python urllib으로 바이너리 다운로드"]
+        D3 -- No --> D4
+    end
+
+    subgraph BinaryInstall ["2. 정적 바이너리 격리 배치 (Zero Global Pollution)"]
+        B_K3D["k3d 바이너리 -> .tools/bin/k3d"]
+        B_KUBECTL["kubectl 바이너리 -> .tools/bin/kubectl"]
+        B_HELM["helm 바이너리 -> .tools/bin/helm"]
+        B_UV["uv 바이너리 -> .tools/bin/uv"]
+    end
+
+    EXEC_CURL --> BinaryInstall
+    EXEC_WGET --> BinaryInstall
+    EXEC_PY --> BinaryInstall
+    D_WIN --> BinaryInstall
+```
+
+| 대상 도구 | 1차 시도 (Primary) | 2차 폴백 (Fallback 1) | 3차 폴백 (Fallback 2 / Extreme) |
+| :--- | :--- | :--- | :--- |
+| **다운로더** | `curl` (기본 탑재 도구) | `wget` (대체 CLI) | `python3 -c "import urllib.request..."` 또는 Windows `Invoke-WebRequest` |
+| **Docker Engine** | `winget` (Win) / `brew` (Mac) | `https://get.docker.com` (Linux 자동 쉘) | 공식 Docker Desktop Installer (.exe / .dmg) 직접 다운로드 후 실행 |
+| **k3d** | OS 패키지 매니저 | 공식 인스톨 스크립트 (`install.sh`) | GitHub Releases Direct Static Binary (`.tools/bin/k3d`) |
+| **kubectl** | OS 패키지 매니저 | `dl.k8s.io` 공식 정적 바이너리 직접 다운로드 | 프로젝트 로컬 격리 바인딩 (`.tools/bin/kubectl`) |
+| **helm** | OS 패키지 매니저 | 공식 `get_helm.sh` 스크립트 | Tarball 아카이브 다운로드 후 `.tools/bin/helm` 압축 해제 |
+| **권한 격리** | 일반 사용자 권한 (`non-root`) | `sudo` 없이 8080/8443 포트 사용 | 시스템 전역 디렉토리 침범 0건 (`.tools/bin/` 로컬 디렉토리만 사용) |
+
+---
+
+### 3.3 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
+
+1. **Track A (권장): Kubernetes + KEDA 분산 클러스터 (`deploy/kubernetes/local.sh all` 또는 `local.ps1 all`)**
    - 실제 운영 환경과 100% 동일하게 로컬 k3d 클러스터를 생성하고, KEDA 오토스케일러와 Ingress Controller를 통한 엔터프라이즈 멀티 티어 배포를 검증합니다.
 2. **Track B (대체): Zero-K8s 경량 Docker-Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
    - K8s를 구동하기 어려운 저사양 노트북이나 CI 파이프라인에서 k3d 설치 없이 **동일한 프론트엔드/백엔드/PostgreSQL/워커 스택을 즉시 구동**하는 Fallback 트랙을 완벽히 보장합니다.
