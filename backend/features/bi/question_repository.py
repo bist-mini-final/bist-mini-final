@@ -38,6 +38,14 @@ class BiQuestionRegistrationError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class BiQuestionResetActiveError(RuntimeError):
+    company_id: str
+
+    def __str__(self) -> str:
+        return f"BI questions are active for company: {self.company_id}"
+
+
+@dataclass(frozen=True, slots=True)
 class BiQuestionTransitionError(RuntimeError):
     question_id: QuestionId
     expected_status: BiQuestionStatus
@@ -139,6 +147,92 @@ class PostgresBiQuestionRepository:
         except psycopg2.Error as error:
             raise BiQuestionRepositoryError(
                 operation="register",
+                reason=str(error),
+            ) from error
+        return registered
+
+    def replace_questions(
+        self,
+        questions: tuple[BiQuestionRecord, ...],
+    ) -> tuple[BiQuestionRecord, ...]:
+        first = questions[0]
+        values = [
+            (
+                question.question_id,
+                question.materialization_job_id,
+                question.company_id,
+                question.workbook_hash,
+                question.index_id,
+                question.metric_id.value,
+                question.period_id,
+                question.question_version,
+                question.question_text,
+                question.status.value,
+                question.workflow_run_id,
+                question.attempt_count,
+                question.created_at,
+                question.updated_at,
+                question.started_at,
+                question.completed_at,
+            )
+            for question in questions
+        ]
+        try:
+            with get_pooled_raw_connection(self._database_url) as connection:
+                with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute(
+                        "SELECT company_id FROM bi_companies "
+                        "WHERE company_id = %s FOR UPDATE",
+                        (first.company_id,),
+                    )
+                    cursor.execute(
+                        "SELECT question_id FROM bi_questions "
+                        "WHERE company_id = %s AND workbook_hash = %s "
+                        "AND index_id = %s AND status IN (%s, %s) "
+                        "LIMIT 1 FOR UPDATE",
+                        (
+                            first.company_id,
+                            first.workbook_hash,
+                            first.index_id,
+                            BiQuestionStatus.QUEUED.value,
+                            BiQuestionStatus.RUNNING.value,
+                        ),
+                    )
+                    if cursor.fetchone() is not None:
+                        raise BiQuestionResetActiveError(str(first.company_id))
+                    cursor.execute(
+                        "DELETE FROM bi_questions "
+                        "WHERE company_id = %s AND workbook_hash = %s "
+                        "AND index_id = %s",
+                        (
+                            first.company_id,
+                            first.workbook_hash,
+                            first.index_id,
+                        ),
+                    )
+                    execute_values(
+                        cursor,
+                        f"INSERT INTO bi_questions ({QUESTION_COLUMNS}) VALUES %s",
+                        values,
+                    )
+                    cursor.execute(
+                        f"SELECT {QUESTION_COLUMNS} FROM bi_questions "
+                        "WHERE materialization_job_id = %s "
+                        "ORDER BY metric_id, period_id",
+                        (first.materialization_job_id,),
+                    )
+                    registered = tuple(
+                        BiQuestionRecord.model_validate(row)
+                        for row in cursor.fetchall()
+                    )
+                    if len(registered) != len(questions):
+                        raise BiQuestionRegistrationError(
+                            materialization_job_id=first.materialization_job_id
+                        )
+                connection.commit()
+        except psycopg2.Error as error:
+            raise BiQuestionRepositoryError(
+                operation="replace",
                 reason=str(error),
             ) from error
         return registered

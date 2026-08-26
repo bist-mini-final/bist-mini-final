@@ -1,4 +1,5 @@
 import {
+  Activity,
   BadgeDollarSign,
   ChartNoAxesCombined,
   Scale,
@@ -94,6 +95,32 @@ export const CARD_REGISTRY = [
     defaultWideSpan: 8.8,
     defaultWideHeight: 10.7,
   },
+  {
+    id: 'financial_health_heatmap',
+    title: '재무 체력 히트맵',
+    description: '핵심 비율의 기간별 개선과 악화를 한눈에 비교합니다.',
+    icon: Activity,
+    primaryMetric: 'operating_margin',
+    secondaryMetric: 'debt_ratio',
+    detailMetrics: [
+      'revenue_yoy_growth',
+      'net_margin',
+      'free_cash_flow_margin',
+      'net_debt_ratio',
+    ],
+    requiredMetrics: [
+      'revenue_yoy_growth',
+      'operating_margin',
+      'net_margin',
+      'free_cash_flow_margin',
+      'debt_ratio',
+      'net_debt_ratio',
+    ],
+    defaultSize: 'L',
+    allowedSizes: ['M', 'L'],
+    defaultWideSpan: 17,
+    defaultWideHeight: 14,
+  },
 ] as const satisfies readonly BiCardDefinition[];
 
 const CARD_IDS = CARD_REGISTRY.map((card) => card.id);
@@ -120,6 +147,8 @@ export const DEFAULT_CARD_LAYOUT = [
     gridSizes: { wide: { w: 8.8, h: 10.7 }, medium: { w: 8, h: 14 } },
   },
 ] as const satisfies readonly BiCardLayoutItem[];
+
+export const DEFAULT_HIDDEN_CARD_IDS = ['financial_health_heatmap'] as const satisfies readonly BiCardId[];
 
 export function getCardDefinition(cardId: BiCardId): BiCardDefinition {
   const card = CARD_REGISTRY.find((candidate) => candidate.id === cardId);

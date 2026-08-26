@@ -8,11 +8,13 @@ import type { BiCompanySummary } from '../../types';
 const {
   createBiMaterializationMock,
   refreshBiDashboardMock,
+  resetBiDashboardMock,
   streamBiMaterializationJobMock,
   streamBiQuestionJobMock,
 } = vi.hoisted(() => ({
   createBiMaterializationMock: vi.fn(),
   refreshBiDashboardMock: vi.fn(),
+  resetBiDashboardMock: vi.fn(),
   streamBiMaterializationJobMock: vi.fn(),
   streamBiQuestionJobMock: vi.fn(),
 }));
@@ -22,6 +24,7 @@ vi.mock('../../services/api', async (importOriginal) => ({
   createBiMaterialization: createBiMaterializationMock,
   fetchBiDashboard: vi.fn(),
   refreshBiDashboard: refreshBiDashboardMock,
+  resetBiDashboard: resetBiDashboardMock,
   streamBiMaterializationJob: streamBiMaterializationJobMock,
   streamBiQuestionJob: streamBiQuestionJobMock,
 }));
@@ -61,6 +64,7 @@ describe('useBiDashboard refresh lifecycle', () => {
     createBiMaterializationMock.mockReset();
     vi.mocked(fetchBiDashboard).mockReset();
     refreshBiDashboardMock.mockReset();
+    resetBiDashboardMock.mockReset();
     streamBiMaterializationJobMock.mockReset();
     streamBiQuestionJobMock.mockReset();
   });
@@ -115,12 +119,12 @@ describe('useBiDashboard refresh lifecycle', () => {
     );
   });
 
-  it('keeps the current snapshot while a refresh is processing', async () => {
+  it('keeps the current snapshot while a reset is processing', async () => {
     vi.mocked(fetchBiDashboard).mockResolvedValue({
       kind: 'snapshot',
       dashboard: CURRENT_DASHBOARD,
     });
-    refreshBiDashboardMock.mockResolvedValue(questionProgress(0));
+    resetBiDashboardMock.mockResolvedValue(questionProgress(0));
     streamBiQuestionJobMock.mockImplementation(async (_jobId, onUpdate) => {
       onUpdate(questionProgress(4));
       return new Promise(() => undefined);
@@ -128,7 +132,7 @@ describe('useBiDashboard refresh lifecycle', () => {
     const { result } = renderHook(() => useBiDashboard(CURRENT_COMPANY));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
 
-    act(() => { void result.current.refresh(); });
+    act(() => { void result.current.reset(); });
 
     await waitFor(() => {
       expect(result.current.state.status).toBe('ready');
@@ -136,22 +140,46 @@ describe('useBiDashboard refresh lifecycle', () => {
       expect(result.current.state.dashboard.snapshot.snapshotId).toBe('fixture-ready-001');
       expect(result.current.state.dashboard.refresh.status).toBe('extracting');
     });
-    expect(refreshBiDashboardMock).toHaveBeenCalledWith(
+    expect(resetBiDashboardMock).toHaveBeenCalledWith(
       CURRENT_DASHBOARD.company.companyId,
       expect.any(AbortSignal),
     );
   });
 
-  it('atomically swaps to the published snapshot when refresh completes', async () => {
+  it('waits for a replacement snapshot after reset questions become terminal', async () => {
     vi.mocked(fetchBiDashboard)
-      .mockResolvedValueOnce({ kind: 'snapshot', dashboard: CURRENT_DASHBOARD })
-      .mockResolvedValueOnce({ kind: 'snapshot', dashboard: NEXT_DASHBOARD });
-    refreshBiDashboardMock.mockResolvedValue(questionProgress(0));
-    streamBiQuestionJobMock.mockImplementation(async (_jobId, onUpdate) => {
-      const completed = questionProgress(10);
-      onUpdate(completed);
-      return completed;
+      .mockResolvedValueOnce({
+        kind: 'snapshot',
+        dashboard: CURRENT_DASHBOARD,
+      })
+      .mockResolvedValueOnce({
+        kind: 'snapshot',
+        dashboard: CURRENT_DASHBOARD,
+      })
+      .mockResolvedValueOnce({
+        kind: 'snapshot',
+        dashboard: NEXT_DASHBOARD,
+      });
+    resetBiDashboardMock.mockResolvedValue(questionProgress(0));
+    streamBiQuestionJobMock.mockResolvedValue(questionProgress(10));
+    const { result } = renderHook(() => useBiDashboard(CURRENT_COMPANY));
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+
+    await act(async () => result.current.reset());
+
+    expect(fetchBiDashboard).toHaveBeenCalledTimes(3);
+    expect(result.current.state.status).toBe('ready');
+    if (result.current.state.status !== 'ready') return;
+    expect(result.current.state.dashboard.snapshot.snapshotId).toBe('fixture-ready-002');
+    expect(result.current.state.dashboard.snapshot.generatedAt).toBe('2026-08-20T12:00:00+09:00');
+  });
+
+  it('atomically swaps to the recalculated snapshot without a question job', async () => {
+    vi.mocked(fetchBiDashboard).mockResolvedValue({
+      kind: 'snapshot',
+      dashboard: CURRENT_DASHBOARD,
     });
+    refreshBiDashboardMock.mockResolvedValue(NEXT_DASHBOARD);
     const { result } = renderHook(() => useBiDashboard(CURRENT_COMPANY));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
 
@@ -162,6 +190,7 @@ describe('useBiDashboard refresh lifecycle', () => {
       if (result.current.state.status !== 'ready') return;
       expect(result.current.state.dashboard.snapshot.snapshotId).toBe('fixture-ready-002');
     });
+    expect(streamBiQuestionJobMock).not.toHaveBeenCalled();
   });
 
   it('keeps the current snapshot and reports a nonblocking refresh failure', async () => {
@@ -169,8 +198,7 @@ describe('useBiDashboard refresh lifecycle', () => {
       kind: 'snapshot',
       dashboard: CURRENT_DASHBOARD,
     });
-    refreshBiDashboardMock.mockResolvedValue(questionProgress(0));
-    streamBiQuestionJobMock.mockRejectedValue(new Error('queue failed'));
+    refreshBiDashboardMock.mockRejectedValue(new Error('recalculation failed'));
     const { result } = renderHook(() => useBiDashboard(CURRENT_COMPANY));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
 

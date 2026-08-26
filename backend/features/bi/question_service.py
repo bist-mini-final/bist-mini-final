@@ -69,6 +69,11 @@ class BiQuestionRepositoryPort(Protocol):
         questions: tuple[BiQuestionRecord, ...],
     ) -> tuple[BiQuestionRecord, ...]: ...
 
+    def replace_questions(
+        self,
+        questions: tuple[BiQuestionRecord, ...],
+    ) -> tuple[BiQuestionRecord, ...]: ...
+
     def get_question(self, question_id: QuestionId) -> BiQuestionRecord | None: ...
 
     def list_questions(self, job_id: JobId) -> tuple[BiQuestionRecord, ...]: ...
@@ -143,6 +148,14 @@ class BiQuestionService:
             BiQuestionJobProgress: Progress summary for the plan's job.
         """
         questions = self.register_materialization_questions(plan)
+        return summarize_questions(plan.job_id, questions)
+
+    def reset_materialization_questions(
+        self,
+        plan: BiQuestionBatchPlan,
+    ) -> BiQuestionJobProgress:
+        batch = build_current_question_batch(plan)
+        questions = self._repository.replace_questions(batch.questions)
         return summarize_questions(plan.job_id, questions)
 
     def get_question(self, question_id: QuestionId) -> BiQuestionRecord | None:

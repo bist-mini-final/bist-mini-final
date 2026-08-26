@@ -8,6 +8,7 @@ import {
 } from '../schemas';
 import type {
   BiCompanyListResponse,
+  BiDashboardSnapshot,
   BiDashboardFetchResult,
   BiMaterializationAccepted,
   BiMaterializationJob,
@@ -111,8 +112,18 @@ export async function streamBiMaterializationJob(
 export async function refreshBiDashboard(
   companyId: string,
   signal: AbortSignal,
-): Promise<BiQuestionJobProgress> {
+): Promise<BiDashboardSnapshot> {
   const endpoint = `/api/bi/companies/${encodeURIComponent(companyId)}/refresh`;
+  return parseBiDashboard(
+    await requestJson<unknown>(endpoint, { method: 'POST', signal }),
+  );
+}
+
+export async function resetBiDashboard(
+  companyId: string,
+  signal: AbortSignal,
+): Promise<BiQuestionJobProgress> {
+  const endpoint = `/api/bi/companies/${encodeURIComponent(companyId)}/reset`;
   return parseBiQuestionJobProgress(
     await requestJson<unknown>(endpoint, { method: 'POST', signal }),
   );
