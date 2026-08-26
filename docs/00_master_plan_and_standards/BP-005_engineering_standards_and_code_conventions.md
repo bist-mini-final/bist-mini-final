@@ -1,5 +1,5 @@
-# [BP-002] 엔지니어링 코드 컨벤션 & 구현 표준 규격서
-> **Document Code:** `BP-002` | **Category:** Engineering Standards & Code Conventions | **Status:** Approved Baseline  
+# [BP-005] 엔지니어링 코드 컨벤션 & 구현 표준 규격서
+> **Document Code:** `BP-005` | **Category:** Engineering Standards & Code Conventions | **Status:** Approved Baseline  
 > **Source Rules:** [`.agents/rules/code-style-guide.md`](file:///c:/Repos/bist-mini-final/.agents/rules/code-style-guide.md)
 
 ---
