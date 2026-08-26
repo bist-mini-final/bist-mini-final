@@ -163,16 +163,15 @@ describe('BiPage Component', () => {
     render(<BiPage />);
 
     const evidenceButtons = await screen.findAllByRole('button', { name: /근거 보기/i });
+    evidenceButtons[0]?.focus();
     fireEvent.click(evidenceButtons[0]);
     expect(screen.getByRole('heading', { name: /근거/i })).toBeInTheDocument();
     expect(screen.getByText('EVIDENCE')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /원본 시트 열기/i })).toHaveAttribute(
-      'href',
-      expect.stringContaining('/api/spreadsheet-artifacts/'),
-    );
+    expect(screen.queryByRole('link', { name: /원본 시트 열기/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /근거 닫기/i }));
     expect(screen.queryByText('EVIDENCE')).not.toBeInTheDocument();
+    await waitFor(() => expect(evidenceButtons[0]).toHaveFocus());
   });
 
   it('starts a refresh from the current validated snapshot source', async () => {
@@ -209,17 +208,45 @@ describe('BiPage Component', () => {
     ));
   });
 
-  it('links chatbot questions to Playground without executing them', async () => {
+  it('returns focus to the data reset trigger when confirmation is cancelled', async () => {
+    render(<BiPage />);
+
+    const resetButton = await screen.findByRole('button', {
+      name: '데이터 초기화 및 재생성',
+    });
+    resetButton.focus();
+    fireEvent.click(resetButton);
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    await waitFor(() => expect(resetButton).toHaveFocus());
+  });
+
+  it('keeps the data reset trigger focusable while regeneration is running', async () => {
+    vi.mocked(streamBiQuestionJob).mockImplementation(() => new Promise(() => undefined));
+    render(<BiPage />);
+
+    const resetButton = await screen.findByRole('button', {
+      name: '데이터 초기화 및 재생성',
+    });
+    resetButton.focus();
+    fireEvent.click(resetButton);
+    fireEvent.click(screen.getByRole('button', { name: '삭제 후 재생성' }));
+
+    const progressButton = await screen.findByRole('button', { name: '데이터 재생성 중' });
+    await waitFor(() => expect(progressButton).toHaveFocus());
+    expect(progressButton).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('does not render chatbot actions in dashboard cards', async () => {
     // Given
     render(<BiPage />);
 
     // When
-    const chatbotLinks = await screen.findAllByRole('link', { name: /챗봇 질문/i });
+    await screen.findByRole('heading', { name: 'BIST 데모 주식회사 Dashboard' });
 
     // Then
-    expect(chatbotLinks[0]).toHaveAttribute('href', expect.stringContaining('/playground?'));
-    expect(chatbotLinks[0]).toHaveAttribute('href', expect.stringContaining('file_name=bist-demo.xlsx'));
-    expect(chatbotLinks[0]).toHaveAttribute('href', expect.stringContaining('metric_id=revenue'));
+    expect(screen.queryByRole('link', { name: /챗봇 질문/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /챗봇 질문/i })).not.toBeInTheDocument();
   });
 
   it('toggles layout editing mode and shows card dialogs', async () => {
@@ -227,15 +254,25 @@ describe('BiPage Component', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /배치 편집/i }));
     const libraryButton = screen.getByRole('button', { name: /카드 추가/i });
+    libraryButton.focus();
     fireEvent.click(libraryButton);
     expect(screen.getByRole('heading', { name: '카드 추가' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '추가' }));
 
     fireEvent.click(screen.getByRole('button', { name: /카드 목록 닫기/i }));
     expect(screen.queryByRole('heading', { name: '카드 추가' })).not.toBeInTheDocument();
+    await waitFor(() => expect(libraryButton).toHaveFocus());
+    expect(libraryButton).toHaveAttribute('aria-disabled', 'true');
+    expect(libraryButton).toHaveAttribute('title', '숨긴 카드가 없어 추가할 수 없습니다');
+    fireEvent.click(libraryButton);
+    expect(screen.queryByRole('heading', { name: '카드 추가' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /기본 배치/i }));
+    const resetLayoutButton = screen.getByRole('button', { name: /기본 배치/i });
+    resetLayoutButton.focus();
+    fireEvent.click(resetLayoutButton);
     expect(screen.getByText('기본 배치로 초기화할까요?')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /취소/i }));
     expect(screen.queryByText('기본 배치로 초기화할까요?')).not.toBeInTheDocument();
+    await waitFor(() => expect(resetLayoutButton).toHaveFocus());
   });
 });
