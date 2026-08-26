@@ -143,42 +143,50 @@ sequenceDiagram
 
 ## 3. 부트스트랩 DI 컨테이너 구성 (Bootstrap DI Container Architecture)
 
-애플리케이션은 [`ApplicationContainer`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py#L106-L140) 단일 진입점(Composition Root)을 통해 모든 하위 의존성을 조립하고, 프로세스 수명주기 동안 핵심 자원의 **싱글톤(Singleton) 생명주기를 전담 관리**합니다.
+애플리케이션은 [`ApplicationContainer`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py#L106-L140) 단일 진입점(Composition Root)을 통해 모든 하위 의존성을 조립하고, 비즈니스 도메인 서비스와 하부 인프라/실행 엔진을 2대 축으로 명확히 분리하여 **싱글톤(Singleton) 생명주기를 전담 관리**합니다.
 
 ```mermaid
 classDiagram
     class ApplicationContainer {
-        +RuntimeContainer runtime
+        +DomainServicesContainer domain_services
+        +InfrastructureContainer infrastructure
         +KubernetesQueueDispatcher workflow_dispatcher
-        +BiApiServices bi_services
-        +create(runtime) ApplicationContainer
+        +create() ApplicationContainer
         +recover_pending_runs() int
         +close() void
     }
 
-    class RuntimeContainer {
+    class DomainServicesContainer {
+        +BiApiServices bi_services
+        +ChatbotService chatbot_service
+        +CompanyComparisonService comparison_service
+        +BenchmarkService benchmark_service
+    }
+
+    class InfrastructureContainer {
         +OpenAIProvider openai_provider
         +OpenAIResponsesClient completion_client
         +EmbeddingEncoder embedding_encoder
-        +WorkflowRuntimeServices services
+        +PipelineExecutionEngine pipeline_engine
         +RuntimePaths paths
         +PgVectorConnectionProbe pgvector_probe
-        +create(paths, initialize_schema) RuntimeContainer
+        +create(paths) InfrastructureContainer
         +close() void
     }
 
-    class WorkflowRuntimeServices {
-        +ModuleRegistry module_registry
-        +WorkflowStore workflow_store
-        +RunStore run_store
+    class PipelineExecutionEngine {
+        +LazyModuleRegistry module_registry
         +WorkflowExecutor workflow_executor
         +PgVectorStore pgvector_store
         +DatabaseManager db_manager
+        +WorkflowStore workflow_store
+        +RunStore run_store
         +EmbeddingArtifactStore embedding_artifact_store
     }
 
-    ApplicationContainer *-- RuntimeContainer : 소유 및 수명주기 위임
-    RuntimeContainer *-- WorkflowRuntimeServices : 순수 실행 엔진 번들 소유
+    ApplicationContainer *-- DomainServicesContainer : 도메인 비즈니스 계층 소유
+    ApplicationContainer *-- InfrastructureContainer : 하부 인프라 및 엔진 소유
+    InfrastructureContainer *-- PipelineExecutionEngine : 순수 실행 엔진 번들 소유
 ```
 
 ---
@@ -193,65 +201,29 @@ classDiagram
 
 ---
 
-### 3.2 3대 DI 컨테이너 상세 명세 및 계층 배치 매트릭스 (Container Specification Matrix)
+### 3.2 DI 컨테이너 상세 명세 및 계층 배치 매트릭스 (Container Specification Matrix)
 
 | 컨테이너 / 객체 명칭 | 수명주기 & 운영 위치 (Scope) | 소유 핵심 필드 및 인터페이스 | 담당 핵심 역할 및 책임 | 계층 배치 및 분리 이유 (Rationale) |
 | :--- | :--- | :--- | :--- | :--- |
-| **`ApplicationContainer`**<br>(최상위 웹 프로세스 루트) | • **FastAPI 메인 웹 서버 프로세스(`backend/main.py`)** 단 1개 생성<br>• 서버 수명주기(`lifespan`)와 1:1 바인딩 | • `runtime: RuntimeContainer`<br>• `workflow_dispatcher: KubernetesQueueDispatcher`<br>• `bi_services: BiApiServices`<br>• `recover_pending_runs() -> int`<br>• `close() -> None` | • REST/WebSocket API 요청 진입점 의존성 주입(DI)<br>• Tier 2 분산 배치 작업 큐잉 디스패치<br>• 서버 재부팅 시 고아(`QUEUED`/`RUNNING`) 작업 복구<br>• 서버 셧다운 시 리소스 안전 해제(Graceful Shutdown) | Worker Pod에는 불필요한 **웹 전용 오케스트레이션, 도메인 비즈니스 서비스, 서버 기동/종료 수명주기 관리 책임**을 최상위 웹 계층에 완벽히 격리 |
-| **`RuntimeContainer`**<br>(공통 AI/인프라 브리지) | • **FastAPI 웹 서버 & KEDA Worker Pod** 양쪽 모두에서 생성 및 공유 | • `openai_provider: OpenAIProvider`<br>• `completion_client: OpenAIResponsesClient`<br>• `embedding_encoder: OpenAIEmbeddingEncoder`<br>• `services: WorkflowRuntimeServices`<br>• `paths: RuntimePaths`<br>• `pgvector_probe: PgVectorConnectionProbe`<br>• `_owns_openai_provider: bool` | • GPT-5.6 Luna LLM/VLM 구조화/Agentic 생성 호출<br>• `text-embedding-3-large` (3072d) 벡터 인코딩<br>• 캐시/아티팩트 파일 시스템 절대 경로 싱글톤 관리<br>• DB/pgvector 연결 상태 검증 및 커넥션 풀 유지 | 웹 프로세스와 워커 프로세스가 **100% 동일한 AI 모델(GPT-5.6 Luna / 3072d) 및 디스크 경로 설정**을 공유하도록 강제하여 **워커 드리프트(Worker Drift)**를 원천 차단 |
-| **`WorkflowRuntimeServices`**<br>(순수 DAG 실행 & 스토리지 번들) | • 웹/워커 환경 무관한 **순수 불변 실행 단위 (`@dataclass(frozen=True)`)** | • `module_registry: ModuleRegistry`<br>• `workflow_executor: WorkflowExecutor`<br>• `pgvector_store: PgVectorStore`<br>• `db_manager: DatabaseManager`<br>• `workflow_store: WorkflowStore`<br>• `run_store: RunStore`<br>• `embedding_artifact_store: EmbeddingArtifactStore` | • 19개 순수 RAG 파이프라인 모듈 싱글톤 인스턴스 맵<br>• Kahn's 알고리즘 위상 정렬 및 `asyncio.TaskGroup` 비동기 병렬 실행<br>• PostgreSQL 16 + 3072d HNSW 코사인 검색 및 Binary COPY 대량 색인<br>• 실행 인스턴스 FSM 상태 전이(RUNNING/COMPLETED) 영속화 | 외부 웹/K8s 프레임워크를 전혀 모르는 **순수 불변 데이터 클래스**로 격리하여, **단위 테스트 시 가짜 Mock 객체로 19개 모듈 전체를 100% 독립 테스트(Unit Testing)** 가능 |
+| **`ApplicationContainer`**<br>(최상위 웹 프로세스 루트) | • **FastAPI 메인 웹 서버 프로세스(`backend/main.py`)** 단 1개 생성<br>• 서버 수명주기(`lifespan`)와 1:1 바인딩 | • `domain_services: DomainServicesContainer`<br>• `infrastructure: InfrastructureContainer`<br>• `workflow_dispatcher: KubernetesQueueDispatcher`<br>• `recover_pending_runs() -> int`<br>• `close() -> None` | • REST/WebSocket API 요청 진입점 의존성 주입(DI)<br>• Tier 2 분산 배치 작업 큐잉 디스패치<br>• 서버 재부팅 시 고아(`QUEUED`/`RUNNING`) 작업 복구<br>• 서버 셧다운 시 리소스 안전 해제(Graceful Shutdown) | Worker Pod에는 불필요한 **웹 전용 오케스트레이션, 도메인 비즈니스 서비스, 서버 기동/종료 수명주기 관리 책임**을 최상위 웹 계층에 완벽히 격리 |
+| **`DomainServicesContainer`**<br>(도메인 비즈니스 서비스 번들) | • **FastAPI 웹 서버 메모리** 내 싱글톤 유지<br>• 각 API 라우터에 비즈니스 서비스 주입 | • `bi_services: BiApiServices`<br>• `chatbot_service: ChatbotService`<br>• `comparison_service: CompanyComparisonService`<br>• `benchmark_service: BenchmarkService` | • 40+ 전사 재무 지표 및 듀퐁 비율 산출<br>• 대화형 멀티턴 금융 챗봇 세션 관리<br>• 다중 기업 듀퐁 지표 정규화 및 레이더 차트 비교<br>• Ground-Truth 기반 정확도 벤치마크 오케스트레이션 | 비즈니스 서비스가 추가/확장될 때 인프라나 상위 루트를 건드리지 않고 독립적으로 확장할 수 있도록 **도메인 계층 전용 번들로 격리 (OCP 준수)** |
+| **`InfrastructureContainer`**<br>(구 `RuntimeContainer` / 공통 인프라 브리지) | • **FastAPI 웹 서버 & KEDA Worker Pod** 양쪽 모두에서 생성 및 공유 | • `openai_provider: OpenAIProvider`<br>• `completion_client: OpenAIResponsesClient`<br>• `embedding_encoder: OpenAIEmbeddingEncoder`<br>• `pipeline_engine: PipelineExecutionEngine`<br>• `paths: RuntimePaths`<br>• `pgvector_probe: PgVectorConnectionProbe`<br>• `_owns_openai_provider: bool` | • GPT-5.6 Luna LLM/VLM 구조화/Agentic 생성 호출<br>• `text-embedding-3-large` (3072d) 벡터 인코딩<br>• 캐시/아티팩트 파일 시스템 절대 경로 싱글톤 관리<br>• DB/pgvector 연결 상태 검증 및 커넥션 풀 유지 | 웹 프로세스와 워커 프로세스가 **100% 동일한 AI 모델(GPT-5.6 Luna / 3072d) 및 디스크 경로 설정**을 공유하도록 강제하여 **워커 드리프트(Worker Drift)**를 원천 차단 |
+| **`PipelineExecutionEngine`**<br>(구 `WorkflowRuntimeServices` / 순수 실행 번들) | • 웹/워커 환경 무관한 **순수 불변 실행 단위 (`@dataclass(frozen=True)`)** | • `module_registry: LazyModuleRegistry`<br>• `workflow_executor: WorkflowExecutor`<br>• `pgvector_store: PgVectorStore`<br>• `db_manager: DatabaseManager`<br>• `workflow_store: WorkflowStore`<br>• `run_store: RunStore`<br>• `embedding_artifact_store: EmbeddingArtifactStore` | • 19개 순수 RAG 파이프라인 모듈 지연 로딩 팩토리 레지스트리<br>• Kahn's 알고리즘 위상 정렬 및 `asyncio.TaskGroup` 비동기 병렬 실행<br>• PostgreSQL 16 + 3072d HNSW 코사인 검색 및 Binary COPY 대량 색인<br>• 실행 인스턴스 FSM 상태 전이(RUNNING/COMPLETED) 영속화 | 외부 웹/K8s 프레임워크를 전혀 모르는 **순수 불변 데이터 클래스**로 격리하여, **단위 테스트 시 가짜 Mock 객체로 19개 모듈 전체를 100% 독립 테스트(Unit Testing)** 가능 |
 
 ---
 
-### 3.3 To-Be DI 컨테이너 리팩토링 아키텍처 (Target Architecture Blueprint)
+### 3.3 지연 생성 모듈 팩토리 및 OCP 확장 전략 (Lazy Module Factory Architecture)
 
-향후 신규 도메인 서비스(챗봇, 기업 비교, 벤치마크) 확장 및 서버 기동 속도 최적화를 위해 아래의 **3대 개선 구조**를 적용합니다:
+향후 신규 모듈 추가 시의 결합도를 낮추고 서버 기동 속도를 최적화하기 위해 **4대 도메인 팩토리 & 지연 로딩 레지스트리**를 적용합니다:
 
-```mermaid
-classDiagram
-    class ApplicationContainer {
-        +InfrastructureContainer infrastructure
-        +DomainServicesContainer domain_services
-        +KubernetesQueueDispatcher workflow_dispatcher
-        +create() ApplicationContainer
-        +close() void
-    }
-
-    class DomainServicesContainer {
-        +BiApiServices bi_services
-        +ChatbotService chatbot_service
-        +CompanyComparisonService comparison_service
-        +BenchmarkService benchmark_service
-    }
-
-    class InfrastructureContainer {
-        +OpenAIResponsesClient completion_client
-        +EmbeddingEncoder embedding_encoder
-        +PipelineExecutionEngine pipeline_engine
-        +RuntimePaths paths
-        +PgVectorConnectionProbe pgvector_probe
-    }
-
-    class PipelineExecutionEngine {
-        +LazyModuleRegistry module_registry
-        +WorkflowExecutor workflow_executor
-        +PgVectorStore pgvector_store
-        +DatabaseManager db_manager
-    }
-
-    ApplicationContainer *-- InfrastructureContainer
-    ApplicationContainer *-- DomainServicesContainer
-    InfrastructureContainer *-- PipelineExecutionEngine
-```
-
-1. **네이밍 직관화**:
-   - `RuntimeContainer` ➡️ **`InfrastructureContainer`** (AI Provider, DB Pool, Paths 등 외부 인프라 전담)
-   - `WorkflowRuntimeServices` ➡️ **`PipelineExecutionEngine`** (19개 모듈, DAG 실행기, 스토어 등 순수 파이프라인 엔진 전담)
-2. **`DomainServicesContainer` 하위 분리**:
-   - `ApplicationContainer`에 비즈니스 서비스를 하드코딩하지 않고, `DomainServicesContainer`로 독립 분리하여 신규 서비스 추가 시 OCP(개방-폐쇄) 원칙 준수.
-3. **4대 도메인 팩토리 & 지연 로딩 레지스트리 (`LazyModuleRegistry`)**:
-   - 19개 모듈을 4대 도메인 팩토리(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`, `ReaderModulesFactory`)로 분리.
-   - 서버 부팅 시 19개 객체를 미리 만들지 않고 팩토리 레시피(`register_factory`)만 등록 후, 실제 파이프라인 실행 시 **최초 1회만 인스턴스화(Lazy Singleton)**하여 기동 지연시간을 500ms ➡️ 20ms로 단축.
+1. **4대 도메인 팩토리 분리**:
+   - `QueryModulesFactory`: 질의 입력, 분해, 라우터, 시맨틱 매처 (LLM 클라이언트 주입)
+   - `RetrievalModulesFactory`: 데이터 스코프, pgvector 검색, 키워드 검색, RRF 퓨전, 컨텍스트 확장기 (DB 스토어 주입)
+   - `VisionModulesFactory`: 시트 래스터라이저, Luna VLM 구조 감지, 셀 직렬화, 인덱스 라이터 (VLM & 디스크 경로 주입)
+   - `ReaderModulesFactory`: 재무 수식 계산 및 QA 리더 모듈 (수식 엔진 & LLM 주입)
+2. **지연 로딩(Lazy Loading) 메커니즘**:
+   - 서버 부팅 시 19개 객체를 미리 메모리에 올리지 않고 팩토리 생성 레시피(`register_factory`)만 등록.
+   - 실제 파이프라인 실행 시 **최초 1회만 인스턴스화(Lazy Singleton)**하여 서버 기동 지연시간을 500ms ➡️ 20ms로 단축.
 
 ---
 
