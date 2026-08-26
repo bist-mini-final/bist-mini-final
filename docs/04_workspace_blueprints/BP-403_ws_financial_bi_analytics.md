@@ -53,10 +53,16 @@ flowchart TD
 
 ---
 
-## 3. 근거 셀 감사 추적성 (Evidence Audit Trail)
+## 3. 근거 셀 감사 추적성 및 대시보드 제어 (Evidence Audit Trail & Reset Controls)
 
-모든 계산된 지표값은 계산에 사용된 원천 엑셀 셀(`cell_id`, 예: `삼성전자:IS:C5`)과 시트명, 원본 텍스트를 `BiEvidence` 객체로 영구 바인딩합니다.
-- 프론트엔드 차트나 카드에서 특정 지표를 클릭하면, 해당 숫자가 도출된 실제 엑셀 시트 행과 열이 하이라이트되어 회계 감사 수준의 신뢰성을 보장합니다.
+1. **근거 셀 감사 추적성 (Evidence Audit Trail)**:
+   - 모든 계산된 지표값은 계산에 사용된 원천 엑셀 셀(`cell_id`, 예: `삼성전자:IS:C5`)과 시트명, 원본 텍스트를 `BiEvidence` 객체로 영구 바인딩합니다.
+   - 프론트엔드 차트나 카드에서 특정 지표를 클릭하면, 해당 숫자가 도출된 실제 엑셀 시트 행과 열이 하이라이트되어 회계 감사 수준의 신뢰성을 보장합니다.
+2. **재무 건전성 히트맵 (`FinancialHealthHeatmap`)**:
+   - `FinancialHealthHeatmap` 컴포넌트가 수익성, 안정성, 활동성 등 4대 핵심 영역의 다년도 지표 상태를 신호등 색상(Healthy, Moderate, Caution)으로 집계하여 직관적인 종합 건전성 매트릭스를 렌더링합니다.
+3. **대시보드 실시간 재계산 및 리셋 제어 (`ResetDataDialog`)**:
+   - **원천 관측값 재계산 (`POST /api/bi/companies/{id}/refresh`)**: 엑셀 재파싱 없이 기존 관측값으로부터 파생 재무 비율과 스냅샷만 1-Shot 고속 재계산.
+   - **질의응답 초기화 및 재생성 (`POST /api/bi/companies/{id}/reset`)**: `ResetDataDialog`를 통해 선택 기업의 질의응답을 트랜잭션으로 교체하고 새 질문 배치를 큐에 등록 후 SSE(`GET /api/bi/question-jobs/{id}/stream`)로 진행률을 실시간 모니터링.
 
 ---
 

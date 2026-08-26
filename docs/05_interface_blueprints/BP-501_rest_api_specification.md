@@ -63,6 +63,10 @@
 | `POST`| `/api/bi/questions/answer` | 단일 재무 질문에 대한 Fast RAG 답변 생성 | `BiQuestionAnswerRequest` -> `BiQuestionAnswerResponse` |
 | `GET` | `/api/bi/snapshots/{profile_id}` | 사전 계산된 40+ 지표 스냅샷 조회 | `BiSnapshotProjection` |
 | `POST`| `/api/bi/materialize` | 백그라운드 지표 일괄 산출 배치 트리거 | `MaterializeTaskAck` |
+| `POST`| `/api/bi/companies/{company_id}/refresh` | 현재 원천 관측값으로 파생 지표 및 스냅샷 즉시 재계산 | `BiDashboardSnapshot` |
+| `POST`| `/api/bi/companies/{company_id}/reset` | 질의응답 데이터 초기화 및 새 질문 배치 K8s 큐 등록 (202 Accepted) | `BiQuestionJobProgress` |
+| `GET` | `/api/bi/question-jobs/{job_id}` | BI 지표 질문 배치 작업 진행률 집계 조회 | `BiQuestionJobProgress` |
+| `GET` | `/api/bi/question-jobs/{job_id}/stream` | BI 지표 질문 배치 진행 상태 실시간 SSE 스트리밍 | `EventSource` (`question_job_progress`) |
 | `GET` | `/api/bi/comparison/{comparison_id}` | 다중 기업 비교 레이더 차트 및 듀퐁 분해도 조회 | `BiComparisonProjection` |
 | `POST`| `/api/bi/comparison/materialize` | 다중 기업 지표 일괄 산출 & 정규화 배치 트리거 (Tier 2 KEDA) | `MaterializeTaskAck` |
 
