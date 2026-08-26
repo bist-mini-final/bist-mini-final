@@ -78,12 +78,13 @@ classDiagram
 
 ---
 
-## 4. 프롬프트 엔지니어링 및 예외 복구 (Prompt Guidance & Fallback)
+## 4. 프롬프트 엔지니어링 및 무오염 Fail-Fast 원칙 (Prompt Guidance & Fail-Fast Policy)
 
 1. **테이블 단일화 가이드라인 (`TABLE_UNIFICATION_GUIDANCE`)**:
    - 빈 행 1~2개로 구분된 인접 블록이라도 계정과목과 기간 축이 동일하면 단일 테이블로 통합 감지하도록 프롬프트 지시.
-2. **VLM 타임아웃 / 오류 시 로컬 휴리스틱 폴백**:
-   - API 호출 실패 또는 40초 타임아웃 발생 시, `fallback_heuristic_detector`가 작동하여 첫 번째 텍스트 행을 헤더로, 첫 번째 열을 스터브로 자동 추정하여 파이프라인 중단 방지.
+2. **엄격한 데이터 무결성 보장 및 Fail-Fast 원칙 (Zero-Heuristic Fail-Fast)**:
+   - **사일런트 휴리스틱 폴백 전면 금지**: 임의로 "첫 행=헤더, 첫 열=스터브"로 대충 때려 맞추는 휴리스틱 폴백은 복합 재무제표의 계층 구조를 심각하게 파괴하고 벡터 DB를 오염(Garbage-In)시킵니다.
+   - **재시도 및 즉시 중단(Fail-Fast)**: VLM API 호출 실패 또는 네트워크 지연 시 `BaseLLMModule` 계층에서 최대 3회 지수 백오프(Exponential Backoff) 재시도를 수행하며, 최종 실패 시 **`ProviderApiError`를 발생시키고 파이프라인을 즉시 중단(Fail-Fast)**하여 오염된 데이터가 인덱싱되는 것을 원천 차단합니다.
 
 ---
 
