@@ -108,6 +108,25 @@ sequenceDiagram
 
 ---
 
+### 2.1 기능별 실행 엔진 매핑 분류표 (Feature vs. Execution Runtime Matrix)
+
+| 워크스페이스 / 기능 영역 | 구체적 기능 (Feature) | 실행 방식 (Execution Tier) | 담당 핵심 컴포넌트 / 모듈 | 트리거 API / 진입점 | 평균 지연시간 (Latency) | 상태 모니터링 방식 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Pipeline Playground** | 단일 노드 인터랙티브 테스트 | **Tier 1 (동기 인메모리)** | `WorkflowExecutor.run_node_sync` | `POST /api/workflows/node/run` | `< 100ms` | HTTP 즉시 반환 |
+| | 인터랙티브 DAG 전체 실행 | **Tier 1 (동기 인메모리)** | `WorkflowExecutor.run_pipeline_sync` | `POST /api/workflows/run` (`async=false`) | `100ms ~ 1.5s` | HTTP 즉시 반환 |
+| | 대규모 DAG 백그라운드 실행 | **Tier 2 (비동기 KEDA 큐)** | `KubernetesQueueDispatcher` | `POST /api/workflows/run` (`async=true`) | `2s ~ 30s` | SSE 실시간 스트림 |
+| **Data Sources** | 워크북 목록 & 시트 그리드 조회 | **Tier 1 (동기 인메모리)** | `WorkbookCatalog`, `OpenPyXL` | `GET /api/data-sources/files` | `< 50ms` | HTTP 즉시 반환 |
+| | Luna VLM 표 감지 & pgvector 색인 | **Tier 2 (비동기 KEDA 큐)** | `LunaVlmStructureDetector`, `PgVectorBinaryCopy` | `POST /api/data-sources/ingest` | `5s ~ 40s` | KEDA Worker & SSE 진척도 |
+| | DB / pgvector 연결 상태 프로브 | **Tier 1 (동기 인메모리)** | `PgVectorConnectionProbe` | `GET /api/data-sources/probe` | `< 10ms` | 3초 주기 HTTP 폴링 |
+| **Financial BI** | 기업 프로파일 & 메트릭 조회 | **Tier 1 (동기 인메모리)** | `DocumentProfiler`, `ProfileRepository` | `GET /api/bi/profiles` | `< 50ms` | HTTP 즉시 반환 |
+| | 단건 재무 질의응답 (Fast RAG) | **Tier 1 (동기 인메모리)** | `FastRagPipelineAdapter` | `POST /api/bi/questions/answer` | `200ms ~ 500ms` | HTTP 즉시 반환 |
+| | 40+ 전사 지표 일괄 산출 (Materialize)| **Tier 2 (비동기 KEDA 큐)** | `QuestionBatchWorkerMain`, `BiCalculator` | `POST /api/bi/materialize` | `10s ~ 60s` | DB 스냅샷 & 큐 상태 |
+| **AI 금융 챗봇** (예정) | 대화형 재무 RAG 질의응답 | **Tier 1 (동기 인메모리)** | `FastRagPipelineAdapter`, `ReaderModule` | `POST /api/chatbot/messages` | `300ms ~ 800ms` | SSE 토큰 스트리밍 |
+| **기업 비교** (예정) | 다중 기업 듀퐁 분석 & 레이더 차트 | **Tier 1 (동기 인메모리)** | `QuestionSnapshotRepository`, `Normalizer` | `POST /api/bi/comparison` | `< 100ms` | HTTP 즉시 반환 |
+| **Benchmark** | 정답지 기반 대량 정확도 평가 | **Tier 2 (비동기 KEDA 큐)** | `BenchmarkWorkerMain`, `BenchmarkService` | `POST /api/benchmarks/run` | `30s ~ 3min` | SSE 진척도 & 리포트 |
+
+---
+
 ## 3. 부트스트랩 DI 컨테이너 구성 (Bootstrap Container Wireframing)
 
 애플리케이션은 [`ApplicationContainer`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py#L106-L140) 단일 진입점을 통해 모든 하위 의존성을 조립합니다.
