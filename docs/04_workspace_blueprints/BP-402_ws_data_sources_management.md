@@ -99,8 +99,11 @@ flowchart TD
 
 ## 4. 리팩토링 타깃 (Refactoring Targets)
 
-1. **가상 스크롤(Virtual Scrolling) 그리드**:
+1. **레거시 multi-row INSERT 코드 완전 삭제 (Zero Legacy Code Policy)**:
+   - As-Is: `PgVectorIndexWriterModule` 및 `pgvector_store.py` 내부에 과거 청크 단위 multi-row `INSERT INTO ... VALUES (...)` 로직 잔존.
+   - To-Be: 이전의 모든 `INSERT` SQL 포매팅 및 일반 적재 코드를 100% 완전 삭제하고, 오직 **Binary COPY 단일 스트리밍 경로(Single Canonical Path)**로만 일원화하여 유지보수 부채 및 레거시 버그 발생 원천 차단.
+2. **가상 스크롤(Virtual Scrolling) 그리드**:
    - As-Is: 1,000행 이상의 거대 시트 렌더링 시 DOM 노드 과다로 프레임 드롭 발생.
    - To-Be: `@tanstack/react-virtual`을 도입하여 뷰포트 내 가시 셀만 렌더링하는 가상화 그리드 적용.
-2. **수동 바운딩 박스 드래그 편집기**:
+3. **수동 바운딩 박스 드래그 편집기**:
    - VLM이 감지하지 못한 특수 레이아웃을 사용자가 마우스 드래그로 직접 영역 지정(Draw Bounding Box)할 수 있는 UI 툴킷 추가.
