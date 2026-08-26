@@ -63,18 +63,30 @@ CanonicalChunk ::= "Company: " CompanyName
 
 ---
 
-## 4. 단일화 아키텍처의 이점 및 문맥 확장 (Zero-Fragmentation Architecture)
+## 4. 단일화 아키텍처의 이점 및 파이프라인 흐름 (Zero-Fragmentation Architecture)
 
-마크다운 표(`| --- |`) 문법의 파편화된 변형을 배제하고 단일 직렬화 포맷을 고수함으로써 얻는 핵심 이점은 다음과 같습니다:
+마크다운 표(`| --- |`) 문법의 파편화된 변형을 배제하고 단일 직렬화 포맷을 고수함으로써 얻는 핵심 이점과 엔드투엔드 데이터 흐름은 다음과 같습니다:
 
 ```mermaid
-flowchart LR
+flowchart TD
     CELL["Spreadsheet Cell<br>(Row, Col, Value)"] --> CANONICAL["단일 표준 직렬화<br>(header_with_value)"]
     
-    CANONICAL --> DENSE["1. pgvector Dense 임베딩 (3072d)"]
-    CANONICAL --> SPARSE["2. Native TSVector BM25 FTS 색인"]
-    CANONICAL --> EXPAND["3. Context Expander 이웃 셀 결합"]
-    EXPAND --> PROMPT["4. LLM Reader 프롬프트 Context 주입"]
+    subgraph IndexingLayer ["1 & 2. 듀얼 색인 (Dual Indexing)"]
+        CANONICAL --> DENSE["1. pgvector Dense 임베딩 (3072d)"]
+        CANONICAL --> SPARSE["2. Native TSVector BM25 FTS 색인"]
+    end
+
+    subgraph RetrievalLayer ["하이브리드 검색 & RRF 융합 (BP-303)"]
+        DENSE -.-> RET_D["Dense 벡터 검색"]
+        SPARSE -.-> RET_S["Sparse 키워드 검색"]
+        RET_D --> RRF["RRF 상호 순위 융합 (k=60)"]
+        RET_S --> RRF
+    end
+
+    subgraph GenerationLayer ["문맥 확장 및 추론"]
+        RRF --> EXPAND["3. Context Expander<br>(융합된 Top-K 셀의 2D 이웃 셀 결합)"]
+        EXPAND --> PROMPT["4. LLM Reader (GPT-5.6 Luna)<br>프롬프트 Context 주입"]
+    end
 ```
 
 1. **극적인 토큰 효율성 (40~50% Token Saving)**:
