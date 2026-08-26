@@ -110,24 +110,35 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> QUEUED : 작업 발행 (available_at = NOW())
-    QUEUED --> RUNNING : Worker Claim 성공 (lease_token 부여)
-    
-    state RUNNING {
-        [*] --> ACTIVE_HEARTBEAT
-        ACTIVE_HEARTBEAT --> ACTIVE_HEARTBEAT : 5초마다 heartbeat_at 갱신
-        ACTIVE_HEARTBEAT --> STALE_HEARTBEAT : 워커 크래시 발생 (180초 경과)
-    }
+    direction TB
 
-    RUNNING --> COMPLETED : 파이프라인 정상 완료
-    RUNNING --> FAILED : 파이프라인 실행 중 예외 발생
+    [*] --> QUEUED : 1. 작업 큐 등록 (status='queued')
     
-    STALE_HEARTBEAT --> RE_QUEUED : 신규 워커가 stale_after_seconds(180s) 초과 감지 후 재임차
-    RE_QUEUED --> RUNNING : 신규 Worker가 새 lease_token으로 실행 재개
+    QUEUED --> RUNNING : 2. 워커 선점 및 임차권 획득 (lease_token 발급)
+    
+    RUNNING --> COMPLETED : 3a. 파이프라인 정상 완료 (outputs 저장)
+    RUNNING --> FAILED : 3b. 파이프라인 내부 에러 발생
+    RUNNING --> STALLED : 3c. 워커 Pod 크래시 (하트비트 갱신 중단)
+    
+    STALLED --> RE_QUEUED : 4. 30초 초과 무응답 감지 후 강제 회수
+    RE_QUEUED --> RUNNING : 5. 신규 워커가 새 lease_token으로 재실행
     
     COMPLETED --> [*]
     FAILED --> [*]
 ```
+
+---
+
+### 3.1 상태 전이(State Transition) 및 복구 트리거 매트릭스
+
+| 전이 (Transition) | 출발 상태 | 도착 상태 | 트리거 조건 (Trigger Condition) | DB 반영 및 처리 동작 |
+| :--- | :---: | :---: | :--- | :--- |
+| **① 작업 인출** | `QUEUED` | `RUNNING` | 워커가 `FOR UPDATE SKIP LOCKED` 선점 | `lease_token=UUID`, `heartbeat_at=NOW()` 기록 |
+| **② 정상 완료** | `RUNNING` | `COMPLETED` | 파이프라인 DAG 모든 노드 성공 | `status='completed'`, `outputs` JSON 영속화, 락 해제 |
+| **③ 실행 에러** | `RUNNING` | `FAILED` | 모듈 예외 발생 (ProviderApiError 등) | `status='failed'`, `error` JSON 및 스택트레이스 기록 |
+| **④ 스톨 감지** | `RUNNING` | `STALLED` | 워커 Pod 비정상 종료 (OOM/SIGKILL) | `heartbeat_at`이 30초 이상 갱신되지 않고 멈춤 |
+| **⑤ 고아 회수** | `STALLED` | `RE_QUEUED` | 후속 워커가 스톨 작업 탐색 쿼리 실행 | 기존 토큰 무효화, `status='queued'`, 재시도 횟수 +1 |
+| **⑥ 작업 재개** | `RE_QUEUED` | `RUNNING` | 신규 정상 워커가 재임차 획득 | 신규 `lease_token` 재발급 후 1번 노드부터 안전 재실행 |
 
 ---
 
