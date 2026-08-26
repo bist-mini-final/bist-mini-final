@@ -50,7 +50,7 @@ flowchart TD
 
 ## 2. 4단계 엔지니어링 라이프사이클 스토리 (The 4-Stage Engineering Narrative)
 
-본 시스템은 **문제 발견 ➡️ 가설 수립 및 설계 ➡️ 모듈/앱 개발 ➡️ 정량 실측 증명 및 거버넌스**의 4단계 엔드투엔드 라이프사이클을 거쳐 완성되었습니다:
+본 시스템은 **문제 발견 ➡️ 가설 수립 및 설계 ➡️ 모듈/앱 개발 ➡️ 벤치마크 평가 계획 및 거버넌스**의 4단계 엔드투엔드 라이프사이클을 거쳐 체계화되었습니다:
 
 ```mermaid
 flowchart LR
@@ -60,7 +60,7 @@ flowchart LR
 • BP-002 5대 유즈케이스 & 추적성"]
     STAGE2["📐 2단계: 가설 검증 및 설계
 (Hypotheses & Design)
-• BP-003 6대 가설 실험 결과
+• BP-003 6대 가설 및 트레이드오프
 • BP-004 마일스톤 & R&R
 • BP-005 엔지니어링 표준
 • BP-101~104 코어 아키텍처"]
@@ -70,10 +70,10 @@ flowchart LR
 • BP-301~303 DAG & 21개 모듈
 • BP-401~405 5대 워크스페이스
 • BP-501~503 & 601 인터페이스/UI"]
-    STAGE4["🏆 4단계: 실측 증명 및 거버넌스
-(Proof & Governance)
-• BP-701 벤치마크 실측 검증
-  (EM 96.8%, Recall 98.4%, 환각 0%)
+    STAGE4["🏆 4단계: 평가 계획 및 거버넌스
+(Evaluation & Governance)
+• BP-701 벤치마크 평가 체계
+  (EM, Cell Recall, Latency, Hallucination)
 • AST 계약 테스트 & 리팩토링"]
 
     STAGE1 --> STAGE2 --> STAGE3 --> STAGE4
@@ -82,9 +82,9 @@ flowchart LR
 | 개발 단계 | 핵심 질문 및 해결 과제 | 주요 수록 문서 | 핵심 산출물 및 증명 내용 |
 | :--- | :--- | :--- | :--- |
 | **Stage 1: 기획 & 문제 정의** | • 왜 기존 LLM/RAG가 재무 엑셀에서 실패하는가?<br>• 비즈니스 사용자가 원하는 핵심 기능은 무엇인가? | [`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_business_vision_and_executive_summary.md)<br>[`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_core_use_cases_and_workflows.md) | • 2D 기하 구조 소실 및 부동소수점 오차 원인 분석<br>• 5대 유즈케이스(UC-1~UC-5) 및 6차원 추적성 매트릭스 수립 |
-| **Stage 2: 가설 검증 & 설계** | • 어떤 기술적 가설과 실험을 통해 아키텍처를 결정했는가?<br>• 인프라와 표준 헌법은 어떻게 구성되는가? | [`BP-003`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md)<br>[`BP-004`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-004_project_timeline_and_role_distribution.md)<br>[`BP-005`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-005_engineering_standards_and_code_conventions.md)<br>[`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md)~[`104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | • 비전 VLM, Binary COPY, RRF 융합 등 6대 가설 대조군 실험 검증<br>• Pydantic DTO 100% 타입화 헌법 및 2-Tier 런타임/3-Level 락 설계 |
+| **Stage 2: 가설 검증 & 설계** | • 어떤 기술적 가설과 공학적 원리로 아키텍처를 결정했는가?<br>• 인프라와 표준 헌법은 어떻게 구성되는가? | [`BP-003`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md)<br>[`BP-004`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-004_project_timeline_and_role_distribution.md)<br>[`BP-005`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-005_engineering_standards_and_code_conventions.md)<br>[`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md)~[`104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | • 비전 VLM, Binary COPY, RRF 융합 등 6대 가설 트레이드오프 분석<br>• Pydantic DTO 100% 타입화 헌법 및 2-Tier 런타임/3-Level 락 설계 |
 | **Stage 3: 엔진 개발 & 구축** | • 파이프라인 21개 모듈과 5대 워크스페이스는 어떻게 구현되었는가?<br>• 백엔드/프론트엔드/DB는 어떻게 연결되는가? | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)~[`203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md)<br>[`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)~[`303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md)<br>[`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)~[`405`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-405_ws_company_comparison.md)<br>[`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)~[`601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | • OpenPyXL 파서, Luna VLM 바운딩박스, pgvector Binary COPY 파이프라인<br>• 21개 모듈 핀아웃, React Flow DAG 빌더, 40+ 재무 BI 대시보드 |
-| **Stage 4: 실측 증명 & 거버넌스** | • 구축된 시스템의 성능과 정확도는 어떻게 실측 증명되었는가?<br>• 향후 리팩토링 시 아키텍처 침범을 어떻게 방지하는가? | [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md)<br>[`README`](file:///c:/Repos/bist-mini-final/docs/README.md#5-리팩토링-및-불변식-검증-가이드-refactoring-safety-workflow) | • Ground-Truth 데이터셋 기반 **Exact Match 96.8%, Recall 98.4%, 0.0% 환각** 증명<br>• AST 아키텍처 불변식 정적 계약 테스트 및 회귀 방지 체계 |
+| **Stage 4: 평가 계획 & 거버넌스** | • 구축된 시스템의 성능과 정확도는 어떤 지표로 측정하는가?<br>• 향후 리팩토링 시 아키텍처 침범을 어떻게 방지하는가? | [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md)<br>[`README`](file:///c:/Repos/bist-mini-final/docs/README.md#5-리팩토링-및-불변식-검증-가이드-refactoring-safety-workflow) | • Ground-Truth 데이터셋 기반 **EM, Recall, Latency, Hallucination** 평가 기준 수립<br>• AST 아키텍처 불변식 정적 계약 테스트 및 회귀 방지 체계 |
 
 ---
 
@@ -92,18 +92,18 @@ flowchart LR
 
 | 영역 (Domain) | 문서 코드 | 문서명 및 핵심 설계 내용 | 주요 대상 코드 / 리팩토링 타깃 |
 | :--- | :--- | :--- | :--- |
-| **00. 마스터 계획 & 표준** | [BP-001](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_business_vision_and_executive_summary.md) | **사업 비전 & 총괄 개요서**<br>산업 문제점, 5대 핵심 가치, 벤치마크 실측치, ROI 분석 | 전사 기획서, IR 덱 |
+| **00. 마스터 계획 & 표준** | [BP-001](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_business_vision_and_executive_summary.md) | **사업 비전 & 총괄 개요서**<br>산업 문제점, 5대 핵심 가치, 벤치마크 평가 계획, ROI 분석 | 전사 기획서, IR 덱 |
 | | [BP-002](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_core_use_cases_and_workflows.md) | **핵심 비즈니스 유즈케이스 & 워크플로우 명세서**<br>5대 워크스페이스(UC-1~UC-5) 페르소나 및 입력/출력 흐름 | `frontend/src/features/`, E2E 시나리오 |
-| | [BP-003](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md) | **아키텍처 결정 배경 & 6대 가설 검증 결과서**<br>대조군 vs 실험군 벤치마크 실측 데이터 및 트레이드오프 분석 | 아키텍처 결정 레코드 (ADR) |
+| | [BP-003](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md) | **아키텍처 결정 배경 & 6대 가설 분석서**<br>대조군 vs 채택안 엔지니어링 트레이드오프 분석 | 아키텍처 결정 레코드 (ADR) |
 | | [BP-004](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-004_project_timeline_and_role_distribution.md) | **프로젝트 마일스톤 타임라인 & 역할 분배 (R&R)**<br>스프린트 1~6 Gantt 마일스톤, 5대 Lead 엔지니어링 책임 | 프로젝트 관리 및 스프린트 WBS |
 | | [BP-005](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-005_engineering_standards_and_code_conventions.md) | **엔지니어링 코드 컨벤션 & 구현 표준 규격서**<br>Pydantic DTO 100% 타입화, 제로 보일러플레이트, Lucide SVG 표준 | [`.agents/rules/code-style-guide.md`](file:///c:/Repos/bist-mini-final/.agents/rules/code-style-guide.md), [`modules/common/`](file:///c:/Repos/bist-mini-final/modules/common/) |
 | **01. 코어 아키텍처** | [BP-101](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md) | **시스템 전체 배치도 & 2-Tier 런타임 토폴로지**<br>Tier 1 Fast In-Memory + Tier 2 K8s KEDA 분산 배치 큐 | [`backend/bootstrap/container.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py), [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py) |
 | | [BP-102](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-102_backend_layered_architecture.md) | **백엔드 7단계 계층 설계도 & 인터페이스 결합도**<br>Presentation ~ Storage 레이어 격리 및 DIP 규칙 | [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/features/`](file:///c:/Repos/bist-mini-final/backend/features/), [`backend/storage/`](file:///c:/Repos/bist-mini-final/backend/storage/) |
-| | [BP-103](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | **분산 락, 임차권(Lease) & 경합 회복 시퀀스**<br>Worker Lease 토큰 및 고아 작업 회복 FSM | [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py) |
+| | [BP-103](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | **분산 락, 임차권(Lease) & 경합 회복 시퀀스**<br>Worker Lease 토큰 및 고아 작업 회복 FSM, 운영 런북 | [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py) |
 | | [BP-104](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | **K8s, KEDA ScaledJob & 인프라 토폴로지**<br>k3d 클러스터, Ingress, Pod Spec, 배포 스크립트 | [`deploy/kubernetes/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/), [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh) |
 | **02. 데이터 엔지니어링** | [BP-201](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md) | **2D 그리드 셀 좌표계 파서 & 마크다운 직렬화**<br>OpenPyXL 병합 해제, 좌표계 정규화, 계층 직렬화 | [`backend/storage/spreadsheets/`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/), [`modules/structure/cell_text_serializer.py`](file:///c:/Repos/bist-mini-final/modules/structure/cell_text_serializer.py) |
 | | [BP-202](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) | **Luna VLM 이미지 렌더링 & 표 바운딩박스 검출**<br>Pillow 이미지 렌더링, GPT-5.6 Luna 구조 추론 | [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py) |
-| | [BP-203](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | **대용량 바이너리 COPY & pgvector 인덱싱**<br>초당 5,400+ 벡터 주입 고속 파이프라인 및 HNSW | [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py) |
+| | [BP-203](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | **대용량 바이너리 COPY & pgvector 인덱싱**<br>PostgreSQL Native Binary 스트리밍 및 HNSW | [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py) |
 | **03. 파이프라인 모듈** | [BP-301](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | **DAG 토폴로지 실행기 & 상태머신(FSM)**<br>위상 정렬, 노드 상태 전이, 에러 바운더리 격리 | [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py) |
 | | [BP-302](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md) | **21개 모듈 입출력 핀아웃(Pinout) 카탈로그**<br>21개 단품 모듈별 Input/Output/Config 핀 규격서 | [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py) |
 | | [BP-303](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | **Dense + Sparse + RRF 융합 & 셀 확장 회로**<br>pgvector 3072d + BM25 tsvector + RRF($k=60$) | [`modules/retrieval/`](file:///c:/Repos/bist-mini-final/modules/retrieval/) |
@@ -133,7 +133,7 @@ flowchart TD
     end
 
     subgraph TrackB ["⚙️ Track B: 데이터 & 파이프라인 심층 흐름 (Data & Pipeline Track)"]
-        B1["BP-003: 가설 검증 & 실험 결과"] --> B2["BP-201 ~ BP-203: 데이터 파싱 / VLM / COPY"]
+        B1["BP-003: 가설 분석 & 트레이드오프"] --> B2["BP-201 ~ BP-203: 데이터 파싱 / VLM / COPY"]
         B2 --> B3["BP-301 ~ BP-303: DAG / 21개 모듈 / RRF 융합"]
         B3 --> B4["BP-501 ~ BP-503: REST API / SSE / 물리 ERD"]
     end
@@ -152,7 +152,7 @@ flowchart TD
 | 독자 역할 및 목적 | 권장 읽기 순서 (Document Navigation Journey) | 핵심 획득 역량 및 이해 목표 |
 | :--- | :--- | :--- |
 | **🚀 제품 기획자 / 풀스택 개발자** | [`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_business_vision_and_executive_summary.md) ➡️ [`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_core_use_cases_and_workflows.md) ➡️ [`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)~[`405`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-405_ws_company_comparison.md) ➡️ [`BP-601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | • 비즈니스 가치, 5대 워크스페이스 유즈케이스 및 프론트엔드 라우팅 흐름 이해 |
-| **⚙️ AI / 데이터 엔지니어** | [`BP-003`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md) ➡️ [`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)~[`203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) ➡️ [`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)~[`303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) ➡️ [`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)~[`503`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-503_database_erd_and_ddl.md) | • 가설 검증 결과, 엑셀 VLM 파싱, 21개 모듈 Pinout 및 하이브리드 RRF 수식 습득 |
+| **⚙️ AI / 데이터 엔지니어** | [`BP-003`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md) ➡️ [`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)~[`203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) ➡️ [`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)~[`303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) ➡️ [`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)~[`503`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-503_database_erd_and_ddl.md) | • 가설 분석, 엑셀 VLM 파싱, 21개 모듈 Pinout 및 하이브리드 RRF 수식 습득 |
 | **🏗️ 시스템 아키텍트 / DevOps** | [`BP-004`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-004_project_timeline_and_role_distribution.md) ➡️ [`BP-005`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-005_engineering_standards_and_code_conventions.md) ➡️ [`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md)~[`104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) ➡️ [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md) | • 엔지니어링 표준 헌법, 3-Level 분산 락, K8s KEDA 큐잉 및 AST 정적 계약 검증 체계 확보 |
 
 ---
