@@ -40,10 +40,10 @@ flowchart TD
 
 | 계층 | 구성 요소 / 파일 경로 | 역할 및 상호작용 방식 |
 | :--- | :--- | :--- |
-| **Layer 3<br>(금융 BI 도메인 모듈 & 엔진)** | **`BiDocumentProfiler`**<br>([`document_profiler.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/document_profiler.py)) | • **[도메인 특화 LLM 프로파일러 모듈]**<br>• **Input Pins**: `workbook_hash`, `file_name`, `index_id`, `available_sheets`<br>• **Output Pins**: `BiDocumentProfile` (`periods: List[BiPeriod]`, `currency: str`, `scale: int`, `relevant_sheets`, `evidence`)<br>• `BaseLLMModule` 계열의 구조화 생성(`complete_structured`)을 통해 회계기간(FY/LTM), 표시 통화/배율(단위), 재무제표 시트를 1-Shot 자동 발견 |
-| | `MetricCatalog`<br>([`catalog.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/catalog.py)) | • 40개 이상 핵심 재무 비율 산출에 필요한 원천 지표 질문 및 동의어 규칙 정의 |
+| **Layer 5<br>(원자적 모듈 & 프로파일러)** | **`structure.document_profiler`**<br>([`BP-302 Module 20`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_19_modules_pinout_catalog.md#20-documentprofilermodule-structuredocument_profiler)) | • **[Layer 5 정규 파이프라인 모듈]**<br>• **Input Pins**: `workbook_hash`, `file_name`, `index_id`, `available_sheets`<br>• **Output Pins**: `DocumentProfileDTO` (`periods: List[str]`, `currency: str`, `scale: int`, `relevant_sheets`, `evidence_cells`)<br>• `BaseLLMModule` 계열의 구조화 생성(`complete_structured`)을 통해 회계기간(FY/LTM), 표시 통화/배율(단위), 재무제표 시트를 1-Shot 자동 발견 |
+| **Layer 3<br>(금융 BI 도메인 엔진)** | `MetricCatalog`<br>([`catalog.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/catalog.py)) | • 40개 이상 핵심 재무 비율 산출에 필요한 원천 지표 질문 및 동의어 규칙 정의 |
 | | `FinancialCalculator`<br>([`calculator.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/calculator.py)) | • 원천 관측값으로부터 무손실 고정소수점(`Decimal`) 40+ 파생 재무 비율 산출<br>• 회계 감사용 원본 엑셀 셀(`BiEvidence`) 추적성 영구 바인딩 |
-| | `FastRagPipelineAdapter`<br>([`fast_rag_adapter.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/fast_rag_adapter.py)) | • 포트-어댑터 패턴으로 하위 19개 모듈을 결합하여 개별 재무 질문에 대한 초고속 답변 및 근거 인출 수행 |
+| | `FastRagPipelineAdapter`<br>([`fast_rag_adapter.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/fast_rag_adapter.py)) | • 포트-어댑터 패턴으로 하위 20개 모듈을 결합하여 개별 재무 질문에 대한 초고속 답변 및 근거 인출 수행 |
 | | `DashboardRecalculation`<br>([`dashboard_recalculation.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/dashboard_recalculation.py)) | • 엑셀 재파싱 없이 기존 관측값 기반 1-Shot 고속 파생 지표 재계산 |
 | **Layer 5<br>(원자적 RAG 모듈군)** | `retrieval.pgvector_retriever`<br>`retrieval.sparse_bm25_retriever` | • Dense(3072d) 벡터 유사도 검색 및 PostgreSQL TSVector BM25 키워드 검색 병렬 수행 |
 | | `retrieval.rrf_fuser`<br>([`rrf_fusion.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/rrf_fusion.py)) | • Dense 및 Sparse 검색 순위를 상호 순위 융합(RRF, $k=60$)하여 최적의 원천 셀 후보 선별 |

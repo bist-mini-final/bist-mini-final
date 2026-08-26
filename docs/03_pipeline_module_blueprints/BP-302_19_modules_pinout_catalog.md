@@ -1,4 +1,4 @@
-# [BP-302] 19개 모듈 입출력 핀아웃(Pinout) 카탈로그
+# [BP-302] 20개 모듈 입출력 핀아웃(Pinout) 카탈로그
 > **Document Code:** `BP-302` | **Category:** Pipeline & Modular Contracts Blueprint | **Status:** Approved Baseline  
 > **Source Directories:** [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)
 
@@ -33,7 +33,7 @@ graph LR
 
 ### 1.2 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
 
-LLM 호출, 프롬프트 엔지니어링, 에이전트 도구 루프 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 19개 구체 모듈로 상속됩니다:
+LLM 호출, 프롬프트 엔지니어링, 에이전트 도구 루프 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 20개 구체 모듈로 상속됩니다:
 
 ```mermaid
 classDiagram
@@ -69,11 +69,11 @@ classDiagram
     }
 
     class LLMInferenceModules {
-        <<10 Modules>>
+        <<11 Modules>>
         Decomposer, MultiQueryExpander, HydeGenerator,
-        LunaVlmStructureDetector, CompanyEntityExtractor,
-        Reader, AgenticReasoner, ContextCompressor,
-        FactChecker, ConfidenceScorer
+        LunaVlmStructureDetector, DocumentProfiler,
+        CompanyEntityExtractor, Reader, AgenticReasoner,
+        ContextCompressor, FactChecker, ConfidenceScorer
     }
 
     class EmbeddingModules {
@@ -90,11 +90,11 @@ classDiagram
 
 ---
 
-### 1.1 19개 파이프라인 모듈 3대 상속 분류 매트릭스
+### 1.3 20개 파이프라인 모듈 3대 상속 분류 매트릭스
 
-| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (19개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
+| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (20개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
 | :--- | :---: | :--- | :--- |
-| **`BaseLLMModule`** | **10개** | • `query.decomposer`<br>• `query.multi_query_expander`<br>• `query.hyde_generator`<br>• `structure.luna_vlm_structure_detector`<br>• `storage.company_entity_extractor`<br>• `generation.reader`<br>• `generation.agentic_reasoner`<br>• `generation.context_compressor`<br>• `generation.fact_checker`<br>• `generation.confidence_scorer` | • `complete_structured(...)` (1-Shot Pydantic 파싱)<br>• `complete_agentic(...)` (LangChain BaseTool 루프)<br>• 토큰 사용량/비용(USD)/지연시간 자동 집계 |
+| **`BaseLLMModule`** | **11개** | • `query.decomposer`<br>• `query.multi_query_expander`<br>• `query.hyde_generator`<br>• `structure.luna_vlm_structure_detector`<br>• `structure.document_profiler`<br>• `storage.company_entity_extractor`<br>• `generation.reader`<br>• `generation.agentic_reasoner`<br>• `generation.context_compressor`<br>• `generation.fact_checker`<br>• `generation.confidence_scorer` | • `complete_structured(...)` (1-Shot Pydantic 파싱)<br>• `complete_agentic(...)` (LangChain BaseTool 루프)<br>• 토큰 사용량/비용(USD)/지연시간 자동 집계 |
 | **`BaseEmbedderModule`** | **2개** | • `retrieval.text_embedder`<br>• `retrieval.cross_encoder_reranker` | • `encode_texts(...)` (배치 임베딩 & 3072d 검증)<br>• `encode_batches_streaming(...)` (스트리밍 인코딩) |
 | **`BaseModule` (직접)** | **7개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander` | • 비동기 논블로킹 알고리즘/I/O 실행 (`execute_async`)<br>• Pydantic DTO 자동 검증 & 중앙화 예외 가드 |
 
@@ -228,6 +228,12 @@ classDiagram
 - **역할**: 벤치마크 평가용 Ground-Truth Q&A 데이터셋 로드.
 - **Input Pins**: `dataset_path: str`
 - **Output Pins**: `qa_examples: List[QaExample]`
+
+#### 20. `DocumentProfilerModule` (`structure.document_profiler`)
+- **역할**: 엑셀 워크북의 회계기간(FY/LTM), 표시 통화(KRW/USD) 및 배율 단위(백만원/천원/원), 재무제표 시트를 1-Shot LLM 구조화 추론으로 자동 발견.
+- **Input Pins**: `workbook_hash: str` (필수), `file_name: str` (필수), `index_id: Optional[str]`, `available_sheets: Optional[List[str]]`
+- **Output Pins**: `periods: List[str]`, `currency: str`, `scale: int`, `relevant_sheets: List[str]`, `evidence_cells: List[Dict[str, Any]]`
+- **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_periods: int = 5`, `temperature: float = 0.0`
 
 ---
 
