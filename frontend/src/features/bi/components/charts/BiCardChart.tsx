@@ -1,6 +1,7 @@
 import type { BiCardId, BiDashboardSnapshot, CardSize, PeriodRange } from '../../types';
 import { CashFlowChart } from './CashFlowChart';
 import { FinancialScaleChart } from './FinancialScaleChart';
+import { FinancialHealthHeatmap } from './FinancialHealthHeatmap';
 import { ProfitabilityChart } from './ProfitabilityChart';
 import { RevenueChart } from './RevenueChart';
 import { StabilityChart } from './StabilityChart';
@@ -28,6 +29,8 @@ export function BiCardChart(props: BiCardChartProps) {
       return <StabilityChart dashboard={props.dashboard} range={props.range} size={props.size} />;
     case 'financial_scale':
       return <FinancialScaleChart dashboard={props.dashboard} range={props.range} size={props.size} />;
+    case 'financial_health_heatmap':
+      return <FinancialHealthHeatmap dashboard={props.dashboard} range={props.range} size={props.size} />;
     default:
       return assertNever(props.cardId);
   }

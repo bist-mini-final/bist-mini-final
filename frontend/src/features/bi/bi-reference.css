@@ -1,6 +1,7 @@
 .bi-card[data-card-id='cash_flow'],
 .bi-card[data-card-id='stability'],
-.bi-card[data-card-id='financial_scale'] {
+.bi-card[data-card-id='financial_scale'],
+.bi-card[data-card-id='financial_health_heatmap'] {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 

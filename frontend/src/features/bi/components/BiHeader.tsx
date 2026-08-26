@@ -1,25 +1,33 @@
-import { Building2, CalendarRange, CheckCircle2, CircleAlert, Clock3, Database, RefreshCw } from 'lucide-react';
+import { Building2, CalendarRange, CheckCircle2, CircleAlert, Clock3, Database, DatabaseZap, RefreshCw } from 'lucide-react';
 import type { BiDashboardSnapshot, PeriodRange } from '../types';
 
 interface BiHeaderProps {
   readonly dashboard: BiDashboardSnapshot;
   readonly periodLabel: PeriodRange;
-  readonly isRefreshing: boolean;
+  readonly activeAction: 'refresh' | 'reset' | null;
   readonly onRefresh: () => void;
+  readonly onReset: () => void;
 }
 
-/**
- * Renders the dashboard header with snapshot status, company details, reporting period, and refresh controls.
- *
- * @param dashboard - The company and snapshot data displayed in the header
- * @param periodLabel - The label for the selected reporting period
- * @param isRefreshing - Whether a data refresh is in progress
- * @param onRefresh - Callback invoked to refresh the dashboard data
- * @returns The dashboard header element
- */
-export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: BiHeaderProps) {
+const KOREA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+function formatGeneratedAt(generatedAt: string): string {
+  return KOREA_DATE_TIME_FORMATTER
+    .format(new Date(generatedAt))
+    .replace(/-/g, '.');
+}
+
+export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onReset }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
-  const generatedAt = dashboard.snapshot.generatedAt.slice(0, 16).replace('T', ' ').split('-').join('.');
+  const generatedAt = formatGeneratedAt(dashboard.snapshot.generatedAt);
 
   return (
     <header className="bi-header">
@@ -53,15 +61,26 @@ export function BiHeader({ dashboard, periodLabel, isRefreshing, onRefresh }: Bi
         <span className="bi-source-note">
           <Database size={14} aria-hidden="true" />검증된 BI 스냅샷 API 데이터입니다.
         </span>
-        <button
-          className="bi-refresh-button"
-          type="button"
-          disabled={isRefreshing}
-          onClick={onRefresh}
-        >
-          <RefreshCw className={isRefreshing ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
-          {isRefreshing ? '데이터 갱신 중' : '데이터 갱신'}
-        </button>
+        <div className="bi-header__data-actions">
+          <button
+            className="bi-refresh-button"
+            type="button"
+            disabled={activeAction !== null}
+            onClick={onRefresh}
+          >
+            <RefreshCw className={activeAction === 'refresh' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
+            {activeAction === 'refresh' ? '대시보드 갱신 중' : '대시보드 갱신'}
+          </button>
+          <button
+            className="bi-data-reset-button"
+            type="button"
+            disabled={activeAction !== null}
+            onClick={onReset}
+          >
+            <DatabaseZap className={activeAction === 'reset' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
+            {activeAction === 'reset' ? '데이터 재생성 중' : '데이터 초기화 및 재생성'}
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -26,10 +26,13 @@ from .question_batch_worker import (
     SystemBiQuestionBatchWorkerClock,
 )
 from .question_pipeline import BiQuestionPipeline, PgVectorQuestionSourceResolver
+from .question_publishing import (
+    BiPublishingQuestionService,
+    BiQuestionPublicationFailureReporter,
+)
 from .question_repository import PostgresBiQuestionRepository
 from .question_service import BiQuestionService
 from .question_snapshot import (
-    BiPublishingQuestionService,
     BiQuestionSnapshotMaterializer,
     BiQuestionSnapshotMaterializerServices,
 )
@@ -96,6 +99,7 @@ def create_bi_question_pipeline(
     extractor = BiMetricExtractionService(
         retriever,
         BiMetricReader(completion, BI_READER_MODEL),
+        PostgresBiDocumentProfileRepository(),
     )
     return BiQuestionPipeline(
         extractor,
@@ -133,7 +137,11 @@ def create_bi_question_worker(
         )
     )
     return BiQuestionWorker(
-        BiPublishingQuestionService(service, snapshot_materializer),
+        BiPublishingQuestionService(
+            service,
+            snapshot_materializer,
+            BiQuestionPublicationFailureReporter(service, store, SystemClock()),
+        ),
         create_bi_question_pipeline(registry, completion_client),
         SystemBiQuestionWorkerClock(),
     )
@@ -167,7 +175,11 @@ def create_bi_question_batch_worker(
             profiles=PostgresBiDocumentProfileRepository(),
         )
     )
-    publishing_service = BiPublishingQuestionService(service, snapshot_materializer)
+    publishing_service = BiPublishingQuestionService(
+        service,
+        snapshot_materializer,
+        BiQuestionPublicationFailureReporter(service, store, SystemClock()),
+    )
     return BiQuestionBatchWorker(
         publishing_service,
         create_bi_question_pipeline(registry, completion_client),
