@@ -39,9 +39,11 @@ flowchart TB
         end
     end
 
-    subgraph ServiceDomain ["4. Domain Services Tier"]
+    subgraph ServiceDomain ["4. Domain Services Tier (Business & Evaluation Engines)"]
         BI_SVC["BiApiServices (Document Profiler & Metric Engine)"]
-        BM_SVC["BenchmarkService (Evaluation & Ground Truth)"]
+        CHAT_SVC["[Planned] ChatbotService (Session & Fast RAG Orchestrator)"]
+        COMP_SVC["[Planned] CompanyComparisonService (Multi-Entity Normalizer & DuPont Engine)"]
+        BM_SVC["BenchmarkService (Evaluation & Ground Truth QA)"]
         WF_SVC["WorkflowRuntimeServices (Run Store & History)"]
     end
 
