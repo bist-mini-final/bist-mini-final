@@ -28,7 +28,7 @@ flowchart TD
 
     subgraph Engine ["2-Tier Execution Runtime (BP-100 & BP-300)"]
         DAG["DAG Topology Executor"]
-        FAST["Tier 1: Fast In-Memory Zero-I/O Engine (<100ms)"]
+        FAST["Tier 1: Async Non-Blocking In-Memory Engine (<100ms)"]
         DIST["Tier 2: Kubernetes KEDA Batch Queue Workers"]
         DAG --> FAST
         DAG --> DIST
