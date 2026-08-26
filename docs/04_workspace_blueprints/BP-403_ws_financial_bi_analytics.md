@@ -81,6 +81,10 @@ flowchart TD
 3. **대시보드 실시간 재계산 및 리셋 제어 (`ResetDataDialog`)**:
    - **원천 관측값 재계산 (`POST /api/bi/companies/{id}/refresh`)**: 엑셀 재파싱 없이 기존 관측값으로부터 파생 재무 비율과 스냅샷만 1-Shot 고속 재계산.
    - **질의응답 초기화 및 재생성 (`POST /api/bi/companies/{id}/reset`)**: `ResetDataDialog`를 통해 선택 기업의 질의응답을 트랜잭션으로 교체하고 새 질문 배치를 큐에 등록 후 SSE(`GET /api/bi/question-jobs/{id}/stream`)로 진행률을 실시간 모니터링.
+4. **적응형 음수 마진 Y축 스케일링 (`getProfitabilityMarginDomain`)**:
+   - `chartViewModel.ts`의 셀렉터 로직을 통해 당기순손실이나 영업적자(음수 마진)가 발생한 기업의 경우에도 차트가 잘리거나 0에 고정되지 않고, 최소/최대 마진율을 고려한 적응형 대칭 Y축 도메인(`[min * 1.15, max * 1.15]`)을 자동 계산하여 Recharts 차트에 바인딩합니다.
+5. **웹 접근성(a11y) 표준 대화상자 라이프사이클 (`useModalDialog`)**:
+   - `ResetDataDialog`, `EvidenceDialog`, `CardLibraryDialog`, `ResetLayoutDialog` 등 모든 BI 모달 컴포넌트에 [`useModalDialog`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/components/useModalDialog.ts) 훅을 적용하여 `role="dialog"`, `aria-modal="true"`, `Escape` 키 닫기 이벤트 및 키보드 포커스 트랩을 표준 지원합니다.
 
 ---
 
