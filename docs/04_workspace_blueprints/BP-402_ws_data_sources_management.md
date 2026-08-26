@@ -24,6 +24,20 @@ flowchart TD
 
 ---
 
+### 1.1 원자적 파이프라인 모듈과 백엔드 인프라의 결합 구조 (Module Composition)
+
+`Data Sources Management`는 독립적인 **Layer 5 원자적 모듈들과 Layer 7 백엔드 스토리지 인프라를 유기적으로 조합**하여 엔드투엔드 엑셀 인제스천 파이프라인을 완성합니다:
+
+| 계층 | 구성 요소 / 파일 경로 | 역할 및 협력 방식 |
+| :--- | :--- | :--- |
+| **Layer 5<br>(원자적 모듈)** | `structure.luna_vlm_structure_detector`<br>([`luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py)) | • 엑셀 시트 이미지를 래스터라이징하여 GPT-5.6 Luna VLM으로 전송<br>• 표 경계(`TableBoundary`), 열 헤더, 행 스터브, 데이터 매트릭스 기하학 감지 |
+| | `structure.cell_text_serializer`<br>([`cell_text_serializer.py`](file:///c:/Repos/bist-mini-final/modules/structure/cell_text_serializer.py)) | • 감지된 2D 좌표계를 단일 표준 규격(`header_with_value`) 텍스트 라인으로 직렬화 |
+| | `retrieval.text_embedder`<br>([`text_embedder.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/text_embedder.py)) | • 직렬화된 셀 텍스트를 `text-embedding-3-large`를 통해 **3072차원 고밀도 벡터**로 배치 임베딩 |
+| **Layer 7<br>(스토리지 인프라)** | `backend/storage/pgvector_binary_copy.py` | • 3072차원 벡터와 메타데이터를 PostgreSQL `langchain_pg_embedding` 테이블로 **Binary COPY 프로토콜**을 통해 초고속 벌크 주입 |
+| | `backend/storage/db_manager.py` | • PostgreSQL 커넥션 풀링 및 HNSW 인덱스 상태 헬스 프로브(`GET /api/data-sources/probe`) |
+
+---
+
 ## 2. Luna VLM 시각적 바운딩 박스 오버레이 (VLM Overlay Rendering)
 
 감지된 표 기하학(`TableBoundary`)을 원본 스프레드시트 캔버스 위에 CSS 하이라이트 박스로 렌더링합니다:
