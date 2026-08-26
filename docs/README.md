@@ -50,10 +50,11 @@ flowchart TD
 
 ## 2. 청사진 네비게이션 맵 (Master Blueprint Matrix)
 
-본 설계서는 7대 도메인, 총 20개의 정밀 엔지니어링 규격서로 구성되어 있습니다.
+본 설계서는 8대 도메인, 총 21개의 정밀 엔지니어링 규격서로 구성되어 있습니다.
 
 | 영역 | 문서 코드 | 문서명 및 핵심 내용 | 주요 대상 코드 / 리팩토링 타깃 |
 | :--- | :--- | :--- | :--- |
+| **00. 표준 및 컨벤션** | [BP-001](file:///c:/Repos/bist-mini-final/docs/00_standards/BP-001_code_style_and_conventions.md) | **엔지니어링 코드 컨벤션 & 구현 표준 규격서**<br>Pydantic DTO 완전 타입화, 제로 예외 보일러플레이트, 무이모티콘 & Lucide SVG 표준 | [`.agents/rules/code-style-guide.md`](file:///c:/Repos/bist-mini-final/.agents/rules/code-style-guide.md), [`modules/common/`](file:///c:/Repos/bist-mini-final/modules/common/) |
 | **01. 코어 아키텍처** | [BP-101](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md) | **시스템 전체 배치도 & 2-Tier 런타임 토폴로지**<br>전체 아키텍처, 런타임 분기, DI 컨테이너 | [`backend/bootstrap/container.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py), [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py) |
 | | [BP-102](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-102_backend_layered_architecture.md) | **백엔드 7단계 계층 설계도 & 인터페이스 결합도**<br>Presentation ~ Storage 레이어 격리 및 DIP 규칙 | [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/features/`](file:///c:/Repos/bist-mini-final/backend/features/), [`backend/storage/`](file:///c:/Repos/bist-mini-final/backend/storage/) |
 | | [BP-103](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | **분산 락, 임차권(Lease) & 경합 회복 시퀀스**<br>Worker Lease 토큰 및 고아 작업 회복 FSM | [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py) |

@@ -144,3 +144,23 @@ PipelineBaseError (HTTP 500 / 기본 에러)
     "details": { "provider": "openai" }
   }
   ```
+
+---
+
+## 5. 프론트엔드 무이모티콘(Zero Emoji) & Lucide SVG 아이콘 표준
+
+### 5.1 UI 내 원시 유니코드 이모티콘 사용 전면 금지 (Zero Raw Emojis)
+- 버튼, 뱃지, 네비게이션 탭, 헤더 등 모든 UI 컴포넌트에 `🔍`, `🚀`, `🔥`, `📊`, `📁`, `⚙️`, `⚠️`, `✅`와 같은 **원시 유니코드 이모티콘 하드코딩을 엄격히 금지**합니다.
+- OS/브라우저 환경별 렌더링 파편화를 방지하고 프로페셔널 엔터프라이즈 UI 톤앤매너를 유지합니다.
+
+### 5.2 `lucide-react` SVG 벡터 아이콘 표준화
+- 모든 아이콘은 **`lucide-react` 라이브러리에서 명시적으로 import**하여 일관된 크기(`w-4 h-4`, `w-5 h-5`), 스트로크(`strokeWidth={1.5}` or `2`), Tailwind 테마 색상(`text-slate-400`, `text-indigo-500`)을 적용합니다.
+
+---
+
+## 6. 무손실 금융 수식 계산 표준 (Lossless Financial Decimal Math)
+
+### 6.1 부동소수점(`float`) 연산 엄격 배제
+- 재무제표의 40+ 지표 및 파생비율(ROE, 부채비율, 영업이익률 등) 연산 시 **부동소수점(`float`) 누적 오차 발생을 엄격히 금지**합니다.
+- 반드시 **`decimal.Decimal`**을 사용하여 고정소수점 무손실 연산을 수행하며, 최종 표시 단계에서만 명시적 반올림(`ROUND_HALF_UP`)을 적용합니다.
+
