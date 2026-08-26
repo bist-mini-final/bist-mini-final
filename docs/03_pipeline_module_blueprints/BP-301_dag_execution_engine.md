@@ -6,26 +6,44 @@
 
 ## 1. DAG 토폴로지 분석 및 위상 정렬 (DAG Validation & Topological Batches)
 
-`WorkflowExecutor`는 사용자가 구성한 파이프라인 그래프의 유효성을 검증하고, 순환 의존성(Cycle) 유무를 검사한 후 **병렬 실행 가능한 노드 배치(Topological Batches)**로 분할합니다.
+`WorkflowExecutor`는 사용자가 구성한 파이프라인 그래프의 유효성을 검증하고, 순환 의존성(Cycle) 유무를 검사한 후 **Kahn 알고리즘 기반의 병렬 실행 가능한 위상 배치(Topological Batches)**로 분할하여 실행합니다.
 
 ```mermaid
 flowchart TD
-    GRAPH["WorkflowGraph (Nodes + Edges + Configs)"] --> VAL["1. DAG Validation (Duplicate Node ID, Invalid Ports Check)"]
-    VAL --> DEG["2. In-Degree & Out-Degree Dependency Calculation"]
-    DEG --> CYCLE{"Cycle Detected?"}
-    CYCLE -- Yes --> ERR["Raise DagExecutionError('순환 의존성이 존재합니다')"]
-    CYCLE -- No --> BATCH["3. Topological Batching (Kahn's Algorithm)"]
+    GRAPH["WorkflowGraph (Nodes + Edges + Configs)"] --> VAL["1. DAG 정적 유효성 검증 (포트 타입, 중복 ID 검사)"]
+    VAL --> DEG["2. 진입/진출 차수(In/Out-Degree) 의존성 계산"]
+    DEG --> CYCLE{"순환 의존성(Cycle) 감지?"}
+    CYCLE -- Yes --> ERR["Raise DagExecutionError('DAG 내 순환 참조 발견')"]
+    CYCLE -- No --> BATCH["3. 위상 정렬 배치 분할 (Kahn's Algorithm)"]
     
-    subgraph ExecutionFlow ["4. Batch Execution Pipeline"]
-        B1["Batch 0 (In-Degree = 0, e.g. QueryInput, FileSelector)"]
-        B2["Batch 1 (e.g. Decomposer, Router, VLM Detector)"]
-        B3["Batch 2 (e.g. PgVectorRetriever, KeywordRetriever)"]
-        B4["Batch 3 (e.g. RrfFusion, ContextExpander)"]
-        B5["Batch 4 (e.g. ReaderModule QA Synthesis)"]
-        B1 --> B2 --> B3 --> B4 --> B5
+    subgraph ExecutionFlow ["4. 단계별 배치 실행 파이프라인 (Execution Pipeline)"]
+        B0["Batch 0: QueryInputModule (자연어 질의 접수)"]
+        B1["Batch 1: LlmQueryRouterModule (질의 의도 분석 & 라우팅 판단)"]
+        B2["Batch 2: DecomposerModule / MultiQueryExpander (원자적 하위 질의 분해)"]
+        B3["Batch 3: PgVectorRetriever / SparseBm25Retriever (하이브리드 병렬 검색)"]
+        B4["Batch 4: RrfFuser / ContextExpander (순위 융합 & 2D 이웃 문맥 확장)"]
+        B5["Batch 5: ReaderModule (GPT-5.6 Luna 최종 추론 및 답변 합성)"]
+        
+        B0 --> B1 --> B2 --> B3 --> B4 --> B5
     end
     BATCH --> ExecutionFlow
 ```
+
+---
+
+### 1.1 `LlmQueryRouter`의 동적 의도 분류 및 분기 제어 (Dynamic Routing Control)
+
+사용자 질의가 유입되면 `QueryInputModule` 바로 다음에 **`LlmQueryRouterModule`이 개입하여 질의의 복잡도와 의도를 사전 분석**합니다:
+
+1. **복합 재무 분석 질의 (Complex Analytical Query)**:
+   - 예: *"삼성전자 2023년 영업이익률과 전년 대비 증감액을 비교해줘"*
+   - ➡️ `LlmQueryRouter`가 `decompose_rag` 경로를 선택하여 **`DecomposerModule`로 질의를 전달**하고, 하위 서브쿼리 분해 및 RRF 융합 파이프라인을 가동합니다.
+2. **단순 사실/정의 조회 질의 (Simple Fact / Direct Retrieval)**:
+   - 예: *"2023년 당기순이익 얼마야?"*
+   - ➡️ 분해(Decomposition) 단계를 생략하고 `PgVectorRetriever`로 직결 라우팅하여 지연 시간을 50% 단축합니다.
+3. **정형 재무 공식 계산 질의 (Pre-calculated BI Metric)**:
+   - 예: *"부채비율 공식 및 현재 수치"*
+   - ➡️ 비정형 RAG 대신 `FinancialCalculator` BI 엔진으로 직결 연결합니다.
 
 ---
 
@@ -71,13 +89,22 @@ stateDiagram-v2
 엣지(`WorkflowEdge`)는 소스 노드의 특정 출력 필드와 타깃 노드의 입력 필드를 1:1로 매핑합니다.
 
 ```json
-{
-  "id": "edge_query_to_decomposer",
-  "source": "node_query_input",
-  "source_handle": "query",
-  "target": "node_decomposer",
-  "target_handle": "query"
-}
+[
+  {
+    "id": "edge_input_to_router",
+    "source": "node_query_input",
+    "source_handle": "query",
+    "target": "node_query_router",
+    "target_handle": "query"
+  },
+  {
+    "id": "edge_router_to_decomposer",
+    "source": "node_query_router",
+    "source_handle": "analytical_query",
+    "target": "node_decomposer",
+    "target_handle": "query"
+  }
+]
 ```
 
 - **타입 호환성 검증**: 타깃 모듈의 입력 DTO 스키마(Pydantic)와 소스 출력의 필드 타입을 실행 전 정적 검증합니다.
