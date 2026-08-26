@@ -34,7 +34,7 @@ graph LR
 - **역할**: 복합 재무 질의를 원자적 하위 질의(Sub-queries)로 분해 (예: "삼성전자 2023년 영업이익률은?" -> "2023년 매출액", "2023년 영업이익").
 - **Input Pins**: `query: str`
 - **Output Pins**: `sub_queries: List[str]`, `reasoning: str`
-- **Config Pins**: `model: str = "gpt-4o-mini"`, `max_sub_queries: int = 4`
+- **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_sub_queries: int = 4`
 
 #### 3. `LlmQueryRouterModule` (`query.llm_query_router`)
 - **역할**: 질의 유형에 따라 직접 검색(Search), BI 수식 계산(Calculation), 메타데이터 조회(Metadata) 경로로 라우팅.
@@ -111,7 +111,7 @@ graph LR
 - **역할**: 확장된 재무 표 컨텍스트와 자연어 질의를 결합하여 수식 검증 및 근거 기반 최종 답변 생성.
 - **Input Pins**: `query: str`, `contexts: List[ExpandedContextBlock]`
 - **Output Pins**: `answer: str`, `reasoning_steps: List[str]`, `cited_cells: List[str]`, `formula_used: Optional[str]`
-- **Config Pins**: `model: str = "gpt-4o"`, `temperature: float = 0.1`
+- **Config Pins**: `model: str = "gpt-5.6-luna"`, `temperature: float = 0.1`
 
 ---
 
@@ -123,10 +123,10 @@ graph LR
 - **Output Pins**: `workbook_list: List[WorkbookMetadata]`
 
 #### 15. `LunaVlmStructureDetectorModule` (`structure.luna_vlm_structure_detector`)
-- **역할**: 시트 이미지 렌더링 및 GPT-4o Vision 기반 표 바운딩 박스 검출.
+- **역할**: 시트 이미지 렌더링 및 GPT-5.6 Luna 기반 표 바운딩 박스 검출.
 - **Input Pins**: `file_name: str`, `workbook_hash: str`, `sheet_names: List[str]`
 - **Output Pins**: `tables: List[TableBoundary]`, `sheet_layouts: Dict[str, Any]`
-- **Config Pins**: `model: str = "gpt-4o"`, `max_rows: int = 100`, `max_cols: int = 30`
+- **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_rows: int = 100`, `max_cols: int = 30`
 
 #### 16. `CellTextSerializerModule` (`structure.cell_text_serializer`)
 - **역할**: 감지된 표 기하학과 2D 그리드 셀 값을 결합하여 대칭적 검색 청크 텍스트 생성.
