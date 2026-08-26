@@ -37,18 +37,44 @@ flowchart TB
 
 ---
 
-## 2. React Flow 커스텀 노드 결선 명세 (Custom Node Architecture)
+## 2. React Flow 커스텀 노드 디자인 시스템 (Unified Slate & 3-Family Design System)
 
-각 커스텀 노드(`CustomWorkflowNode`)는 모듈 카테고리에 따라 색상 톤과 핀아웃이 동적 렌더링됩니다:
+기존 6가지 무지개색으로 인한 시각적 피로도와 디자인 불일치(Visual Fragmentation)를 해소하기 위해, **통합 뉴트럴 슬레이트 베이스(Unified Slate Base) + 3대 기능 패밀리 미니멀 액센트 + 상태 중심 다이내믹 링(Dynamic State Glow)** 체계로 통일합니다.
 
-| 모듈 카테고리 | 톤 및 테마 (Tone/Color) | 핸들 (Input/Output Handles) | 주요 노드 예시 |
+```mermaid
+graph TD
+    subgraph DesignSystem ["통합 슬레이트 노드 디자인 시스템"]
+        BASE["1. 일관된 슬레이트 카드 베이스 (bg-slate-900 / border-slate-700)"]
+        
+        subgraph Accents ["2. 3대 기능 패밀리 미니 액센트 (헤더 뱃지/아이콘 포인트)"]
+            A1["① Flow / Control (Primary Blue) : QueryInput, Router, Decomposer"]
+            A2["② Data / Search (Teal Emerald) : PgVector, BM25, RRF, Embedder"]
+            A3["③ AI / Inference (Indigo Violet) : Reader, Agentic, Luna VLM, FactChecker"]
+        end
+        
+        subgraph States ["3. 런타임 상태 중심 다이내믹 링 (State Glow Rings)"]
+            S1["• Idle / Pending : 기본 슬레이트 테두리 (border-slate-700)"]
+            S2["• Running (⚡ Live) : 펄스 링 (ring-2 ring-blue-400 animate-pulse)"]
+            S3["• Completed (✅) : 성공 그린 뱃지 & 실행 소요시간(ms)"]
+            S4["• Failed (❌) : 에러 로즈 뱃지 & 에러 메시지 툴팁"]
+        end
+        
+        BASE --> Accents
+        BASE --> States
+    end
+```
+
+---
+
+### 2.1 3대 기능 패밀리 및 핀아웃 매트릭스
+
+모든 노드는 동일한 프리미엄 슬레이트 카드로 렌더링되며, 상단 헤더의 **정제된 미니 뱃지 색상**으로만 역할을 깔끔하게 구분합니다:
+
+| 기능 패밀리 | 액센트 톤 (Accent) | 소속 모듈 (19개 모듈군) | 핸들 구성 (Handles) |
 | :--- | :--- | :--- | :--- |
-| **Query** | 인디고 / 블루 (`tone-indigo`) | Target Handle 0~1개, Source Handle 1~2개 | `QueryInput`, `Decomposer`, `Router` |
-| **Embedding** | 바이올렛 (`tone-violet`) | Target 1개 (Text), Source 1개 (Vectors) | `Embedder`, `CellTextEmbedder` |
-| **Retrieval** | 에메랄드 / 그린 (`tone-green`) | Target 1~2개 (Embedding/Criteria), Source 1개 | `PgVectorRetriever`, `KeywordRetriever`, `RrfFusion` |
-| **Context** | 앰버 / 옐로우 (`tone-amber`) | Target 1개 (Chunks), Source 1개 (Markdown) | `ContextExpander` |
-| **Reader** | 로즈 / 레드 (`tone-rose`) | Target 2개 (Query + Context), Source 1개 (Answer)| `ReaderModule` |
-| **Storage/VLM** | 시안 / 틸 (`tone-cyan`) | Target 1개, Source 1~2개 | `LunaVlmStructureDetector`, `IndexWriter` |
+| **① Flow & Control**<br>(입력 & 흐름 제어) | `Primary Blue`<br>(`#3B82F6`) | • `QueryInput`<br>• `LlmQueryRouter`<br>• `Decomposer`<br>• `MultiQueryExpander` | • Target: 0~1개 (Query)<br>• Source: 1~3개 (Branch Edges) |
+| **② Data & Search**<br>(데이터 인덱싱 & 검색) | `Teal Emerald`<br>(`#10B981`) | • `TextEmbedder`<br>• `CellTextSerializer`<br>• `PgVectorRetriever`<br>• `SparseBm25Retriever`<br>• `RrfFuser`<br>• `ContextExpander` | • Target: 1~2개 (Vector / Chunks)<br>• Source: 1개 (Fused Context) |
+| **③ AI & Inference**<br>(VLM 및 LLM 추론) | `Indigo Violet`<br>(`#6366F1`) | • `LunaVlmStructureDetector`<br>• `CompanyEntityExtractor`<br>• `ReaderModule`<br>• `AgenticReasoner`<br>• `ContextCompressor`<br>• `FactChecker`<br>• `ConfidenceScorer` | • Target: 1~2개 (Query + Context)<br>• Source: 1개 (Structured Output) |
 
 ---
 
