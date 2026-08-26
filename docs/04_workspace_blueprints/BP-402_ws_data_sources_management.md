@@ -42,11 +42,44 @@ graph TD
 
 ---
 
-## 3. 원클릭 인덱싱 및 pgvector 헬스 프로브 파이프라인
+## 3. 2단계 인제스천 & 사용자 피드백 분기점 (Two-Stage Ingestion & Review Checkpoint)
 
-1. 사용자가 워크북 선택 후 **"pgvector 색인 생성"** 버튼 클릭.
-2. 백엔드 `POST /api/data-sources/ingest` 호출 -> Luna VLM 감지 -> 직렬화 -> 임베딩 -> Binary COPY 일괄 실행.
-3. **Database Connection Probe**: 우측 상단 인디케이터가 페이지 진입(Mount) 시 `GET /api/data-sources/probe`를 단 1회 호출하여 PostgreSQL 및 pgvector 정상 가동 여부를 확인 및 표시 (주기적 폴링 없음, 필요 시 새로고침 버튼으로 1회 재조회).
+VLM의 잘못된 구조 인식이 벡터 스토어로 전파되는 것을 원천 차단하기 위해, 일괄 자동 실행 대신 **VLM 감지 후 사용자의 시각적 검증 및 승인을 거쳐 인덱싱을 진행하는 휴먼인더루프(Human-in-the-Loop) 분기점**을 적용합니다.
+
+```mermaid
+flowchart TD
+    UPLOAD["1. 엑셀 워크북 업로드 및 시트 선택"] --> DETECT["2. Luna VLM 구조 감지 (POST /api/data-sources/detect-structure)"]
+    DETECT --> OVERLAY["3. 그리드 위 바운딩 박스 시각적 렌더링 (헤더/스터브/데이터)"]
+    
+    subgraph ReviewCheckpoint ["★ 사용자 피드백 & 검증 분기점 (Human Review Checkpoint)"]
+        OVERLAY --> USER_DECISION{"사용자 구조 검증"}
+        USER_DECISION -- "구조 보정 필요" --> EDIT["바운딩 박스 드래그 수동 보정 / VLM 재감지"]
+        EDIT --> OVERLAY
+        USER_DECISION -- "구조 승인 (Confirm & Index)" --> PROCEED["사용자 승인 확인 (User Approved)"]
+    end
+
+    PROCEED --> INGEST["4. 확정 구조 기반 인덱싱 (POST /api/data-sources/ingest)"]
+    
+    subgraph IndexingPipeline ["5. 확정 인덱싱 파이프라인 (SSE 실시간 스트리밍)"]
+        INGEST --> SERIAL["단일 표준 직렬화 (header_with_value)"]
+        SERIAL --> EMBED["text-embedding-3-large (3072d 배치 임베딩)"]
+        EMBED --> COPY["PostgreSQL Binary COPY 고속 주입"]
+    end
+```
+
+---
+
+### 3.1 단계별 실행 및 피드백 프로토콜
+
+1. **Stage 1 (VLM 구조 감지 및 프리뷰)**:
+   - 사용자가 워크북 시트를 선택하면 `POST /api/data-sources/detect-structure`를 호출하여 Luna VLM이 표 경계(`TableBoundary`), 열 헤더, 행 스터브를 감지하고 캔버스에 색상별 오버레이 박스를 렌더링합니다.
+2. **중간 검증 분기점 (Human-in-the-Loop Review & Approval)**:
+   - 사용자는 캔버스에서 감지된 헤더 계층 구조와 데이터 셀 영역을 시각적으로 확인합니다.
+   - 오인식된 영역이 있을 경우 사용자가 직접 영역을 마우스로 보정할 수 있으며, 구조가 정확할 때만 **"구조 확정 및 색인 시작"** 버튼을 클릭합니다.
+3. **Stage 2 (확정 구조 기반 벡터 인덱싱)**:
+   - 사용자가 승인한 확정 좌표계를 바탕으로 `POST /api/data-sources/ingest`를 호출하여 직렬화 ➡️ 3072d 임베딩 ➡️ PostgreSQL Binary COPY 주입을 실행하며, SSE(`event: progress`)를 통해 진행률을 실시간 수신합니다.
+4. **Database Connection Probe**:
+   - 우측 상단 인디케이터가 페이지 진입(Mount) 시 `GET /api/data-sources/probe`를 단 1회 호출하여 PostgreSQL 및 pgvector 정상 가동 여부를 확인 및 표시합니다 (주기적 폴링 없음, 필요 시 새로고침 버튼으로 1회 수동 재조회).
 
 ---
 

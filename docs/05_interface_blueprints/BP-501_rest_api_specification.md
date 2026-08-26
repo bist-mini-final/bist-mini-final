@@ -52,7 +52,8 @@
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/data-sources/files` | 업로드된 엑셀 워크북 목록 조회 | `List[WorkbookFileSummary]` |
 | `POST`| `/api/data-sources/upload` | 엑셀 파일 업로드 (`multipart/form-data`) | `UploadFileAck` (file_id, hash) |
-| `POST`| `/api/data-sources/ingest` | 엑셀 파싱 -> VLM -> 임베딩 -> pgvector 인덱싱 | `IngestionTaskResult` |
+| `POST`| `/api/data-sources/detect-structure` | 시트별 Luna VLM 표 구조(바운딩 박스/헤더) 사전 감지 | `StructureDetectionResponse` |
+| `POST`| `/api/data-sources/ingest` | 사용자 승인 구조 기반 직렬화 -> 임베딩 -> pgvector Binary COPY | `IngestionTaskResult` |
 | `GET` | `/api/data-sources/probe` | PostgreSQL + pgvector 연결 및 인덱스 상태 헬스체크 | `{"status": "healthy", "pgvector": true}` |
 
 ### [Group 4: 재무 BI 및 프로파일러 (`/api/bi`)]
