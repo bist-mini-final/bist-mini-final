@@ -48,17 +48,19 @@ flowchart TD
 ---
 
 ### 🔬 [Hypothesis 2] Pixel RAG (이미지 패치 검색) vs 하이브리드 구조화 셀 RAG
-* **가설 (Hypothesis)**: 문서를 고해상도 이미지 패치로 분할하여 비전-임베딩으로 직접 검색하는 **Pixel RAG(ColPali 등)** 방식보다, **비전으로 기하학을 감지하되 최종 색인 및 검색은 원본 좌표가 결합된 구조화 셀(`header_with_value`)로 수행하는 하이브리드 RAG**가 회계 감사 추적성과 연산 무결성 관점에서 압도적으로 유리할 것이다.
+* **가설 (Hypothesis)**: 문서를 고해상도 이미지 패치/타일로 분할하여 비전-임베딩으로 직접 검색하는 **Pixel RAG(ColPali 등)** 방식은 표의 시각적 형태는 포착할 수 있으나, **인덱싱 I/O 및 지연시간이 과다하고 시각적 그리드 패턴이 내용적 의미(텍스트/계정과목)를 압도하여 희석**시키므로, 비전으로 표 기하학을 감지하되 최종 색인 및 검색은 원본 좌표가 결합된 구조화 셀(`header_with_value`)로 수행하는 하이브리드 RAG가 압도적으로 우수할 것이다.
 * **아키텍처 대조군 비교 (Trade-off Analysis)**:
   * **대조군 (Pixel RAG / Pure Visual Document Patch Retrieval)**:
-    * 엑셀 시트를 이미지 패치 단위로 임베딩하여 VLM으로 직접 검색·추론.
-    * 🛑 **한계 1 (감사 추적 불가)**: 결과 숫자가 원본 엑셀의 정확히 어떤 셀 좌표(`sheet_name`, `row 15, col C`)에서 유래했는지 기계 판독 가능한 메타데이터 바인딩이 불가능함 (블랙박스 비주얼).
-    * 🛑 **한계 2 (수식 연산 불가)**: VLM이 이미지 숫자를 OCR하듯 읽어오면서 소수점/자릿수 환각이 발생하여, 전사 재무비율 무손실 계산기(`FinancialCalculatorModule`)와 직결 불가.
-    * 🛑 **한계 3 (인덱싱 I/O 및 Latency 폭증)**: 이미지 패치 임베딩으로 인한 스토리지 폭증 및 VLM 멀티모달 추론 지연(2,000ms+)으로 Fast RAG(<300ms) 달성 실패.
-    * 🛑 **한계 4 (Sparse 키워드 결합 불가)**: 금융 특유의 정확한 계정과목 코드 및 영문 티커에 대한 PostgreSQL TSVector BM25 역색인 및 RRF 융합 불가.
+    * 엑셀 시트를 고해상도 이미지 타일 단위로 분할 임베딩하여 VLM으로 직접 검색·추론.
+    * 🛑 **한계 1 (시각적 표 구조 패턴 과적합 및 내용적 의미 희석)**:
+      * 비전 임베딩 모델 특성상 표의 외곽 테두리, 행/열 그리드, 셀 밀도 등 **'기하학적 레이아웃 패턴의 시각적 유사도'가 벡터 거리를 강하게 지배**함.
+      * 이로 인해 표의 생김새(패턴)는 유사하지만 내부 계정과목 명칭이나 수치적 의미가 전혀 다른 오답 시트/타일이 최상위 랭킹으로 잘못 인출되어, **실제 텍스트적·회계적 의미가 심각하게 희석(Dilution)**되는 문제 발생.
+    * 🛑 **한계 2 (대량 인덱싱 I/O 병목 및 쿼리 Latency 폭증)**:
+      * 다중 시트 엑셀의 모든 영역을 고해상도 이미지 타일로 렌더링하고 비전 패치 임베딩을 생성·저장하는 과정에서 스토리지 및 I/O 오버헤드가 기하급수적으로 폭증.
+      * VLM 멀티모달 추론 시 1회 질의당 수 초 이상의 지연시간이 소요되어 실시간 Fast RAG(<300ms) 서빙이 불가능.
   * **채택안 (Hybrid Vision-Structured Cell RAG)**:
-    * 비전의 장점(Luna VLM 표 기하학/헤더 인식) + 구조화 셀의 장점(OpenPyXL 정밀 좌표 + `header_with_value` 직렬화 + pgvector 3072d/BM25 + `Decimal` 무손실 연산) 융합.
-    * 100% 원본 셀 좌표 감사 추적성, 무손실 수식 연산 및 초고속 Fast RAG 응답 동시 확보.
+    * **비전의 강점(Luna VLM 1-Shot 표 경계/헤더 기하학 검출)** ➡️ **구조화 셀의 강점(OpenPyXL 정밀 좌표 매핑 + `header_with_value` 텍스트 직렬화 + Dense 3072d / Sparse BM25 + RRF 융합)**으로 결합.
+    * 기하학적 형태에 휘둘리지 않고 **정확한 계정과목 텍스트와 수치 맥락을 온전히 검색**하며, 초고속 색인 I/O 및 300ms 이내 실시간 응답 보장.
 * **아키텍처 결정**: **하이브리드 비전-구조화 셀 포맷 RAG 파이프라인 단일 채택 ([`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md), [`BP-303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md))**.
 
 ---
