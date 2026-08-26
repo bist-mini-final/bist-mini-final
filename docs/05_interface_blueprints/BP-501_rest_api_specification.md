@@ -43,7 +43,7 @@
 
 | Method | Endpoint | 설명 | Response DTO |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/modules` | 20개 등록된 모듈 목록 및 메타데이터 조회 | `List[ModuleDefinitionDTO]` |
+| `GET` | `/api/modules` | 21개 등록된 모듈 목록 및 메타데이터 조회 | `List[ModuleDefinitionDTO]` |
 | `GET` | `/api/modules/{module_type}/schema` | 특정 모듈의 동적 JSON Schema (Pydantic) 조회 | `{"input_schema": {...}, "output_schema": {...}}` |
 
 ### [Group 3: 데이터 소스 및 인제스천 (`/api/data-sources`)]
