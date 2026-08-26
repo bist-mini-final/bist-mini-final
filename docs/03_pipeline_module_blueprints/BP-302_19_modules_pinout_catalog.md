@@ -6,12 +6,12 @@
 
 ## 1. 19개 파이프라인 모듈 종합 핀아웃 매트릭스 (Pinout Specification)
 
-모든 모듈은 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py) 추상 클래스를 상속하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스를 준수합니다.
+모든 모듈은 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py) 추상 클래스를 상속하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스 및 **100% 비동기 논블로킹 실행 계약(`execute_async`)**을 준수합니다.
 
 ```mermaid
 graph LR
-    subgraph ModuleContract ["표준 모듈 인터페이스 (Pinout Interface)"]
-        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.execute()"]
+    subgraph ModuleContract ["표준 비동기 모듈 인터페이스 (Async Pinout Interface)"]
+        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.execute_async()"]
         CFG["Config Pins (ModuleConfigDTO)"] --> MOD
         MOD --> OUT["Output Pins (Pydantic OutputDTO)"]
         MOD --> ERR["Error Envelope (ModuleExecutionError)"]
