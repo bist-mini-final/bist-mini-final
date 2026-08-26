@@ -52,14 +52,14 @@ sequenceDiagram
     autonumber
     participant L1 as Layer 1 (API Router)
     participant L3 as Layer 3 (BI Feature Service)
-    participant L4 as Layer 4 (Workflow Executor)
+    participant L4 as Layer 4 (Async Workflow Executor)
     participant L5 as Layer 5 (Module: PgVectorRetriever)
-    participant L7 as Layer 7 (PgVectorStore)
+    participant L7 as Layer 7 (PgVectorStore - asyncpg)
 
-    L1->>L3: BiQuestionAnswerRequest (Pydantic DTO)
-    L3->>L4: execute_dag(dag_definition, inputs)
-    L4->>L5: module.execute(inputs, context)
-    L5->>L7: pgvector_store.similarity_search(query_vec, k=5, scope={...})
+    L1->>L3: await get_answer(BiQuestionAnswerRequest)
+    L3->>L4: await execute_dag_async(dag_definition, inputs)
+    L4->>L5: await module.execute_async(inputs, context)
+    L5->>L7: await pgvector_store.similarity_search_async(query_vec, k=5, scope={...})
     L7-->>L5: List[ScoredChunkRecord] (Raw DB Domain Entity)
     L5-->>L4: ModuleExecutionResult (outputs={"retrieved_chunks": [...]})
     L4-->>L3: PipelineRunResult (outputs, execution_trace, latency_ms)
@@ -73,12 +73,17 @@ sequenceDiagram
 
 ### 불변식 아키텍처 계약 (Architecture Contracts)
 - **하향식 의존성 엄수**: 하위 계층(Layer 7, 6, 5)은 상위 계층(Layer 1, 2, 3)을 절대 import할 수 없습니다. (CI에서 `test_architecture_contracts.py`로 검증)
-- **DB 커넥션 누수 방지**: Layer 7은 항상 컨텍스트 매니저(`with get_connection():`)를 통해 풀에 반환해야 합니다.
+- **전면 비동기 논블로킹 불변식 (Full-Async Invariant)**: FastAPI 이벤트 루프를 블로킹하는 모든 동기 I/O 함수(`time.sleep`, 블로킹 `requests`, 동기 DB 쿼리)를 엄격히 금지합니다. 모든 계층은 `async/await` 논블로킹 계약을 준수해야 합니다.
+- **CPU/디스크 I/O 스레드 격리**: `openpyxl.load_workbook` 등 비동기 미지원 고부하 파싱 로직은 반드시 `await asyncio.to_thread(...)`로 메인 루프에서 격리합니다.
+- **DB 커넥션 누수 방지**: Layer 7은 항상 비동기 컨텍스트 매니저(`async with get_async_connection():`)를 통해 풀에 반환해야 합니다.
 
 ### As-Is 부채 및 To-Be 개선안
-1. **`features/bi`와 `storage/db_manager` 간의 거대 결합**:
-   - As-Is: `backend/features/bi/postgres_store.py`가 25KB에 달하며 직접 SQL을 실행함.
-   - To-Be: `BiRepositoryPort` 인터페이스를 정의하고, `SqlAlchemyBiRepository` 또는 `PsycopgBiRepository` 어댑터로 격리.
-2. **모듈과 스토어의 직접 결합 완화**:
+1. **전 계층 Full-Async 논블로킹 전환**:
+   - As-Is: `BaseModule.execute()` 및 `WorkflowExecutor` 내부가 동기 함수와 `threading.RLock`으로 묶여 있어 고부하 시 이벤트 루프 지연 발생.
+   - To-Be: `async def execute_async()` 및 `asyncio.TaskGroup` 기반 네이티브 비동기 스케줄러로 전면 전환하고, `AsyncOpenAI`와 `AsyncConnectionPool` 바인딩.
+2. **`features/bi`와 `storage/db_manager` 간의 거대 결합**:
+   - As-Is: `backend/features/bi/postgres_store.py`가 25KB에 달하며 직접 동기 SQL을 실행함.
+   - To-Be: `BiRepositoryPort` 비동기 인터페이스를 정의하고, `SqlAlchemyBiRepository` 또는 `AsyncPsycopgBiRepository` 어댑터로 격리.
+3. **모듈과 스토어의 직접 결합 완화**:
    - As-Is: `PgVectorRetrieverModule`이 `PgVectorStore` 구체 클래스를 직접 주입받음.
-   - To-Be: `VectorSearchPort` 추상 인터페이스를 주입받아 Milvus, Pinecone, pgvector 등 다중 백엔드 교체 가능 구조로 리팩토링.
+   - To-Be: `VectorSearchPort` 비동기 추상 인터페이스를 주입받아 Milvus, Pinecone, pgvector 등 다중 백엔드 교체 가능 구조로 리팩토링.

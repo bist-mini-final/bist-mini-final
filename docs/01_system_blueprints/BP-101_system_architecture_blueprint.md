@@ -185,18 +185,22 @@ classDiagram
 ## 4. 리팩토링 타깃 및 기술 부채 (Refactoring Targets & Debts)
 
 ### As-Is 분석 및 기술 부채
-1. **`ApplicationContainer`의 단일 거대 조립 결합도**:
+1. **전 계층 동기(Sync Blocking) 부채 존재**:
+   - `BaseModule.execute()` 동기 함수, `executor.py`의 `threading.RLock`, `openpyxl` 동기 엑셀 로딩으로 인해 고부하 동시 요청 시 이벤트 루프 지연 발생.
+2. **`ApplicationContainer`의 단일 거대 조립 결합도**:
    - `create_workflow_runtime_services()` 내부에서 19개 모듈, DB 매니저, 파일 시스템 경로를 일괄 바인딩하여 단위 테스트 시 개별 모듈 격리 모킹(Mocking)이 번거로움.
-2. **동기/비동기 실행 분기의 컨트롤러 계층 혼재**:
+3. **런타임 실행 분기의 컨트롤러 계층 혼재**:
    - `workflow_routes.py`와 `benchmark_routes.py`에서 `workflow_dispatcher`와 `workflow_executor`를 직접 참조하여 if/else 분기하고 있음.
 
 ### To-Be 권장 리팩토링 설계 (Refactoring Blueprint)
-1. **`ExecutionPort` 인터페이스 추상화**:
+1. **전 계층 Full-Async 논블로킹 전환 (`async def execute_async`)**:
+   - 모든 모듈과 `WorkflowExecutor`를 `asyncio.TaskGroup` 및 `AsyncOpenAI`, `AsyncConnectionPool` 기반의 순수 비동기 아키텍처로 전환하여 동시 처리 성능 극대화.
+2. **`ExecutionPort` 인터페이스 추상화**:
    ```python
    class ExecutionPort(ABC):
        @abstractmethod
        async def execute(self, command: RunWorkflowCommand) -> WorkflowExecutionHandle: ...
    ```
-   - `DirectInMemoryExecutionAdapter`와 `KubernetesQueueExecutionAdapter`로 구현 분리.
-2. **모듈 팩토리(Module Factory) 레이어 도입**:
+   - `AsyncInMemoryExecutionAdapter`와 `KubernetesQueueExecutionAdapter`로 구현 분리.
+3. **모듈 팩토리(Module Factory) 레이어 도입**:
    - 19개 모듈을 카테고리별(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`)로 팩토리화하여 동적 로딩 가능하도록 분리.
