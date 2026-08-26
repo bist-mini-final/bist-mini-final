@@ -10,21 +10,13 @@
 
 ```mermaid
 graph TD
-    classDef layer1 fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff;
-    classDef layer2 fill:#1e293b,stroke:#818cf8,stroke-width:2px,color:#fff;
-    classDef layer3 fill:#1e293b,stroke:#34d399,stroke-width:2px,color:#fff;
-    classDef layer4 fill:#1e293b,stroke:#fbbf24,stroke-width:2px,color:#fff;
-    classDef layer5 fill:#1e293b,stroke:#f87171,stroke-width:2px,color:#fff;
-    classDef layer6 fill:#1e293b,stroke:#c084fc,stroke-width:2px,color:#fff;
-    classDef layer7 fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#fff;
-
-    L1["1. Presentation & API Layer<br>(FastAPI Routers, Pydantic DTOs, Error Envelopes)"]:::layer1
-    L2["2. Bootstrap & DI Layer<br>(ApplicationContainer, RuntimeContainer, Lifespan)"]:::layer2
-    L3["3. Domain & Feature Services Layer<br>(BiApiServices, Profiler, Metric Engine, BenchmarkService)"]:::layer3
-    L4["4. Execution & Orchestration Layer<br>(WorkflowExecutor, KubernetesQueueDispatcher, Lease Manager)"]:::layer4
-    L5["5. Modular Pipeline Contracts Layer<br>(BaseModule ABC, 19 Pipeline Modules, ModuleRegistry)"]:::layer5
-    L6["6. External Providers & Adapters Layer<br>(OpenAIResponsesClient, EmbeddingEncoder Ports & Adapters)"]:::layer6
-    L7["7. Storage & Infrastructure Layer<br>(DatabaseManager, PgVectorStore, BinaryCopy, ConnectionPool)"]:::layer7
+    L1["1. Presentation & API Layer<br>(FastAPI Routers, Pydantic DTOs, Error Envelopes)"]
+    L2["2. Bootstrap & DI Layer<br>(ApplicationContainer, RuntimeContainer, Lifespan)"]
+    L3["3. Domain & Feature Services Layer<br>(BiApiServices, Profiler, Metric Engine, BenchmarkService)"]
+    L4["4. Execution & Orchestration Layer<br>(WorkflowExecutor, KubernetesQueueDispatcher, Lease Manager)"]
+    L5["5. Modular Pipeline Contracts Layer<br>(BaseModule ABC, 19 Pipeline Modules, ModuleRegistry)"]
+    L6["6. External Providers & Adapters Layer<br>(OpenAIResponsesClient, EmbeddingEncoder Ports & Adapters)"]
+    L7["7. Storage & Infrastructure Layer<br>(DatabaseManager, PgVectorStore, BinaryCopy, ConnectionPool)"]
 
     L1 -->|Invokes via DTO| L2
     L2 -->|Composes & Injects| L3
