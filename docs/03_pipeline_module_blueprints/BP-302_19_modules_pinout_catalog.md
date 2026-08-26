@@ -1,4 +1,4 @@
-# [BP-302] 20개 모듈 입출력 핀아웃(Pinout) 카탈로그
+# [BP-302] 21개 모듈 입출력 핀아웃(Pinout) 카탈로그
 > **Document Code:** `BP-302` | **Category:** Pipeline & Modular Contracts Blueprint | **Status:** Approved Baseline  
 > **Source Directories:** [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)
 
@@ -33,7 +33,7 @@ graph LR
 
 ### 1.2 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
 
-LLM 호출, 프롬프트 엔지니어링, 에이전트 도구 루프 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 20개 구체 모듈로 상속됩니다:
+LLM 호출, 프롬프트 엔지니어링, 에이전트 도구 루프 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 21개 구체 모듈로 상속됩니다:
 
 ```mermaid
 classDiagram
@@ -62,10 +62,10 @@ classDiagram
     }
 
     class PureAlgorithmModules {
-        <<7 Modules>>
+        <<8 Modules>>
         QueryInput, QueryRouter, CellTextSerializer,
         PgVectorRetriever, SparseBm25Retriever,
-        RrfFuser, ContextExpander
+        RrfFuser, ContextExpander, FinancialCalculator
     }
 
     class LLMInferenceModules {
@@ -90,13 +90,13 @@ classDiagram
 
 ---
 
-### 1.3 20개 파이프라인 모듈 3대 상속 분류 매트릭스
+### 1.3 21개 파이프라인 모듈 3대 상속 분류 매트릭스
 
-| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (20개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
+| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (21개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
 | :--- | :---: | :--- | :--- |
 | **`BaseLLMModule`** | **11개** | • `query.decomposer`<br>• `query.multi_query_expander`<br>• `query.hyde_generator`<br>• `structure.luna_vlm_structure_detector`<br>• `structure.document_profiler`<br>• `storage.company_entity_extractor`<br>• `generation.reader`<br>• `generation.agentic_reasoner`<br>• `generation.context_compressor`<br>• `generation.fact_checker`<br>• `generation.confidence_scorer` | • `complete_structured(...)` (1-Shot Pydantic 파싱)<br>• `complete_agentic(...)` (LangChain BaseTool 루프)<br>• 토큰 사용량/비용(USD)/지연시간 자동 집계 |
 | **`BaseEmbedderModule`** | **2개** | • `retrieval.text_embedder`<br>• `retrieval.cross_encoder_reranker` | • `encode_texts(...)` (배치 임베딩 & 3072d 검증)<br>• `encode_batches_streaming(...)` (스트리밍 인코딩) |
-| **`BaseModule` (직접)** | **7개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander` | • 비동기 논블로킹 알고리즘/I/O 실행 (`execute_async`)<br>• Pydantic DTO 자동 검증 & 중앙화 예외 가드 |
+| **`BaseModule` (직접)** | **8개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander`<br>• **`reader.financial_calculator`** | • 비동기 논블로킹 알고리즘/수식/I/O 실행 (`execute_async`)<br>• Pydantic DTO 자동 검증 & 중앙화 예외 가드<br>• 무손실 `Decimal` 재무 지표 40+ 산출 (지연 0ms, 비용 0원) |
 
 ---
 
@@ -234,6 +234,12 @@ classDiagram
 - **Input Pins**: `workbook_hash: str` (필수), `file_name: str` (필수), `index_id: Optional[str]`, `available_sheets: Optional[List[str]]`
 - **Output Pins**: `periods: List[str]`, `currency: str`, `scale: int`, `relevant_sheets: List[str]`, `evidence_cells: List[Dict[str, Any]]`
 - **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_periods: int = 5`, `temperature: float = 0.0`
+
+#### 21. `FinancialCalculatorModule` (`reader.financial_calculator`)
+- **역할**: 관측된 원천 재무 수치(매출액, 영업이익, 자산, 부채 등)를 입력받아 무손실 고정소수점(`Decimal`)으로 40개 이상의 핵심 재무 비율(수익성, 안정성, 활동성, 성장성)을 산출하고 감사 근거(`evidence_cells`)를 합성·바인딩.
+- **Input Pins**: `raw_metrics: Dict[str, Any]` (기간별 원천 관측 수치 맵), `evidence_cells: Optional[List[Dict[str, Any]]]` (원천 감사 셀 목록)
+- **Output Pins**: `derived_ratios: Dict[str, Any]` (40+ 산출 재무 비율 및 상태 플래그), `bound_evidence: Dict[str, List[Dict[str, Any]]]` (파생 지표별 합성 감사 근거)
+- **Config Pins**: `precision: int = 4`, `categories: List[str] = ["all"]` (또는 `["profitability", "stability", "activity", "growth"]`)
 
 ---
 

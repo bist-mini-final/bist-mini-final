@@ -6,12 +6,12 @@
 
 ## 1. 워크스페이스 개요 및 UI 결선도 (Workspace Overview)
 
-**Pipeline Playground**는 개발자 및 연구자가 20개의 파이프라인 모듈을 시각적 2D 노드 그래프(React Flow) 상에서 자유롭게 배치하고 핀을 결선하여, 대기열(Queue) 지연 없이 **오직 Tier 1 비동기 논블로킹 인메모리 제로 I/O 엔진(`WorkflowExecutor`)을 통해 즉각적인 피드백을 얻는 고속 실험실(Interactive Laboratory / Sandbox)** 워크스페이스입니다.
+**Pipeline Playground**는 개발자 및 연구자가 21개의 파이프라인 모듈을 시각적 2D 노드 그래프(React Flow) 상에서 자유롭게 배치하고 핀을 결선하여, 대기열(Queue) 지연 없이 **오직 Tier 1 비동기 논블로킹 인메모리 제로 I/O 엔진(`WorkflowExecutor`)을 통해 즉각적인 피드백을 얻는 고속 실험실(Interactive Laboratory / Sandbox)** 워크스페이스입니다.
 
 ```mermaid
 flowchart TB
     subgraph UI_Canvas ["React Flow 2D Interactive Canvas (@xyflow/react)"]
-        PALETTE["Module Sidebar Palette (20 Modules)"]
+        PALETTE["Module Sidebar Palette (21 Modules)"]
         CANVAS["Graph Canvas (Custom Workflow Nodes & Edges)"]
         INSPECTOR["Node Config Inspector & Parameter Tuner"]
         TRACE_PANEL["Execution Trace & I/O Inspector Panel"]
@@ -70,11 +70,11 @@ graph TD
 
 모든 노드는 동일한 프리미엄 슬레이트 카드로 렌더링되며, 상단 헤더의 **정제된 미니 뱃지 색상 및 Lucide React 벡터 아이콘**으로만 역할을 깔끔하게 구분합니다:
 
-| 기능 패밀리 | 액센트 톤 (Accent) | 표준 Lucide 아이콘 | 소속 모듈 (19개 모듈군) | 핸들 구성 (Handles) |
+| 기능 패밀리 | 액센트 톤 (Accent) | 표준 Lucide 아이콘 | 소속 모듈 (21개 모듈군) | 핸들 구성 (Handles) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Flow & Control**<br>(입력 & 흐름 제어) | `Primary Blue`<br>(`#3B82F6`) | `<Workflow />`<br>`<GitFork />`<br>`<Split />` | • `QueryInput`<br>• `LlmQueryRouter`<br>• `Decomposer`<br>• `MultiQueryExpander` | • Target: 0~1개 (Query)<br>• Source: 1~3개 (Branch Edges) |
 | **Data & Search**<br>(데이터 인덱싱 & 검색) | `Teal Emerald`<br>(`#10B981`) | `<Database />`<br>`<Search />`<br>`<Layers />` | • `TextEmbedder`<br>• `CellTextSerializer`<br>• `PgVectorRetriever`<br>• `SparseBm25Retriever`<br>• `RrfFuser`<br>• `ContextExpander` | • Target: 1~2개 (Vector / Chunks)<br>• Source: 1개 (Fused Context) |
-| **AI & Inference**<br>(VLM 및 LLM 추론) | `Indigo Violet`<br>(`#6366F1`) | `<Sparkles />`<br>`<Brain />`<br>`<ScanEye />` | • `LunaVlmStructureDetector`<br>• `DocumentProfiler`<br>• `CompanyEntityExtractor`<br>• `ReaderModule`<br>• `AgenticReasoner`<br>• `ContextCompressor`<br>• `FactChecker`<br>• `ConfidenceScorer` | • Target: 1~2개 (Query + Context)<br>• Source: 1개 (Structured Output) |
+| **AI & Inference**<br>(VLM, 추론 & 재무연산) | `Indigo Violet`<br>(`#6366F1`) | `<Sparkles />`<br>`<Brain />`<br>`<Calculator />` | • `LunaVlmStructureDetector`<br>• `DocumentProfiler`<br>• `FinancialCalculator`<br>• `CompanyEntityExtractor`<br>• `ReaderModule`<br>• `AgenticReasoner`<br>• `ContextCompressor`<br>• `FactChecker`<br>• `ConfidenceScorer` | • Target: 1~2개 (Query + Context / Metrics)<br>• Source: 1개 (Structured / Derived Output) |
 
 ---
 
