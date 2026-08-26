@@ -1,4 +1,4 @@
-# [BP-003] 아키텍처 결정 배경 및 6대 핵심 가설 분석서
+# [BP-003] 아키텍처 결정 배경 및 7대 핵심 가설 분석서
 > **Document Code:** `BP-003` | **Domain:** 00. Master Plan & Standards | **Status:** Approved Baseline  
 > **Classification:** Architectural Decision Rationale, Hypotheses & Engineering Trade-off Analysis
 
@@ -10,19 +10,20 @@
 
 ```mermaid
 flowchart TD
-    subgraph EngineValidation ["6대 핵심 아키텍처 설계 가설 매트릭스"]
-        H1["1. 비전 VLM 표 기하학 감지\n(줄글 청킹 대비 2D 표 문맥 및 병합 셀 보존)"]
-        H2["2. PostgreSQL Native Binary COPY\n(SQL 파싱 배제 및 초고속 벡터 벌크 스트리밍)"]
-        H3["3. Dense + Sparse + RRF 융합\n(고유 계정과목 코드와 서술형 의미 질문 동시 커버)"]
-        H4["4. 무손실 Decimal 금융 연산\n(float 부동소수점 누적 오차 원천 배제)"]
-        H5["5. 2-Tier 런타임 분리\n(Fast In-Memory <100ms & K8s KEDA 분산 큐 격리)"]
-        H6["6. BaseLLMModule 부모 계층 일원화\n(Pydantic 1-shot 구조화 및 제로 예외 보일러플레이트)"]
+    subgraph EngineValidation ["7대 핵심 아키텍처 설계 가설 매트릭스"]
+        H1["1. 비전 VLM 표 기하학 감지\n(줄글, 마크다운, BFS, Docling 대비 2D 표 문맥 완벽 보존)"]
+        H2["2. 구조화 셀 RAG vs Pixel RAG\n(순수 이미지 패치 검색 대비 100% 셀 좌표 감사 추적 & Decimal 직결)"]
+        H3["3. PostgreSQL Native Binary COPY\n(SQL 파싱 배제 및 초고속 벡터 벌크 스트리밍)"]
+        H4["4. Dense + Sparse + RRF 융합\n(고유 계정과목 코드와 서술형 의미 질문 동시 커버)"]
+        H5["5. 무손실 Decimal 금융 연산\n(float 부동소수점 누적 오차 원천 배제)"]
+        H6["6. 2-Tier 런타임 분리\n(Fast In-Memory <100ms & K8s KEDA 분산 큐 격리)"]
+        H7["7. BaseLLMModule 부모 계층 일원화\n(Pydantic 1-shot 구조화 및 제로 예외 보일러플레이트)"]
     end
 ```
 
 ---
 
-## 2. 6대 핵심 아키텍처 가설 및 트레이드오프 분석
+## 2. 7대 핵심 아키텍처 가설 및 트레이드오프 분석
 
 ### 🔬 [Hypothesis 1] 비전 VLM 표 기하학 감지 vs 4대 대조군 (줄글, 마크다운, BFS, Docling)
 * **가설 (Hypothesis)**: 재무 엑셀은 병합 헤더, 상하 분산 단위, 빈 셀 갭(Blank Gap)이 복잡하게 얽혀 있어, 순수 텍스트 줄글이나 좌표 탐색 알고리즘(BFS), 범용 문서 파서(Docling)보다 **시각적 비전 모델(Luna VLM)로 2D 표 기하 바운딩박스를 먼저 검출하고 `header_with_value`로 직렬화**하는 것이 행-열 교차 의미와 회계 계층을 가장 온전히 보존할 것이다.
@@ -46,7 +47,23 @@ flowchart TD
 
 ---
 
-### 🔬 [Hypothesis 2] PostgreSQL Native Binary COPY vs Multi-Row INSERT
+### 🔬 [Hypothesis 2] Pixel RAG (이미지 패치 검색) vs 하이브리드 구조화 셀 RAG
+* **가설 (Hypothesis)**: 문서를 고해상도 이미지 패치로 분할하여 비전-임베딩으로 직접 검색하는 **Pixel RAG(ColPali 등)** 방식보다, **비전으로 기하학을 감지하되 최종 색인 및 검색은 원본 좌표가 결합된 구조화 셀(`header_with_value`)로 수행하는 하이브리드 RAG**가 회계 감사 추적성과 연산 무결성 관점에서 압도적으로 유리할 것이다.
+* **아키텍처 대조군 비교 (Trade-off Analysis)**:
+  * **대조군 (Pixel RAG / Pure Visual Document Patch Retrieval)**:
+    * 엑셀 시트를 이미지 패치 단위로 임베딩하여 VLM으로 직접 검색·추론.
+    * 🛑 **한계 1 (감사 추적 불가)**: 결과 숫자가 원본 엑셀의 정확히 어떤 셀 좌표(`sheet_name`, `row 15, col C`)에서 유래했는지 기계 판독 가능한 메타데이터 바인딩이 불가능함 (블랙박스 비주얼).
+    * 🛑 **한계 2 (수식 연산 불가)**: VLM이 이미지 숫자를 OCR하듯 읽어오면서 소수점/자릿수 환각이 발생하여, 전사 재무비율 무손실 계산기(`FinancialCalculatorModule`)와 직결 불가.
+    * 🛑 **한계 3 (인덱싱 I/O 및 Latency 폭증)**: 이미지 패치 임베딩으로 인한 스토리지 폭증 및 VLM 멀티모달 추론 지연(2,000ms+)으로 Fast RAG(<300ms) 달성 실패.
+    * 🛑 **한계 4 (Sparse 키워드 결합 불가)**: 금융 특유의 정확한 계정과목 코드 및 영문 티커에 대한 PostgreSQL TSVector BM25 역색인 및 RRF 융합 불가.
+  * **채택안 (Hybrid Vision-Structured Cell RAG)**:
+    * 비전의 장점(Luna VLM 표 기하학/헤더 인식) + 구조화 셀의 장점(OpenPyXL 정밀 좌표 + `header_with_value` 직렬화 + pgvector 3072d/BM25 + `Decimal` 무손실 연산) 융합.
+    * 100% 원본 셀 좌표 감사 추적성, 무손실 수식 연산 및 초고속 Fast RAG 응답 동시 확보.
+* **아키텍처 결정**: **하이브리드 비전-구조화 셀 포맷 RAG 파이프라인 단일 채택 ([`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md), [`BP-303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md))**.
+
+---
+
+### 🔬 [Hypothesis 3] PostgreSQL Native Binary COPY vs Multi-Row INSERT
 * **가설 (Hypothesis)**: 수만 개 셀 임베딩 벡터 적재 시 개별/다중 `INSERT`는 텍스트 SQL 파싱 및 직렬화 오버헤드로 병목이 발생하므로, PostgreSQL 네이티브 `Binary COPY` 프로토콜을 사용하면 대량 I/O 지연을 획기적으로 단축할 것이다.
 * **아키텍처 대조군 비교 (Trade-off Analysis)**:
   * 대조군 A (Multi-Row `INSERT` batch=100): 파라미터 바인딩 및 SQL 파싱 오버헤드로 DB 커넥션 점유 시간 과다.
@@ -55,7 +72,7 @@ flowchart TD
 
 ---
 
-### 🔬 [Hypothesis 3] 하이브리드 RRF ($k=60$) 융합 vs 단일 Dense/Sparse 검색
+### 🔬 [Hypothesis 4] 하이브리드 RRF ($k=60$) 융합 vs 단일 Dense/Sparse 검색
 * **가설 (Hypothesis)**: 재무 질의는 고유명사/계정과목(Sparse BM25 강점)과 복합 서술형 문맥(Dense 3072d 강점)이 혼재하므로, 상호 순위 융합(Reciprocal Rank Fusion, $k=60$)을 적용할 때 최적의 후보 셀을 도출할 것이다.
 * **아키텍처 대조군 비교 (Trade-off Analysis)**:
   * Dense 단독 (3072d pgvector): 축약어 및 정밀 계정과목 코드 검색 한계.
@@ -65,7 +82,7 @@ flowchart TD
 
 ---
 
-### 🔬 [Hypothesis 4] 무손실 `Decimal` 연산 vs `float` 부동소수점
+### 🔬 [Hypothesis 5] 무손실 `Decimal` 연산 vs `float` 부동소수점
 * **가설 (Hypothesis)**: 재무제표의 40+ 지표 및 파생비율(ROE, 부채비율, 듀퐁 분해) 연산 시 `float`를 사용하면 부동소수점 오차가 누적되므로, `decimal.Decimal` 고정소수점 연산을 적용해야 회계 무결성을 보장할 수 있다.
 * **아키텍처 대조군 비교 (Trade-off Analysis)**:
   * `float` 연산: 이진 부동소수점 유효숫자 절사로 인한 미세 오차 및 분기 합산 불일치 위험.
@@ -74,7 +91,7 @@ flowchart TD
 
 ---
 
-### 🔬 [Hypothesis 5] 2-Tier 런타임 분리 (Fast In-Memory vs Distributed Queue)
+### 🔬 [Hypothesis 6] 2-Tier 런타임 분리 (Fast In-Memory vs Distributed Queue)
 * **가설 (Hypothesis)**: 실시간 대화형 챗봇과 대규모 전사 지표 배치 추출을 동일 런타임에서 처리하면 헤드오브라인 블로킹(HoL)이 발생하므로, 2-Tier 런타임으로 분리해야 한다.
 * **아키텍처 대조군 비교 (Trade-off Analysis)**:
   * 단일 백엔드 동기 처리: 대량 배치 실행 중 실시간 질의응답 지연시간 급증 및 타임아웃 위험.
@@ -83,7 +100,7 @@ flowchart TD
 
 ---
 
-### 🔬 [Hypothesis 6] 제로 보일러플레이트 부모-자식 계층 분리 (`BaseLLMModule`)
+### 🔬 [Hypothesis 7] 제로 보일러플레이트 부모-자식 계층 분리 (`BaseLLMModule`)
 * **가설 (Hypothesis)**: 21개 모듈마다 OpenAI API 호출, JSON 파싱, try-except 예외 래핑을 반복 작성하면 코드 중복과 런타임 휴먼 에러가 급증하므로, 부모 클래스로 집약해야 한다.
 * **아키텍처 대조군 비교 (Trade-off Analysis)**:
   * 개별 모듈 중복 작성: API 호출/파싱/예외 처리가 분산되어 유지보수성 저하 및 파싱 에러 취약.
