@@ -33,7 +33,9 @@ graph TD
 
 ---
 
-## 2. 라우팅 및 탭 상태 배선표 (Route Wiring Matrix)
+## 2. 라우팅 및 시스템 포털 배선표 (Route & System Portals Matrix)
+
+### 2.1 React SPA 프론트엔드 라우트 (Client-Side SPA Routes)
 
 | URL Path | 라우트 이름 | 렌더링 컴포넌트 | 워크스페이스 상태 |
 | :--- | :--- | :--- | :--- |
@@ -43,8 +45,19 @@ graph TD
 | `/bi` | `Financial BI` | [`BiPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 40+ 지표 차트 |
 | `/chatbot` | `AI Financial Chatbot` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[설계완료 / 확장예정]** Fast RAG 대화형 질의응답 (WebSocket) |
 | `/company-comparison`| `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx)| **[설계완료 / 확장예정]** 다중 기업 크로스 분석 (Tier 1/2 분리) |
-| `/jobs` | `K8s Job & Worker Portal` | 백엔드 내장 관제 HTML 대시보드 (`GET /jobs`) | **[백엔드 서빙]** K8s 잡 상태 & 실시간 로그 터미널 관제 |
 | `/settings` | `Settings` | [`SettingsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/SettingsPage.tsx) | 환경 변수 및 DB/큐 튜닝 인디케이터 |
+
+---
+
+### 2.2 백엔드 호스팅 시스템 및 개발자 콘솔 (Backend-Hosted System & Dev Portals)
+
+React SPA 내부 라우팅이 아닌, **FastAPI 백엔드가 1-depth 최상위 경로에서 직접 렌더링하는 시스템 관리 및 API 문서 포털 3종** (AppShell 헤더 및 설정 메뉴에서 링크로 연동):
+
+| URL Path | 포털 명칭 | 제공 기술 / 엔진 | 역할 및 기능 |
+| :--- | :--- | :--- | :--- |
+| `/jobs` | **K8s Job & Worker Portal** | FastAPI Jinja2 HTML + WebSocket | 백엔드 내장 분산 워커 상태, Pod 라이프사이클 및 실시간 로그 터미널 관제 ([`BP-104 Section 4`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_distributed_job_and_worker_system.md#4-내장-k8s-배치-잡--워커-실시간-관제-대시보드-jobs)) |
+| `/docs` | **Swagger UI Interactive API** | Swagger UI (OpenAPI 3.1) | 30+ REST API 엔드포인트 대화형 테스트 및 Pydantic 스키마 검증 |
+| `/redoc` | **ReDoc API Documentation** | ReDoc Responsive Engine | 구조화된 REST API 공식 레퍼런스 문서 뷰어 |
 
 ---
 
