@@ -52,21 +52,16 @@ $$
 
 ---
 
-## 3. 비교 API 엔드포인트 명세 (Target API Specification)
+## 3. 비교 API 2-Tier 엔드포인트 명세 (Target API Specification)
 
-### `POST /api/bi/comparison`
-- **Request Body**:
-  ```json
-  {
-    "company_ids": ["samsung_electronics", "sk_hynix"],
-    "fiscal_years": ["2022", "2023"],
-    "target_currency": "KRW",
-    "metrics": ["operating_margin", "roe", "debt_ratio", "current_ratio", "revenue_growth"]
-  }
-  ```
+기업 비교 기능은 빠른 대시보드 로딩을 위한 **Tier 1 스냅샷 조회**와 대량 정규화/환율 변환을 위한 **Tier 2 분산 배치 큐**로 분리 운영됩니다:
+
+### ① `GET /api/bi/comparison/{comparison_id}` (Tier 1: 비동기 인메모리 스냅샷 조회, <100ms)
 - **Response Payload**:
   ```json
   {
+    "comparison_id": "cmp_2023_semi_kr",
+    "target_currency": "KRW",
     "benchmark_summary": {
       "leader_by_margin": "samsung_electronics",
       "leader_by_growth": "sk_hynix"
@@ -83,6 +78,18 @@ $$
     ]
   }
   ```
+
+### ② `POST /api/bi/comparison/materialize` (Tier 2: 분산 배치 큐 정규화/합성, 15s~90s)
+- **Request Body**:
+  ```json
+  {
+    "company_ids": ["samsung_electronics", "sk_hynix"],
+    "fiscal_years": ["2022", "2023"],
+    "target_currency": "KRW",
+    "metrics": ["operating_margin", "roe", "debt_ratio", "current_ratio", "revenue_growth"]
+  }
+  ```
+- **Response**: `202 Accepted` (`{"run_id": "run-cmp-902", "sse_stream": "/api/workflows/runs/run-cmp-902/stream"}`)
 
 ---
 

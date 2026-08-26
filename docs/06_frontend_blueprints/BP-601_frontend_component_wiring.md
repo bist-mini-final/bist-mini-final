@@ -39,8 +39,9 @@ graph TD
 | `/playground` | `Pipeline Playground` | [`PlaygroundPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx) | **[운영중]** React Flow 2D DAG 빌더 & 실행 |
 | `/data-sources` | `Data Sources` | [`DataSourcesPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx) | **[운영중]** 스프레드시트 뷰어 & pgvector 관리 |
 | `/bi` | `Financial BI` | [`BiPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 40+ 지표 차트 |
-| `/chatbot` | `AI Financial Chatbot` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[설계완료 / 확장예정]** Fast RAG 대화형 질의응답 |
-| `/company-comparison`| `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx)| **[설계완료 / 확장예정]** 다중 기업 크로스 분석 |
+| `/chatbot` | `AI Financial Chatbot` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[설계완료 / 확장예정]** Fast RAG 대화형 질의응답 (WebSocket) |
+| `/company-comparison`| `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx)| **[설계완료 / 확장예정]** 다중 기업 크로스 분석 (Tier 1/2 분리) |
+| `/jobs` | `K8s Job & Worker Portal` | 백엔드 내장 관제 HTML 대시보드 (`GET /jobs`) | **[백엔드 서빙]** K8s 잡 상태 & 실시간 로그 터미널 관제 |
 | `/settings` | `Settings` | [`SettingsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/SettingsPage.tsx) | 환경 변수 및 DB/큐 튜닝 인디케이터 |
 
 ---
