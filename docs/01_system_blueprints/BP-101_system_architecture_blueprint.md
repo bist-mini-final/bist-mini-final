@@ -79,11 +79,13 @@ graph TB
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Client (Frontend/API)
-    participant API as /api/workflows/run
+    actor User as Client (Frontend SPA / API)
+    participant API as FastAPI APIRouter (/api/workflows/run)
+    participant SSE as SSE Streamer (/api/workflows/runs/{id}/stream)
     participant Disp as KubernetesQueueDispatcher
     participant T1 as Tier 1 In-Memory Engine
     participant KEDA as Tier 2 KEDA Queue
+    participant Worker as KEDA Worker Pods
     participant DB as PostgreSQL (Runs & Leases)
 
     User->>API: POST /api/workflows/run (DAG Definition + Inputs + async_execution flag)
@@ -95,11 +97,25 @@ sequenceDiagram
     else async_execution == True (대용량 엑셀 VLM, BI Materialization, 벤치마크)
         API->>Disp: KubernetesQueueDispatcher.dispatch(run_id, payload)
         Disp->>DB: INSERT INTO workflow_runs (status='QUEUED')
-        Disp->>KEDA: Push Job Payload to KEDA / Redis Queue
+        Disp->>KEDA: Push Job Payload to KEDA Queue
         Disp-->>API: RunDispatchAck (run_id)
-        API-->>User: 202 Accepted + { run_id: "...", stream_url: "/api/workflows/runs/{run_id}/stream" }
-        User->>API: GET /api/workflows/runs/{run_id}/stream (SSE Connect)
-        Note over KEDA,DB: Worker Pod 스케일아웃 -> Lease 획득 -> 실행 -> SSE 이벤트 발송
+        API-->>User: 202 Accepted + { run_id, stream_url }
+        
+        User->>SSE: EventSource 연결 (GET /api/workflows/runs/{run_id}/stream)
+        SSE-->>User: 200 OK (Content-Type: text/event-stream)
+        
+        KEDA->>Worker: 큐 대기열 감지 후 Worker Pod 자동 생성
+        Worker->>DB: acquire_lease(run_id, worker_id, ttl=30s)
+        
+        Worker->>SSE: emit_event(NODE_STARTED, node_id="luna_vlm", progress=30%)
+        SSE-->>User: event: message\ndata: {"type": "PROGRESS", "pct": 30}
+        
+        Worker->>Worker: 파이프라인 모듈 순차/병렬 실행
+        
+        Worker->>SSE: emit_event(RUN_COMPLETED, result_summary, progress=100%)
+        SSE-->>User: event: message\ndata: {"type": "COMPLETED", "result": {...}}
+        
+        Worker->>DB: update_status('COMPLETED') & release_lease()
     end
 ```
 
