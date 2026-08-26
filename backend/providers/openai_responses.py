@@ -128,6 +128,7 @@ class OpenAIResponsesClient:
         max_output_tokens: int | None = None,
         timeout_seconds: float | None = None,
         store: bool = False,
+        max_retries: int = 5,
     ) -> OpenAIResponseResult:
         request: dict[str, Any] = {
             "model": model,
@@ -148,7 +149,7 @@ class OpenAIResponsesClient:
             request["max_output_tokens"] = max_output_tokens
 
         started_at = time.perf_counter()
-        retries = 5
+        retries = max(0, max_retries)
         document = None
         for attempt in range(retries + 1):
             try:

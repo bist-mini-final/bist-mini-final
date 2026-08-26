@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timedelta
 from typing import AsyncGenerator
+from zoneinfo import ZoneInfo
 
 from anyio import to_thread
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -78,6 +81,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.warning("Kubernetes run 큐 복구 실패", exc_info=True)
 
+    async def refresh_daily_suggestions() -> None:
+        while True:
+            try:
+                await to_thread.run_sync(container.chat_suggestions.refresh_if_due)
+            except Exception:
+                logger.warning("일일 챗봇 추천 질문 갱신 실패", exc_info=True)
+            now = datetime.now(ZoneInfo("Asia/Seoul"))
+            next_run = (now + timedelta(days=1)).replace(hour=0, minute=1, second=0, microsecond=0)
+            await asyncio.sleep((next_run - now).total_seconds())
+
+    try:
+        # 서버를 재시작하면 운영자가 즉시 새 추천 질문 세트를 확인할 수 있게 합니다.
+        await to_thread.run_sync(lambda: container.chat_suggestions.refresh_if_due(force=True))
+    except Exception:
+        logger.warning("시작 시 챗봇 추천 질문 생성 실패", exc_info=True)
+    suggestions_task = asyncio.create_task(refresh_daily_suggestions())
+
     elapsed = time.time() - start_time
     logger.info("✨ Application initialization complete in %.3fs.", elapsed)
 
@@ -86,6 +106,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown sequence
     logger.info("🛑 Shutting down backend application...")
     try:
+        suggestions_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await suggestions_task
         container.close()
         close_pool()
         logger.info("🔌 Database connection pools closed cleanly.")

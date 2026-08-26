@@ -32,6 +32,13 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
   ];
   const compositionTotal = composition.reduce((sum, item) => sum + item.value, 0);
   const chartData = data.map((point) => ({ ...point, totalAssets: point.values.total_assets }));
+  const hasData = data.some((point) => METRICS.some((metric) => {
+    const value = point.values[metric];
+    return typeof value === 'number' && value !== 0;
+  }));
+  if (!hasData) {
+    return <div className="bi-chart-empty chatbot-visualization__empty">자산·부채·자본 데이터가 없어 차트를 표시할 수 없습니다.</div>;
+  }
   return (
     <BiChartFrame title="자산 구성과 규모" description={`최근 ${latest?.periodLabel ?? '기간'} 구성과 총자산 추이입니다.`} data={data} series={series} valueKind="amount">
       <div className="bi-chart-layout bi-financial-scale-chart">
