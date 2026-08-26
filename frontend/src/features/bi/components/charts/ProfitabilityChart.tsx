@@ -1,5 +1,5 @@
 import { CartesianGrid, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { buildChartPoints, formatChartAxis, getChartSeries } from '../../selectors/chartViewModel';
+import { buildChartPoints, buildProfitabilityAxis, formatChartAxis, getChartSeries } from '../../selectors/chartViewModel';
 import type { BiDashboardSnapshot, CardSize, PeriodRange } from '../../types';
 import { BiChartFrame, BiChartTooltip } from './BiChartFrame';
 import { CHART_COLORS, CHART_GEOMETRY } from './chartStyle';
@@ -20,6 +20,10 @@ export function ProfitabilityChart({ dashboard, range, size }: ProfitabilityChar
     operatingMargin: point.values.operating_margin,
     netMargin: point.values.net_margin,
   }));
+  const profitabilityValues = chartData.flatMap(({ operatingMargin, netMargin }) => (
+    [operatingMargin, netMargin].filter((value): value is number => value !== null)
+  ));
+  const axis = buildProfitabilityAxis(profitabilityValues);
 
   return (
     <BiChartFrame title="수익성 흐름" description="영업이익률과 순이익률을 같은 축에서 비교합니다." data={data} series={series} valueKind="percent">
@@ -27,7 +31,7 @@ export function ProfitabilityChart({ dashboard, range, size }: ProfitabilityChar
         <LineChart data={chartData} margin={{ ...CHART_GEOMETRY.margin, top: 12, right: 10, bottom: 0 }} accessibilityLayer>
           <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="periodLabel" tickLine={false} axisLine={false} minTickGap={20} />
-          <YAxis domain={[0, 20]} ticks={[0, 5, 10, 15, 20]} tickFormatter={(value: number) => formatChartAxis(value, 'percent')} tickLine={false} axisLine={false} width={34} />
+          <YAxis domain={axis.domain} ticks={axis.ticks} tickFormatter={(value: number) => formatChartAxis(value, 'percent')} tickLine={false} axisLine={false} width={34} />
           <Tooltip content={(tooltipProps) => <BiChartTooltip {...tooltipProps} data={data} valueKind="percent" />} />
           <Legend verticalAlign="top" align="right" iconType="plainline" wrapperStyle={{ top: 0, fontSize: 10 }} />
           <Line
