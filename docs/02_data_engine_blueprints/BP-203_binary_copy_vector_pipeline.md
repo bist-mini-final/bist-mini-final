@@ -76,8 +76,11 @@ WITH (
 
 ## 5. 리팩토링 타깃 (Refactoring Targets)
 
-1. **Halfvec (fp16) 및 양자화(IVF-PQ) 지원**:
+1. **레거시 multi-row INSERT 경로 완전 삭제 (Zero Legacy Code Policy)**:
+   - As-Is: `PgVectorIndexWriterModule` 및 `pgvector_store.py`에 과거 청크 단위 multi-row `INSERT INTO ... VALUES (...)` 로직이 혼재.
+   - To-Be: 이전의 모든 `INSERT` SQL 포매팅 및 일반 적재 코드를 100% 완전 삭제하고, 오직 **Binary COPY 단일 스트리밍 경로(Single Canonical Path)**로만 파이프라인을 일원화하여 레거시 기술 부채 및 유지보수 혼선 원천 차단.
+2. **Halfvec (fp16) 및 양자화(IVF-PQ) 지원**:
    - As-Is: Full float32 (3072차원 = 12,288 바이트/행).
    - To-Be: pgvector 0.7+ `halfvec` (16비트 부동소수점) 지원 추가로 인덱스 메모리 사용량 50% 절감.
-2. **동적 파티셔닝(Partitioned Tables)**:
+3. **동적 파티셔닝(Partitioned Tables)**:
    - 기업별(`company_name`), 회계연도별 파티셔닝 테이블로 분할하여 멀티테넌트 대규모 데이터 색인 최적화.
