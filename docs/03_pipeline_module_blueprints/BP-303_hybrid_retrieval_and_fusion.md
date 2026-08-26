@@ -48,32 +48,34 @@ $$
 
 ## 3. 기하학적 2D 셀 컨텍스트 확장 회로 (`PgContextExpanderModule`)
 
-단일 셀($C5$) 하나만으로는 해당 수치가 매출액인지 감가상각비인지, 직전 연도 대비 증감률이 얼마인지 LLM이 파악할 수 없습니다. 따라서 검색된 좌표를 기준으로 2D 영역을 복원합니다.
+단일 셀($C5$) 하나만으로는 해당 수치가 매출액인지 감가상각비인지, 직전 연도 대비 증감률이 얼마인지 LLM이 파악할 수 없습니다. 따라서 RRF로 선별된 상위 좌표를 기준으로 **2D 영역(상위 계층 헤더, 시계열 비교 열, 인접 행)을 단일 표준 규격(`header_with_value`)으로 복원 및 확장**합니다.
 
 ```mermaid
 graph TD
-    TARGET["Retrieved Cell: samsung:손익계산서:C5 (영업이익: 65,670)"]
+    TARGET["Retrieved Top-K Cell: samsung:포괄손익계산서:C15 (영업이익: 6,567,200)"]
     
     subgraph ContextExpansion ["2D Grid Context Expansion Engine"]
-        HDR["1. 상위 열 헤더 복원 (제 55기, 2023년)"]
-        STUB["2. 좌측 행 헤더(스터브) 복원 (매출액 -> 매출원가 -> 영업이익)"]
-        NEIGHBOR["3. 인접 연도 열 복원 (2021년 B5, 2022년 C5, 2023년 D5)"]
-        MD["4. 마크다운 표 블록 재구성"]
+        HDR["1. 상위 열 헤더 복원 (제 55기, 2023.12)"]
+        STUB["2. 좌측 행 계층 경로 복원 (영업수익 > 매출총이익 > 영업이익)"]
+        NEIGHBOR["3. 인접 비교 연도 열 복원 (2022.12 제 54기)"]
+        CANONICAL["4. 단일 표준 규격(header_with_value) 라인들로 합성 (BP-201 일치)"]
     end
 
     TARGET --> ContextExpansion
-    ContextExpansion --> RESULT["Markdown Context Block for LLM Prompt"]
+    ContextExpansion --> RESULT["Canonical Structured Context Block for LLM Prompt"]
 ```
 
-### 생성된 확장 마크다운 블록 예시
-```markdown
-### [손익계산서] 표 1: 포괄손익계산서 (단위: 백만원)
-| 계정과목 | 2021 (제 53기) | 2022 (제 54기) | 2023 (제 55기) |
-| :--- | :--- | :--- | :--- |
-| I. 매출액 | 279,604,799 | 302,231,360 | 258,935,494 |
-| II. 매출원가 | 166,411,192 | 190,041,129 | 180,388,542 |
-| **III. 영업이익** | **51,633,856** | **43,376,630** | **6,566,976** |
+### [BP-201 표준 일치] 생성된 확장 컨텍스트 블록 예시 (Canonical Context Block)
+
+```text
+[Context Block: Top-K 융합 및 2D 이웃 확장 셀 목록]
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출액] | Col: [2022.12 (제 54기)] | Value: 302,231,360 | Unit: 백만원
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출액] | Col: [2023.12 (제 55기)] | Value: 258,935,494 | Unit: 백만원
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2022.12 (제 54기)] | Value: 43,370,290 | Unit: 백만원
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2023.12 (제 55기)] | Value: 6,567,200 | Unit: 백만원
 ```
+
+* **토큰 절감 및 파편화 방지**: 마크다운 테이블 구문 대신 [BP-201] 단일 표준(`header_with_value`)을 그대로 유지함으로써, 토큰을 40~50% 절감하고 `ReaderModule` LLM이 환각 없이 명확한 Key-Value 및 시계열 관계를 인식합니다.
 
 ---
 
