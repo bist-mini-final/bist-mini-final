@@ -24,6 +24,11 @@ export interface BiChartSeriesMeta {
   readonly label: string;
 }
 
+export interface BiChartAxis {
+  readonly domain: readonly [number, number];
+  readonly ticks: readonly number[];
+}
+
 interface ChartViewModelInput {
   readonly dashboard: BiDashboardSnapshot;
   readonly metricIds: readonly MetricId[];
@@ -32,6 +37,27 @@ interface ChartViewModelInput {
 }
 
 const COMPACT_NUMBER = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
+const PROFITABILITY_TICK_STEP = 5;
+
+export function buildProfitabilityAxis(values: readonly number[]): BiChartAxis {
+  const minimum = Math.min(0, ...values);
+  const maximum = Math.max(20, ...values);
+  const lowerBound = minimum < 0
+    ? Math.floor((minimum - PROFITABILITY_TICK_STEP) / PROFITABILITY_TICK_STEP) * PROFITABILITY_TICK_STEP
+    : 0;
+  const upperBound = maximum > 20
+    ? Math.ceil((maximum + PROFITABILITY_TICK_STEP) / PROFITABILITY_TICK_STEP) * PROFITABILITY_TICK_STEP
+    : 20;
+  const tickCount = ((upperBound - lowerBound) / PROFITABILITY_TICK_STEP) + 1;
+
+  return {
+    domain: [lowerBound, upperBound],
+    ticks: Array.from(
+      { length: tickCount },
+      (_, index) => lowerBound + (index * PROFITABILITY_TICK_STEP),
+    ),
+  };
+}
 
 function readValue(series: MetricSeries | undefined, periodId: string): number | null {
   const observation = series?.observations.find((candidate) => candidate.periodId === periodId);

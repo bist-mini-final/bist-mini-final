@@ -28,6 +28,7 @@ function formatGeneratedAt(generatedAt: string): string {
 export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onReset }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
   const generatedAt = formatGeneratedAt(dashboard.snapshot.generatedAt);
+  const canStartAction = activeAction === null;
 
   return (
     <header className="bi-header">
@@ -65,8 +66,10 @@ export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onRe
           <button
             className="bi-refresh-button"
             type="button"
-            disabled={activeAction !== null}
-            onClick={onRefresh}
+            aria-disabled={!canStartAction}
+            onClick={() => {
+              if (canStartAction) onRefresh();
+            }}
           >
             <RefreshCw className={activeAction === 'refresh' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
             {activeAction === 'refresh' ? '대시보드 갱신 중' : '대시보드 갱신'}
@@ -74,8 +77,10 @@ export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onRe
           <button
             className="bi-data-reset-button"
             type="button"
-            disabled={activeAction !== null}
-            onClick={onReset}
+            aria-disabled={!canStartAction}
+            onClick={() => {
+              if (canStartAction) onReset();
+            }}
           >
             <DatabaseZap className={activeAction === 'reset' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
             {activeAction === 'reset' ? '데이터 재생성 중' : '데이터 초기화 및 재생성'}

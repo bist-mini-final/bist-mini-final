@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { DatabaseZap, X } from 'lucide-react';
+import { useModalDialog } from './useModalDialog';
 
 interface ResetDataDialogProps {
   readonly companyName: string;
@@ -12,11 +12,7 @@ export function ResetDataDialog({
   onConfirm,
   onClose,
 }: ResetDataDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (dialogRef.current && !dialogRef.current.open) dialogRef.current.showModal();
-  }, []);
+  const dialogRef = useModalDialog();
 
   return (
     <dialog

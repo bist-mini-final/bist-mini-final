@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { ExternalLink, FileSpreadsheet, X } from 'lucide-react';
+import { FileSpreadsheet, X } from 'lucide-react';
 import type { BiEvidence, BiMaterializationSource } from '../types';
+import { useModalDialog } from './useModalDialog';
 
 interface EvidenceDialogProps {
   readonly cardTitle: string;
@@ -11,11 +11,7 @@ interface EvidenceDialogProps {
 }
 
 export function EvidenceDialog({ cardTitle, evidence, source, snapshotId, onClose }: EvidenceDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (dialogRef.current && !dialogRef.current.open) dialogRef.current.showModal();
-  }, []);
+  const dialogRef = useModalDialog();
 
   return (
     <dialog
@@ -39,13 +35,6 @@ export function EvidenceDialog({ cardTitle, evidence, source, snapshotId, onClos
             <div>
               <strong>{item.sheetName}!{item.cellCoord}</strong>
               <span>{item.sourceText}</span>
-              <a
-                href={`/api/spreadsheet-artifacts/${encodeURIComponent(source.workbookHash)}/sheets/${encodeURIComponent(item.sheetName)}?layer=rendered`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={13} aria-hidden="true" />원본 시트 열기
-              </a>
             </div>
           </li>
         ))}

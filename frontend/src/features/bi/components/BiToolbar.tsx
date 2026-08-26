@@ -23,6 +23,8 @@ export function BiToolbar<Period extends string>({
   onOpenCardLibrary,
   onResetLayout,
 }: BiToolbarProps<Period>) {
+  const canOpenCardLibrary = hiddenCardCount > 0;
+
   return (
     <section className="bi-toolbar" aria-label="대시보드 도구">
       <div className="bi-toolbar__period">
@@ -51,9 +53,23 @@ export function BiToolbar<Period extends string>({
           {isEditing ? <Check size={16} aria-hidden="true" /> : <Pencil size={16} aria-hidden="true" />}
           {isEditing ? '완료' : '배치 편집'}
         </button>
-        <button className="bi-tool-button" type="button" onClick={onOpenCardLibrary}>
+        <button
+          className="bi-tool-button"
+          type="button"
+          aria-disabled={!canOpenCardLibrary}
+          aria-describedby={!canOpenCardLibrary ? 'bi-card-library-status' : undefined}
+          title={canOpenCardLibrary ? '숨긴 카드 추가' : '숨긴 카드가 없어 추가할 수 없습니다'}
+          onClick={() => {
+            if (canOpenCardLibrary) onOpenCardLibrary();
+          }}
+        >
           <Plus size={16} aria-hidden="true" />카드 추가{hiddenCardCount > 0 ? ` (${hiddenCardCount})` : ''}
         </button>
+        {!canOpenCardLibrary ? (
+          <span id="bi-card-library-status" className="bi-visually-hidden">
+            숨긴 카드가 없어 추가할 수 없습니다.
+          </span>
+        ) : null}
         <button className="bi-tool-button" type="button" onClick={onResetLayout}>
           <RotateCcw size={16} aria-hidden="true" />기본 배치
         </button>
