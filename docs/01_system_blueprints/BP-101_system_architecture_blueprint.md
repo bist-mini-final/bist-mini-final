@@ -25,30 +25,29 @@ graph TB
         INGRESS --> ROUTER --> CONTAINER
     end
 
-    subgraph DomainTier ["3. Domain Services Tier"]
+    subgraph DomainTier ["3. Domain & Feature Services Tier"]
         FAST_RAG["FastRagPipelineAdapter (Chatbot/BI Orchestrator)"]
         BI_SVC["BiApiServices & DuPont Calculator"]
         INGEST_COORD["IngestionCoordinator (Excel & VLM Manager)"]
         BENCH_SVC["BenchmarkService (Evaluation Runner)"]
     end
 
-    subgraph RuntimeTier ["4. 2-Tier Execution Runtime Hosts"]
-        subgraph T1_Box ["Tier 1: Fast In-Memory Host (<100ms)"]
+    subgraph ModularLayer ["4. Modular Pipeline Layer (modules/* - 19 Independent Building Blocks)"]
+        M_REG["ModuleRegistry (Single Source of Truth)"]
+        M_DAG["Composed DAG Pipelines (Query -> Hybrid Retrieval -> VLM -> Reader)"]
+        M_REG --> M_DAG
+    end
+
+    subgraph RuntimeTier ["5. 2-Tier Execution Runtime Tier"]
+        subgraph T1_Box ["Tier 1: Synchronous In-Memory Engine (<100ms)"]
             T1_EXEC["WorkflowExecutor (Zero-I/O In-Memory Context Bus)"]
         end
-        subgraph T2_Box ["Tier 2: KEDA Distributed Batch Host"]
+        subgraph T2_Box ["Tier 2: Asynchronous Distributed Batch Engine"]
             DISPATCHER["KubernetesQueueDispatcher"]
             KEDA_QUEUE["KEDA Trigger (workflow-core Queue)"]
             WORKER_PODS["Workflow Worker Pods (WorkerLease Locked)"]
             DISPATCHER --> KEDA_QUEUE --> WORKER_PODS
         end
-    end
-
-    subgraph ModularCore ["5. Modular Pipeline Core (modules/* - 19 Building Blocks)"]
-        M_QUERY["Query Processing (Input, Decomposer, Router, Matcher)"]
-        M_RETRIEVE["Hybrid Retrieval (DataScope, PgVector, TSVector, RRF, Expander)"]
-        M_VISION["Vision & Ingestion (Rasterizer, Luna VLM, Serializer, IndexWriter)"]
-        M_REASON["Reasoning & Generation (ReaderModule)"]
     end
 
     subgraph InfraTier ["6. AI Models & Storage Persistence Tier"]
@@ -65,12 +64,10 @@ graph TB
 
     ClientTier --> INGRESS
     CONTAINER --> DomainTier
-    DomainTier --> T1_EXEC
-    DomainTier --> DISPATCHER
-    T1_EXEC --> ModularCore
-    WORKER_PODS --> ModularCore
-    ModularCore --> AI_PROV
-    ModularCore --> PERSIST
+    DomainTier -->|1. 비즈니스 목적별 모듈 선택 및 DAG 구성| ModularLayer
+    ModularLayer -->|2. 구성된 DAG를 실행 호스트에 위임| RuntimeTier
+    RuntimeTier -->|3. AI 추론 및 임베딩 호출| AI_PROV
+    RuntimeTier -->|4. 데이터 적재 및 벡터 검색| PERSIST
 ```
 
 ---
