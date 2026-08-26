@@ -78,7 +78,45 @@ flowchart TD
 
 ---
 
-## 3. 리팩토링 마스터 가이드 (How to Use This Blueprint for Refactoring)
+## 3. 역할별 맞춤형 추천 읽기 경로 (Recommended Reading Tracks)
+
+시스템을 분석하거나 기능을 개발하는 목적과 역할에 따라 다음의 최적화된 추천 읽기 경로를 활용할 수 있습니다:
+
+```mermaid
+flowchart TD
+    START(["📘 마스터 청사진 시작 (docs/README.md)"])
+
+    subgraph TrackA ["🚀 Track A: 제품 & 풀스택 기능 흐름 (Product & UI Track)"]
+        A1["BP-001: 구현 표준 & 디자인 토큰"] --> A2["BP-101: 시스템 전체 토폴로지"]
+        A2 --> A3["BP-401 ~ BP-405: 5대 워크스페이스"]
+        A3 --> A4["BP-601: React SPA 결선도 & 라우트"]
+    end
+
+    subgraph TrackB ["⚙️ Track B: 데이터 & 파이프라인 심층 흐름 (Data & Pipeline Track)"]
+        B1["BP-201 ~ BP-203: 데이터 파싱 / VLM / 3072d COPY"] --> B2["BP-301 ~ BP-303: DAG / 21개 모듈 / RRF 융합"]
+        B2 --> B3["BP-501 ~ BP-503: REST API / SSE / 물리 ERD"]
+    end
+
+    subgraph TrackC ["🏗️ Track C: 인프라, 분산 동시성 & QA 흐름 (DevOps & QA Track)"]
+        C1["BP-102: 백엔드 7단계 계층 아키텍처"] --> C2["BP-103: 3-Level 동시성 제어 & Lease 락"]
+        C2 --> C3["BP-104: K8s KEDA ScaledJob & 관제 (/jobs)"]
+        C3 --> C4["BP-701: AST 계약 검증 & 벤치마크"]
+    end
+
+    START --> TrackA
+    START --> TrackB
+    START --> TrackC
+```
+
+| 독자 역할 및 목적 | 권장 읽기 순서 (Document Navigation Journey) | 핵심 획득 역량 및 이해 목표 |
+| :--- | :--- | :--- |
+| **🚀 풀스택 / 프론트엔드 개발자** | `README` ➡️ [`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_standards/BP-001_code_style_and_conventions.md) ➡️ [`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md) ➡️ [`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)~[`405`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-405_ws_company_comparison.md) ➡️ [`BP-601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | • UI/UX 디자인 시스템 토큰 및 무이모티콘 규격 습득<br>• 5대 워크스페이스별 컴포넌트 구조 및 React SPA 라우팅 흐름 이해 |
+| **⚙️ AI 엔지니어 / 백엔드 개발자** | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)~[`203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) ➡️ [`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)~[`303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) ➡️ [`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)~[`503`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-503_database_erd_and_ddl.md) | • 엑셀 셀 좌표 파싱, Luna VLM 및 pgvector 3072d 고속 주입 원리<br>• 21개 파이프라인 모듈 Pinout 규격 및 Dense+Sparse+RRF 융합 수식 습득 |
+| **🏗️ 시스템 아키텍트 / DevOps** | [`BP-102`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-102_backend_layered_architecture.md) ➡️ [`BP-103`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-103_concurrency_and_locking_model.md) ➡️ [`BP-104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) ➡️ [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md) | • 7계층 Screaming Architecture 및 3-Level 분산 락/임차권 모델 검증<br>• K8s KEDA 배치 큐잉, 실시간 관제 및 AST 정적 계약 검증 체계 확보 |
+
+---
+
+## 4. 리팩토링 마스터 가이드 (How to Use This Blueprint for Refactoring)
 
 본 설계서는 다음 세 단계의 리팩토링 및 고도화 워크플로우를 완벽히 지원하도록 설계되었습니다:
 
@@ -104,3 +142,4 @@ graph LR
 1. **코드 변경 전 필수 확인**: 수정하려는 모듈의 해당 번호 청사진(`BP-XXX`)을 열어 **"I/O Pinout 규격"** 및 **"계층 간 의존성 방향"**을 확인합니다.
 2. **리팩토링 포인트 섹션 참조**: 각 문서의 `Refactoring Targets & Debts` 항목에 명시된 기술 부채와 개선 권장안을 확인합니다.
 3. **불변식 검증**: 리팩토링 후 `pytest tests/modules/test_architecture_contracts.py`를 실행하여 레이어 의존성 위반이 없는지 즉시 검증합니다.
+
