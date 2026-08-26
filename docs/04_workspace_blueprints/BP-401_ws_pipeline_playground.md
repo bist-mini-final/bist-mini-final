@@ -39,24 +39,24 @@ flowchart TB
 
 ## 2. React Flow 커스텀 노드 디자인 시스템 (Unified Slate & 3-Family Design System)
 
-기존 6가지 무지개색으로 인한 시각적 피로도와 디자인 불일치(Visual Fragmentation)를 해소하기 위해, **통합 뉴트럴 슬레이트 베이스(Unified Slate Base) + 3대 기능 패밀리 미니멀 액센트 + 상태 중심 다이내믹 링(Dynamic State Glow)** 체계로 통일합니다.
+기존 6가지 무지개색으로 인한 시각적 피로도와 디자인 불일치(Visual Fragmentation)를 해소하기 위해, **통합 뉴트럴 슬레이트 베이스(Unified Slate Base) + 3대 기능 패밀리 미니멀 액센트 + 상태 중심 다이내믹 링(Dynamic State Glow) + Lucide React 벡터 아이콘 표준** 체계로 통일합니다.
 
 ```mermaid
 graph TD
     subgraph DesignSystem ["통합 슬레이트 노드 디자인 시스템"]
         BASE["1. 일관된 슬레이트 카드 베이스 (bg-slate-900 / border-slate-700)"]
         
-        subgraph Accents ["2. 3대 기능 패밀리 미니 액센트 (헤더 뱃지/아이콘 포인트)"]
-            A1["① Flow / Control (Primary Blue) : QueryInput, Router, Decomposer"]
-            A2["② Data / Search (Teal Emerald) : PgVector, BM25, RRF, Embedder"]
-            A3["③ AI / Inference (Indigo Violet) : Reader, Agentic, Luna VLM, FactChecker"]
+        subgraph Accents ["2. 3대 기능 패밀리 미니 액센트 (헤더 뱃지 / Lucide Icon)"]
+            A1["• Flow / Control (Primary Blue) : Lucide GitFork, Split"]
+            A2["• Data / Search (Teal Emerald) : Lucide Database, Layers"]
+            A3["• AI / Inference (Indigo Violet) : Lucide Sparkles, Brain"]
         end
         
-        subgraph States ["3. 런타임 상태 중심 다이내믹 링 (State Glow Rings)"]
-            S1["• Idle / Pending : 기본 슬레이트 테두리 (border-slate-700)"]
-            S2["• Running (⚡ Live) : 펄스 링 (ring-2 ring-blue-400 animate-pulse)"]
-            S3["• Completed (✅) : 성공 그린 뱃지 & 실행 소요시간(ms)"]
-            S4["• Failed (❌) : 에러 로즈 뱃지 & 에러 메시지 툴팁"]
+        subgraph States ["3. 런타임 상태 중심 다이내믹 링 (State Glow & Lucide Status)"]
+            S1["• Idle / Pending : border-slate-700 (Lucide: Clock)"]
+            S2["• Running (Live SSE) : ring-2 ring-blue-400 animate-pulse (Lucide: Loader2)"]
+            S3["• Completed : border-emerald-500 (Lucide: CheckCircle2)"]
+            S4["• Failed : border-rose-500 (Lucide: AlertCircle)"]
         end
         
         BASE --> Accents
@@ -68,13 +68,40 @@ graph TD
 
 ### 2.1 3대 기능 패밀리 및 핀아웃 매트릭스
 
-모든 노드는 동일한 프리미엄 슬레이트 카드로 렌더링되며, 상단 헤더의 **정제된 미니 뱃지 색상**으로만 역할을 깔끔하게 구분합니다:
+모든 노드는 동일한 프리미엄 슬레이트 카드로 렌더링되며, 상단 헤더의 **정제된 미니 뱃지 색상 및 Lucide React 벡터 아이콘**으로만 역할을 깔끔하게 구분합니다:
 
-| 기능 패밀리 | 액센트 톤 (Accent) | 소속 모듈 (19개 모듈군) | 핸들 구성 (Handles) |
-| :--- | :--- | :--- | :--- |
-| **① Flow & Control**<br>(입력 & 흐름 제어) | `Primary Blue`<br>(`#3B82F6`) | • `QueryInput`<br>• `LlmQueryRouter`<br>• `Decomposer`<br>• `MultiQueryExpander` | • Target: 0~1개 (Query)<br>• Source: 1~3개 (Branch Edges) |
-| **② Data & Search**<br>(데이터 인덱싱 & 검색) | `Teal Emerald`<br>(`#10B981`) | • `TextEmbedder`<br>• `CellTextSerializer`<br>• `PgVectorRetriever`<br>• `SparseBm25Retriever`<br>• `RrfFuser`<br>• `ContextExpander` | • Target: 1~2개 (Vector / Chunks)<br>• Source: 1개 (Fused Context) |
-| **③ AI & Inference**<br>(VLM 및 LLM 추론) | `Indigo Violet`<br>(`#6366F1`) | • `LunaVlmStructureDetector`<br>• `CompanyEntityExtractor`<br>• `ReaderModule`<br>• `AgenticReasoner`<br>• `ContextCompressor`<br>• `FactChecker`<br>• `ConfidenceScorer` | • Target: 1~2개 (Query + Context)<br>• Source: 1개 (Structured Output) |
+| 기능 패밀리 | 액센트 톤 (Accent) | 표준 Lucide 아이콘 | 소속 모듈 (19개 모듈군) | 핸들 구성 (Handles) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Flow & Control**<br>(입력 & 흐름 제어) | `Primary Blue`<br>(`#3B82F6`) | `<Workflow />`<br>`<GitFork />`<br>`<Split />` | • `QueryInput`<br>• `LlmQueryRouter`<br>• `Decomposer`<br>• `MultiQueryExpander` | • Target: 0~1개 (Query)<br>• Source: 1~3개 (Branch Edges) |
+| **Data & Search**<br>(데이터 인덱싱 & 검색) | `Teal Emerald`<br>(`#10B981`) | `<Database />`<br>`<Search />`<br>`<Layers />` | • `TextEmbedder`<br>• `CellTextSerializer`<br>• `PgVectorRetriever`<br>• `SparseBm25Retriever`<br>• `RrfFuser`<br>• `ContextExpander` | • Target: 1~2개 (Vector / Chunks)<br>• Source: 1개 (Fused Context) |
+| **AI & Inference**<br>(VLM 및 LLM 추론) | `Indigo Violet`<br>(`#6366F1`) | `<Sparkles />`<br>`<Brain />`<br>`<ScanEye />` | • `LunaVlmStructureDetector`<br>• `CompanyEntityExtractor`<br>• `ReaderModule`<br>• `AgenticReasoner`<br>• `ContextCompressor`<br>• `FactChecker`<br>• `ConfidenceScorer` | • Target: 1~2개 (Query + Context)<br>• Source: 1개 (Structured Output) |
+
+---
+
+### 2.2 Lucide React 벡터 아이콘 표준 (Zero Raw Emoji Policy)
+
+UI 컴포넌트 내부에서 OS별 렌더링 편차가 심하고 유치한 인상을 주는 **유니코드 이모티콘(⚡, ✅, ❌ 등)의 사용을 엄격히 배제**하고, 100% SVG 기반의 [`lucide-react`](file:///c:/Repos/bist-mini-final/frontend/package.json#L18) 벡터 컴포넌트만을 사용합니다.
+
+```tsx
+// 표준 노드 상태 인디케이터 배선 예시
+import { AlertCircle, CheckCircle2, Clock, Loader2, MinusCircle } from "lucide-react";
+
+export function NodeStatusBadge({ status }: { status: NodeStatus }) {
+  switch (status) {
+    case "running":
+      return <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />;
+    case "completed":
+      return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />;
+    case "failed":
+      return <AlertCircle className="w-3.5 h-3.5 text-rose-400" />;
+    case "skipped":
+      return <MinusCircle className="w-3.5 h-3.5 text-slate-500" />;
+    case "pending":
+    default:
+      return <Clock className="w-3.5 h-3.5 text-slate-400" />;
+  }
+}
+```
 
 ---
 
