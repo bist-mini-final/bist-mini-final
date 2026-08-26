@@ -11,8 +11,8 @@
 ```mermaid
 flowchart TB
     subgraph ClientTier ["1. Client & Presentation Tier (React 18 + Vite)"]
-        UI_PLAY["Playground WS (DAG Builder)"]
-        UI_DS["Data Sources WS (VLM Viewer)"]
+        UI_PLAY["Playground WS (Interactive DAG Builder)"]
+        UI_DS["Data Sources WS (VLM Sheet Viewer)"]
         UI_BI["Financial BI WS (Recharts Dashboard)"]
         UI_CHAT["[Planned] AI Financial Chatbot WS"]
         UI_COMP["[Planned] Company Comparison WS"]
@@ -21,25 +21,32 @@ flowchart TB
     subgraph GatewayTier ["2. Gateway & API Ingress Tier"]
         INGRESS["Kubernetes Ingress (Nginx / Traefik)"]
         CORS["CORS & RequestObservabilityMiddleware"]
-        FASTAPI["FastAPI App ApplicationContainer"]
+        FASTAPI["FastAPI App (backend/main.py)"]
     end
 
-    subgraph RuntimeTier ["3. 2-Tier Execution Runtime Tier"]
+    subgraph ModularCore ["3. Pure Modular Pipeline Core (modules/* - Independent Building Blocks)"]
         direction TB
-        subgraph Tier1 ["Tier 1: Synchronous In-Memory Engine (<100ms)"]
-            T1_EXEC["WorkflowExecutor (Zero-I/O In-Memory Context)"]
-            T1_REG["ModuleRegistry (19 Registered In-Memory Modules)"]
-            T1_EXEC --- T1_REG
+        M_QUERY["Query Processing Modules<br>(QueryInput, Decomposer, Router, SemanticMatcher)"]
+        M_EMB["Embedding & Indexing Modules<br>(QueryEmbedder, CellTextEmbedder, IndexWriter)"]
+        M_RET["Retrieval & Fusion Modules<br>(DataScope, PgVectorRetriever, KeywordRetriever, RrfFusion, ContextExpander)"]
+        M_GEN["Generation & Reasoning Modules<br>(ReaderModule)"]
+        M_VIS["Vision & Preprocessing Modules<br>(FileSelector, LunaVlmDetector, Serializer, EntityExtractor)"]
+    end
+
+    subgraph RuntimeTier ["4. 2-Tier Composition & Execution Hosts"]
+        direction TB
+        subgraph Tier1 ["Tier 1 Host: Synchronous In-Memory Host (FastAPI Web Process)"]
+            T1_EXEC["WorkflowExecutor (DAG Topology Runner & Zero-I/O In-Memory Bus)"]
         end
-        subgraph Tier2 ["Tier 2: Asynchronous Distributed Batch Engine"]
+        subgraph Tier2 ["Tier 2 Host: Distributed Batch Host (KEDA ScaledJob Worker Pods)"]
             K8S_DISP["KubernetesQueueDispatcher"]
             KEDA["KEDA ScaledJob / Celery Queue: workflow-core"]
-            WORKER_POOL["Workflow Worker Pods (WorkerLease Locked)"]
-            K8S_DISP --> KEDA --> WORKER_POOL
+            WORKER_PODS["Standalone Worker Containers (backend/engine/worker/main.py)"]
+            K8S_DISP --> KEDA --> WORKER_PODS
         end
     end
 
-    subgraph ServiceDomain ["4. Domain Services Tier (Business & Evaluation Engines)"]
+    subgraph ServiceDomain ["5. Domain Services Tier (Business & Evaluation Engines)"]
         BI_SVC["BiApiServices (Document Profiler & Metric Engine)"]
         CHAT_SVC["[Planned] ChatbotService (Session & Fast RAG Orchestrator)"]
         COMP_SVC["[Planned] CompanyComparisonService (Multi-Entity Normalizer & DuPont Engine)"]
@@ -47,14 +54,14 @@ flowchart TB
         WF_SVC["WorkflowRuntimeServices (Run Store & History)"]
     end
 
-    subgraph ProviderTier ["5. AI & Model Provider Tier"]
+    subgraph ProviderTier ["6. AI & Model Provider Tier"]
         OAI_LLM["OpenAIResponsesClient (GPT-5.6 Luna)"]
         OAI_VLM["Luna VLM (GPT-5.6 Luna Visual Engine)"]
         OAI_EMB["OpenAIEmbeddingEncoder (text-embedding-3-large 3072d)"]
         BGE_EMB["BgeEmbeddingEncoder (Local ONNX/PyTorch Fallback)"]
     end
 
-    subgraph StorageTier ["6. Persistence & Storage Tier"]
+    subgraph StorageTier ["7. Persistence & Storage Tier"]
         PG_POOL["Thread-Safe ConnectionPool (Min: 2, Max: 10)"]
         PG_CORE["PostgreSQL 16 Engine"]
         PG_VEC["pgvector (HNSW Index: m=16, ef_construction=64)"]
@@ -69,10 +76,13 @@ flowchart TB
     FASTAPI --> ServiceDomain
     ServiceDomain --> Tier1
     ServiceDomain --> Tier2
-    Tier1 --> ProviderTier
-    Tier2 --> ProviderTier
-    Tier1 --> StorageTier
-    Tier2 --> StorageTier
+    
+    Tier1 -->|Dynamically Composes & Executes| ModularCore
+    WORKER_PODS -->|Dynamically Composes & Executes| ModularCore
+
+    ModularCore --> ProviderTier
+    ModularCore --> StorageTier
+    ServiceDomain --> StorageTier
 ```
 
 ---
