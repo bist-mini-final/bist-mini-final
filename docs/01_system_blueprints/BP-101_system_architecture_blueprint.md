@@ -10,48 +10,40 @@
 
 ```mermaid
 flowchart TD
-    classDef client fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e;
-    classDef gw fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px,color:#4c1d95;
-    classDef domain fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#064e3b;
-    classDef t1 fill:#fffbeb,stroke:#d97706,stroke-width:2px,color:#78350f;
-    classDef t2 fill:#fff1f2,stroke:#e11d48,stroke-width:2px,color:#881337;
-    classDef dag fill:#fdf4ff,stroke:#c026d3,stroke-width:2px,color:#701a75;
-    classDef infra fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#0f172a;
-
     %% 1. 클라이언트 요청 계층
     subgraph L1_Client ["1. 클라이언트 워크스페이스 요청 계층 (Frontend SPA)"]
-        UI_PLAY["Pipeline Playground<br>(실시간 단일 노드 / DAG 실험)"]:::client
-        UI_CHAT["[Planned] AI Financial Chatbot<br>(대화형 재무 질의응답)"]:::client
-        UI_BI["Financial BI & Company Comp<br>(단건 지표 조회 / 전사 산출)"]:::client
-        UI_INGEST["Data Sources Management<br>(엑셀 업로드 & VLM 색인 요청)"]:::client
-        UI_BENCH["Benchmark Evaluation<br>(정답지 기반 대량 평가 요청)"]:::client
+        UI_PLAY["Pipeline Playground<br>(실시간 단일 노드 / DAG 실험)"]
+        UI_CHAT["[Planned] AI Financial Chatbot<br>(대화형 재무 질의응답)"]
+        UI_BI["Financial BI & Company Comp<br>(단건 지표 조회 / 전사 산출)"]
+        UI_INGEST["Data Sources Management<br>(엑셀 업로드 & VLM 색인 요청)"]
+        UI_BENCH["Benchmark Evaluation<br>(정답지 기반 대량 평가 요청)"]
     end
 
     %% 2. 게이트웨이 및 API 라우팅
     subgraph L2_Gateway ["2. 게이트웨이 & API 컨트롤러 계층 (FastAPI)"]
-        INGRESS["Kubernetes Ingress (bist-mini-ingress : 포트 8080 단일 진입점)"]:::gw
-        ROUTER["FastAPI APIRouter (/api/* 라우팅 및 DTO 스키마 검증)"]:::gw
-        CONTAINER["ApplicationContainer (DI 조립 및 생명주기 관리)"]:::gw
+        INGRESS["Kubernetes Ingress (bist-mini-ingress : 포트 8080 단일 진입점)"]
+        ROUTER["FastAPI APIRouter (/api/* 라우팅 및 DTO 스키마 검증)"]
+        CONTAINER["ApplicationContainer (DI 조립 및 생명주기 관리)"]
         INGRESS --> ROUTER --> CONTAINER
     end
 
     %% 3. 도메인 서비스 및 오케스트레이터 계층
     subgraph L3_Domain ["3. 도메인 서비스 계층 (Business Logic & Flow Orchestration)"]
-        FAST_RAG["FastRagPipelineAdapter<br>(챗봇/BI 전용 경량 RAG 오케스트레이터)"]:::domain
-        BI_SVC["BiApiServices & Calculator<br>(40+ 재무 비율 산출 및 프로파일러)"]:::domain
-        INGEST_SVC["IngestionCoordinator<br>(엑셀 VLM 분석 및 색인 작업 조율)"]:::domain
-        BENCH_SVC["BenchmarkService<br>(정답 데이터셋 로드 및 배치 평가 조율)"]:::domain
+        FAST_RAG["FastRagPipelineAdapter<br>(챗봇/BI 전용 경량 RAG 오케스트레이터)"]
+        BI_SVC["BiApiServices & Calculator<br>(40+ 재무 비율 산출 및 프로파일러)"]
+        INGEST_SVC["IngestionCoordinator<br>(엑셀 VLM 분석 및 색인 작업 조율)"]
+        BENCH_SVC["BenchmarkService<br>(정답 데이터셋 로드 및 배치 평가 조율)"]
     end
 
     %% 4. 2-Tier 실행 호스트 분기 계층
     subgraph L4_Hosts ["4. 2-Tier 파이프라인 조합 및 실행 호스트 (Execution Hosts)"]
         subgraph Tier1_Host ["Tier 1: 동기식 인메모리 제로 I/O 엔진 (<100ms)"]
-            T1_EXEC["WorkflowExecutor<br>(FastAPI 프로세스 내 RAM 메모리 버스 고속 DAG 실행)"]:::t1
+            T1_EXEC["WorkflowExecutor<br>(FastAPI 프로세스 내 RAM 메모리 버스 고속 DAG 실행)"]
         end
         subgraph Tier2_Host ["Tier 2: 비동기식 분산 배치 큐 엔진 (KEDA ScaledJob)"]
-            DISPATCHER["KubernetesQueueDispatcher<br>(workflow_runs 테이블 작업 큐잉)"]:::t2
-            KEDA_QUEUE["KEDA Queue Trigger & Autoscaler<br>(대기열 감지 후 워커 Pod 동적 프로비저닝)"]:::t2
-            WORKER_PODS["Standalone Worker Pods<br>(backend/engine/worker/main.py - Lease 분산락)"]:::t2
+            DISPATCHER["KubernetesQueueDispatcher<br>(workflow_runs 테이블 작업 큐잉)"]
+            KEDA_QUEUE["KEDA Queue Trigger & Autoscaler<br>(대기열 감지 후 워커 Pod 동적 프로비저닝)"]
+            WORKER_PODS["Standalone Worker Pods<br>(backend/engine/worker/main.py - Lease 분산락)"]
             DISPATCHER --> KEDA_QUEUE --> WORKER_PODS
         end
     end
@@ -59,18 +51,18 @@ flowchart TD
     %% 5. 순수 파이프라인 모듈 코어 (동적으로 조립되는 DAG 파이프라인)
     subgraph L5_DAGs ["5. 파이프라인 모듈 코어 (modules/* - 동적 결선 및 실행)"]
         subgraph DAG_RAG ["(A) 하이브리드 RAG 질의응답 파이프라인"]
-            M_DEC["Decomposer / Router<br>(원자적 분해 & 라우팅)"]:::dag
-            M_RET["PgVector (Dense) ∥ TSVector (Sparse)<br>(3072d Cosine + BM25 병렬 검색)"]:::dag
-            M_FUS["RrfFusion (k=60) & ContextExpander<br>(순위 융합 및 2D 그리드 셀 문맥 확장)"]:::dag
-            M_READ["ReaderModule<br>(수식 검증 및 근거 기반 답변 생성)"]:::dag
+            M_DEC["Decomposer / Router<br>(원자적 분해 & 라우팅)"]
+            M_RET["PgVector (Dense) ∥ TSVector (Sparse)<br>(3072d Cosine + BM25 병렬 검색)"]
+            M_FUS["RrfFusion (k=60) & ContextExpander<br>(순위 융합 및 2D 그리드 셀 문맥 확장)"]
+            M_READ["ReaderModule<br>(수식 검증 및 근거 기반 답변 생성)"]
             M_DEC --> M_RET --> M_FUS --> M_READ
         end
 
         subgraph DAG_INGEST ["(B) 엑셀 비전 구조 분석 및 대량 색인 파이프라인"]
-            M_VLM["Sheet Image Rasterizer + Luna VLM<br>(GPT-5.6 Luna 표 바운딩박스 검출)"]:::dag
-            M_SER["CellTextSerializer<br>(2D 그리드 셀 계층 직렬화)"]:::dag
-            M_EMB["CellTextEmbedder<br>(3072차원 배치 임베딩 아티팩트 생성)"]:::dag
-            M_COPY["PgVectorIndexWriter<br>(PostgreSQL Binary COPY 초고속 색인)"]:::dag
+            M_VLM["Sheet Image Rasterizer + Luna VLM<br>(GPT-5.6 Luna 표 바운딩박스 검출)"]
+            M_SER["CellTextSerializer<br>(2D 그리드 셀 계층 직렬화)"]
+            M_EMB["CellTextEmbedder<br>(3072차원 배치 임베딩 아티팩트 생성)"]
+            M_COPY["PgVectorIndexWriter<br>(PostgreSQL Binary COPY 초고속 색인)"]
             M_VLM --> M_SER --> M_EMB --> M_COPY
         end
     end
@@ -78,13 +70,13 @@ flowchart TD
     %% 6. 외부 AI 프로바이더 및 물리 영속성 계층
     subgraph L6_Infra ["6. AI 모델 프로바이더 & 물리 저장소 계층 (Infra & Storage)"]
         subgraph AI_PROV ["AI & Model Provider Ports"]
-            OAI_LLM["OpenAIResponsesClient<br>(GPT-5.6 Luna 추론 및 비전 엔진)"]:::infra
-            OAI_EMB["OpenAIEmbeddingEncoder<br>(text-embedding-3-large 3072d)"]:::infra
+            OAI_LLM["OpenAIResponsesClient<br>(GPT-5.6 Luna 추론 및 비전 엔진)"]
+            OAI_EMB["OpenAIEmbeddingEncoder<br>(text-embedding-3-large 3072d)"]
         end
         subgraph PERSIST ["PostgreSQL 16 + pgvector & Disk"]
-            PG_VEC["langchain_pg_embedding<br>(3072d HNSW 벡터 + GIN TSVector)"]:::infra
-            PG_META["PostgreSQL Tables<br>(runs, leases, profiles, snapshots)"]:::infra
-            DISK_FS["Artifact Storage<br>(.xlsx 원본, 시트 PNG, 임베딩 .bin)"]:::infra
+            PG_VEC["langchain_pg_embedding<br>(3072d HNSW 벡터 + GIN TSVector)"]
+            PG_META["PostgreSQL Tables<br>(runs, leases, profiles, snapshots)"]
+            DISK_FS["Artifact Storage<br>(.xlsx 원본, 시트 PNG, 임베딩 .bin)"]
         end
     end
 
