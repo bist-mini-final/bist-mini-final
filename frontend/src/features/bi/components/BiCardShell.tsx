@@ -25,7 +25,8 @@ export function BiCardShell(props: BiCardShellProps) {
   const showChart = props.viewModel.state === 'ready' || props.viewModel.state === 'partial';
   const chartOwnsSummary = props.definition.id === 'cash_flow'
     || props.definition.id === 'stability'
-    || props.definition.id === 'financial_scale';
+    || props.definition.id === 'financial_scale'
+    || props.definition.id === 'financial_health_heatmap';
   const selectedPeriods = selectPeriods(props.dashboard.periods, props.periodLabel);
   const selectedPeriod = selectedPeriods[selectedPeriods.length - 1];
   const chatbotUrl = selectedPeriod

@@ -26,6 +26,8 @@ class BiApiStorePort(Protocol):
 
     def get_current(self, company_id: CompanyId) -> BiDashboardSnapshot | None: ...
 
+    def publish(self, snapshot: BiDashboardSnapshot) -> None: ...
+
     def get_current_many(
         self,
         company_ids: tuple[CompanyId, ...],
@@ -59,6 +61,11 @@ class BiMaterializationQueuePort(Protocol):
 
 class BiQuestionApiPort(Protocol):
     def queue_materialization_questions(
+        self,
+        plan: BiQuestionBatchPlan,
+    ) -> BiQuestionJobProgress: ...
+
+    def reset_materialization_questions(
         self,
         plan: BiQuestionBatchPlan,
     ) -> BiQuestionJobProgress: ...

@@ -35,6 +35,10 @@ from .api_state import (
     job_id_for,
     with_refresh_state,
 )
+from .dashboard_recalculation import (
+    BiDashboardRecalculationError,
+    recalculate_dashboard,
+)
 from .models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
@@ -46,7 +50,10 @@ from .models import (
 from .postgres_store import BiPostgresStoreError
 from .question_batch import BiQuestionBatchPlan
 from .question_records import BiQuestionJobProgress
-from .question_repository import BiQuestionRegistrationError
+from .question_repository import (
+    BiQuestionRegistrationError,
+    BiQuestionResetActiveError,
+)
 from .question_repository_queries import BiQuestionRepositoryError
 
 COMPANY_NOT_FOUND: Final = "company not found"
@@ -308,18 +315,66 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
     @router.post(
         "/companies/{company_id}/refresh",
         tags=["BI 지표 질문 및 배치 계산"],
-        response_model=BiQuestionJobProgress,
-        status_code=status.HTTP_202_ACCEPTED,
-        summary="기존 대시보드 지표 일괄 재계산 요청",
-        description="저장된 기간(Periods)과 공식들에 대해 지표 추출 질문들을 다시 큐에 등록하여 최신화합니다.",
+        response_model=BiDashboardSnapshot,
+        summary="현재 관측값으로 대시보드 재계산",
+        description="질문과 답변을 추가하지 않고 현재 원천 관측값으로 파생 지표와 스냅샷을 다시 계산합니다.",
         responses={
             404: {"model": ApiErrorEnvelope},
             409: {"model": ApiErrorEnvelope},
             500: {"model": ApiErrorEnvelope},
         },
     )
-    def refresh_dashboard(company_id: IdentifierPath) -> BiQuestionJobProgress:
-        """대시보드 지표 관측값을 갱신하기 위해 질문 추출 배치를 큐에 등록합니다."""
+    def refresh_dashboard(company_id: IdentifierPath) -> BiDashboardSnapshot:
+        typed_company_id = CompanyId(company_id)
+        company = services.store.get_company(typed_company_id)
+        if company is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, COMPANY_NOT_FOUND)
+        snapshot = services.store.get_current(typed_company_id)
+        if snapshot is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, DASHBOARD_NOT_AVAILABLE)
+        if not snapshot.periods:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                REFRESH_PERIODS_UNAVAILABLE,
+            )
+        created_at = services.clock.now()
+        identity = "\x00".join(
+            (
+                str(typed_company_id),
+                str(snapshot.snapshot.snapshot_id),
+                snapshot.source.workbook_hash,
+                str(snapshot.source.index_id),
+                created_at.isoformat(),
+            )
+        )
+        job_id = JobId(
+            "recalculation-"
+            + sha256(identity.encode("utf-8")).hexdigest()[:24]
+        )
+        try:
+            return recalculate_dashboard(
+                store=services.store,
+                company_id=typed_company_id,
+                job_id=job_id,
+                generated_at=created_at,
+            )
+        except BiDashboardRecalculationError as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+
+    @router.post(
+        "/companies/{company_id}/reset",
+        tags=["BI 지표 질문 및 배치 계산"],
+        response_model=BiQuestionJobProgress,
+        status_code=status.HTTP_202_ACCEPTED,
+        summary="질의응답 데이터 초기화 및 재생성",
+        description="선택 기업의 현재 원본 질의응답을 트랜잭션으로 교체하고 새 질문 배치를 큐에 등록합니다.",
+        responses={
+            404: {"model": ApiErrorEnvelope},
+            409: {"model": ApiErrorEnvelope},
+            503: {"model": ApiErrorEnvelope},
+        },
+    )
+    def reset_dashboard(company_id: IdentifierPath) -> BiQuestionJobProgress:
         typed_company_id = CompanyId(company_id)
         company = services.store.get_company(typed_company_id)
         if company is None:
@@ -342,11 +397,11 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
             )
         )
         job_id = JobId(
-            "question-job-"
+            "question-reset-"
             + sha256(identity.encode("utf-8")).hexdigest()[:24]
         )
         try:
-            return services.questions.queue_materialization_questions(
+            return services.questions.reset_materialization_questions(
                 BiQuestionBatchPlan(
                     materialization=BiMaterializationRequest(
                         company_id=company.company_id,
@@ -358,6 +413,11 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
                     created_at=created_at,
                 )
             )
+        except BiQuestionResetActiveError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "BI questions are already active for this company",
+            ) from error
         except (BiQuestionRepositoryError, BiQuestionRegistrationError) as error:
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
