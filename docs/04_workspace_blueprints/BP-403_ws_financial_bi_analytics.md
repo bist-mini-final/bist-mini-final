@@ -34,6 +34,24 @@ flowchart TD
 
 ---
 
+### 1.1 원자적 RAG 모듈과 금융 BI 도메인 오케스트레이션 결합 구조 (Module & Domain Composition)
+
+`Financial BI Analytics`는 범용 **Layer 5 원자적 RAG 모듈들**을 회계 비즈니스 로직을 관장하는 **Layer 3 도메인 오케스트레이션 엔진**과 유기적으로 결합하여 동작합니다:
+
+| 계층 | 구성 요소 / 파일 경로 | 역할 및 상호작용 방식 |
+| :--- | :--- | :--- |
+| **Layer 3<br>(금융 BI 도메인 엔진)** | `BiDocumentProfiler`<br>([`document_profiler.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/document_profiler.py)) | • 대상 워크북의 회계기간(`BiPeriod`, FY/LTM), 표시 통화(`currency`) 및 배율(`scale`) 자동 발견<br>• 재무제표 시트(손익계산서/재무상태표/현금흐름표) 자동 분류 |
+| | `MetricCatalog`<br>([`catalog.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/catalog.py)) | • 40개 이상 핵심 재무 비율 산출에 필요한 원천 지표 질문 및 동의어 규칙 정의 |
+| | `FinancialCalculator`<br>([`calculator.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/calculator.py)) | • 원천 관측값으로부터 무손실 고정소수점(`Decimal`) 40+ 파생 재무 비율 산출<br>• 회계 감사용 원본 엑셀 셀(`BiEvidence`) 추적성 영구 바인딩 |
+| | `FastRagPipelineAdapter`<br>([`fast_rag_adapter.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/fast_rag_adapter.py)) | • 포트-어댑터 패턴으로 하위 19개 모듈을 결합하여 개별 재무 질문에 대한 초고속 답변 및 근거 인출 수행 |
+| | `DashboardRecalculation`<br>([`dashboard_recalculation.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/dashboard_recalculation.py)) | • 엑셀 재파싱 없이 기존 관측값 기반 1-Shot 고속 파생 지표 재계산 |
+| **Layer 5<br>(원자적 RAG 모듈)** | `retrieval.pgvector_retriever`<br>`retrieval.sparse_bm25_retriever` | • Dense(3072d) 벡터 유사도 검색 및 PostgreSQL TSVector BM25 키워드 검색 병렬 수행 |
+| | `retrieval.rrf_fuser`<br>([`rrf_fusion.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/rrf_fusion.py)) | • Dense 및 Sparse 검색 순위를 상호 순위 융합(RRF, $k=60$)하여 최적의 원천 셀 후보 선별 |
+| | `retrieval.context_expander`<br>([`context_expander.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/context_expander.py)) | • 2D 그리드 이웃 셀 및 계층 헤더를 단일 표준(`header_with_value`) 문맥으로 복원 |
+| | `generation.reader`<br>([`reader.py`](file:///c:/Repos/bist-mini-final/modules/generation/reader.py)) | • GPT-5.6 Luna 구조화 완성을 통해 정확한 회계 수치 및 감사 근거 추출 |
+
+---
+
 ## 2. 40+ 핵심 재무 지표 및 산출 공식 명세 (Financial Formulas Matrix)
 
 `calculator.py`에서 무손실 고정소수점 `Decimal` 타입으로 계산되는 주요 파생 지표 공식:
