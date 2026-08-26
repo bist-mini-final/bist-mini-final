@@ -198,9 +198,9 @@ classDiagram
 ### 3.1 부트스트랩(Bootstrap)과 싱글톤 관리 원칙
 
 1. **부트스트랩(Bootstrap)의 정의**:
-   - 서버 시동(FastAPI `lifespan startup`) 시점에 환경 변수 로드, DB 커넥션 풀 초기화, AI 모델 클라이언트 생성, 19개 파이프라인 모듈 등록을 **단 한 곳의 조립 루트(`backend/bootstrap/container.py`)에서 일괄 실행**하여 애플리케이션을 즉시 동작 가능한 상태로 준비시키는 초기화 과정입니다.
+   - 서버 시동(FastAPI `lifespan startup`) 시점에 환경 변수 로드, DB 커넥션 풀 초기화, AI 모델 클라이언트 생성, 21개 파이프라인 모듈 등록을 **단 한 곳의 조립 루트(`backend/bootstrap/container.py`)에서 일괄 실행**하여 애플리케이션을 즉시 동작 가능한 상태로 준비시키는 초기화 과정입니다.
 2. **컨테이너 기반 싱글톤(Container-Managed Singleton)**:
-   - 전역 변수(`global`)나 하드코딩 싱글톤 패턴을 배제하고, `ApplicationContainer`가 DB 커넥션 풀, OpenAI 클라이언트, 19개 모듈 인스턴스를 **메모리에 단 1회만 생성하여 보관**합니다.
+   - 전역 변수(`global`)나 하드코딩 싱글톤 패턴을 배제하고, `ApplicationContainer`가 DB 커넥션 풀, OpenAI 클라이언트, 21개 모듈 인스턴스를 **메모리에 단 1회만 생성하여 보관**합니다.
    - 모든 HTTP/WebSocket 요청은 이 컨테이너로부터 의존성을 주입(DI)받아 재사용함으로써 불필요한 객체 생성 비용을 0으로 억제하고 커넥션 풀 고갈을 방지합니다.
 
 ---
@@ -211,7 +211,7 @@ classDiagram
 | :--- | :--- | :--- | :--- | :--- |
 | **`ApplicationContainer`**<br>(최상위 웹 프로세스 루트) | • **FastAPI 메인 웹 서버 프로세스(`backend/main.py`)** 단 1개 생성<br>• 서버 수명주기(`lifespan`)와 1:1 바인딩 | • `domain_services: DomainServicesContainer`<br>• `pipeline_engine: PipelineExecutionEngine`<br>• `infrastructure: InfrastructureContainer`<br>• `workflow_dispatcher: KubernetesQueueDispatcher`<br>• `recover_pending_runs() -> int`<br>• `close() -> None` | • REST/WebSocket API 요청 진입점 의존성 주입(DI)<br>• Tier 2 분산 배치 작업 큐잉 디스패치<br>• 서버 재부팅 시 고아(`QUEUED`/`RUNNING`) 작업 복구<br>• 서버 셧다운 시 리소스 안전 해제(Graceful Shutdown) | Worker Pod에는 불필요한 **웹 전용 오케스트레이션, 서버 기동/종료 수명주기 관리 책임**을 최상위 웹 계층에 완벽히 격리 |
 | **`DomainServicesContainer`**<br>(도메인 비즈니스 서비스 계층) | • **FastAPI 웹 서버 메모리** 내 싱글톤 유지<br>• 각 API 라우터에 비즈니스 서비스 주입 | • `bi_services: BiApiServices`<br>• `chatbot_service: ChatbotService`<br>• `comparison_service: CompanyComparisonService`<br>• `benchmark_service: BenchmarkService` | • 40+ 전사 재무 지표 및 듀퐁 비율 산출<br>• 대화형 멀티턴 금융 챗봇 세션 관리<br>• 다중 기업 듀퐁 지표 정규화 및 레이더 차트 비교<br>• Ground-Truth 기반 정확도 벤치마크 오케스트레이션 | **파이프라인 엔진(`PipelineExecutionEngine`)을 직접 주입받아 비즈니스 목적별 모듈을 조립/호출**하며, 인프라 변경에 영향받지 않도록 격리 |
-| **`PipelineExecutionEngine`**<br>(순수 DAG 실행 & 모듈 계층) | • 웹/워커 환경 무관한 **순수 불변 실행 단위 (`@dataclass(frozen=True)`)** | • `module_registry: LazyModuleRegistry`<br>• `workflow_executor: WorkflowExecutor`<br>• `workflow_store: WorkflowStore`<br>• `run_store: RunStore` | • 19개 순수 RAG 파이프라인 모듈 지연 로딩 팩토리 레지스트리<br>• Kahn's 알고리즘 위상 정렬 및 `asyncio.TaskGroup` 비동기 병렬 실행<br>• 실행 인스턴스 FSM 상태 전이(RUNNING/COMPLETED) 영속화 | **인프라(`InfrastructureContainer`)를 주입받아 19개 모듈을 구동**하며, 단위 테스트 시 Mock 인프라로 100% 격리 테스트 가능 |
+| **`PipelineExecutionEngine`**<br>(순수 DAG 실행 & 모듈 계층) | • 웹/워커 환경 무관한 **순수 불변 실행 단위 (`@dataclass(frozen=True)`)** | • `module_registry: LazyModuleRegistry`<br>• `workflow_executor: WorkflowExecutor`<br>• `workflow_store: WorkflowStore`<br>• `run_store: RunStore` | • 21개 순수 RAG 파이프라인 모듈 지연 로딩 팩토리 레지스트리<br>• Kahn's 알고리즘 위상 정렬 및 `asyncio.TaskGroup` 비동기 병렬 실행<br>• 실행 인스턴스 FSM 상태 전이(RUNNING/COMPLETED) 영속화 | **인프라(`InfrastructureContainer`)를 주입받아 21개 모듈을 구동**하며, 단위 테스트 시 Mock 인프라로 100% 격리 테스트 가능 |
 | **`InfrastructureContainer`**<br>(공통 인프라 & 스토리지 계층) | • **FastAPI 웹 서버 & KEDA Worker Pod** 양쪽 모두에서 생성 및 공유 | • `openai_provider: OpenAIProvider`<br>• `completion_client: OpenAIResponsesClient`<br>• `embedding_encoder: OpenAIEmbeddingEncoder`<br>• `db_manager: DatabaseManager`<br>• `pgvector_store: PgVectorStore`<br>• `embedding_artifact_store: EmbeddingArtifactStore`<br>• `paths: RuntimePaths`<br>• `pgvector_probe: PgVectorConnectionProbe`<br>• `_owns_openai_provider: bool` | • GPT-5.6 Luna LLM/VLM 구조화/Agentic 생성 호출<br>• `text-embedding-3-large` (3072d) 벡터 인코딩<br>• PostgreSQL 16 비동기 풀 & 3072d pgvector 검색/색인<br>• 캐시/아티팩트 파일 시스템 절대 경로 싱글톤 관리 | 웹 프로세스와 워커 프로세스가 **100% 동일한 AI 모델 및 물리 DB/디스크 설정**을 공유하도록 강제하여 **워커 드리프트(Worker Drift)**를 원천 차단 |
 
 ---
@@ -223,10 +223,10 @@ classDiagram
 1. **4대 도메인 팩토리 분리**:
    - `QueryModulesFactory`: 질의 입력, 분해, 라우터, 시맨틱 매처 (LLM 클라이언트 주입)
    - `RetrievalModulesFactory`: 데이터 스코프, pgvector 검색, 키워드 검색, RRF 퓨전, 컨텍스트 확장기 (DB 스토어 주입)
-   - `VisionModulesFactory`: 시트 래스터라이저, Luna VLM 구조 감지, 셀 직렬화, 인덱스 라이터 (VLM & 디스크 경로 주입)
-   - `ReaderModulesFactory`: 재무 수식 계산 및 QA 리더 모듈 (수식 엔진 & LLM 주입)
+   - `VisionModulesFactory`: 시트 래스터라이저, Luna VLM 구조 감지, 셀 직렬화, 인덱스 라이터, 프로파일러 (VLM & 디스크 경로 주입)
+   - `ReaderModulesFactory`: 재무 수식 계산기, QA 리더 모듈 (수식 엔진 & LLM 주입)
 2. **지연 로딩(Lazy Loading) 메커니즘**:
-   - 서버 부팅 시 19개 객체를 미리 메모리에 올리지 않고 팩토리 생성 레시피(`register_factory`)만 등록.
+   - 서버 부팅 시 21개 객체를 미리 메모리에 올리지 않고 팩토리 생성 레시피(`register_factory`)만 등록.
    - 실제 파이프라인 실행 시 **최초 1회만 인스턴스화(Lazy Singleton)**하여 서버 기동 지연시간을 500ms ➡️ 20ms로 단축.
 
 ---
@@ -237,7 +237,7 @@ classDiagram
 1. **전 계층 동기(Sync Blocking) 부채 존재**:
    - `BaseModule.execute()` 동기 함수, `executor.py`의 `threading.RLock`, `openpyxl` 동기 엑셀 로딩으로 인해 고부하 동시 요청 시 이벤트 루프 지연 발생.
 2. **`ApplicationContainer`의 단일 거대 조립 결합도**:
-   - `create_workflow_runtime_services()` 내부에서 19개 모듈, DB 매니저, 파일 시스템 경로를 일괄 바인딩하여 단위 테스트 시 개별 모듈 격리 모킹(Mocking)이 번거로움.
+   - `create_workflow_runtime_services()` 내부에서 21개 모듈, DB 매니저, 파일 시스템 경로를 일괄 바인딩하여 단위 테스트 시 개별 모듈 격리 모킹(Mocking)이 번거로움.
 3. **런타임 실행 분기의 컨트롤러 계층 혼재**:
    - `workflow_routes.py`와 `benchmark_routes.py`에서 `workflow_dispatcher`와 `workflow_executor`를 직접 참조하여 if/else 분기하고 있음.
 
@@ -252,4 +252,5 @@ classDiagram
    ```
    - `AsyncInMemoryExecutionAdapter`와 `KubernetesQueueExecutionAdapter`로 구현 분리.
 3. **지연 생성 모듈 팩토리(Lazy Module Factory) 레이어 도입**:
-   - 19개 모듈을 4대 카테고리별(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`, `ReaderModulesFactory`)로 팩토리화하고 지연 로딩(`LazyModuleRegistry`)을 적용하여 메모리 오버헤드 최소화 및 단위 테스트 격리.
+   - 21개 모듈을 4대 카테고리별(`QueryModulesFactory`, `RetrievalModulesFactory`, `VisionModulesFactory`, `ReaderModulesFactory`)로 팩토리화하고 지연 로딩(`LazyModuleRegistry`)을 적용하여 메모리 오버헤드 최소화 및 단위 테스트 격리.
+
