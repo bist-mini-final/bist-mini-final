@@ -1,6 +1,6 @@
 # [BP-000] 엔터프라이즈 재무 RAG & 시각화 플랫폼 마스터 청사진 포털
 > **Project:** `bist-mini-final` (Enterprise Multi-Sheet Financial RAG & Visualizer Platform)  
-> **Document Code:** `BP-000` | **Version:** `3.0.0` | **Classification:** Master Blueprint Portal & Architectural Navigation Matrix
+> **Document Code:** `BP-000` | **Version:** `3.1.0` | **Classification:** Master Blueprint Portal & Engineering Lifecycle Story
 
 ---
 
@@ -48,7 +48,47 @@ flowchart TD
 
 ---
 
-## 2. 8대 도메인 25개 마스터 청사진 매트릭스 (Master Blueprint Matrix)
+## 2. 4단계 엔지니어링 라이프사이클 스토리 (The 4-Stage Engineering Narrative)
+
+본 시스템은 **문제 발견 ➡️ 가설 수립 및 설계 ➡️ 모듈/앱 개발 ➡️ 정량 실측 증명 및 거버넌스**의 4단계 엔드투엔드 라이프사이클을 거쳐 완성되었습니다:
+
+```mermaid
+flowchart LR
+    STAGE1["📘 1단계: 기획 및 문제 정의
+(Genesis & Discovery)
+• BP-001 비전 & 시장 문제점
+• BP-002 5대 유즈케이스 & 추적성"]
+    STAGE2["📐 2단계: 가설 검증 및 설계
+(Hypotheses & Design)
+• BP-003 6대 가설 실험 결과
+• BP-004 마일스톤 & R&R
+• BP-005 엔지니어링 표준
+• BP-101~104 코어 아키텍처"]
+    STAGE3["⚙️ 3단계: 엔진 및 워크스페이스 구축
+(Development & Workspaces)
+• BP-201~203 비전 & COPY
+• BP-301~303 DAG & 21개 모듈
+• BP-401~405 5대 워크스페이스
+• BP-501~503 & 601 인터페이스/UI"]
+    STAGE4["🏆 4단계: 실측 증명 및 거버넌스
+(Proof & Governance)
+• BP-701 벤치마크 실측 검증
+  (EM 96.8%, Recall 98.4%, 환각 0%)
+• AST 계약 테스트 & 리팩토링"]
+
+    STAGE1 --> STAGE2 --> STAGE3 --> STAGE4
+```
+
+| 개발 단계 | 핵심 질문 및 해결 과제 | 주요 수록 문서 | 핵심 산출물 및 증명 내용 |
+| :--- | :--- | :--- | :--- |
+| **Stage 1: 기획 & 문제 정의** | • 왜 기존 LLM/RAG가 재무 엑셀에서 실패하는가?<br>• 비즈니스 사용자가 원하는 핵심 기능은 무엇인가? | [`BP-001`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-001_business_vision_and_executive_summary.md)<br>[`BP-002`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-002_core_use_cases_and_workflows.md) | • 2D 기하 구조 소실 및 부동소수점 오차 원인 분석<br>• 5대 유즈케이스(UC-1~UC-5) 및 6차원 추적성 매트릭스 수립 |
+| **Stage 2: 가설 검증 & 설계** | • 어떤 기술적 가설과 실험을 통해 아키텍처를 결정했는가?<br>• 인프라와 표준 헌법은 어떻게 구성되는가? | [`BP-003`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-003_architecture_decision_and_hypotheses.md)<br>[`BP-004`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-004_project_timeline_and_role_distribution.md)<br>[`BP-005`](file:///c:/Repos/bist-mini-final/docs/00_master_plan_and_standards/BP-005_engineering_standards_and_code_conventions.md)<br>[`BP-101`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-101_system_architecture_blueprint.md)~[`104`](file:///c:/Repos/bist-mini-final/docs/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | • 비전 VLM, Binary COPY, RRF 융합 등 6대 가설 대조군 실험 검증<br>• Pydantic DTO 100% 타입화 헌법 및 2-Tier 런타임/3-Level 락 설계 |
+| **Stage 3: 엔진 개발 & 구축** | • 파이프라인 21개 모듈과 5대 워크스페이스는 어떻게 구현되었는가?<br>• 백엔드/프론트엔드/DB는 어떻게 연결되는가? | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)~[`203`](file:///c:/Repos/bist-mini-final/docs/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md)<br>[`BP-301`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md)~[`303`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md)<br>[`BP-401`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)~[`405`](file:///c:/Repos/bist-mini-final/docs/04_workspace_blueprints/BP-405_ws_company_comparison.md)<br>[`BP-501`](file:///c:/Repos/bist-mini-final/docs/05_interface_blueprints/BP-501_rest_api_specification.md)~[`601`](file:///c:/Repos/bist-mini-final/docs/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | • OpenPyXL 파서, Luna VLM 바운딩박스, pgvector Binary COPY 파이프라인<br>• 21개 모듈 핀아웃, React Flow DAG 빌더, 40+ 재무 BI 대시보드 |
+| **Stage 4: 실측 증명 & 거버넌스** | • 구축된 시스템의 성능과 정확도는 어떻게 실측 증명되었는가?<br>• 향후 리팩토링 시 아키텍처 침범을 어떻게 방지하는가? | [`BP-701`](file:///c:/Repos/bist-mini-final/docs/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md)<br>[`README`](file:///c:/Repos/bist-mini-final/docs/README.md#5-리팩토링-및-불변식-검증-가이드-refactoring-safety-workflow) | • Ground-Truth 데이터셋 기반 **Exact Match 96.8%, Recall 98.4%, 0.0% 환각** 증명<br>• AST 아키텍처 불변식 정적 계약 테스트 및 회귀 방지 체계 |
+
+---
+
+## 3. 8대 도메인 25개 마스터 청사진 매트릭스 (Master Blueprint Matrix)
 
 | 영역 (Domain) | 문서 코드 | 문서명 및 핵심 설계 내용 | 주요 대상 코드 / 리팩토링 타깃 |
 | :--- | :--- | :--- | :--- |
@@ -80,7 +120,7 @@ flowchart TD
 
 ---
 
-## 3. 역할별 맞춤형 추천 읽기 경로 (Recommended Reading Tracks)
+## 4. 역할별 맞춤형 추천 읽기 경로 (Recommended Reading Tracks)
 
 ```mermaid
 flowchart TD
@@ -117,7 +157,7 @@ flowchart TD
 
 ---
 
-## 4. 리팩토링 및 불변식 검증 가이드 (Refactoring Safety Workflow)
+## 5. 리팩토링 및 불변식 검증 가이드 (Refactoring Safety Workflow)
 
 ```mermaid
 graph LR
