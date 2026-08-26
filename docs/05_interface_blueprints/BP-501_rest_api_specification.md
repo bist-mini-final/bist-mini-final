@@ -63,6 +63,8 @@
 | `POST`| `/api/bi/questions/answer` | 단일 재무 질문에 대한 Fast RAG 답변 생성 | `BiQuestionAnswerRequest` -> `BiQuestionAnswerResponse` |
 | `GET` | `/api/bi/snapshots/{profile_id}` | 사전 계산된 40+ 지표 스냅샷 조회 | `BiSnapshotProjection` |
 | `POST`| `/api/bi/materialize` | 백그라운드 지표 일괄 산출 배치 트리거 | `MaterializeTaskAck` |
+| `GET` | `/api/bi/comparison/{comparison_id}` | 다중 기업 비교 레이더 차트 및 듀퐁 분해도 조회 | `BiComparisonProjection` |
+| `POST`| `/api/bi/comparison/materialize` | 다중 기업 지표 일괄 산출 & 정규화 배치 트리거 (Tier 2 KEDA) | `MaterializeTaskAck` |
 
 ### [Group 5: AI 금융 챗봇 대화 세션 (`/api/chatbot`)]
 
