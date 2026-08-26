@@ -64,21 +64,28 @@
 | `GET` | `/api/bi/snapshots/{profile_id}` | 사전 계산된 40+ 지표 스냅샷 조회 | `BiSnapshotProjection` |
 | `POST`| `/api/bi/materialize` | 백그라운드 지표 일괄 산출 배치 트리거 | `MaterializeTaskAck` |
 
-### [Group 5: 벤치마크 평가 (`/api/benchmarks`)]
+### [Group 5: AI 금융 챗봇 대화 세션 (`/api/chatbot`)]
+
+| Method | Endpoint | 설명 | Request / Response |
+| :--- | :--- | :--- | :--- |
+| `WS`  | `/api/chatbot/ws` | 멀티턴 대화, 실시간 토큰 스트리밍 및 중단(Abort) 제어용 양방향 WebSocket | WebSocket JSON Frames (`USER_MESSAGE` <-> `DELTA_TOKEN`) |
+| `GET` | `/api/chatbot/sessions` | 사용자의 최근 대화 세션 목록 조회 | `List[ChatbotSessionSummary]` |
+| `GET` | `/api/chatbot/sessions/{session_id}` | 특정 세션의 과거 대화 히스토리 및 근거 표 조회 | `ChatbotSessionDetailDTO` |
+
+### [Group 6: 벤치마크 평가 (`/api/benchmarks`)]
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
 | `POST`| `/api/benchmarks/run` | Ground-Truth 데이터셋 기반 정확도 벤치마크 실행 | `BenchmarkRunRequest` -> `BenchmarkRunResult` |
 | `GET` | `/api/benchmarks/runs/{run_id}` | 벤치마크 점수(Accuracy, Recall@K, Latency) 조회 | `BenchmarkEvaluationReport` |
 
-### [Group 6: K8s 배치 잡 & 워커 실시간 관제 (`/jobs`, `/api/jobs`)]
+### [Group 7: K8s 배치 잡 & 워커 실시간 관제 (`/jobs`, `/api/jobs`)]
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/jobs` | 백엔드 내장 K8s 배치 잡 & 워커 실시간 관제 대시보드 (1-depth 최상위 경로) | HTML / 대시보드 (200 OK) |
+| `WS`  | `/api/jobs/ws` | K8s Pod 라이프사이클 및 컨테이너 stdout 로그 양방향 터미널 스트림 | WebSocket JSON Frames (Pod Events / Terminal Stream) |
 | `GET` | `/api/jobs` | 현재 K8s 활성 워커 Pod 목록 및 Lease 락 상태 조회 | `List[K8sWorkerPodStatusDTO]` |
-| `GET` | `/api/jobs/stream` | K8s Pod 스케일아웃 및 라이프사이클 SSE 실시간 스트림 | `text/event-stream` (Pod Events) |
-| `GET` | `/api/jobs/{pod_name}/logs` | 특정 워커 Pod의 컨테이너 표준 출력(stdout) 실시간 로그 스트림 | `text/event-stream` (Log Lines) |
 | `POST`| `/api/jobs/{run_id}/cancel` | 고아/응답 없는 작업 강제 회수 및 Lease 반환 | `{"status": "cancelled", "released_lease": true}` |
 
 ---

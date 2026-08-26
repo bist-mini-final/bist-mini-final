@@ -41,24 +41,41 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Client UI
-    participant API as POST /api/chatbot/query
+    actor User as Client UI (ChatbotView)
+    participant WS as WebSocket Handler (WS /api/chatbot/ws)
     participant Adapter as FastRagPipelineAdapter
     participant Reg as ModuleRegistry
     participant PG as PostgreSQL (pgvector + FTS)
     participant LLM as GPT-5.6 Luna Financial Reader
 
-    User->>API: { session_id, message: "SK하이닉스 2023년 영업적자 원인 및 규모는?" }
-    API->>Adapter: retrieve(BiRetrievalRequest)
+    User->>WS: WebSocket Connect (Session Handshake)
+    WS-->>User: 101 Switching Protocols (Session Ready)
+
+    User->>WS: {"type": "USER_MESSAGE", "session_id": "s-1", "message": "SK하이닉스 2023년 영업적자 원인 및 규모는?"}
+    WS->>Adapter: retrieve(BiRetrievalRequest)
     Adapter->>Reg: decomposer.execute(query)
     Adapter->>Reg: router.execute(subqueries)
     Adapter->>PG: parallel_dense_and_keyword_search()
     PG-->>Adapter: raw_candidates
     Adapter->>Reg: rrf_fusion.execute(dense, keyword)
     Adapter->>Reg: context_expander.execute(fused_candidates)
-    Adapter-->>API: BiRetrievedContext (Expanded Tables & Evidence Cells)
-    API->>LLM: stream_chat_completion(SystemPrompt, RetrievedContext, UserQuery)
-    LLM-->>User: Server-Sent Events (SSE Text Chunks & Cited Cell Highlights)
+    Adapter-->>WS: BiRetrievedContext (Expanded Tables & Evidence Cells)
+
+    WS-->>User: {"type": "EVIDENCE_TABLES", "tables": [...], "cells": [...]}
+    WS->>LLM: stream_chat_completion(SystemPrompt, RetrievedContext, UserQuery)
+    
+    loop Realtime Token Streaming
+        LLM-->>WS: Delta Token ("영업적자는", " 7조...")
+        WS-->>User: {"type": "DELTA_TOKEN", "token": "..."}
+    end
+    
+    WS-->>User: {"type": "MESSAGE_COMPLETE", "message_id": "m-99", "usage": {...}}
+    
+    opt 사용자 즉시 중단 제어 (Abort on demand)
+        User->>WS: {"type": "ABORT_GENERATION"}
+        WS->>LLM: cancel_stream()
+        WS-->>User: {"type": "GENERATION_ABORTED"}
+    end
 ```
 
 ---
