@@ -10,6 +10,10 @@
 
 ```mermaid
 graph TB
+    subgraph ExternalDBGroup ["외부 관리형 DB (기본 연결 기준선 - Default Baseline)"]
+        PG_EXTERNAL["외부 PostgreSQL 16 + pgvector 3072d<br>(AWS RDS / Supabase / Neon / 호스트 PostgreSQL)"]
+    end
+
     subgraph K8sCluster ["Kubernetes Cluster (Namespace: bist-batch)"]
         INGRESS["Ingress Controller (Port 80/443)"]
         
@@ -21,8 +25,8 @@ graph TB
             BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• K8s Job Dashboard (/jobs)"]
         end
 
-        subgraph StorageGroup ["Storage Layer (선택적 프로비저닝)"]
-            PG_INTERNAL["[옵션 A] 내장 bist-postgres (StatefulSet)<br>pgvector 0.7.0 / PG 16 (PVC: 10Gi)"]
+        subgraph OptionalStorageGroup ["Storage Layer (선택적 로컬 프로비저닝)"]
+            PG_INTERNAL["[선택 옵션] 내장 bist-postgres (StatefulSet)<br>pgvector 0.7.0 / PG 16 (PVC: 10Gi)"]
         end
 
         subgraph KedaGroup ["Event-Driven Autoscaling (KEDA)"]
@@ -33,21 +37,17 @@ graph TB
         end
     end
 
-    subgraph ExternalDBGroup ["외부 관리형 DB (선택적 연결)"]
-        PG_EXTERNAL["[옵션 B] 외부 PostgreSQL + pgvector<br>(AWS RDS / Supabase / Neon / 호스트 DB)"]
-    end
-
     INGRESS -->|/ -> User Frontend UI| FE
     INGRESS -->|/api/* -> Core API| BE
     INGRESS -->|/docs, /redoc -> API Specs| BE
     INGRESS -->|/jobs -> K8s Job Monitor| BE
     
-    BE -->|내장 DB 사용 시| PG_INTERNAL
-    BE -->|외부 DB 지정 시| PG_EXTERNAL
-    WORKER_PODS -->|Lease & Processing| PG_INTERNAL
-    WORKER_PODS -->|Lease & Processing| PG_EXTERNAL
-    KEDA_OP -->|Polls Queue Count| PG_INTERNAL
-    KEDA_OP -->|Polls Queue Count| PG_EXTERNAL
+    BE -->|기본: 외부 DB 연결| PG_EXTERNAL
+    BE -.->|선택: 내장 DB 활성화 시| PG_INTERNAL
+    WORKER_PODS -->|기본: 외부 DB 연결| PG_EXTERNAL
+    WORKER_PODS -.->|선택: 내장 DB 활성화 시| PG_INTERNAL
+    KEDA_OP -->|기본: 외부 DB 큐 감지| PG_EXTERNAL
+    KEDA_OP -.->|선택: 내장 DB 큐 감지| PG_INTERNAL
     KEDA_OP -->|Triggers| SCALED_JOB
 ```
 
@@ -205,17 +205,17 @@ flowchart TD
 
 ---
 
-### 3.4 선택적 DB 프로비저닝 (Internal StatefulSet vs External Managed DB)
+### 3.4 선택적 DB 프로비저닝 (External Managed DB 기본값 vs Internal StatefulSet 선택)
 
-클러스터/컴포즈 배포 시 **PostgreSQL + pgvector 컨테이너를 함께 띄울지(내장 DB), 아니면 기존 외부 DB에 연결할지(외부 DB)**를 유연하게 선택할 수 있습니다:
+엔터프라이즈 프로덕션 환경과의 일치성을 위해 **외부 관리형 DB(External Managed PostgreSQL + pgvector) 연결이 기본값(Default)**으로 동작하며, 별도 DB가 없는 환경을 위해 **내장 DB 컨테이너 기동은 선택 옵션(Optional)**으로 제공됩니다:
 
-| 구분 | [옵션 A] 내장 DB 컨테이너 배포 (기본값) | [옵션 B] 외부 관리형 DB 연결 (선택) |
+| 구분 | [기본값] 외부 관리형 DB 연결 (Default Baseline) | [선택 옵션] 내장 DB 컨테이너 배포 (Optional Local DB) |
 | :--- | :--- | :--- |
-| **적용 시나리오** | 로컬에 별도 DB가 없는 일반 개발/테스트 환경 | AWS RDS, Neon, Supabase, 호스트 자체 PostgreSQL 사용 시 |
-| **실행 옵션** | `./deploy/kubernetes/local.sh all`<br>(기본 플래그 `--with-postgres`) | `./deploy/kubernetes/local.sh all --without-postgres`<br>(또는 환경변수 `POSTGRES_HOST=your-rds-host.com` 지정) |
-| **DB 컨테이너** | K8s `bist-postgres` StatefulSet 자동 기동 (PVC 10Gi) | **내부 DB 컨테이너 생성 스킵** (5432 포트 충돌 및 메모리 낭비 0) |
-| **연결 바인딩** | 클러스터 내부 서비스 DNS (`bist-postgres:5432`) 주입 | 제공된 외부 DB 접속 정보(`Secret`/`ConfigMap`)를 백엔드/워커에 주입 |
-| **KEDA 트리거** | 내부 DB 큐 카운트 감지 | 외부 DB `workflow_runs` 테이블을 원격 폴링하여 오토스케일링 |
+| **적용 시나리오** | **AWS RDS, Neon, Supabase, 호스트 자체 PostgreSQL 연결** | 로컬 머신에 별도 DB가 전혀 없는 개발/테스트 환경 |
+| **실행 옵션** | `./deploy/kubernetes/local.sh all`<br>(기본값: 환경변수 `POSTGRES_HOST` / `.env` 참조) | `./deploy/kubernetes/local.sh all --with-embedded-postgres`<br>(내장 DB 자동 기동 플래그 명시 시) |
+| **DB 컨테이너** | **내부 DB 컨테이너 생성 스킵** (5432 포트 충돌 및 메모리 낭비 0) | K8s `bist-postgres` StatefulSet 자동 기동 (PVC 10Gi) |
+| **연결 바인딩** | 제공된 외부 DB 접속 정보(`Secret`/`ConfigMap`)를 백엔드/워커에 주입 | 클러스터 내부 서비스 DNS (`bist-postgres:5432`) 주입 |
+| **KEDA 트리거** | 외부 DB `workflow_runs` 테이블을 원격 폴링하여 오토스케일링 | 내부 DB 큐 카운트 감지 |
 
 ---
 
