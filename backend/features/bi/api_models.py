@@ -76,9 +76,9 @@ def _should_list_company(company: BiCompanySummary) -> bool:
         bool: `true` if the company has a ready snapshot or an active refresh, `false` otherwise.
     """
     match company.snapshot_status:
-        case SnapshotStatus.READY:
+        case SnapshotStatus.READY | SnapshotStatus.PARTIAL:
             return True
-        case SnapshotStatus.PARTIAL | None:
+        case None:
             match company.refresh_status:
                 case (
                     RefreshStatus.QUEUED
