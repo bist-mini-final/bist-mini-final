@@ -51,13 +51,13 @@ flowchart TD
     subgraph S2 ["Stage 2: 배치 임베딩 (batch_size=512)"]
         EMB["CellTextEmbedder (OpenAI text-embedding-3-large 512건씩 슬라이싱)"]
         DISK["디스크 바이너리 아티팩트 (data/artifacts/embeddings/*.f32 순차 Append)"]
-        EMB -->|Raw float32 바이트 스트림| DISK
+        EMB -->|"Raw float32 바이트 스트림"| DISK
     end
 
     subgraph S3 ["Stage 3: PostgreSQL Binary COPY (batch_size=1000)"]
         STORE["PgVectorIndexWriter (디스크에서 memoryview로 1,000개씩 읽기)"]
         PG["PostgreSQL langchain_pg_embedding (TCP 소켓 직결 주입)"]
-        DISK -->|OS Page Cache (RAM 속도) 읽기| STORE
+        DISK -->|"OS Page Cache (RAM 속도) 읽기"| STORE
         STORE --> PG
     end
 
