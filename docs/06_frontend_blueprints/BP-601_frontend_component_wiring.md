@@ -61,11 +61,13 @@ React SPA 내부 라우팅이 아닌, **FastAPI 백엔드가 1-depth 최상위 �
 
 ---
 
-## 3. 전역 상태 및 데이터 페칭 계층 (State & Data Fetching)
+## 3. 전역 상태, 뷰모델 및 접근성 계층 (State, ViewModels & Accessibility)
 
 - **HTTP 통신 라이브러리**: [`ky`](file:///c:/Repos/bist-mini-final/frontend/package.json#L16)를 사용하여 기본 타임아웃, 인터셉터(X-Request-ID 주입), JSON 자동 파싱 처리.
 - **실시간 스트리밍**: 브라우저 네이티브 `EventSource` API를 래핑한 커스텀 훅(`useWorkflowStream`)으로 SSE 연결 수명주기 관리.
 - **런타임 스키마 검증**: 백엔드 API 응답을 `zod` 스키마로 런타임 검증하여 타입 불일치 사전 차단.
+- **적응형 차트 뷰모델 (`chartViewModel.ts`)**: `getProfitabilityMarginDomain` 등 도메인 셀렉터를 통해 음수 마진/영업적자 발생 시 Recharts Y축 도메인을 자동 계산하여 스케일링.
+- **접근성(a11y) 표준 모달 훅 (`useModalDialog`)**: 모든 대화상자(`ResetDataDialog`, `EvidenceDialog` 등)에 `role="dialog"`, `aria-modal="true"`, `Escape` 닫기 및 포커스 트랩 표준 적용.
 
 ---
 
