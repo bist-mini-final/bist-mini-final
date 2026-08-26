@@ -6,14 +6,14 @@
 
 ## 1. Luna VLM 구조 감지 아키텍처 (Luna VLM Vision Architecture)
 
-엑셀 파일 내의 표는 복잡한 서식, 텍스트 메모, 다중 표 병합 등으로 인해 순수 텍스트 파싱만으로는 표의 경계를 정확히 잡기 어렵습니다. `LunaVlmStructureDetectorModule`은 **시트 래스터라이징(Rasterization)과 GPT-4o Vision 추론**을 결합하여 완벽한 표 바운딩 박스를 도출합니다.
+엑셀 파일 내의 표는 복잡한 서식, 텍스트 메모, 다중 표 병합 등으로 인해 순수 텍스트 파싱만으로는 표의 경계를 정확히 잡기 어렵습니다. `LunaVlmStructureDetectorModule`은 **시트 래스터라이징(Rasterization)과 GPT-5.6 Luna 추론**을 결합하여 완벽한 표 바운딩 박스를 도출합니다.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Parser as LunaVlmStructureDetectorModule
     participant Renderer as ExcelSheetRenderer (Pillow)
-    participant VLM as OpenAIResponsesClient (GPT-4o Vision)
+    participant VLM as OpenAIResponsesClient (GPT-5.6 Luna)
     participant Disk as Spreadsheet Artifact Storage (/data/artifacts)
 
     Parser->>Renderer: render_sheet_image(workbook, sheet_name, max_rows=100, max_cols=30)
@@ -33,7 +33,7 @@ sequenceDiagram
 
 ## 2. 시각적 오버레이 합성 파이프라인 (Cell Type Visual Overlay)
 
-`ExcelSheetRenderer`는 GPT-4o Vision 모델의 인식 정확도를 극대화하기 위해 셀 데이터 타입별 시각적 힌트를 캔버스에 그립니다:
+`ExcelSheetRenderer`는 GPT-5.6 Luna 모델의 인식 정확도를 극대화하기 위해 셀 데이터 타입별 시각적 힌트를 캔버스에 그립니다:
 
 | 셀 데이터 타입 | 시각적 렌더링 스타일 (Rendering Style) | VLM 인식 보조 효과 |
 | :--- | :--- | :--- |
@@ -90,7 +90,7 @@ classDiagram
 ## 5. 리팩토링 타깃 (Refactoring Targets)
 
 1. **로컬 VLM 경량화 모델 지원 (Local VLM Support)**:
-   - As-Is: OpenAI GPT-4o Vision 클라우드 API에 의존.
+   - As-Is: OpenAI GPT-5.6 Luna 클라우드 API에 의존.
    - To-Be: `Qwen2-VL-7B` 또는 `PaliGemma-2` 로컬 ONNX/vLLM 추론 어댑터를 추가하여 에어갭(Air-gapped) 보안 환경 지원.
 2. **동적 타일링(Dynamic Image Tiling)**:
    - 100행 이상의 거대 시트를 균등 분할 렌더링하고, 바운딩 박스 좌표를 합성하는 Multi-Tile VLM 결합 알고리즘 도입.

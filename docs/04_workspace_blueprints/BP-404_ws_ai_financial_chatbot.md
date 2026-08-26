@@ -46,7 +46,7 @@ sequenceDiagram
     participant Adapter as FastRagPipelineAdapter
     participant Reg as ModuleRegistry
     participant PG as PostgreSQL (pgvector + FTS)
-    participant LLM as GPT-4o Financial Reader
+    participant LLM as GPT-5.6 Luna Financial Reader
 
     User->>API: { session_id, message: "SK하이닉스 2023년 영업적자 원인 및 규모는?" }
     API->>Adapter: retrieve(BiRetrievalRequest)
