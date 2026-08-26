@@ -4,19 +4,72 @@
 
 ---
 
-## 1. 19개 파이프라인 모듈 종합 핀아웃 매트릭스 (Pinout Specification)
+## 1. 3단계 클래스 상속 계층 및 종합 핀아웃 규격 (3-Tier Inheritance Architecture)
 
-모든 모듈은 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py) 추상 클래스를 상속하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스 및 **100% 비동기 논블로킹 실행 계약(`execute_async`)**을 준수합니다.
+모든 모듈은 최상위 추상 클래스 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)을 정점으로 하며, LLM 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 19개 구체 모듈로 상속됩니다.
 
 ```mermaid
-graph LR
-    subgraph ModuleContract ["표준 비동기 모듈 인터페이스 (Async Pinout Interface)"]
-        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.execute_async()"]
-        CFG["Config Pins (ModuleConfigDTO)"] --> MOD
-        MOD --> OUT["Output Pins (Pydantic OutputDTO)"]
-        MOD --> ERR["Error Envelope (ModuleExecutionError)"]
-    end
+classDiagram
+    class BaseModule {
+        <<Abstract Root>>
+        +input_model: Type[ModuleInputDTO]
+        +config_model: Type[ModuleConfigDTO]
+        +output_model: Type[ModuleDTO]
+        +definition: ModuleDefinition
+        +execute_async(input_data, config)*
+        +run(input_data, config) Template Method
+    }
+
+    class BaseLLMModule {
+        <<Abstract Intermediate>>
+        +complete_structured(response_model, prompt)
+        +complete_text(prompt, system_prompt)
+        +complete_agentic(tools, max_turns)
+        +calculate_token_cost_usd(usage)
+    }
+
+    class BaseEmbedderModule {
+        <<Abstract Intermediate>>
+        +encode_texts(texts, dimension=3072)
+        +encode_batches_streaming(texts, batch_size)
+    }
+
+    class PureAlgorithmModules {
+        <<7 Modules>>
+        QueryInput, QueryRouter, CellTextSerializer,
+        PgVectorRetriever, SparseBm25Retriever,
+        RrfFuser, ContextExpander
+    }
+
+    class LLMInferenceModules {
+        <<10 Modules>>
+        Decomposer, MultiQueryExpander, HydeGenerator,
+        LunaVlmStructureDetector, CompanyEntityExtractor,
+        Reader, AgenticReasoner, ContextCompressor,
+        FactChecker, ConfidenceScorer
+    }
+
+    class EmbeddingModules {
+        <<2 Modules>>
+        TextEmbedder, CrossEncoderReranker
+    }
+
+    BaseModule <|-- BaseLLMModule : Inherits
+    BaseModule <|-- BaseEmbedderModule : Inherits
+    BaseModule <|-- PureAlgorithmModules : Directly Inherits
+    BaseLLMModule <|-- LLMInferenceModules : Inherits
+    BaseEmbedderModule <|-- EmbeddingModules : Inherits
 ```
+
+---
+
+### 1.1 19개 파이프라인 모듈 3대 상속 분류 매트릭스
+
+| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (19개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
+| :--- | :---: | :--- | :--- |
+| **`BaseLLMModule`** | **10개** | • `query.decomposer`<br>• `query.multi_query_expander`<br>• `query.hyde_generator`<br>• `structure.luna_vlm_structure_detector`<br>• `storage.company_entity_extractor`<br>• `generation.reader`<br>• `generation.agentic_reasoner`<br>• `generation.context_compressor`<br>• `generation.fact_checker`<br>• `generation.confidence_scorer` | • `complete_structured(...)` (1-Shot Pydantic 파싱)<br>• `complete_agentic(...)` (LangChain BaseTool 루프)<br>• 토큰 사용량/비용(USD)/지연시간 자동 집계 |
+| **`BaseEmbedderModule`** | **2개** | • `retrieval.text_embedder`<br>• `retrieval.cross_encoder_reranker` | • `encode_texts(...)` (배치 임베딩 & 3072d 검증)<br>• `encode_batches_streaming(...)` (스트리밍 인코딩) |
+| **`BaseModule` (직접)** | **7개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander` | • 비동기 논블로킹 알고리즘/I/O 실행 (`execute_async`)<br>• Pydantic DTO 자동 검증 & 중앙화 예외 가드 |
 
 ---
 
