@@ -11,10 +11,10 @@
 ```mermaid
 graph TD
     L1["1. Presentation & API Layer<br>(FastAPI Routers, Pydantic DTOs, Error Envelopes)"]
-    L2["2. Bootstrap & DI Layer<br>(ApplicationContainer, RuntimeContainer, Lifespan)"]
-    L3["3. Domain & Feature Services Layer<br>(BiApiServices, Profiler, Metric Engine, BenchmarkService)"]
+    L2["2. Bootstrap & DI Layer<br>(ApplicationContainer, DomainServices, PipelineEngine, Infra)"]
+    L3["3. Domain & Feature Services Layer<br>(BiApiServices, Chatbot, Comparison, Benchmark)"]
     L4["4. Execution & Orchestration Layer<br>(WorkflowExecutor, KubernetesQueueDispatcher, Lease Manager)"]
-    L5["5. Modular Pipeline Contracts Layer<br>(BaseModule ABC, 19 Pipeline Modules, ModuleRegistry)"]
+    L5["5. Modular Pipeline Contracts Layer<br>(BaseModule ABC, 19 Pipeline Modules, LazyModuleRegistry)"]
     L6["6. External Providers & Adapters Layer<br>(OpenAIResponsesClient, EmbeddingEncoder Ports & Adapters)"]
     L7["7. Storage & Infrastructure Layer<br>(DatabaseManager, PgVectorStore, BinaryCopy, ConnectionPool)"]
 
@@ -45,7 +45,64 @@ graph TD
 
 ---
 
-## 3. 계층 간 데이터 버스 및 DTO 전파 규칙 (Data Bus & DTO Wire Protocol)
+## 3. 7계층 1:1 대응 디렉토리 표준 구조 (Screaming Architecture Directory Layout)
+
+백엔드 소스 트리는 7단계 아키텍처 계층과 **1:1로 직접 매핑되는 직관적인 디렉토리 체계(Screaming Architecture)**로 구성됩니다:
+
+```text
+bist-mini-final/
+├── modules/                        # [Layer 5] 19개 순수 RAG 파이프라인 모듈 라이브러리 (루트 독립)
+│   ├── query/                      # 질의 분해, 라우터, 시맨틱 매처
+│   ├── retrieval/                  # 하이브리드 검색, 키워드 검색, RRF 퓨전
+│   ├── vision/                     # 시트 래스터라이저, Luna VLM 구조 감지, 셀 직렬화
+│   ├── reader/                     # 재무 수식 계산 및 QA 리더
+│   └── common/                     # BaseModule, BaseLLMModule, BaseTool
+│
+├── backend/
+│   ├── main.py                     # FastAPI 엔트리포인트 (Lifespan 관리)
+│   │
+│   ├── core/                       # [공통 기반] 환경설정, 로깅, 전역 상수, 예외
+│   │   ├── settings.py
+│   │   ├── logging.py
+│   │   └── exceptions.py
+│   │
+│   ├── api/                        # [Layer 1: Presentation & API]
+│   │   ├── routers/                # workflow_routes, bi_routes, chatbot_routes, job_routes
+│   │   ├── schemas/                # 요청/응답 Pydantic DTO 및 OpenAPI 스키마
+│   │   ├── middlewares/            # CORS, X-Request-ID, Latency 계측
+│   │   └── error_handlers/         # 전역 에러 핸들러 및 HTTP 에러 매핑
+│   │
+│   ├── bootstrap/                  # [Layer 2: Bootstrap & DI]
+│   │   ├── container.py            # ApplicationContainer (단일 Composition Root)
+│   │   ├── lifespan.py             # FastAPI startup / shutdown 핸들러
+│   │   └── factories/              # 4대 도메인 모듈 팩토리 (Query, Retrieval, Vision, Reader)
+│   │
+│   ├── features/                   # [Layer 3: Domain & Features]
+│   │   ├── bi/                     # 재무제표 프로파일러, 40+ 재무비율 계산기
+│   │   ├── chatbot/                # [예정] AI 금융 챗봇 멀티턴 세션 관리자
+│   │   ├── comparison/             # [예정] 다중 기업 크로스 비교 & 듀퐁 정규화
+│   │   └── benchmark/              # 파이프라인 정확도 평가 벤치마크 서비스
+│   │
+│   ├── engine/                     # [Layer 4: Execution & Orchestration]
+│   │   ├── workflows/              # WorkflowExecutor (asyncio DAG 위상 정렬 실행기)
+│   │   ├── orchestration/          # KubernetesQueueDispatcher (KEDA 분산 큐)
+│   │   ├── worker/                 # WorkerMain, LeaseManager (Advisory Lock & Heartbeat)
+│   │   └── runtime/                # LazyModuleRegistry, ExecutionPorts
+│   │
+│   ├── providers/                  # [Layer 6: External Providers]
+│   │   ├── openai/                 # OpenAIProvider, ResponsesClient (GPT-5.6 Luna)
+│   │   └── embeddings/             # OpenAIEmbeddingEncoder (3072d)
+│   │
+│   └── storage/                    # [Layer 7: Storage & Persistence]
+│       ├── postgres/               # DatabaseManager (비동기 풀), DDL/Migrations
+│       ├── pgvector/               # PgVectorStore (3072d HNSW 코사인 검색)
+│       ├── binary_copy/            # Binary COPY 초고속 대량 색인 파이프라인
+│       └── artifacts/              # EmbeddingArtifactStore, RunStore, WorkflowStore
+```
+
+---
+
+## 4. 계층 간 데이터 버스 및 DTO 전파 규칙 (Data Bus & DTO Wire Protocol)
 
 ```mermaid
 sequenceDiagram
@@ -69,7 +126,7 @@ sequenceDiagram
 
 ---
 
-## 4. 리팩토링 타깃 및 아키텍처 규칙 (Refactoring Invariants & Debts)
+## 5. 리팩토링 타깃 및 아키텍처 규칙 (Refactoring Invariants & Debts)
 
 ### 불변식 아키텍처 계약 (Architecture Contracts)
 - **하향식 의존성 엄수**: 하위 계층(Layer 7, 6, 5)은 상위 계층(Layer 1, 2, 3)을 절대 import할 수 없습니다. (CI에서 `test_architecture_contracts.py`로 검증)
@@ -78,12 +135,11 @@ sequenceDiagram
 - **DB 커넥션 누수 방지**: Layer 7은 항상 비동기 컨텍스트 매니저(`async with get_async_connection():`)를 통해 풀에 반환해야 합니다.
 
 ### As-Is 부채 및 To-Be 개선안
-1. **전 계층 Full-Async 논블로킹 전환**:
-   - As-Is: `BaseModule.execute()` 및 `WorkflowExecutor` 내부가 동기 함수와 `threading.RLock`으로 묶여 있어 고부하 시 이벤트 루프 지연 발생.
-   - To-Be: `async def execute_async()` 및 `asyncio.TaskGroup` 기반 네이티브 비동기 스케줄러로 전면 전환하고, `AsyncOpenAI`와 `AsyncConnectionPool` 바인딩.
-2. **`features/bi`와 `storage/db_manager` 간의 거대 결합**:
-   - As-Is: `backend/features/bi/postgres_store.py`가 25KB에 달하며 직접 동기 SQL을 실행함.
-   - To-Be: `BiRepositoryPort` 비동기 인터페이스를 정의하고, `SqlAlchemyBiRepository` 또는 `AsyncPsycopgBiRepository` 어댑터로 격리.
-3. **모듈과 스토어의 직접 결합 완화**:
-   - As-Is: `PgVectorRetrieverModule`이 `PgVectorStore` 구체 클래스를 직접 주입받음.
-   - To-Be: `VectorSearchPort` 비동기 추상 인터페이스를 주입받아 Milvus, Pinecone, pgvector 등 다중 백엔드 교체 가능 구조로 리팩토링.
+1. **백엔드 디렉토리의 Screaming Architecture 정렬**:
+   - 과거 20여 개로 분산된 평면 디렉토리(`spreadsheets/`, `vision/`, `llm/` 등)를 7개 계층(`api/`, `bootstrap/`, `features/`, `engine/`, `modules/`, `providers/`, `storage/`)으로 1:1 완벽 정렬.
+2. **전 계층 Full-Async 논블로킹 전환**:
+   - `BaseModule.execute()` 및 `WorkflowExecutor` 내부를 `async def execute_async()` 및 `asyncio.TaskGroup` 기반 네이티브 비동기 스케줄러로 전면 전환하고, `AsyncOpenAI`와 `AsyncConnectionPool` 바인딩.
+3. **`features/bi`와 `storage/db_manager` 간의 결합 완화**:
+   - `BiRepositoryPort` 비동기 인터페이스를 정의하고, `SqlAlchemyBiRepository` 또는 `AsyncPsycopgBiRepository` 어댑터로 격리.
+4. **모듈과 스토어의 직접 결합 완화**:
+   - `VectorSearchPort` 비동기 추상 인터페이스를 주입받아 Milvus, Pinecone, pgvector 등 다중 백엔드 교체 가능 구조로 리팩토링.
