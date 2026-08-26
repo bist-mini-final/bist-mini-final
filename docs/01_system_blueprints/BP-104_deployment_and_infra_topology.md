@@ -21,8 +21,8 @@ graph TB
             BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• K8s Job Dashboard (/jobs)"]
         end
 
-        subgraph StorageGroup ["Storage StatefulSet"]
-            PG["bist-postgres (pgvector 0.7.0 / PG 16)<br>PVC: 10Gi Local Path Storage"]
+        subgraph StorageGroup ["Storage Layer (선택적 프로비저닝)"]
+            PG_INTERNAL["[옵션 A] 내장 bist-postgres (StatefulSet)<br>pgvector 0.7.0 / PG 16 (PVC: 10Gi)"]
         end
 
         subgraph KedaGroup ["Event-Driven Autoscaling (KEDA)"]
@@ -33,13 +33,21 @@ graph TB
         end
     end
 
+    subgraph ExternalDBGroup ["외부 관리형 DB (선택적 연결)"]
+        PG_EXTERNAL["[옵션 B] 외부 PostgreSQL + pgvector<br>(AWS RDS / Supabase / Neon / 호스트 DB)"]
+    end
+
     INGRESS -->|/ -> User Frontend UI| FE
     INGRESS -->|/api/* -> Core API| BE
     INGRESS -->|/docs, /redoc -> API Specs| BE
     INGRESS -->|/jobs -> K8s Job Monitor| BE
-    BE -->|SQL & Vector I/O| PG
-    WORKER_PODS -->|Lease & Processing| PG
-    KEDA_OP -->|Polls Queue Count| PG
+    
+    BE -->|내장 DB 사용 시| PG_INTERNAL
+    BE -->|외부 DB 지정 시| PG_EXTERNAL
+    WORKER_PODS -->|Lease & Processing| PG_INTERNAL
+    WORKER_PODS -->|Lease & Processing| PG_EXTERNAL
+    KEDA_OP -->|Polls Queue Count| PG_INTERNAL
+    KEDA_OP -->|Polls Queue Count| PG_EXTERNAL
     KEDA_OP -->|Triggers| SCALED_JOB
 ```
 
@@ -194,6 +202,20 @@ flowchart TD
    - 실제 운영 환경과 100% 동일하게 로컬 k3d 클러스터를 생성하고, KEDA 오토스케일러와 Ingress Controller를 통한 엔터프라이즈 멀티 티어 배포를 검증합니다.
 2. **Track B (대체): Zero-K8s 경량 Docker-Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
    - K8s를 구동하기 어려운 저사양 노트북이나 CI 파이프라인에서 k3d 설치 없이 **동일한 프론트엔드/백엔드/PostgreSQL/워커 스택을 즉시 구동**하는 Fallback 트랙을 완벽히 보장합니다.
+
+---
+
+### 3.4 선택적 DB 프로비저닝 (Internal StatefulSet vs External Managed DB)
+
+클러스터/컴포즈 배포 시 **PostgreSQL + pgvector 컨테이너를 함께 띄울지(내장 DB), 아니면 기존 외부 DB에 연결할지(외부 DB)**를 유연하게 선택할 수 있습니다:
+
+| 구분 | [옵션 A] 내장 DB 컨테이너 배포 (기본값) | [옵션 B] 외부 관리형 DB 연결 (선택) |
+| :--- | :--- | :--- |
+| **적용 시나리오** | 로컬에 별도 DB가 없는 일반 개발/테스트 환경 | AWS RDS, Neon, Supabase, 호스트 자체 PostgreSQL 사용 시 |
+| **실행 옵션** | `./deploy/kubernetes/local.sh all`<br>(기본 플래그 `--with-postgres`) | `./deploy/kubernetes/local.sh all --without-postgres`<br>(또는 환경변수 `POSTGRES_HOST=your-rds-host.com` 지정) |
+| **DB 컨테이너** | K8s `bist-postgres` StatefulSet 자동 기동 (PVC 10Gi) | **내부 DB 컨테이너 생성 스킵** (5432 포트 충돌 및 메모리 낭비 0) |
+| **연결 바인딩** | 클러스터 내부 서비스 DNS (`bist-postgres:5432`) 주입 | 제공된 외부 DB 접속 정보(`Secret`/`ConfigMap`)를 백엔드/워커에 주입 |
+| **KEDA 트리거** | 내부 DB 큐 카운트 감지 | 외부 DB `workflow_runs` 테이블을 원격 폴링하여 오토스케일링 |
 
 ---
 
