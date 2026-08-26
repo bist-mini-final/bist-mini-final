@@ -27,6 +27,8 @@ graph TD
     P_PLAY --> XYFLOW["@xyflow/react (Custom Nodes, Minimap, Controls)"]
     P_DS --> GRID_VIEW["Spreadsheet Table & VLM Overlay Inspector"]
     P_BI --> RECHARTS["Recharts (Area, Bar, Line, ResponsiveContainer)"]
+    P_BI --> HEATMAP["FinancialHealthHeatmap (종합 재무 건전성 히트맵)"]
+    P_BI --> RESET_DLG["ResetDataDialog (데이터 초기화 & 배치 모니터링)"]
 ```
 
 ---
