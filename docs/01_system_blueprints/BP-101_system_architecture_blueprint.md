@@ -20,7 +20,7 @@ graph TB
 
     subgraph GatewayTier ["2. Gateway & API Tier (Kubernetes & FastAPI)"]
         INGRESS["Kubernetes Ingress (bist-mini-ingress : 8080)"]
-        ROUTER["FastAPI App (/api/*, /docs, /admin/jobs)"]
+        ROUTER["FastAPI App (/api/*, /docs, /redoc, /jobs)"]
         CONTAINER["ApplicationContainer (DI Composition Root)"]
         INGRESS --> ROUTER --> CONTAINER
     end
