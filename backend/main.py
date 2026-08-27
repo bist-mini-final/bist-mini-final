@@ -1,4 +1,4 @@
-"""Main FastAPI application entry point with lifespan management, health probes, and centralized error handling."""
+"""Main FastAPI application entry point with lifespan management, health probes, centralized error handling, and hierarchical ReDoc documentation."""
 
 from __future__ import annotations
 
@@ -8,12 +8,13 @@ import time
 import uuid
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta
-from typing import AsyncGenerator
 from zoneinfo import ZoneInfo
+from typing import Any, AsyncGenerator, Dict
 
 from anyio import to_thread
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -202,34 +203,144 @@ def register_global_exception_handlers(application: FastAPI) -> None:
 
 
 # ==============================================================================
-# 4. Application Factory
+# 4. Custom OpenAPI with ReDoc Hierarchical x-tagGroups & External Modules Schema
 # ==============================================================================
-def create_app(container: ApplicationContainer | None = None) -> FastAPI:
-    shared_container = container or ApplicationContainer.create()
-    application = FastAPI(
-        title="RAG Pipeline Visualizer API",
+def custom_openapi_schema(app: FastAPI) -> Dict[str, Any]:
+    """x-tagGroups 계층 구조와 전체 외부 파이프라인 모듈의 Pydantic DTO 스키마를 포함하는 OpenAPI 스키마 생성."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="BIST 엔터프라이즈 RAG 파이프라인 & BI 엔진 API",
         version="2.0.0",
         description=(
-            "RAG·스프레드시트 모듈 계약과 Kubernetes 기반 비동기 워크플로 "
-            "API입니다. Input/Config/Output Pydantic 스키마와 실행 상태를 "
-            "Swagger에 노출합니다."
+            "### 🏢 BIST Mini Final — 엔터프라이즈 RAG 파이프라인 및 BI 엔진\n\n"
+            "재무 스프레드시트 구조 분석, **Luna VLM 비정형 표 감지**, **PostgreSQL/pgvector 하이브리드 검색 (Dense + FTS + RRF)**, "
+            "근거 기반 수식 답변 생성, **BI 대시보드 지표 추출** 및 **RAG 파이프라인 벤치마크 평가**를 위한 엔터프라이즈 REST API 명세서입니다.\n\n"
+            "#### 📂 아키텍처 계층 및 시스템 구성\n"
+            "- **`modules/`**: 19개 RAG 파이프라인 모듈 및 Pydantic v2 계약의 단일 소스 (Single Source of Truth)\n"
+            "- **`jobs/`**: 선언적 DAG 파이프라인 레시피 및 전용 배치 워커 엔트리포인트\n"
+            "- **FastAPI Control Plane**: API 계약 검증, PostgreSQL 큐 등록, 스냅샷 영속화, SSE 실시간 스트리밍 제공\n"
+            "- **KEDA ScaledJobs**: 4개 독립 큐(`workflow-core`, `bi-materialization`, `bi-question`, `benchmark`) 기반 쿠버네티스 수평 자동 확장\n"
         ),
+        routes=app.routes,
+    )
+
+    # 1. ReDoc 계층형 사이드바 x-tagGroups 정의 (완전 한글화)
+    openapi_schema["x-tagGroups"] = [
+        {
+            "name": "1. 시스템 및 인프라",
+            "tags": ["시스템 헬스 & 프로브", "데이터 소스 관리", "스프레드시트 렌더 아티팩트"],
+        },
+        {
+            "name": "2. RAG 파이프라인 모듈",
+            "tags": ["모듈 카탈로그 및 스키마"],
+        },
+        {
+            "name": "3. DAG 워크플로 엔진",
+            "tags": ["워크플로 정의 관리", "워크플로 실행 및 실시간 스트림"],
+        },
+        {
+            "name": "4. BI 대시보드 및 분석 엔진",
+            "tags": [
+                "BI 기업 목록 및 개요",
+                "BI 대시보드 스냅샷",
+                "BI 머티리얼라이제이션 작업",
+                "BI 지표 질문 및 배치 계산",
+            ],
+        },
+        {
+            "name": "5. RAG 벤치마크 평가",
+            "tags": ["벤치마크 실행 및 채점"],
+        },
+    ]
+
+    # 2. Inject External modules/* Pydantic DTO Schemas into components/schemas
+    container: ApplicationContainer | None = getattr(app.state, "container", None)
+    if container is not None:
+        schemas = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
+        try:
+            modules = container.runtime.services.module_registry.list_modules()
+            for module in modules:
+                for model_attr in ("input_model", "config_model", "output_model"):
+                    model_cls = getattr(module, model_attr, None)
+                    if model_cls is not None and hasattr(model_cls, "model_json_schema"):
+                        try:
+                            schema_dict = model_cls.model_json_schema(
+                                mode="serialization",
+                                ref_template="#/components/schemas/{model}",
+                            )
+                            schema_name = model_cls.__name__
+                            if schema_name not in schemas:
+                                schemas[schema_name] = schema_dict
+                            # In case model_json_schema generated $defs, merge them into schemas
+                            defs = schema_dict.pop("$defs", {})
+                            for def_name, def_schema in defs.items():
+                                if def_name not in schemas:
+                                    schemas[def_name] = def_schema
+                        except Exception as exc:
+                            logger.debug("Failed to extract schema for %s: %s", model_cls, exc)
+        except Exception as exc:
+            logger.warning("Failed to auto-inject modules schemas into OpenAPI: %s", exc)
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+# ==============================================================================
+# 5. Application Factory
+# ==============================================================================
+def create_app(container: ApplicationContainer | None = None) -> FastAPI:
+    """Create and configure the FastAPI application instance."""
+    shared_container = container or ApplicationContainer.create()
+    application = FastAPI(
+        title="BIST 엔터프라이즈 RAG 파이프라인 & BI 엔진 API",
+        version="2.0.0",
+        description="RAG·스프레드시트 모듈 계약과 Kubernetes 기반 비동기 워크플로 API",
         openapi_tags=[
             {
-                "name": "Health",
-                "description": "쿠버네티스 프로브 및 시스템 상태 진단",
+                "name": "시스템 헬스 & 프로브",
+                "description": "쿠버네티스 Liveness/Readiness 프로브 및 백엔드 서비스 상태 진단 엔드포인트",
             },
             {
-                "name": "Modules",
-                "description": "워크플로 구성에 사용하는 모듈 계약 조회",
+                "name": "데이터 소스 관리",
+                "description": "재무제표 엑셀 파일 업로드, 다운로드, 시트 미리보기, 데이터베이스 연결 테스트 및 pgvector 인덱스 컬렉션 관리",
             },
             {
-                "name": "Workflows",
-                "description": "DTO 포트를 조합한 DAG 저장과 실행",
+                "name": "스프레드시트 렌더 아티팩트",
+                "description": "Luna VLM 시각 구조 감지 엔진이 생성한 고해상도 시트 렌더링(rendered) 및 셀 타입 마스킹(typed) PNG 이미지 서빙",
             },
             {
-                "name": "Spreadsheet Artifacts",
-                "description": "스프레드시트 분석 결과 이미지 조회",
+                "name": "모듈 카탈로그 및 스키마",
+                "description": "`modules/` 디렉토리에 위치한 19개 RAG 파이프라인 모듈의 포트 계약, 입출력 정의 및 Pydantic DTO 스키마 조회",
+            },
+            {
+                "name": "워크플로 정의 관리",
+                "description": "XYFlow 기반 DAG 파이프라인 노드와 엣지 토폴로지 정의의 생성, 조회, 수정 및 삭제",
+            },
+            {
+                "name": "워크플로 실행 및 실시간 스트림",
+                "description": "PostgreSQL 큐 및 KEDA 기반 비동기 DAG 워크플로 실행, 재개, 취소 및 Server-Sent Events 실시간 실행 텔레메트리 스트리밍",
+            },
+            {
+                "name": "BI 기업 목록 및 개요",
+                "description": "인덱싱된 기업 목록, 바인딩된 원본 스프레드시트 정보 및 최신 BI 대시보드 머티리얼라이제이션 상태 요약",
+            },
+            {
+                "name": "BI 대시보드 스냅샷",
+                "description": "기업별 18개 재무 지표 시계열, 공식 계산 결과, 출처 셀 링크 및 데이터 검증 이슈가 포함된 완성형 BI 대시보드 스냅샷",
+            },
+            {
+                "name": "BI 머티리얼라이제이션 작업",
+                "description": "스프레드시트 구조 프로파일링 및 지표 질문 생성 머티리얼라이제이션 백그라운드 작업 관리 및 진행 상태 스트리밍",
+            },
+            {
+                "name": "BI 지표 질문 및 배치 계산",
+                "description": "OpenAI Responses LLM을 통한 병렬 재무 지표 추출 질문 배치 실행, 재계산 요청 및 실시간 진행률 구독",
+            },
+            {
+                "name": "벤치마크 실행 및 채점",
+                "description": "사전 정의된 골든 데이터셋 기반 RAG 파이프라인 정확도, LLM 비용, 응답 지연 시간 평가 및 채점 결과 조회",
             },
         ],
         docs_url="/docs",
@@ -238,6 +349,9 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.container = shared_container
+
+    # Override openapi schema generator
+    application.openapi = lambda: custom_openapi_schema(application)
 
     # 1. Middlewares
     application.add_middleware(
@@ -253,8 +367,14 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     register_bi_exception_handlers(application)
 
     # 3. Health Check & Kubernetes Probes
-    @application.get("/healthz", tags=["Health"], summary="System Health Status")
+    @application.get(
+        "/healthz",
+        tags=["시스템 헬스 & 프로브"],
+        summary="전체 시스템 헬스 상태 확인",
+        description="백엔드 서비스 활성화 여부, 버전, 타임스탬프를 반환합니다.",
+    )
     def health_check() -> dict:
+        """시스템 헬스 상태와 버전 정보를 반환합니다."""
         return {
             "status": "healthy",
             "timestamp": time.time(),
@@ -262,12 +382,24 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
             "version": "2.0.0",
         }
 
-    @application.get("/livez", tags=["Health"], summary="Kubernetes Liveness Probe")
+    @application.get(
+        "/livez",
+        tags=["시스템 헬스 & 프로브"],
+        summary="Kubernetes Liveness Probe",
+        description="Pod가 정상 실행 중인지 확인하는 쿠버네티스 라이브니스 프로브입니다.",
+    )
     def liveness_probe() -> dict:
+        """쿠버네티스 라이브니스 프로브 응답을 반환합니다."""
         return {"status": "alive"}
 
-    @application.get("/readyz", tags=["Health"], summary="Kubernetes Readiness Probe")
+    @application.get(
+        "/readyz",
+        tags=["시스템 헬스 & 프로브"],
+        summary="Kubernetes Readiness Probe",
+        description="PostgreSQL DB 커넥션 풀 연결 상태를 검증하는 쿠버네티스 레디니스 프로브입니다.",
+    )
     def readiness_probe() -> JSONResponse:
+        """쿠버네티스 레디니스 프로브로 PostgreSQL 연결 상태를 점검합니다."""
         try:
             pool = get_pool(DATABASE_URL)
             conn = pool.getconn()
@@ -302,6 +434,7 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
 
     @application.get("/", include_in_schema=False)
     def serve_index():
+        """Serve the frontend single-page application index."""
         return frontend_index_response()
 
     @application.get("/{frontend_path:path}", include_in_schema=False)

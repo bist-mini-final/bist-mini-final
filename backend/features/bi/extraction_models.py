@@ -66,6 +66,14 @@ class ReaderContractFailure:
     code: str
 
 
+@dataclass(frozen=True, slots=True)
+class BiMetricExtractionStatusError(RuntimeError):
+    status: MetricStatus
+
+    def __str__(self) -> str:
+        return f"metric extraction status is unavailable: {self.status}"
+
+
 MetricReaderResult = BiMetricReaderResponse | ReaderContractFailure
 
 

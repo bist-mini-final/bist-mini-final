@@ -8,6 +8,7 @@ import { BiToolbar } from './components/BiToolbar';
 import { CardLibraryDialog } from './components/CardLibraryDialog';
 import { CompanyTabs } from './components/CompanyTabs';
 import { EvidenceDialog } from './components/EvidenceDialog';
+import { ResetDataDialog } from './components/ResetDataDialog';
 import { ResetLayoutDialog } from './components/ResetLayoutDialog';
 import { getCardDefinition } from './config/cardRegistry';
 import { useBiCompanies } from './hooks/useBiCompanies';
@@ -46,6 +47,7 @@ export function BiPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
+  const [isDataResetOpen, setIsDataResetOpen] = useState(false);
   const [evidenceCardId, setEvidenceCardId] = useState<BiCardId | null>(null);
   const layout = useBiLayout();
   const resolvedCompanyId = companiesState.status === 'ready'
@@ -111,8 +113,6 @@ export function BiPage() {
   }
 
   const dashboard = dashboardState.dashboard;
-  const isRefreshing = dashboard.refresh.status !== 'idle'
-    && dashboard.refresh.status !== 'failed';
   const evidenceCard = evidenceCardId ? getCardDefinition(evidenceCardId) : null;
   const evidenceViewModel = evidenceCard ? buildCardViewModel({
     definition: evidenceCard,
@@ -126,8 +126,9 @@ export function BiPage() {
       <BiHeader
         dashboard={dashboard}
         periodLabel={selectedPeriod}
-        isRefreshing={isRefreshing}
+        activeAction={dashboardController.activeAction}
         onRefresh={() => void dashboardController.refresh()}
+        onReset={() => setIsDataResetOpen(true)}
       />
       <BiPageNotice refresh={dashboard.refresh} />
 
@@ -179,6 +180,16 @@ export function BiPage() {
         <ResetLayoutDialog
           onConfirm={() => { layout.resetLayout(); setIsResetOpen(false); }}
           onClose={() => setIsResetOpen(false)}
+        />
+      ) : null}
+      {isDataResetOpen ? (
+        <ResetDataDialog
+          companyName={dashboard.company.displayName}
+          onConfirm={() => {
+            setIsDataResetOpen(false);
+            void dashboardController.reset();
+          }}
+          onClose={() => setIsDataResetOpen(false)}
         />
       ) : null}
     </section>

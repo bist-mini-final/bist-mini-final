@@ -3,6 +3,7 @@ import {
   createBiMaterialization,
   fetchBiDashboard,
   refreshBiDashboard,
+  resetBiDashboard,
   streamBiMaterializationJob,
   streamBiQuestionJob,
   BiApiRequestError,
@@ -26,8 +27,29 @@ export type BiDashboardState =
 
 export interface UseBiDashboardResult {
   readonly state: BiDashboardState;
+  readonly activeAction: 'refresh' | 'reset' | null;
   readonly refresh: () => Promise<void>;
+  readonly reset: () => Promise<void>;
   readonly retryMaterialization: () => Promise<void>;
+}
+
+const SNAPSHOT_PUBLICATION_POLL_INTERVAL_MS = 500;
+
+function waitForSnapshotPublication(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => {
+      window.clearTimeout(timer);
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, SNAPSHOT_PUBLICATION_POLL_INTERVAL_MS);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function dashboardErrorMessage(error: unknown): string {
@@ -66,6 +88,7 @@ export function useBiDashboard(
 ): UseBiDashboardResult {
   const companyId = company?.companyId ?? '';
   const [state, setState] = useState<BiDashboardState>({ status: 'idle' });
+  const [activeAction, setActiveAction] = useState<'refresh' | 'reset' | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const dashboardRef = useRef<BiDashboardSnapshot | null>(null);
 
@@ -154,6 +177,34 @@ export function useBiDashboard(
     return publishResult(result);
   };
 
+  const loadReplacementSnapshot = async (
+    previousSnapshotId: string,
+    controller: AbortController,
+  ): Promise<void> => {
+    while (isCurrent(controller)) {
+      const result = await fetchBiDashboard(companyId, controller.signal);
+      if (!isCurrent(controller)) return;
+      switch (result.kind) {
+        case 'snapshot':
+          if (
+            result.dashboard.snapshot.snapshotId !== previousSnapshotId
+            || result.dashboard.refresh.status === 'failed'
+          ) {
+            publishResult(result);
+            return;
+          }
+          break;
+        case 'pending':
+          showJobProgress(result.job);
+          if (result.job.status === 'failed') return;
+          break;
+        default:
+          assertNever(result);
+      }
+      await waitForSnapshotPublication(controller.signal);
+    }
+  };
+
   const observeMaterialization = async (
     jobId: string,
     controller: AbortController,
@@ -183,6 +234,7 @@ export function useBiDashboard(
     const controller = new AbortController();
     controllerRef.current = controller;
     dashboardRef.current = null;
+    setActiveAction(null);
     setState({ status: 'loading', companyId });
 
     const load = async (): Promise<void> => {
@@ -230,8 +282,28 @@ export function useBiDashboard(
     const dashboard = dashboardRef.current;
     const controller = controllerRef.current;
     if (!dashboard || !controller || !isCurrent(controller)) return;
+    setActiveAction('refresh');
     try {
-      const accepted = await refreshBiDashboard(companyId, controller.signal);
+      const refreshed = await refreshBiDashboard(companyId, controller.signal);
+      if (!isCurrent(controller)) return;
+      dashboardRef.current = refreshed;
+      setState({ status: 'ready', companyId, dashboard: refreshed });
+    } catch (error) {
+      if (!isCurrent(controller)) return;
+      showRefreshFailure(dashboardErrorMessage(error));
+    } finally {
+      if (isCurrent(controller)) setActiveAction(null);
+    }
+  };
+
+  const reset = async (): Promise<void> => {
+    const dashboard = dashboardRef.current;
+    const controller = controllerRef.current;
+    if (!dashboard || !controller || !isCurrent(controller)) return;
+    const previousSnapshotId = dashboard.snapshot.snapshotId;
+    setActiveAction('reset');
+    try {
+      const accepted = await resetBiDashboard(companyId, controller.signal);
       if (!isCurrent(controller)) return;
       showQuestionProgress(accepted);
       await streamBiQuestionJob(
@@ -242,10 +314,12 @@ export function useBiDashboard(
         controller.signal,
       );
       if (!isCurrent(controller)) return;
-      await loadPublishedSnapshot(controller);
+      await loadReplacementSnapshot(previousSnapshotId, controller);
     } catch (error) {
       if (!isCurrent(controller)) return;
       showRefreshFailure(dashboardErrorMessage(error));
+    } finally {
+      if (isCurrent(controller)) setActiveAction(null);
     }
   };
 
@@ -267,5 +341,5 @@ export function useBiDashboard(
     }
   };
 
-  return { state, refresh, retryMaterialization };
+  return { state, activeAction, refresh, reset, retryMaterialization };
 }

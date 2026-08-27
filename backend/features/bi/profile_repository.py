@@ -13,9 +13,9 @@ from .materialization_models import (
     BiDocumentProfile,
     BiProfilingResult,
 )
-from .models import BiMaterializationRequest
+from .models import BiMaterializationRequest, BiMaterializationSource
 
-PROFILE_VERSION: Final = "5"
+PROFILE_VERSION: Final = "7"
 
 
 class BiProfileClockPort(Protocol):
@@ -70,6 +70,34 @@ class PostgresBiDocumentProfileRepository:
                         "WHERE company_id = %s AND workbook_hash = %s "
                         "AND index_id = %s AND profile_version = %s",
                         self._identity(request),
+                    )
+                    row = cursor.fetchone()
+        except psycopg2.Error as error:
+            raise BiDocumentProfileRepositoryError("read", str(error)) from error
+        if row is None:
+            return None
+        try:
+            return BiDocumentProfile.model_validate(row["profile_payload"])
+        except ValidationError as error:
+            raise BiDocumentProfileRepositoryError("validate", str(error)) from error
+
+    def get_for_source(
+        self,
+        source: BiMaterializationSource,
+    ) -> BiDocumentProfile | None:
+        try:
+            with get_pooled_raw_connection(self._database_url) as connection:
+                with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                    cursor.execute(
+                        "SELECT profile_payload FROM bi_document_profiles "
+                        "WHERE workbook_hash = %s AND index_id = %s "
+                        "AND profile_version = %s "
+                        "ORDER BY updated_at DESC LIMIT 1",
+                        (
+                            source.workbook_hash,
+                            source.index_id,
+                            self._profile_version,
+                        ),
                     )
                     row = cursor.fetchone()
         except psycopg2.Error as error:

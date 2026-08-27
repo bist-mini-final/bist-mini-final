@@ -1078,40 +1078,49 @@ class PgVectorStore:
             cur.execute(f'DROP INDEX CONCURRENTLY IF EXISTS "{index_name}";')
 
     def delete(self, index_id: str) -> bool:
-        """Delete a collection from pgvector."""
+        """Delete a collection from pgvector.
+
+        Returns:
+            bool: True if deleted, False if not found.
+
+        Raises:
+            PgVectorStoreError: If database operation fails (not including not-found case).
+        """
+        conn = self._raw_connection()
         try:
-            conn = self._raw_connection()
-            try:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        DELETE FROM langchain_pg_collection
-                        WHERE name = %s
-                        RETURNING uuid, cmetadata;
-                        """,
-                        (index_id,),
-                    )
-                    deleted_row = cur.fetchone()
-                conn.commit()
-            finally:
-                conn.close()
-            if deleted_row is None:
-                return False
-            with self._collection_uuid_lock:
-                self._collection_uuid_cache.pop(index_id, None)
-            metadata = deleted_row[1] if isinstance(deleted_row[1], dict) else {}
-            dimension = int(metadata.get("dimension") or DEFAULT_EMBEDDING_DIMENSION)
-            try:
-                self._drop_collection_vector_index(str(deleted_row[0]), dimension)
-            except Exception:
-                logger.warning(
-                    "삭제된 컬렉션의 HNSW 인덱스 정리 실패: %s",
-                    index_id,
-                    exc_info=True,
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM langchain_pg_collection
+                    WHERE name = %s
+                    RETURNING uuid, cmetadata;
+                    """,
+                    (index_id,),
                 )
-            return True
-        except Exception:
+                deleted_row = cur.fetchone()
+            conn.commit()
+        except Exception as error:
+            conn.rollback()
+            raise PgVectorStoreError(
+                f"pgvector 컬렉션 삭제 중 데이터베이스 오류 발생: {error}"
+            ) from error
+        finally:
+            conn.close()
+        if deleted_row is None:
             return False
+        with self._collection_uuid_lock:
+            self._collection_uuid_cache.pop(index_id, None)
+        metadata = deleted_row[1] if isinstance(deleted_row[1], dict) else {}
+        dimension = int(metadata.get("dimension") or DEFAULT_EMBEDDING_DIMENSION)
+        try:
+            self._drop_collection_vector_index(str(deleted_row[0]), dimension)
+        except Exception:
+            logger.warning(
+                "삭제된 컬렉션의 HNSW 인덱스 정리 실패: %s",
+                index_id,
+                exc_info=True,
+            )
+        return True
 
     def delete_by_workbook_hash(self, workbook_hash: str) -> int:
         """Logical cascade deletion: remove all collections matching a deleted workbook hash."""
@@ -1571,7 +1580,6 @@ class PgVectorStore:
         results = []
         for r in rows:
             _id, text, _cmeta, cell_id, cell_coord, sheet_name, cell_value, row_header, col_header, company_name = r
-            resolved_cell_id = cell_id or f"{sheet_name} Cell {cell_coord}"
             if isinstance(row_header, str):
                 try:
                     row_header = json.loads(row_header)
