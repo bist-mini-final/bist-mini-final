@@ -30,7 +30,8 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertIn("2. RAG 파이프라인 모듈", group_names)
         self.assertIn("3. DAG 워크플로 엔진", group_names)
         self.assertIn("4. BI 대시보드 및 분석 엔진", group_names)
-        self.assertIn("5. RAG 벤치마크 평가", group_names)
+        self.assertIn("5. 기업 비교 분석", group_names)
+        self.assertIn("6. RAG 벤치마크 평가", group_names)
 
     def test_openapi_schemas_contain_external_module_dtos(self) -> None:
         """Verify that components.schemas contains Pydantic DTOs from modules/."""
@@ -58,9 +59,42 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
                 f"Expected {dto_name} to be injected into OpenAPI components.schemas",
             )
 
+    def test_openapi_exposes_only_the_versioned_api_namespace(self) -> None:
+        paths = self.client.get("/openapi.json").json()["paths"]
+        product_paths = [path for path in paths if path.startswith("/api/")]
+
+        self.assertTrue(product_paths)
+        self.assertTrue(all(path.startswith("/api/v1/") for path in product_paths))
+        self.assertIn("/api/v1/company-comparisons/league", paths)
+        self.assertNotIn("/api/v1/bi/comparisons/league", paths)
+
+    def test_legacy_api_namespace_remains_a_hidden_compatibility_alias(self) -> None:
+        canonical = self.client.get("/api/v1/modules/categories")
+        legacy = self.client.get("/api/modules/categories")
+
+        self.assertEqual(canonical.status_code, 200)
+        self.assertEqual(legacy.status_code, 200)
+        self.assertEqual(canonical.json(), legacy.json())
+        self.assertEqual(legacy.headers["Deprecation"], "true")
+        self.assertIn(
+            "/api/v1/modules/categories",
+            legacy.headers["Link"],
+        )
+        self.assertNotIn("Deprecation", canonical.headers)
+
+    def test_chatbot_documentation_alias_matches_the_canonical_chat_api(self) -> None:
+        canonical = self.client.get("/api/v1/chat/sessions", params={"client_id": "test-client-0001"})
+        alias = self.client.get("/api/v1/chatbot/sessions", params={"client_id": "test-client-0001"})
+        paths = self.client.get("/openapi.json").json()["paths"]
+
+        self.assertEqual(canonical.status_code, alias.status_code)
+        self.assertEqual(canonical.json(), alias.json())
+        self.assertTrue(any(path.startswith("/api/v1/chat/") for path in paths))
+        self.assertFalse(any(path.startswith("/api/v1/chatbot/") for path in paths))
+
     def test_module_categories_endpoint(self) -> None:
-        """Verify GET /api/modules/categories returns grouped module contracts."""
-        response = self.client.get("/api/modules/categories")
+        """Verify GET /api/v1/modules/categories returns grouped module contracts."""
+        response = self.client.get("/api/v1/modules/categories")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
 
@@ -81,8 +115,8 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertIn("pgvector_retriever", all_types)
 
     def test_module_schemas_endpoint(self) -> None:
-        """Verify GET /api/modules/schemas returns all input/config/output JSON schemas."""
-        response = self.client.get("/api/modules/schemas")
+        """Verify GET /api/v1/modules/schemas returns all input/config/output JSON schemas."""
+        response = self.client.get("/api/v1/modules/schemas")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
 
@@ -96,8 +130,8 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertIn("output_schema", decomposer_schema)
 
     def test_get_single_module_detail(self) -> None:
-        """Verify GET /api/modules/{module_type} returns single contract and docs."""
-        response = self.client.get("/api/modules/decomposer")
+        """Verify GET /api/v1/modules/{module_type} returns one contract and docs."""
+        response = self.client.get("/api/v1/modules/decomposer")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["type"], "decomposer")
@@ -105,13 +139,13 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertIn("output_schema", payload)
 
         # Markdown docs endpoint
-        doc_resp = self.client.get("/api/modules/decomposer/docs")
+        doc_resp = self.client.get("/api/v1/modules/decomposer/docs")
         self.assertEqual(doc_resp.status_code, 200)
         self.assertIn("decomposer", doc_resp.text.lower())
 
     def test_get_nonexistent_module_returns_404(self) -> None:
         """Verify 404 for invalid module type."""
-        response = self.client.get("/api/modules/non_existent_module_type_123")
+        response = self.client.get("/api/v1/modules/non_existent_module_type_123")
         self.assertEqual(response.status_code, 404)
 
 

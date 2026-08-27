@@ -25,7 +25,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run one registered backend module with JSON input/config DTOs."
     )
-    parser.add_argument("module_type", help="GET /api/modules에 노출되는 모듈 type")
+    parser.add_argument("module_type", help="GET /api/v1/modules에 노출되는 모듈 type")
     parser.add_argument(
         "--request",
         type=Path,

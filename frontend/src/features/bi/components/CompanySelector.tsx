@@ -9,6 +9,7 @@ const COMPANY_NAME_COLLATOR = new Intl.Collator(['en-US', 'ko-KR'], {
   sensitivity: 'base',
   numeric: true,
 });
+const COMPANY_SELECTOR_DIALOG_ID = 'bi-company-selector-dialog';
 
 interface CompanySelectorProps {
   readonly companies: readonly BiCompanySummary[];
@@ -74,8 +75,10 @@ function CompanySelectorDialog({
   return (
     <dialog
       ref={dialogRef}
+      id={COMPANY_SELECTOR_DIALOG_ID}
       className="bi-dialog bi-company-dialog"
       aria-labelledby="bi-company-dialog-title"
+      onClose={onClose}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
     >
       <div className="bi-dialog__header">
@@ -83,7 +86,7 @@ function CompanySelectorDialog({
           <span className="bi-dialog__eyebrow">COMPANY</span>
           <h2 id="bi-company-dialog-title">기업 선택</h2>
         </div>
-        <button type="button" onClick={onClose} aria-label="기업 선택 닫기"><X size={18} /></button>
+        <button type="button" onClick={onClose} aria-label="기업 선택 닫기"><X size={18} aria-hidden="true" /></button>
       </div>
       <p className="bi-company-dialog__status" aria-live="polite">
         {isRefreshing
@@ -120,15 +123,23 @@ function CompanySelectorDialog({
 export function CompanySelector(props: CompanySelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const focusRestoreTimerRef = useRef<number | null>(null);
   const closeDialog = () => {
     setIsOpen(false);
-    window.setTimeout(() => {
-      const currentTrigger = document.querySelector<HTMLButtonElement>(
-        '[data-bi-company-selector-trigger="true"]',
-      );
-      (triggerRef.current ?? currentTrigger)?.focus();
+    if (focusRestoreTimerRef.current !== null) {
+      window.clearTimeout(focusRestoreTimerRef.current);
+    }
+    focusRestoreTimerRef.current = window.setTimeout(() => {
+      triggerRef.current?.focus();
+      focusRestoreTimerRef.current = null;
     }, 0);
   };
+
+  useEffect(() => () => {
+    if (focusRestoreTimerRef.current !== null) {
+      window.clearTimeout(focusRestoreTimerRef.current);
+    }
+  }, []);
 
   return (
     <div className="bi-company-section">
@@ -144,8 +155,10 @@ export function CompanySelector(props: CompanySelectorProps) {
         <button
           ref={triggerRef}
           className="bi-company-selector__trigger"
-          data-bi-company-selector-trigger="true"
           type="button"
+          aria-controls={COMPANY_SELECTOR_DIALOG_ID}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
           onClick={() => setIsOpen(true)}
         >
           기업 선택

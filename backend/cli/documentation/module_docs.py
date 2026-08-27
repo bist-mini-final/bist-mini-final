@@ -204,7 +204,7 @@ python -m backend.tools.run_module {definition.type} --contract
 python -m backend.tools.run_module {definition.type} --request request.json
 ```
 
-HTTP에서는 `POST /api/modules/{definition.type}/execute`를 사용합니다. 응답은 별도 envelope 없이 Output DTO JSON입니다.
+HTTP에서는 `POST /api/v1/modules/{definition.type}/execute`를 사용합니다. 응답은 별도 envelope 없이 Output DTO JSON입니다.
 """
 
 
@@ -228,7 +228,7 @@ def write_module_guides(modules: Iterable[BaseModule]) -> list[Path]:
         "- 읽기 중심 API 문서: [ReDoc](/redoc)",
         "- 브라우저에서 직접 실행: [Swagger UI](/docs)",
         "- 원본 OpenAPI 계약: [OpenAPI JSON](/openapi.json)",
-        "- 모듈별 실시간 Markdown: `/api/modules/{module_type}/docs`",
+        "- 모듈별 실시간 Markdown: `/api/v1/modules/{module_type}/docs`",
         "",
         "## 문서 재생성",
         "",

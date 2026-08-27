@@ -9,9 +9,15 @@ from .models import (
     WorkflowRun,
     WorkflowSaveRequest,
 )
+from .service import (
+    ActiveWorkflowRunsError,
+    WorkflowExecutionPort,
+    WorkflowExecutionService,
+)
 from .store import ResultCache, RunStore, WorkflowStore
 
 __all__ = [
+    "ActiveWorkflowRunsError",
     "DagExecutionCancelled",
     "DagExecutionError",
     "ResultCache",
@@ -19,6 +25,8 @@ __all__ = [
     "RunStore",
     "WorkflowDocument",
     "WorkflowExecutionRequest",
+    "WorkflowExecutionPort",
+    "WorkflowExecutionService",
     "WorkflowExecutor",
     "WorkflowGraph",
     "WorkflowRun",

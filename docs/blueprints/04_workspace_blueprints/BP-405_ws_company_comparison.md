@@ -49,11 +49,11 @@ $$
 
 ## 3. REST API 규격
 
-### ① `GET /api/bi/comparisons/league`
+### ① `GET /api/v1/company-comparisons/league`
 - **역할**: 전사 등록 기업의 5대 건전성 종합 점수 및 리그 순위 반환.
 - **반환 DTO**: `FinancialLeagueResponse(standings, rankings, last_updated)`
 
-### ② `POST /api/bi/comparisons/analyze`
+### ② `POST /api/v1/company-comparisons/analyze`
 - **역할**: Base 기업과 Target 기업 간의 듀퐁 3단계 분해, 5각 레이더 지표 및 전년 대비 증감률(Delta) 비교.
 - **요청 Body**: `CompanyComparisonRequest(base_company_id, target_company_id, fiscal_year)`
 - **반환 DTO**: `CompanyComparisonResponse(dupont_breakdown, radar_metrics, summary_delta)`

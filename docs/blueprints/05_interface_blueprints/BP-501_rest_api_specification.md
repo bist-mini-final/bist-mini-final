@@ -6,12 +6,12 @@
 
 ## 1. REST API 아키텍처 및 표준 엔벨로프 (API Protocol & Envelope)
 
-`bist-mini-final`의 모든 HTTP API는 `/api` 접두사를 가지며, 일관된 요청/응답 구조와 표준 에러 엔벨로프(Error Envelope)를 반환합니다.
+`bist-mini-final`의 정식 제품 API는 `/api/v1` 접두사를 가지며, 기존 `/api`는 `Deprecation`/`Link` 헤더를 제공하는 숨김 호환 경로입니다. OpenAPI에는 `/api/v1`만 노출합니다.
 
 ### 표준 에러 응답 형식 (RFC 7807 기반 확장)
 ```json
 {
-  "error": {
+  "detail": {
     "code": "MODULE_EXECUTION_ERROR",
     "message": "VLM 표 감지 중 타임아웃이 발생했습니다 (40s)",
     "retryable": true,
@@ -27,78 +27,102 @@
 
 ## 2. 도메인별 엔드포인트 상세 명세서 (API Endpoint Matrix)
 
-### [Group 1: 워크플로우 및 DAG 실행 (`/api/workflows`)]
+### [Group 1: 워크플로우 및 DAG 실행 (`/api/v1/workflows`, `/api/v1/runs`)]
 
 | Method | Endpoint | 설명 | Request Body / Query | Response DTO |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/workflows` | 저장된 워크플로우 문서 목록 조회 | - | `List[WorkflowDocumentSummary]` |
-| `POST`| `/api/workflows` | 신규 워크플로우 DAG 생성/저장 | `WorkflowDocument` | `WorkflowDocument` (201 Created) |
-| `GET` | `/api/workflows/{workflow_id}` | 특정 워크플로우 상세 그래프 조회 | - | `WorkflowDocument` |
-| `POST`| `/api/workflows/run` | 워크플로우 전체 실행 (동기/비동기) | `WorkflowExecutionRequest` | `PipelineRunResult` or `RunDispatchAck` (202) |
-| `POST`| `/api/workflows/node/run` | 단일 노드 인터랙티브 단독 실행 | `NodeExecutionRequest` | `NodeExecutionResult` |
-| `GET` | `/api/workflows/runs/{run_id}` | 특정 실행의 전체 이력 및 상태 조회| - | `WorkflowRun` |
-| `POST`| `/api/workflows/runs/{run_id}/cancel` | 실행 중인 작업 강제 취소 | - | `{"status": "cancelled"}` |
+| `GET` | `/api/v1/workflows` | 저장된 워크플로 문서 목록 조회 | - | `List[WorkflowDocumentSummary]` |
+| `PUT` | `/api/v1/workflows/{workflow_id}` | 워크플로 DAG 저장/갱신 | `WorkflowSaveRequest` | `WorkflowDocument` |
+| `GET/DELETE` | `/api/v1/workflows/{workflow_id}` | 워크플로 조회/삭제 | - | 문서 또는 삭제 응답 |
+| `POST`| `/api/v1/workflows/{workflow_id}/runs` | durable PostgreSQL 큐에 실행 등록 | `WorkflowExecutionRequest` | `WorkflowRun` (202) |
+| `GET` | `/api/v1/runs/{run_id}` | 실행 상태 조회 | - | `WorkflowRun` |
+| `GET` | `/api/v1/runs/{run_id}/stream` | 실행 진행 상태 SSE | - | `EventSource` |
+| `POST`| `/api/v1/runs/{run_id}/resume` | 실패/취소 실행 재등록 | - | `WorkflowRun` (202) |
+| `POST`| `/api/v1/runs/{run_id}/cancel` | 실행 취소 요청 | - | `WorkflowRun` |
 
-### [Group 2: 파이프라인 모듈 인트로스펙션 (`/api/modules`)]
+### [Group 2: 파이프라인 모듈 인트로스펙션 (`/api/v1/modules`)]
 
 | Method | Endpoint | 설명 | Response DTO |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/modules` | 21개 등록된 모듈 목록 및 메타데이터 조회 | `List[ModuleDefinitionDTO]` |
-| `GET` | `/api/modules/{module_type}/schema` | 특정 모듈의 동적 JSON Schema (Pydantic) 조회 | `{"input_schema": {...}, "output_schema": {...}}` |
+| `GET` | `/api/v1/modules` | 19개 등록 파이프라인 모듈 목록 및 메타데이터 | `List[ModuleDefinitionDTO]` |
+| `GET` | `/api/v1/modules/categories` | 카테고리별 모듈 계약 | 카테고리 응답 |
+| `GET` | `/api/v1/modules/schemas` | 전체 Pydantic 입출력/config JSON Schema | 스키마 맵 |
+| `GET` | `/api/v1/modules/{module_type}` | 단일 모듈 계약과 스키마 | `ModuleDefinitionDTO` |
+| `GET` | `/api/v1/modules/{module_type}/docs` | 단일 모듈 Markdown 문서 | `text/markdown` |
 
-### [Group 3: 데이터 소스 및 인제스천 (`/api/data-sources`)]
-
-| Method | Endpoint | 설명 | Request / Response |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/data-sources/files` | 업로드된 엑셀 워크북 목록 조회 | `List[WorkbookFileSummary]` |
-| `POST`| `/api/data-sources/upload` | 엑셀 파일 업로드 (`multipart/form-data`) | `UploadFileAck` (file_id, hash) |
-| `POST`| `/api/data-sources/detect-structure` | 시트별 Luna VLM 표 구조(바운딩 박스/헤더) 사전 감지 | `StructureDetectionResponse` |
-| `POST`| `/api/data-sources/ingest` | 사용자 승인 구조 기반 직렬화 -> 임베딩 -> pgvector Binary COPY | `IngestionTaskResult` |
-| `GET` | `/api/data-sources/probe` | PostgreSQL + pgvector 연결 및 인덱스 상태 헬스체크 | `{"status": "healthy", "pgvector": true}` |
-
-### [Group 4: 재무 BI 및 프로파일러 (`/api/bi`)]
+### [Group 3: 데이터 소스 및 인제스천 (`/api/v1/data-sources`)]
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/bi/profiles` | 기업별 재무 프로파일 및 시트 목록 조회 | `List[BiProfileSummary]` |
-| `POST`| `/api/bi/questions/answer` | 단일 재무 질문에 대한 Fast RAG 답변 생성 | `BiQuestionAnswerRequest` -> `BiQuestionAnswerResponse` |
-| `GET` | `/api/bi/snapshots/{profile_id}` | 사전 계산된 40+ 지표 스냅샷 조회 | `BiSnapshotProjection` |
-| `POST`| `/api/bi/materialize` | 백그라운드 지표 일괄 산출 배치 트리거 | `MaterializeTaskAck` |
-| `POST`| `/api/bi/companies/{company_id}/refresh` | 현재 원천 관측값으로 파생 지표 및 스냅샷 즉시 재계산 | `BiDashboardSnapshot` |
-| `POST`| `/api/bi/companies/{company_id}/reset` | 질의응답 데이터 초기화 및 새 질문 배치 K8s 큐 등록 (202 Accepted) | `BiQuestionJobProgress` |
-| `GET` | `/api/bi/question-jobs/{job_id}` | BI 지표 질문 배치 작업 진행률 집계 조회 | `BiQuestionJobProgress` |
-| `GET` | `/api/bi/question-jobs/{job_id}/stream` | BI 지표 질문 배치 진행 상태 실시간 SSE 스트리밍 | `EventSource` (`question_job_progress`) |
-| `GET` | `/api/bi/comparison/{comparison_id}` | 다중 기업 비교 레이더 차트 및 듀퐁 분해도 조회 | `BiComparisonProjection` |
-| `POST`| `/api/bi/comparison/materialize` | 다중 기업 지표 일괄 산출 & 정규화 배치 트리거 (Tier 2 KEDA) | `MaterializeTaskAck` |
+| `GET` | `/api/v1/data-sources/files` | 업로드된 파일 목록 조회 | 파일 목록 응답 |
+| `POST`| `/api/v1/data-sources/files/upload` | 파일 업로드 및 선택적 인제스천 큐 등록 | 업로드/작업 응답 |
+| `GET/DELETE` | `/api/v1/data-sources/files/{filename}` | 다운로드/삭제 | 파일 또는 삭제 응답 |
+| `GET` | `/api/v1/data-sources/files/{filename}/preview` | 스프레드시트 미리보기 | 미리보기 DTO |
+| `GET/POST` | `/api/v1/data-sources/ingestion-jobs` | 인제스천 작업 목록/등록 | 작업 DTO |
+| `GET/DELETE` | `/api/v1/data-sources/ingestion-jobs/{run_id}` | 인제스천 작업 조회/삭제 | 작업 DTO |
+| `POST` | `/api/v1/data-sources/ingestion-jobs/{run_id}/resume` | 실패 작업 재등록 | 작업 DTO |
+| `POST` | `/api/v1/data-sources/ingestion-jobs/{run_id}/cancel` | 작업 취소 요청 | 작업 DTO |
+| `GET` | `/api/v1/data-sources/indexes` | pgvector 인덱스 목록 | 인덱스 목록 |
+| `GET/DELETE` | `/api/v1/data-sources/indexes/{index_id}` | 인덱스 조회/삭제 | 인덱스 DTO |
+| `POST` | `/api/v1/data-sources/indexes/{index_id}/search` | 인덱스 검색 | 검색 결과 |
+| `GET` | `/api/v1/data-sources/db-status` | PostgreSQL/pgvector 상태 | DB 상태 DTO |
 
-### [Group 5: AI 금융 챗봇 대화 세션 (`/api/chatbot`)]
-
-| Method | Endpoint | 설명 | Request / Response |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/chatbot/sessions` | 사용자의 최근 대화 세션 목록 조회 | `client_id: str` -> `List[ChatSessionDTO]` |
-| `POST`| `/api/chatbot/sessions` | 신규 대화 세션 컨텍스트 생성 | `CreateSessionRequest(client_id)` -> `ChatSessionDTO` |
-| `GET` | `/api/chatbot/sessions/{session_id}` | 특정 세션 상세 내역 및 메시지 히스토리 조회 | `ChatSessionDetailDTO(messages, attachments)` |
-| `PATCH`| `/api/chatbot/sessions/{session_id}` | 세션 제목 수정 | `RenameSessionRequest(title)` -> `ChatSessionDTO` |
-| `DELETE`| `/api/chatbot/sessions/{session_id}` | 세션 및 메시지/첨부파일 완전 삭제 | `{"deleted": true}` |
-| `POST`| `/api/chatbot/sessions/{session_id}/messages` | 메시지 전송, RAG 답변 및 인라인 시각화 생성 | `CreateMessageRequest` -> `MessageResponseDTO` |
-| `POST`| `/api/chatbot/sessions/{session_id}/attachments` | 엑셀/CSV 첨부파일 업로드 및 텍스트 추출 | `UploadFile` -> `AttachmentDTO` |
-| `GET` | `/api/chatbot/suggestions` | 색인된 기업 목록 기반 스마트 추천 질문 인출 | `List[str]` |
-
-### [Group 6: 벤치마크 평가 (`/api/benchmarks`)]
+### [Group 4: 재무 BI 및 프로파일러 (`/api/v1/bi`)]
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
-| `POST`| `/api/benchmarks/run` | Ground-Truth 데이터셋 기반 정확도 벤치마크 실행 | `BenchmarkRunRequest` -> `BenchmarkRunResult` |
-| `GET` | `/api/benchmarks/runs/{run_id}` | 벤치마크 점수(Accuracy, Recall@K, Latency) 조회 | `BenchmarkEvaluationReport` |
+| `GET` | `/api/v1/bi/companies` | 기업 목록 조회 | 기업 목록 DTO |
+| `GET` | `/api/v1/bi/companies/{company_id}/dashboard` | 근거가 있는 21개 지표 대시보드 스냅샷 | `BiDashboardSnapshot` |
+| `POST`| `/api/v1/bi/materializations` | 백그라운드 스냅샷 산출 등록 | 작업 승인 DTO (202) |
+| `GET` | `/api/v1/bi/materializations/{job_id}` | 산출 작업 상태 | 작업 DTO |
+| `GET` | `/api/v1/bi/materializations/{job_id}/stream` | 산출 작업 상태 SSE | `EventSource` |
+| `POST`| `/api/v1/bi/companies/{company_id}/refresh` | 파생 지표와 스냅샷 재계산 | `BiDashboardSnapshot` |
+| `POST`| `/api/v1/bi/companies/{company_id}/reset` | 질의응답 초기화 및 새 질문 배치 등록 | `BiQuestionJobProgress` (202) |
+| `GET` | `/api/v1/bi/question-jobs/{job_id}` | 질문 배치 진행률 | `BiQuestionJobProgress` |
+| `GET` | `/api/v1/bi/question-jobs/{job_id}/stream` | 질문 배치 진행 상태 SSE | `EventSource` |
 
-### [Group 7: K8s 배치 잡 & 워커 실시간 관제 (`/jobs`, `/api/jobs`)]
+### [Group 5: 기업 비교 분석 (`/api/v1/company-comparisons`)]
+
+기업 비교는 BI 대시보드와 독립된 프런트엔드 탭·담당 도메인입니다. 따라서 대시보드의 단일 기업 스냅샷 API와 분리된 전용 namespace를 사용합니다. 기존 `/api/v1/bi/comparisons/*`는 OpenAPI에 노출하지 않는 호환 alias이며 `Deprecation`·`Link` 헤더로 새 경로를 안내합니다.
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/jobs` | 백엔드 내장 K8s 배치 잡 & 워커 실시간 관제 대시보드 (1-depth 최상위 경로) | HTML / 대시보드 (200 OK) |
-| `WS`  | `/api/jobs/ws` | K8s Pod 라이프사이클 및 컨테이너 stdout 로그 양방향 터미널 스트림 | WebSocket JSON Frames (Pod Events / Terminal Stream) |
-| `GET` | `/api/jobs` | 현재 K8s 활성 워커 Pod 목록 및 Lease 락 상태 조회 | `List[K8sWorkerPodStatusDTO]` |
-| `POST`| `/api/jobs/{run_id}/cancel` | 고아/응답 없는 작업 강제 회수 및 Lease 반환 | `{"status": "cancelled", "released_lease": true}` |
+| `GET` | `/api/v1/company-comparisons/league` | 다중 기업 리그 순위 조회 | `FinancialLeagueResponse` |
+| `POST` | `/api/v1/company-comparisons/analyze` | 근거 기반 선택 기업 비교 분석 | `CompanyComparisonResponse` |
+
+### [Group 6: AI 금융 챗봇 대화 세션 (`/api/v1/chat`)]
+
+`/api/v1/chatbot`은 기존 청사진 링크를 위한 숨김 호환 alias이며 신규 클라이언트는 `/api/v1/chat`을 사용합니다.
+
+| Method | Endpoint | 설명 | Request / Response |
+| :--- | :--- | :--- | :--- |
+| `GET/POST` | `/api/v1/chat/sessions` | 최근 세션 목록/신규 세션 생성 | 세션 DTO |
+| `GET/PATCH/DELETE` | `/api/v1/chat/sessions/{session_id}` | 세션 상세/제목 수정/삭제 | 세션 DTO 또는 삭제 응답 |
+| `POST`| `/api/v1/chat/sessions/{session_id}/messages` | 메시지 전송 및 RAG 실행 등록 | 메시지 DTO |
+| `POST`| `/api/v1/chat/sessions/{session_id}/attachments` | 파일 업로드 및 텍스트 추출 | 첨부 DTO |
+| `GET` | `/api/v1/chat/suggestions` | 추천 질문 조회 | 추천 질문 목록 |
+| `POST` | `/api/v1/chat/suggestions/refresh` | 추천 질문 재생성 | 추천 질문 목록 |
+
+### [Group 7: 벤치마크 평가 (`/api/v1/benchmarks`)]
+
+| Method | Endpoint | 설명 | Request / Response |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/benchmark-sets` | 실행 가능한 benchmark set 목록 | 세트 목록 |
+| `POST`| `/api/v1/benchmarks/jobs` | Ground-Truth 기반 벤치마크 작업 등록 | 작업 DTO (202) |
+| `GET/DELETE` | `/api/v1/benchmarks/jobs/{job_id}` | 작업 상태 조회/삭제 | 작업 DTO |
+| `POST` | `/api/v1/benchmarks/jobs/{job_id}/pause` | 작업 일시정지 요청 | 작업 DTO |
+| `POST` | `/api/v1/benchmarks/jobs/{job_id}/resume` | 작업 재개 | 작업 DTO |
+| `GET` | `/api/v1/benchmarks` | 완료된 평가 목록 | 평가 목록 |
+| `GET` | `/api/v1/benchmarks/{benchmark_id}` | 정확도·재현율·지연 평가 상세 | 평가 DTO |
+
+### [Group 8: K8s 배치 잡 & 워커 읽기 전용 관제 (`/jobs`, `/api/v1/jobs`)]
+
+| Method | Endpoint | 설명 | Request / Response |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/jobs` | React SPA 작업 관제 화면 | HTML / SPA route |
+| `GET` | `/api/v1/jobs` | ScaledJob, Job, Pod 요약 상태 조회 | `KubernetesWorkloadSnapshot` |
+
+WebSocket 로그 터미널과 작업 취소/Lease 회수는 인증·감사·운영 정책이 필요한 To-Be 범위이며 현재 읽기 전용 API에는 포함하지 않습니다.
 
 ---
 

@@ -28,6 +28,22 @@ function completedRun(data: unknown): WorkflowRun | null {
   return run && typeof run === 'object' ? run as WorkflowRun : null;
 }
 
+const NODE_EVENTS = new Set([
+  'node_progress',
+  'node_started',
+  'node_completed',
+  'node_failed',
+]);
+const TERMINAL_EVENTS = new Set(['run_completed', 'run_finished', 'run_failed']);
+
+export function isWorkflowNodeEvent(event: string): boolean {
+  return NODE_EVENTS.has(event);
+}
+
+export function isWorkflowTerminalEvent(event: string): boolean {
+  return TERMINAL_EVENTS.has(event);
+}
+
 function reconnectDelay(signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.reject(signal.reason);
   return new Promise((resolve, reject) => {
@@ -53,13 +69,11 @@ export async function observeWorkflowRun(
         options.onEvent?.(event);
         if (
           current
-          && (event.event === 'node_progress'
-            || event.event === 'node_completed'
-            || event.event === 'node_failed')
+          && isWorkflowNodeEvent(event.event)
         ) {
           const update = nodeUpdate(event.data);
           if (update) current = mergeRunNodeUpdate(current, update);
-        } else if (event.event === 'run_completed') {
+        } else if (isWorkflowTerminalEvent(event.event)) {
           current = completedRun(event.data) ?? current;
         }
         if (current) options.onRun?.(current, event);

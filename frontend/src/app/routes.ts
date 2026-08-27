@@ -1,5 +1,6 @@
 import {
   Bot,
+  Boxes,
   ChartNoAxesCombined,
   Database,
   GitCompareArrows,
@@ -32,6 +33,9 @@ const DataSourcesPage = lazy(() =>
   import('../pages/DataSourcesPage').then((module) => ({
     default: module.DataSourcesPage,
   }))
+);
+const JobsPage = lazy(() =>
+  import('../pages/JobsPage').then((module) => ({ default: module.JobsPage }))
 );
 
 type RouteStatus = 'ready' | 'planned';
@@ -112,6 +116,15 @@ export const APP_ROUTES: readonly AppRoute[] = [
     status: 'ready',
   },
   {
+    path: '/jobs',
+    label: '작업 관제',
+    shortLabel: 'Jobs',
+    description: 'KEDA ScaledJob, Job, Pod 읽기 전용 상태 관제',
+    icon: Boxes,
+    component: JobsPage,
+    status: 'ready',
+  },
+  {
     path: '/settings',
     label: '설정',
     shortLabel: 'Settings',
@@ -122,6 +135,12 @@ export const APP_ROUTES: readonly AppRoute[] = [
   },
 ] as const;
 
+/** Compatibility paths retained for links published by the architecture docs. */
+export const ROUTE_ALIASES: Readonly<Record<string, string>> = {
+  '/bi': '/dashboard',
+};
+
 export function findRoute(pathname: string): AppRoute | undefined {
-  return APP_ROUTES.find((route) => route.path === pathname);
+  const canonicalPath = ROUTE_ALIASES[pathname] ?? pathname;
+  return APP_ROUTES.find((route) => route.path === canonicalPath);
 }

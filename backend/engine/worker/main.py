@@ -44,21 +44,29 @@ def runtime_services() -> WorkflowRuntimeServices:
 @contextmanager
 def task_timeout(seconds: Optional[float]) -> Generator[None, None, None]:
     """Apply a per-module wall-clock timeout in the worker's main thread."""
-    if seconds is None or not hasattr(signal, "setitimer"):
+    setitimer = getattr(signal, "setitimer", None)
+    sigalrm = getattr(signal, "SIGALRM", None)
+    itimer_real = getattr(signal, "ITIMER_REAL", None)
+    if (
+        seconds is None
+        or not callable(setitimer)
+        or sigalrm is None
+        or itimer_real is None
+    ):
         yield
         return
 
     def _timeout_handler(_signum: int, _frame: object) -> None:
         raise ModuleTaskTimeout(f"모듈 실행 제한 시간 {seconds:g}초를 초과했습니다")
 
-    previous_handler = signal.getsignal(signal.SIGALRM)
-    signal.signal(signal.SIGALRM, _timeout_handler)
-    signal.setitimer(signal.ITIMER_REAL, seconds)
+    previous_handler = signal.getsignal(sigalrm)
+    signal.signal(sigalrm, _timeout_handler)
+    setitimer(itimer_real, seconds)
     try:
         yield
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, previous_handler)
+        setitimer(itimer_real, 0)
+        signal.signal(sigalrm, previous_handler)
 
 
 def execute_with_policy(

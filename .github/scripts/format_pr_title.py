@@ -4,8 +4,8 @@
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 
 
 def fetch_pr_commits(repo: str, pr_number: str, github_token: str) -> list[str]:

@@ -148,8 +148,19 @@ def _card_id(question: str) -> str:
     return "stability"
 
 
-def create_chat_router(*, db_manager: DatabaseManager, workflow_store: WorkflowStore, run_store: RunStore, workflow_executor: WorkflowExecutor, workflow_dispatcher: RunDispatcher, completion_client: OpenAIResponsesClient, bi_services: BiApiServices, suggestion_service: ChatSuggestionService) -> APIRouter:
-    router = APIRouter(prefix="/chat", tags=["Chat"])
+def create_chat_router(
+    *,
+    db_manager: DatabaseManager,
+    workflow_store: WorkflowStore,
+    run_store: RunStore,
+    workflow_executor: WorkflowExecutor,
+    workflow_dispatcher: RunDispatcher,
+    completion_client: OpenAIResponsesClient,
+    bi_services: BiApiServices,
+    suggestion_service: ChatSuggestionService,
+    prefix: str = "/chat",
+) -> APIRouter:
+    router = APIRouter(prefix=prefix, tags=["Chat"])
     repository = ChatSessionRepository(db_manager)
 
     def visualization_for(question: str) -> dict[str, str] | None:

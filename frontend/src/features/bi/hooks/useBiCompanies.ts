@@ -16,6 +16,8 @@ interface BiCompaniesController {
   readonly refresh: () => Promise<BiCompaniesRefreshResult>;
 }
 
+type CompanyLoadMode = 'initial' | 'refresh';
+
 function companyErrorMessage(error: unknown): string {
   if (error instanceof BiApiRequestError) {
     return `기업 목록을 불러오지 못했습니다. (HTTP ${error.status})`;
@@ -28,8 +30,8 @@ export function useBiCompanies(): BiCompaniesController {
   const [state, setState] = useState<BiCompaniesState>({ status: 'loading', companies: [] });
   const activeControllerRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (
-    preserveCurrentState: boolean,
+  const loadCompanies = useCallback(async (
+    mode: CompanyLoadMode,
   ): Promise<BiCompaniesRefreshResult> => {
     activeControllerRef.current?.abort();
     const controller = new AbortController();
@@ -44,19 +46,23 @@ export function useBiCompanies(): BiCompaniesController {
     } catch (error) {
       if (controller.signal.aborted) return { errorMessage: null };
       const message = companyErrorMessage(error);
-      if (!preserveCurrentState) {
-        setState({ status: 'error', companies: [], message: companyErrorMessage(error) });
+      if (mode === 'initial') {
+        setState({ status: 'error', companies: [], message });
       }
       return { errorMessage: message };
+    } finally {
+      if (activeControllerRef.current === controller) {
+        activeControllerRef.current = null;
+      }
     }
   }, []);
 
   useEffect(() => {
-    void load(false);
+    void loadCompanies('initial');
     return () => activeControllerRef.current?.abort();
-  }, [load]);
+  }, [loadCompanies]);
 
-  const refresh = useCallback(() => load(true), [load]);
+  const refresh = useCallback(() => loadCompanies('refresh'), [loadCompanies]);
 
   return {
     state,

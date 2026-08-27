@@ -5,11 +5,23 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 from textwrap import dedent
+from typing import get_type_hints
 
+from backend.bootstrap.container import (
+    ApplicationContainer,
+    DomainServicesContainer,
+    ExecutionContainer,
+)
 from jobs import ALL_JOBS, WorkerJobDefinition
 from jobs.kubernetes import kubernetes_worker_specs
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_application_container_is_split_by_runtime_responsibility() -> None:
+    annotations = get_type_hints(ApplicationContainer)
+    assert annotations["execution"] is ExecutionContainer
+    assert annotations["domain"] is DomainServicesContainer
 
 
 def _python_files(relative_root: str) -> list[Path]:
@@ -29,6 +41,22 @@ def test_features_never_import_http_api_layer() -> None:
                 if any(alias.name.startswith("backend.api") for alias in node.names):
                     violations.append(str(path.relative_to(PROJECT_ROOT)))
     assert not violations, f"feature -> API layer inversion: {sorted(set(violations))}"
+
+
+def test_framework_state_access_is_confined_to_the_composition_boundary() -> None:
+    allowed = {
+        Path("backend/api/dependencies.py"),
+        Path("backend/main.py"),
+    }
+    violations: list[str] = []
+    for path in _python_files("backend"):
+        relative = path.relative_to(PROJECT_ROOT)
+        if relative in allowed:
+            continue
+        source = path.read_text(encoding="utf-8")
+        if ".app.state" in source or "application.state" in source:
+            violations.append(str(relative))
+    assert not violations, f"framework state escaped composition boundary: {violations}"
 
 
 def test_modules_do_not_construct_infrastructure_clients() -> None:

@@ -12,7 +12,7 @@ from fastapi import Path as FastPath
 from pydantic import BaseModel, Field
 
 from backend.core.settings import PGVECTOR_URL
-from backend.engine.workflows import RunDispatcher, WorkflowExecutor, WorkflowStore
+from backend.engine.workflows import RunStore, WorkflowExecutionPort, WorkflowStore
 from backend.features.benchmark.postgres_store import (
     BenchmarkPostgresStore,
     BenchmarkStoreError,
@@ -42,12 +42,12 @@ class BenchmarkJobStatusResponse(BaseModel):
 
 def create_benchmark_router(
     workflow_store: WorkflowStore,
-    workflow_executor: WorkflowExecutor,
-    workflow_dispatcher: RunDispatcher,
+    run_store: RunStore,
+    workflow_execution: WorkflowExecutionPort,
 ) -> APIRouter:
     """RAG 벤치마크 실행, 제어 및 채점을 위한 FastAPI 라우터 생성."""
     router = APIRouter(tags=["벤치마크 실행 및 채점"])
-    database = workflow_executor.run_store.db_manager
+    database = run_store.db_manager
     database_url = (
         database.database_url
         if database is not None and hasattr(database, "database_url")
@@ -69,7 +69,7 @@ def create_benchmark_router(
         active_run_id = payload.pop("active_run_id", None)
         if active_run_id:
             try:
-                run = workflow_executor.run_store.load_summary(str(active_run_id))
+                run = run_store.load_summary(str(active_run_id))
                 payload["active_run"] = run_snapshot(run)
             except (FileNotFoundError, PermissionError, OSError, ValueError):
                 payload["active_run"] = None
@@ -172,7 +172,7 @@ def create_benchmark_router(
             raise HTTPException(status_code=409, detail="벤치마크 작업을 취소할 수 없습니다.")
         run_id = existing.get("active_run_id")
         if run_id:
-            workflow_dispatcher.cancel(str(run_id))
+            workflow_execution.cancel(str(run_id))
         return {"id": job_id, "status": job["status"]}
 
     @router.post(

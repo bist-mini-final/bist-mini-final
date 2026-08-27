@@ -10,6 +10,7 @@ from backend.features.company_comparison import (
 
 from .benchmark_routes import create_benchmark_router
 from .data_source_routes import create_data_source_router
+from .job_routes import create_job_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
 from .workflow_routes import create_workflow_router
@@ -17,41 +18,57 @@ from .workflow_routes import create_workflow_router
 
 def create_api_router(container: ApplicationContainer) -> APIRouter:
     """
-    Compose the application's `/api` router with shared services and domain-specific endpoints.
+    Compose version-neutral routes; the application factory owns the public prefix.
     """
 
-    router = APIRouter(prefix="/api")
+    router = APIRouter()
     runtime = container.runtime
     services = runtime.services
     paths = runtime.paths
     module_registry = services.module_registry
-    router.include_router(create_bi_router(container.bi_services))
+    domain = container.domain
+    execution = container.execution
+    router.include_router(create_bi_router(domain.bi_services))
+    company_comparison_service = create_company_comparison_service(
+        store=domain.bi_services.store,
+        registry=module_registry,
+        cell_store=services.pgvector_store,
+        completion_client=runtime.completion_client,
+    )
+    router.include_router(create_company_comparison_router(company_comparison_service))
     router.include_router(
         create_company_comparison_router(
-            create_company_comparison_service(
-                store=container.bi_services.store,
-                registry=module_registry,
-                cell_store=services.pgvector_store,
-                completion_client=runtime.completion_client,
-            )
+            company_comparison_service,
+            prefix="/bi/comparisons",
+            include_in_schema=False,
+            legacy_alias=True,
         )
     )
-    workflow_dispatcher = container.workflow_dispatcher
+    workflow_dispatcher = execution.workflow_dispatcher
+    workflow_execution = execution.workflow_execution
     workflow_store = services.workflow_store
     run_store = services.run_store
     workflow_executor = services.workflow_executor
-    router.include_router(create_chat_router(
+    chat_router = create_chat_router(
         db_manager=services.db_manager,
         workflow_store=workflow_store,
         run_store=run_store,
         workflow_executor=workflow_executor,
         workflow_dispatcher=workflow_dispatcher,
         completion_client=runtime.completion_client,
-        bi_services=container.bi_services,
-        suggestion_service=container.chat_suggestions,
-    ))
+        bi_services=domain.bi_services,
+        suggestion_service=domain.chat_suggestions,
+        prefix="",
+    )
+    router.include_router(chat_router, prefix="/chat")
+    router.include_router(
+        chat_router,
+        prefix="/chatbot",
+        include_in_schema=False,
+    )
+    router.include_router(create_job_router(domain.job_monitor))
     pgvector_store = services.pgvector_store
-    router.include_router(create_module_router(module_registry))
+    router.include_router(create_module_router())
     router.include_router(
         create_spreadsheet_artifact_router(paths.spreadsheet_artifact_dir)
     )
@@ -59,8 +76,7 @@ def create_api_router(container: ApplicationContainer) -> APIRouter:
         create_workflow_router(
             workflow_store=workflow_store,
             run_store=run_store,
-            workflow_executor=workflow_executor,
-            workflow_dispatcher=workflow_dispatcher,
+            workflow_execution=workflow_execution,
         )
     )
     router.include_router(
@@ -79,8 +95,8 @@ def create_api_router(container: ApplicationContainer) -> APIRouter:
     router.include_router(
         create_benchmark_router(
             workflow_store=workflow_store,
-            workflow_executor=workflow_executor,
-            workflow_dispatcher=workflow_dispatcher,
+            run_store=run_store,
+            workflow_execution=workflow_execution,
         )
     )
     return router

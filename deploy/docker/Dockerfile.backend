@@ -26,7 +26,8 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
 COPY backend ./backend
 COPY modules ./modules
 COPY jobs ./jobs
-COPY data/workflows ./data/workflows
+COPY alembic.ini ./
+COPY migrations ./migrations
 RUN mkdir -p \
     /app/data/runs \
     /app/data/cache \

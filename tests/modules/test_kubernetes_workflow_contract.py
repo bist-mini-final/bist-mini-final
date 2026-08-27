@@ -22,6 +22,7 @@ from backend.engine.workflows.models import (
     WorkflowSaveRequest,
     utc_now_iso,
 )
+from backend.engine.workflows.service import WorkflowExecutionService
 from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
 from tests.modules.registry_factory import create_test_registry
 
@@ -240,13 +241,18 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
             run_store = RunStore(root / "runs", db_manager=database)
             registry = create_test_registry(db_manager=database)
             executor = WorkflowExecutor(registry, run_store, ResultCache(root / "cache"))
+            workflow_store = WorkflowStore(root / "workflows")
             app = FastAPI()
             app.include_router(
                 create_workflow_router(
-                    workflow_store=WorkflowStore(root / "workflows"),
+                    workflow_store=workflow_store,
                     run_store=run_store,
-                    workflow_executor=executor,
-                    workflow_dispatcher=dispatcher,  # type: ignore[arg-type]
+                    workflow_execution=WorkflowExecutionService(
+                        workflow_store,
+                        run_store,
+                        executor,
+                        dispatcher,  # type: ignore[arg-type]
+                    ),
                 )
             )
             response = TestClient(app).post(
@@ -268,13 +274,18 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
                 run_store,
                 ResultCache(root / "cache"),
             )
+            workflow_store = WorkflowStore(root / "workflows")
             app = FastAPI()
             app.include_router(
                 create_workflow_router(
-                    workflow_store=WorkflowStore(root / "workflows"),
+                    workflow_store=workflow_store,
                     run_store=run_store,
-                    workflow_executor=executor,
-                    workflow_dispatcher=dispatcher,  # type: ignore[arg-type]
+                    workflow_execution=WorkflowExecutionService(
+                        workflow_store,
+                        run_store,
+                        executor,
+                        dispatcher,  # type: ignore[arg-type]
+                    ),
                 )
             )
             response = TestClient(app).post(

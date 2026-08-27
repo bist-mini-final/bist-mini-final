@@ -219,41 +219,33 @@ spec:
 
 ---
 
-## 4. 백엔드 내장 K8s 배치 잡 & 워커 관제 대시보드 (`GET /jobs`)
+## 4. 읽기 전용 K8s 배치 잡 & 워커 관제 (`/jobs`, `GET /api/v1/jobs`)
 
-일반 사용자 화면(React SPA)과 인프라 관제 화면을 분리하기 위해, FastAPI 백엔드는 `/docs` (Swagger UI), `/redoc` (ReDoc)과 유사하게 **백엔드 프로세스 자체에서 단일 경로(`GET /jobs`)로 K8s 잡 & 워커 실시간 관제 대시보드를 서빙**합니다.
+현재 승인 기준선은 React SPA의 `/jobs` 화면이 FastAPI의 `GET /api/v1/jobs`를 5초마다 조회하는 구조입니다. API는 KEDA `ScaledJob`, `batch/v1 Job`, `core/v1 Pod`의 요약 상태만 반환합니다. 클러스터 내부에서는 전용 ServiceAccount와 네임스페이스 한정 Role을 사용하고, 로컬 개발에서는 현재 `kubectl` context를 읽기 전용으로 조회합니다.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Admin as DevOps / System Admin
     participant Ingress as Kubernetes Ingress (Port 8080)
-    participant FastAPI as FastAPI Job Router (GET /jobs)
-    participant SSE as K8s Stream Hub (GET /api/jobs/stream)
-    participant K8s as Kubernetes API (batch/v1, core/v1 Watch)
-    participant DB as PostgreSQL (workflow_runs & Leases)
+    participant SPA as React Jobs Page
+    participant FastAPI as FastAPI Job Router (GET /api/v1/jobs)
+    participant K8s as Kubernetes API (keda.sh, batch/v1, core/v1)
 
     Admin->>Ingress: GET /jobs (브라우저 접속)
-    Ingress->>FastAPI: HTML 대시보드 요청
-    FastAPI-->>Admin: 200 OK (내장 경량 관제 대시보드 HTML/JS 반환)
-
-    Admin->>SSE: EventSource 연결 (/api/jobs/stream)
-    SSE->>K8s: watch.Watch(list_namespaced_pod, namespace="bist-batch")
-    SSE->>DB: SELECT * FROM workflow_runs WHERE status IN ('QUEUED', 'RUNNING')
-
-    K8s-->>SSE: Pod 스케일아웃 감지 (bist-worker-abc: RUNNING)
-    SSE-->>Admin: event: pod_status\ndata: {"pod": "bist-worker-abc", "run_id": "run-101", "cpu": "35%", "lease_ttl": 28}
-
-    Admin->>FastAPI: GET /api/jobs/bist-worker-abc/logs (로그 클릭)
-    FastAPI->>K8s: read_namespaced_pod_log(follow=True)
-    FastAPI-->>Admin: 실시간 컨테이너 stdout 로그 스트리밍 (Terminal 뷰어)
+    Ingress->>SPA: 정적 SPA 및 /jobs route 반환
+    SPA->>FastAPI: GET /api/v1/jobs (5초 polling)
+    FastAPI->>K8s: list ScaledJobs, Jobs, Pods (bist-batch)
+    K8s-->>FastAPI: resource status JSON
+    FastAPI-->>SPA: KubernetesWorkloadSnapshot
+    SPA-->>Admin: 상태 카드와 읽기 전용 표 갱신
 ```
 
 ### 대시보드 주요 기능 및 관제 항목
-1. **KEDA 스케일아웃 상태 모니터링**: 현재 활성 워커 Pod 수 (0 ~ N개), KEDA 큐 트리거 쿼리 카운트 실시간 표시.
-2. **분산 Lease 락 관제**: 각 워커가 점유 중인 작업 ID(`run_id`), 임차권 만료 잔여시간(`TTL`), 하트비트 정상 여부 표시.
-3. **실시간 컨테이너 로그 뷰어**: 터미널 없이 웹 브라우저 안에서 워커 Pod의 표준 출력(stdout/stderr) 로그 실시간 스트리밍.
-4. **고아 작업 강제 회복 및 취소**: 장시간 응답 없는 워커의 Lease 강제 회수(`POST /api/jobs/{run_id}/cancel`).
+1. **구현됨 — KEDA/Job/Pod 상태 모니터링**: 이름, 상태, Ready, 성공/실패 수, 생성 시각, condition 메시지 표시.
+2. **구현됨 — 최소 권한**: `pods`, `jobs`, `scaledjobs`의 `get/list/watch`만 허용하며 Secret, 로그, 생성·수정·삭제 권한은 부여하지 않음.
+3. **To-Be — Lease/큐 상세 관제**: `workflow_runs`의 작업 ID, TTL, 하트비트와 Kubernetes 리소스의 상관관계 표시.
+4. **To-Be — 로그 및 운영 명령**: 인증·감사·RBAC 정책이 확정되기 전까지 로그 스트리밍과 취소/회복 명령은 제공하지 않음.
 
 ---
 

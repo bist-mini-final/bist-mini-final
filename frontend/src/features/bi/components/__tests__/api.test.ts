@@ -133,7 +133,7 @@ describe('BI API service', () => {
     expect(input).toBeInstanceOf(Request);
     if (!(input instanceof Request)) return;
     expect(input.method).toBe('POST');
-    expect(new URL(input.url).pathname).toBe('/api/bi/materializations');
+    expect(new URL(input.url).pathname).toBe('/api/v1/bi/materializations');
     expect(await input.clone().json()).toEqual({
       company_id: 'acme',
       display_name: 'ACME',
@@ -235,7 +235,7 @@ describe('BI API service', () => {
     expect(request).toBeInstanceOf(Request);
     if (!(request instanceof Request)) return;
     expect(request.method).toBe('POST');
-    expect(new URL(request.url).pathname).toBe('/api/bi/companies/acme/refresh');
+    expect(new URL(request.url).pathname).toBe('/api/v1/bi/companies/acme/refresh');
   });
 
   it('resets and reads a question regeneration job', async () => {
@@ -269,9 +269,9 @@ describe('BI API service', () => {
     expect(second).toBeInstanceOf(Request);
     if (!(first instanceof Request) || !(second instanceof Request)) return;
     expect(first.method).toBe('POST');
-    expect(new URL(first.url).pathname).toBe('/api/bi/companies/acme/reset');
+    expect(new URL(first.url).pathname).toBe('/api/v1/bi/companies/acme/reset');
     expect(new URL(second.url).pathname).toBe(
-      '/api/bi/question-jobs/question-job-refresh',
+      '/api/v1/bi/question-jobs/question-job-refresh',
     );
   });
 });

@@ -2,6 +2,8 @@
 > **Document Code:** `BP-503` | **Category:** Interface & Physical Schema Blueprint | **Status:** Approved Baseline  
 > **Source Files:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/features/bi/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/database_schema.py), [`backend/features/benchmark/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/database_schema.py)
 
+> **Canonical runtime note:** 벤치마크 큐의 실제 테이블은 `benchmark_jobs`, `benchmark_result_rows`입니다. 아래의 `benchmark_runs`, `benchmark_results` DDL은 초기 설계 이력이며 신규 구현의 기준이 아닙니다. 현재 스키마 기준은 소스의 `*_SCHEMA_SQL`과 Alembic migration입니다.
+
 ---
 
 ## 1. 물리 데이터베이스 ERD (Physical Entity-Relationship Diagram)
@@ -462,8 +464,9 @@ CREATE TABLE IF NOT EXISTS benchmark_results (
 
 ## 3. 리팩토링 타깃 (Refactoring Targets)
 
-1. **Alembic 데이터베이스 마이그레이션 도구 도입**:
-   - As-Is: `db_manager.py` 및 `database_schema.py` 내부의 raw SQL DDL 문자열을 서버 시작 시 실행.
-   - To-Be: Alembic 마이그레이션 스크립트로 버전 관리 및 안전한 롤백(Down-migration) 지원.
+1. **Alembic 데이터베이스 마이그레이션 도구 도입 — 기준선 구현 완료**:
+   - `migrations/versions/20260827_0001_schema_baseline.py`가 기존 설치를 데이터 삭제 없이 채택합니다.
+   - CI와 배포 전 `alembic upgrade head`를 실행하며, 서버 시작 시 raw SQL 확인은 구버전 호환 안전망으로만 유지합니다.
+   - 데이터 손실을 유발하는 기준선 downgrade는 차단하고, 이후 변경은 별도 revision에서 명시적인 안전 롤백 여부를 결정합니다.
 2. **소프트 삭제(Soft Delete) 및 감사 로그(Audit Log)**:
    - `source_files`, `bi_companies`에 `is_deleted`, `deleted_at` 컬럼 추가 및 데이터 변경 이력 테이블(`audit_logs`) 구축.

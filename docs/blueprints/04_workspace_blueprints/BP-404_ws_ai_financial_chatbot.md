@@ -10,7 +10,7 @@ AI 금융 챗봇은 자연어 재무 질의에 대해 **PostgreSQL 기반 대화
 
 ```mermaid
 flowchart TD
-    UI["ChatbotView (React 18 SPA)"] <-->|REST API| ROUTER["FastAPI Chatbot Router (/api/chatbot)"]
+    UI["ChatbotView (React 18 SPA)"] <-->|REST API| ROUTER["FastAPI Chatbot Router (/api/v1/chat)"]
     
     subgraph ChatServices ["Chatbot Core Services"]
         REPO["ChatSessionRepository (chat_sessions, chat_messages)"]
@@ -31,11 +31,13 @@ flowchart TD
 
 ## 2. 핵심 엔드포인트 명세
 
-* `GET /api/chatbot/sessions`: 세션 목록 조회
-* `POST /api/chatbot/sessions`: 세션 생성
-* `GET /api/chatbot/sessions/{session_id}`: 세션 상세 및 메시지 히스토리 조회
-* `PATCH /api/chatbot/sessions/{session_id}`: 세션 제목 수정
-* `DELETE /api/chatbot/sessions/{session_id}`: 세션 삭제
-* `POST /api/chatbot/sessions/{session_id}/messages`: 메시지 전송 및 답변/시각화 생성
-* `POST /api/chatbot/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
-* `GET /api/chatbot/suggestions`: 동적 스마트 질문 추천
+정식 경로는 `/api/v1/chat`입니다. 문서가 과거에 사용한 `/api/chatbot` 및 버전 경로 `/api/v1/chatbot`은 호환 별칭으로 유지합니다.
+
+* `GET /api/v1/chat/sessions`: 세션 목록 조회
+* `POST /api/v1/chat/sessions`: 세션 생성
+* `GET /api/v1/chat/sessions/{session_id}`: 세션 상세 및 메시지 히스토리 조회
+* `PATCH /api/v1/chat/sessions/{session_id}`: 세션 제목 수정
+* `DELETE /api/v1/chat/sessions/{session_id}`: 세션 삭제
+* `POST /api/v1/chat/sessions/{session_id}/messages`: 메시지 전송 및 답변/시각화 생성
+* `POST /api/v1/chat/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
+* `GET /api/v1/chat/suggestions`: 동적 스마트 질문 추천
