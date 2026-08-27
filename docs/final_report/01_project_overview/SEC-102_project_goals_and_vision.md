@@ -20,7 +20,7 @@
 
 ## 2. 정량적 벤치마크 평가 목표 KPI (Target Evaluation KPIs)
 
-향후 파이프라인 최적화 완료 후 벤치마크 하네스([`SEC-501`](file:///c:/Repos/bist-mini-final/docs/05_validation_and_conclusion/SEC-501_benchmark_evaluation_plan.md))를 통해 검증할 정량적 목표치입니다:
+향후 파이프라인 최적화 완료 후 벤치마크 하네스([`SEC-501`](file:///c:/Repos/bist-mini-final/docs/final_report/05_validation_and_conclusion/SEC-501_benchmark_evaluation_plan.md))를 통해 검증할 정량적 목표치입니다:
 
 | 평가 영역 (Evaluation Dimension) | 핵심 메트릭 (Metric) | 목표치 (Target KPI) | 측정 방식 및 기준 |
 | :--- | :--- | :---: | :--- |

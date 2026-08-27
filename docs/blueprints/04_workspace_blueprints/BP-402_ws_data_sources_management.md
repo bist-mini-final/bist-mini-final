@@ -32,8 +32,8 @@ flowchart TD
 | :--- | :--- | :--- |
 | **Layer 5<br>(원자적 모듈군)** | `structure.luna_vlm_structure_detector`<br>([`luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py)) | • 엑셀 시트 이미지를 래스터라이징하여 GPT-5.6 Luna VLM으로 전송<br>• 표 경계(`TableBoundary`), 열 헤더, 행 스터브, 데이터 매트릭스 기하학 감지 |
 | | `structure.cell_text_serializer`<br>([`cell_text_serializer.py`](file:///c:/Repos/bist-mini-final/modules/structure/cell_text_serializer.py)) | • 감지된 2D 좌표계를 단일 표준 규격(`header_with_value`) 텍스트 라인으로 직렬화 |
-| | `retrieval.text_embedder`<br>([`text_embedder.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/text_embedder.py)) | • 직렬화된 셀 텍스트를 `text-embedding-3-large`를 통해 **3072차원 고밀도 벡터**로 배치 임베딩 |
-| | `storage.pgvector_index_writer`<br>([`BP-302 Module 7`](file:///c:/Repos/bist-mini-final/docs/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md#7-pgvectorindexwritermodule-storagepgvector_index_writer)) | • **[Layer 5 모듈화]** 임베딩 벡터와 메타데이터를 Layer 7 Binary COPY 엔진을 통해 PostgreSQL `langchain_pg_embedding` 테이블로 초고속 벌크 주입 |
+| | `retrieval.text_embedder`<br>([`text_embedder.py`](file:///c:/Repos/bist-mini-final/modules/embedding/cell_text_embedder.py)) | • 직렬화된 셀 텍스트를 `text-embedding-3-large`를 통해 **3072차원 고밀도 벡터**로 배치 임베딩 |
+| | `storage.pgvector_index_writer`<br>([`BP-302 Module 7`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md#7-pgvectorindexwritermodule-storagepgvector_index_writer)) | • **[Layer 5 모듈화]** 임베딩 벡터와 메타데이터를 Layer 7 Binary COPY 엔진을 통해 PostgreSQL `langchain_pg_embedding` 테이블로 초고속 벌크 주입 |
 | **Layer 7<br>(스토리지 인프라)** | `backend/storage/db_manager.py`<br>`backend/storage/connection_pool.py` | • PostgreSQL 커넥션 풀링 및 HNSW 인덱스 상태 헬스 프로브(`GET /api/data-sources/probe`) |
 
 ---
