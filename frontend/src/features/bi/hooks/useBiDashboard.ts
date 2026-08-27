@@ -87,6 +87,10 @@ export function useBiDashboard(
   company: BiCompanySummary | null,
 ): UseBiDashboardResult {
   const companyId = company?.companyId ?? '';
+  const companyDisplayName = company?.displayName ?? '';
+  const sourceFileName = company?.source?.fileName ?? '';
+  const sourceWorkbookHash = company?.source?.workbookHash ?? '';
+  const sourceIndexId = company?.source?.indexId ?? '';
   const [state, setState] = useState<BiDashboardState>({ status: 'idle' });
   const [activeAction, setActiveAction] = useState<'refresh' | 'reset' | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
@@ -276,7 +280,15 @@ export function useBiDashboard(
 
     void load();
     return () => controller.abort();
-  }, [companyId, company?.currentSnapshotId, company?.refreshStatus, company?.source]);
+  }, [
+    companyId,
+    companyDisplayName,
+    company?.currentSnapshotId,
+    company?.refreshStatus,
+    sourceFileName,
+    sourceWorkbookHash,
+    sourceIndexId,
+  ]);
 
   const refresh = async (): Promise<void> => {
     const dashboard = dashboardRef.current;
