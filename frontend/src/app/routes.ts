@@ -2,6 +2,7 @@ import {
   Bot,
   ChartNoAxesCombined,
   Database,
+  GitCompareArrows,
   House,
   Scale,
   Settings,
@@ -10,10 +11,15 @@ import {
 } from 'lucide-react';
 import { type ComponentType, lazy } from 'react';
 import { ChatbotPage } from '../pages/ChatbotPage';
-import { CompanyComparisonPage } from '../pages/CompanyComparisonPage';
 import { HomePage } from '../pages/HomePage';
 import { SettingsPage } from '../pages/SettingsPage';
 
+const CompanyComparisonPage = lazy(() =>
+  import('../pages/CompanyComparisonPage').then((module) => ({ default: module.CompanyComparisonPage }))
+);
+const CompanyComparisonV2Page = lazy(() =>
+  import('../pages/CompanyComparisonV2Page').then((module) => ({ default: module.CompanyComparisonV2Page }))
+);
 const BiPage = lazy(() =>
   import('../pages/BiPage').then((module) => ({ default: module.BiPage }))
 );
@@ -94,7 +100,16 @@ export const APP_ROUTES: readonly AppRoute[] = [
     description: '다중 기업 재무 지표 비교 분석 대시보드',
     icon: Scale,
     component: CompanyComparisonPage,
-    status: 'planned',
+    status: 'ready',
+  },
+  {
+    path: '/company-comparison-v2',
+    label: 'AI 기업 비교',
+    shortLabel: 'AI Comparison',
+    description: '선택 기업의 RAG 근거 기반 동적 비교 분석',
+    icon: GitCompareArrows,
+    component: CompanyComparisonV2Page,
+    status: 'ready',
   },
   {
     path: '/settings',
