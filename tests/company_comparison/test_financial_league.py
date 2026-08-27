@@ -1,7 +1,4 @@
-import pytest
-
 from backend.features.bi.models import AmountScale, BiEvidence, CompanyId
-from backend.features.company_comparison.calculator import ComparisonDataError
 from backend.features.company_comparison.league_service import (
     BaseFinancials,
     FinancialLeagueService,
@@ -33,10 +30,7 @@ def _base(index: int) -> BaseFinancials:
         display_name=f"Company {index}",
         currency="KRW",
         scale=AmountScale.MILLIONS,
-        revenues={
-            year: revenue_2021 * pow(1 + growth, year - 2021)
-            for year in range(2021, 2026)
-        },
+        revenues={year: revenue_2021 * pow(1 + growth, year - 2021) for year in range(2021, 2026)},
         margins={year: 8.0 + index * 0.55 for year in range(2021, 2026)},
         liabilities_to_assets=28.0 + index,
         net_debt=80.0 - index * 9,
@@ -65,11 +59,12 @@ def test_league_ranks_each_loaded_company_once() -> None:
     assert result.companies[0].company_id == result.spotlight.leader_company_id
 
 
-def test_league_requires_loaded_company_data_instead_of_fallbacks() -> None:
-    with pytest.raises(ComparisonDataError) as error:
-        FinancialLeagueService(UnavailableStore()).build()
+def test_league_exposes_only_fifteen_page_scoped_temporary_companies_without_store() -> None:
+    result = FinancialLeagueService(UnavailableStore()).build()
 
-    assert error.value.code == "financial_league_insufficient_companies"
+    assert len(result.companies) == 15
+    assert all(company.company_id.startswith("temp-") for company in result.companies)
+    assert {item.file_name for item in result.evidence} == {"company-comparison-temporary-data"}
 
 
 def test_league_score_uses_documented_weights_and_valid_candles() -> None:
@@ -85,9 +80,7 @@ def test_league_score_uses_documented_weights_and_valid_candles() -> None:
         for candle in company.candles:
             assert candle.low <= min(candle.open, candle.close)
             assert candle.high >= max(candle.open, candle.close)
-            assert candle.period_type == (
-                "historical" if candle.year <= 2025 else "forecast"
-            )
+            assert candle.period_type == ("historical" if candle.year <= 2025 else "forecast")
 
 
 def test_league_preserves_excel_evidence_coordinates() -> None:
@@ -100,7 +93,4 @@ def test_league_preserves_excel_evidence_coordinates() -> None:
         for company in result.companies
         for candle in company.candles
     )
-    assert all(
-        item.sheet_name and item.cell_coord and item.source_text
-        for item in result.evidence
-    )
+    assert all(item.sheet_name and item.cell_coord and item.source_text for item in result.evidence)
