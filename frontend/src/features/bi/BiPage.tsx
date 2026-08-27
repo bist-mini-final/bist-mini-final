@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Landmark } from 'lucide-react';
 import { BiDashboardGrid } from './components/BiDashboardGrid';
 import { BiDataState } from './components/BiDataState';
 import { BiHeader } from './components/BiHeader';
 import { BiPageNotice } from './components/BiPageNotice';
 import { BiToolbar } from './components/BiToolbar';
 import { CardLibraryDialog } from './components/CardLibraryDialog';
-import { CompanyTabs } from './components/CompanyTabs';
+import { CompanySelector } from './components/CompanySelector';
 import { EvidenceDialog } from './components/EvidenceDialog';
 import { ResetDataDialog } from './components/ResetDataDialog';
 import { ResetLayoutDialog } from './components/ResetLayoutDialog';
@@ -41,7 +40,8 @@ function storeSelectedCompanyId(companyId: string): void {
 }
 
 export function BiPage() {
-  const companiesState = useBiCompanies();
+  const companiesController = useBiCompanies();
+  const companiesState = companiesController.state;
   const [selectedCompanyId, setSelectedCompanyId] = useState(readSelectedCompanyId);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodRange>('최근 5개');
   const [isEditing, setIsEditing] = useState(false);
@@ -70,25 +70,17 @@ export function BiPage() {
   if (companiesState.companies.length === 0) {
     return <BiDataState tone="empty" title="등록된 기업이 없습니다" message="인덱싱 완료 후 BI materialization을 시작하면 대시보드가 표시됩니다." />;
   }
-  const companyTabs = companiesState.companies.map((company) => ({
-    id: company.companyId,
-    name: company.displayName,
-  }));
   const companySelector = (
-    <div className="bi-company-section">
-      <div className="bi-section-heading">
-        <Landmark size={17} aria-hidden="true" />
-        <h2>기업 선택</h2>
-      </div>
-      <CompanyTabs
-        companies={companyTabs}
-        selectedId={resolvedCompanyId}
-        onSelect={(companyId) => {
-          setSelectedCompanyId(companyId);
-          storeSelectedCompanyId(companyId);
-        }}
-      />
-    </div>
+    <CompanySelector
+      companies={companiesState.companies}
+      selectedId={resolvedCompanyId}
+      selectedName={selectedCompany?.displayName ?? ''}
+      onRefresh={companiesController.refresh}
+      onSelect={(companyId) => {
+        setSelectedCompanyId(companyId);
+        storeSelectedCompanyId(companyId);
+      }}
+    />
   );
   if (dashboardState.status === 'idle' || dashboardState.status === 'loading') {
     return <BiDataState tone="loading" title="대시보드를 불러오는 중입니다" message="게시된 지표 스냅샷을 확인하고 있습니다.">{companySelector}</BiDataState>;
@@ -125,7 +117,6 @@ export function BiPage() {
     <section className="bi-page" aria-labelledby="bi-page-title">
       <BiHeader
         dashboard={dashboard}
-        periodLabel={selectedPeriod}
         activeAction={dashboardController.activeAction}
         onRefresh={() => void dashboardController.refresh()}
         onReset={() => setIsDataResetOpen(true)}
