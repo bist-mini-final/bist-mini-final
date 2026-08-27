@@ -310,7 +310,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
                     ),
                 }
 
-        return EventSourceResponse(events())
+        return EventSourceResponse(events(), ping=15)
 
     @router.post(
         "/companies/{company_id}/refresh",
@@ -491,7 +491,7 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
                     ),
                 }
 
-        return EventSourceResponse(events())
+        return EventSourceResponse(events(), ping=15)
 
     return router
 

@@ -49,7 +49,7 @@ V2 구현 중 V1의 다음 파일은 수정하지 않는다.
 [V2 화면]
   기업 2~3개 + 기간 선택
           |
-          | POST /api/bi/comparisons/analyze
+          | POST /api/v1/company-comparisons/analyze
           v
 [V2 API Router]
           |
@@ -93,7 +93,7 @@ V2 구현 중 V1의 다음 파일은 수정하지 않는다.
 
 ### 5.1 엔드포인트
 
-`POST /api/bi/comparisons/analyze`
+`POST /api/v1/company-comparisons/analyze`
 
 초기 버전은 동기 API로 구현한다. SSE job 방식은 긴 처리 시간이나 동시 사용자가 실제 문제가 될 때 V2.1에서 추가한다. 프런트엔드는 `AbortController`로 요청을 취소할 수 있어야 한다.
 

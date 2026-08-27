@@ -84,7 +84,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           {/* <span className="product-nav__caption">WORKSPACE</span> */}
           {APP_ROUTES.filter((r) => r.path !== '/settings').map((route) => {
             const Icon = route.icon;
-            const isActive = route.path === pathname;
+            const isActive = route.path === activeRoute?.path;
             return (
               <AppLink
                 key={route.path}
@@ -113,7 +113,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
             const settingsRoute = APP_ROUTES.find((r) => r.path === '/settings');
             if (!settingsRoute) return null;
             const Icon = settingsRoute.icon;
-            const isActive = pathname === '/settings';
+            const isActive = activeRoute?.path === '/settings';
             return (
               <AppLink
                 to="/settings"

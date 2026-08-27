@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bist-schema-migrate
+  namespace: bist-batch
+  labels:
+    app.kubernetes.io/name: bist-schema-migrate
+    app.kubernetes.io/part-of: bist-mini
+spec:
+  # local.sh sets the final image before resuming this Job. Suspending prevents
+  # a custom registry image from accidentally running the default local tag.
+  suspend: true
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bist-schema-migrate
+        app.kubernetes.io/part-of: bist-mini
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: bist-backend:local
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bist-batch-env
+                  key: PGVECTOR_URL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

@@ -6,6 +6,10 @@ import {
   mergeRunNodeUpdate,
   workflowRuntimeInputs,
 } from '../domain/execution';
+import {
+  isWorkflowNodeEvent,
+  isWorkflowTerminalEvent,
+} from '../../../shared/workflows/observeRun';
 import type {
   SaveStatus,
   WorkflowGraph,
@@ -214,11 +218,7 @@ export function useWorkflowPersistence(
           run = await pipelineApi.streamRun(
             run.id,
             (event) => {
-              if (
-                event.event === 'node_progress'
-                || event.event === 'node_completed'
-                || event.event === 'node_failed'
-              ) {
+              if (isWorkflowNodeEvent(event.event)) {
                 const nodeUpdate = event.data;
                 if (nodeUpdate?.node_id) {
                   const current = latestRunRef.current;
@@ -227,7 +227,10 @@ export function useWorkflowPersistence(
                   applyRun(updated);
                   onBatch?.(updated);
                 }
-              } else if (event.event === 'run_completed' && event.data?.run) {
+              } else if (
+                isWorkflowTerminalEvent(event.event)
+                && event.data?.run
+              ) {
                 applyRun(event.data.run);
                 onBatch?.(event.data.run);
               }

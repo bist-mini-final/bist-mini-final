@@ -1,4 +1,4 @@
-# [BP-302] 21개 모듈 입출력 핀아웃(Pinout) 카탈로그
+# [BP-302] 19개 파이프라인 모듈 + 2개 BI 도메인 서비스 카탈로그
 > **Document Code:** `BP-302` | **Category:** Pipeline & Modular Contracts Blueprint | **Status:** Approved Baseline  
 > **Source Directories:** [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)
 
@@ -6,18 +6,20 @@
 
 ## 1. 3단계 클래스 상속 계층 및 종합 핀아웃 규격 (3-Tier Inheritance & Pinout Architecture)
 
-모든 모듈은 최상위 추상 클래스 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)을 정점으로 하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스 및 **100% 비동기 논블로킹 실행 계약(`execute_async`)**을 준수합니다.
+런타임에 등록되는 19개 파이프라인 모듈은 최상위 추상 클래스 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)을 정점으로 하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스를 준수합니다. 현재 모듈 템플릿 메서드는 동기 `run/execute` 계약이며, FastAPI의 블로킹 경계는 스레드 격리하고 장시간 작업은 Kubernetes one-shot 워커에서 실행합니다.
+
+> **Canonical count:** [`ModuleRegistry`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)가 등록하는 파이프라인 모듈은 19개입니다. `DocumentProfiler`와 `FinancialCalculator`는 각각 `backend/features/bi/document_profiler.py`, `backend/features/bi/calculator.py`에 위치한 BI 도메인 서비스이며 DAG 모듈 수에 포함하지 않습니다.
 
 ---
 
-### 1.1 표준 비동기 모듈 입출력 핀아웃 계약 (Async Pinout Interface Protocol)
+### 1.1 표준 모듈 입출력 핀아웃 계약 (Pinout Interface Protocol)
 
 각 모듈은 엄격한 Pydantic 스키마를 통해 입출력 계약(Contract)을 체결하며, 파이프라인 런타임은 이 핀아웃을 기반으로 DAG 결선 유효성을 100% 사전 검증합니다:
 
 ```mermaid
 graph LR
-    subgraph ModuleContract ["표준 비동기 모듈 인터페이스 (Async Pinout Interface)"]
-        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.execute_async()"]
+    subgraph ModuleContract ["표준 모듈 인터페이스 (Pinout Interface)"]
+        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.run() / execute()"]
         CFG["Config Pins (ModuleConfigDTO)"] --> MOD
         MOD --> OUT["Output Pins (Pydantic OutputDTO)"]
         MOD --> ERR["Error Envelope (ModuleExecutionError)"]
@@ -33,7 +35,7 @@ graph LR
 
 ### 1.2 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
 
-LLM 호출, 프롬프트 엔지니어링, 에이전트 도구 루프 및 임베딩 처리의 보일러플레이트를 단일화하기 위해 **`BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층**을 거쳐 21개 구체 모듈로 상속됩니다:
+LLM 호출과 임베딩 처리의 보일러플레이트는 **`BaseLLMModule`과 `BaseEmbedderModule` 중간 추상 계층**에서 공유합니다. 아래 21개 분류도는 장기 확장 목표이며 현재 런타임의 canonical 등록 목록은 `ModuleRegistry`의 19개입니다.
 
 ```mermaid
 classDiagram
@@ -90,7 +92,9 @@ classDiagram
 
 ---
 
-### 1.3 21개 파이프라인 모듈 3대 상속 분류 매트릭스
+### 1.3 장기 확장 목표 모듈 분류 매트릭스
+
+이 절의 21개 분류는 Cross-Encoder, Agentic Reasoner 등 향후 후보를 포함한 To-Be 카탈로그입니다. 현재 실행 가능한 모듈 수나 API 응답 수를 의미하지 않습니다.
 
 | 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (21개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
 | :--- | :---: | :--- | :--- |
@@ -229,14 +233,14 @@ classDiagram
 - **Input Pins**: `dataset_path: str`
 - **Output Pins**: `qa_examples: List[QaExample]`
 
-#### 20. `DocumentProfilerModule` (`structure.document_profiler`)
+#### Domain Service A. `DocumentProfiler` (`backend.features.bi.document_profiler`)
 - **역할**: 엑셀 워크북의 회계기간(FY/LTM), 표시 통화(KRW/USD) 및 배율 단위(백만원/천원/원), 재무제표 시트를 1-Shot LLM 구조화 추론으로 자동 발견.
 - **Input Pins**: `workbook_hash: str` (필수), `file_name: str` (필수), `index_id: Optional[str]`, `available_sheets: Optional[List[str]]`
 - **Output Pins**: `periods: List[str]`, `currency: str`, `scale: int`, `relevant_sheets: List[str]`, `evidence_cells: List[Dict[str, Any]]`
 - **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_periods: int = 5`, `temperature: float = 0.0`
 
-#### 21. `FinancialCalculatorModule` (`reader.financial_calculator`)
-- **역할**: 관측된 원천 재무 수치(매출액, 영업이익, 자산, 부채 등)를 입력받아 무손실 고정소수점(`Decimal`)으로 40개 이상의 핵심 재무 비율(수익성, 안정성, 활동성, 성장성)을 산출하고 감사 근거(`evidence_cells`)를 합성·바인딩.
+#### Domain Service B. `FinancialCalculator` (`backend.features.bi.calculator`)
+- **역할**: 관측된 원천 재무 수치로 현재 카탈로그의 파생 지표를 무손실 고정소수점(`Decimal`)으로 산출하고 감사 근거를 합성·바인딩.
 - **Input Pins**: `raw_metrics: Dict[str, Any]` (기간별 원천 관측 수치 맵), `evidence_cells: Optional[List[Dict[str, Any]]]` (원천 감사 셀 목록)
 - **Output Pins**: `derived_ratios: Dict[str, Any]` (40+ 산출 재무 비율 및 상태 플래그), `bound_evidence: Dict[str, List[Dict[str, Any]]]` (파생 지표별 합성 감사 근거)
 - **Config Pins**: `precision: int = 4`, `categories: List[str] = ["all"]` (또는 `["profitability", "stability", "activity", "growth"]`)

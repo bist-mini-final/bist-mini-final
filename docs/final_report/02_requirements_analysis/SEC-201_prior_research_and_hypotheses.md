@@ -6,13 +6,21 @@
 
 ## 1. 선행 연구 조사 (Prior Art Review)
 
-금융 도메인 재무제표 엑셀 분석을 위해 선행 연구된 핵심 방법론 및 프레임워크입니다:
+금융 도메인 재무제표 엑셀 분석과 의사결정 자동화를 위해 선행 연구된 핵심 방법론 및 프로덕트 프레임워크입니다:
 
-1. **FRTR (Financial RAG / Table Retrieval) 프레임워크**:
-   - 금융 도메인 특화 계정과목 매핑 및 표 구조 복원 방법론 조사.
-   - 단일 텍스트 검색의 한계를 극복하기 위해 Dense 임베딩과 Sparse 키워드 검색의 상호 융합 필요성 도출.
-2. **시맨틱 쿼리 라우팅 (Semantic & LLM Query Routing)**:
-   - 광범위한 전체 데이터베이스 검색 대신, 질의 의도를 파악하여 대상 기업 컬렉션 및 특정 재무제표 시트로 **데이터 스코프(Data Scope)**를 사전 제한하는 최적화 기법.
+1. **대화형 금융 질의응답 및 Fast RAG (Conversational Financial QA & Hybrid Retrieval)**:
+   - 금융 도메인 특화 계정과목 매핑 및 표 구조 복원 방법론 조사 (FRTR 프레임워크).
+   - 단일 Dense 임베딩의 계정과목 코드 오인식과 단일 Sparse 키워드의 의미적 맥락 유실을 극복하기 위한 Dense(3072d) + Sparse(BM25) + RRF($k=60$) 상호 순위 융합 하이브리드 검색 필요성 도출.
+   - 대규모 LLM 질의 시 지연시간을 300ms 이내로 단축하기 위한 인메모리 포트 바인딩 기반 Fast RAG 아키텍처 연구.
+2. **자동화 재무 BI 및 듀퐁 분해 (Automated Financial BI & DuPont Decomposition)**:
+   - 다중 시트 재무제표로부터 40+ 전사 재무비율(수익성, 안정성, 성장성, 활동성)을 자동 도출하고 5개년 시계열 추세를 진단하는 BI 방법론.
+   - ROE를 순이익률(Profit Margin), 총자산회전율(Asset Turnover), 재무레버리지(Financial Leverage)로 분해하여 기업의 실질적 이익 창출 드라이버를 판별하는 듀퐁 3단계 분석 기법.
+3. **다자간 피어 벤치마킹 및 정규화 (Multi-Company Peer Benchmarking & Normalization)**:
+   - 상이한 회계기준(K-IFRS, US-GAAP), 이종 통화(KRW, USD), 상하 분산 단위(억원, 백만원, 천달러)를 단일 기준으로 자동 정규화하는 크로스 엔티티 정규화 방법론.
+   - 5각 건전성 레이더 차트를 통한 동종 업계 경쟁사 간 상대가치 및 재무 건전성 랭킹 스크리닝 기법.
+4. **시맨틱 쿼리 라우팅 및 2D 표 기하학 복원 (Semantic Routing & Table Geometry)**:
+   - 질의 의도를 파악하여 대상 기업 컬렉션 및 특정 재무제표 시트로 데이터 스코프(Data Scope)를 사전 제한하는 최적화.
+   - 비전 모델(VLM)을 활용한 병합 셀 및 다층 헤더의 2D 공간 좌표 복원 및 원천 셀 감사 추적성(Audit Trail) 보장 연구.
 
 ---
 

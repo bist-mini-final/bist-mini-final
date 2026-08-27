@@ -1,291 +1,394 @@
-# BIST Mini Final — RAG Pipeline & BI Visualizer
+# BIST Mini Final
 
-재무 스프레드시트 구조 분석, Luna VLM 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 근거 기반 응답, BI 대시보드 스냅샷 및 RAG 벤치마크를 제공하는 엔터프라이즈 RAG & BI 플랫폼입니다.
+재무 스프레드시트 구조 분석, Luna VLM 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 근거 기반 응답, BI 대시보드와 RAG 벤치마크를 제공하는 RAG & BI 플랫폼입니다.
 
----
+이 문서는 저장소를 처음 받은 개발자가 **로컬 웹 애플리케이션을 실행하고, 필요할 때 k3d/KEDA 워커까지 구성**할 수 있도록 현재 프로젝트 설정을 기준으로 작성되었습니다.
 
-## 1. 시스템 아키텍처 및 큐 구조
+## 1. 실행 환경
 
-```text
-[Frontend: React/Vite/XYFlow]
-        │ (HTTP / SSE)
-        ▼
-[Control Plane: FastAPI Backend (:8765)]
-        │
-        ├── PostgreSQL & pgvector (DB, Embeddings, Queue Tables)
-        │     ├── bi_materialization_jobs / bi_questions / bi_answers
-        │     ├── workflow_runs / workflow_leases
-        │     └── benchmark_runs / benchmark_results
-        │
-        ▼ (KEDA Trigger & Autoscaling)
-[Kubernetes Worker Pods / ScaledJobs]
-        ├── workflow-core worker (RAG & Ingestion DAG 실행)
-        ├── bi-materialization runner (지표 프로파일링 & 질문 생성)
-        ├── bi-question batch worker (OpenAI Responses LLM 병렬 지표 추출)
-        └── benchmark worker (파이프라인 평가 & 스코어링)
-```
+| 도구 | 지원/권장 버전 | 용도 |
+| --- | --- | --- |
+| Python | 3.11 이상, **3.12 권장** | FastAPI, 파이프라인, 워커 |
+| uv | 최신 안정 버전 | Python 가상환경 및 잠금 의존성 설치 |
+| Node.js | **22 LTS 권장** | React/Vite 프론트엔드 |
+| npm | Node.js에 포함 | 프론트엔드 의존성 및 스크립트 |
+| Docker | 24 이상 권장 | PostgreSQL/pgvector, 이미지 빌드 |
+| Git | 최신 안정 버전 | 소스 관리 |
 
-- **`modules/`**: 19개 파이프라인 모듈 및 Pydantic v2 계약의 단일 소스(Single Source of Truth).
-- **`jobs/`**: 모듈 간 DAG 파이프라인 정의 및 배치 워커 엔트리포인트.
-- **FastAPI Control Plane**: API 계약 검증, DB 큐 등록, 스냅샷/이슈 조회, SSE 실시간 스트리밍 제공.
-- **KEDA ScaledJobs**: 4개 독립 큐(`workflow-core`, `bi-materialization`, `bi-question`, `benchmark`)에 쌓인 작업량에 따라 워커 Pod를 0부터 수평 자동 확장(HPA).
+전체 비동기 실행 환경에는 `k3d`, `kubectl`, `helm`이 추가로 필요합니다. Windows에서는 WSL2 또는 Git Bash에서 `deploy/kubernetes/local.sh`를 실행할 수 있습니다. 스크립트는 Device Guard가 프로젝트 가상환경 실행을 막는 경우 uv 관리 Python으로 자동 우회합니다.
 
----
+> 로컬 pgvector 설정은 `shared_buffers=4GB`를 사용합니다. Docker Desktop에는 메모리를 8GB 이상 할당하는 것을 권장하며, 자원이 부족한 환경에서는 `deploy/compose/docker-compose.yml`의 PostgreSQL 메모리 설정을 낮춰야 합니다.
 
-## 2. 원클릭 개발 환경 및 Kubernetes (k3d & KEDA) 배포 가이드
-
-### 2.1 원클릭 일괄 설치 및 클러스터 구동 (`deploy/kubernetes/local.sh`)
-
-`./deploy/kubernetes/local.sh all` 명령어 한 줄로 **필수 개발도구 자동 감지 및 설치부터 k3d 클러스터 구성, KEDA 오토스케일러, 워커 이미지 빌드/임포트, DB 스키마 동기화, KEDA ScaledJob 배포까지 모든 과정이 자동으로 완료**됩니다:
+설치 여부는 저장소를 구성하기 전에 확인합니다.
 
 ```bash
-# 1. 전체 인프라 및 개발 도구 원클릭 일괄 설치 & 배포
-./deploy/kubernetes/local.sh all
-
-# 2. 클러스터 및 큐 상태 점검
-./deploy/kubernetes/local.sh status
+python --version
+uv --version
+node --version
+npm --version
+docker version
 ```
 
-> **`local.sh` 자동화 범위:**
-> - 미설치 도구 자동 감지 및 자동 설치 (`k3d`, `kubectl`, `helm`, `uv`, `node`)
-> - Python 가상환경 및 잠금 의존성 자동 동기화 (`uv sync --frozen`)
-> - Docker 데몬 자동 실행 확인
-> - PostgreSQL DB 스키마 및 pgvector 확장 자동 검증
-> - k3d 로컬 클러스터 (`bist-local`) 생성 및 KEDA v2.20.2 / Metrics Server 설치
-> - 파이프라인 워커 이미지 빌드 및 클러스터 자동 임포트
-> - 네임스페이스(`bist-batch`), 시크릿(`bist-batch-env`), 4종 ScaledJob 매니페스트 동적 렌더링 및 적용
+## 2. 빠른 시작: 백엔드 + 프론트엔드
 
-#### 특정 단계별 개별 제어 명령어:
-```bash
-./deploy/kubernetes/local.sh setup-tools # 개발 도구 및 가상환경만 설치
-./deploy/kubernetes/local.sh cluster     # k3d 클러스터 & KEDA 설치
-./deploy/kubernetes/local.sh build       # 워커 이미지 빌드 및 k3d import
-./deploy/kubernetes/local.sh deploy      # ScaledJob 및 Secret 적용
-./deploy/kubernetes/local.sh status      # 클러스터, Pod, ScaledJob 상태 확인
-./deploy/kubernetes/local.sh logs        # 워커 Pod 실시간 로그 출력
-./deploy/kubernetes/local.sh down        # 로컬 클러스터 정지
-./deploy/kubernetes/local.sh destroy     # 로컬 클러스터 완전 삭제
-```
+아래 구성은 개발 서버와 PostgreSQL을 실행합니다. 파일 업로드, BI 생성, 벤치마크처럼 큐에 등록되는 작업을 실제 처리하려면 [5. 비동기 워커 실행](#5-비동기-워커-실행)도 구성해야 합니다.
 
----
+### 2.1 환경 변수 파일 만들기
 
-### 2.2 필수/권장 도구 목록 및 수동 설치 (참고용)
+저장소 루트에서 실행합니다.
 
-도구를 직접 수동으로 설치하고자 할 경우 아래 표와 명령어를 참고하세요.
+PowerShell:
 
-| 도구 | 권장 버전 | 용도 | macOS (Homebrew) | Linux / 기타 |
-| :--- | :--- | :--- | :--- | :--- |
-| **Docker** | 24.0+ | 컨테이너 엔진 및 런타임 | Docker Desktop / OrbStack | Docker Engine |
-| **k3d** | v5.6+ | Docker 위에서 구동되는 경량 k3s 클러스터 관리 | `brew install k3d` | `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh \| bash` |
-| **kubectl** | v1.28+ | Kubernetes 클러스터 CLI | `brew install kubectl` | `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl` |
-| **helm** | v3.12+ | KEDA 및 Metrics Server 설치용 패키지 매니저 | `brew install helm` | `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \| bash` |
-| **uv** | 0.4+ | 초고속 Python 가상환경 및 패키지 관리자 | `brew install uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| **Node.js** | 18.0+ | React 프론트엔드 빌드 및 개발 서버 | `brew install node` | `nvm install 20` |
-
-#### macOS 원클릭 일괄 설치 (Homebrew):
-```bash
-brew install k3d kubectl helm uv node
-```
-
-#### Windows (WSL2 / Winget):
 ```powershell
-winget install Docker.DockerDesktop Rancher.k3d Kubernetes.kubectl Helm.Helm astral-sh.uv OpenJS.NodeJS
+Copy-Item .env.example .env
 ```
 
----
+macOS, Linux, WSL2:
 
-### 2.3 KEDA ScaledJob 스케일링 설정 (`deploy/kubernetes/manifests/scaledjob.yaml`)
-
-KEDA는 PostgreSQL의 대기 질문 및 작업 큐를 주기적으로 폴링(3s)하여 Worker Pod를 0개에서 최대 16개(시스템 자원 비례)까지 자동 증설합니다:
-
-- **`workflow-core-scaler`**: `workflow_runs` 테이블의 `status = 'queued'` 건수에 따라 워커 확장.
-- **`bi-materialization-scaler`**: `bi_materialization_jobs` 테이블의 `status = 'queued'` 건수 기반 확장.
-- **`bi-question-scaler`**: `bi_questions` 테이블의 대기 질문(`status = 'queued'`) 건수 기반 대규모 병렬 추출 확장 (ScaleTarget: 16).
-- **`benchmark-scaler`**: `benchmark_runs` 테이블의 `status = 'queued'` 평가 작업 기반 확장.
-
-```yaml
-# ScaledJob 매니페스트 예시 (bi-question 워커)
-apiVersion: keda.sh/v1alpha1
-kind: ScaledJob
-metadata:
-  name: bi-question-worker
-  namespace: bist-batch
-spec:
-  jobTargetRef:
-    template:
-      spec:
-        containers:
-          - name: worker
-            image: bist-workflow-worker:local
-            command: ["python", "-m", "backend.features.bi.question_worker_main"]
-            envFrom:
-              - secretRef:
-                  name: bist-secrets
-  pollingInterval: 3
-  successfulJobsHistoryLimit: 5
-  failedJobsHistoryLimit: 5
-  maxReplicaCount: 16
-  triggers:
-    - type: postgresql
-      metadata:
-        connectionFromEnv: PGVECTOR_URL
-        query: "SELECT COUNT(*) FROM bi_questions WHERE status = 'queued'"
-        targetQueryValue: "16"
+```bash
+cp .env.example .env
 ```
 
----
+`.env`에서 데이터베이스 주소를 확인하고, OpenAI 기반 모듈을 사용한다면 API 키를 입력합니다.
 
-## 3. 로컬 서비스 실행 가이드
-
-### 3.1 환경 변수 설정 (`.env`)
-루트 디렉토리에 `.env` 파일을 구성합니다:
-
-```env
-OPENAI_API_KEY=sk-proj-your-api-key-here
+```dotenv
+OPENAI_API_KEY=sk-your-key
+OPENAI_BASE_URL=https://api.openai.com/v1
 PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
-ENVIRONMENT=development
-LOG_LEVEL=INFO
 ```
 
-### 3.2 의존성 설치
-```bash
-# Python 백엔드 및 모듈 의존성 설치
-uv sync --frozen
+백엔드는 API 키 없이도 시작되지만 Query Decomposer, Luna 구조 감지, BI 질문 처리 등 OpenAI를 호출하는 기능은 실패합니다. `.env`와 `frontend/.env*`는 Git에서 제외되어 있으므로 실제 키를 커밋하지 마세요.
 
-# Frontend 의존성 설치
-cd frontend
-npm ci
-cd ..
-```
+### 2.2 PostgreSQL + pgvector 실행
 
-### 3.3 서버 기동
-```bash
-# Terminal 1: Backend FastAPI Control Plane
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
-
-# Terminal 2: Frontend React UI
-cd frontend
-npm run dev
-```
-
-- **웹 대시보드 UI**: [http://localhost:5173](http://localhost:5173)
-- **FastAPI OpenAPI 문서**: [http://localhost:8765/docs](http://localhost:8765/docs)
-
----
-
-### 3.4 테스트 및 품질 검증
+현재 Docker Compose 파일은 **데이터베이스만** 실행하며 외부 Docker 볼륨 `pgdata`를 사용합니다.
 
 ```bash
-# 백엔드 Python 테스트 & 린트
-uv run pytest tests/
-uv run ruff check modules backend jobs tests
-uv run pyright
-
-# 프론트엔드 테스트 & 빌드
-cd frontend
-npm test
-npm run build
-```
-
----
-
-## 4. (선택 사항) 로컬 pgvector 컨테이너 및 Docker 단독 빌드
-
-> [!NOTE]
-> **외부 PostgreSQL / 클라우드 DB(Supabase, Neon, RDS 등)를 사용하거나 이미 로컬에 실행 중인 DB가 있다면 본 섹션은 건너뛰셔도 무방합니다.**  
-> `.env`의 `PGVECTOR_URL`에 해당 DB 주소만 적어주시면 `./deploy/kubernetes/local.sh`가 이를 자동 감지하여 처리합니다.
-
-### 4.1 로컬 PostgreSQL + pgvector 컨테이너 설정 (`deploy/compose/docker-compose.yml`)
-
-로컬에 pgvector가 설치되어 있지 않거나 독립된 로컬 전용 DB 컨테이너가 필요한 경우 사용합니다.
-
-```yaml
-services:
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: bist-pgvector
-    restart: unless-stopped
-    shm_size: 4g
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-rag_flow}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "0.0.0.0:${PGVECTOR_PORT:-5432}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    command:
-      - "postgres"
-      - "-c", "listen_addresses=*"
-      - "-c", "shared_buffers=4GB"
-      - "-c", "work_mem=64MB"
-      - "-c", "maintenance_work_mem=1GB"
-      - "-c", "effective_cache_size=8GB"
-      - "-c", "max_parallel_workers_per_gather=4"
-      - "-c", "max_parallel_maintenance_workers=4"
-      - "-c", "max_parallel_workers=8"
-      - "-c", "effective_io_concurrency=200"
-      - "-c", "random_page_cost=1.1"
-      - "-c", "wal_buffers=64MB"
-      - "-c", "min_wal_size=1GB"
-      - "-c", "max_wal_size=4GB"
-      - "-c", "max_connections=200"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_flow}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  pgdata:
-    external: true
-```
-
-#### 로컬 pgvector 컨테이너 기동:
-```bash
-# 1. 외장 볼륨 생성 (데이터 영속성 보장)
 docker volume create pgdata
-
-# 2. pgvector 컨테이너 시작
 docker compose -f deploy/compose/docker-compose.yml up -d
-
-# 3. 컨테이너 상태 및 헬스체크 확인
 docker compose -f deploy/compose/docker-compose.yml ps
 ```
 
-### 4.2 Docker 이미지 수동 빌드 (`deploy/docker/`)
+`bist-pgvector`의 상태가 `healthy`인지 확인합니다. 외부 PostgreSQL을 사용한다면 이 단계는 건너뛰고 `.env`의 `PGVECTOR_URL` 또는 `DATABASE_URL`을 해당 접속 문자열로 설정합니다. 최초 실행과 배포 전에는 버전 마이그레이션을 적용합니다.
 
 ```bash
-# Backend Control Plane 이미지 빌드
-docker build -t bist-backend:local -f deploy/docker/Dockerfile.backend .
-
-# Kubernetes / Worker 이미지 빌드
-docker build -t bist-workflow-worker:local -f deploy/docker/Dockerfile.worker .
-
-# Frontend UI 이미지 빌드
-docker build -t bist-frontend:local -f deploy/docker/Dockerfile.frontend ./frontend
+uv run alembic upgrade head
 ```
 
----
+기존 설치도 `CREATE IF NOT EXISTS` 기반 기준선으로 현재 데이터를 유지한 채 채택됩니다. 애플리케이션의 시작 시 스키마 확인은 이전 배포와의 호환 안전망이며, 이후 스키마 변경은 `migrations/`의 새 Alembic revision으로 추가합니다.
 
-## 5. 디렉토리 구조
+### 2.3 의존성 설치
+
+```bash
+uv sync --frozen
+npm --prefix frontend ci
+```
+
+`uv sync --frozen`은 루트의 `uv.lock`을 그대로 사용해 Python 개발 의존성까지 설치합니다.
+
+### 2.4 개발 서버 실행
+
+터미널 1 — FastAPI 백엔드:
+
+```bash
+uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+```
+
+터미널 2 — React/Vite 프론트엔드:
+
+```bash
+npm --prefix frontend run dev
+```
+
+접속 주소:
+
+| 서비스 | 주소 |
+| --- | --- |
+| 웹 UI | <http://localhost:5173> |
+| Swagger UI | <http://localhost:8765/docs> |
+| ReDoc | <http://localhost:8765/redoc> |
+| OpenAPI JSON | <http://localhost:8765/openapi.json> |
+| 상태 확인 | <http://localhost:8765/healthz> |
+| Liveness | <http://localhost:8765/livez> |
+| 준비 상태 | <http://localhost:8765/readyz> |
+| Kubernetes 작업 관제 | <http://localhost:5173/jobs> |
+
+프론트엔드 개발 서버는 `/api`, `/docs`, `/redoc`, `/openapi.json` 요청을 `http://localhost:8765`로 프록시합니다. 정식 API 경로는 `/api/v1`이며 기존 `/api` 경로도 호환용으로 유지됩니다.
+
+### 2.5 기동 확인
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8765/healthz
+Invoke-RestMethod http://localhost:8765/readyz
+```
+
+macOS, Linux, WSL2:
+
+```bash
+curl http://localhost:8765/healthz
+curl http://localhost:8765/readyz
+```
+
+`/healthz`는 프로세스 생존 여부, `/readyz`는 데이터베이스를 포함한 요청 처리 준비 상태를 확인합니다.
+
+## 3. 환경 변수
+
+### 애플리케이션 설정
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | 없음 | OpenAI 기반 모듈 사용 시 필요 |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 호환 API 주소 |
+| `DATABASE_URL` | 없음 | 설정하면 `PGVECTOR_URL`보다 우선하는 PostgreSQL 접속 문자열 |
+| `PGVECTOR_URL` | `postgresql://postgres:postgres@localhost:5432/rag_flow` | PostgreSQL/pgvector 및 큐 저장소 주소 |
+| `USE_PGVECTOR` | `true` | `true`, `1`, `yes`일 때 pgvector 사용 |
+| `DB_POOL_MIN_SIZE` | `2` | 백엔드 프로세스의 최소 DB 연결 수 |
+| `DB_POOL_MAX_SIZE` | 템플릿 `10`, 미설정 시 `50` | 백엔드 프로세스의 최대 DB 연결 수 |
+| `KUBERNETES_WORKFLOW_QUEUE` | `workflow-core` | 기본 워크플로 큐 이름 |
+| `KUBERNETES_DATABASE_URL` | 없음 | Kubernetes 배포에만 사용할 PostgreSQL 접속 문자열. 지정하면 `DATABASE_URL`, `PGVECTOR_URL`보다 우선 |
+| `KUBERNETES_BACKEND_IMAGE` | `bist-backend:local` | 배포할 API 이미지. 레지스트리 태그를 지정할 수 있음 |
+| `KUBERNETES_WORKER_IMAGE` | `bist-workflow-worker:local` | 배포할 KEDA 워커 이미지 |
+| `KUBERNETES_FRONTEND_IMAGE` | `bist-frontend:local` | 배포할 UI 이미지 |
+| `K3D_IMPORT_IMAGES` | `true` | `true`면 로컬 빌드 이미지를 k3d에 import. 원격 레지스트리 배포 시 `false` |
+| `KUBERNETES_MAX_JOBS` | 자동 계산 | k3d/KEDA 최대 병렬 Job 수. 빈 값이면 Docker 자원으로 계산 |
+| `KUBERNETES_JOB_CPU_REQUEST` | `1000m` | 워커 CPU request |
+| `KUBERNETES_JOB_MEMORY_REQUEST` | `2Gi` | 워커 메모리 request |
+| `KUBERNETES_JOB_CPU_LIMIT` | `2` | 워커 CPU limit |
+| `KUBERNETES_JOB_MEMORY_LIMIT` | `3Gi` | 워커 메모리 limit |
+| `BI_QUESTION_BATCH_SIZE` | `16` | BI 질문 워커가 한 번에 가져올 질문 수 |
+| `BI_QUESTION_MAX_WORKERS` | `8` | BI 질문 워커 내부 최대 병렬 스레드 수 |
+| `LOG_LEVEL` | `INFO` | 워커 로그 레벨 |
+
+`KUBERNETES_JOB_NAME`은 Kubernetes가 워커 식별용으로 주입하는 값이고, `WORKFLOW_QUEUE`는 워크플로 워커 프로세스에서 기본 큐를 일시적으로 재정의할 때 사용합니다.
+
+### Docker Compose 설정
+
+다음 값은 `deploy/compose/docker-compose.yml`의 PostgreSQL 컨테이너 설정에 사용됩니다.
+
+| 변수 | 기본값 |
+| --- | --- |
+| `POSTGRES_DB` | `rag_flow` |
+| `POSTGRES_USER` | `postgres` |
+| `POSTGRES_PASSWORD` | `postgres` |
+| `PGVECTOR_PORT` | `5432` |
+
+기본 계정 정보는 로컬 개발용입니다. 공유 환경이나 운영 환경에서는 반드시 별도 비밀번호와 Secret 저장소를 사용하세요.
+
+## 4. 외부 데이터베이스 사용
+
+PostgreSQL 16과 pgvector 확장을 사용할 수 있는 관리형 DB(Supabase, Neon, RDS 등)도 연결할 수 있습니다.
+
+```dotenv
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require
+```
+
+- `DATABASE_URL`이 있으면 `PGVECTOR_URL`보다 우선합니다.
+- 접속 계정에는 확장 및 스키마를 준비할 권한이 필요합니다.
+- 특수문자가 포함된 사용자명과 비밀번호는 URL 인코딩해야 합니다.
+- `deploy/kubernetes/local.sh`는 `KUBERNETES_DATABASE_URL` → `DATABASE_URL` → `PGVECTOR_URL` 순으로 클러스터 DB를 선택합니다. 개발용 `.env`가 원격 DB를 가리키더라도, 로컬 k3d 실행에만 `KUBERNETES_DATABASE_URL`을 지정해 분리할 수 있습니다.
+
+## 5. 비동기 워커 실행
+
+이 프로젝트의 워크플로, BI, 벤치마크는 PostgreSQL 큐와 one-shot 워커를 사용합니다.
+
+```text
+React/Vite → FastAPI → PostgreSQL 큐 → KEDA ScaledJob → Worker Pod
+```
+
+### 5.1 전체 로컬 배치 환경: k3d + KEDA
+
+Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
+
+```bash
+./deploy/kubernetes/local.sh all
+./deploy/kubernetes/local.sh status
+```
+
+`all`은 도구 확인, Python 동기화, pgvector 및 Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Secret·ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
+
+개발용 `.env`의 `DATABASE_URL`이 원격 DB를 가리킬 때 로컬 DB로 실행하려면 다음처럼 한 번만 재정의합니다.
+
+```bash
+KUBERNETES_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rag_flow \
+  ./deploy/kubernetes/local.sh all
+```
+
+단계별 명령:
+
+```bash
+./deploy/kubernetes/local.sh setup-tools  # 도구 및 Python 환경 준비
+./deploy/kubernetes/local.sh check        # 도구 확인
+./deploy/kubernetes/local.sh cluster      # DB, k3d, KEDA 준비
+./deploy/kubernetes/local.sh build        # API·워커·UI 이미지 빌드 및 k3d import
+./deploy/kubernetes/local.sh deploy       # DB migration, 워커, API/UI/Ingress 적용
+./deploy/kubernetes/local.sh recreate     # 8080/8443 포트 매핑을 포함해 k3d만 다시 생성
+./deploy/kubernetes/local.sh restart      # 중지된 클러스터 재시작
+./deploy/kubernetes/local.sh status       # 용량, Pod, Job, ScaledJob 확인
+./deploy/kubernetes/local.sh logs         # 워크플로 워커 로그 확인
+./deploy/kubernetes/local.sh logs-api     # API 로그 확인
+./deploy/kubernetes/local.sh down         # 클러스터 정지(데이터 유지)
+./deploy/kubernetes/local.sh destroy      # k3d 클러스터 삭제
+```
+
+`recreate`와 `destroy`는 k3d 클러스터만 삭제하며 외부 Docker 볼륨 `pgdata`는 삭제하지 않습니다. 새 클러스터는 `http://localhost:8080`을 Ingress에 연결하고 8443 포트도 예약합니다. 실제 HTTPS는 운영 도메인과 TLS Secret을 설정한 뒤 사용합니다. 이전 형식으로 생성한 클러스터는 안전을 위해 자동 삭제하지 않으므로, 포트가 없다면 `recreate`를 실행하거나 다음처럼 임시 접속합니다.
+
+```bash
+kubectl -n bist-batch port-forward service/frontend-ui 8080:80
+```
+
+원격 레지스트리로 배포할 때는 이미지를 별도로 `docker push`한 후, import를 끄고 불변 태그를 지정합니다.
+
+```bash
+K3D_IMPORT_IMAGES=false \
+KUBERNETES_BACKEND_IMAGE=registry.example.com/bist/backend:2026.08.27 \
+KUBERNETES_WORKER_IMAGE=registry.example.com/bist/worker:2026.08.27 \
+KUBERNETES_FRONTEND_IMAGE=registry.example.com/bist/frontend:2026.08.27 \
+  ./deploy/kubernetes/local.sh deploy
+```
+
+### 5.2 워커를 로컬에서 한 번 실행하기
+
+Kubernetes 없이 큐 동작을 디버깅할 때 사용할 수 있습니다. 각 명령은 현재 큐에서 작업을 가져와 한 번 처리한 뒤 종료합니다.
+
+```bash
+# workflow-core 큐 1건
+uv run python -m backend.engine.worker.main
+
+# BI materialization 1건
+uv run python -m backend.features.bi.materialization_worker_main
+
+# BI 질문 최대 1 batch
+uv run python -m backend.features.bi.question_worker_main
+
+# benchmark 1건
+uv run python -m backend.features.benchmark.worker_main
+```
+
+큐가 비어 있으면 정상적으로 메시지를 출력하고 종료합니다. 연속 처리가 필요하면 KEDA 구성을 사용하세요.
+
+## 6. 테스트와 품질 검증
+
+저장소 루트에서 실행합니다.
+
+```bash
+# Python
+uv run alembic upgrade head
+uv run pytest -q
+uv run ruff check .
+uv run pyright
+
+# Frontend
+npm --prefix frontend test
+npm --prefix frontend run build
+```
+
+프론트엔드 빌드 결과는 루트의 `dist/`에 생성됩니다.
+
+## 7. Docker 이미지 빌드
+
+세 Dockerfile 모두 저장소 루트를 build context로 사용합니다.
+
+```bash
+docker build -t bist-backend:local -f deploy/docker/Dockerfile.backend .
+docker build -t bist-workflow-worker:local -f deploy/docker/Dockerfile.worker .
+docker build -t bist-frontend:local -f deploy/docker/Dockerfile.frontend .
+```
+
+`deploy/compose/docker-compose.yml`은 전체 애플리케이션 Compose 구성이 아니라 pgvector 전용 구성입니다. 백엔드와 프론트엔드는 개발 명령 또는 각 Docker 이미지로 별도 실행합니다.
+
+## 8. 문제 해결
+
+### `uv` 명령을 찾을 수 없음
+
+uv 설치 후 터미널을 다시 열고 확인합니다.
+
+```bash
+uv --version
+```
+
+Windows에서 이미 `.venv`가 준비되어 있다면 임시로 다음과 같이 실행할 수 있습니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+### DB 연결 실패 또는 `/readyz` 실패
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml ps
+docker logs bist-pgvector --tail 100
+```
+
+- `pgdata` 볼륨이 없으면 `docker volume create pgdata`를 실행합니다.
+- 5432 포트가 이미 사용 중이면 `PGVECTOR_PORT`와 애플리케이션 DB URL의 포트를 함께 변경합니다.
+- Docker 메모리가 부족하면 Docker Desktop 할당량을 높이거나 Compose의 PostgreSQL 메모리 설정을 낮춥니다.
+- 외부 DB 사용 시 방화벽, SSL 옵션, 사용자 권한을 확인합니다.
+
+### 작업이 `queued`에서 진행되지 않음
+
+API와 DB만 실행한 상태에서는 정상적인 현상입니다. `./deploy/kubernetes/local.sh status`로 KEDA 워커를 확인하거나 [로컬 one-shot 워커](#52-워커를-로컬에서-한-번-실행하기)를 실행합니다.
+
+### OpenAI 호출 오류
+
+- `.env`의 `OPENAI_API_KEY`와 `OPENAI_BASE_URL`을 확인합니다.
+- 호환 API를 사용할 경우 `/v1` 포함 여부와 지원 모델을 확인합니다.
+- 키를 로그, 이슈, 커밋에 남겼다면 즉시 폐기하고 재발급합니다.
+
+### 프론트엔드에서 API 호출 실패
+
+- 백엔드가 `localhost:8765`에서 실행 중인지 확인합니다.
+- 프론트엔드는 `npm --prefix frontend run dev`로 실행해야 Vite 프록시 설정을 사용합니다.
+- 직접 API를 호출할 때는 정식 경로 `/api/v1`을 사용합니다.
+
+## 9. 프로젝트 구조
 
 ```text
 bist-mini-final/
-├── modules/                       # RAG 파이프라인 단일 소스 모듈 (Retriever, Expander, Reader 등)
-├── jobs/                          # canonical DAG 파이프라인 및 배치 엔트리포인트
 ├── backend/
-│   ├── api/                       # FastAPI 라우트, 스키마, SSE 스트리밍
-│   ├── bootstrap/                 # 의존성 주입 컨테이너
-│   ├── engine/                    # DAG 실행 엔진 및 워커
-│   ├── features/
-│   │   ├── bi/                    # BI 카탈로그, 질문 생성기, 공식 계산기, 스냅샷
-│   │   └── benchmark/             # RAG 벤치마크 및 지표 평가
-│   └── storage/                   # PostgreSQL 커넥션 풀, pgvector 저장소
-├── frontend/                      # React 18, TypeScript, TailwindCSS, Recharts
+│   ├── api/                  # FastAPI 라우트, 버전, 미들웨어, SSE
+│   ├── bootstrap/            # 애플리케이션/런타임 컨테이너와 lifecycle
+│   ├── engine/               # DAG 실행 엔진, 워크플로 서비스, 워커
+│   ├── features/             # BI 및 benchmark 기능
+│   └── storage/              # PostgreSQL 풀과 저장소
+├── frontend/                 # React 18, TypeScript, Vite
+├── modules/                  # RAG 파이프라인 모듈 및 Pydantic 계약
+├── jobs/                     # canonical DAG와 배치 엔트리포인트
 ├── deploy/
-│   ├── compose/                   # Docker Compose (pgvector 전용 인프라)
-│   ├── docker/                    # Dockerfiles (backend, worker, frontend)
-│   └── kubernetes/                # k3d 스크립트, KEDA ScaledJob 매니페스트
-└── docs/specs/                    # 아키텍처 및 검증 명세서
+│   ├── compose/              # 로컬 pgvector
+│   ├── docker/               # backend, worker, frontend 이미지
+│   └── kubernetes/           # k3d/KEDA 스크립트와 매니페스트
+├── docs/
+│   ├── blueprints/           # 시스템 설계도
+│   └── final_report/         # 최종 보고서
+├── tests/                    # Python 계약 및 통합 테스트
+├── .env.example              # 환경 변수 템플릿
+├── pyproject.toml            # Python 프로젝트와 도구 설정
+├── uv.lock                   # Python 잠금 파일
+└── README.md
 ```
+
+## 10. 아키텍처 요약
+
+```text
+[Frontend: React/Vite]
+          │ HTTP / SSE
+          ▼
+[FastAPI Control Plane :8765]
+          │
+          ├── PostgreSQL + pgvector
+          │     ├── workflow queue / leases
+          │     ├── BI jobs / questions / answers
+          │     └── benchmark runs / results
+          │
+          └── KEDA PostgreSQL trigger
+                    ▼
+              [ScaledJob Workers]
+```
+
+- `modules/`가 파이프라인 모듈 계약의 단일 소스입니다.
+- FastAPI는 요청 검증, 큐 등록, 조회, SSE 관찰을 담당합니다.
+- KEDA는 PostgreSQL 큐 길이에 따라 one-shot 워커를 0개부터 확장합니다.
+- 상세 설계는 `docs/blueprints/`를 참고하세요.

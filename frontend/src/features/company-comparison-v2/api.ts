@@ -9,7 +9,7 @@ export async function analyzeCompanyComparisonV2(
   request: CompanyComparisonV2Request,
   signal: AbortSignal,
 ): Promise<CompanyComparisonV2Response> {
-  const payload = await requestJson<unknown>('/api/bi/comparisons/analyze', {
+  const payload = await requestJson<unknown>('/api/v1/company-comparisons/analyze', {
     method: 'POST',
     signal,
     timeout: 120_000,

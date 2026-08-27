@@ -46,15 +46,15 @@ flowchart TD
 | | `retrieval.context_expander`<br>([`context_expander.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/context_expander.py)) | • 2D 그리드 이웃 셀 및 계층 헤더를 단일 표준(`header_with_value`) 문맥으로 복원 |
 | | `generation.reader`<br>([`reader.py`](file:///c:/Repos/bist-mini-final/modules/reader/reader.py)) | • GPT-5.6 Luna 구조화 완성을 통해 정확한 회계 수치 및 감사 근거 추출 |
 | | **`reader.financial_calculator`**<br>([`BP-302 Module 21`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md#21-financialcalculatormodule-readerfinancial_calculator)) | • **[Layer 5 재무 수식 연산 모듈]**<br>• **Input Pins**: `raw_metrics` (원천 관측값), `evidence_cells` (감사 근거)<br>• **Output Pins**: `derived_ratios` (40+ 파생비율), `bound_evidence` (파생 감사 근거)<br>• `BaseModule` 직접 상속 순수 결정론적 알고리즘으로 무손실 고정소수점(`Decimal`) 40+ 비율 0ms 산출 |
-| **Layer 3<br>(금융 BI 도메인 엔진)** | `MetricCatalog`<br>([`catalog.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/catalog.py)) | • 40개 이상 핵심 재무 비율 산출에 필요한 원천 지표 질문 및 동의어 규칙 정의 |
-| | `FastRagPipelineAdapter`<br>([`fast_rag_adapter.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/fast_rag_adapter.py)) | • 포트-어댑터 패턴으로 하위 21개 모듈을 결합하여 개별 재무 질문에 대한 초고속 답변 및 근거 인출 수행 |
+| **Layer 3<br>(금융 BI 도메인 엔진)** | `MetricCatalog`<br>([`catalog.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/catalog.py)) | • 현재 21개 근거 기반 지표의 원천 질문, 동의어, 파생 계산 규칙 정의 |
+| | `FastRagPipelineAdapter`<br>([`fast_rag_adapter.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/fast_rag_adapter.py)) | • 포트-어댑터 패턴으로 하위 19개 파이프라인 모듈을 결합하여 개별 재무 질문에 대한 답변 및 근거 인출 수행 |
 | | `DashboardRecalculation`<br>([`dashboard_recalculation.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/dashboard_recalculation.py)) | • 엑셀 재파싱 없이 기존 관측값 기반 1-Shot 고속 파생 지표 재계산 및 DB 스냅샷 저장 |
 
 ---
 
-## 2. 40+ 핵심 재무 지표 및 산출 공식 명세 (Financial Formulas Matrix)
+## 2. 현재 21개 근거 기반 지표 및 확장 공식 명세 (Financial Formulas Matrix)
 
-`calculator.py`에서 무손실 고정소수점 `Decimal` 타입으로 계산되는 주요 파생 지표 공식:
+현재 canonical 목록은 `MetricId`와 `METRIC_CATALOG`에 선언된 21개입니다. 구현된 파생 계산은 매출 성장률, 영업이익률, 순이익률, FCF, FCF 마진, 총차입금, 순차입금, 부채비율, 순차입금비율입니다. 아래 표의 나머지 항목은 원천 정의와 근거 셀이 추가된 뒤 확장할 후보이며 현재 API가 제공한다고 간주하지 않습니다.
 
 | 분류 | 지표 ID / 영문명 | 한글 라벨 | 산출 공식 (Formula) | 단위 / 정책 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -79,12 +79,15 @@ flowchart TD
 2. **재무 건전성 히트맵 (`FinancialHealthHeatmap`)**:
    - `FinancialHealthHeatmap` 컴포넌트가 수익성, 안정성, 활동성 등 4대 핵심 영역의 다년도 지표 상태를 신호등 색상(Healthy, Moderate, Caution)으로 집계하여 직관적인 종합 건전성 매트릭스를 렌더링합니다.
 3. **대시보드 실시간 재계산 및 리셋 제어 (`ResetDataDialog`)**:
-   - **원천 관측값 재계산 (`POST /api/bi/companies/{id}/refresh`)**: 엑셀 재파싱 없이 기존 관측값으로부터 파생 재무 비율과 스냅샷만 1-Shot 고속 재계산.
-   - **질의응답 초기화 및 재생성 (`POST /api/bi/companies/{id}/reset`)**: `ResetDataDialog`를 통해 선택 기업의 질의응답을 트랜잭션으로 교체하고 새 질문 배치를 큐에 등록 후 SSE(`GET /api/bi/question-jobs/{id}/stream`)로 진행률을 실시간 모니터링.
+   - **원천 관측값 재계산 (`POST /api/v1/bi/companies/{id}/refresh`)**: 엑셀 재파싱 없이 기존 관측값으로부터 파생 재무 비율과 스냅샷만 1-Shot 고속 재계산.
+   - **질의응답 초기화 및 재생성 (`POST /api/v1/bi/companies/{id}/reset`)**: `ResetDataDialog`를 통해 선택 기업의 질의응답을 트랜잭션으로 교체하고 새 질문 배치를 큐에 등록 후 SSE(`GET /api/v1/bi/question-jobs/{id}/stream`)로 진행률을 실시간 모니터링.
 4. **적응형 음수 마진 Y축 스케일링 (`getProfitabilityMarginDomain`)**:
    - `chartViewModel.ts`의 셀렉터 로직을 통해 당기순손실이나 영업적자(음수 마진)가 발생한 기업의 경우에도 차트가 잘리거나 0에 고정되지 않고, 최소/최대 마진율을 고려한 적응형 대칭 Y축 도메인(`[min * 1.15, max * 1.15]`)을 자동 계산하여 Recharts 차트에 바인딩합니다.
 5. **웹 접근성(a11y) 표준 대화상자 라이프사이클 (`useModalDialog`)**:
    - `ResetDataDialog`, `EvidenceDialog`, `CardLibraryDialog`, `ResetLayoutDialog` 등 모든 BI 모달 컴포넌트에 [`useModalDialog`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/components/useModalDialog.ts) 훅을 적용하여 `role="dialog"`, `aria-modal="true"`, `Escape` 키 닫기 이벤트 및 키보드 포커스 트랩을 표준 지원합니다.
+6. **기업 선택 상태 경계 (`CompanySelector`, `useSelectedBiCompany`)**:
+   - `CompanySelector`는 선택 대화상자를 통해 최신 기업 목록을 새로고침하고 키보드 탐색을 제공합니다. 선택값의 localStorage 영속화와 목록 변경 시 첫 유효 기업으로의 fallback은 `useSelectedBiCompany` 훅이 담당하므로 페이지 컴포넌트는 BI 상태 조합과 화면 배선만 수행합니다.
+   - 로딩·오류·대기 상태에서도 선택기를 같은 워크스페이스 위치에 유지해, 기업 전환 뒤 포커스와 접근성 컨텍스트가 끊기지 않습니다.
 
 ---
 

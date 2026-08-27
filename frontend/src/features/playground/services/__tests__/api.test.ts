@@ -56,17 +56,17 @@ describe('playground API errors', () => {
     const encoder = new TextEncoder();
 
     streamController?.enqueue(encoder.encode(
-      'event: node_progress\r\ndata: {"node_id":"query","status":"running"}\r\n\r\n'
+      'event: node_started\r\ndata: {"node_id":"query","status":"running"}\r\n\r\n'
     ));
-    await vi.waitFor(() => expect(events).toEqual(['node_progress']));
+    await vi.waitFor(() => expect(events).toEqual(['node_started']));
 
     const completedRun = { id: 'run-1', status: 'completed' } as unknown as WorkflowRun;
     streamController?.enqueue(encoder.encode(
-      `event: run_completed\r\ndata: ${JSON.stringify({ run: completedRun })}\r\n\r\n`
+      `event: run_finished\r\ndata: ${JSON.stringify({ run: completedRun })}\r\n\r\n`
     ));
     streamController?.close();
 
     await expect(streamPromise).resolves.toEqual(completedRun);
-    expect(events).toEqual(['node_progress', 'run_completed']);
+    expect(events).toEqual(['node_started', 'run_finished']);
   });
 });

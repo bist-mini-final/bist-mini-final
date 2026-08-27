@@ -22,7 +22,7 @@ describe('SseDecoder', () => {
 
   it('flushes a final unterminated event', () => {
     const decoder = new SseDecoder();
-    decoder.push('event: run_completed\ndata: {}');
-    expect(decoder.finish()).toEqual([{ event: 'run_completed', data: '{}' }]);
+    decoder.push('event: run_finished\ndata: {}');
+    expect(decoder.finish()).toEqual([{ event: 'run_finished', data: '{}' }]);
   });
 });
