@@ -24,6 +24,49 @@ erDiagram
     bi_questions ||--|| bi_answers : "produces (1:1)"
     workflow_runs ||--o| bi_questions : "executes query (1:1)"
 
+        %% 5. AI Chatbot Domain
+    chat_sessions ||--o{ chat_messages : "contains (1:N)"
+    chat_sessions ||--o{ chat_attachments : "has_attachments (1:N)"
+    workflow_runs ||--o| chat_messages : "executes_rag (1:1)"
+
+    chat_sessions {
+        varchar session_id PK "세션 고유 식별자"
+        varchar client_id "클라이언트 식별자"
+        varchar title "세션 제목"
+        timestamptz created_at "생성 일시"
+        timestamptz updated_at "수정 일시"
+    }
+
+    chat_messages {
+        varchar message_id PK "메시지 고유 식별자"
+        varchar session_id FK "chat_sessions.session_id"
+        varchar role "발화 주체 (user/assistant)"
+        text content "메시지 본문 (GFM Markdown / LaTeX)"
+        varchar status "상태 (pending/completed/failed)"
+        varchar workflow_run_id FK "workflow_runs.run_id"
+        jsonb visualization "인라인 차트 시각화 데이터"
+        jsonb attachments "첨부파일 메타데이터"
+        timestamptz created_at "생성 일시"
+    }
+
+    chat_attachments {
+        varchar attachment_id PK "첨부파일 고유 식별자"
+        varchar session_id FK "chat_sessions.session_id"
+        varchar file_name "파일명"
+        varchar content_type "MIME 타입"
+        bigint file_size "바이트 크기"
+        varchar storage_path "물리 저장 경로"
+        text extracted_text "추출된 텍스트/표 요약"
+        timestamptz created_at "생성 일시"
+    }
+
+    chat_suggested_questions {
+        date suggestion_date PK "추천 날짜"
+        smallint position PK "배열 순서"
+        varchar question "스마트 추천 질문 문장"
+        timestamptz created_at "생성 일시"
+    }
+
     %% 4. Benchmark Domain
     benchmark_runs ||--o{ benchmark_results : "evaluates (1:N)"
 
