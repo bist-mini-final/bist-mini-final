@@ -112,6 +112,21 @@ class PooledConnectionWrapper:
         self._conn = conn
         self._closed = False
 
+    def _discard(self, reason: str, error: Exception) -> None:
+        """Remove a broken connection from both the server and pool bookkeeping."""
+
+        logger.error("%s: %s", reason, error)
+        try:
+            # ``close=True`` is important: calling ``conn.close()`` alone leaves
+            # ThreadedConnectionPool's internal _used set occupied forever.
+            self._pool.putconn(self._conn, close=True)
+        except Exception as discard_error:
+            logger.warning("손상된 커넥션을 풀에서 제거하지 못했습니다: %s", discard_error)
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+
     def close(self) -> None:
         if self._closed:
             return
@@ -123,36 +138,19 @@ class PooledConnectionWrapper:
                 ):
                     self._conn.rollback()
             except Exception as error:
-                logger.error(
-                    "커넥션 트랜잭션 복구 실패로 풀에 반환하지 않고 직접 닫습니다: %s",
-                    error,
-                )
-                try:
-                    self._conn.close()
-                except Exception:
-                    pass
+                self._discard("커넥션 트랜잭션 복구 실패로 풀에서 제거합니다", error)
                 return
             try:
                 if getattr(self._conn, "autocommit", False):
                     self._conn.autocommit = False
             except Exception as error:
-                logger.error(
-                    "커넥션 autocommit 복구 실패로 커넥션을 풀에 반환하지 않고 직접 닫습니다: %s",
-                    error,
-                )
-                try:
-                    self._conn.close()
-                except Exception:
-                    pass
+                self._discard("커넥션 autocommit 복구 실패로 풀에서 제거합니다", error)
                 return
 
             try:
                 self._pool.putconn(self._conn)
             except Exception as error:
-                logger.error(
-                    "커넥션 풀 반환(putconn) 실패로 커넥션을 직접 닫습니다: %s",
-                    error,
-                )
+                logger.error("커넥션 풀 반환(putconn) 실패: %s", error)
                 try:
                     self._conn.close()
                 except Exception:
@@ -195,6 +193,11 @@ def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) 
     while True:
         try:
             conn = pool.getconn()
+            if conn.closed:
+                # A server restart can leave a dead connection in a client-side
+                # pool. Discard it before handing it to application code.
+                pool.putconn(conn, close=True)
+                continue
             return PooledConnectionWrapper(pool, conn)
         except psycopg2.pool.PoolError:
             if time.time() >= deadline:

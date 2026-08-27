@@ -85,7 +85,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
     description: '자연어로 질의하는 대화형 재무 비서',
     icon: Bot,
     component: ChatbotPage,
-    status: 'planned',
+    status: 'ready',
   },
   {
     path: '/company-comparison',

@@ -23,6 +23,7 @@ from .models import (
     IndexId,
     JobId,
     MaterializationStatus,
+    MetricId,
     SnapshotId,
 )
 
@@ -586,8 +587,21 @@ class PostgresBiStore:
         operation: str,
     ) -> BiDashboardSnapshot:
         try:
-            return BiDashboardSnapshot.model_validate(row["snapshot_payload"])
-        except (KeyError, ValidationError) as error:
+            payload = row["snapshot_payload"]
+            if not isinstance(payload, dict):
+                raise TypeError("snapshot payload is not a mapping")
+            metrics = payload.get("metrics")
+            if isinstance(metrics, dict):
+                # 이전 스키마에서 저장된 파생 지표는 현 MetricId 계약에 없을 수
+                # 있습니다. 읽기 시 제외해 현재 유효한 재무 지표는 계속 제공합니다.
+                valid_metrics = {
+                    key: value for key, value in metrics.items()
+                    if key in MetricId._value2member_map_
+                }
+                if len(valid_metrics) != len(metrics):
+                    payload = {**payload, "metrics": valid_metrics}
+            return BiDashboardSnapshot.model_validate(payload)
+        except (KeyError, TypeError, ValidationError) as error:
             raise BiPostgresStoreError(operation, str(error)) from error
 
 
