@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -93,7 +94,8 @@ def test_normalize_snapshot_removes_only_unsupported_metric_references() -> None
 
     assert isinstance(normalized, dict)
     assert list(normalized["metrics"]) == ["revenue"]
-    assert normalized["issues"] == [original["issues"][0]]
+    original_issues = cast(list[object], original["issues"])
+    assert normalized["issues"] == [original_issues[0]]
     assert payload == original
     BiDashboardSnapshot.model_validate(normalized)
 

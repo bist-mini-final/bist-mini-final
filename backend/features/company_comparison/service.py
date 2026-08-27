@@ -10,7 +10,6 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from backend.features.bi.api_services import BiApiStorePort
 from backend.features.bi.extraction_models import BiRetrievedContext
 from backend.features.bi.metric_reader import StructuredCompletionPort
 from backend.features.bi.models import BiDashboardSnapshot, CompanyId, MetricId
@@ -19,7 +18,7 @@ from backend.features.bi.profile_models import BiProfileRetrievalRequest
 from .cache import ComparisonResponseCachePort, comparison_cache_key
 from .calculator import ComparisonDataError, calculate_comparison
 from .forecast_reader import ComparisonForecastReader
-from .league_service import FinancialLeagueService
+from .league_service import FinancialLeagueService, FinancialLeagueStorePort
 from .models import (
     BriefStatus,
     CompanyComparisonBrief,
@@ -93,10 +92,17 @@ class ComparisonRetrieverPort(Protocol):
     ) -> BiRetrievedContext: ...
 
 
+class CompanyComparisonStorePort(FinancialLeagueStorePort, Protocol):
+    def get_current_many(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiDashboardSnapshot]: ...
+
+
 class CompanyComparisonService:
     def __init__(
         self,
-        store: BiApiStorePort,
+        store: CompanyComparisonStorePort,
         retriever: ComparisonRetrieverPort,
         completion: StructuredCompletionPort,
         forecast_reader: ComparisonForecastReader | None = None,

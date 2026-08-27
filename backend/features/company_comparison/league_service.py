@@ -6,14 +6,15 @@ from decimal import Decimal
 from itertools import pairwise
 from math import pow
 from statistics import fmean
-from typing import Final
+from typing import Final, Protocol, TypedDict
 
-from backend.features.bi.api_services import BiApiStorePort
+from backend.features.bi.materialization_models import BiCompanyIndexEntry
 from backend.features.bi.models import (
     AmountScale,
     AvailableObservation,
     BiDashboardSnapshot,
     BiEvidence,
+    CompanyId,
     MetricId,
 )
 
@@ -36,7 +37,7 @@ MAX_LEAGUE_COMPANIES: Final = 30
 
 @dataclass(frozen=True, slots=True)
 class BaseFinancials:
-    company_id: str
+    company_id: CompanyId
     display_name: str
     currency: str
     scale: AmountScale
@@ -46,6 +47,30 @@ class BaseFinancials:
     net_debt: float
     file_name: str
     evidence: BiEvidence
+
+
+class FinancialLeagueStorePort(Protocol):
+    def list_companies(self) -> tuple[BiCompanyIndexEntry, ...]: ...
+
+    def get_current(self, company_id: CompanyId) -> BiDashboardSnapshot | None: ...
+
+
+class LeagueCandidate(TypedDict):
+    company_id: CompanyId
+    display_name: str
+    currency: str
+    scale: AmountScale
+    composite_score: float
+    growth_score: float
+    profitability_score: float
+    stability_score: float
+    revenue_cagr: float
+    operating_margin: float
+    liabilities_to_assets: float
+    net_debt: float
+    tier: FinancialTier
+    candles: tuple[FinancialCandle, ...]
+    historical_score: float
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
@@ -116,7 +141,7 @@ def _base_from_snapshot(snapshot: BiDashboardSnapshot) -> BaseFinancials | None:
         source_text=f"{snapshot.company.display_name} {last_year} revenue",
     )
     return BaseFinancials(
-        company_id=str(snapshot.company.company_id),
+        company_id=snapshot.company.company_id,
         display_name=snapshot.company.display_name,
         currency=revenue_series.currency,
         scale=revenue_series.scale,
@@ -130,7 +155,7 @@ def _base_from_snapshot(snapshot: BiDashboardSnapshot) -> BaseFinancials | None:
 
 
 class FinancialLeagueService:
-    def __init__(self, store: BiApiStorePort) -> None:
+    def __init__(self, store: FinancialLeagueStorePort) -> None:
         self._store = store
 
     def build(self) -> FinancialLeagueResponse:
@@ -141,7 +166,7 @@ class FinancialLeagueService:
                 f"재무 리그에는 파싱 완료된 기업이 최소 {MIN_LEAGUE_COMPANIES}개 필요합니다. 현재 {len(bases)}개입니다.",
             )
         evidence: list[ComparisonEvidence] = []
-        candidates: list[dict[str, object]] = []
+        candidates: list[LeagueCandidate] = []
         for evidence_index, base in enumerate(bases, 1):
             evidence_id = f"E{evidence_index}"
             evidence.append(ComparisonEvidence(
@@ -155,15 +180,28 @@ class FinancialLeagueService:
             ))
             candidates.append(self._candidate(base, evidence_id))
 
-        previous_order = sorted(candidates, key=lambda item: float(item["historical_score"]), reverse=True)
+        previous_order = sorted(candidates, key=lambda item: item["historical_score"], reverse=True)
         previous_rank = {str(item["company_id"]): rank for rank, item in enumerate(previous_order, 1)}
-        current_order = sorted(candidates, key=lambda item: float(item["composite_score"]), reverse=True)
+        current_order = sorted(candidates, key=lambda item: item["composite_score"], reverse=True)
         companies = tuple(
             LeagueCompany(
-                **{key: value for key, value in item.items() if key != "historical_score"},
+                company_id=item["company_id"],
+                display_name=item["display_name"],
+                currency=item["currency"],
+                scale=item["scale"],
                 rank=rank,
                 previous_rank=previous_rank[str(item["company_id"])],
                 rank_change=previous_rank[str(item["company_id"])] - rank,
+                composite_score=item["composite_score"],
+                growth_score=item["growth_score"],
+                profitability_score=item["profitability_score"],
+                stability_score=item["stability_score"],
+                revenue_cagr=item["revenue_cagr"],
+                operating_margin=item["operating_margin"],
+                liabilities_to_assets=item["liabilities_to_assets"],
+                net_debt=item["net_debt"],
+                tier=item["tier"],
+                candles=item["candles"],
             )
             for rank, item in enumerate(current_order, 1)
         )
@@ -195,7 +233,7 @@ class FinancialLeagueService:
             return ()
         return loaded[:MAX_LEAGUE_COMPANIES]
 
-    def _candidate(self, base: BaseFinancials, evidence_id: str) -> dict[str, object]:
+    def _candidate(self, base: BaseFinancials, evidence_id: str) -> LeagueCandidate:
         historical_growth = pow(base.revenues[2025] / base.revenues[2021], 1 / 4) - 1
         forecast_growth = max(-0.12, historical_growth)
         revenue_by_year = dict(base.revenues)
@@ -269,4 +307,4 @@ class FinancialLeagueService:
         return tuple(buckets)
 
 
-__all__ = ["FinancialLeagueService"]
+__all__ = ["FinancialLeagueService", "FinancialLeagueStorePort"]
