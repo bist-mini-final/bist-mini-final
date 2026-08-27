@@ -49,22 +49,35 @@
 .bi-header__title-group,
 .bi-header__summary,
 .bi-header__metadata div,
+.bi-header__updated-at div,
 .bi-card__heading {
   min-inline-size: 0;
 }
 
-.bi-header__eyebrow {
-  color: var(--brand-600);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.11em;
+.bi-header__title-group {
+  align-self: center;
 }
 
 .bi-header h1 {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-size: clamp(1.9rem, 4vw, 2.4rem);
   line-height: 1.1;
   letter-spacing: -0.045em;
+}
+
+.bi-header__company-name,
+.bi-header__dashboard-label {
+  display: block;
+}
+
+.bi-header__company-name {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.bi-header__dashboard-label {
+  color: var(--brand-700);
+  font-weight: 750;
 }
 
 .bi-header__title-group > p {
@@ -107,19 +120,21 @@
 .bi-header__metadata {
   display: grid;
   inline-size: 100%;
-  grid-template-columns: minmax(0, 1.45fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
   margin: 0;
 }
 
-.bi-header__metadata div {
+.bi-header__metadata div,
+.bi-header__updated-at div {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   padding: 0.55rem;
 }
 
-.bi-header__metadata dt {
+.bi-header__metadata dt,
+.bi-header__updated-at dt {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -130,12 +145,10 @@
 
 .bi-header__metadata dd {
   margin: 0.4rem 0 0;
-  overflow: hidden;
   color: var(--text);
   font-size: 0.76rem;
   font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .bi-source-note {
@@ -164,8 +177,26 @@
 .bi-header__data-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: stretch;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.bi-header__updated-at {
+  margin: 0;
+}
+
+.bi-header__updated-at div {
+  min-block-size: 2.75rem;
+  padding-block: 0.45rem;
+}
+
+.bi-header__updated-at dd {
+  margin: 0.25rem 0 0;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .bi-data-reset-button {
@@ -278,20 +309,27 @@
   font-weight: 750;
 }
 
-.bi-company-tabs__scroller {
-  max-inline-size: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.bi-company-tabs {
+.bi-company-selector {
   display: flex;
-  inline-size: max-content;
-  min-inline-size: 100%;
-  gap: 0.45rem;
+  min-inline-size: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--brand-50);
+  padding: 0.6rem 0.7rem;
 }
 
-.bi-company-tab,
+.bi-company-selector__current {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.15rem;
+}
+
+.bi-company-selector__current span { color: var(--text-muted); font-size: 0.62rem; font-weight: 700; }
+.bi-company-selector__current strong { overflow: hidden; font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.bi-company-selector__trigger,
 .bi-segmented-control button,
 .bi-tool-button,
 .bi-card__actions button,
@@ -305,17 +343,14 @@
   font-weight: 700;
 }
 
-.bi-company-tab {
-  max-inline-size: 20rem;
+.bi-company-selector__trigger {
+  flex: none;
   min-block-size: 2.25rem;
-  padding-inline: 1rem;
-  overflow: hidden;
+  padding-inline: 0.9rem;
   font-size: 0.78rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.bi-company-tab:hover,
+.bi-company-selector__trigger:hover,
 .bi-segmented-control button:hover,
 .bi-tool-button:hover:not(:disabled) {
   border-color: var(--brand-200);
@@ -323,7 +358,6 @@
   color: var(--brand-700);
 }
 
-.bi-company-tab[aria-selected='true'],
 .bi-segmented-control button[aria-pressed='true'] {
   border-color: var(--brand-600);
   background: var(--brand-600);
@@ -807,6 +841,14 @@
 .bi-dialog__actions button { gap: 0.35rem; padding-inline: 0.9rem; }
 .bi-dialog__confirm { border-color: var(--brand-600) !important; background: var(--brand-600) !important; color: var(--surface) !important; }
 .bi-dialog__danger { border-color: var(--bi-danger-text) !important; background: var(--bi-danger-text) !important; color: var(--surface) !important; }
+.bi-company-dialog { display: grid; grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
+.bi-company-dialog__status { min-block-size: 1.1rem; margin: 0.65rem 0 0; color: var(--text-muted); font-size: 0.68rem; line-height: 1.5; }
+.bi-company-list { display: grid; min-block-size: 0; max-block-size: min(55vh, 27rem); gap: 0.4rem; margin-top: 0.65rem; overflow-y: auto; padding: 0.1rem 0.25rem 0.1rem 0.1rem; scrollbar-width: thin; }
+.bi-dialog .bi-company-option { inline-size: 100%; min-block-size: 2.9rem; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.8rem; text-align: left; }
+.bi-company-option span { min-inline-size: 0; overflow: hidden; color: var(--text); font-size: 0.76rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.bi-dialog .bi-company-option:hover { border-color: var(--brand-200); background: var(--brand-50); color: var(--brand-700); }
+.bi-dialog .bi-company-option[aria-selected='true'] { border-color: var(--brand-600); background: var(--brand-600); color: var(--surface); }
+.bi-company-option[aria-selected='true'] span { color: var(--surface); }
 .bi-card-library, .bi-evidence-list { display: grid; gap: 0.5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
 .bi-card-library li, .bi-evidence-list li { display: flex; min-inline-size: 0; align-items: center; justify-content: space-between; gap: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; }
 .bi-card-library li > div, .bi-evidence-list li > div { display: grid; min-inline-size: 0; gap: 0.25rem; }
@@ -820,6 +862,7 @@
 
 @media (max-width: 1279px) {
   .bi-header { flex-direction: column; }
+  .bi-header__title-group { align-self: stretch; }
   .bi-header__summary { inline-size: 100%; justify-items: start; }
   .bi-header__data-actions { justify-content: flex-start; }
 }
@@ -842,7 +885,7 @@
   .bi-page__workspace { gap: 0.75rem; margin-top: 0.75rem; }
   .bi-company-section { padding: 0.6rem; }
   .bi-toolbar { padding: 0.35rem 0.6rem; }
-  .bi-company-tab,
+  .bi-company-selector__trigger,
   .bi-tool-button,
   .bi-chart-toggle button { min-block-size: 2.75rem; }
 }
@@ -853,6 +896,8 @@
   .bi-toolbar { align-items: stretch; flex-direction: column; }
   .bi-toolbar__period { align-items: flex-start; flex-direction: column; }
   .bi-toolbar__actions { justify-content: flex-start; }
+  .bi-company-selector { align-items: stretch; flex-direction: column; }
+  .bi-company-selector__trigger { inline-size: 100%; }
   .bi-card__footer { grid-template-columns: minmax(0, 1fr); }
   .bi-card__actions { justify-content: flex-start; }
   .bi-card__deferred-note { text-align: left; }

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BiPage } from '../../BiPage';
 import { DASHBOARD_FIXTURES } from '../../../../test/fixtures/biDashboardFixtures';
@@ -35,6 +35,7 @@ const companyResponse = {
 
 describe('BiPage Component', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
     vi.mocked(fetchBiCompanies).mockResolvedValue(companyResponse);
     vi.mocked(refreshBiDashboard).mockResolvedValue(DASHBOARD_FIXTURES[0]);
@@ -80,18 +81,80 @@ describe('BiPage Component', () => {
     });
   });
 
-  it('renders API-backed company tabs and default cards', async () => {
+  it('renders the selected company and opens the company selector', async () => {
     render(<BiPage />);
 
     expect(await screen.findByRole('heading', { name: 'BIST 데모 주식회사 Dashboard' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'BIST 데모 주식회사' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '그린랩스' })).toBeInTheDocument();
+    expect(screen.queryByText('COMPANY DASHBOARD')).not.toBeInTheDocument();
+    expect(screen.getByText('BIST 데모 주식회사', { selector: '.bi-header__company-name' })).toBeInTheDocument();
+    expect(screen.getByText('Dashboard', { selector: '.bi-header__dashboard-label' })).toBeInTheDocument();
+    expect(screen.getByText('선택 파일')).toBeInTheDocument();
+    expect(screen.getByText(DASHBOARD_FIXTURES[0].source.fileName)).toBeInTheDocument();
+    expect(screen.queryByText('선택 기업')).not.toBeInTheDocument();
+    expect(screen.queryByText('기준 기간')).not.toBeInTheDocument();
+    const updatedAtLabel = screen.getByText('업데이트');
+    const refreshButton = screen.getByRole('button', { name: '대시보드 갱신' });
+    expect(
+      updatedAtLabel.compareDocumentPosition(refreshButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText('현재 기업')).toBeInTheDocument();
+    expect(screen.getByText('BIST 데모 주식회사', { selector: '.bi-company-selector__current strong' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '기업 선택' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.getByText('매출 및 성장')).toBeInTheDocument();
     expect(screen.getByText('수익성')).toBeInTheDocument();
     expect(screen.getByText('현금흐름')).toBeInTheDocument();
     expect(screen.getByText('재무 안정성')).toBeInTheDocument();
     expect(screen.getByText('재무 규모')).toBeInTheDocument();
     expect(fetchBiCompanies).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes and alphabetically sorts the company list whenever the selector opens', async () => {
+    const bistCompany = companyResponse.companies[0];
+    const greenLabsCompany = companyResponse.companies[1];
+    if (!bistCompany || !greenLabsCompany) throw new Error('missing company fixtures');
+    const addedCompany = {
+      ...bistCompany,
+      companyId: 'aardvark-analytics',
+      displayName: 'Aardvark Analytics',
+    };
+    const refreshedGreenLabs = {
+      ...greenLabsCompany,
+      source: greenLabsCompany.source ? { ...greenLabsCompany.source } : null,
+    };
+    const refreshedBist = {
+      ...bistCompany,
+      source: bistCompany.source ? { ...bistCompany.source } : null,
+    };
+    const numberedCompanies = Array.from({ length: 15 }, (_, index) => ({
+      ...bistCompany,
+      companyId: `company-${String(index + 1).padStart(2, '0')}`,
+      displayName: `Company ${String(index + 1).padStart(2, '0')}`,
+    }));
+    vi.mocked(fetchBiCompanies)
+      .mockResolvedValueOnce({ companies: [greenLabsCompany, bistCompany] })
+      .mockResolvedValueOnce({
+        companies: [refreshedGreenLabs, ...numberedCompanies, addedCompany, refreshedBist],
+      });
+
+    render(<BiPage />);
+
+    expect(await screen.findByRole('heading', { name: '그린랩스 Dashboard' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '기업 선택' }));
+
+    const dialog = screen.getByRole('dialog', { name: '기업 선택' });
+    await waitFor(() => expect(within(dialog).getAllByRole('option')).toHaveLength(18));
+    const options = within(dialog).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Aardvark Analytics',
+      'BIST 데모 주식회사',
+      ...numberedCompanies.map((company) => company.displayName),
+      '그린랩스',
+    ]);
+    await waitFor(() => expect(options[17]).toHaveFocus());
+    fireEvent.keyDown(options[17], { key: 'ArrowDown' });
+    expect(options[0]).toHaveFocus();
+    expect(fetchBiCompanies).toHaveBeenCalledTimes(2);
   });
 
   it('renders the snapshot update time in Korea time', async () => {
@@ -115,13 +178,17 @@ describe('BiPage Component', () => {
     render(<BiPage />);
 
     await screen.findByRole('heading', { name: 'BIST 데모 주식회사 Dashboard' });
-    const greenLabsTab = screen.getByRole('tab', { name: '그린랩스' });
-    fireEvent.click(greenLabsTab);
+    const selectorTrigger = screen.getByRole('button', { name: '기업 선택' });
+    selectorTrigger.focus();
+    fireEvent.click(selectorTrigger);
+    const greenLabsOption = await screen.findByRole('option', { name: '그린랩스' });
+    fireEvent.click(greenLabsOption);
 
     await waitFor(() => expect(fetchBiDashboard).toHaveBeenCalledWith('green-labs', expect.any(AbortSignal)));
-    expect(await screen.findByRole('tab', { name: '그린랩스' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('heading', { name: '그린랩스 Dashboard' })).toBeInTheDocument();
-    expect(screen.getAllByText('그린랩스').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('그린랩스', { selector: '.bi-company-selector__current strong' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '기업 선택' })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: '기업 선택' })).toHaveFocus());
   });
 
   it('keeps company switching available when the selected snapshot failed', async () => {
@@ -141,9 +208,8 @@ describe('BiPage Component', () => {
     render(<BiPage />);
 
     expect(await screen.findByRole('button', { name: '스냅샷 다시 생성' })).toBeInTheDocument();
-    const greenLabsTab = screen.getByRole('tab', { name: '그린랩스' });
-    fireEvent.click(greenLabsTab);
-    await waitFor(() => expect(greenLabsTab).toHaveAttribute('aria-selected', 'true'));
+    fireEvent.click(screen.getByRole('button', { name: '기업 선택' }));
+    fireEvent.click(await screen.findByRole('option', { name: '그린랩스' }));
     await waitFor(() => expect(fetchBiDashboard).toHaveBeenCalledWith(
       'green-labs',
       expect.any(AbortSignal),
