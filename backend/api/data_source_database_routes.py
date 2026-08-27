@@ -22,9 +22,11 @@ _POSTGRES_SCHEMES = frozenset({"postgresql", "postgresql+psycopg", "postgres"})
 
 
 class DbConnectRequestDTO(BaseModel):
+    """PostgreSQL + pgvector 데이터베이스 연결 테스트 요청 DTO."""
+
     database_url: str = Field(
         min_length=1,
-        description="PostgreSQL + pgvector 접속 URL",
+        description="PostgreSQL + pgvector 접속 URL (예: postgresql://...)",
     )
 
 
@@ -57,14 +59,25 @@ def create_database_router(
     pgvector_store: PgVectorStore,
     connection_probe: PgVectorConnectionProbe,
 ) -> APIRouter:
+    """PostgreSQL + pgvector 데이터베이스 헬스 및 연결 진단을 위한 FastAPI 라우터 생성."""
     router = APIRouter()
 
-    @router.get("/db-status")
+    @router.get(
+        "/db-status",
+        summary="PostgreSQL 및 pgvector 연결 상태 및 컬렉션 요약 조회",
+        description="현재 바인딩된 PostgreSQL 데이터베이스의 pgvector 확장 활성화 여부, 전체 컬렉션 수, 총 벡터 청크 수를 반환합니다.",
+    )
     def get_db_status() -> dict[str, Any]:
+        """데이터베이스 연결 상태와 벡터 인덱스 총계를 반환합니다."""
         return pgvector_store.get_db_info()
 
-    @router.post("/db-connect")
+    @router.post(
+        "/db-connect",
+        summary="외부 PostgreSQL + pgvector 연결 테스트",
+        description="입력받은 데이터베이스 URL로 직접 연결을 시도하여 접속 가능 여부 및 pgvector 확장을 검증합니다.",
+    )
     def test_db_connect(request: DbConnectRequestDTO) -> dict[str, Any]:
+        """지정된 데이터베이스 URL에 대한 연결 가능 여부를 진단합니다."""
         try:
             parsed = urlparse(request.database_url)
             port = parsed.port

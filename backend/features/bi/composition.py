@@ -19,22 +19,25 @@ from .profile_sheet_catalog import (
     PostgresBiProfileEvidenceRetriever,
     PostgresBiProfileSheetCatalog,
 )
+from .question_batch_worker import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MAX_WORKERS,
+    BiQuestionBatchWorker,
+    SystemBiQuestionBatchWorkerClock,
+)
 from .question_pipeline import BiQuestionPipeline, PgVectorQuestionSourceResolver
+from .question_publishing import (
+    BiPublishingQuestionService,
+    BiQuestionPublicationFailureReporter,
+)
 from .question_repository import PostgresBiQuestionRepository
 from .question_service import BiQuestionService
 from .question_snapshot import (
-    BiPublishingQuestionService,
     BiQuestionSnapshotMaterializer,
     BiQuestionSnapshotMaterializerServices,
 )
 from .question_snapshot_repository import PostgresBiQuestionSnapshotRepository
 from .question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
-from .question_batch_worker import (
-    BiQuestionBatchWorker,
-    DEFAULT_BATCH_SIZE,
-    DEFAULT_MAX_WORKERS,
-    SystemBiQuestionBatchWorkerClock,
-)
 from .queued_materializer import BiQueuedMaterializer, BiQueuedMaterializerServices
 
 if TYPE_CHECKING:
@@ -96,6 +99,7 @@ def create_bi_question_pipeline(
     extractor = BiMetricExtractionService(
         retriever,
         BiMetricReader(completion, BI_READER_MODEL),
+        PostgresBiDocumentProfileRepository(),
     )
     return BiQuestionPipeline(
         extractor,
@@ -111,6 +115,16 @@ def create_bi_question_worker(
     registry: ModuleRegistry,
     completion_client: OpenAIResponsesClient,
 ) -> BiQuestionWorker:
+    """
+    Create a BI question worker with PostgreSQL persistence and snapshot materialization.
+    
+    Parameters:
+        registry (ModuleRegistry): Application registry providing database configuration and retrieval dependencies.
+        completion_client (OpenAIResponsesClient): Client used to generate structured question responses.
+    
+    Returns:
+        BiQuestionWorker: Configured worker for processing and publishing BI questions.
+    """
     service = create_bi_question_service()
     store = PostgresBiStore(registry.db_manager.database_url)
     snapshot_materializer = BiQuestionSnapshotMaterializer(
@@ -119,10 +133,15 @@ def create_bi_question_worker(
             answers=PostgresBiQuestionSnapshotRepository(),
             store=store,
             clock=SystemClock(),
+            profiles=PostgresBiDocumentProfileRepository(),
         )
     )
     return BiQuestionWorker(
-        BiPublishingQuestionService(service, snapshot_materializer),
+        BiPublishingQuestionService(
+            service,
+            snapshot_materializer,
+            BiQuestionPublicationFailureReporter(service, store, SystemClock()),
+        ),
         create_bi_question_pipeline(registry, completion_client),
         SystemBiQuestionWorkerClock(),
     )
@@ -135,12 +154,15 @@ def create_bi_question_batch_worker(
     batch_size: int = DEFAULT_BATCH_SIZE,
     max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> BiQuestionBatchWorker:
-    """Build a batch question worker that claims *batch_size* questions and
-    processes them concurrently using up to *max_workers* threads.
-
-    Snapshot refresh (publish_snapshot) is triggered per-question through the
-    same :class:`BiPublishingQuestionService` used by the single-question worker
-    so no changes to the snapshot pipeline are required.
+    """
+    Create a worker that processes BI questions in configurable batches and publishes refreshed snapshots.
+    
+    Parameters:
+        batch_size (int): Number of questions claimed per batch.
+        max_workers (int): Maximum number of concurrent worker threads.
+    
+    Returns:
+        BiQuestionBatchWorker: Configured batch question worker.
     """
     service = create_bi_question_service()
     store = PostgresBiStore(registry.db_manager.database_url)
@@ -150,9 +172,14 @@ def create_bi_question_batch_worker(
             answers=PostgresBiQuestionSnapshotRepository(),
             store=store,
             clock=SystemClock(),
+            profiles=PostgresBiDocumentProfileRepository(),
         )
     )
-    publishing_service = BiPublishingQuestionService(service, snapshot_materializer)
+    publishing_service = BiPublishingQuestionService(
+        service,
+        snapshot_materializer,
+        BiQuestionPublicationFailureReporter(service, store, SystemClock()),
+    )
     return BiQuestionBatchWorker(
         publishing_service,
         create_bi_question_pipeline(registry, completion_client),

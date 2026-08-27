@@ -1,6 +1,8 @@
 from collections import Counter
+from dataclasses import replace
 from typing import Protocol
 
+from .current_periods import select_current_periods
 from .question_batch import BiQuestionBatchPlan, build_question_batch
 from .question_records import (
     BiAnswerRecord,
@@ -18,10 +20,38 @@ from .question_records import (
 )
 
 
+def build_current_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
+    """
+    Build a question batch using the periods current at the plan's creation time.
+    
+    Parameters:
+        plan (BiQuestionBatchPlan): The batch plan whose periods determine the question batch.
+    
+    Returns:
+        BiQuestionBatch: The question batch for the selected current periods.
+    """
+    return build_question_batch(
+        replace(
+            plan,
+            periods=select_current_periods(plan.periods, plan.created_at),
+        )
+    )
+
+
 def summarize_questions(
     job_id: JobId,
     questions: tuple[BiQuestionRecord, ...],
 ) -> BiQuestionJobProgress:
+    """
+    Summarize question statuses for a job.
+    
+    Parameters:
+    	job_id (JobId): Identifier of the job.
+    	questions (tuple[BiQuestionRecord, ...]): Questions whose statuses are counted.
+    
+    Returns:
+    	BiQuestionJobProgress: Progress summary containing the total and status-specific question counts.
+    """
     counts = Counter(question.status for question in questions)
     return BiQuestionJobProgress(
         job_id=job_id,
@@ -35,6 +65,11 @@ def summarize_questions(
 
 class BiQuestionRepositoryPort(Protocol):
     def register_questions(
+        self,
+        questions: tuple[BiQuestionRecord, ...],
+    ) -> tuple[BiQuestionRecord, ...]: ...
+
+    def replace_questions(
         self,
         questions: tuple[BiQuestionRecord, ...],
     ) -> tuple[BiQuestionRecord, ...]: ...
@@ -89,13 +124,38 @@ class BiQuestionService:
         self,
         plan: BiQuestionBatchPlan,
     ) -> tuple[BiQuestionRecord, ...]:
-        return self.register_questions(build_question_batch(plan))
+        """Register questions for the periods current at the plan's creation time.
+        
+        Parameters:
+        	plan (BiQuestionBatchPlan): The batch plan used to build the questions.
+        
+        Returns:
+        	tuple[BiQuestionRecord, ...]: The registered question records.
+        """
+        return self.register_questions(build_current_question_batch(plan))
 
     def queue_materialization_questions(
         self,
         plan: BiQuestionBatchPlan,
     ) -> BiQuestionJobProgress:
+        """
+        Queue materialization questions for a batch plan and summarize their progress.
+        
+        Parameters:
+            plan (BiQuestionBatchPlan): Batch plan used to register the questions.
+        
+        Returns:
+            BiQuestionJobProgress: Progress summary for the plan's job.
+        """
         questions = self.register_materialization_questions(plan)
+        return summarize_questions(plan.job_id, questions)
+
+    def reset_materialization_questions(
+        self,
+        plan: BiQuestionBatchPlan,
+    ) -> BiQuestionJobProgress:
+        batch = build_current_question_batch(plan)
+        questions = self._repository.replace_questions(batch.questions)
         return summarize_questions(plan.job_id, questions)
 
     def get_question(self, question_id: QuestionId) -> BiQuestionRecord | None:

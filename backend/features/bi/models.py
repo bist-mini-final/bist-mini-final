@@ -27,6 +27,7 @@ class MetricId(StrEnum):
     OPERATING_CASH_FLOW = "operating_cash_flow"
     CAPITAL_EXPENDITURE = "capital_expenditure"
     FREE_CASH_FLOW = "free_cash_flow"
+    FREE_CASH_FLOW_MARGIN = "free_cash_flow_margin"
     CASH_AND_SHORT_TERM_INVESTMENTS = "cash_and_short_term_investments"
     SHORT_TERM_DEBT = "short_term_debt"
     CURRENT_PORTION_OF_LONG_TERM_DEBT = "current_portion_of_long_term_debt"
@@ -36,6 +37,8 @@ class MetricId(StrEnum):
     TOTAL_ASSETS = "total_assets"
     TOTAL_LIABILITIES = "total_liabilities"
     TOTAL_EQUITY = "total_equity"
+    DEBT_RATIO = "debt_ratio"
+    NET_DEBT_RATIO = "net_debt_ratio"
 
 
 @unique

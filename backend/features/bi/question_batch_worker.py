@@ -3,17 +3,17 @@ saves all answers in a single transaction.
 
 Key design decisions
 --------------------
-* **ThreadPoolExecutor** – the existing RAG pipeline uses synchronous psycopg2
+* **ThreadPoolExecutor** - the existing RAG pipeline uses synchronous psycopg2
   and blocking OpenAI calls, so thread-level parallelism gives real concurrency
   without needing a full asyncio rewrite.
-* **Embed-first grouping** – questions sharing the same workbook index_id also
+* **Embed-first grouping** - questions sharing the same workbook index_id also
   share the same embedding model/dimension, so we could further batch embed calls
   across questions.  The current ``FastRagPipelineAdapter`` already batches
   sub-queries within a single question; cross-question batching would require a
   deeper refactor of the embedder module and is left for a future iteration.
-* **Heartbeat per question** – each claimed question gets its own heartbeat
+* **Heartbeat per question** - each claimed question gets its own heartbeat
   thread so the 180-second stale-window is respected even for large batches.
-* **Best-effort save** – a failure in one question never aborts the others; each
+* **Best-effort save** - a failure in one question never aborts the others; each
   answer is saved independently after its pipeline completes.
 """
 
@@ -35,7 +35,7 @@ from modules.common.exceptions import ModuleExecutionError
 
 from .extraction_models import BiMetricExtractionResult
 from .models import AvailableObservation, UnavailableObservation
-from .question_pipeline import BiQuestionPipeline, BiQuestionSourceError
+from .question_pipeline import BiQuestionSourceError
 from .question_records import (
     AnswerId,
     BiAnswerOutcome,
@@ -187,7 +187,7 @@ class BiQuestionBatchWorker:
 
         outcomes = self._run_parallel(questions, claimed_at)
 
-        # Save answers sequentially – each save is a short DB round-trip and
+        # Save answers sequentially - each save is a short DB round-trip and
         # keeping them out of the thread pool avoids connection pool contention.
         saved: list[BiQuestionRecord] = []
         for outcome in outcomes:
@@ -196,7 +196,7 @@ class BiQuestionBatchWorker:
                 saved.append(saved_question)
             except Exception:
                 logger.exception(
-                    "Failed to save answer for question %s – it will be retried",
+                    "Failed to save answer for question %s - it will be retried",
                     outcome.question.question_id,
                 )
 

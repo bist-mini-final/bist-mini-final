@@ -171,6 +171,9 @@ class OpenAIResponsesClient:
                     f"OpenAI Responses API 호출에 실패했습니다: {error}"
                 ) from error
 
+        if document is None:
+            raise OpenAIResponsesError("OpenAI Responses API 응답을 받지 못했습니다.")
+
         status = document.get("status")
         if status == "incomplete":
             reason = (document.get("incomplete_details") or {}).get("reason")

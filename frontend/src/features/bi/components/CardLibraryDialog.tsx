@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
 import { Plus, X } from 'lucide-react';
 import { getCardDefinition } from '../config/cardRegistry';
 import type { BiCardId } from '../types';
+import { useModalDialog } from './useModalDialog';
 
 interface CardLibraryDialogProps {
   readonly hiddenCardIds: readonly BiCardId[];
@@ -10,11 +10,7 @@ interface CardLibraryDialogProps {
 }
 
 export function CardLibraryDialog({ hiddenCardIds, onRestore, onClose }: CardLibraryDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (dialogRef.current && !dialogRef.current.open) dialogRef.current.showModal();
-  }, []);
+  const dialogRef = useModalDialog();
 
   return (
     <dialog

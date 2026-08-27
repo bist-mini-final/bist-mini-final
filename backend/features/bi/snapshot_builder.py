@@ -3,8 +3,11 @@ from typing import Final, assert_never
 
 from .calculator import (
     DebtComponents,
+    calculate_debt_ratio,
     calculate_free_cash_flow,
+    calculate_free_cash_flow_margin,
     calculate_net_debt,
+    calculate_net_debt_ratio,
     calculate_net_margin,
     calculate_operating_margin,
     calculate_revenue_yoy_growth,
@@ -133,6 +136,22 @@ class BiSnapshotBuilder:
             observations[MetricId.NET_DEBT][period_id] = calculate_net_debt(
                 observations[MetricId.TOTAL_DEBT][period_id],
                 observations[MetricId.CASH_AND_SHORT_TERM_INVESTMENTS][period_id],
+            )
+            observations[MetricId.FREE_CASH_FLOW_MARGIN][period_id] = (
+                calculate_free_cash_flow_margin(
+                    observations[MetricId.FREE_CASH_FLOW][period_id],
+                    observations[MetricId.REVENUE][period_id],
+                )
+            )
+            observations[MetricId.DEBT_RATIO][period_id] = calculate_debt_ratio(
+                observations[MetricId.TOTAL_LIABILITIES][period_id],
+                observations[MetricId.TOTAL_ASSETS][period_id],
+            )
+            observations[MetricId.NET_DEBT_RATIO][period_id] = (
+                calculate_net_debt_ratio(
+                    observations[MetricId.NET_DEBT][period_id],
+                    observations[MetricId.TOTAL_ASSETS][period_id],
+                )
             )
 
         previous_fy: MetricObservation | None = None

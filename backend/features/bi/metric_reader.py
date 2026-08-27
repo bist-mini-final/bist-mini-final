@@ -95,6 +95,16 @@ class BiMetricReader:
         request: BiMetricExtractionRequest,
         context: BiRetrievedContext,
     ) -> MetricReaderResult:
+        """
+        Extract one metric for one reporting period from the retrieved context.
+        
+        Parameters:
+            request (BiMetricExtractionRequest): Identifies the metric and reporting period to extract.
+            context (BiRetrievedContext): Provides the allowed evidence cells and contextual blocks.
+        
+        Returns:
+            MetricReaderResult: The validated extraction result, or a reader contract failure when the response payload is invalid.
+        """
         payload = json.dumps(
             {
                 "request": {
@@ -123,7 +133,8 @@ class BiMetricReader:
                     "재무 지표 한 개와 기간 한 개만 추출한다. 계산하지 않는다. "
                     "request_id, metric_id, period_id 필드는 입력 request의 값을 그대로 정확히 동일하게 복사하여 반환한다. "
                     "근거는 allowed_evidence_cells의 cell_id만 사용한다. "
-                    "재무제표의 모든 금액 수치는 기본 백만 달러(USD millions) 기준이므로 근거 셀에 유효한 숫자가 있으면 status를 available로 지정하고 normalized_value에 해당 수치, scale에 millions, currency에 USD를 기재한다. "
+                    "금액 지표의 currency와 scale은 근거에 명시된 표기만 사용하고 추정하거나 환산하지 않는다. "
+                    "근거에서 통화 또는 배율을 특정할 수 없으면 해당 필드는 null로 둔다. "
                     "셀 값이 비어있거나 '?', 'NA'인 경우에만 missing 또는 ambiguous로 표현한다."
                 ),
             },

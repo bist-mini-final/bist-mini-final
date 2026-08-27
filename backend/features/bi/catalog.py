@@ -5,11 +5,12 @@ from typing import Final, Mapping
 
 from .models import MetricId, ValueKind
 
-CATALOG_VERSION: Final = "1"
-FORMULA_VERSION: Final = "1"
+CATALOG_VERSION: Final = "2"
+FORMULA_VERSION: Final = "2"
 SOURCE_QUESTION_TEMPLATE: Final = (
-    "Find the reported value of '{metric_label}' (aliases: {metric_aliases}) on sheet {statement_hint} for {period_label} in this financial document. "
-    "Do not compute or infer; extract the exact numerical value, currency, scale, and supporting cell_id."
+    "Find the exact reported value of '{metric_label}' for {period_label} in this financial document. "
+    "Match equivalent metric names ({metric_aliases}), period labels, and date-formatted column headers across the entire workbook; prioritize relevant statements such as {statement_hint}, but do not require an exact sheet name. "
+    "Return the numerical value, currency, scale, and supporting cell_id from the same metric row and requested period. Do not calculate, forecast, or substitute a neighboring period."
 )
 
 
@@ -112,6 +113,10 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
             MetricId.FREE_CASH_FLOW, "FCF", "Free Cash Flow", "영업현금흐름에서 자본적지출을 반영한 현금", ValueKind.AMOUNT,
             _PRIMARY, "free_cash_flow", (MetricId.OPERATING_CASH_FLOW, MetricId.CAPITAL_EXPENDITURE),
         ),
+        MetricId.FREE_CASH_FLOW_MARGIN: DerivedMetricDefinition(
+            MetricId.FREE_CASH_FLOW_MARGIN, "FCF 마진", "Free Cash Flow Margin", "매출 대비 잉여현금흐름 비율", ValueKind.PERCENT,
+            _PRIMARY, "free_cash_flow_margin", (MetricId.FREE_CASH_FLOW, MetricId.REVENUE),
+        ),
         MetricId.CASH_AND_SHORT_TERM_INVESTMENTS: SourceMetricDefinition(
             MetricId.CASH_AND_SHORT_TERM_INVESTMENTS, "현금 및 단기투자자산", "Total Cash & ST Investments", "즉시 활용 가능한 현금성 자산", ValueKind.AMOUNT,
             _PRIMARY, ("현금 및 단기투자자산", "현금성자산"),
@@ -163,6 +168,14 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
             ("총자본", "자본총계"), ("Total Equity", "Total Common Equity", "Shareholders' Equity", "Stockholders' Equity", "IQ_TOTAL_EQUITY", "IQ_TOTAL_COMMON_EQUITY"),
             ("Balance_Sheet", "Key_Stats"), ("Total Equity", "Total Common Equity", "Shareholders' Equity"),
             ("Average Total Equity",), SignPolicy.AS_REPORTED, _SOURCE,
+        ),
+        MetricId.DEBT_RATIO: DerivedMetricDefinition(
+            MetricId.DEBT_RATIO, "부채비율", "Debt Ratio", "총자산 대비 총부채 비율", ValueKind.PERCENT,
+            _PRIMARY, "debt_ratio", (MetricId.TOTAL_LIABILITIES, MetricId.TOTAL_ASSETS),
+        ),
+        MetricId.NET_DEBT_RATIO: DerivedMetricDefinition(
+            MetricId.NET_DEBT_RATIO, "순차입금비율", "Net Debt Ratio", "총자산 대비 순차입금 비율", ValueKind.PERCENT,
+            _PRIMARY, "net_debt_ratio", (MetricId.NET_DEBT, MetricId.TOTAL_ASSETS),
         ),
     }
 )

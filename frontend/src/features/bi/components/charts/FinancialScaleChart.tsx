@@ -12,9 +12,17 @@ interface FinancialScaleChartProps {
 
 const METRICS = ['total_assets', 'total_liabilities', 'total_equity'] as const;
 
+/**
+ * Renders a chart showing asset composition and total-asset trends.
+ *
+ * @param dashboard - Dashboard data used to build the chart.
+ * @param range - Period range displayed in the chart.
+ * @param size - Chart size configuration.
+ */
 export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleChartProps) {
   const data = buildChartPoints({ dashboard, metricIds: METRICS, range, size });
   const series = getChartSeries(dashboard, METRICS);
+  const unit = dashboard.metrics.total_assets ?? null;
   const latest = [...data].reverse().find(
     (pt) => pt.values.total_assets !== null && pt.values.total_assets !== undefined
   ) ?? data[data.length - 1];
@@ -40,7 +48,7 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
     return <div className="bi-chart-empty chatbot-visualization__empty">자산·부채·자본 데이터가 없어 차트를 표시할 수 없습니다.</div>;
   }
   return (
-    <BiChartFrame title="자산 구성과 규모" description={`최근 ${latest?.periodLabel ?? '기간'} 구성과 총자산 추이입니다.`} data={data} series={series} valueKind="amount">
+    <BiChartFrame title="자산 구성과 규모" description={`최근 ${latest?.periodLabel ?? '기간'} 구성과 총자산 추이입니다.`} data={data} series={series} valueKind="amount" unit={unit}>
       <div className="bi-chart-layout bi-financial-scale-chart">
         <div className="bi-financial-scale-chart__composition">
           <strong>자산 구성 ({latest?.periodLabel ?? '최근'})</strong>
@@ -57,7 +65,7 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
                     <stop offset="100%" stopColor={CHART_COLORS.primary} />
                   </linearGradient>
                 </defs>
-                <Tooltip formatter={(value, name) => [formatChartAxis(Number(value), 'amount'), name]} />
+                <Tooltip formatter={(value, name) => [formatChartAxis(Number(value), 'amount', unit), name]} />
                 <Pie data={composition} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="84%" paddingAngle={1} stroke={CHART_COLORS.surface} strokeWidth={2} isAnimationActive={false}>
                   {composition.map((item) => <Cell key={item.name} fill={item.fill} />)}
                 </Pie>
@@ -68,7 +76,7 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
             {composition.map((item, index) => (
               <span key={item.name}>
                 <i data-tone={index === 0 ? 'liability' : 'equity'} />
-                {item.name} {compositionTotal > 0 ? Math.round(item.value / compositionTotal * 100) : 0}% ({formatChartValue(item.value, 'amount')})
+                {item.name} {compositionTotal > 0 ? Math.round(item.value / compositionTotal * 100) : 0}% ({formatChartValue(item.value, 'amount', unit)})
               </span>
             ))}
           </div>
@@ -76,15 +84,15 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
         <div className="bi-financial-scale-chart__trend">
           <div className="bi-financial-scale-chart__trend-heading">
             <span>총자산 추이</span>
-            <strong>{formatChartValue(latest?.values.total_assets ?? 0, 'amount')}</strong>
+            <strong>{formatChartValue(latest?.values.total_assets ?? 0, 'amount', unit)}</strong>
           </div>
           <div>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={chartData} margin={{ ...CHART_GEOMETRY.margin, top: 22, right: 12 }} accessibilityLayer>
                 <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="periodLabel" tickLine={false} axisLine={false} minTickGap={18} />
-                <YAxis tickFormatter={(value: number) => formatChartAxis(value, 'amount')} tickLine={false} axisLine={false} width={42} />
-                <Tooltip content={(tooltipProps) => <BiChartTooltip {...tooltipProps} data={data} valueKind="amount" />} />
+                <YAxis tickFormatter={(value: number) => formatChartAxis(value, 'amount', unit)} tickLine={false} axisLine={false} width={42} />
+                <Tooltip content={(tooltipProps) => <BiChartTooltip {...tooltipProps} data={data} valueKind="amount" unit={unit} />} />
                 <Line
                   type="monotone"
                   dataKey="totalAssets"
@@ -95,7 +103,7 @@ export function FinancialScaleChart({ dashboard, range, size }: FinancialScaleCh
                   activeDot={{ r: CHART_GEOMETRY.activeDotRadius }}
                   isAnimationActive={false}
                 >
-                  <LabelList dataKey="totalAssets" position="top" formatter={(value) => typeof value === 'number' ? formatChartAxis(value, 'amount') : ''} fill={CHART_COLORS.neutral} fontSize={9} />
+                  <LabelList dataKey="totalAssets" position="top" formatter={(value) => typeof value === 'number' ? formatChartAxis(value, 'amount', unit) : ''} fill={CHART_COLORS.neutral} fontSize={9} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>

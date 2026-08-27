@@ -225,6 +225,27 @@ def calculate_free_cash_flow(
             raise TypeError("cash-flow inputs were not narrowed to available observations")
 
 
+def calculate_free_cash_flow_margin(
+    free_cash_flow: MetricObservation,
+    revenue: MetricObservation,
+) -> MetricObservation:
+    return _calculate_ratio(free_cash_flow, revenue, "free_cash_flow_margin")
+
+
+def calculate_debt_ratio(
+    total_liabilities: MetricObservation,
+    total_assets: MetricObservation,
+) -> MetricObservation:
+    return _calculate_ratio(total_liabilities, total_assets, "debt_ratio")
+
+
+def calculate_net_debt_ratio(
+    net_debt: MetricObservation,
+    total_assets: MetricObservation,
+) -> MetricObservation:
+    return _calculate_ratio(net_debt, total_assets, "net_debt_ratio")
+
+
 def calculate_total_debt(
     direct_total_debt: MetricObservation | None,
     components: DebtComponents,

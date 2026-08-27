@@ -8,6 +8,7 @@ export const METRIC_IDS = [
   'operating_cash_flow',
   'capital_expenditure',
   'free_cash_flow',
+  'free_cash_flow_margin',
   'cash_and_short_term_investments',
   'short_term_debt',
   'current_portion_of_long_term_debt',
@@ -17,6 +18,8 @@ export const METRIC_IDS = [
   'total_assets',
   'total_liabilities',
   'total_equity',
+  'debt_ratio',
+  'net_debt_ratio',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -200,4 +203,5 @@ export type BiCardId =
   | 'profitability'
   | 'cash_flow'
   | 'stability'
-  | 'financial_scale';
+  | 'financial_scale'
+  | 'financial_health_heatmap';
