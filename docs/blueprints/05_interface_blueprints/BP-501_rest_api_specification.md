@@ -75,9 +75,14 @@
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
-| `WS`  | `/api/chatbot/ws` | 멀티턴 대화, 실시간 토큰 스트리밍 및 중단(Abort) 제어용 양방향 WebSocket | WebSocket JSON Frames (`USER_MESSAGE` <-> `DELTA_TOKEN`) |
-| `GET` | `/api/chatbot/sessions` | 사용자의 최근 대화 세션 목록 조회 | `List[ChatbotSessionSummary]` |
-| `GET` | `/api/chatbot/sessions/{session_id}` | 특정 세션의 과거 대화 히스토리 및 근거 표 조회 | `ChatbotSessionDetailDTO` |
+| `GET` | `/api/chatbot/sessions` | 사용자의 최근 대화 세션 목록 조회 | `client_id: str` -> `List[ChatSessionDTO]` |
+| `POST`| `/api/chatbot/sessions` | 신규 대화 세션 컨텍스트 생성 | `CreateSessionRequest(client_id)` -> `ChatSessionDTO` |
+| `GET` | `/api/chatbot/sessions/{session_id}` | 특정 세션 상세 내역 및 메시지 히스토리 조회 | `ChatSessionDetailDTO(messages, attachments)` |
+| `PATCH`| `/api/chatbot/sessions/{session_id}` | 세션 제목 수정 | `RenameSessionRequest(title)` -> `ChatSessionDTO` |
+| `DELETE`| `/api/chatbot/sessions/{session_id}` | 세션 및 메시지/첨부파일 완전 삭제 | `{"deleted": true}` |
+| `POST`| `/api/chatbot/sessions/{session_id}/messages` | 메시지 전송, RAG 답변 및 인라인 시각화 생성 | `CreateMessageRequest` -> `MessageResponseDTO` |
+| `POST`| `/api/chatbot/sessions/{session_id}/attachments` | 엑셀/CSV 첨부파일 업로드 및 텍스트 추출 | `UploadFile` -> `AttachmentDTO` |
+| `GET` | `/api/chatbot/suggestions` | 색인된 기업 목록 기반 스마트 추천 질문 인출 | `List[str]` |
 
 ### [Group 6: 벤치마크 평가 (`/api/benchmarks`)]
 
