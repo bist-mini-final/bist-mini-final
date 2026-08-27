@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from backend.bootstrap.container import ApplicationContainer
 from backend.features.bi.api_routes import create_bi_router
+from backend.features.chatbot.api_routes import create_chat_router
 
 from .benchmark_routes import create_benchmark_router
 from .data_source_routes import create_data_source_router
@@ -25,6 +26,16 @@ def create_api_router(container: ApplicationContainer) -> APIRouter:
     workflow_store = services.workflow_store
     run_store = services.run_store
     workflow_executor = services.workflow_executor
+    router.include_router(create_chat_router(
+        db_manager=services.db_manager,
+        workflow_store=workflow_store,
+        run_store=run_store,
+        workflow_executor=workflow_executor,
+        workflow_dispatcher=workflow_dispatcher,
+        completion_client=runtime.completion_client,
+        bi_services=container.bi_services,
+        suggestion_service=container.chat_suggestions,
+    ))
     pgvector_store = services.pgvector_store
     router.include_router(create_module_router(module_registry))
     router.include_router(
