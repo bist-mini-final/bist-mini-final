@@ -1,9 +1,8 @@
-import { Building2, CalendarRange, CheckCircle2, CircleAlert, Clock3, Database, DatabaseZap, RefreshCw } from 'lucide-react';
-import type { BiDashboardSnapshot, PeriodRange } from '../types';
+import { CheckCircle2, CircleAlert, Clock3, DatabaseZap, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import type { BiDashboardSnapshot } from '../types';
 
 interface BiHeaderProps {
   readonly dashboard: BiDashboardSnapshot;
-  readonly periodLabel: PeriodRange;
   readonly activeAction: 'refresh' | 'reset' | null;
   readonly onRefresh: () => void;
   readonly onReset: () => void;
@@ -25,7 +24,7 @@ function formatGeneratedAt(generatedAt: string): string {
     .replace(/-/g, '.');
 }
 
-export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onReset }: BiHeaderProps) {
+export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
   const generatedAt = formatGeneratedAt(dashboard.snapshot.generatedAt);
   const canStartAction = activeAction === null;
@@ -33,9 +32,10 @@ export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onRe
   return (
     <header className="bi-header">
       <div className="bi-header__title-group">
-        <span className="bi-header__eyebrow">COMPANY DASHBOARD</span>
-        <h1 id="bi-page-title">{dashboard.company.displayName} Dashboard</h1>
-        <p>기업의 핵심 재무 흐름을 쉬운 구조로 살펴보는 <span>작업 공간입니다.</span></p>
+        <h1 id="bi-page-title">
+          <span className="bi-header__company-name">{dashboard.company.displayName}</span>
+          <span className="bi-header__dashboard-label">Dashboard</span>
+        </h1>
       </div>
 
       <div className="bi-header__summary" aria-label="현재 대시보드 상태">
@@ -47,22 +47,17 @@ export function BiHeader({ dashboard, periodLabel, activeAction, onRefresh, onRe
         </span>
         <dl className="bi-header__metadata">
           <div>
-            <dt><Building2 size={15} aria-hidden="true" />선택 기업</dt>
-            <dd title={dashboard.company.displayName}>{dashboard.company.displayName}</dd>
-          </div>
-          <div>
-            <dt><CalendarRange size={15} aria-hidden="true" />기준 기간</dt>
-            <dd>{periodLabel}</dd>
-          </div>
-          <div>
-            <dt><Clock3 size={15} aria-hidden="true" />업데이트</dt>
-            <dd title={generatedAt}>{generatedAt}</dd>
+            <dt><FileSpreadsheet size={15} aria-hidden="true" />선택 파일</dt>
+            <dd title={dashboard.source.fileName}>{dashboard.source.fileName}</dd>
           </div>
         </dl>
-        <span className="bi-source-note">
-          <Database size={14} aria-hidden="true" />검증된 BI 스냅샷 API 데이터입니다.
-        </span>
         <div className="bi-header__data-actions">
+          <dl className="bi-header__updated-at">
+            <div>
+              <dt><Clock3 size={15} aria-hidden="true" />업데이트</dt>
+              <dd title={generatedAt}>{generatedAt}</dd>
+            </div>
+          </dl>
           <button
             className="bi-refresh-button"
             type="button"
