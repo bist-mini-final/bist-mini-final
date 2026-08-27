@@ -79,7 +79,9 @@ def _repair_inline_markdown_tables(answer: str) -> str:
             *(f"| {' | '.join(row)} |" for row in rows),
         ]
         remainder = " | ".join(data_cells[row_count * len(header_cells):]).strip()
-        repaired_lines.append(f"{line[:table_start]}{'\n'.join(table)}{f'\n{remainder}' if remainder else ''}")
+        table_str = "\n".join(table)
+        suffix = f"\n{remainder}" if remainder else ""
+        repaired_lines.append(f"{line[:table_start]}{table_str}{suffix}")
     return "\n".join(repaired_lines)
 
 
@@ -89,7 +91,7 @@ def _format_user_facing_answer(answer: str) -> str:
     cleaned = re.sub(
         r"(?<![A-Za-z])NA(?![A-Za-z])\s*로?\s*근거가 부족(?:합니다|해요)?",
         "확인 가능한 근거가 부족해 요약에서 제외했습니다",
-        answer,
+        cleaned,
         flags=re.IGNORECASE,
     )
     cleaned = re.sub(

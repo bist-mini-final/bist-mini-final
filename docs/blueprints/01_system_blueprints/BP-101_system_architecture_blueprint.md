@@ -12,7 +12,7 @@
 graph TB
     subgraph ClientTier ["1. Client & Workspace Tier (React 18 SPA)"]
         WS_PLAY["Pipeline Playground (DAG Lab)"]
-        WS_CHAT["[Planned] AI Financial Chatbot"]
+        WS_CHAT["AI Financial Chatbot (/chatbot)"]
         WS_BI["Financial BI & Company Comparison"]
         WS_DS["Data Sources (VLM Sheet Viewer)"]
         WS_BENCH["Benchmark Evaluation"]
@@ -32,7 +32,7 @@ graph TB
         BENCH_SVC["BenchmarkService (Evaluation Runner)"]
     end
 
-    subgraph ModularLayer ["4. Modular Pipeline Layer (modules/* - 19 Independent Building Blocks)"]
+    subgraph ModularLayer ["4. Modular Pipeline Layer (modules/* - 21 Independent Building Blocks)"]
         M_REG["ModuleRegistry (Single Source of Truth)"]
         M_DAG["Composed DAG Pipelines (Query -> Hybrid Retrieval -> VLM -> Reader)"]
         M_REG --> M_DAG
