@@ -102,7 +102,7 @@ flowchart TD
 | **② 하드웨어 리소스** | 메모리 부족으로 K8s Pod OOM 크래시 | 가용 RAM을 사전 검사하여 4GB 미만일 경우 경고 알림 및 **경량 Track B(docker-compose) 전환 권고**. |
 | **③ 포트 충돌 검사** | 기존 8080, 5432 포트 중복 점유 | 포트 충돌 감지 시 에러로 죽지 않고 환경 변수(`PORT=8081`)로 대체 포트 자동 바인딩 제안. |
 | **④ Docker 엔진 검증** | Docker 미설치 또는 데몬 정지 | OS별 다중 Fallback(winget, curl 쉘, direct DMG/EXE 다운로드)을 통해 설치 가이드 및 데몬 기동 루프 실행. |
-| **⑤ K8s CLI 도구 자동화** | `k3d`, `kubectl`, `helm` 미설치 | **패키지 매니저 유무와 무관하게**, 공식 정적 바이너리(Static Binary)를 프로젝트 로컬 디렉토리([`.tools/bin/`](file:///c:/Repos/bist-mini-final/.tools/bin/))에 자동 다운로드하여 `PATH`에 격리 바인딩. |
+| **⑤ K8s CLI 도구 자동화** | `k3d`, `kubectl`, `helm` 미설치 | **패키지 매니저 유무와 무관하게**, 공식 정적 바이너리(Static Binary)를 프로젝트 로컬 디렉토리([`.tools/bin/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh))에 자동 다운로드하여 `PATH`에 격리 바인딩. |
 
 ---
 
