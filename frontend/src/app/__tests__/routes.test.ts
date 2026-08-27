@@ -8,6 +8,8 @@ describe('APP_ROUTES registry', () => {
     expect(paths).toContain('/playground');
     expect(paths).toContain('/data-sources');
     expect(paths).toContain('/dashboard');
+    expect(paths).toContain('/company-comparison');
+    expect(paths).toContain('/company-comparison-v2');
     expect(paths).toContain('/settings');
     expect(paths).not.toContain('/evaluations');
   });
