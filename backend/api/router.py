@@ -3,6 +3,10 @@ from fastapi import APIRouter
 from backend.bootstrap.container import ApplicationContainer
 from backend.features.bi.api_routes import create_bi_router
 from backend.features.chatbot.api_routes import create_chat_router
+from backend.features.company_comparison import (
+    create_company_comparison_router,
+    create_company_comparison_service,
+)
 
 from .benchmark_routes import create_benchmark_router
 from .data_source_routes import create_data_source_router
@@ -22,6 +26,16 @@ def create_api_router(container: ApplicationContainer) -> APIRouter:
     paths = runtime.paths
     module_registry = services.module_registry
     router.include_router(create_bi_router(container.bi_services))
+    router.include_router(
+        create_company_comparison_router(
+            create_company_comparison_service(
+                store=container.bi_services.store,
+                registry=module_registry,
+                cell_store=services.pgvector_store,
+                completion_client=runtime.completion_client,
+            )
+        )
+    )
     workflow_dispatcher = container.workflow_dispatcher
     workflow_store = services.workflow_store
     run_store = services.run_store
