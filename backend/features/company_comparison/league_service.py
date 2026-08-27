@@ -73,6 +73,54 @@ class LeagueCandidate(TypedDict):
     historical_score: float
 
 
+@dataclass(frozen=True, slots=True)
+class TemporaryCompanySpec:
+    company_id: str
+    display_name: str
+    revenue_2021: float
+    annual_growth: float
+    margin_2021: float
+    annual_margin_gain: float
+    liabilities_to_assets: float
+    net_debt: float
+
+
+TEMPORARY_COMPANY_SPECS: Final = (
+    TemporaryCompanySpec("temp-amesoft", "Amesoft", 9_360, 0.106, 10.6, 0.98, 34.0, -420),
+    TemporaryCompanySpec("temp-nexora-labs", "Nexora Labs", 6_480, 0.148, 5.8, 1.62, 46.0, 310),
+    TemporaryCompanySpec(
+        "temp-veltrix-systems", "Veltrix Systems", 12_800, 0.081, 18.2, 0.48, 29.0, -860
+    ),
+    TemporaryCompanySpec("temp-lumena-ai", "Lumena AI", 4_250, 0.192, 2.6, 2.18, 52.0, 540),
+    TemporaryCompanySpec("temp-corevia-tech", "Corevia Tech", 15_300, 0.064, 13.4, 0.32, 38.0, 190),
+    TemporaryCompanySpec("temp-altiven", "Altiven", 7_920, 0.117, 9.1, 1.04, 41.0, -120),
+    TemporaryCompanySpec(
+        "temp-serenex-systems", "Serenex Systems", 11_400, 0.049, 21.6, 0.22, 25.0, -1_180
+    ),
+    TemporaryCompanySpec(
+        "temp-bluepeak-digital", "Bluepeak Digital", 5_780, 0.164, 4.4, 1.54, 49.0, 460
+    ),
+    TemporaryCompanySpec(
+        "temp-meridian-logic", "Meridian Logic", 13_650, 0.092, 12.1, 0.73, 36.0, -260
+    ),
+    TemporaryCompanySpec(
+        "temp-orbixa-networks", "Orbixa Networks", 8_840, 0.071, 16.8, 0.41, 31.0, -590
+    ),
+    TemporaryCompanySpec("temp-primeforge", "Primeforge", 17_200, 0.038, 8.7, 0.16, 57.0, 1_420),
+    TemporaryCompanySpec("temp-solvanta", "Solvanta", 6_940, 0.128, 7.3, 1.12, 43.0, 230),
+    TemporaryCompanySpec(
+        "temp-redwood-dynamics", "Redwood Dynamics", 14_100, 0.056, 14.9, 0.27, 33.0, -370
+    ),
+    TemporaryCompanySpec(
+        "temp-ironvale-tech", "Ironvale Tech", 10_250, 0.022, 6.2, -0.18, 63.0, 1_860
+    ),
+    TemporaryCompanySpec(
+        "temp-northstar-materials", "Northstar Materials", 19_500, -0.014, 11.5, -0.36, 54.0, 2_140
+    ),
+)
+TEMPORARY_COMPANY_COUNT: Final = len(TEMPORARY_COMPANY_SPECS)
+
+
 def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
     return max(low, min(high, value))
 
@@ -113,11 +161,18 @@ def _base_from_snapshot(snapshot: BiDashboardSnapshot) -> BaseFinancials | None:
     revenues_raw = _series(snapshot, MetricId.REVENUE)
     income_raw = _series(snapshot, MetricId.OPERATING_INCOME)
     common = sorted(set(revenues_raw) & set(income_raw))
-    if not common or revenue_series is None or revenue_series.currency is None or revenue_series.scale is None:
+    if (
+        not common
+        or revenue_series is None
+        or revenue_series.currency is None
+        or revenue_series.scale is None
+    ):
         return None
     actual_revenues = {year: float(revenues_raw[year].normalized_value) for year in common}
     actual_margins = {
-        year: float(income_raw[year].normalized_value / revenues_raw[year].normalized_value * Decimal(100))
+        year: float(
+            income_raw[year].normalized_value / revenues_raw[year].normalized_value * Decimal(100)
+        )
         for year in common
         if revenues_raw[year].normalized_value > 0
     }
@@ -130,15 +185,21 @@ def _base_from_snapshot(snapshot: BiDashboardSnapshot) -> BaseFinancials | None:
     anchor = actual_revenues[last_year]
     for year in HISTORICAL_YEARS:
         revenues[year] = actual_revenues.get(year, anchor / pow(1 + growth, last_year - year))
-    margins = {year: actual_margins.get(year, actual_margins[last_year]) for year in HISTORICAL_YEARS}
+    margins = {
+        year: actual_margins.get(year, actual_margins[last_year]) for year in HISTORICAL_YEARS
+    }
     liabilities = _latest_value(snapshot, MetricId.TOTAL_LIABILITIES) or anchor * 0.34
     assets = _latest_value(snapshot, MetricId.TOTAL_ASSETS) or anchor * 0.82
     net_debt = _latest_value(snapshot, MetricId.NET_DEBT) or 0.0
-    evidence = revenues_raw[last_year].evidence[0] if revenues_raw[last_year].evidence else BiEvidence(
-        cell_id=f"{snapshot.company.company_id}-revenue-{last_year}",
-        sheet_name="Financials",
-        cell_coord="A1",
-        source_text=f"{snapshot.company.display_name} {last_year} revenue",
+    evidence = (
+        revenues_raw[last_year].evidence[0]
+        if revenues_raw[last_year].evidence
+        else BiEvidence(
+            cell_id=f"{snapshot.company.company_id}-revenue-{last_year}",
+            sheet_name="Financials",
+            cell_coord="A1",
+            source_text=f"{snapshot.company.display_name} {last_year} revenue",
+        )
     )
     return BaseFinancials(
         company_id=snapshot.company.company_id,
@@ -152,6 +213,41 @@ def _base_from_snapshot(snapshot: BiDashboardSnapshot) -> BaseFinancials | None:
         file_name=snapshot.source.file_name,
         evidence=evidence,
     )
+
+
+def _temporary_bases() -> tuple[BaseFinancials, ...]:
+    bases: list[BaseFinancials] = []
+    for spec in TEMPORARY_COMPANY_SPECS:
+        revenues = {
+            year: spec.revenue_2021 * pow(1 + spec.annual_growth, year - 2021)
+            for year in HISTORICAL_YEARS
+        }
+        margins = {
+            year: spec.margin_2021 + spec.annual_margin_gain * (year - 2021)
+            for year in HISTORICAL_YEARS
+        }
+        bases.append(
+            BaseFinancials(
+                company_id=CompanyId(spec.company_id),
+                display_name=spec.display_name,
+                currency="USD",
+                scale=AmountScale.MILLIONS,
+                revenues=revenues,
+                margins=margins,
+                liabilities_to_assets=spec.liabilities_to_assets,
+                net_debt=spec.net_debt,
+                file_name="company-comparison-temporary-data",
+                evidence=BiEvidence(
+                    cell_id=f"{spec.company_id}-temporary-revenue-2025",
+                    sheet_name="Temporary_Scenario",
+                    cell_coord="A1",
+                    source_text=(
+                        f"{spec.display_name} AI 기업 비교 화면용 임시 재무 시나리오 데이터"
+                    ),
+                ),
+            )
+        )
+    return tuple(bases)
 
 
 class FinancialLeagueService:
@@ -169,19 +265,23 @@ class FinancialLeagueService:
         candidates: list[LeagueCandidate] = []
         for evidence_index, base in enumerate(bases, 1):
             evidence_id = f"E{evidence_index}"
-            evidence.append(ComparisonEvidence(
-                evidence_id=evidence_id,
-                company_id=base.company_id,
-                file_name=base.file_name,
-                sheet_name=base.evidence.sheet_name,
-                cell_coord=base.evidence.cell_coord,
-                source_text=base.evidence.source_text,
-                origin="snapshot",
-            ))
+            evidence.append(
+                ComparisonEvidence(
+                    evidence_id=evidence_id,
+                    company_id=base.company_id,
+                    file_name=base.file_name,
+                    sheet_name=base.evidence.sheet_name,
+                    cell_coord=base.evidence.cell_coord,
+                    source_text=base.evidence.source_text,
+                    origin="snapshot",
+                )
+            )
             candidates.append(self._candidate(base, evidence_id))
 
         previous_order = sorted(candidates, key=lambda item: item["historical_score"], reverse=True)
-        previous_rank = {str(item["company_id"]): rank for rank, item in enumerate(previous_order, 1)}
+        previous_rank = {
+            str(item["company_id"]): rank for rank, item in enumerate(previous_order, 1)
+        }
         current_order = sorted(candidates, key=lambda item: item["composite_score"], reverse=True)
         companies = tuple(
             LeagueCompany(
@@ -214,8 +314,12 @@ class FinancialLeagueService:
                 riser_company_id=riser.company_id,
                 average_cagr=_round(fmean(item.revenue_cagr for item in companies)),
                 average_margin=_round(fmean(item.operating_margin for item in companies)),
-                cagr_distribution=self._distribution([item.revenue_cagr for item in companies], (-5, 5, 10, 15, 20, 30)),
-                margin_distribution=self._distribution([item.operating_margin for item in companies], (0, 5, 10, 15, 20, 30)),
+                cagr_distribution=self._distribution(
+                    [item.revenue_cagr for item in companies], (-5, 5, 10, 15, 20, 30)
+                ),
+                margin_distribution=self._distribution(
+                    [item.operating_margin for item in companies], (0, 5, 10, 15, 20, 30)
+                ),
             ),
             evidence=tuple(evidence),
         )
@@ -228,10 +332,15 @@ class FinancialLeagueService:
                 for entry in entries
                 if (snapshot := self._store.get_current(entry.company.company_id)) is not None
             )
-            loaded = tuple(item for snapshot in snapshots if (item := _base_from_snapshot(snapshot)) is not None)
+            loaded = tuple(
+                item
+                for snapshot in snapshots
+                if (item := _base_from_snapshot(snapshot)) is not None
+            )
         except (AttributeError, KeyError, ValueError):
-            return ()
-        return loaded[:MAX_LEAGUE_COMPANIES]
+            loaded = ()
+        real_company_limit = MAX_LEAGUE_COMPANIES - TEMPORARY_COMPANY_COUNT
+        return (*loaded[:real_company_limit], *_temporary_bases())
 
     def _candidate(self, base: BaseFinancials, evidence_id: str) -> LeagueCandidate:
         historical_growth = pow(base.revenues[2025] / base.revenues[2021], 1 / 4) - 1
@@ -247,7 +356,9 @@ class FinancialLeagueService:
         net_debt = base.net_debt - (revenue_by_year[2028] - base.revenues[2025]) * 0.08
         growth_score = _clamp((cagr + 5) / 30 * 100)
         profitability_score = _clamp((margin + 5) / 30 * 100)
-        net_cash_bonus = 14 if net_debt <= 0 else -min(22, net_debt / max(revenue_by_year[2028], 1) * 100)
+        net_cash_bonus = (
+            14 if net_debt <= 0 else -min(22, net_debt / max(revenue_by_year[2028], 1) * 100)
+        )
         stability_score = _clamp(100 - debt_ratio * 1.15 + net_cash_bonus)
         growth_score = _round(growth_score)
         profitability_score = _round(profitability_score)
@@ -256,9 +367,23 @@ class FinancialLeagueService:
         historical_margin = margin_by_year[2025]
         historical_growth_score = _clamp((historical_growth * 100 + 5) / 30 * 100)
         historical_profit_score = _clamp((historical_margin + 5) / 30 * 100)
-        historical_stability = _clamp(100 - base.liabilities_to_assets * 1.15 + (14 if base.net_debt <= 0 else -8))
-        historical_score = historical_growth_score * 0.35 + historical_profit_score * 0.35 + historical_stability * 0.30
-        tier = FinancialTier.S if composite >= 90 else FinancialTier.A if composite >= 75 else FinancialTier.B if composite >= 60 else FinancialTier.C
+        historical_stability = _clamp(
+            100 - base.liabilities_to_assets * 1.15 + (14 if base.net_debt <= 0 else -8)
+        )
+        historical_score = (
+            historical_growth_score * 0.35
+            + historical_profit_score * 0.35
+            + historical_stability * 0.30
+        )
+        tier = (
+            FinancialTier.S
+            if composite >= 90
+            else FinancialTier.A
+            if composite >= 75
+            else FinancialTier.B
+            if composite >= 60
+            else FinancialTier.C
+        )
         candles = tuple(
             self._candle(year, revenue_by_year[year], margin_by_year[year], evidence_id)
             for year in (*HISTORICAL_YEARS, *FORECAST_YEARS)
@@ -282,7 +407,9 @@ class FinancialLeagueService:
         }
 
     @staticmethod
-    def _candle(year: int, annual_revenue: float, margin: float, evidence_id: str) -> FinancialCandle:
+    def _candle(
+        year: int, annual_revenue: float, margin: float, evidence_id: str
+    ) -> FinancialCandle:
         seasonality = (0.225, 0.242, 0.252, 0.281)
         quarterly_run_rates = [annual_revenue * value * 4 for value in seasonality]
         return FinancialCandle(
@@ -299,12 +426,26 @@ class FinancialLeagueService:
         )
 
     @staticmethod
-    def _distribution(values: list[float], edges: tuple[int, ...]) -> tuple[LeagueDistributionBucket, ...]:
+    def _distribution(
+        values: list[float], edges: tuple[int, ...]
+    ) -> tuple[LeagueDistributionBucket, ...]:
         buckets: list[LeagueDistributionBucket] = []
         for low, high in pairwise(edges):
-            buckets.append(LeagueDistributionBucket(label=f"{low}-{high}%", count=sum(low <= value < high for value in values)))
-        buckets.append(LeagueDistributionBucket(label=f"{edges[-1]}%+", count=sum(value >= edges[-1] for value in values)))
+            buckets.append(
+                LeagueDistributionBucket(
+                    label=f"{low}-{high}%", count=sum(low <= value < high for value in values)
+                )
+            )
+        buckets.append(
+            LeagueDistributionBucket(
+                label=f"{edges[-1]}%+", count=sum(value >= edges[-1] for value in values)
+            )
+        )
         return tuple(buckets)
 
 
-__all__ = ["FinancialLeagueService", "FinancialLeagueStorePort"]
+__all__ = [
+    "FinancialLeagueService",
+    "FinancialLeagueStorePort",
+    "TEMPORARY_COMPANY_COUNT",
+]

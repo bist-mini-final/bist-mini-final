@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from backend.features.bi.extraction_models import BiContextCell, BiRetrievedContext
+from backend.features.bi.materialization_models import BiCompanyIndexEntry
 from backend.features.bi.models import (
     AmountScale,
     AvailableObservation,
@@ -98,8 +99,7 @@ def _snapshot(
             scale=AmountScale.MILLIONS,
             status=MetricStatus.AVAILABLE,
             observations=tuple(
-                observation(year, value, metric_id.value)
-                for year, value in sorted(yearly.items())
+                observation(year, value, metric_id.value) for year, value in sorted(yearly.items())
             ),
         )
 
@@ -151,9 +151,7 @@ def _snapshot(
 
 class FakeStore:
     def __init__(self, snapshots: tuple[BiDashboardSnapshot, ...]) -> None:
-        self.snapshots = {
-            snapshot.company.company_id: snapshot for snapshot in snapshots
-        }
+        self.snapshots = {snapshot.company.company_id: snapshot for snapshot in snapshots}
 
     def get_current_many(self, company_ids):
         return {
@@ -163,7 +161,14 @@ class FakeStore:
         }
 
     def list_companies(self):
-        return ()
+        return tuple(
+            BiCompanyIndexEntry(
+                company=snapshot.company,
+                source=snapshot.source,
+                current_snapshot_id=snapshot.snapshot.snapshot_id,
+            )
+            for snapshot in self.snapshots.values()
+        )
 
     def get_current(self, company_id):
         return self.snapshots.get(company_id)
@@ -201,9 +206,12 @@ class FakeCompletion:
         if schema_name == "company_comparison_question_plan":
             question = json.loads(messages[-1]["content"])["question"]
             evaluation_type = (
-                "stability" if "안정" in question or "부채" in question
-                else "profitability" if "수익" in question or "영업이익" in question
-                else "growth" if "성장" in question or "매출" in question
+                "stability"
+                if "안정" in question or "부채" in question
+                else "profitability"
+                if "수익" in question or "영업이익" in question
+                else "growth"
+                if "성장" in question or "매출" in question
                 else "comprehensive"
             )
             return json.dumps(
@@ -217,9 +225,7 @@ class FakeCompletion:
         company_ids = payload["analysis"]["company_ids"]
         evidence = payload["allowed_evidence"]
         evidence_ids = [item["evidence_id"] for item in evidence]
-        rag_evidence_id = next(
-            item["evidence_id"] for item in evidence if item["origin"] == "rag"
-        )
+        rag_evidence_id = next(item["evidence_id"] for item in evidence if item["origin"] == "rag")
         return json.dumps(
             {
                 "compared_company_ids": company_ids,
@@ -280,17 +286,35 @@ def test_calculator_computes_metrics_and_preserves_net_debt_sign(snapshots) -> N
 def test_calculator_combines_actuals_with_2026_to_2028_forecasts(snapshots) -> None:
     def forecast(company_id: str, multiplier: Decimal) -> CompanyForecastData:
         observations = {}
-        for year, revenue in ((2026, Decimal("260")), (2027, Decimal("300")), (2028, Decimal("360"))):
+        for year, revenue in (
+            (2026, Decimal("260")),
+            (2027, Decimal("300")),
+            (2028, Decimal("360")),
+        ):
             income = revenue * Decimal("0.15")
             observations[year] = {
                 MetricId.REVENUE: ComparisonObservation(
                     normalized_value=revenue * multiplier,
-                    evidence=(BiEvidence(cell_id=f"revenue-{company_id}-{year}", sheet_name="Key_Stats", cell_coord=f"N{year - 1993}", source_text=f"{year} revenue estimate"),),
+                    evidence=(
+                        BiEvidence(
+                            cell_id=f"revenue-{company_id}-{year}",
+                            sheet_name="Key_Stats",
+                            cell_coord=f"N{year - 1993}",
+                            source_text=f"{year} revenue estimate",
+                        ),
+                    ),
                     origin="rag",
                 ),
                 MetricId.OPERATING_INCOME: ComparisonObservation(
                     normalized_value=income * multiplier,
-                    evidence=(BiEvidence(cell_id=f"income-{company_id}-{year}", sheet_name="Key_Stats", cell_coord=f"N{year - 1984}", source_text=f"{year} EBIT estimate"),),
+                    evidence=(
+                        BiEvidence(
+                            cell_id=f"income-{company_id}-{year}",
+                            sheet_name="Key_Stats",
+                            cell_coord=f"N{year - 1984}",
+                            source_text=f"{year} EBIT estimate",
+                        ),
+                    ),
                     origin="rag",
                 ),
             }
@@ -313,6 +337,38 @@ def test_calculator_combines_actuals_with_2026_to_2028_forecasts(snapshots) -> N
 def test_calculator_rejects_missing_common_period(snapshots) -> None:
     with pytest.raises(ComparisonDataError, match="공통으로 존재"):
         calculate_comparison(snapshots, 2020, 2025)
+
+
+def test_league_combines_three_real_companies_with_fifteen_temporary_companies(
+    snapshots,
+) -> None:
+    third = _snapshot(
+        "company-c",
+        "Company C",
+        {2021: (Decimal("300"), Decimal("30")), 2025: (Decimal("390"), Decimal("45"))},
+        liabilities=Decimal("90"),
+        assets=Decimal("300"),
+        net_debt=Decimal("-15"),
+    )
+    service = CompanyComparisonService(
+        store=FakeStore((*snapshots, third)),
+        retriever=FakeRetriever(),
+        completion=FakeCompletion(),
+    )
+
+    result = service.league()
+
+    assert len(result.companies) == 18
+    assert {
+        company.company_id
+        for company in result.companies
+        if not company.company_id.startswith("temp-")
+    } == {
+        "company-a",
+        "company-b",
+        "company-c",
+    }
+    assert sum(company.company_id.startswith("temp-") for company in result.companies) == 15
 
 
 def test_service_retrieves_and_briefs_only_selected_companies(snapshots) -> None:
@@ -343,9 +399,10 @@ def test_service_retrieves_and_briefs_only_selected_companies(snapshots) -> None
     assert response.brief is not None
     assert set(response.brief.compared_company_ids) == {"company-a", "company-b"}
     assert any(item.origin == "rag" for item in response.evidence)
-    assert {
-        item.company_id for item in response.evidence if item.origin == "rag"
-    } == {"company-a", "company-b"}
+    assert {item.company_id for item in response.evidence if item.origin == "rag"} == {
+        "company-a",
+        "company-b",
+    }
     assert response.query_analysis is None
 
 
@@ -478,9 +535,11 @@ def test_three_company_comparison_keeps_rag_evidence_for_every_company(snapshots
     )
 
     assert response.brief_status is BriefStatus.READY
-    assert {
-        item.company_id for item in response.evidence if item.origin == "rag"
-    } == {"company-a", "company-b", "company-c"}
+    assert {item.company_id for item in response.evidence if item.origin == "rag"} == {
+        "company-a",
+        "company-b",
+        "company-c",
+    }
 
 
 def test_request_rejects_duplicate_company_ids() -> None:
