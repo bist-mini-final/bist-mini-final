@@ -25,7 +25,6 @@ export function BiDataState({
           ? <LoaderCircle className="bi-page-notice__spinner" size={22} aria-hidden="true" />
           : <CircleAlert size={22} aria-hidden="true" />}
         <div>
-          <span className="bi-header__eyebrow">COMPANY DASHBOARD</span>
           <h1 id="bi-page-title">{title}</h1>
           <p>{message}</p>
           {actionLabel && onAction ? (
