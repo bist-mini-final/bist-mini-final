@@ -20,6 +20,7 @@ from backend.features.bi.models import (
     BiRefreshState,
     BiSnapshotMeta,
     CompanyId,
+    IndexId,
     MetricId,
     MetricSeries,
     MetricStatus,
@@ -131,7 +132,7 @@ def _snapshot(
         source=BiMaterializationSource(
             file_name=f"{name}.xlsm",
             workbook_hash=("a" if company_id.endswith("a") else "b") * 64,
-            index_id=f"index-{company_id}",
+            index_id=IndexId(f"index-{company_id}"),
         ),
         snapshot=BiSnapshotMeta(
             snapshot_id=SnapshotId(f"snapshot-{company_id}"),
@@ -160,6 +161,12 @@ class FakeStore:
             for company_id in company_ids
             if company_id in self.snapshots
         }
+
+    def list_companies(self):
+        return ()
+
+    def get_current(self, company_id):
+        return self.snapshots.get(company_id)
 
 
 class FakeRetriever:

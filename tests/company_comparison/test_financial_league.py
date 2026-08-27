@@ -1,6 +1,6 @@
 import pytest
 
-from backend.features.bi.models import AmountScale, BiEvidence
+from backend.features.bi.models import AmountScale, BiEvidence, CompanyId
 from backend.features.company_comparison.calculator import ComparisonDataError
 from backend.features.company_comparison.league_service import (
     BaseFinancials,
@@ -11,6 +11,9 @@ from backend.features.company_comparison.league_service import (
 class UnavailableStore:
     def list_companies(self):
         raise AttributeError("database is unavailable")
+
+    def get_current(self, company_id):
+        return None
 
 
 class FixtureLeagueService(FinancialLeagueService):
@@ -26,7 +29,7 @@ def _base(index: int) -> BaseFinancials:
     growth = 0.035 + index * 0.004
     revenue_2021 = 500.0 + index * 45
     return BaseFinancials(
-        company_id=f"company-{index}",
+        company_id=CompanyId(f"company-{index}"),
         display_name=f"Company {index}",
         currency="KRW",
         scale=AmountScale.MILLIONS,
