@@ -6,8 +6,8 @@
 
 ## 1. 3차 MVP 핵심 과제 및 구현 목표
 
-* **목표**: 실시간 대화형 AI 금융 챗봇 풀스택 구축, 다중 기업 듀퐁 3단계 크로스 비교 인사이트 엔진 개발, 프론트엔드 a11y 표준 모달 및 인터랙션 고도화.
-* **주관 엔지니어**: **김정원 (AI Chatbot)**, **전명준 (DuPont Comparison)**, **권혁준 (BI Interaction & a11y)**, **김지환 (Refactoring Governance)**.
+* **목표**: 실시간 대화형 AI 금융 챗봇 풀스택 구축, 다중 기업 듀퐁 3단계 크로스 비교 인사이트 엔진 및 파이낸셜 리그 테이블 개발, 프론트엔드 a11y 표준 모달 및 인터랙션 고도화.
+* **주관 엔지니어**: **김정원 (AI Chatbot & Router)**, **전명준 (DuPont Comparison & League)**, **권혁준 (BI Interaction & a11y)**, **김지환 (Team Lead & Refactoring Governance)**.
 
 ---
 
@@ -23,8 +23,15 @@
   - 세션 사이드바(생성/조회/삭제/이름수정) + 실시간 메시지 버블 + 추천 질문 칩(Chips).
   - 마크다운 및 LaTeX 수식 실시간 렌더링, 인라인 차트 시각화(`visualization`), 원천 감사 셀 태그 바인딩.
 
-### 2. 다중 기업 듀퐁 크로스 비교 엔진 ([`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md))
-* 이종 통화/단위 자동 정규화, $\text{ROE} = \text{PM} \times \text{AT} \times \text{FL}$ 3단계 분해 트리 및 동종업계 5각 건전성 레이더 차트 랭킹 시각화.
+### 2. 다중 기업 듀퐁 크로스 비교 & 파이낸셜 리그 엔진 ([`backend/features/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/features/company_comparison/), [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md))
+* **백엔드 아키텍처**:
+  - `CompanyComparisonService` & `FinancialLeagueService`: 5대 영역 종합 재무 건전성 리그 산출 및 듀퐁 크로스 분석.
+  - `DuPontCalculator`: 이종 통화/단위 자동 정규화 및 $\text{ROE} = \text{PM} \times \text{AT} \times \text{FL}$ 3단계 분해 수식 무손실 `Decimal` 연산.
+  - `ComparisonCache`: 실시간 비교 질의 지연시간 단축을 위한 인메모리 캐싱 계층.
+* **프론트엔드 UI/UX (`/company-comparison`, `/company-comparison-v2`)**:
+  - `FinancialLeagueTable`: 동종업계 5각 건전성(수익성/성장성/안정성/활동성/현금창출) 종합 순위표.
+  - `FinancialCandlestickTerminal`: 재무 지표 시계열 변동성 캔들스틱 터미널 시각화.
+  - `RankingCriteriaPanel`: 가중치 기반 사용자 정의 랭킹 기준 패널.
 
 ### 3. Financial BI 대시보드 인터랙션 고도화 ([`BP-601`](file:///c:/Repos/bist-mini-final/docs/blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md))
 * 영업적자 음수 마진 적응형 Y축 동적 스케일링 엔진(`getProfitabilityMarginDomain`) 및 `useModalDialog` a11y 표준 모달 시스템 연동.

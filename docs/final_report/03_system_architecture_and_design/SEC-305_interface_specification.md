@@ -23,4 +23,5 @@
 | **Financial BI** | `GET /api/bi/companies` | `limit: int = 50` | `List[CompanyProfileDTO]` | 등록 기업 목록 및 메타데이터 인출 |
 | | `GET /api/bi/companies/{id}/dashboard`| `company_id: str` (Path) | `BiDashboardSnapshotDTO(40+ ratios)` | 40+ 지표 무손실 연산 스냅샷 조회 |
 | | `POST /api/bi/companies/{id}/refresh` | `company_id: str` (Path) | `BiRefreshResponseDTO(job_id)` | 최신 엑셀 기준 지표 재연산 트리거 |
-| **Comparison** | `POST /api/bi/comparison/matrix` | `ComparisonRequestDTO(comp_ids)` | `CompanyComparisonMatrixDTO(radar, dupont)`| 다중 기업 통화/단위 정규화 & 듀퐁 3단계 분해 |
+| **Comparison** | `GET /api/bi/comparisons/league` | None | `FinancialLeagueResponse(standings, rankings)` | 5대 영역 종합 재무 건전성 리그 테이블 랭킹 인출 |
+| | `POST /api/bi/comparisons/analyze` | `CompanyComparisonRequest(base, target)` | `CompanyComparisonResponse(dupont, radar, delta)` | 다중 기업 듀퐁 3단계 분해 및 크로스 비교 분석 |
