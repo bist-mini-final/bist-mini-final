@@ -14,7 +14,7 @@ graph TD
     L2["2. Bootstrap & DI Layer<br>(ApplicationContainer, DomainServices, PipelineEngine, Infra)"]
     L3["3. Domain & Feature Services Layer<br>(BiApiServices, Chatbot, Comparison, Benchmark)"]
     L4["4. Execution & Orchestration Layer<br>(WorkflowExecutor, KubernetesQueueDispatcher, Lease Manager)"]
-    L5["5. Modular Pipeline Contracts Layer<br>(BaseModule ABC, 19 Pipeline Modules, LazyModuleRegistry)"]
+    L5["5. Modular Pipeline Contracts Layer<br>(BaseModule ABC, 21 Pipeline Modules, LazyModuleRegistry)"]
     L6["6. External Providers & Adapters Layer<br>(OpenAIResponsesClient, EmbeddingEncoder Ports & Adapters)"]
     L7["7. Storage & Infrastructure Layer<br>(DatabaseManager, PgVectorStore, BinaryCopy, ConnectionPool)"]
 
@@ -79,8 +79,8 @@ bist-mini-final/
 │   │
 │   ├── features/                   # [Layer 3: Domain & Features]
 │   │   ├── bi/                     # 재무제표 프로파일러, 40+ 재무비율 계산기
-│   │   ├── chatbot/                # [예정] AI 금융 챗봇 멀티턴 세션 관리자
-│   │   ├── comparison/             # [예정] 다중 기업 크로스 비교 & 듀퐁 정규화
+│   │   ├── chatbot/                # AI 금융 챗봇 세션/메시지/첨부파일 관리자
+│   │   ├── company_comparison/     # 다중 기업 크로스 비교 & 듀퐁 정규화 및 파이낸셜 리그
 │   │   └── benchmark/              # 파이프라인 정확도 평가 벤치마크 서비스
 │   │
 │   ├── engine/                     # [Layer 4: Execution & Orchestration]
