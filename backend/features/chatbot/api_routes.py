@@ -38,7 +38,8 @@ class RenameSessionRequest(CreateSessionRequest):
 
 def _reader_answer(run: Any) -> str | None:
     output = run.nodes.get("read").output if run.nodes.get("read") else None
-    if not isinstance(output, dict): return None
+    if not isinstance(output, dict):
+        return None
     answer = output.get("answer_json", {}).get("answer") if isinstance(output.get("answer_json"), dict) else None
     return answer if isinstance(answer, str) and answer.strip() else None
 
@@ -98,7 +99,7 @@ def _format_user_facing_answer(answer: str) -> str:
         flags=re.IGNORECASE,
     )
     return re.sub(
-        r"\s*[;；]\s*(?=(?:\*\*)?[^\n]*확인 가능한 근거가 부족)",
+        r"\s*[;\uff1b]\s*(?=(?:\*\*)?[^\n]*확인 가능한 근거가 부족)",
         "\n\n",
         cleaned,
     )
@@ -134,10 +135,14 @@ def _with_company_intro(answer: str, company: str | None, question: str) -> str:
 
 def _card_id(question: str) -> str:
     lowered = question.lower()
-    if "매출" in lowered: return "revenue_growth"
-    if "마진" in lowered or "이익률" in lowered: return "profitability"
-    if "현금흐름" in lowered or "fcf" in lowered: return "cash_flow"
-    if "자산" in lowered or "부채" in lowered or "자본" in lowered: return "financial_scale"
+    if "매출" in lowered:
+        return "revenue_growth"
+    if "마진" in lowered or "이익률" in lowered:
+        return "profitability"
+    if "현금흐름" in lowered or "fcf" in lowered:
+        return "cash_flow"
+    if "자산" in lowered or "부채" in lowered or "자본" in lowered:
+        return "financial_scale"
     return "stability"
 
 
@@ -147,7 +152,8 @@ def create_chat_router(*, db_manager: DatabaseManager, workflow_store: WorkflowS
 
     def visualization_for(question: str) -> dict[str, str] | None:
         lowered = question.lower()
-        if not any(term in lowered for term in _CHART_TERMS): return None
+        if not any(term in lowered for term in _CHART_TERMS):
+            return None
         for entry in bi_services.store.list_companies():
             if entry.company.display_name.lower() in lowered:
                 if bi_services.store.get_current(entry.company.company_id) is not None:
@@ -219,7 +225,8 @@ def create_chat_router(*, db_manager: DatabaseManager, workflow_store: WorkflowS
 
     def session_or_404(session_id: str, client_id: str) -> dict[str, Any]:
         session = repository.get_session(session_id, client_id)
-        if session is None: raise HTTPException(status_code=404, detail="대화 세션을 찾을 수 없습니다")
+        if session is None:
+            raise HTTPException(status_code=404, detail="대화 세션을 찾을 수 없습니다")
         return session
 
     @router.get("/sessions")
