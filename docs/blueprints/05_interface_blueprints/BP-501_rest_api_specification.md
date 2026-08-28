@@ -90,7 +90,7 @@
 
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/company-comparisons/league` | 다중 기업 리그 순위 조회 | `FinancialLeagueResponse` |
+| `GET` | `/api/v1/company-comparisons/league` | 성장성·수익성·안정성 고정 점수 기반 다중 기업 리그 순위 조회 | `FinancialLeagueResponse` |
 | `POST` | `/api/v1/company-comparisons/analyze` | 근거 기반 선택 기업 비교 분석 | `CompanyComparisonResponse` |
 
 ### [Group 6: AI 금융 챗봇 대화 세션 (`/api/v1/chat`)]
@@ -102,7 +102,7 @@
 | `GET/POST` | `/api/v1/chat/sessions` | 최근 세션 목록/신규 세션 생성 | 세션 DTO |
 | `GET/PATCH/DELETE` | `/api/v1/chat/sessions/{session_id}` | 세션 상세/제목 수정/삭제 | 세션 DTO 또는 삭제 응답 |
 | `POST`| `/api/v1/chat/sessions/{session_id}/messages` | 메시지 전송 및 RAG 실행 등록 | 메시지 DTO |
-| `GET` | `/api/v1/chat/runs/{run_id}` | 비동기 RAG 실행 상태를 대화 메시지로 동기화 | 실행/메시지 DTO |
+| `GET` | `/api/v1/chat/runs/{run_id}` | 비동기 RAG 실행 상태를 동기화하고 실행 근거 셀을 검증한 메시지 반환 | 실행/메시지 DTO |
 | `POST`| `/api/v1/chat/sessions/{session_id}/attachments` | 파일 업로드 및 텍스트 추출 | 첨부 DTO |
 | `GET` | `/api/v1/chat/suggestions` | 추천 질문 조회 | 추천 질문 목록 |
 | `POST` | `/api/v1/chat/suggestions/refresh` | 추천 질문 재생성 | 추천 질문 목록 |
