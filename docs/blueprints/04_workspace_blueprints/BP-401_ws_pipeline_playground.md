@@ -6,12 +6,12 @@
 
 ## 1. 워크스페이스 개요 및 UI 결선도 (Workspace Overview)
 
-**Pipeline Playground**는 개발자 및 연구자가 21개의 파이프라인 모듈을 시각적 2D 노드 그래프(React Flow) 상에서 자유롭게 배치하고 핀을 결선하여, 대기열(Queue) 지연 없이 **오직 Tier 1 비동기 논블로킹 인메모리 제로 I/O 엔진(`WorkflowExecutor`)을 통해 즉각적인 피드백을 얻는 고속 실험실(Interactive Laboratory / Sandbox)** 워크스페이스입니다.
+**Pipeline Playground**는 개발자 및 연구자가 현재 등록된 19개 파이프라인 모듈을 시각적 2D 노드 그래프(React Flow) 상에서 배치하고 핀을 결선하여, durable PostgreSQL queue에 실행을 등록하고 상태를 SSE로 관찰하는 워크스페이스입니다. API·워커가 분리되어도 실행 상태가 보존되므로 브라우저를 새로고침하거나 API Pod가 바뀌어도 실행 이력이 유지됩니다.
 
 ```mermaid
 flowchart TB
     subgraph UI_Canvas ["React Flow 2D Interactive Canvas (@xyflow/react)"]
-        PALETTE["Module Sidebar Palette (21 Modules)"]
+        PALETTE["Module Sidebar Palette (19 Modules)"]
         CANVAS["Graph Canvas (Custom Workflow Nodes & Edges)"]
         INSPECTOR["Node Config Inspector & Parameter Tuner"]
         TRACE_PANEL["Execution Trace & I/O Inspector Panel"]
@@ -29,8 +29,8 @@ flowchart TB
     CANVAS -->|Run Pipeline| CTX
     CTX --> ADAPTER
     ADAPTER --> API_CLIENT
-    API_CLIENT -->|POST /api/workflows/run| BACKEND["FastAPI /api/workflows"]
-    BACKEND -.->|"SSE Stream: /api/workflows/runs/:id/stream"| API_CLIENT
+    API_CLIENT -->|POST /api/v1/workflows/{workflowId}/runs| BACKEND["FastAPI /api/v1/workflows"]
+    BACKEND -.->|"SSE Stream: /api/v1/runs/{runId}/stream"| API_CLIENT
     API_CLIENT --> SSE_BAR
     API_CLIENT --> TRACE_PANEL
 ```
@@ -70,7 +70,7 @@ graph TD
 
 모든 노드는 동일한 프리미엄 슬레이트 카드로 렌더링되며, 상단 헤더의 **정제된 미니 뱃지 색상 및 Lucide React 벡터 아이콘**으로만 역할을 깔끔하게 구분합니다:
 
-| 기능 패밀리 | 액센트 톤 (Accent) | 표준 Lucide 아이콘 | 소속 모듈 (21개 모듈군) | 핸들 구성 (Handles) |
+| 기능 패밀리 | 액센트 톤 (Accent) | 표준 Lucide 아이콘 | 소속 모듈 (19개 모듈군) | 핸들 구성 (Handles) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Flow & Control**<br>(입력 & 흐름 제어) | `Primary Blue`<br>(`#3B82F6`) | `<Workflow />`<br>`<GitFork />`<br>`<Split />` | • `QueryInput`<br>• `LlmQueryRouter`<br>• `Decomposer`<br>• `MultiQueryExpander` | • Target: 0~1개 (Query)<br>• Source: 1~3개 (Branch Edges) |
 | **Data & Search**<br>(데이터 인덱싱 & 검색) | `Teal Emerald`<br>(`#10B981`) | `<Database />`<br>`<Search />`<br>`<Layers />` | • `TextEmbedder`<br>• `CellTextSerializer`<br>• `PgVectorRetriever`<br>• `SparseBm25Retriever`<br>• `RrfFuser`<br>• `ContextExpander` | • Target: 1~2개 (Vector / Chunks)<br>• Source: 1개 (Fused Context) |
@@ -108,7 +108,7 @@ export function NodeStatusBadge({ status }: { status: NodeStatus }) {
 ## 3. 실시간 실행 스트림 및 상태 동기화 프로토콜
 
 1. 사용자가 **"파이프라인 실행"** 버튼을 클릭하면 `WorkflowGraphAdapter`가 React Flow 노드/엣지 객체를 백엔드 `WorkflowGraph` JSON으로 변환하여 전송합니다.
-2. 백엔드로부터 `run_id`를 수신하면 `EventSource`를 열어 `/api/workflows/runs/{run_id}/stream`에 연결합니다.
+2. 백엔드로부터 `run_id`를 수신하면 `EventSource`를 열어 `/api/v1/runs/{run_id}/stream`에 연결합니다. SPA의 `/api` 호출은 정식 `/api/v1`의 비노출 호환 별칭이므로 신규 외부 클라이언트와 문서는 정식 경로를 사용합니다.
 3. 수신되는 이벤트(`node_started`, `node_completed`, `node_failed`)에 따라 해당 노드의 테두리에 실시간 로딩 스피너 및 성공/실패 뱃지가 표시됩니다.
 4. 노드를 클릭하면 해당 노드의 입력 데이터, 출력 데이터, 실행 소요 시간(ms), 토큰 사용량이 `TracePanel`에 즉시 렌더링됩니다.
 
@@ -116,11 +116,10 @@ export function NodeStatusBadge({ status }: { status: NodeStatus }) {
 
 ## 4. 리팩토링 타깃 (Refactoring Targets)
 
-1. **`playground.css` 모듈화**:
-   - As-Is: `playground.css` 파일이 80KB에 달하는 단일 거대 CSS 파일로 존재.
-   - To-Be: 컴포넌트별 CSS Modules 또는 Tailwind CSS v4 유틸리티 클래스로 분할 리팩토링.
-2. **템플릿 프리셋 갤러리**:
-   - "기본 하이브리드 RAG", "VLM 엑셀 인덱싱 파이프라인", "재무 비율 직접 계산" 등 사전 정의된 원클릭 DAG 프리셋 로더 추가.
-3. **노드 설정 인스펙터 & 파라미터 튜너 패널 활성화 (`NodeConfigInspector`)**:
-   - **As-Is**: 노드 클릭 시 실행 트레이스 패널(`TracePanel`)만 연동되고, 모듈의 런타임 설정 파라미터(`ModuleConfigDTO`, 예: `model`, `top_k`, `temperature`)를 직접 수정할 수 있는 `NodeConfigInspector` 사이드 패널이 열리지 않음.
-   - **To-Be**: 노드 선택 시 백엔드 `GET /api/modules/{module_type}/schema`로부터 Pydantic Config JSON Schema를 동적으로 조회하여 폼 컨트롤러를 자동 렌더링하고 실시간 파라미터 오버라이드 및 노드 상태에 즉시 반영.
+1. **구현됨 — `playground.css` 컴포넌트 단위 분리**:
+   - 기존 약 80KB 단일 파일에서 `SpreadsheetResultModal.css`, `ModuleSettingsModal.css`, `WorkflowLayersPanel.css`을 분리해 공통 캔버스 CSS를 약 42KB로 축소했습니다. 신규 컴포넌트 스타일은 해당 컴포넌트 옆 파일에 둡니다.
+2. **구현됨 — 템플릿 프리셋 갤러리**:
+   - 워크플로 레이어 패널에서 canonical `rag_query`, `excel_ingestion` 템플릿의 노드·연결 수와 모듈 흐름을 미리보고, 편집 가능한 신규 워크플로로 복제할 수 있습니다.
+3. **구현됨 — 노드 설정 인스펙터 & 파라미터 튜너 (`ModuleSettingsModal`)**:
+   - 노드 메뉴에서 설정 모달을 열고, `GET /api/v1/modules`가 제공하는 모듈 contract의 config schema·enum·preset을 사용해 설정값을 편집합니다.
+   - 변경값은 선택 노드의 config에 즉시 반영되며 저장/실행 시 워크플로 문서의 node config로 전달됩니다. 존재하지 않는 `/api/modules/{module_type}/schema` 경로를 호출하지 않습니다.

@@ -4,6 +4,7 @@ from typing import Final
 import psycopg2
 
 from backend.core.settings import PGVECTOR_URL
+from backend.storage.audit_schema import AUDIT_SCHEMA_SQL, BI_COMPANY_AUDIT_SQL
 from backend.storage.connection_pool import get_pooled_raw_connection
 
 BI_SCHEMA_SQL: Final = """
@@ -11,9 +12,14 @@ CREATE TABLE IF NOT EXISTS bi_companies (
     company_id VARCHAR(128) PRIMARY KEY,
     display_name VARCHAR(200) NOT NULL,
     current_snapshot_id VARCHAR(128),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE bi_companies ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE bi_companies ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS bi_materialization_jobs (
     job_id VARCHAR(128) PRIMARY KEY,
@@ -141,7 +147,9 @@ CREATE INDEX IF NOT EXISTS idx_bi_materialization_company
     ON bi_materialization_jobs(company_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bi_snapshots_company
     ON bi_dashboard_snapshots(company_id, generated_at DESC);
-"""
+CREATE INDEX IF NOT EXISTS idx_bi_companies_active
+    ON bi_companies(display_name, company_id) WHERE is_deleted = FALSE;
+""" + AUDIT_SCHEMA_SQL + BI_COMPANY_AUDIT_SQL
 
 
 @dataclass(frozen=True, slots=True)

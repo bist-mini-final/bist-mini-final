@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 from backend.providers.openai_responses import OpenAIResponseResult
 from modules.common.base_module import QueryContextDTO
@@ -63,3 +64,8 @@ def test_decomposer_module_execution():
     assert "Company: 삼성전자" in serialized[0]
     assert "2023" in serialized[0]
     assert "2024" in serialized[1]
+
+    mock_llm.create_response_async = AsyncMock(return_value=mock_llm.create_response.return_value)
+    async_result = asyncio.run(module.run_async(input_dto, DecomposerConfigDTO()))
+    assert async_result == SubqueriesDTO.model_validate(result).model_dump(mode="json")
+    mock_llm.create_response_async.assert_awaited_once()

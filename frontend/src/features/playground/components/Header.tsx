@@ -25,6 +25,9 @@ interface ExecutionMetrics {
 export interface WorkflowOption {
   id: string;
   name: string;
+  nodeCount?: number;
+  edgeCount?: number;
+  moduleTypes?: string[];
 }
 
 interface HeaderProps {

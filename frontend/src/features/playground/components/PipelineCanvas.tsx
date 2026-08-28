@@ -47,6 +47,7 @@ interface PipelineCanvasProps {
   onSelectWorkflow: (id: string) => void;
   onCreateWorkflow: () => void;
   onDuplicateWorkflow: () => void;
+  onCreateFromTemplate: (templateId: string) => void;
   onRenameWorkflow: () => void;
   onDeleteWorkflow: () => void;
 }
@@ -62,6 +63,7 @@ export function PipelineCanvas({
   onSelectWorkflow,
   onCreateWorkflow,
   onDuplicateWorkflow,
+  onCreateFromTemplate,
   onRenameWorkflow,
   onDeleteWorkflow,
 }: PipelineCanvasProps) {
@@ -160,6 +162,7 @@ export function PipelineCanvas({
           onSelectWorkflow={onSelectWorkflow}
           onCreateWorkflow={onCreateWorkflow}
           onDuplicateWorkflow={onDuplicateWorkflow}
+          onCreateFromTemplate={onCreateFromTemplate}
           onRenameWorkflow={onRenameWorkflow}
           onDeleteWorkflow={onDeleteWorkflow}
           onSelectNode={graph.selectNode}

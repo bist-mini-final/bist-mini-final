@@ -21,9 +21,11 @@ flowchart TD
 
     QP --> RAW_METRICS["Source Metric Observations (매출액, 영업이익, 자산총계, 부채총계 등)"]
     
-    subgraph CalcEngine ["3. Financial Calculator Engine (calculator.py)"]
-        FORMULA["Derived Metric Formulas (Decimal Precision 100)"]
+    subgraph CalcEngine ["3. Financial Calculator Engine"]
+        DSL["Versioned JSON Formula DSL (formulas.json)"]
+        FORMULA["Safe AST Evaluator (Decimal Precision)"]
         EVIDENCE["Evidence Cell Trace & Audit Trail Binder"]
+        DSL --> FORMULA
         RAW_METRICS --> FORMULA
         RAW_METRICS --> EVIDENCE
     end
@@ -62,7 +64,7 @@ flowchart TD
 | | `net_margin` | **순이익률** | $\frac{\text{당기순이익 (Net Income)}}{\text{매출액 (Revenue)}} \times 100$ | `%` (Percent) |
 | | `roe` | **자기자본이익률 (ROE)** | $\frac{\text{당기순이익}}{\text{자본총계 (Total Equity)}} \times 100$ | `%` (Percent) |
 | | `roa` | **총자산순이익률 (ROA)**| $\frac{\text{당기순이익}}{\text{자산총계 (Total Assets)}} \times 100$ | `%` (Percent) |
-| **안정성 (Stability)** | `debt_ratio` | **부채비율** | $\frac{\text{부채총계 (Total Liabilities)}}{\text{자본총계 (Total Equity)}} \times 100$ | `%` (Percent) |
+| **안정성 (Stability)** | `debt_ratio` | **부채비율** | $\frac{\text{부채총계 (Total Liabilities)}}{\text{자산총계 (Total Assets)}} \times 100$ | `%` (Percent) |
 | | `current_ratio` | **유동비율** | $\frac{\text{유동자산 (Current Assets)}}{\text{유동부채 (Current Liabilities)}} \times 100$ | `%` (Percent) |
 | | `quick_ratio` | **당좌비율** | $\frac{\text{당좌자산 (Quick Assets)}}{\text{유동부채}} \times 100$ | `%` (Percent) |
 | **활동성 (Activity)** | `asset_turnover` | **총자산회전율** | $\frac{\text{매출액}}{\text{평균 자산총계}}$ | 회 (Times) |
@@ -93,8 +95,10 @@ flowchart TD
 
 ## 4. 리팩토링 타깃 (Refactoring Targets)
 
-1. **지표 수식 DSL(Domain-Specific Language) 엔진 분리**:
-   - As-Is: `calculator.py` 내부에 하드코딩된 Python 함수(`calculate_operating_margin`, `calculate_debt_ratio`).
-   - To-Be: JSON/YAML 기반 수식 정의 DSL 엔진(예: `formula: "operating_income / revenue * 100"`)으로 분리하여 비개발자도 신규 재무 비율 추가 가능하도록 개편.
-2. **비교 가능 기간 정렬기(Calendar-Period Normalizer)**:
-   - 12월 결산법인과 3월 결산법인의 회계기간 축을 글로벌 캘린더 분기(Q1, Q2, Q3, Q4)로 자동 정렬하는 보정기 추가.
+1. **구현됨 — 지표 수식 DSL(Domain-Specific Language) 엔진 분리**:
+   - `formulas.json`에 버전이 명시된 파생 수식을 선언하고 `formula_dsl.py`가 이를 로드합니다.
+   - 실행기는 `eval`을 사용하지 않으며 숫자·선언된 변수·사칙연산만 허용하는 AST 화이트리스트와 `Decimal` 연산을 적용합니다. 기존 상태 전파, 0 분모, 근거 병합 계약은 `calculator.py`의 공통 어댑터가 유지합니다.
+   - 직전 기간을 별도로 요구하는 YoY와 일부 구성요소 누락을 허용하는 총차입금 fallback은 일반 수식보다 의미 규칙이 강하므로 전용 계산으로 유지합니다.
+2. **구현됨 — 비교 가능 기간 정렬기(Calendar-Period Normalizer)**:
+   - `calendar_periods.py`가 FY 종료일을 글로벌 달력 축 `YYYY-Q1`~`YYYY-Q4`로 정규화하고, 날짜가 없는 레거시 기간은 `YYYY-FY`로 명시적으로 구분합니다.
+   - 기업비교 계산기는 이 정규화 인덱스를 사용해 기간을 결정하며, 12월 결산법인과 3월 결산법인이 같은 연도에 섞이면 각 기업의 실제 달력 분기 축을 응답 경고에 포함합니다. 연간 수치를 임의의 분기 실적으로 환산하지 않습니다.

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final, assert_never
 
+from .formula_dsl import FormulaEvaluationError, evaluate_formula
 from .models import (
     AvailableObservation,
     BiEvidence,
@@ -121,32 +122,44 @@ def _not_meaningful(
     )
 
 
+def _calculate_formula(
+    formula_id: str,
+    named_inputs: tuple[tuple[str, MetricObservation], ...],
+) -> MetricObservation:
+    if not named_inputs:
+        raise ValueError("formula requires at least one input")
+    inputs = tuple(observation for _, observation in named_inputs)
+    period_id = inputs[0].period_id
+    blocked = _prepare_inputs(period_id, formula_id, inputs)
+    if blocked is not None:
+        return blocked
+    values = {
+        name: observation.normalized_value
+        for name, observation in named_inputs
+        if isinstance(observation, AvailableObservation)
+    }
+    if len(values) != len(inputs):
+        raise TypeError("formula inputs were not narrowed to available observations")
+    try:
+        value = evaluate_formula(formula_id, values)
+    except FormulaEvaluationError as exc:
+        if str(exc) == "zero_denominator":
+            return _not_meaningful(period_id, formula_id, inputs)
+        raise
+    return _available_result(DerivedValue(period_id, formula_id, value), inputs)
+
+
 def _calculate_ratio(
+    numerator_name: str,
     numerator: MetricObservation,
+    denominator_name: str,
     denominator: MetricObservation,
     formula_id: str,
 ) -> MetricObservation:
-    inputs = (numerator, denominator)
-    blocked = _prepare_inputs(numerator.period_id, formula_id, inputs)
-    if blocked is not None:
-        return blocked
-
-    match numerator, denominator:
-        case AvailableObservation(normalized_value=numerator_value), AvailableObservation(
-            normalized_value=denominator_value
-        ):
-            if denominator_value == 0:
-                return _not_meaningful(numerator.period_id, formula_id, inputs)
-            return _available_result(
-                DerivedValue(
-                    numerator.period_id,
-                    formula_id,
-                    numerator_value / denominator_value * HUNDRED,
-                ),
-                inputs,
-            )
-        case _:
-            raise TypeError("ratio inputs were not narrowed to available observations")
+    return _calculate_formula(
+        formula_id,
+        ((numerator_name, numerator), (denominator_name, denominator)),
+    )
 
 
 def calculate_revenue_yoy_growth(
@@ -189,61 +202,64 @@ def calculate_operating_margin(
     operating_income: MetricObservation,
     revenue: MetricObservation,
 ) -> MetricObservation:
-    return _calculate_ratio(operating_income, revenue, "operating_margin")
+    return _calculate_ratio(
+        "operating_income", operating_income, "revenue", revenue, "operating_margin"
+    )
 
 
 def calculate_net_margin(
     net_income: MetricObservation,
     revenue: MetricObservation,
 ) -> MetricObservation:
-    return _calculate_ratio(net_income, revenue, "net_margin")
+    return _calculate_ratio("net_income", net_income, "revenue", revenue, "net_margin")
 
 
 def calculate_free_cash_flow(
     operating_cash_flow: MetricObservation,
     normalized_capex: MetricObservation,
 ) -> MetricObservation:
-    formula_id = "free_cash_flow"
-    inputs = (operating_cash_flow, normalized_capex)
-    blocked = _prepare_inputs(operating_cash_flow.period_id, formula_id, inputs)
-    if blocked is not None:
-        return blocked
-
-    match operating_cash_flow, normalized_capex:
-        case AvailableObservation(normalized_value=cash_flow), AvailableObservation(
-            normalized_value=capex
-        ):
-            return _available_result(
-                DerivedValue(
-                    operating_cash_flow.period_id,
-                    formula_id,
-                    cash_flow + capex,
-                ),
-                inputs,
-            )
-        case _:
-            raise TypeError("cash-flow inputs were not narrowed to available observations")
+    return _calculate_formula(
+        "free_cash_flow",
+        (
+            ("operating_cash_flow", operating_cash_flow),
+            ("capital_expenditure", normalized_capex),
+        ),
+    )
 
 
 def calculate_free_cash_flow_margin(
     free_cash_flow: MetricObservation,
     revenue: MetricObservation,
 ) -> MetricObservation:
-    return _calculate_ratio(free_cash_flow, revenue, "free_cash_flow_margin")
+    return _calculate_ratio(
+        "free_cash_flow",
+        free_cash_flow,
+        "revenue",
+        revenue,
+        "free_cash_flow_margin",
+    )
 
 
 def calculate_debt_ratio(
     total_liabilities: MetricObservation,
     total_assets: MetricObservation,
 ) -> MetricObservation:
-    return _calculate_ratio(total_liabilities, total_assets, "debt_ratio")
+    return _calculate_ratio(
+        "total_liabilities",
+        total_liabilities,
+        "total_assets",
+        total_assets,
+        "debt_ratio",
+    )
 
 
 def calculate_net_debt_ratio(
     net_debt: MetricObservation,
     total_assets: MetricObservation,
 ) -> MetricObservation:
-    return _calculate_ratio(net_debt, total_assets, "net_debt_ratio")
+    return _calculate_ratio(
+        "net_debt", net_debt, "total_assets", total_assets, "net_debt_ratio"
+    )
 
 
 def calculate_total_debt(
@@ -313,19 +329,13 @@ def calculate_net_debt(
     total_debt: MetricObservation,
     cash_and_short_term_investments: MetricObservation,
 ) -> MetricObservation:
-    formula_id = "net_debt"
-    inputs = (total_debt, cash_and_short_term_investments)
-    blocked = _prepare_inputs(total_debt.period_id, formula_id, inputs)
-    if blocked is not None:
-        return blocked
-
-    match total_debt, cash_and_short_term_investments:
-        case AvailableObservation(normalized_value=debt), AvailableObservation(
-            normalized_value=cash
-        ):
-            return _available_result(
-                DerivedValue(total_debt.period_id, formula_id, debt - cash),
-                inputs,
-            )
-        case _:
-            raise TypeError("net-debt inputs were not narrowed to available observations")
+    return _calculate_formula(
+        "net_debt",
+        (
+            ("total_debt", total_debt),
+            (
+                "cash_and_short_term_investments",
+                cash_and_short_term_investments,
+            ),
+        ),
+    )

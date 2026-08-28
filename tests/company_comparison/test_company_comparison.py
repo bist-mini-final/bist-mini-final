@@ -58,6 +58,7 @@ def _snapshot(
     liabilities: Decimal,
     assets: Decimal,
     net_debt: Decimal,
+    fiscal_year_end_month: int = 12,
 ) -> BiDashboardSnapshot:
     periods = tuple(
         BiPeriod(
@@ -65,7 +66,11 @@ def _snapshot(
             kind=PeriodKind.FY,
             label=str(year),
             source_label=f"FY {year}",
-            end_date=datetime(year, 12, 31).date(),
+            end_date=datetime(
+                year,
+                fiscal_year_end_month,
+                31 if fiscal_year_end_month in {3, 12} else 30,
+            ).date(),
             ordinal=index,
         )
         for index, year in enumerate(sorted(values), start=1)
@@ -337,6 +342,27 @@ def test_calculator_combines_actuals_with_2026_to_2028_forecasts(snapshots) -> N
 def test_calculator_rejects_missing_common_period(snapshots) -> None:
     with pytest.raises(ComparisonDataError, match="공통으로 존재"):
         calculate_comparison(snapshots, 2020, 2025)
+
+
+def test_calculator_reports_calendar_quarter_alignment_difference(snapshots) -> None:
+    march_company = _snapshot(
+        "company-c",
+        "March Company",
+        {2021: (Decimal("150"), Decimal("15")), 2025: (Decimal("250"), Decimal("25"))},
+        liabilities=Decimal("80"),
+        assets=Decimal("200"),
+        net_debt=Decimal("10"),
+        fiscal_year_end_month=3,
+    )
+
+    result = calculate_comparison((snapshots[0], march_company), 2021, 2025)
+
+    assert result.alignment_warnings == (
+        "2021년 회계기간은 글로벌 달력 분기로 정규화했으며 결산 시점이 서로 다릅니다 "
+        "(Company A=2021-Q4, March Company=2021-Q1).",
+        "2025년 회계기간은 글로벌 달력 분기로 정규화했으며 결산 시점이 서로 다릅니다 "
+        "(Company A=2025-Q4, March Company=2025-Q1).",
+    )
 
 
 def test_league_combines_three_real_companies_with_fifteen_temporary_companies(

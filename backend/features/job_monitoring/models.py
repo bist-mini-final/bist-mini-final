@@ -21,6 +21,26 @@ class KubernetesResourceSummary(BaseModel):
     message: str | None = None
 
 
+class WorkflowLeaseSummary(BaseModel):
+    run_id: str
+    workflow_id: str
+    queue_name: str
+    status: str
+    worker_id: str | None = None
+    priority: int
+    attempt_count: int = Field(ge=0)
+    available_at: datetime
+    claimed_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    heartbeat_age_seconds: float | None = Field(default=None, ge=0)
+    lease_ttl_seconds: float | None = Field(default=None, ge=0)
+    lease_stale: bool = False
+    cancel_requested: bool = False
+    created_at: datetime
+    updated_at: datetime
+    kubernetes_resource: str | None = None
+
+
 class KubernetesWorkloadSnapshot(BaseModel):
     available: bool
     source: Literal["in_cluster", "kubectl", "unavailable"]
@@ -30,7 +50,14 @@ class KubernetesWorkloadSnapshot(BaseModel):
     scaled_jobs: list[KubernetesResourceSummary] = Field(default_factory=list)
     jobs: list[KubernetesResourceSummary] = Field(default_factory=list)
     pods: list[KubernetesResourceSummary] = Field(default_factory=list)
+    queue_available: bool = False
+    workflow_runs: list[WorkflowLeaseSummary] = Field(default_factory=list)
+    queue_error: str | None = None
     error: str | None = None
 
 
-__all__ = ["KubernetesResourceSummary", "KubernetesWorkloadSnapshot"]
+__all__ = [
+    "KubernetesResourceSummary",
+    "KubernetesWorkloadSnapshot",
+    "WorkflowLeaseSummary",
+]

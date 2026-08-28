@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -70,7 +71,9 @@ def test_reader_tool_calling_execution():
     reader = ReaderModule(completion_client=mock_llm, pgvector_store=mock_store)
     input_dto = ReaderInputDTO(
         context_json=ContextDTO(
-            query_context=QueryContextDTO(question_id="q1", question_text="삼성전자 2023년 영업이익은?"),
+            query_context=QueryContextDTO(
+                question_id="q1", question_text="삼성전자 2023년 영업이익은?"
+            ),
             document_context=DocumentContextDTO(
                 file_name="samsung.xlsx",
                 workbook_hash="hash123",
@@ -139,3 +142,92 @@ def test_reader_math_tool_calling_execution():
 
     res = reader.execute(input_dto)
     assert "432.97%" in res["answer_json"]["answer"]
+
+
+def test_reader_native_async_response_path() -> None:
+    mock_llm = MagicMock()
+    mock_llm.create_response_async = AsyncMock(
+        return_value=OpenAIResponseResult(
+            response_id="resp_async_reader",
+            content="비동기 답변입니다. [Sheet: 손익계산서 | Cell: B10]",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            latency_seconds=0.05,
+        )
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    input_dto = ReaderInputDTO(
+        context_json=ContextDTO(
+            query_context=QueryContextDTO(question_id="q3", question_text="답변해줘"),
+            document_context=DocumentContextDTO(
+                file_name="sample.xlsx",
+                workbook_hash="hash-async",
+                sheet_names=["손익계산서"],
+            ),
+            items=["근거"],
+        )
+    )
+
+    result = asyncio.run(reader.run_async(input_dto))
+
+    assert result["answer_json"]["answer"].startswith("비동기 답변")
+    mock_llm.create_response_async.assert_awaited_once()
+
+
+def test_reader_native_async_cell_lookup_tool_path() -> None:
+    mock_llm = MagicMock()
+    mock_llm.create_response_async = AsyncMock(
+        side_effect=[
+            OpenAIResponseResult(
+                response_id="resp_async_lookup",
+                content="",
+                usage={"prompt_tokens": 10, "completion_tokens": 5},
+                latency_seconds=0.02,
+                function_calls=(
+                    {
+                        "call_id": "call_async_lookup",
+                        "name": "lookup_cell_metadata",
+                        "arguments": '{"cell_coords": ["B10"]}',
+                    },
+                ),
+            ),
+            OpenAIResponseResult(
+                response_id="resp_async_answer",
+                content="비동기 조회 결과는 70,000억원입니다. [Sheet: 손익계산서 | Cell: B10]",
+                usage={"prompt_tokens": 20, "completion_tokens": 8},
+                latency_seconds=0.03,
+            ),
+        ]
+    )
+    store = MagicMock()
+    store.fetch_cells_by_metadata_async = AsyncMock(
+        return_value=[
+            {
+                "cell_coord": "B10",
+                "sheet_name": "손익계산서",
+                "company_name": "삼성전자",
+                "cell_value": "70,000억원",
+                "row_header": ["영업이익"],
+                "column_header": ["2024"],
+                "source_text": "영업이익 | 2024 | Cell Value: 70,000억원",
+            }
+        ]
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=store)
+    input_dto = ReaderInputDTO(
+        context_json=ContextDTO(
+            query_context=QueryContextDTO(question_id="q4", question_text="영업이익은?"),
+            document_context=DocumentContextDTO(
+                file_name="sample.xlsx",
+                workbook_hash="hash-async",
+                company_name="삼성전자",
+                sheet_names=["손익계산서"],
+            ),
+            items=["근거"],
+        )
+    )
+
+    result = asyncio.run(reader.run_async(input_dto))
+
+    assert "70,000억원" in result["answer_json"]["answer"]
+    store.fetch_cells_by_metadata_async.assert_awaited_once()
+    store.fetch_cells_by_metadata.assert_not_called()

@@ -55,6 +55,8 @@ cp .env.example .env
 OPENAI_API_KEY=sk-your-key
 OPENAI_BASE_URL=https://api.openai.com/v1
 PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
+# Multi-Pod SSE relay is optional for a single local API process.
+REDIS_URL=
 ```
 
 백엔드는 API 키 없이도 시작되지만 Query Decomposer, Luna 구조 감지, BI 질문 처리 등 OpenAI를 호출하는 기능은 실패합니다. `.env`와 `frontend/.env*`는 Git에서 제외되어 있으므로 실제 키를 커밋하지 마세요.
@@ -143,6 +145,7 @@ curl http://localhost:8765/readyz
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 호환 API 주소 |
 | `DATABASE_URL` | 없음 | 설정하면 `PGVECTOR_URL`보다 우선하는 PostgreSQL 접속 문자열 |
 | `PGVECTOR_URL` | `postgresql://postgres:postgres@localhost:5432/rag_flow` | PostgreSQL/pgvector 및 큐 저장소 주소 |
+| `REDIS_URL` | 없음 | 설정 시 API Pod 간 SSE 상태 변경 알림용 Redis Pub/Sub 주소. 상태 원본은 계속 PostgreSQL이며 Redis 장애 시 0.5초 폴링으로 안전하게 대체 |
 | `USE_PGVECTOR` | `true` | `true`, `1`, `yes`일 때 pgvector 사용 |
 | `DB_POOL_MIN_SIZE` | `2` | 백엔드 프로세스의 최소 DB 연결 수 |
 | `DB_POOL_MAX_SIZE` | 템플릿 `10`, 미설정 시 `50` | 백엔드 프로세스의 최대 DB 연결 수 |
@@ -188,6 +191,7 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require
 - 접속 계정에는 확장 및 스키마를 준비할 권한이 필요합니다.
 - 특수문자가 포함된 사용자명과 비밀번호는 URL 인코딩해야 합니다.
 - `deploy/kubernetes/local.sh`는 `KUBERNETES_DATABASE_URL` → `DATABASE_URL` → `PGVECTOR_URL` 순으로 클러스터 DB를 선택합니다. 개발용 `.env`가 원격 DB를 가리키더라도, 로컬 k3d 실행에만 `KUBERNETES_DATABASE_URL`을 지정해 분리할 수 있습니다.
+- 원격 DB를 선택한 경우 스크립트는 마이그레이션이나 기존 로컬 PostgreSQL 컨테이너 중지 전에 인증 연결과 `SELECT 1`을 확인합니다. 검증에 실패하면 기존 로컬 DB와 클러스터를 유지한 채 중단합니다.
 
 ## 5. 비동기 워커 실행
 
@@ -206,7 +210,7 @@ Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
 ./deploy/kubernetes/local.sh status
 ```
 
-`all`은 도구 확인, Python 동기화, pgvector 및 Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Secret·ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
+`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·4개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
 
 개발용 `.env`의 `DATABASE_URL`이 원격 DB를 가리킬 때 로컬 DB로 실행하려면 다음처럼 한 번만 재정의합니다.
 
@@ -248,7 +252,25 @@ KUBERNETES_FRONTEND_IMAGE=registry.example.com/bist/frontend:2026.08.27 \
   ./deploy/kubernetes/local.sh deploy
 ```
 
-### 5.2 워커를 로컬에서 한 번 실행하기
+### 5.2 운영 배포: Helm Chart
+
+운영·스테이징은 [`deploy/helm/bist/`](deploy/helm/bist/) Chart를 기준으로 배포합니다. Secret은 Chart 값에 넣지 않고, 애플리케이션용 `bist-batch-env`와 KEDA PostgreSQL 트리거 전용 `bist-keda-postgresql`을 네임스페이스에 먼저 생성합니다. 운영용 RWX PVC도 `bist-data` 이름으로 사전에 준비해야 합니다.
+
+```bash
+kubectl create namespace bist-batch
+kubectl -n bist-batch create secret generic bist-batch-env \
+  --from-literal=PGVECTOR_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' \
+  --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY"
+kubectl -n bist-batch create secret generic bist-keda-postgresql \
+  --from-literal=PGVECTOR_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE'
+helm upgrade --install bist ./deploy/helm/bist \
+  --namespace bist-batch \
+  --values ./deploy/helm/bist/values.yaml
+```
+
+로컬 k3d 검증용 값은 `values-k3d.yaml`이며, 호스트 경로와 단일 replica를 사용하므로 운영에 사용하지 않습니다. Chart는 Redis, schema migration hook, API/UI deployment, 4개 KEDA ScaledJob 및 `TriggerAuthentication`을 함께 렌더링합니다.
+
+### 5.3 워커를 로컬에서 한 번 실행하기
 
 Kubernetes 없이 큐 동작을 디버깅할 때 사용할 수 있습니다. 각 명령은 현재 큐에서 작업을 가져와 한 번 처리한 뒤 종료합니다.
 

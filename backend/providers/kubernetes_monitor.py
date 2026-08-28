@@ -10,16 +10,26 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from time import monotonic
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 import httpx
 
 from backend.features.job_monitoring import (
     KubernetesResourceSummary,
     KubernetesWorkloadSnapshot,
+    WorkflowLeaseSummary,
 )
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
+
+
+class WorkflowLeaseReader(Protocol):
+    def list_active_workflow_leases(
+        self,
+        *,
+        stale_after_seconds: int = 180,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]: ...
 
 
 def _condition(status: Mapping[str, Any], condition_type: str) -> Mapping[str, Any]:
@@ -147,10 +157,14 @@ class KubernetesMonitor:
         namespace: str | None = None,
         command_runner: CommandRunner = subprocess.run,
         cache_seconds: float = 2.0,
+        queue_reader: WorkflowLeaseReader | None = None,
+        lease_stale_seconds: int = 180,
     ) -> None:
         self.namespace = namespace or os.getenv("KUBERNETES_NAMESPACE", "bist-batch")
         self._command_runner = command_runner
         self._cache_seconds = max(0.0, cache_seconds)
+        self._queue_reader = queue_reader
+        self._lease_stale_seconds = max(1, lease_stale_seconds)
         self._cache_lock = Lock()
         self._cached_at = 0.0
         self._cached: KubernetesWorkloadSnapshot | None = None
@@ -174,6 +188,9 @@ class KubernetesMonitor:
                 context, items = self._kubectl_items()
                 source = "kubectl"
             resources = [resource for item in items if (resource := _resource(item))]
+            queue_available, workflow_runs, queue_error = self._workflow_leases(
+                resources
+            )
             return KubernetesWorkloadSnapshot(
                 available=True,
                 source=source,
@@ -183,15 +200,61 @@ class KubernetesMonitor:
                 scaled_jobs=[item for item in resources if item.kind == "ScaledJob"],
                 jobs=[item for item in resources if item.kind == "Job"],
                 pods=[item for item in resources if item.kind == "Pod"],
+                queue_available=queue_available,
+                workflow_runs=workflow_runs,
+                queue_error=queue_error,
             )
         except Exception as error:
+            queue_available, workflow_runs, queue_error = self._workflow_leases([])
             return KubernetesWorkloadSnapshot(
                 available=False,
                 source="unavailable",
                 namespace=self.namespace,
                 collected_at=datetime.now(UTC),
+                queue_available=queue_available,
+                workflow_runs=workflow_runs,
+                queue_error=queue_error,
                 error=f"{type(error).__name__}: {str(error)[:220]}",
             )
+
+    def _workflow_leases(
+        self,
+        resources: list[KubernetesResourceSummary],
+    ) -> tuple[bool, list[WorkflowLeaseSummary], str | None]:
+        if self._queue_reader is None:
+            return False, [], "queue reader is not configured"
+        resource_names = tuple(resource.name for resource in resources)
+        try:
+            rows = self._queue_reader.list_active_workflow_leases(
+                stale_after_seconds=self._lease_stale_seconds,
+                limit=100,
+            )
+            leases: list[WorkflowLeaseSummary] = []
+            for row in rows:
+                worker_id = row.get("worker_id")
+                matching_resources = (
+                    name
+                    for name in resource_names
+                    if isinstance(worker_id, str)
+                    and (
+                        name == worker_id
+                        or name.startswith(worker_id)
+                        or worker_id.startswith(name)
+                    )
+                )
+                matched_resource = max(
+                    matching_resources,
+                    key=lambda name: (name == worker_id, len(name)),
+                    default=None,
+                )
+                leases.append(
+                    WorkflowLeaseSummary.model_validate(
+                        {**row, "kubernetes_resource": matched_resource}
+                    )
+                )
+            return True, leases, None
+        except Exception as error:
+            return False, [], f"{type(error).__name__}: {str(error)[:220]}"
 
     def _in_cluster_items(self) -> tuple[str, list[Mapping[str, Any]]]:
         host = os.environ["KUBERNETES_SERVICE_HOST"]
@@ -255,4 +318,4 @@ class KubernetesMonitor:
         return [item for item in payload["items"] if isinstance(item, Mapping)]
 
 
-__all__ = ["KubernetesMonitor"]
+__all__ = ["KubernetesMonitor", "WorkflowLeaseReader"]

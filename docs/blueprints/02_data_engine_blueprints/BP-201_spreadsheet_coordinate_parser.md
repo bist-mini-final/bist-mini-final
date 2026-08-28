@@ -107,8 +107,8 @@ flowchart TD
 
 ## 5. 리팩토링 타깃 (Refactoring Targets)
 
-1. **대용량 시트 메모리 최적화**:
-   - As-Is: OpenPyXL 전체 메모리 로드 (`load_workbook(data_only=True)`). 100MB 이상 엑셀에서 메모리 스파이크 발생 가능.
-   - To-Be: `read_only=True` 스트리밍 파서 도입 및 청크 단위 이터레이터 패턴 적용.
-2. **수식(Formula) 보존 옵션**:
-   - `data_only=False`와 `data_only=True`를 듀얼 로드하여 계산된 값과 원본 엑셀 수식(`=SUM(C2:C4)`)을 동시 보존하는 메타데이터 확장.
+1. **구현됨 — 대용량 시트 읽기 경로**:
+   - 워크북 카탈로그, 인제스천, 기업 엔터티 추출과 첨부 파일 파서는 `load_workbook(read_only=True, data_only=True)`로 순차 읽기를 사용합니다. 대형 파일은 업로드 제한(500MB)과 worker 단위 실행으로 추가 격리합니다.
+   - 렌더링이 필요한 VLM 구조 감지 경로는 이미지·수식 좌표 접근을 위해 일반 workbook 객체를 사용하므로, 해당 경로의 메모리 상한을 별도로 계측·개선하는 일은 남아 있습니다.
+2. **구현됨 — 수식/값 듀얼 보존**:
+   - `LunaVlmStructureDetector`는 `data_only=False`와 `data_only=True` workbook을 함께 열어 원본 수식과 계산값을 동시에 참조합니다. 따라서 수식 문서화와 값 기반 인덱싱을 같은 분석 결과에 결합할 수 있습니다.

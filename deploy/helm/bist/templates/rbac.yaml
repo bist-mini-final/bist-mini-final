@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "bist.fullname" . }}-backend
+  labels:
+    {{- include "bist.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "bist.fullname" . }}-workload-reader
+  labels:
+    {{- include "bist.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["keda.sh"]
+    resources: ["scaledjobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "bist.fullname" . }}-workload-reader
+  labels:
+    {{- include "bist.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bist.fullname" . }}-backend
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "bist.fullname" . }}-workload-reader

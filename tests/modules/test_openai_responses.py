@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import httpx
 
+from backend.providers.openai_provider import OpenAIProvider
 from backend.providers.openai_responses import OpenAIResponsesClient
 
 
@@ -131,3 +133,43 @@ def test_responses_client_extracts_function_calls() -> None:
             "arguments": '{"key":"value"}',
         },
     )
+
+
+def test_responses_client_async_path_uses_async_transport() -> None:
+    captured: dict[str, object] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_async",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "done"}],
+                    }
+                ],
+                "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+            },
+        )
+
+    async def scenario() -> None:
+        http_client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+        provider = OpenAIProvider(api_key="test", async_http_client=http_client)
+        client = OpenAIResponsesClient(provider=provider)
+        try:
+            result = await client.create_response_async(
+                model="gpt-5.6-luna",
+                input_items=[{"role": "user", "content": "answer"}],
+            )
+        finally:
+            await http_client.aclose()
+            provider.close()
+
+        assert result.response_id == "resp_async"
+        assert result.content == "done"
+        assert captured["input"] == [{"role": "user", "content": "answer"}]
+
+    asyncio.run(scenario())

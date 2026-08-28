@@ -1,6 +1,6 @@
 # [BP-701] 아키텍처 불변식 계약 테스트 & 벤치마크
-> **Document Code:** `BP-701` | **Category:** Validation & Benchmark Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py), [`backend/features/benchmark/service.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/service.py), [`tests/`](file:///c:/Repos/bist-mini-final/tests/)
+> **Document Code:** `BP-701` | **Category:** Validation & Benchmark Blueprint | **Status:** Implemented & Operational
+> **Source Files:** [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py), [`tests/modules/test_workflow_http_queue_sse_integration.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_workflow_http_queue_sse_integration.py), [`tests/modules/test_redis_state_stream_integration.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_redis_state_stream_integration.py), [`.github/workflows/ci.yml`](file:///c:/Repos/bist-mini-final/.github/workflows/ci.yml)
 
 ---
 
@@ -90,17 +90,25 @@ uv run ruff check .
 uv run pyright
 ```
 
+### 현재 CI 통합 범위
+
+GitHub Actions의 backend job은 PostgreSQL/pgvector와 Redis 서비스를 함께 기동하고 Alembic migration 후 전체 pytest를 실행합니다. 이 과정에는 다음 실사용 경로가 포함됩니다.
+
+1. HTTP 워크플로 저장·큐 등록 → one-shot worker 처리 → `/api/v1/runs/{run_id}/stream` 종료 이벤트까지의 PostgreSQL 통합 계약
+2. 서로 다른 `SharedStateStream` 인스턴스가 Redis Pub/Sub 알림을 받고, 60초 polling을 기다리지 않고 저장 상태를 다시 읽는 멀티 API Pod 시뮬레이션
+3. Kubernetes ScaledJob renderer가 네 개의 유효한 `ScaledJob` 문서를 생성하는지 확인
+
 ---
 
 ## 5. 리팩토링 타깃 (Refactoring Targets)
 
 1. **신규 기능 및 모듈 추가 시 단위 테스트 동반 확장 (Test Suite Co-Evolution)**:
-   - **원칙**: 향후 신규 파이프라인 모듈(예: `DocumentProfilerModule`, `FinancialCalculatorModule`)이나 신규 비즈니스 기능(AI 챗봇 세션, 다중 기업 비교, 반정밀도 양자화 등) 추가 시, 반드시 **모듈별 독립 단위 테스트(`tests/modules/test_*.py`)와 입출력 Pydantic 핀아웃 계약 검증 테스트를 의무적으로 동반 추가**합니다.
+   - **원칙**: 향후 신규 파이프라인 모듈(예: `DocumentProfilerModule`, `FinancialCalculatorModule`)이나 신규 비즈니스 기능(AI 챗봇 세션, 다중 기업 비교, 벡터 양자화 등) 추가 시, 반드시 **모듈별 독립 단위 테스트(`tests/modules/test_*.py`)와 입출력 Pydantic 핀아웃 계약 검증 테스트를 의무적으로 동반 추가**합니다.
    - **AST 아키텍처 규칙 확장**: 신규 레이어나 컴포넌트가 추가될 때마다 `test_architecture_contracts.py`에 불변식(Layer Inversion 차단 규칙)을 즉시 갱신하여 아키텍처 드리프트를 0%로 유지합니다.
    - **벤치마크 데이터셋 동기화**: 신규 도메인 수식 및 시나리오에 대한 Ground-Truth 정답 Q&A 데이터셋을 확충하여 릴리즈 전 회귀(Regression) 여부를 정량 검증합니다.
-2. **비동기 E2E 통합 테스트 자동화 (Full-Cycle Test Harness)**:
-   - As-Is: 개별 모듈 및 도메인 단위 테스트 위주.
-   - To-Be: FastAPI HTTP 호출 ➡️ 분산 워커 큐 디스패치 ➡️ PostgreSQL pgvector Binary COPY ➡️ SSE 스트리밍 수신까지 이어지는 엔드투엔드 비동기 통합 테스트 스위트 구축.
-3. **GitHub Actions CI/CD 검증 파이프라인 연동**:
-   - 모든 PR 및 커밋 푸시 시 `AST 검증` + `단위 테스트` + `Pyright 타입 검사` + `Ruff 린트`를 병렬 자동 실행하여 머지 전 무결성을 자동 보장.
-
+2. **구현됨 — 비동기 핵심 흐름 통합 테스트**:
+   - FastAPI HTTP 호출 → PostgreSQL durable queue → one-shot worker → SSE terminal event와 Redis 멀티 Pod 상태 알림을 자동 검증합니다.
+   - 실제 PostgreSQL을 사용하는 `AsyncConnectionPool` 재사용·쿼리·반환과 `TaskGroup` 병렬 상태 병합을 검증합니다. Native async leaf가 sync `execute()`를 우회하는 실행기 계약, Decomposer/Router/Reader의 async Responses, Query Embedder의 async embedding, data scope·dense/keyword Retriever·context expansion·Reader 셀 조회 도구의 async port 호출도 각각 회귀 검사합니다.
+   - 파일 업로드부터 실제 OpenAI 임베딩과 Binary COPY까지의 전체 연결은 외부 API 비용·키가 필요하므로 현재 CI의 결정론적 기본 경로에는 넣지 않았습니다. 별도 통합 환경에서 확장할 대상입니다.
+3. **구현됨 — GitHub Actions CI**:
+   - `dev`, `main`의 push/PR에서 migration, pytest, Ruff, Pyright, ScaledJob render, 프론트엔드 typecheck·Vitest·build를 자동 실행합니다.

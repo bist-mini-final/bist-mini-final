@@ -70,6 +70,7 @@ class PostgresBiStore:
                         "VALUES (%s, %s, %s, %s) "
                         "ON CONFLICT (company_id) DO UPDATE SET "
                         "display_name = EXCLUDED.display_name, "
+                        "is_deleted = FALSE, deleted_at = NULL, "
                         "updated_at = EXCLUDED.updated_at",
                         (
                             request.company_id,
@@ -128,7 +129,8 @@ class PostgresBiStore:
                     cursor.execute(
                         "INSERT INTO bi_companies (company_id, display_name) "
                         "VALUES (%s, %s) ON CONFLICT (company_id) DO UPDATE SET "
-                        "display_name = EXCLUDED.display_name, updated_at = NOW()",
+                        "display_name = EXCLUDED.display_name, is_deleted = FALSE, "
+                        "deleted_at = NULL, updated_at = NOW()",
                         (company.company_id, company.display_name),
                     )
                 connection.commit()
@@ -196,6 +198,7 @@ class PostgresBiStore:
                         "UPDATE bi_companies SET display_name = %s, "
                         "current_snapshot_id = %s, updated_at = %s "
                         "WHERE company_id = %s "
+                        "AND is_deleted = FALSE "
                         "AND (updated_at IS NULL OR updated_at <= %s)",
                         (
                             snapshot.company.display_name,
@@ -216,7 +219,8 @@ class PostgresBiStore:
 
     def get_company(self, company_id: CompanyId) -> BiCompany | None:
         row = self._fetchone(
-            "SELECT company_id, display_name FROM bi_companies WHERE company_id = %s",
+            "SELECT company_id, display_name FROM bi_companies "
+            "WHERE company_id = %s AND is_deleted = FALSE",
             (company_id,),
             "get_company",
         )
@@ -224,7 +228,7 @@ class PostgresBiStore:
 
     def list_companies(self) -> tuple[BiCompanyIndexEntry, ...]:
         company_rows = self._fetchall(
-            "SELECT company_id, display_name, current_snapshot_id "
+            "SELECT company_id, display_name, current_snapshot_id, is_deleted "
             "FROM bi_companies ORDER BY display_name, company_id",
             (),
             "list_companies",
@@ -244,6 +248,12 @@ class PostgresBiStore:
         persisted = {
             self._company_key(str(row["display_name"])): row
             for row in company_rows
+            if not bool(row["is_deleted"])
+        }
+        deleted_keys = {
+            self._company_key(str(row["display_name"]))
+            for row in company_rows
+            if bool(row["is_deleted"])
         }
         def _source_priority(row: dict[str, object]) -> tuple[int, str]:
             file_name = str(row.get("file_name") or "").casefold()
@@ -254,6 +264,8 @@ class PostgresBiStore:
         latest_sources: dict[str, dict[str, object]] = {}
         for row in source_rows:
             key = self._company_key(str(row["display_name"]))
+            if key in deleted_keys:
+                continue
             current = latest_sources.get(key)
             if current is None or _source_priority(row) > _source_priority(current):
                 latest_sources[key] = row
@@ -327,7 +339,7 @@ class PostgresBiStore:
             "SELECT snapshot.snapshot_payload FROM bi_companies company "
             "JOIN bi_dashboard_snapshots snapshot "
             "ON snapshot.snapshot_id = company.current_snapshot_id "
-            "WHERE company.company_id = %s",
+            "WHERE company.company_id = %s AND company.is_deleted = FALSE",
             (company_id,),
             "get_current",
         )
@@ -343,7 +355,7 @@ class PostgresBiStore:
             "SELECT company.company_id, snapshot.snapshot_payload "
             "FROM bi_companies company JOIN bi_dashboard_snapshots snapshot "
             "ON snapshot.snapshot_id = company.current_snapshot_id "
-            "WHERE company.company_id = ANY(%s)",
+            "WHERE company.company_id = ANY(%s) AND company.is_deleted = FALSE",
             (list(company_ids),),
             "get_current_many",
         )
@@ -361,8 +373,10 @@ class PostgresBiStore:
         snapshot_id: SnapshotId,
     ) -> BiDashboardSnapshot | None:
         row = self._fetchone(
-            "SELECT snapshot_payload FROM bi_dashboard_snapshots "
-            "WHERE company_id = %s AND snapshot_id = %s",
+            "SELECT snapshot.snapshot_payload FROM bi_dashboard_snapshots snapshot "
+            "JOIN bi_companies company ON company.company_id = snapshot.company_id "
+            "WHERE snapshot.company_id = %s AND snapshot.snapshot_id = %s "
+            "AND company.is_deleted = FALSE",
             (company_id, snapshot_id),
             "get_snapshot",
         )
@@ -429,6 +443,34 @@ class PostgresBiStore:
             if row is not None
             else None
         )
+
+    def soft_delete_company(
+        self,
+        company_id: CompanyId,
+        *,
+        actor_id: str = "system",
+        request_id: str | None = None,
+    ) -> bool:
+        """Hide a company while preserving snapshots and a recoverable audit trail."""
+        try:
+            with get_pooled_raw_connection(self._database_url) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT set_config('app.audit_actor_id', %s, TRUE), "
+                        "set_config('app.audit_request_id', %s, TRUE)",
+                        (actor_id[:128], (request_id or "")[:128]),
+                    )
+                    cursor.execute(
+                        "UPDATE bi_companies SET is_deleted = TRUE, "
+                        "deleted_at = NOW(), updated_at = NOW() "
+                        "WHERE company_id = %s AND is_deleted = FALSE",
+                        (company_id,),
+                    )
+                    deleted = cursor.rowcount == 1
+                connection.commit()
+        except psycopg2.Error as error:
+            raise BiPostgresStoreError("soft_delete_company", str(error)) from error
+        return deleted
 
     def claim_next_materialization(
         self,

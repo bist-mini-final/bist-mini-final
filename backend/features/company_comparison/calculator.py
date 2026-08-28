@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal, Mapping
 
+from backend.features.bi.calendar_periods import (
+    CalendarQuarter,
+    index_fiscal_periods_by_calendar_year,
+)
 from backend.features.bi.models import (
     AvailableObservation,
     BiDashboardSnapshot,
@@ -47,23 +51,46 @@ class CalculatedComparison:
     companies: tuple[ComparisonCompanyResult, ...]
     evidence: tuple[SnapshotEvidenceItem, ...]
     stability_basis_year: int
-
-
-def _period_year(period: BiPeriod) -> int | None:
-    if period.kind.value != "fy":
-        return None
-    if period.end_date is not None:
-        return period.end_date.year
-    match = "".join(character for character in period.label if character.isdigit())[:4]
-    return int(match) if len(match) == 4 else None
+    alignment_warnings: tuple[str, ...] = ()
 
 
 def _period_by_year(snapshot: BiDashboardSnapshot) -> dict[int, BiPeriod]:
     return {
-        year: period
-        for period in snapshot.periods
-        if (year := _period_year(period)) is not None
+        year: normalized.source
+        for year, normalized in index_fiscal_periods_by_calendar_year(
+            snapshot.periods
+        ).items()
     }
+
+
+def _calendar_alignment_warnings(
+    snapshots: tuple[BiDashboardSnapshot, ...],
+    selected_years: tuple[int, ...],
+) -> tuple[str, ...]:
+    alignments = {
+        str(snapshot.company.company_id): index_fiscal_periods_by_calendar_year(
+            snapshot.periods
+        )
+        for snapshot in snapshots
+    }
+    warnings: list[str] = []
+    for year in selected_years:
+        company_axes: list[str] = []
+        quarters: set[CalendarQuarter] = set()
+        for snapshot in snapshots:
+            normalized = alignments[str(snapshot.company.company_id)].get(year)
+            if normalized is None or normalized.calendar_period.quarter is None:
+                continue
+            quarters.add(normalized.calendar_period.quarter)
+            company_axes.append(
+                f"{snapshot.company.display_name}={normalized.calendar_period.axis_label}"
+            )
+        if len(quarters) > 1:
+            warnings.append(
+                f"{year}년 회계기간은 글로벌 달력 분기로 정규화했으며 결산 시점이 "
+                f"서로 다릅니다 ({', '.join(company_axes)})."
+            )
+    return tuple(warnings)
 
 
 def _available(
@@ -263,7 +290,10 @@ def calculate_comparison(
                 )
 
     return CalculatedComparison(
-        tuple(results), tuple(evidence_items), stability_basis_year
+        tuple(results),
+        tuple(evidence_items),
+        stability_basis_year,
+        _calendar_alignment_warnings(snapshots, selected_years),
     )
 
 

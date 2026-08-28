@@ -20,6 +20,7 @@ from starlette import status
 
 from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
 from backend.core.state_stream import SharedStateStream
+from backend.core.state_stream_broker import StateStreamBroker
 
 from .api_models import (
     BiCompanyListResponse,
@@ -66,7 +67,11 @@ REFRESH_PERIODS_UNAVAILABLE: Final = "dashboard periods are unavailable"
 IdentifierPath = Annotated[str, Path(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", description="기업 또는 작업 식별자")]
 
 
-def create_bi_router(services: BiApiServices) -> APIRouter:
+def create_bi_router(
+    services: BiApiServices,
+    *,
+    state_stream_broker: StateStreamBroker | None = None,
+) -> APIRouter:
     """Create and configure the FastAPI router for enterprise BI analytics endpoints.
 
     Args:
@@ -119,6 +124,8 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
             MaterializationStatus.PARTIAL,
             MaterializationStatus.FAILED,
         ),
+        broker=state_stream_broker,
+        topic_prefix="bi-materialization",
     )
     question_stream = SharedStateStream(
         load_question_progress,
@@ -131,6 +138,8 @@ def create_bi_router(services: BiApiServices) -> APIRouter:
         terminal=lambda progress: (
             progress.queued_questions == 0 and progress.running_questions == 0
         ),
+        broker=state_stream_broker,
+        topic_prefix="bi-question-job",
     )
 
     @router.get(

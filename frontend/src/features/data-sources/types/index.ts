@@ -28,6 +28,10 @@ export interface DbStatusInfo {
   pgvector_version?: string;
   total_indexes: number;
   total_chunks: number;
+  vector_index_strategy?: 'binary_quantized_hnsw_exact_rerank';
+  vector_index_count?: number;
+  partition_strategy?: 'collection_local_partial_indexes';
+  embedding_table_partitioned?: boolean;
   error?: string;
 }
 

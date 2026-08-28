@@ -80,8 +80,9 @@ __VOLUME_BLOCK__
   triggers:
     - type: postgresql
       metadata:
-        connectionFromEnv: PGVECTOR_URL
         targetQueryValue: "1"
         activationTargetQueryValue: "0"
         query: >-
 __QUERY_BLOCK__
+      authenticationRef:
+        name: bist-postgresql

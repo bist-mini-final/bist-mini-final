@@ -4,6 +4,7 @@ import { jobsApi } from './api';
 import type {
   KubernetesResourceSummary,
   KubernetesWorkloadSnapshot,
+  WorkflowLeaseSummary,
 } from './types';
 import './jobs.css';
 
@@ -74,6 +75,39 @@ function ResourceTable({
   );
 }
 
+function duration(value: number | null): string {
+  if (value == null) return '-';
+  return value >= 60 ? `${Math.floor(value / 60)}분 ${Math.round(value % 60)}초` : `${Math.round(value)}초`;
+}
+
+function LeaseTable({ runs }: { runs: WorkflowLeaseSummary[] }) {
+  return (
+    <section className="jobs-panel">
+      <header className="jobs-panel__header">
+        <div><h2>Workflow Queue / Lease</h2><p>PostgreSQL 작업과 Kubernetes 워커 소유권 상관관계</p></div>
+        <span className="jobs-count">{runs.length}</span>
+      </header>
+      <div className="jobs-table-wrap">
+        <table className="jobs-table jobs-table--leases">
+          <thead><tr><th>Run / Workflow</th><th>Queue</th><th>상태</th><th>Worker / K8s</th><th>Heartbeat / TTL</th><th>시도</th></tr></thead>
+          <tbody>
+            {runs.length === 0 ? <tr><td className="jobs-table__empty" colSpan={6}>현재 활성 큐 작업이 없습니다.</td></tr> : runs.map((run) => (
+              <tr key={run.run_id}>
+                <td><strong>{run.run_id}</strong><small>{run.workflow_id}</small></td>
+                <td>{run.queue_name}<small>priority {run.priority}</small></td>
+                <td><span className="jobs-status" data-status={run.lease_stale ? 'failed' : run.status.toLowerCase()}>{run.lease_stale ? 'Lease stale' : run.status}</span>{run.cancel_requested ? <small>취소 요청됨</small> : null}</td>
+                <td>{run.worker_id ?? '-'}<small>{run.kubernetes_resource ?? 'K8s 미연결'}</small></td>
+                <td>{duration(run.heartbeat_age_seconds)} 경과<small>TTL {duration(run.lease_ttl_seconds)} · {formattedTime(run.heartbeat_at)}</small></td>
+                <td>{run.attempt_count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function JobsView() {
   const [snapshot, setSnapshot] = useState<KubernetesWorkloadSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +168,13 @@ export function JobsView() {
         </div>
       )}
 
+      {snapshot && !snapshot.queue_available && (
+        <div className="jobs-alert jobs-alert--warning" role="status">
+          <CircleAlert size={18} />
+          <div><strong>큐/Lease 상태를 확인할 수 없습니다.</strong><span>{snapshot.queue_error ?? 'PostgreSQL 조회 실패'}</span></div>
+        </div>
+      )}
+
       <section className="jobs-summary" aria-label="Kubernetes 상태 요약">
         <article><Boxes size={18} /><span>전체 리소스<strong>{total}</strong></span></article>
         <article><CheckCircle2 size={18} /><span>Ready<strong>{ready}</strong></span></article>
@@ -145,6 +186,8 @@ export function JobsView() {
         <span>Namespace <strong>{snapshot?.namespace ?? 'bist-batch'}</strong></span>
         <span>Context <strong>{snapshot?.context ?? '-'}</strong></span>
       </div>
+
+      <LeaseTable runs={snapshot?.workflow_runs ?? []} />
 
       <ResourceTable
         title="KEDA ScaledJobs"

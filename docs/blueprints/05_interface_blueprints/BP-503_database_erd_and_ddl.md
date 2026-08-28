@@ -103,7 +103,7 @@ erDiagram
     langchain_pg_embedding {
         varchar id PK "청크 고유 식별자"
         uuid collection_id FK "langchain_pg_collection.uuid"
-        vector embedding "3072차원 float32 벡터"
+        vector embedding "컬렉션 메타데이터로 차원을 검증하는 float32 벡터"
         varchar document "단일 표준 직렬화 텍스트 (header_with_value)"
         jsonb cmetadata "셀 좌표 및 계층 헤더 메타데이터"
     }
@@ -130,7 +130,7 @@ erDiagram
         varchar log_id PK "노드 실행 로그 UUID"
         varchar run_id FK "workflow_runs.run_id"
         varchar node_id "DAG 노드 식별자"
-        varchar module_type "21개 모듈 타입명"
+        varchar module_type "19개 등록 모듈 타입명"
         int batch_index "위상 정렬 배치 번호"
         varchar status "상태 (completed/failed)"
         jsonb input_payload "노드 입력 데이터"
@@ -169,7 +169,7 @@ erDiagram
         varchar snapshot_id PK "스냅샷 UUID (snap-...)"
         varchar company_id FK "bi_companies.company_id"
         char workbook_hash "대상 엑셀 워크북 해시"
-        jsonb snapshot_payload "40+ 지표 시계열 및 근거 셀 전체 JSON"
+        jsonb snapshot_payload "현재 21개 근거 기반 지표 시계열 및 근거 셀 JSON"
         timestamptz generated_at "산출 일시"
         timestamptz created_at "저장 일시"
     }
@@ -231,9 +231,9 @@ erDiagram
 
 | 워크플로우 유형 | `workflow_id` 식별자 | `queue_name` | 주요 실행 내용 및 입출력 (`inputs` / `outputs`) | 연계 테이블 / 워크스페이스 |
 | :--- | :--- | :--- | :--- | :--- |
-| **Playground DAG 실험** | `wf-interactive-playground` | `workflow-core` | • 21개 모듈 임의 2D 결선 그래프 비동기 실행<br>• `inputs`: 사용자 질의, 노드별 파라미터<br>• `outputs`: 각 노드별 중간 산출물 맵 | `node_execution_logs`<br>([`BP-401`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)) |
+| **Playground DAG 실험** | `wf-interactive-playground` | `workflow-core` | • 19개 등록 모듈 임의 2D 결선 그래프 비동기 실행<br>• `inputs`: 사용자 질의, 노드별 파라미터<br>• `outputs`: 각 노드별 중간 산출물 맵 | `node_execution_logs`<br>([`BP-401`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md)) |
 | **엑셀 인제스천 파이프라인** | `wf-excel-ingestion` | `workflow-ingest` | • Luna VLM 표 감지, 직렬화, 3072d 임베딩, Binary COPY<br>• `inputs`: `file_id`, `sheet_names`<br>• `outputs`: `persisted_vectors_count`, `artifact_id` | `source_files`, `sheets`<br>([`BP-402`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-402_ws_data_sources_management.md)) |
-| **재무 BI 자동 분석** | `wf-financial-bi-analytics` | `workflow-bi` | • 프로파일링(기간/단위 탐색) ➡️ 40+ 지표 질의 ➡️ 수식 계산<br>• `inputs`: `company_name`, `workbook_hash`<br>• `outputs`: 기간별 40개 파생비율 및 스냅샷 ID | `bi_questions`, `bi_answers`<br>([`BP-403`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md)) |
+| **재무 BI 자동 분석** | `wf-financial-bi-analytics` | `workflow-bi` | • 프로파일링(기간/단위 탐색) ➡️ 현재 21개 근거 기반 지표 질의 ➡️ 수식 계산<br>• `inputs`: `company_name`, `workbook_hash`<br>• `outputs`: 기간별 파생 비율과 스냅샷 ID | `bi_questions`, `bi_answers`<br>([`BP-403`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md)) |
 | **정확도 벤치마크 평가** | `wf-accuracy-benchmark` | `workflow-benchmark` | • Ground-Truth Q&A 데이터셋 대량 배치 평가<br>• `inputs`: `dataset_path`, `target_pipeline_config`<br>• `outputs`: Recall@K, Exact Match율, 평균 레이턴시 | `benchmark_runs`<br>(Benchmark Evaluation) |
 | **AI 챗봇 추론 세션** | `wf-ai-chatbot-session` | `workflow-fast` | • 사용자 멀티턴 금융 질의에 대한 Fast RAG 및 에이전틱 리즈너 실행<br>• `inputs`: `session_id`, `user_prompt`<br>• `outputs`: 생성 답변, 인용 셀 목록 | `node_execution_logs`<br>(AI Chatbot Session) |
 
@@ -282,18 +282,22 @@ CREATE TABLE IF NOT EXISTS langchain_pg_collection (
 CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
     id VARCHAR PRIMARY KEY,
     collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
-    embedding VECTOR(3072),
-    document VARCHAR NOT NULL,
-    cmetadata JSONB NOT NULL DEFAULT '{}'::jsonb
+    embedding VECTOR,
+    document VARCHAR,
+    cmetadata JSONB
 );
 
-CREATE INDEX IF NOT EXISTS idx_embedding_hnsw 
-ON langchain_pg_embedding 
-USING hnsw (embedding vector_cosine_ops) 
-WITH (m = 16, ef_construction = 64);
+-- PgVectorStore가 컬렉션 발행 전에 UUID/차원별로 생성한다.
+CREATE INDEX CONCURRENTLY idx_lc_hnsw_bq_c_{collection_uuid}_{dimension}
+ON langchain_pg_embedding
+USING hnsw (
+    (binary_quantize(embedding)::bit({dimension})) bit_hamming_ops
+)
+WHERE collection_id = '{collection_uuid}'::uuid
+  AND vector_dims(embedding) = {dimension};
 
-CREATE INDEX IF NOT EXISTS idx_embedding_metadata_gin 
-ON langchain_pg_embedding 
+CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_cmetadata
+ON langchain_pg_embedding
 USING gin (cmetadata jsonb_path_ops);
 
 CREATE INDEX IF NOT EXISTS idx_source_files_hash ON source_files(file_hash);
@@ -468,5 +472,8 @@ CREATE TABLE IF NOT EXISTS benchmark_results (
    - `migrations/versions/20260827_0001_schema_baseline.py`가 기존 설치를 데이터 삭제 없이 채택합니다.
    - CI와 배포 전 `alembic upgrade head`를 실행하며, 서버 시작 시 raw SQL 확인은 구버전 호환 안전망으로만 유지합니다.
    - 데이터 손실을 유발하는 기준선 downgrade는 차단하고, 이후 변경은 별도 revision에서 명시적인 안전 롤백 여부를 결정합니다.
-2. **소프트 삭제(Soft Delete) 및 감사 로그(Audit Log)**:
-   - `source_files`, `bi_companies`에 `is_deleted`, `deleted_at` 컬럼 추가 및 데이터 변경 이력 테이블(`audit_logs`) 구축.
+2. **구현됨 — 소프트 삭제(Soft Delete) 및 감사 로그(Audit Log)**:
+   - `20260828_0002_soft_delete_audit.py`가 `source_files`, `bi_companies`에 `is_deleted`, `deleted_at`과 active partial index를 추가합니다. 신규 설치 DDL에도 동일 계약이 포함됩니다.
+   - 일반 조회는 삭제된 BI 기업을 제외하며 동일 ID를 다시 등록하면 복구됩니다. 원천 파일 메타데이터 삭제도 물리 행 삭제 대신 soft-delete로 기록합니다.
+   - `audit_logs`는 두 엔티티의 INSERT/UPDATE/DELETE 전후 JSON을 DB trigger로 자동 수집합니다. 감사 테이블 자체의 UPDATE/DELETE는 별도 trigger가 거부하며 actor/request correlation을 세션 context로 보존합니다.
+   - 감사 이력을 지우는 downgrade는 의도적으로 차단합니다.

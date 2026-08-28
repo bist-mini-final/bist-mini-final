@@ -113,8 +113,10 @@ stateDiagram-v2
 
 ## 4. 리팩토링 타깃 (Refactoring Targets)
 
-1. **비동기 asyncio 전면 전환**:
-   - As-Is: `WorkflowExecutor` 내부가 멀티스레딩(`RLock`, `ThreadPoolExecutor`) 기반 동기 실행 중심.
-   - To-Be: `asyncio.TaskGroup` 기반의 네이티브 비동기 DAG 스케줄러로 리팩토링하여 동시 처리 성능 4배 향상.
-2. **조건부 분기(Conditional Branching / Switch Node)**:
-   - 라우터 모듈의 결정에 따라 특정 서브그래프만 활성화하고 다른 브랜치를 우아하게 건너뛰는 조건부 엣지(Conditional Edges) 지원.
+1. **구현됨 — 비동기 asyncio 실행 엔진 및 핵심 질의 체인**:
+   - 동일 위상 배치의 노드는 `asyncio.TaskGroup`으로 병렬 실행합니다. 각 노드는 깊은 복사 상태를 사용하고 완료 후 공유 상태에 잠금 병합하여 lost update를 방지합니다.
+   - 실행기는 `BaseModuleRegistry.execute_async()`를 직접 await합니다. Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구는 네이티브 provider/DB await 경로를 사용하고, 동기 모듈은 `asyncio.to_thread()` 호환 경계를 사용합니다.
+   - 하드 타임아웃이 설정된 배치는 Unix signal 기반 강제 제한을 보존하기 위해 순차 실행합니다. Windows에서는 signal hard-timeout을 사용할 수 없어 동일 순차 경로에서 협력적 취소 계약을 적용합니다.
+   - 특정 배수의 성능 향상은 문서상 가정으로 두지 않고, 실제 워크로드 벤치마크 결과로 검증합니다.
+2. **구현됨 — 조건부 분기(Conditional Branching / Switch Node)**:
+   - `WorkflowEdge.source_branch`, 모듈의 `branch_outputs`, 실행 결과 `outcome` 계약으로 활성 edge를 선택합니다. 비활성 브랜치의 downstream 노드는 입력 준비 판정에서 제외되며 Playground도 branch handle과 실행 상태를 표시합니다.

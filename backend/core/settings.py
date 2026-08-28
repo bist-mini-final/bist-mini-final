@@ -32,6 +32,7 @@ KUBERNETES_WORKFLOW_QUEUE = os.getenv(
     "KUBERNETES_WORKFLOW_QUEUE",
     "workflow-core",
 )
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
 
 # PostgreSQL + pgvector Configuration
 DATABASE_URL = os.getenv(

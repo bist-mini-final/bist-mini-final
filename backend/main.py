@@ -14,7 +14,8 @@ from backend.api.system_routes import create_system_router
 from backend.api.versioning import API_V1_PREFIX, API_VERSION, LEGACY_API_PREFIX
 from backend.bootstrap.container import ApplicationContainer
 from backend.bootstrap.lifecycle import create_lifespan
-from backend.core.settings import DEV_CORS_ORIGINS
+from backend.core.settings import DEV_CORS_ORIGINS, REDIS_URL
+from backend.core.state_stream_broker import create_state_stream_broker
 from backend.features.bi.api_routes import register_bi_exception_handlers
 
 
@@ -22,6 +23,7 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     """Compose the HTTP application around one explicit service container."""
 
     shared_container = container or ApplicationContainer.create()
+    state_stream_broker = create_state_stream_broker(REDIS_URL)
     application = FastAPI(
         title="BIST 엔터프라이즈 RAG 파이프라인 & BI 엔진 API",
         version=API_VERSION,
@@ -30,9 +32,13 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
-        lifespan=create_lifespan(shared_container),
+        lifespan=create_lifespan(
+            shared_container,
+            on_shutdown=(state_stream_broker.aclose if state_stream_broker else None),
+        ),
     )
     application.state.container = shared_container
+    application.state.state_stream_broker = state_stream_broker
     application.openapi = lambda: custom_openapi_schema(application, shared_container)
 
     application.add_middleware(
@@ -46,7 +52,10 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     register_bi_exception_handlers(application)
 
     application.include_router(create_system_router())
-    api_router = create_api_router(shared_container)
+    api_router = create_api_router(
+        shared_container,
+        state_stream_broker=state_stream_broker,
+    )
     application.include_router(api_router, prefix=API_V1_PREFIX)
     application.include_router(
         api_router,

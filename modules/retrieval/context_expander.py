@@ -36,6 +36,7 @@ from __future__ import annotations
 # ==============================================================================
 # 1. Imports & Logger Setup
 # ==============================================================================
+import asyncio
 import logging
 import re
 from collections import defaultdict
@@ -44,7 +45,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import Field
 
-from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
     BaseModule,
     DocumentContextDTO,
@@ -58,6 +58,7 @@ from modules.common.config import (
     DEFAULT_PG_CONTEXT_TOP_K,
     DEFAULT_PG_MAX_BLOCKS,
 )
+from modules.retrieval.ports import ContextExpansionStorePort
 from modules.retrieval.rrf_fusion import RetrievalDTO
 
 logger = logging.getLogger(__name__)
@@ -69,9 +70,7 @@ logger = logging.getLogger(__name__)
 class ContextDTO(ModuleDTO):
     """Structured context output carrying full-row timeseries documents."""
 
-    query_context: QueryContextDTO = Field(
-        description="Reader까지 보존되는 원본 질문 컨텍스트"
-    )
+    query_context: QueryContextDTO = Field(description="Reader까지 보존되는 원본 질문 컨텍스트")
     document_context: DocumentContextDTO = Field(
         description="컨텍스트 블록이 추출된 원본 문서 컨텍스트"
     )
@@ -83,6 +82,7 @@ class ContextDTO(ModuleDTO):
         default_factory=list,
         description="Reader 및 다운스트림에서 증거로 사용할 수 있는 확장 셀들의 메타데이터 목록",
     )
+
 
 class PgContextExpanderInputDTO(ModuleInputDTO):
     """Input contract containing retrieved search results."""
@@ -118,7 +118,9 @@ class PgContextExpanderConfigDTO(ModuleConfigDTO):
 # ==============================================================================
 # 3. Coordinate Helper Functions
 # ==============================================================================
-def _parse_cell_id_coords(cell_id: str, text: str = "") -> Tuple[str, str, Optional[int], Optional[int]]:
+def _parse_cell_id_coords(
+    cell_id: str, text: str = ""
+) -> Tuple[str, str, Optional[int], Optional[int]]:
     """Parses cell_id string and candidate text into (company, sheet_name, row_idx, col_idx)."""
     company = ""
     sheet = ""
@@ -188,14 +190,45 @@ class PgContextExpanderModule(BaseModule):
     config_model = PgContextExpanderConfigDTO
     output_model = ContextDTO
 
-    def __init__(self, pgvector_store: PgVectorStore) -> None:
+    def __init__(self, pgvector_store: ContextExpansionStorePort) -> None:
         super().__init__()
         self.pgvector_store = pgvector_store
+
+    @staticmethod
+    def _target_rows(
+        retrieval_items: List[Any],
+        cfg: PgContextExpanderConfigDTO,
+    ) -> Dict[Tuple[str, str], Set[int]]:
+        target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
+        for candidate in retrieval_items:
+            _, sheet, row_index, _ = _parse_cell_id_coords(
+                candidate.cell_id,
+                candidate.text,
+            )
+            if candidate.index_id and sheet and row_index is not None:
+                scope_key = (candidate.index_id, sheet)
+                if cfg.adjacent_radius and cfg.adjacent_radius > 0:
+                    for row in range(
+                        max(1, row_index - cfg.adjacent_radius),
+                        row_index + cfg.adjacent_radius + 1,
+                    ):
+                        target_rows_by_scope[scope_key].add(row)
+                else:
+                    target_rows_by_scope[scope_key].add(row_index)
+        return target_rows_by_scope
 
     def execute(
         self,
         input_data: PgContextExpanderInputDTO,
         config: Optional[PgContextExpanderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        return self._render(input_data, config, None)
+
+    def _render(
+        self,
+        input_data: PgContextExpanderInputDTO,
+        config: Optional[PgContextExpanderConfigDTO],
+        prefetched_rows: Optional[Dict[Tuple[str, str], Dict[int, List[Dict[str, Any]]]]],
     ) -> Dict[str, Any]:
         cfg = config or PgContextExpanderConfigDTO()
         retrieval_items = input_data.retrieval_json.items[: cfg.top_k]
@@ -236,26 +269,20 @@ class PgContextExpanderModule(BaseModule):
                 )
 
         # Step 2: Target the exact rows for all candidate cells
-        target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
-        for candidate in retrieval_items:
-            _, sheet, r_idx, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
-            if candidate.index_id and sheet and r_idx is not None:
-                scope_key = (candidate.index_id, sheet)
-                if cfg.adjacent_radius and cfg.adjacent_radius > 0:
-                    radius = cfg.adjacent_radius
-                    for r in range(max(1, r_idx - radius), r_idx + radius + 1):
-                        target_rows_by_scope[scope_key].add(r)
-                else:
-                    target_rows_by_scope[scope_key].add(r_idx)
+        target_rows_by_scope = self._target_rows(retrieval_items, cfg)
 
         if target_rows_by_scope:
             for (collection_name, sheet), row_indices in target_rows_by_scope.items():
-                rows_by_index = self.pgvector_store.fetch_rows_cells(
-                    collection_name=collection_name,
-                    workbook_hash=None,
-                    sheet_name=sheet,
-                    row_indices=sorted(row_indices),
-                    limit_per_row=100,
+                rows_by_index = (
+                    prefetched_rows.get((collection_name, sheet), {})
+                    if prefetched_rows is not None
+                    else self.pgvector_store.fetch_rows_cells(
+                        collection_name=collection_name,
+                        workbook_hash=None,
+                        sheet_name=sheet,
+                        row_indices=sorted(row_indices),
+                        limit_per_row=100,
+                    )
                 )
                 for r_idx in sorted(row_indices):
                     rows = rows_by_index.get(r_idx, [])
@@ -278,7 +305,9 @@ class PgContextExpanderModule(BaseModule):
                                 raw_text,
                             )
                         if not raw_text:
-                            c_name = cell.get("company_name") or doc_context_dict.get("company_name", "")
+                            c_name = cell.get("company_name") or doc_context_dict.get(
+                                "company_name", ""
+                            )
                             s_name = cell.get("sheet_name") or sheet
                             rh = (
                                 " > ".join(cell["row_header"])
@@ -338,6 +367,35 @@ class PgContextExpanderModule(BaseModule):
             "items": context_blocks,
             "cells": expanded_cells,
         }
+
+    async def execute_async(
+        self,
+        input_data: PgContextExpanderInputDTO,
+        config: Optional[PgContextExpanderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or PgContextExpanderConfigDTO()
+        retrieval_items = input_data.retrieval_json.items[: cfg.top_k]
+        targets = self._target_rows(retrieval_items, cfg)
+        tasks: Dict[
+            Tuple[str, str],
+            asyncio.Task[Dict[int, List[Dict[str, Any]]]],
+        ] = {}
+        async with asyncio.TaskGroup() as task_group:
+            tasks = {
+                (collection_name, sheet): task_group.create_task(
+                    self.pgvector_store.fetch_rows_cells_async(
+                        collection_name=collection_name,
+                        workbook_hash=None,
+                        sheet_name=sheet,
+                        row_indices=sorted(row_indices),
+                        limit_per_row=100,
+                    ),
+                    name=f"context-rows:{collection_name}:{sheet}",
+                )
+                for (collection_name, sheet), row_indices in targets.items()
+            }
+        prefetched_rows = {scope: task.result() for scope, task in tasks.items()}
+        return self._render(input_data, cfg, prefetched_rows)
 
 
 # ==============================================================================

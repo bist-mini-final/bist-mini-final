@@ -12,6 +12,30 @@ from backend.api.job_routes import create_job_router
 from backend.providers.kubernetes_monitor import KubernetesMonitor
 
 
+class FakeQueueReader:
+    def list_active_workflow_leases(self, **_: Any) -> list[dict[str, Any]]:
+        return [
+            {
+                "run_id": "run-1",
+                "workflow_id": "workflow-1",
+                "queue_name": "workflow-core",
+                "status": "running",
+                "worker_id": "workflow-core-abc",
+                "priority": 10,
+                "attempt_count": 2,
+                "available_at": "2026-08-27T00:00:00Z",
+                "claimed_at": "2026-08-27T00:00:05Z",
+                "heartbeat_at": "2026-08-27T00:00:10Z",
+                "heartbeat_age_seconds": 5,
+                "lease_ttl_seconds": 175,
+                "lease_stale": False,
+                "cancel_requested": False,
+                "created_at": "2026-08-27T00:00:00Z",
+                "updated_at": "2026-08-27T00:00:10Z",
+            }
+        ]
+
+
 def _runner(command: Sequence[str], **_: Any) -> subprocess.CompletedProcess[str]:
     if "current-context" in command:
         return subprocess.CompletedProcess(command, 0, "k3d-bist-local\n", "")
@@ -49,7 +73,11 @@ def _runner(command: Sequence[str], **_: Any) -> subprocess.CompletedProcess[str
 
 def test_kubectl_snapshot_is_normalized_for_the_read_only_portal(monkeypatch: Any) -> None:
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monitor = KubernetesMonitor(command_runner=_runner, cache_seconds=0)
+    monitor = KubernetesMonitor(
+        command_runner=_runner,
+        cache_seconds=0,
+        queue_reader=FakeQueueReader(),
+    )
 
     snapshot = monitor.snapshot()
 
@@ -59,6 +87,9 @@ def test_kubectl_snapshot_is_normalized_for_the_read_only_portal(monkeypatch: An
     assert snapshot.scaled_jobs[0].status == "Ready"
     assert snapshot.jobs[0].status == "Running"
     assert snapshot.pods[0].ready is True
+    assert snapshot.queue_available is True
+    assert snapshot.workflow_runs[0].lease_ttl_seconds == 175
+    assert snapshot.workflow_runs[0].kubernetes_resource == "workflow-core-abc"
 
 
 def test_monitor_failure_is_a_safe_snapshot(monkeypatch: Any) -> None:

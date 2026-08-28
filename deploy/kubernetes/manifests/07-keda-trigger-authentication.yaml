@@ -1,0 +1,12 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: bist-postgresql
+  namespace: bist-batch
+  labels:
+    app.kubernetes.io/part-of: bist-mini
+spec:
+  secretTargetRef:
+    - parameter: connection
+      name: bist-keda-postgresql
+      key: PGVECTOR_URL

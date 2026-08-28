@@ -216,15 +216,39 @@ raise SystemExit(0 if host in {"localhost", "127.0.0.1", "::1"} else 1)
 PY
 }
 
+verify_remote_database() {
+  local pg_url="$1"
+  "${PROJECT_PYTHON}" - "${pg_url}" <<'PY'
+import sys
+
+import psycopg
+
+url = sys.argv[1].replace("postgresql+psycopg://", "postgresql://", 1)
+try:
+    with psycopg.connect(url, connect_timeout=10) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+except Exception as error:
+    raise SystemExit(f"remote PostgreSQL connection verification failed: {error}")
+PY
+}
+
 start_database() {
   local pg_url
   pg_url="$(database_url)"
   if database_is_local; then
     docker compose -f "${PROJECT_ROOT}/deploy/compose/docker-compose.yml" up -d --wait
   else
-    # A remote PGVECTOR_URL makes the local container unnecessary. Preserve
-    # its named volume so switching back to local does not lose data.
-    docker compose -f "${PROJECT_ROOT}/deploy/compose/docker-compose.yml" down
+    # A configured remote endpoint can be a router/NAT alias that ultimately
+    # forwards to the local container. Never stop a healthy local database as
+    # a side effect of selecting a remote-looking URL: doing so can invalidate
+    # the endpoint between this probe and the migration, and creates avoidable
+    # local data downtime even for a genuinely independent remote database.
+    if ! verify_remote_database "${pg_url}"; then
+      echo "원격 PostgreSQL 연결 검증에 실패했습니다. 기존 로컬 DB는 변경하지 않았습니다." >&2
+      return 1
+    fi
+    echo "ℹ️  외부 PostgreSQL을 사용하며 로컬 DB 컨테이너 상태는 변경하지 않습니다."
   fi
   (
     cd "${PROJECT_ROOT}"
@@ -404,6 +428,10 @@ PY
     --from-literal=OPENAI_API_KEY="${openai_key}" \
     --from-literal=OPENAI_BASE_URL="${openai_base}" \
     --dry-run=client -o yaml | kubectl apply -f -
+  kubectl -n "${NAMESPACE}" create secret generic bist-keda-postgresql \
+    --from-literal=PGVECTOR_URL="${cluster_pg_url}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  kubectl apply -f "${DEPLOY_DIR}/manifests/07-keda-trigger-authentication.yaml"
   "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/render.py" \
     --max-replicas "${max_jobs}" \
     --image "${WORKER_IMAGE}" \
@@ -440,6 +468,8 @@ run_schema_migration() {
 
 apply_application() {
   kubectl apply -f "${DEPLOY_DIR}/manifests/01-backend-rbac.yaml"
+  kubectl apply -f "${DEPLOY_DIR}/manifests/06-redis.yaml"
+  kubectl rollout status deployment/bist-redis -n "${NAMESPACE}" --timeout=120s
   run_schema_migration
   kubectl apply -f "${DEPLOY_DIR}/manifests/02-backend.yaml"
   kubectl apply -f "${DEPLOY_DIR}/manifests/03-frontend.yaml"

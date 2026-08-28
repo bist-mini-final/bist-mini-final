@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import './ModuleSettingsModal.css';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,

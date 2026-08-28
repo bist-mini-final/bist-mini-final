@@ -1,6 +1,6 @@
 # [BP-502] SSE 실시간 파이프라인 스트리밍 규격서
-> **Document Code:** `BP-502` | **Category:** Interface & Streaming Protocol Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/)
+> **Document Code:** `BP-502` | **Category:** Interface & Streaming Protocol Blueprint | **Status:** Implemented & Operational
+> **Source Files:** [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/core/state_stream.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream.py), [`backend/core/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream_broker.py), [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/)
 
 ---
 
@@ -12,29 +12,35 @@
 sequenceDiagram
     autonumber
     actor Browser as Frontend Playground
-    participant FastAPISSE as GET /api/workflows/runs/{run_id}/stream
-    participant StreamPub as WorkflowRunStream (Subscription Bus)
-    participant Worker as Background Worker Process
+    participant FastAPISSE as GET /api/v1/runs/{run_id}/stream
+    participant StreamPub as SharedStateStream
+    participant Store as PostgreSQL State Store
+    participant Redis as Redis Pub/Sub (optional)
+    participant Worker as KEDA Worker Process
 
-    Browser->>FastAPISSE: GET /api/workflows/runs/{run_id}/stream (Accept: text/event-stream)
+    Browser->>FastAPISSE: GET /api/v1/runs/{run_id}/stream (Accept: text/event-stream)
     FastAPISSE->>StreamPub: subscribe(run_id)
+    StreamPub->>Store: load persisted run state
     FastAPISSE-->>Browser: HTTP 200 OK (Content-Type: text/event-stream)
     
     FastAPISSE-->>Browser: event: run_started\ndata: {"run_id": "...", "status": "running"}\n\n
     
     loop 노드 실행 중 (Node Execution)
-        Worker->>StreamPub: publish_node_update(node_id, status='running')
-        StreamPub-->>FastAPISSE: RunNodeState
+        Worker->>Store: persist node/run state update
+        StreamPub->>Store: refresh persisted state (0.5s fallback)
+        StreamPub->>Redis: publish change hint when configured
+        Redis-->>StreamPub: other API Pod receives change hint
+        StreamPub-->>FastAPISSE: persisted RunNodeState
         FastAPISSE-->>Browser: event: node_started\ndata: {"node_id": "node_vlm", "started_at": "..."}\n\n
         
-        Worker->>StreamPub: publish_node_update(node_id, status='completed', outputs={...})
-        StreamPub-->>FastAPISSE: RunNodeState
+        Worker->>Store: persist node status='succeeded', outputs={...}
+        StreamPub-->>FastAPISSE: refreshed RunNodeState
         FastAPISSE-->>Browser: event: node_completed\ndata: {"node_id": "node_vlm", "elapsed_ms": 1240.5, "outputs": {...}}\n\n
     end
 
-    Worker->>StreamPub: publish_run_completed(status='completed')
+    Worker->>Store: persist run status='completed'
     FastAPISSE-->>Browser: event: run_finished\ndata: {"status": "completed", "total_elapsed_ms": 3450.2}\n\n
-    FastAPISSE-->>Browser: event: close\ndata: {}\n\n
+    Note over StreamPub,Store: PostgreSQL is the source of truth. Redis sends no domain payload.
 ```
 
 ---
@@ -134,13 +140,13 @@ sequenceDiagram
 
 ## 3. 네트워크 재연결 및 하트비트 정책 (Keep-Alive & Reconnection)
 
-- **하트비트 (Keep-Alive Ping)**: 아무 이벤트가 발생하지 않더라도 TCP 프록시(Nginx, Cloudflare, Ingress)에 의한 타임아웃(60s) 방지를 위해 **15초마다 `: ping\n\n` 코멘트 프레임**을 자동 발송합니다.
-- **클라이언트 자동 재연결**: `EventSource` 연결이 끊어질 경우 브라우저는 3초 후 지수 백오프(Exponential Backoff)로 재연결을 시도합니다.
+- **하트비트 (Keep-Alive Ping)**: 아무 이벤트가 발생하지 않더라도 TCP 프록시(Nginx, Cloudflare, Ingress)에 의한 타임아웃을 줄이기 위해 **15초마다 `: ping\n\n` 코멘트 프레임**을 자동 발송합니다.
+- **클라이언트 자동 재연결**: 브라우저의 표준 `EventSource` 재연결 동작을 사용합니다. 클라이언트가 별도 재시도 간격을 제어해야 하면 UI 코드에서 명시적으로 구현합니다.
 
 ---
 
-## 4. 리팩토링 타깃 (Refactoring Targets)
+## 4. 다중 Pod 전달 보장 범위
 
-1. **Redis Pub/Sub 브로커 기반 SSE 분산 중계**:
-   - As-Is: 단일 서버 인메모리 `asyncio.Queue` 기반 `run_stream`.
-   - To-Be: 다중 백엔드 Pod 환경에서 Redis Pub/Sub 채널을 바인딩하여 워커 Pod와 API Pod가 달라도 완벽한 실시간 이벤트 라우팅 지원.
+1. **구현됨 — Redis Pub/Sub 변경 신호**: `REDIS_URL`이 설정되면 `SharedStateStream`이 `workflow-run:{run_id}`, `bi-materialization:{job_id}`, `bi-question-job:{job_id}` topic을 구독합니다. 다른 API Pod가 상태 변화를 감지하면 Pub/Sub 알림으로 즉시 저장 상태를 다시 읽습니다.
+2. **구현됨 — 상태 정합성 및 fallback**: Redis에는 run/job payload를 저장하지 않습니다. PostgreSQL의 실행·작업 레코드만 전달 기준이며, 구독/발행 실패 또는 Pub/Sub 메시지 유실 시 기존 0.5초 polling이 계속 동작합니다.
+3. **검증됨**: 단일 프로세스 팬아웃 테스트와 Redis를 사용한 두 `SharedStateStream` 인스턴스 간 알림 통합 테스트를 CI 서비스 컨테이너에서 실행합니다.

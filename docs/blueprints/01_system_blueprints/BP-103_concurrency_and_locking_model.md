@@ -12,17 +12,17 @@ Kubernetes 환경에서 수십 개의 Worker Pod가 단일 PostgreSQL `workflow_
 flowchart TD
     subgraph L1 ["Level 1: DB 행 수준 비차단 락 (FOR UPDATE SKIP LOCKED)"]
         P1["🛑 방어: Thundering Herd 및 작업 인출 대기 블로킹 방지"]
-        M1["💡 원리: 다른 워커가 선점한 행은 대기 없이 0.1ms 만에 건너뛰고 다음 작업 획득"]
+        M1["💡 원리: 다른 워커가 선점한 행은 대기하지 않고 건너뛰어 다음 작업 획득"]
     end
 
     subgraph L2 ["Level 2: 세션 분산 자문 락 (pg_try_advisory_lock)"]
         P2["🛑 방어: 트랜잭션 커밋 후 장기 실행 중(In-Flight) 경합 및 프로세스 크래시 데드락 방지"]
-        M2["💡 원리: 워커 TCP 세션과 바인딩되어, 워커 Pod가 OOM으로 죽으면 DB가 0초 만에 락 자동 반환"]
+        M2["💡 원리: 워커 TCP 세션과 바인딩되어, 세션 종료 시 DB가 락 자동 반환"]
     end
 
     subgraph L3 ["Level 3: 동적 세대 임차권 (Lease Token & Heartbeat)"]
         P3["🛑 방어: 좀비 워커의 늦은 덮어쓰기(Split-Brain) 및 고아(Stalled) 작업 방치 방지"]
-        M3["💡 원리: UUID 세대 토큰 검증 + 5초 주기 하트비트로 30초 무응답 시 자동 회수"]
+        M3["💡 원리: UUID 세대 토큰 검증 + 기본 15초 하트비트로 180초 무응답 시 자동 회수"]
     end
 
     L1 --> L2 --> L3
@@ -34,9 +34,9 @@ flowchart TD
 
 | 안전 계층 (Level) | 핵심 기술 및 프로토콜 | 🛑 해결하는 핵심 문제점 (Problem) | 💡 동작 원리 및 아키텍처 보장 (Guarantee) |
 | :--- | :--- | :--- | :--- |
-| **Level 1: 인출 경합 방지**<br>(Row-Level Non-Blocking) | `SELECT ... FOR UPDATE SKIP LOCKED` | • **Thundering Herd 병목**<br>• **워커 프로세스 전체 블로킹**<br>• **동일 작업 중복 인출(Double Claim)** | 여러 워커가 동시에 큐를 폴링해도, 다른 워커가 잠근 행을 대기하지 않고 **즉시 건너뛰어(Skip) 0.1ms 만에 다음 빈 작업을 획득**하므로 락 대기 시간 0초 달성 및 완전 수평 확장. |
-| **Level 2: 실행 중 상호 배제**<br>(Session-Level Advisory Lock) | `pg_try_advisory_lock(hashtext(...))` | • **트랜잭션 종료 후 실행 중 경합**<br>• **Redis 분산락 만료/TTL 데드락**<br>• **워커 OOM 크래시 시 락 잔존** | Level 1의 행 락은 `COMMIT` 즉시 풀리지만, Advisory Lock은 **파이프라인 실행(10~60초) 내내 세션 수준에서 유지**됨. 워커 Pod가 OOM/SIGKILL로 죽으면 **PostgreSQL 서버가 즉시 락을 0초 만에 자동 해제**하여 데드락 완전 배제. |
-| **Level 3: 스플릿 브레인 방어**<br>(Generation Token & Heartbeat) | `WorkflowRunLease` (UUID) & `LeaseHeartbeat` (5초 주기) | • **지연된 좀비 워커의 결과 덮어쓰기**<br>• **네트워크 파티션 Split-Brain**<br>• **무한 대기 고아(Orphaned) 작업** | 작업 인출 시 고유한 UUID 세대 토큰을 발급. 지연된 구형 워커가 뒤늦게 결과를 쓰려 해도 `WHERE run_id = :id AND lease_token = :token` 불일치로 **DB 단에서 덮어쓰기 원천 거부(Rows Affected=0)**. 30초 무응답 시 다른 워커가 안전하게 회수. |
+| **Level 1: 인출 경합 방지**<br>(Row-Level Non-Blocking) | `SELECT ... FOR UPDATE SKIP LOCKED` | • **Thundering Herd 병목**<br>• **워커 프로세스 전체 블로킹**<br>• **동일 작업 중복 인출(Double Claim)** | 여러 워커가 동시에 큐를 폴링해도 다른 워커가 잠근 행을 기다리지 않고 건너뛰어 다음 claim 후보를 찾습니다. 실제 지연시간은 PostgreSQL 부하와 네트워크에 따라 달라집니다. |
+| **Level 2: 실행 중 상호 배제**<br>(Session-Level Advisory Lock) | `pg_try_advisory_lock(hashtext(...))` | • **트랜잭션 종료 후 실행 중 경합**<br>• **Redis 분산락 만료/TTL 데드락**<br>• **워커 OOM 크래시 시 락 잔존** | Level 1의 행 락은 `COMMIT` 시 풀리지만 Advisory Lock은 파이프라인 실행 동안 세션 수준에서 유지됩니다. 워커 세션이 종료되면 PostgreSQL이 락을 자동 해제합니다. |
+| **Level 3: 스플릿 브레인 방어**<br>(Generation Token & Heartbeat) | `WorkflowRunLease` (UUID) & `LeaseHeartbeat` (기본 15초 주기) | • **지연된 좀비 워커의 결과 덮어쓰기**<br>• **네트워크 파티션 Split-Brain**<br>• **무한 대기 고아(Orphaned) 작업** | 작업 인출 시 고유한 UUID 세대 토큰을 발급합니다. 지연된 구형 워커가 결과를 쓰려 해도 `WHERE run_id = :id AND lease_token = :token` 불일치로 DB가 덮어쓰기를 거부합니다. 기본 180초 무응답 시 다른 워커가 안전하게 회수합니다. |
 
 ---
 
@@ -46,7 +46,7 @@ flowchart TD
 sequenceDiagram
     autonumber
     participant W as Worker Engine (Main Flow)
-    participant HB as Background Heartbeat Task
+    participant HB as LeaseHeartbeat Thread
     participant SSE as SSE Streamer (Hub)
     participant Client as React Client (UI)
     participant DB as PostgreSQL (workflow_runs)
@@ -65,42 +65,44 @@ sequenceDiagram
         W->>DB: finalize_workflow_run_claim(run_id, token, worker_id)
         DB->>DB: UPDATE workflow_runs SET status='running', lease_token=token, heartbeat_at=NOW()
         
-        Note over W,HB: 4. 백그라운드 하트비트 비동기 태스크 가동 (메인 루프 비간섭)
-        W->>HB: asyncio.create_task(heartbeat_loop(run_id, token, interval=5s))
+        Note over W,HB: 4. 전용 daemon thread에서 LeaseHeartbeat 가동
+        W->>HB: LeaseHeartbeat(..., interval_seconds=15).start()
         
-        par 메인 파이프라인 실행 & ⚡ 실시간 SSE 즉시 스트리밍 (0ms 지연)
+        par 메인 파이프라인 실행 및 durable 상태 저장
             W->>W: Module 1 (Decomposer) execute_async()
-            W->>SSE: emit('node_completed', node='decomposer')
-            SSE-->>Client: ⚡ SSE Event 수신 (UI 프로그레스 바 즉시 갱신)
+            W->>DB: save_workflow_node_state(node='decomposer')
+            SSE->>DB: load_summary() (기본 0.5초 polling)
+            SSE-->>Client: SSE node state 전송
             
-            W->>W: Module 2 (PgVectorRetriever) execute_async() (대기 없이 즉시 연속 실행!)
-            W->>SSE: emit('node_completed', node='retriever')
-            SSE-->>Client: ⚡ SSE Event 수신
+            W->>W: Module 2 (PgVectorRetriever) execute_async()
+            W->>DB: save_workflow_node_state(node='retriever')
+            SSE->>DB: load_summary()
+            SSE-->>Client: SSE node state 전송
         and 백그라운드 세대 갱신 (워커 돌연사 감지용)
-            loop 5초 주기
+            loop 기본 15초 주기
                 HB->>DB: UPDATE workflow_runs SET heartbeat_at=NOW() WHERE run_id=... AND lease_token=token
             end
         end
 
         Note over W,DB: 5. 정상 종료 및 락 해제
-        W->>HB: heartbeat_task.cancel()
+        W->>HB: heartbeat.stop()
         W->>DB: mark_workflow_completed(run_id, token, outputs)
         W->>DB: pg_advisory_unlock(...)
-        W->>SSE: emit('run_completed', outputs)
-        SSE-->>Client: 최종 결과 수신 및 화면 렌더링
+        SSE->>DB: load_summary()
+        SSE-->>Client: terminal 상태·최종 결과 전송
     end
 ```
 
 ---
 
-### 2.1 실시간 SSE 스트리밍과 백그라운드 Lease 하트비트의 역할 분담 (Zero-Bottleneck Architecture)
+### 2.1 SSE 상태 관찰과 백그라운드 Lease 하트비트의 역할 분담
 
-1. **실시간 모듈 진행 통보 (SSE Push ➡️ 지연 시간 0ms)**:
-   - 각 파이프라인 모듈(노드)이 완료되는 즉시 SSE 이벤트 버스로 `node_completed`, `progress`를 발행합니다.
-   - 다음 모듈 실행과 클라이언트 화면 갱신은 **하트비트 주기(5초)를 전혀 기다리지 않고 0.00ms 만에 즉시 연속 실행**됩니다.
+1. **모듈 진행 상태 관찰 (SSE + Redis 알림 + polling fallback)**:
+   - 각 파이프라인 모듈은 진행·완료 상태를 먼저 PostgreSQL에 영속화합니다. API의 `SharedStateStream`은 기본 0.5초 간격으로 변경을 읽고 SSE 구독자에게 fan-out합니다.
+   - 한 API Pod가 변경을 감지하면 Redis Pub/Sub로 다른 API Pod의 동일 구독을 깨워 다시 읽게 합니다. Redis 장애 시에도 0.5초 polling fallback을 유지하며, 문서에서 0ms 지연을 보장하지 않습니다.
 2. **백그라운드 임차권 하트비트 (Lease Liveness ➡️ 워커 돌연사 방어)**:
-   - 모듈 실행 흐름과 완전히 격리된 별도의 비동기 태스크(`asyncio.create_task`)에서 **5초마다 DB의 `heartbeat_at` 타임스탬프 1개만 가볍게 갱신**합니다.
-   - 워커 Pod가 메모리 부족(OOM)이나 노드 장애로 `SIGKILL` 증발하여 SSE 에러조차 못 보내고 사망했을 때, **다른 워커가 30초 무응답을 감지하여 고아 작업을 안전하게 회수하기 위한 순수 인프라 안전장치**입니다.
+   - 모듈 실행 흐름과 분리된 `LeaseHeartbeat` daemon thread가 기본 **15초마다** DB의 `heartbeat_at`을 갱신합니다. 갱신 거부·DB 예외가 발생하면 lease 상실로 기록하고 2초 grace 후 one-shot worker를 fail-closed 종료합니다.
+   - 워커 Pod가 OOM이나 노드 장애로 사망하면 다른 워커가 기본 **180초 무응답**을 감지하여 고아 작업을 안전하게 회수합니다.
 
 ---
 
@@ -120,7 +122,7 @@ stateDiagram-v2
     RUNNING --> FAILED : 3b. 파이프라인 내부 에러 발생
     RUNNING --> STALLED : 3c. 워커 Pod 크래시 (하트비트 갱신 중단)
     
-    STALLED --> RE_QUEUED : 4. 30초 초과 무응답 감지 후 강제 회수
+    STALLED --> RE_QUEUED : 4. 기본 180초 초과 무응답 감지 후 강제 회수
     RE_QUEUED --> RUNNING : 5. 신규 워커가 새 lease_token으로 재실행
     
     COMPLETED --> [*]
@@ -136,7 +138,7 @@ stateDiagram-v2
 | **① 작업 인출** | `QUEUED` | `RUNNING` | 워커가 `FOR UPDATE SKIP LOCKED` 선점 | `lease_token=UUID`, `heartbeat_at=NOW()` 기록 |
 | **② 정상 완료** | `RUNNING` | `COMPLETED` | 파이프라인 DAG 모든 노드 성공 | `status='completed'`, `outputs` JSON 영속화, 락 해제 |
 | **③ 실행 에러** | `RUNNING` | `FAILED` | 모듈 예외 발생 (ProviderApiError 등) | `status='failed'`, `error` JSON 및 스택트레이스 기록 |
-| **④ 스톨 감지** | `RUNNING` | `STALLED` | 워커 Pod 비정상 종료 (OOM/SIGKILL) | `heartbeat_at`이 30초 이상 갱신되지 않고 멈춤 |
+| **④ 스톨 감지** | `RUNNING` | `STALLED` | 워커 Pod 비정상 종료 (OOM/SIGKILL) | `heartbeat_at`이 기본 180초 이상 갱신되지 않고 멈춤 |
 | **⑤ 고아 회수** | `STALLED` | `RE_QUEUED` | 후속 워커가 스톨 작업 탐색 쿼리 실행 | 기존 토큰 무효화, `status='queued'`, 재시도 횟수 +1 |
 | **⑥ 작업 재개** | `RE_QUEUED` | `RUNNING` | 신규 정상 워커가 재임차 획득 | 신규 `lease_token` 재발급 후 1번 노드부터 안전 재실행 |
 
@@ -168,17 +170,17 @@ class WorkflowRunLease:
 
 | 장애 시나리오 (Scenario) | 감지 메커니즘 (Detection) | 자동 복구 절차 (Automated Recovery Sequence) | 운영자 수동 개입 지침 (Runbook Action) |
 | :--- | :--- | :--- | :--- |
-| **워커 Pod OOM / 노드 장애** | 5초 주기 하트비트 중단 ➡️ `heartbeat_at < NOW() - INTERVAL '30s'` | 1. PostgreSQL이 워커 세션의 `pg_advisory_lock`을 즉시 0초 해제.<br>2. 30초 경과 시 타 워커가 `STALLED` 상태 감지.<br>3. `reap_stalled_leases()`가 기존 토큰을 무효화하고 `status='queued'`로 전환. | k8s 워커 Pod의 메모리 리밋 증설 (`deploy/kubernetes/`) 및 `/jobs` 포털에서 큐 재유입 확인. |
+| **워커 Pod OOM / 노드 장애** | 기본 15초 주기 하트비트 중단 ➡️ `heartbeat_at`이 기본 180초 stale 임계값 초과 | 1. PostgreSQL이 종료된 워커 세션의 `pg_advisory_lock`을 자동 해제.<br>2. 180초 경과 시 타 워커가 stale lease를 감지.<br>3. `reap_stalled_leases()`가 기존 토큰을 무효화하고 `status='queued'`로 전환. | k8s 워커 Pod의 메모리 리밋 증설 (`deploy/kubernetes/`) 및 `/jobs` 포털에서 큐 재유입 확인. |
 | **PostgreSQL 일시적 연결 단절** | `psycopg2.OperationalError` 발생 | 1. 워커는 DB 업데이트 실패 시 `lease_token`을 상실한 것으로 간주하여 즉시 실행 중단.<br>2. 커넥션 풀이 지수 백오프(1s, 2s, 4s)로 재연결 시도. | DB 서버 리소스(CPU/메모리) 점유율 확인 및 `pg_stat_activity`에서 잔여 락 세션 점검. |
 | **OpenAI Responses API 429 (Rate-Limit)** | ProviderApiError (HTTP 429) 반환 | 1. `BaseLLMModule`이 `Retry-After` 헤더를 파싱하여 최대 5회 지수 백오프 자동 재시도.<br>2. 재시도 초과 시 에러 엔벨로프 포장 후 큐에 재등록. | OpenAI 티어 할당량(TPM/RPM) 모니터링 및 KEDA 동시 워커 수 상한(`maxReplicaCount`) 조정. |
-| **장기 실행 좀비 워커 발생** | 실행 시간이 `timeout_seconds` 초과 | 1. 워커 내부 비동기 타임아웃 트리거.<br>2. `cancel_requested=true` 플래그 감지 시 프로세스 안전 종료 및 롤백. | 필요 시 `/jobs` 관리자 콘솔에서 특정 `run_id`에 대해 강제 취소 명령(`POST /api/workflows/{id}/cancel`) 발행. |
+| **장기 실행 좀비 워커 발생** | 실행 시간이 `timeout_seconds` 초과 | 1. 워커 내부 비동기 타임아웃 트리거.<br>2. `cancel_requested=true` 플래그 감지 시 프로세스 안전 종료 및 롤백. | 워크플로 실행은 `POST /api/v1/runs/{run_id}/cancel`로 취소 요청합니다. `/jobs`는 현재 읽기 전용 관제 화면이며 취소 명령을 발행하지 않습니다. |
 
 ---
 
 ## 6. 리팩토링 타깃 및 주의사항 (Refactoring Targets)
 
-1. **Advisory Lock Key 해시 충돌 방지**:
-   - As-Is: `hashtext('workflow_run:' || run_id)`로 32비트/64비트 정수 변환. 극단적인 대규모 실행 시 해시 충돌 가능성.
-   - To-Be: 64비트 BigInt 해시 함수 또는 네임스페이스 분리형 `pg_advisory_xact_lock(class_id, obj_id)` 사용 권장.
-2. **PostgreSQL 커넥션 타임아웃 & 고아 세션**:
-   - 하트비트 갱신 실패 시 즉각적인 프로세스 자결(Self-Termination) 회로를 추가하여 Split-Brain 현상 방지.
+1. **구현됨 — Advisory Lock Key 해시 충돌 범위 축소**:
+   - workflow run lock은 `hashtextextended(..., 0)`의 64비트 키를 사용하고 전용 세션 종료로 lock 해제를 보장합니다. 컬렉션 publish의 트랜잭션 lock도 후속 정합성 개선 시 같은 64비트 방식으로 통일할 수 있습니다.
+2. **구현됨 — 하트비트 상실 fail-closed 회로**:
+   - `LeaseHeartbeat`는 갱신 거부 또는 DB 예외를 lease 상실로 기록합니다. 정상 terminal 갱신과의 race를 위한 2초 grace 안에 owner가 heartbeat를 정지하지 않으면 one-shot worker 프로세스를 종료하여 Split-Brain 실행을 차단합니다.
+   - workflow, benchmark, BI materialization, BI question worker가 동일한 중단 회로를 사용하며, 협력적 실행 경계에서는 `raise_if_lost()`로 결과 저장 전 소유권을 재검증합니다.

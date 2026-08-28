@@ -6,11 +6,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pydantic import BaseModel, Field
 
@@ -162,6 +163,55 @@ class BaseLLMModule(BaseModule):
         self.last_duration_seconds = latency
         return parsed, usage, cost, latency
 
+    async def complete_structured_async(
+        self,
+        messages_or_prompt: Union[str, List[Dict[str, str]]],
+        response_model: Type[T],
+        model: str,
+        system_prompt: Optional[str] = None,
+    ) -> Tuple[T, ApiUsageDTO, float, float]:
+        """Native async equivalent of :meth:`complete_structured`."""
+        if isinstance(messages_or_prompt, str):
+            messages: List[Dict[str, str]] = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": messages_or_prompt})
+        else:
+            messages = messages_or_prompt
+
+        schema_name = response_model.__name__[:64]
+        response_schema = self._structured_schema_cache.get(response_model)
+        if response_schema is None:
+            response_schema = self._strict_schema(response_model.model_json_schema())
+            self._structured_schema_cache[response_model] = response_schema
+        instructions, input_items = self._response_prompt(messages)
+        res = await self.completion_client.create_response_async(
+            model=model,
+            instructions=instructions,
+            input_items=input_items,
+            text_format={
+                "type": "json_schema",
+                "name": schema_name,
+                "strict": True,
+                "schema": response_schema,
+            },
+        )
+        parsed = response_model.model_validate_json(res.content.strip())
+
+        usage = self._usage_from_result(res)
+        cost = calculate_openai_cost(
+            model_name=model,
+            prompt_tokens=usage.prompt_tokens or 0,
+            completion_tokens=usage.completion_tokens or 0,
+            cached_tokens=usage.cached_tokens or 0,
+        )
+        latency = getattr(res, "latency_seconds", 0.0) or 0.0
+        self.last_usage = usage.model_dump(mode="json")
+        self.last_model = model
+        self.last_cost_usd = cost
+        self.last_duration_seconds = latency
+        return parsed, usage, cost, latency
+
     def complete_text(
         self,
         messages_or_prompt: Union[str, List[Dict[str, str]]],
@@ -199,6 +249,42 @@ class BaseLLMModule(BaseModule):
         self.last_duration_seconds = latency
         return content, usage, cost, latency
 
+    async def complete_text_async(
+        self,
+        messages_or_prompt: Union[str, List[Dict[str, str]]],
+        model: str,
+        system_prompt: Optional[str] = None,
+    ) -> Tuple[str, ApiUsageDTO, float, float]:
+        """Call Responses without blocking the workflow event loop."""
+        if isinstance(messages_or_prompt, str):
+            messages: List[Dict[str, str]] = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": messages_or_prompt})
+        else:
+            messages = messages_or_prompt
+
+        instructions, input_items = self._response_prompt(messages)
+        res = await self.completion_client.create_response_async(
+            model=model,
+            instructions=instructions,
+            input_items=input_items,
+        )
+        content = res.content.strip()
+        usage = self._usage_from_result(res)
+        cost = calculate_openai_cost(
+            model_name=model,
+            prompt_tokens=usage.prompt_tokens or 0,
+            completion_tokens=usage.completion_tokens or 0,
+            cached_tokens=usage.cached_tokens or 0,
+        )
+        latency = getattr(res, "latency_seconds", 0.0) or 0.0
+        self.last_usage = usage.model_dump(mode="json")
+        self.last_model = model
+        self.last_cost_usd = cost
+        self.last_duration_seconds = latency
+        return content, usage, cost, latency
+
     def complete_agentic(
         self,
         messages: List[Dict[str, Any]],
@@ -209,7 +295,7 @@ class BaseLLMModule(BaseModule):
     ) -> Tuple[str, ApiUsageDTO, float, float]:
         """
         Executes a multi-turn tool-calling loop using standard LangChain BaseTool instances.
-        
+
         Encapsulates:
         - OpenAI tool conversion
         - Multi-turn invoke loop with error-as-message feedback
@@ -234,7 +320,8 @@ class BaseLLMModule(BaseModule):
                             "name": function["name"],
                             "description": function.get("description", ""),
                             "parameters": self._strict_schema(
-                                function.get("parameters") or {
+                                function.get("parameters")
+                                or {
                                     "type": "object",
                                     "properties": {},
                                 }
@@ -347,6 +434,155 @@ class BaseLLMModule(BaseModule):
             reasoning_tokens=total_reasoning_tokens,
             total_tokens=total_prompt_tokens + total_completion_tokens,
         )
+        self.last_usage = api_usage.model_dump(mode="json")
+        self.last_model = model
+        self.last_cost_usd = total_cost
+        self.last_duration_seconds = total_latency
+        return answer_text, api_usage, total_cost, total_latency
+
+    async def complete_agentic_async(
+        self,
+        messages: List[Dict[str, Any]],
+        tools_map: Dict[str, Any],
+        model: str,
+        max_iterations: int = 5,
+        enable_tools: bool = True,
+    ) -> Tuple[str, ApiUsageDTO, float, float]:
+        """Run the Responses tool loop with native async provider and tool calls."""
+        from langchain_core.utils.function_calling import convert_to_openai_tool
+
+        started_at = time.perf_counter()
+        openai_tools = None
+        if enable_tools and tools_map:
+            cache_key = tuple(tools_map)
+            openai_tools = self._tool_schema_cache.get(cache_key)
+            if openai_tools is None:
+                openai_tools = []
+                for tool in tools_map.values():
+                    converted = convert_to_openai_tool(tool)
+                    function = converted["function"]
+                    openai_tools.append(
+                        {
+                            "type": "function",
+                            "name": function["name"],
+                            "description": function.get("description", ""),
+                            "parameters": self._strict_schema(
+                                function.get("parameters") or {"type": "object", "properties": {}}
+                            ),
+                            "strict": True,
+                        }
+                    )
+                self._tool_schema_cache[cache_key] = openai_tools
+
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        total_cached_tokens = 0
+        total_reasoning_tokens = 0
+        total_cost = 0.0
+        answer_text = ""
+
+        def record_usage(response: Any) -> None:
+            nonlocal total_prompt_tokens
+            nonlocal total_completion_tokens
+            nonlocal total_cached_tokens
+            nonlocal total_reasoning_tokens
+            nonlocal total_cost
+            usage_dict = getattr(response, "usage", {}) or {}
+            prompt_tokens = usage_dict.get("prompt_tokens", 0) or 0
+            completion_tokens = usage_dict.get("completion_tokens", 0) or 0
+            cached_tokens = usage_dict.get("cached_tokens", 0) or 0
+            reasoning_tokens = usage_dict.get("reasoning_tokens", 0) or 0
+            total_prompt_tokens += prompt_tokens
+            total_completion_tokens += completion_tokens
+            total_cached_tokens += cached_tokens
+            total_reasoning_tokens += reasoning_tokens
+            total_cost += calculate_openai_cost(
+                model_name=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cached_tokens=cached_tokens,
+            )
+
+        instructions, input_items = self._response_prompt(messages)
+        previous_response_id: Optional[str] = None
+
+        for _ in range(max_iterations):
+            res = await self.completion_client.create_response_async(
+                model=model,
+                instructions=instructions,
+                input_items=input_items,
+                tools=openai_tools,
+                previous_response_id=previous_response_id,
+                store=True,
+            )
+            record_usage(res)
+            function_calls = getattr(res, "function_calls", ())
+            if not function_calls:
+                answer_text = res.content
+                break
+
+            input_items = []
+            for function_call in function_calls:
+                fn_name = function_call.get("name")
+                fn_args_raw = function_call.get("arguments", "{}")
+                if isinstance(fn_args_raw, str):
+                    try:
+                        fn_args = json.loads(fn_args_raw)
+                    except (json.JSONDecodeError, TypeError):
+                        fn_args = {}
+                else:
+                    fn_args = fn_args_raw or {}
+
+                if fn_name in tools_map:
+                    tool = tools_map[fn_name]
+                    try:
+                        async_invoke = getattr(tool, "ainvoke", None)
+                        if callable(async_invoke):
+                            tool_result = await cast(Any, async_invoke)(fn_args)
+                        else:
+                            tool_result = await asyncio.to_thread(tool.invoke, fn_args)
+                        tool_result_str = str(tool_result)
+                    except Exception as invoke_err:
+                        logger.warning(
+                            "Tool %s invocation error: %s",
+                            fn_name,
+                            invoke_err,
+                        )
+                        tool_result_str = f"Tool execution failed: {invoke_err}"
+                else:
+                    tool_result_str = f"Unknown tool name: {fn_name}"
+
+                input_items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": function_call.get("call_id"),
+                        "output": tool_result_str,
+                    }
+                )
+            previous_response_id = res.response_id
+        else:
+            res = await self.completion_client.create_response_async(
+                model=model,
+                instructions=instructions,
+                input_items=input_items,
+                previous_response_id=previous_response_id,
+                store=True,
+            )
+            answer_text = res.content
+            record_usage(res)
+
+        total_latency = time.perf_counter() - started_at
+        api_usage = ApiUsageDTO(
+            prompt_tokens=total_prompt_tokens,
+            completion_tokens=total_completion_tokens,
+            cached_tokens=total_cached_tokens,
+            reasoning_tokens=total_reasoning_tokens,
+            total_tokens=total_prompt_tokens + total_completion_tokens,
+        )
+        self.last_usage = api_usage.model_dump(mode="json")
+        self.last_model = model
+        self.last_cost_usd = total_cost
+        self.last_duration_seconds = total_latency
         return answer_text, api_usage, total_cost, total_latency
 
 

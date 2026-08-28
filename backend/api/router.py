@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from backend.bootstrap.container import ApplicationContainer
+from backend.core.state_stream_broker import StateStreamBroker
 from backend.features.bi.api_routes import create_bi_router
 from backend.features.chatbot.api_routes import create_chat_router
 from backend.features.company_comparison import (
@@ -16,7 +17,11 @@ from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
 from .workflow_routes import create_workflow_router
 
 
-def create_api_router(container: ApplicationContainer) -> APIRouter:
+def create_api_router(
+    container: ApplicationContainer,
+    *,
+    state_stream_broker: StateStreamBroker | None = None,
+) -> APIRouter:
     """
     Compose version-neutral routes; the application factory owns the public prefix.
     """
@@ -28,7 +33,9 @@ def create_api_router(container: ApplicationContainer) -> APIRouter:
     module_registry = services.module_registry
     domain = container.domain
     execution = container.execution
-    router.include_router(create_bi_router(domain.bi_services))
+    router.include_router(
+        create_bi_router(domain.bi_services, state_stream_broker=state_stream_broker)
+    )
     company_comparison_service = create_company_comparison_service(
         store=domain.bi_services.store,
         registry=module_registry,
@@ -77,6 +84,7 @@ def create_api_router(container: ApplicationContainer) -> APIRouter:
             workflow_store=workflow_store,
             run_store=run_store,
             workflow_execution=workflow_execution,
+            state_stream_broker=state_stream_broker,
         )
     )
     router.include_router(

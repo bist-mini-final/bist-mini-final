@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from anyio import open_file, to_thread
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi import Path as FastPath
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -252,6 +252,7 @@ def create_data_source_router(
         description="파일을 디스크에서 제거하고 관련된 pgvector 벡터 인덱스 컬렉션도 함께 정리합니다.",
     )
     def remove_file(
+        request: Request,
         filename: str = FastPath(..., description="삭제할 파일명"),
     ) -> Dict[str, Any]:
         """업로드된 원본 파일을 삭제하고 연결된 pgvector 벡터 인덱스를 제거합니다."""
@@ -282,6 +283,20 @@ def create_data_source_router(
             except Exception as error:
                 logger.warning(
                     "연관된 벡터 인덱스 정리 중 오류 발생 (파일은 삭제됨): %s",
+                    error,
+                    exc_info=True,
+                )
+
+        if db_manager.is_connected():
+            try:
+                db_manager.delete_source_file(
+                    workbook_hash or safe_filename,
+                    actor_id="api-user",
+                    request_id=getattr(request.state, "request_id", None),
+                )
+            except Exception as error:
+                logger.warning(
+                    "삭제된 파일의 DB 메타데이터 soft-delete 실패: %s",
                     error,
                     exc_info=True,
                 )

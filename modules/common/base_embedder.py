@@ -6,6 +6,7 @@ LangChain Embeddings 표준 어댑터 기반으로 텍스트 인코딩, 차원 �
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Mapping, Optional, cast
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # 1. Dimension & Cost Helpers
 # ==============================================================================
+
 
 def get_expected_dimension(model_name: Optional[str] = None) -> int:
     """Return the provider's default vector dimension for a known model family."""
@@ -115,6 +117,7 @@ class EmbeddingConfigDTO(ModuleConfigDTO):
 # ==============================================================================
 # 3. Base Embedding Module
 # ==============================================================================
+
 
 class BaseEmbeddingModule(BaseModule):
     """Base class for all embedding modules managing encoder lifecycle, model resolution,
@@ -236,14 +239,12 @@ class BaseEmbeddingModule(BaseModule):
             return
 
         resolved_model = model_name or DEFAULT_EMBEDDING_MODEL
-        target_dimension = expected_dimension or self.resolve_dimension(
-            resolved_model)
+        target_dimension = expected_dimension or self.resolve_dimension(resolved_model)
         effective_batch_size = max(1, batch_size or 128)
         encoder = self._encoder_for(resolved_model)
 
         total_items = len(texts)
-        total_batches = max(
-            1, (total_items + effective_batch_size - 1) // effective_batch_size)
+        total_batches = max(1, (total_items + effective_batch_size - 1) // effective_batch_size)
         total_tokens = 0
 
         start_perf = time.perf_counter()
@@ -287,8 +288,7 @@ class BaseEmbeddingModule(BaseModule):
             if isinstance(usage, dict) and "total_tokens" in usage:
                 total_tokens += usage.get("total_tokens", 0)
             else:
-                total_tokens += sum(max(1, len(t.split()) * 2)
-                                    for t in batch_texts)
+                total_tokens += sum(max(1, len(t.split()) * 2) for t in batch_texts)
 
             if on_batch_complete is not None:
                 on_batch_complete(batch_vectors, start, end)
@@ -307,8 +307,7 @@ class BaseEmbeddingModule(BaseModule):
             yield (start, end, batch_vectors)
 
         duration_seconds = round(time.perf_counter() - start_perf, 3)
-        self.last_usage = {"total_tokens": total_tokens,
-                           "prompt_tokens": total_tokens}
+        self.last_usage = {"total_tokens": total_tokens, "prompt_tokens": total_tokens}
         self.last_total_tokens = total_tokens
         self.last_duration_seconds = duration_seconds
         self.last_model = resolved_model
@@ -335,6 +334,97 @@ class BaseEmbeddingModule(BaseModule):
             vectors.extend(batch_vectors)
         return vectors
 
+    async def encode_texts_async(
+        self,
+        texts: List[str],
+        model_name: Optional[str] = None,
+        expected_dimension: Optional[int] = None,
+        batch_size: Optional[int] = None,
+        report_progress: bool = True,
+    ) -> List[List[float]]:
+        """Encode through a native async encoder while preserving usage contracts."""
+        resolved_model = model_name or DEFAULT_EMBEDDING_MODEL
+        target_dimension = expected_dimension or self.resolve_dimension(resolved_model)
+        effective_batch_size = max(1, batch_size or 128)
+        if not texts:
+            self.last_usage = {"total_tokens": 0, "prompt_tokens": 0}
+            self.last_model = resolved_model
+            self.last_dimension = target_dimension
+            self.last_total_tokens = 0
+            self.last_duration_seconds = 0.0
+            return []
+
+        encoder = self._encoder_for(resolved_model)
+        started_at = time.perf_counter()
+        if report_progress:
+            self.report_progress(
+                {
+                    "phase": "embedding_batches",
+                    "completed_batches": 0,
+                    "total_batches": 1,
+                    "completed_items": 0,
+                    "total_items": len(texts),
+                }
+            )
+
+        encode_for_model_async = getattr(encoder, "encode_for_model_async", None)
+        vectors: List[List[float]]
+        if callable(encode_for_model_async):
+            vectors = cast(
+                List[List[float]],
+                await cast(Any, encode_for_model_async)(
+                    texts,
+                    resolved_model,
+                    effective_batch_size,
+                ),
+            )
+        else:
+            encode_for_model = getattr(encoder, "encode_for_model", None)
+            encode = encoder.encode
+            vectors = cast(
+                List[List[float]],
+                await asyncio.to_thread(
+                    encode_for_model if callable(encode_for_model) else encode,
+                    texts,
+                    *(
+                        (resolved_model, effective_batch_size)
+                        if callable(encode_for_model)
+                        else (effective_batch_size,)
+                    ),
+                ),
+            )
+
+        if len(vectors) != len(texts):
+            raise ModuleExecutionError(
+                f"입력 텍스트 개수({len(texts)})와 생성된 임베딩 개수({len(vectors)})가 일치하지 않습니다."
+            )
+        self.validate_vectors(
+            vectors,
+            expected_dimension=target_dimension,
+            model_name=resolved_model,
+        )
+        usage = getattr(encoder, "last_usage", None)
+        total_tokens = (
+            int(usage.get("total_tokens", 0) or 0)
+            if isinstance(usage, dict)
+            else sum(max(1, len(text.split()) * 2) for text in texts)
+        )
+        self.last_usage = {"total_tokens": total_tokens, "prompt_tokens": total_tokens}
+        self.last_total_tokens = total_tokens
+        self.last_duration_seconds = round(time.perf_counter() - started_at, 3)
+        self.last_model = resolved_model
+        if report_progress:
+            self.report_progress(
+                {
+                    "phase": "embedding_batches",
+                    "completed_batches": 1,
+                    "total_batches": 1,
+                    "completed_items": len(texts),
+                    "total_items": len(texts),
+                }
+            )
+        return vectors
+
     def execute(
         self,
         input_data: Any,
@@ -350,8 +440,7 @@ class BaseEmbeddingModule(BaseModule):
         else:
             texts = []
         model_name = self.resolve_model(config)
-        expected_dimension = self.resolve_dimension(
-            model_name=model_name, config=config)
+        expected_dimension = self.resolve_dimension(model_name=model_name, config=config)
         batch_size = self.resolve_batch_size(config=config)
         vectors = self.encode_texts(
             texts,
