@@ -118,7 +118,9 @@ def create_data_source_router(
     )
     def preview_file(
         filename: str = FastPath(..., description="조회할 파일명 (예: 'sample.xlsx')"),
-        sheet_name: Optional[str] = Query(default=None, description="특정 시트명 (기본값: 첫 번째 시트)"),
+        sheet_name: Optional[str] = Query(
+            default=None, description="특정 시트명 (기본값: 첫 번째 시트)"
+        ),
         max_rows: int = Query(default=15, ge=1, le=50, description="미리볼 최대 행 수"),
     ) -> Dict[str, Any]:
         """업로드된 엑셀 파일의 원시 셀 데이터를 미리보기 형식으로 반환합니다."""
@@ -140,7 +142,9 @@ def create_data_source_router(
     async def upload_file(
         file: UploadFile = File(..., description="업로드할 엑셀 스프레드시트 파일"),
         auto_ingest: bool = Query(default=True, description="업로드 완료 후 자동 인덱싱 실행 여부"),
-        model: str = Query(default=DEFAULT_EMBEDDING_MODEL, description="사용할 텍스트 임베딩 모델"),
+        model: str = Query(
+            default=DEFAULT_EMBEDDING_MODEL, description="사용할 텍스트 임베딩 모델"
+        ),
         batch_size: int = Query(default=2048, ge=1, le=2048, description="임베딩 배치 크기"),
     ) -> Dict[str, Any]:
         """새로운 엑셀 파일을 업로드하고 옵션에 따라 비동기 인덱싱 작업을 등록합니다."""
@@ -180,17 +184,15 @@ def create_data_source_router(
         finally:
             await file.close()
 
-        if await to_thread.run_sync(db_manager.is_connected):
+        if await db_manager.is_connected_async():
             try:
-                await to_thread.run_sync(
-                    lambda: db_manager.save_source_file(
-                        file_id=file_hash,
-                        file_name=safe_filename,
-                        file_hash=file_hash,
-                        file_type=destination.suffix.lstrip(".").lower() or "bin",
-                        file_size=destination.stat().st_size,
-                        storage_path=str(destination.resolve()),
-                    )
+                await db_manager.save_source_file_async(
+                    file_id=file_hash,
+                    file_name=safe_filename,
+                    file_hash=file_hash,
+                    file_type=destination.suffix.lstrip(".").lower() or "bin",
+                    file_size=size_bytes,
+                    storage_path=str(destination.resolve()),
                 )
             except Exception as error:
                 logger.warning("업로드 파일 DB 메타데이터 저장 실패: %s", error)

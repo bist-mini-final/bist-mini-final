@@ -276,30 +276,11 @@ class WorkflowExecutor:
             self._cancelled_run_ids.discard(run_id)
             self._active_run_ids.add(run_id)
         try:
-            with self._execution_lock:
-                base_run = self.run_store.load(run_id)
-                graph_nodes = {node.id: node for node in base_run.graph.nodes}
-                try:
-                    selected_nodes = tuple(graph_nodes[node_id] for node_id in node_ids)
-                except KeyError as error:
-                    raise DagExecutionError(
-                        f"실행할 노드를 찾을 수 없습니다: {error.args[0]}"
-                    ) from error
-                batch_indexes = {base_run.nodes[node.id].batch_index for node in selected_nodes}
-                if len(batch_indexes) != 1:
-                    raise DagExecutionError(
-                        "TaskGroup은 하나의 topological batch만 실행할 수 있습니다"
-                    )
-                batch_index = next(iter(batch_indexes))
-                batch = base_run.batches[batch_index]
-                if set(node_ids) != set(batch.node_ids):
-                    raise DagExecutionError(
-                        "TaskGroup 입력은 persisted batch의 전체 노드와 일치해야 합니다"
-                    )
-                base_run.status = "running"
-                batch.status = "running"
-                batch.started_at = batch.started_at or utc_now_iso()
-                batch.completed_at = None
+            base_run, selected_nodes = await asyncio.to_thread(
+                self._prepare_scheduled_batch,
+                run_id,
+                node_ids,
+            )
 
             module_locks: dict[str, asyncio.Lock] = {}
             results: dict[str, RunNodeState] = {}
@@ -369,20 +350,19 @@ class WorkflowExecutor:
                         name=f"workflow:{run_id}:{node.id}",
                     )
 
-            with self._execution_lock:
-                merged = self.run_store.load(run_id)
-                for node_id in node_ids:
-                    merged.nodes[node_id] = results[node_id]
-                self._refresh_run_status(merged)
-                for node_id in node_ids:
-                    self.run_store.save_node(merged, node_id)
+            merged = await asyncio.to_thread(
+                self._merge_scheduled_batch_results,
+                run_id,
+                node_ids,
+                results,
+            )
 
             cancellation = next(
                 (error for error in errors.values() if isinstance(error, DagExecutionCancelled)),
                 None,
             )
             if cancellation is not None:
-                self._persist_cancelled_run(run_id)
+                await asyncio.to_thread(self._persist_cancelled_run, run_id)
                 raise DagExecutionCancelled(
                     "실행이 사용자 요청으로 중단되었습니다"
                 ) from cancellation
@@ -394,6 +374,51 @@ class WorkflowExecutor:
         finally:
             with self._cancellation_lock:
                 self._active_run_ids.discard(run_id)
+
+    def _prepare_scheduled_batch(
+        self,
+        run_id: str,
+        node_ids: tuple[str, ...],
+    ) -> tuple[WorkflowRun, tuple[WorkflowNode, ...]]:
+        """Load and validate a persisted batch outside the asyncio event loop."""
+        with self._execution_lock:
+            run = self.run_store.load(run_id)
+            graph_nodes = {node.id: node for node in run.graph.nodes}
+            try:
+                selected_nodes = tuple(graph_nodes[node_id] for node_id in node_ids)
+            except KeyError as error:
+                raise DagExecutionError(
+                    f"실행할 노드를 찾을 수 없습니다: {error.args[0]}"
+                ) from error
+            batch_indexes = {run.nodes[node.id].batch_index for node in selected_nodes}
+            if len(batch_indexes) != 1:
+                raise DagExecutionError("TaskGroup은 하나의 topological batch만 실행할 수 있습니다")
+            batch = run.batches[next(iter(batch_indexes))]
+            if set(node_ids) != set(batch.node_ids):
+                raise DagExecutionError(
+                    "TaskGroup 입력은 persisted batch의 전체 노드와 일치해야 합니다"
+                )
+            run.status = "running"
+            batch.status = "running"
+            batch.started_at = batch.started_at or utc_now_iso()
+            batch.completed_at = None
+            return run, selected_nodes
+
+    def _merge_scheduled_batch_results(
+        self,
+        run_id: str,
+        node_ids: tuple[str, ...],
+        results: Mapping[str, RunNodeState],
+    ) -> WorkflowRun:
+        """Merge and persist one async batch while holding the execution lock."""
+        with self._execution_lock:
+            merged = self.run_store.load(run_id)
+            for node_id in node_ids:
+                merged.nodes[node_id] = results[node_id]
+            self._refresh_run_status(merged)
+            for node_id in node_ids:
+                self.run_store.save_node(merged, node_id)
+            return merged
 
     def _execute_scheduled_node(self, run_id: str, node_id: str) -> WorkflowRun:
         self._raise_if_cancelled(run_id)
@@ -642,7 +667,7 @@ class WorkflowExecutor:
         )
         output = prepared.output
         if output is None:
-            self._raise_if_cancelled(run.id)
+            await self._raise_if_cancelled_async(run.id)
             with trace_node_execution(
                 run.workflow_id,
                 run.id,
@@ -659,7 +684,7 @@ class WorkflowExecutor:
                     )
                 finally:
                     prepared.module.set_progress_callback(None)
-            self._raise_if_cancelled(run.id)
+            await self._raise_if_cancelled_async(run.id)
             if prepared.cache_enabled:
                 await asyncio.to_thread(
                     self.result_cache.put,
@@ -907,6 +932,10 @@ class WorkflowExecutor:
                 )
         if cancelled:
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다")
+
+    async def _raise_if_cancelled_async(self, run_id: str) -> None:
+        """Check durable cancellation state without blocking the event loop."""
+        await asyncio.to_thread(self._raise_if_cancelled, run_id)
 
     def _persist_cancelled_run(self, run_id: str) -> WorkflowRun:
         """Persist a run after cancellation, resetting running nodes and marking non-terminal runs as paused.

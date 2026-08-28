@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from typing import Final
 
+import psycopg
 import psycopg2
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from psycopg2.extras import Json, RealDictCursor
 from pydantic import ValidationError
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.storage.connection_pool import (
+    get_pooled_async_connection,
+    get_pooled_raw_connection,
+)
 
 from .materialization_models import BiCompanyIndexEntry
 from .models import (
@@ -31,6 +38,20 @@ MATERIALIZATION_JOB_COLUMNS: Final = (
     "job_id, company_id, workbook_hash, status, completed_requests, "
     "total_requests, published_snapshot_id, error_code, message, "
     "started_at, updated_at"
+)
+COMPANY_ROWS_QUERY: Final = (
+    "SELECT company_id, display_name, current_snapshot_id, is_deleted "
+    "FROM bi_companies ORDER BY display_name, company_id"
+)
+COMPANY_SOURCE_ROWS_QUERY: Final = (
+    "SELECT name AS index_id, cmetadata->>'company_name' AS display_name, "
+    "cmetadata->>'file_name' AS file_name, "
+    "cmetadata->>'workbook_hash' AS workbook_hash, "
+    "cmetadata->>'created_at' AS created_at "
+    "FROM langchain_pg_collection "
+    "WHERE NULLIF(BTRIM(cmetadata->>'company_name'), '') IS NOT NULL "
+    "AND NULLIF(BTRIM(cmetadata->>'file_name'), '') IS NOT NULL "
+    "AND (cmetadata->>'workbook_hash') ~ '^[a-f0-9]{64}$'"
 )
 
 
@@ -117,6 +138,73 @@ class PostgresBiStore:
                     row = cursor.fetchone()
                 connection.commit()
         except psycopg2.Error as error:
+            raise BiPostgresStoreError("enqueue", str(error)) from error
+        if row is None:
+            raise BiPostgresStoreError("enqueue", "stored job was not found")
+        return self._validate_job(row, "enqueue")
+
+    async def enqueue_async(
+        self,
+        request: BiMaterializationRequest,
+        job: BiMaterializationJob,
+    ) -> BiMaterializationJob:
+        """Register a BI materialization without occupying a FastAPI worker thread."""
+        try:
+            async with get_pooled_async_connection(self._database_url) as connection:
+                async with connection.cursor(row_factory=dict_row) as cursor:
+                    await cursor.execute(
+                        "INSERT INTO bi_companies "
+                        "(company_id, display_name, created_at, updated_at) "
+                        "VALUES (%s, %s, %s, %s) "
+                        "ON CONFLICT (company_id) DO UPDATE SET "
+                        "display_name = EXCLUDED.display_name, "
+                        "is_deleted = FALSE, deleted_at = NULL, "
+                        "updated_at = EXCLUDED.updated_at",
+                        (
+                            request.company_id,
+                            request.display_name,
+                            job.started_at,
+                            job.updated_at,
+                        ),
+                    )
+                    await cursor.execute(
+                        "INSERT INTO bi_materialization_jobs ("
+                        "job_id, company_id, workbook_hash, request_payload, status, "
+                        "completed_requests, total_requests, published_snapshot_id, "
+                        "error_code, message, available_at, started_at, updated_at"
+                        ") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+                        "ON CONFLICT (job_id) DO UPDATE SET "
+                        "request_payload = EXCLUDED.request_payload, "
+                        "status = EXCLUDED.status, completed_requests = 0, "
+                        "total_requests = 0, published_snapshot_id = NULL, "
+                        "error_code = NULL, message = NULL, worker_id = NULL, "
+                        "available_at = EXCLUDED.available_at, heartbeat_at = NULL, "
+                        "started_at = EXCLUDED.started_at, updated_at = EXCLUDED.updated_at "
+                        "WHERE bi_materialization_jobs.status = 'failed'",
+                        (
+                            job.job_id,
+                            job.company_id,
+                            job.workbook_hash,
+                            Jsonb(request.model_dump(mode="json")),
+                            job.status.value,
+                            job.completed_requests,
+                            job.total_requests,
+                            job.published_snapshot_id,
+                            job.error_code,
+                            job.message,
+                            job.updated_at,
+                            job.started_at,
+                            job.updated_at,
+                        ),
+                    )
+                    await cursor.execute(
+                        f"SELECT {MATERIALIZATION_JOB_COLUMNS} "
+                        "FROM bi_materialization_jobs WHERE job_id = %s",
+                        (job.job_id,),
+                    )
+                    row = await cursor.fetchone()
+                await connection.commit()
+        except psycopg.Error as error:
             raise BiPostgresStoreError("enqueue", str(error)) from error
         if row is None:
             raise BiPostgresStoreError("enqueue", "stored job was not found")
@@ -228,42 +316,45 @@ class PostgresBiStore:
 
     def list_companies(self) -> tuple[BiCompanyIndexEntry, ...]:
         company_rows = self._fetchall(
-            "SELECT company_id, display_name, current_snapshot_id, is_deleted "
-            "FROM bi_companies ORDER BY display_name, company_id",
+            COMPANY_ROWS_QUERY,
             (),
             "list_companies",
         )
         source_rows = self._fetchall(
-            "SELECT name AS index_id, cmetadata->>'company_name' AS display_name, "
-            "cmetadata->>'file_name' AS file_name, "
-            "cmetadata->>'workbook_hash' AS workbook_hash, "
-            "cmetadata->>'created_at' AS created_at "
-            "FROM langchain_pg_collection "
-            "WHERE NULLIF(BTRIM(cmetadata->>'company_name'), '') IS NOT NULL "
-            "AND NULLIF(BTRIM(cmetadata->>'file_name'), '') IS NOT NULL "
-            "AND (cmetadata->>'workbook_hash') ~ '^[a-f0-9]{64}$'",
+            COMPANY_SOURCE_ROWS_QUERY,
             (),
             "list_company_sources",
         )
+        return self._company_entries(company_rows, source_rows)
+
+    @classmethod
+    def _company_entries(
+        cls,
+        company_rows: list[dict[str, object]],
+        source_rows: list[dict[str, object]],
+    ) -> tuple[BiCompanyIndexEntry, ...]:
         persisted = {
-            self._company_key(str(row["display_name"])): row
+            cls._company_key(str(row["display_name"])): row
             for row in company_rows
             if not bool(row["is_deleted"])
         }
         deleted_keys = {
-            self._company_key(str(row["display_name"]))
+            cls._company_key(str(row["display_name"]))
             for row in company_rows
             if bool(row["is_deleted"])
         }
+
         def _source_priority(row: dict[str, object]) -> tuple[int, str]:
             file_name = str(row.get("file_name") or "").casefold()
-            is_preferred_financials = 1 if "v3" in file_name or "ai_dx" in file_name or "golden" in file_name else 0
+            is_preferred_financials = (
+                1 if "v3" in file_name or "ai_dx" in file_name or "golden" in file_name else 0
+            )
             created_at = str(row.get("created_at") or "")
             return (is_preferred_financials, created_at)
 
         latest_sources: dict[str, dict[str, object]] = {}
         for row in source_rows:
-            key = self._company_key(str(row["display_name"]))
+            key = cls._company_key(str(row["display_name"]))
             if key in deleted_keys:
                 continue
             current = latest_sources.get(key)
@@ -278,7 +369,7 @@ class PostgresBiStore:
             company_id = (
                 CompanyId(str(company_row["company_id"]))
                 if company_row is not None
-                else self._company_id(display_name)
+                else cls._company_id(display_name)
             )
             entries.append(
                 BiCompanyIndexEntry(
@@ -310,9 +401,7 @@ class PostgresBiStore:
                         company_id=CompanyId(str(company_row["company_id"])),
                         display_name=str(company_row["display_name"]),
                     ),
-                    current_snapshot_id=SnapshotId(
-                        str(company_row["current_snapshot_id"])
-                    ),
+                    current_snapshot_id=SnapshotId(str(company_row["current_snapshot_id"])),
                 )
             )
         return tuple(
@@ -384,8 +473,7 @@ class PostgresBiStore:
 
     def get_job(self, job_id: JobId) -> BiMaterializationJob | None:
         row = self._fetchone(
-            f"SELECT {MATERIALIZATION_JOB_COLUMNS} "
-            "FROM bi_materialization_jobs WHERE job_id = %s",
+            f"SELECT {MATERIALIZATION_JOB_COLUMNS} FROM bi_materialization_jobs WHERE job_id = %s",
             (job_id,),
             "get_job",
         )
@@ -438,11 +526,143 @@ class PostgresBiStore:
             (company_id,),
             "find_latest_job",
         )
-        return (
-            self._validate_job(row, "find_latest_job")
-            if row is not None
-            else None
+        return self._validate_job(row, "find_latest_job") if row is not None else None
+
+    async def get_company_async(
+        self,
+        company_id: CompanyId,
+    ) -> BiCompany | None:
+        row = await self._fetchone_async(
+            "SELECT company_id, display_name FROM bi_companies "
+            "WHERE company_id = %s AND is_deleted = FALSE",
+            (company_id,),
+            "get_company",
         )
+        return BiCompany.model_validate(row) if row is not None else None
+
+    async def list_companies_async(self) -> tuple[BiCompanyIndexEntry, ...]:
+        company_rows, source_rows = await asyncio.gather(
+            self._fetchall_async(
+                COMPANY_ROWS_QUERY,
+                (),
+                "list_companies",
+            ),
+            self._fetchall_async(
+                COMPANY_SOURCE_ROWS_QUERY,
+                (),
+                "list_company_sources",
+            ),
+        )
+        return self._company_entries(company_rows, source_rows)
+
+    async def get_current_async(
+        self,
+        company_id: CompanyId,
+    ) -> BiDashboardSnapshot | None:
+        row = await self._fetchone_async(
+            "SELECT snapshot.snapshot_payload FROM bi_companies company "
+            "JOIN bi_dashboard_snapshots snapshot "
+            "ON snapshot.snapshot_id = company.current_snapshot_id "
+            "WHERE company.company_id = %s AND company.is_deleted = FALSE",
+            (company_id,),
+            "get_current",
+        )
+        return self._validate_snapshot(row, "get_current") if row is not None else None
+
+    async def get_current_many_async(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiDashboardSnapshot]:
+        if not company_ids:
+            return {}
+        rows = await self._fetchall_async(
+            "SELECT company.company_id, snapshot.snapshot_payload "
+            "FROM bi_companies company JOIN bi_dashboard_snapshots snapshot "
+            "ON snapshot.snapshot_id = company.current_snapshot_id "
+            "WHERE company.company_id = ANY(%s) AND company.is_deleted = FALSE",
+            (list(company_ids),),
+            "get_current_many",
+        )
+        return {
+            CompanyId(str(row["company_id"])): self._validate_snapshot(
+                row,
+                "get_current_many",
+            )
+            for row in rows
+        }
+
+    async def get_snapshot_async(
+        self,
+        company_id: CompanyId,
+        snapshot_id: SnapshotId,
+    ) -> BiDashboardSnapshot | None:
+        row = await self._fetchone_async(
+            "SELECT snapshot.snapshot_payload FROM bi_dashboard_snapshots snapshot "
+            "JOIN bi_companies company ON company.company_id = snapshot.company_id "
+            "WHERE snapshot.company_id = %s AND snapshot.snapshot_id = %s "
+            "AND company.is_deleted = FALSE",
+            (company_id, snapshot_id),
+            "get_snapshot",
+        )
+        return self._validate_snapshot(row, "get_snapshot") if row is not None else None
+
+    async def get_job_async(
+        self,
+        job_id: JobId,
+    ) -> BiMaterializationJob | None:
+        row = await self._fetchone_async(
+            f"SELECT {MATERIALIZATION_JOB_COLUMNS} FROM bi_materialization_jobs WHERE job_id = %s",
+            (job_id,),
+            "get_job",
+        )
+        return self._validate_job(row, "get_job") if row is not None else None
+
+    async def get_latest_job_async(
+        self,
+        company_id: CompanyId,
+    ) -> BiMaterializationJob | None:
+        row = await self._fetchone_async(
+            f"SELECT {MATERIALIZATION_JOB_COLUMNS} "
+            "FROM bi_materialization_jobs WHERE company_id = %s "
+            "ORDER BY updated_at DESC LIMIT 1",
+            (company_id,),
+            "get_latest_job",
+        )
+        return self._validate_job(row, "get_latest_job") if row is not None else None
+
+    async def get_latest_jobs_async(
+        self,
+        company_ids: tuple[CompanyId, ...],
+    ) -> dict[CompanyId, BiMaterializationJob]:
+        if not company_ids:
+            return {}
+        rows = await self._fetchall_async(
+            f"SELECT DISTINCT ON (company_id) {MATERIALIZATION_JOB_COLUMNS} "
+            "FROM bi_materialization_jobs WHERE company_id = ANY(%s) "
+            "ORDER BY company_id, updated_at DESC",
+            (list(company_ids),),
+            "get_latest_jobs",
+        )
+        return {
+            CompanyId(str(row["company_id"])): self._validate_job(
+                row,
+                "get_latest_jobs",
+            )
+            for row in rows
+        }
+
+    async def find_latest_job_async(
+        self,
+        company_id: CompanyId,
+    ) -> BiMaterializationJob | None:
+        row = await self._fetchone_async(
+            f"SELECT {MATERIALIZATION_JOB_COLUMNS} "
+            "FROM bi_materialization_jobs WHERE company_id = %s "
+            "ORDER BY updated_at DESC LIMIT 1",
+            (company_id,),
+            "find_latest_job",
+        )
+        return self._validate_job(row, "find_latest_job") if row is not None else None
 
     def soft_delete_company(
         self,
@@ -581,6 +801,20 @@ class PostgresBiStore:
         rows = self._query(query, parameters, operation, fetch_all=False)
         return rows if isinstance(rows, dict) else None
 
+    async def _fetchone_async(
+        self,
+        query: str,
+        parameters: tuple[object, ...],
+        operation: str,
+    ) -> dict[str, object] | None:
+        rows = await self._query_async(
+            query,
+            parameters,
+            operation,
+            fetch_all=False,
+        )
+        return rows if isinstance(rows, dict) else None
+
     def _fetchall(
         self,
         query: str,
@@ -588,6 +822,20 @@ class PostgresBiStore:
         operation: str,
     ) -> list[dict[str, object]]:
         rows = self._query(query, parameters, operation, fetch_all=True)
+        return list(rows) if isinstance(rows, list) else []
+
+    async def _fetchall_async(
+        self,
+        query: str,
+        parameters: tuple[object, ...],
+        operation: str,
+    ) -> list[dict[str, object]]:
+        rows = await self._query_async(
+            query,
+            parameters,
+            operation,
+            fetch_all=True,
+        )
         return list(rows) if isinstance(rows, list) else []
 
     def _query(
@@ -606,6 +854,22 @@ class PostgresBiStore:
         except psycopg2.Error as error:
             raise BiPostgresStoreError(operation, str(error)) from error
 
+    async def _query_async(
+        self,
+        query: str,
+        parameters: tuple[object, ...],
+        operation: str,
+        *,
+        fetch_all: bool,
+    ) -> dict[str, object] | list[dict[str, object]] | None:
+        try:
+            async with get_pooled_async_connection(self._database_url) as connection:
+                async with connection.cursor(row_factory=dict_row) as cursor:
+                    await cursor.execute(query, parameters)  # type: ignore[arg-type]
+                    return list(await cursor.fetchall()) if fetch_all else await cursor.fetchone()
+        except psycopg.Error as error:
+            raise BiPostgresStoreError(operation, str(error)) from error
+
     @staticmethod
     def _validate_job(
         row: object,
@@ -615,10 +879,7 @@ class PostgresBiStore:
             if not isinstance(row, dict):
                 raise TypeError("job row is not a mapping")
             return BiMaterializationJob.model_validate(
-                {
-                    field_name: row[field_name]
-                    for field_name in BiMaterializationJob.model_fields
-                }
+                {field_name: row[field_name] for field_name in BiMaterializationJob.model_fields}
             )
         except (KeyError, TypeError, ValidationError) as error:
             raise BiPostgresStoreError(operation, str(error)) from error

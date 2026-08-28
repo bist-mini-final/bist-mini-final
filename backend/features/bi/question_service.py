@@ -23,10 +23,10 @@ from .question_records import (
 def build_current_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
     """
     Build a question batch using the periods current at the plan's creation time.
-    
+
     Parameters:
         plan (BiQuestionBatchPlan): The batch plan whose periods determine the question batch.
-    
+
     Returns:
         BiQuestionBatch: The question batch for the selected current periods.
     """
@@ -44,13 +44,13 @@ def summarize_questions(
 ) -> BiQuestionJobProgress:
     """
     Summarize question statuses for a job.
-    
+
     Parameters:
-    	job_id (JobId): Identifier of the job.
-    	questions (tuple[BiQuestionRecord, ...]): Questions whose statuses are counted.
-    
+        job_id (JobId): Identifier of the job.
+        questions (tuple[BiQuestionRecord, ...]): Questions whose statuses are counted.
+
     Returns:
-    	BiQuestionJobProgress: Progress summary containing the total and status-specific question counts.
+        BiQuestionJobProgress: Progress summary containing the total and status-specific question counts.
     """
     counts = Counter(question.status for question in questions)
     return BiQuestionJobProgress(
@@ -79,6 +79,11 @@ class BiQuestionRepositoryPort(Protocol):
     def list_questions(self, job_id: JobId) -> tuple[BiQuestionRecord, ...]: ...
 
     def get_job_progress(
+        self,
+        job_id: JobId,
+    ) -> BiQuestionJobProgress | None: ...
+
+    async def get_job_progress_async(
         self,
         job_id: JobId,
     ) -> BiQuestionJobProgress | None: ...
@@ -125,12 +130,12 @@ class BiQuestionService:
         plan: BiQuestionBatchPlan,
     ) -> tuple[BiQuestionRecord, ...]:
         """Register questions for the periods current at the plan's creation time.
-        
+
         Parameters:
-        	plan (BiQuestionBatchPlan): The batch plan used to build the questions.
-        
+                plan (BiQuestionBatchPlan): The batch plan used to build the questions.
+
         Returns:
-        	tuple[BiQuestionRecord, ...]: The registered question records.
+                tuple[BiQuestionRecord, ...]: The registered question records.
         """
         return self.register_questions(build_current_question_batch(plan))
 
@@ -140,10 +145,10 @@ class BiQuestionService:
     ) -> BiQuestionJobProgress:
         """
         Queue materialization questions for a batch plan and summarize their progress.
-        
+
         Parameters:
             plan (BiQuestionBatchPlan): Batch plan used to register the questions.
-        
+
         Returns:
             BiQuestionJobProgress: Progress summary for the plan's job.
         """
@@ -169,6 +174,12 @@ class BiQuestionService:
         job_id: JobId,
     ) -> BiQuestionJobProgress | None:
         return self._repository.get_job_progress(job_id)
+
+    async def get_job_progress_async(
+        self,
+        job_id: JobId,
+    ) -> BiQuestionJobProgress | None:
+        return await self._repository.get_job_progress_async(job_id)
 
     def claim_next(
         self,

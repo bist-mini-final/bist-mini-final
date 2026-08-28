@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, Callable, Hashable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Hashable
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar, cast
 
@@ -17,9 +17,7 @@ _END = object()
 
 @dataclass(slots=True)
 class _StateChannel(Generic[StateT]):
-    subscribers: set[asyncio.Queue[StateT | BaseException | object]] = field(
-        default_factory=set
-    )
+    subscribers: set[asyncio.Queue[StateT | BaseException | object]] = field(default_factory=set)
     task: asyncio.Task[None] | None = None
     broker_task: asyncio.Task[None] | None = None
     latest: StateT | None = None
@@ -39,6 +37,7 @@ class SharedStateStream(Generic[KeyT, StateT]):
         self,
         loader: Callable[[KeyT], StateT],
         *,
+        async_loader: Callable[[KeyT], Awaitable[StateT]] | None = None,
         fingerprint: Callable[[StateT], object],
         terminal: Callable[[StateT], bool],
         interval_seconds: float = 0.5,
@@ -48,6 +47,7 @@ class SharedStateStream(Generic[KeyT, StateT]):
         if interval_seconds <= 0:
             raise ValueError("interval_seconds must be positive")
         self._loader = loader
+        self._async_loader = async_loader
         self._fingerprint = fingerprint
         self._terminal = terminal
         self._interval_seconds = interval_seconds
@@ -62,9 +62,7 @@ class SharedStateStream(Generic[KeyT, StateT]):
         *,
         initial: StateT | None = None,
     ) -> AsyncGenerator[StateT, None]:
-        queue: asyncio.Queue[StateT | BaseException | object] = asyncio.Queue(
-            maxsize=2
-        )
+        queue: asyncio.Queue[StateT | BaseException | object] = asyncio.Queue(maxsize=2)
         async with self._lock:
             channel = self._channels.get(key)
             if channel is None:
@@ -131,11 +129,13 @@ class SharedStateStream(Generic[KeyT, StateT]):
         channel: _StateChannel[StateT],
     ) -> tuple[bool, StateT]:
         async with channel.refresh_lock:
-            state = await to_thread.run_sync(self._loader, key)
-            changed = (
-                not channel.has_latest
-                or self._fingerprint(state)
-                != self._fingerprint(cast(StateT, channel.latest))
+            state = (
+                await self._async_loader(key)
+                if self._async_loader is not None
+                else await to_thread.run_sync(self._loader, key)
+            )
+            changed = not channel.has_latest or self._fingerprint(state) != self._fingerprint(
+                cast(StateT, channel.latest)
             )
             if changed:
                 channel.latest = state

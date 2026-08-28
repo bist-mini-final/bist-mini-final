@@ -56,6 +56,12 @@ class ResetRepository(BiQuestionRepositoryPort):
     def get_job_progress(self, job_id: JobId) -> BiQuestionJobProgress | None:
         raise AssertionError("reset must summarize the replacement batch")
 
+    async def get_job_progress_async(
+        self,
+        job_id: JobId,
+    ) -> BiQuestionJobProgress | None:
+        raise AssertionError("reset must not load async progress")
+
     def claim_next(
         self,
         command: BiQuestionClaim,

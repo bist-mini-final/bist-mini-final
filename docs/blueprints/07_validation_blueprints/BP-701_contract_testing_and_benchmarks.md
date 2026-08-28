@@ -109,6 +109,7 @@ GitHub Actions의 backend job은 PostgreSQL/pgvector와 Redis 서비스를 함�
 2. **구현됨 — 비동기 핵심 흐름 통합 테스트**:
    - FastAPI HTTP 호출 → PostgreSQL durable queue → one-shot worker → SSE terminal event와 Redis 멀티 Pod 상태 알림을 자동 검증합니다.
    - 실제 PostgreSQL을 사용하는 `AsyncConnectionPool` 재사용·쿼리·반환과 `TaskGroup` 병렬 상태 병합을 검증합니다. Native async leaf가 sync `execute()`를 우회하는 실행기 계약, Decomposer/Router/Reader의 async Responses, Query Embedder의 async embedding, data scope·dense/keyword Retriever·context expansion·Reader 셀 조회 도구의 async port 호출도 각각 회귀 검사합니다.
+   - BI API가 동기 저장소 메서드를 우회하고 async 조회·큐 등록을 사용하는 계약, `SharedStateStream`의 async loader 우선 실행, 업로드 메타데이터의 실제 PostgreSQL async 저장, async DAG의 `RunStore` I/O가 이벤트 루프 외부 스레드에서 실행되는 계약을 추가로 검증합니다.
    - 파일 업로드부터 실제 OpenAI 임베딩과 Binary COPY까지의 전체 연결은 외부 API 비용·키가 필요하므로 현재 CI의 결정론적 기본 경로에는 넣지 않았습니다. 별도 통합 환경에서 확장할 대상입니다.
 3. **구현됨 — GitHub Actions CI**:
    - `dev`, `main`의 push/PR에서 migration, pytest, Ruff, Pyright, ScaledJob render, 프론트엔드 typecheck·Vitest·build를 자동 실행합니다.

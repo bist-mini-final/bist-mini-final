@@ -74,3 +74,30 @@ def test_cross_process_notification_reloads_persisted_state() -> None:
             await second_events.aclose()
 
     asyncio.run(scenario())
+
+
+def test_shared_state_stream_prefers_native_async_loader() -> None:
+    async def scenario() -> None:
+        calls: list[str] = []
+
+        def sync_loader(_key: str) -> dict[str, object]:
+            raise AssertionError("sync loader must not be called")
+
+        async def async_loader(key: str) -> dict[str, object]:
+            calls.append(key)
+            return {"status": "completed", "revision": 1}
+
+        stream = SharedStateStream(
+            sync_loader,
+            async_loader=async_loader,
+            fingerprint=lambda state: state["revision"],
+            terminal=lambda state: state["status"] == "completed",
+        )
+        events = stream.subscribe("run-async")
+        try:
+            assert await anext(events) == {"status": "completed", "revision": 1}
+            assert calls == ["run-async"]
+        finally:
+            await events.aclose()
+
+    asyncio.run(scenario())

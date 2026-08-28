@@ -25,9 +25,9 @@ flowchart TD
         AUTH["CORS, Global Exception Guard & DTO Validation"]
     end
 
-    subgraph ExecutionTier ["3. Synchronous Read API & Durable Job Runtime"]
-        subgraph ReadApi ["Synchronous read/calculation API"]
-            BI_CALC["FinancialCalculator & BI Snapshot Query"]
+    subgraph ExecutionTier ["3. Non-blocking Read API & Durable Job Runtime"]
+        subgraph ReadApi ["Async read/calculation API"]
+            BI_CALC["Async BI Snapshot Query & FinancialCalculator"]
         end
         subgraph DurableJobs ["Durable PostgreSQL Queue (KEDA Workers)"]
             DAG_EXEC["DAG Topology Executor (Kahn Topological Sort)"]
@@ -64,5 +64,5 @@ flowchart TD
 
 | 실행 경로 | 구동 메커니즘 | 처리 작업 성격 | 상태 전달 |
 | :--- | :--- | :--- | :--- |
-| **동기 read/calculation** | FastAPI route → domain service → PostgreSQL | • BI 대시보드 스냅샷<br>• 기업 비교·리그<br>• 파일/인덱스 조회 | HTTP 응답 |
+| **비차단 read/calculation** | FastAPI async route → domain service → async PostgreSQL 또는 명시적 thread boundary | • BI 대시보드 스냅샷<br>• 기업 비교·리그<br>• 파일/인덱스 조회 | HTTP 응답. BI 핫패스는 native async pool, 동기 라이브러리는 이벤트 루프 밖에서 실행 |
 | **Durable job** | PostgreSQL queue + KEDA ScaledJob + lease | • 워크플로 DAG<br>• 인제스천·BI materialization/question·benchmark<br>• 채팅 RAG run | 상태 저장 후 SSE 또는 polling. Redis는 API Pod 간 SSE 갱신 신호만 전달 |

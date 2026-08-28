@@ -116,6 +116,7 @@ stateDiagram-v2
 1. **구현됨 — 비동기 asyncio 실행 엔진 및 핵심 질의 체인**:
    - 동일 위상 배치의 노드는 `asyncio.TaskGroup`으로 병렬 실행합니다. 각 노드는 깊은 복사 상태를 사용하고 완료 후 공유 상태에 잠금 병합하여 lost update를 방지합니다.
    - 실행기는 `BaseModuleRegistry.execute_async()`를 직접 await합니다. Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구는 네이티브 provider/DB await 경로를 사용하고, 동기 모듈은 `asyncio.to_thread()` 호환 경계를 사용합니다.
+   - 배치 준비·결과 병합·취소 영속화와 노드 전후 취소 확인에 필요한 동기 `RunStore` I/O도 `asyncio.to_thread()`로 이동하여 이벤트 루프에서 PostgreSQL 호출을 직접 실행하지 않습니다.
    - 하드 타임아웃이 설정된 배치는 Unix signal 기반 강제 제한을 보존하기 위해 순차 실행합니다. Windows에서는 signal hard-timeout을 사용할 수 없어 동일 순차 경로에서 협력적 취소 계약을 적용합니다.
    - 특정 배수의 성능 향상은 문서상 가정으로 두지 않고, 실제 워크로드 벤치마크 결과로 검증합니다.
 2. **구현됨 — 조건부 분기(Conditional Branching / Switch Node)**:
