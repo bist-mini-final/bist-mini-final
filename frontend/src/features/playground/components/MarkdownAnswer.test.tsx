@@ -22,4 +22,14 @@ describe('normalizeMarkdownTables', () => {
       '| 매출 | 10 | 12 |',
     ].join('\n'));
   });
+
+  it('restores a long financial table with an empty header cell', () => {
+    const markdown = String.raw`\| 항목 | | 2014-12-31 | 2015-12-31 | 2016-12-31 | 2017-12-31 | |---|---:|---:|---:|---:| | 영업활동 현금흐름 | 558 | 646 | 750 | 861 |`;
+
+    expect(normalizeMarkdownTables(markdown)).toBe([
+      '| 항목 | 2014-12-31 | 2015-12-31 | 2016-12-31 | 2017-12-31 |',
+      '| --- | ---: | ---: | ---: | ---: |',
+      '| 영업활동 현금흐름 | 558 | 646 | 750 | 861 |',
+    ].join('\n'));
+  });
 });

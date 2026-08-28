@@ -164,14 +164,22 @@ class ChatSessionRepository:
             connection.commit()
         return {"assistant_message": assistant, "run_id": None, "mode": "direct"}
 
-    def complete_turn(self, run_id: str, status: str, content: str) -> dict[str, Any] | None:
+    def complete_turn(
+        self,
+        run_id: str,
+        status: str,
+        content: str,
+        *,
+        suppress_visualization: bool = False,
+    ) -> dict[str, Any] | None:
         with self._database._raw_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
-                    """UPDATE chat_messages SET status = %s, content = %s
+                    """UPDATE chat_messages SET status = %s, content = %s,
+                    visualization = CASE WHEN %s THEN NULL ELSE visualization END
                     WHERE workflow_run_id = %s
                     RETURNING message_id, role, content, status, workflow_run_id, visualization, attachments, created_at""",
-                    (status, content, run_id),
+                    (status, content, suppress_visualization, run_id),
                 )
                 row = cursor.fetchone()
             connection.commit()
