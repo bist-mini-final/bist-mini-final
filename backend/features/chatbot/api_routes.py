@@ -20,6 +20,17 @@ from backend.storage.db_manager import DatabaseManager
 from modules.common.config import DEFAULT_READER_MODEL
 
 from .attachments import compact_evidence, save_upload
+from .conversation import (
+    company_aliases,
+    company_identity_answer,
+    is_recent_question_request,
+    needs_rag,
+)
+from .grounding import (
+    INSUFFICIENT_EVIDENCE_ANSWER,
+    EvidenceCellStorePort,
+    finalize_grounded_answer,
+)
 from .repository import ChatSessionRepository
 from .suggestions import ChatSuggestionService
 
@@ -49,26 +60,7 @@ def _reader_answer(run: Any) -> str | None:
     return answer if isinstance(answer, str) and answer.strip() else None
 
 
-_RAG_TERMS = (
-    "매출",
-    "영업이익",
-    "순이익",
-    "자산",
-    "부채",
-    "자본",
-    "현금흐름",
-    "재무",
-    "실적",
-    "eps",
-    "dps",
-    "수치",
-    "얼마",
-    "몇",
-    "분기",
-    "연도",
-)
 _CHART_TERMS = ("그래프", "차트", "추이", "추세", "변화", "비교", "연도별")
-_EXPLANATION_TERMS = ("뜻", "의미", "정의", "란", "무엇", "설명")
 
 
 def _repair_inline_markdown_tables(answer: str) -> str:
@@ -184,6 +176,7 @@ def create_chat_router(
     completion_client: OpenAIResponsesClient,
     bi_services: BiApiServices,
     suggestion_service: ChatSuggestionService,
+    pgvector_store: EvidenceCellStorePort,
     prefix: str = "/chat",
 ) -> APIRouter:
     router = APIRouter(prefix=prefix, tags=["Chat"])
@@ -194,7 +187,9 @@ def create_chat_router(
         if not any(term in lowered for term in _CHART_TERMS):
             return None
         for entry in bi_services.store.list_companies():
-            if entry.company.display_name.lower() in lowered:
+            if any(
+                alias.casefold() in lowered for alias in company_aliases(entry.company.display_name)
+            ):
                 if bi_services.store.get_current(entry.company.company_id) is not None:
                     return {
                         "company_id": str(entry.company.company_id),
@@ -202,32 +197,12 @@ def create_chat_router(
                     }
         return None
 
-    def needs_rag(question: str, visualization: dict[str, str] | None) -> bool:
-        lowered = question.lower()
-        if visualization is not None:
-            return True
-        # 용어 정의는 사내 문서의 숫자 근거가 필요하지 않으므로, 별도 LLM
-        # 답변으로 보냅니다. 단, 연도/금액을 함께 묻는 경우는 RAG가 우선입니다.
-        if any(term in lowered for term in _EXPLANATION_TERMS) and not any(
-            marker in lowered for marker in ("얼마", "몇", "20", "최신", "실적")
-        ):
-            return False
-        return any(term in lowered for term in _RAG_TERMS)
-
-    def company_aliases(name: str) -> tuple[str, ...]:
-        base_name = name.split("(", 1)[0].strip()
-        tickers = re.findall(r"\b[A-Z]{2,8}\b", name)
-        return tuple(dict.fromkeys((name, base_name, *tickers)))
-
     def conversation_company(question: str, session_id: str) -> str | None:
         companies = repository.company_names()
         question_lower = question.casefold()
-        if any(
-            alias.casefold() in question_lower
-            for name in companies
-            for alias in company_aliases(name)
-        ):
-            return None
+        for name in companies:
+            if any(alias.casefold() in question_lower for alias in company_aliases(name)):
+                return name
         for message in repository.recent_user_messages(session_id):
             message_lower = message.casefold()
             for name in companies:
@@ -235,14 +210,28 @@ def create_chat_router(
                     return name
         return None
 
-    def direct_answer(question: str) -> str:
+    def direct_answer(question: str, *, company: str | None, recent_messages: list[str]) -> str:
+        context = "\n".join(f"- {message}" for message in recent_messages[:3])
         result = completion_client.create_response(
             model=DEFAULT_READER_MODEL,
             instructions=(
-                "당신은 금융 서비스의 친절한 대화 도우미입니다. 제공된 사내 데이터는 조회하지 않습니다. "
-                "일상 대화와 금융 용어의 일반적 정의만 간결하게 답하고, 특정 기업의 최신 수치·실적은 데이터 조회가 필요하다고 안내하십시오."
+                "당신은 금융 서비스의 친절한 대화 도우미입니다. 제공된 사내 데이터는 직접 조회하지 않습니다. "
+                "일상 대화와 금융 용어의 일반적 정의만 간결하게 답하고, 특정 기업의 최신 수치·실적은 데이터 조회가 필요하다고 안내하십시오. "
+                "현재 질문이 금융 용어의 뜻·의미·정의(예: '영업이익이 뭐야?')라면 일반적인 정의만 답하고, "
+                "최근 대화나 등록 기업의 이름, 기업별 수치·실적·표를 절대 덧붙이지 마십시오. "
+                "대화 문맥의 대상 기업이 있으면 그 기업은 이 서비스의 등록 분석 대상 회사라고만 말하고, "
+                "서비스명·제품명이라고 추측하지 마십시오. 최근 대화는 현재 질문의 대상 식별에만 사용하십시오."
             ),
-            input_items=[{"role": "user", "content": question}],
+            input_items=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"최근 사용자 대화:\n{context or '- 없음'}\n\n"
+                        f"대화 문맥의 대상 기업: {company or '없음'}\n\n"
+                        f"현재 질문: {question}"
+                    ),
+                }
+            ],
             max_output_tokens=400,
             max_retries=0,
         )
@@ -367,20 +356,35 @@ def create_chat_router(
                     attachment_answer(request.content, attachment),
                     attachment_meta,
                 )
+            recent_messages = repository.recent_user_messages(session_id, limit=3)
+            company = conversation_company(request.content, session_id)
+            if is_recent_question_request(request.content) and recent_messages:
+                return repository.create_direct_turn(
+                    session_id,
+                    request.content,
+                    f"방금 전에는 “{recent_messages[0]}”라고 물으셨습니다.",
+                )
+            identity_answer = company_identity_answer(company, request.content) if company else None
+            if identity_answer:
+                return repository.create_direct_turn(session_id, request.content, identity_answer)
             visualization = visualization_for(request.content)
             if not needs_rag(request.content, visualization):
                 return repository.create_direct_turn(
-                    session_id, request.content, direct_answer(request.content)
+                    session_id,
+                    request.content,
+                    direct_answer(
+                        request.content, company=company, recent_messages=recent_messages
+                    ),
                 )
             workflow = workflow_store.load("rag_query")
-            company = conversation_company(request.content, session_id)
             query = (
                 request.content
                 if company is None
                 else (f"{request.content}\n\n[대화 문맥의 대상 기업: {company}]")
             )
             run = workflow_executor.create_run(
-                workflow, WorkflowExecutionRequest(inputs={"query": {"query": query}})
+                workflow,
+                WorkflowExecutionRequest(inputs={"query": {"query": query}}),
             )
             workflow_dispatcher.submit(run.id)
             return repository.create_turn(session_id, request.content, run.id, visualization)
@@ -404,14 +408,26 @@ def create_chat_router(
                 repository.recent_user_messages(session_id, limit=1) if session_id else []
             )
             company = conversation_company("", session_id) if session_id else None
-            answer = _with_company_intro(
-                _format_user_facing_answer(
-                    _reader_answer(run) or "답변 생성 결과를 읽지 못했습니다."
-                ),
-                company,
-                recent_questions[0] if recent_questions else "",
+            answer = _format_user_facing_answer(
+                finalize_grounded_answer(
+                    _reader_answer(run),
+                    run,
+                    db_manager,
+                    pgvector_store,
+                )
             )
-            message = repository.complete_turn(run_id, "completed", answer)
+            if answer != INSUFFICIENT_EVIDENCE_ANSWER:
+                answer = _with_company_intro(
+                    answer,
+                    company,
+                    recent_questions[0] if recent_questions else "",
+                )
+            message = repository.complete_turn(
+                run_id,
+                "completed",
+                answer,
+                suppress_visualization=answer == INSUFFICIENT_EVIDENCE_ANSWER,
+            )
         elif run.status in ("failed", "paused"):
             failed = next(
                 (

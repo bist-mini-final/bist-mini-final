@@ -81,6 +81,47 @@ from modules.retrieval.context_expander import ContextDTO
 
 logger = logging.getLogger(__name__)
 
+_INSUFFICIENT_EVIDENCE_ANSWER = "확인 가능한 근거가 부족해 답변할 수 없습니다."
+_CELL_CITATION_PATTERN = re.compile(
+    r"\[Sheet:\s*(?P<sheet>[^\]|]+?)\s*\|\s*Cell:\s*(?P<coord>[A-Za-z]{1,3}[1-9][0-9]{0,6})\]"
+)
+
+
+def _citation_ready_cells(cells: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Keep only cells that can be shown to a user as verifiable evidence."""
+    evidence: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for cell in cells:
+        sheet = str(cell.get("sheet_name") or "").strip()
+        coord = str(cell.get("cell_coord") or "").strip().upper()
+        source = str(cell.get("source_text") or "").strip()
+        if not sheet or not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", coord):
+            continue
+        key = (sheet, coord)
+        if key in seen:
+            continue
+        seen.add(key)
+        evidence.append({"sheet": sheet, "coord": coord, "source": source})
+    return evidence
+
+
+def _render_evidence_cells(cells: list[dict[str, str]]) -> str:
+    return "\n".join(
+        f"- [Sheet: {cell['sheet']} | Cell: {cell['coord']}] {cell['source']}" for cell in cells
+    )
+
+
+def _has_supported_cell_citation(answer: str, evidence_cells: list[dict[str, str]]) -> bool:
+    allowed = {(cell["sheet"].casefold(), cell["coord"]) for cell in evidence_cells}
+    return any(
+        (match.group("sheet").strip().casefold(), match.group("coord").upper()) in allowed
+        for match in _CELL_CITATION_PATTERN.finditer(answer)
+    )
+
+
+def _has_any_cell_citation(answer: str) -> bool:
+    return bool(_CELL_CITATION_PATTERN.search(answer))
+
 
 def _normalize_inline_markdown_tables(answer: str) -> str:
     """Convert an escaped, one-line GFM table into valid Markdown at its source."""
@@ -362,7 +403,7 @@ READER_SYSTEM_PROMPT = """당신은 주어진 재무제표 및 비즈니스 데�
 1. `lookup_cell_metadata`: 컨텍스트에 누락되었거나 정확한 확인이 필요한 특정 셀 좌표가 있다면 이 도구를 호출하여 데이터베이스에서 직접 셀 메타데이터를 조회하십시오.
 2. `calculate_math_expression`: 비율, 증감률, 절대 차이, 비중, 합계, 평균, 반올림 등의 정밀 수치 연산이 필요할 경우 반드시 이 도구를 호출하여 100% 오차 없는 수학적 계산 결과를 도출하십시오.
 
-수치나 특정 항목을 언급할 때는 반드시 해당 셀 좌표나 시트명을 인용([Sheet: A | Cell: B])하십시오.
+수치나 특정 항목을 언급할 때는 반드시 아래 `[검증 가능한 근거 셀]`에 있는 정확한 셀 인용을 붙이십시오. 인용할 수 있는 근거 셀이 없으면 수치·추세·비교 결과를 답하지 말고 `확인 가능한 근거가 부족해 답변할 수 없습니다.`라고만 답하십시오. 임의의 시트명이나 셀 좌표를 만들지 마십시오.
 
 [서식 규칙]
 - 연도·분기별 수치가 3개 이상이면 반드시 GitHub Flavored Markdown 표를 사용하십시오. 첫 행은 `| 연도 | 항목 |`, 둘째 행은 `|---|---|` 형식이어야 합니다.
@@ -376,6 +417,9 @@ READER_SYSTEM_PROMPT = """당신은 주어진 재무제표 및 비즈니스 데�
 
 READER_USER_TEMPLATE = """[Context Blocks]
 {context_text}
+
+[검증 가능한 근거 셀]
+{evidence_cells}
 
 [User Question]
 {question}
@@ -479,6 +523,7 @@ class ReaderModule(BaseLLMModule):
         Dict[str, BaseTool],
         QueryContextDTO,
         DocumentContextDTO,
+        list[dict[str, str]],
     ]:
         preset_data = READER_PRESETS.get(cfg.preset, READER_PRESETS["luna_reader"])
         system_prompt = cfg.system_prompt or preset_data["system_prompt"]
@@ -490,10 +535,15 @@ class ReaderModule(BaseLLMModule):
         user_template = cfg.user_prompt_template or preset_data["user_prompt_template"]
         query_ctx = input_data.context_json.query_context
         doc_ctx = input_data.context_json.document_context
-        user_prompt = user_template.replace(
-            "{context_text}",
-            "\n\n".join(input_data.context_json.items),
-        ).replace("{question}", query_ctx.question_text)
+        evidence_cells = _citation_ready_cells(input_data.context_json.cells)
+        user_prompt = (
+            user_template.replace(
+                "{context_text}",
+                "\n\n".join(input_data.context_json.items),
+            )
+            .replace("{evidence_cells}", _render_evidence_cells(evidence_cells))
+            .replace("{question}", query_ctx.question_text)
+        )
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -512,7 +562,7 @@ class ReaderModule(BaseLLMModule):
             ),
             "calculate_math_expression": CalculateMathExpressionTool(),
         }
-        return messages, tools_map, query_ctx, doc_ctx
+        return messages, tools_map, query_ctx, doc_ctx, evidence_cells
 
     @staticmethod
     def _output(
@@ -536,6 +586,21 @@ class ReaderModule(BaseLLMModule):
             }
         }
 
+    @staticmethod
+    def _ground_answer(
+        answer_text: str,
+        evidence_cells: list[dict[str, str]],
+    ) -> str:
+        normalized = _normalize_inline_markdown_tables(answer_text)
+        if not _has_any_cell_citation(normalized):
+            return (
+                f"{normalized.rstrip()}\n\n**근거**\n{_render_evidence_cells(evidence_cells[:6])}"
+            )
+        if _has_supported_cell_citation(normalized, evidence_cells):
+            return normalized
+        logger.warning("Reader answer rejected because it has no supported cell citation")
+        return _INSUFFICIENT_EVIDENCE_ANSWER
+
     def execute(
         self,
         input_data: ReaderInputDTO,
@@ -543,7 +608,18 @@ class ReaderModule(BaseLLMModule):
     ) -> Dict[str, Any]:
         """Execute Agentic Reader synthesis with LangChain BaseTool native execution."""
         cfg = config or ReaderConfigDTO()
-        messages, tools_map, query_ctx, doc_ctx = self._request(input_data, cfg)
+        messages, tools_map, query_ctx, doc_ctx, evidence_cells = self._request(input_data, cfg)
+
+        if not evidence_cells:
+            return self._output(
+                cfg,
+                query_ctx,
+                doc_ctx,
+                _INSUFFICIENT_EVIDENCE_ANSWER,
+                ApiUsageDTO(),
+                0.0,
+                0.0,
+            )
 
         answer_text, api_usage, total_cost, latency = self.complete_agentic(
             messages=messages,
@@ -556,7 +632,7 @@ class ReaderModule(BaseLLMModule):
             cfg,
             query_ctx,
             doc_ctx,
-            answer_text,
+            self._ground_answer(answer_text, evidence_cells),
             api_usage,
             total_cost,
             latency,
@@ -569,7 +645,17 @@ class ReaderModule(BaseLLMModule):
     ) -> Dict[str, Any]:
         """Execute the provider and tool loop through native async boundaries."""
         cfg = config or ReaderConfigDTO()
-        messages, tools_map, query_ctx, doc_ctx = self._request(input_data, cfg)
+        messages, tools_map, query_ctx, doc_ctx, evidence_cells = self._request(input_data, cfg)
+        if not evidence_cells:
+            return self._output(
+                cfg,
+                query_ctx,
+                doc_ctx,
+                _INSUFFICIENT_EVIDENCE_ANSWER,
+                ApiUsageDTO(),
+                0.0,
+                0.0,
+            )
         answer_text, api_usage, total_cost, latency = await self.complete_agentic_async(
             messages=messages,
             tools_map=tools_map,
@@ -581,7 +667,7 @@ class ReaderModule(BaseLLMModule):
             cfg,
             query_ctx,
             doc_ctx,
-            answer_text,
+            self._ground_answer(answer_text, evidence_cells),
             api_usage,
             total_cost,
             latency,

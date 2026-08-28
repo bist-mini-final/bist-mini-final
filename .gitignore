@@ -66,8 +66,8 @@ data/bencmarks/*
 .vscode/
 
 # Evaluation / Questions data
-data/notion_questions.json
 *notion_question*.json
 data/eval/results/
 !/.github/scripts/
 .claude/
+.codex_tmp/

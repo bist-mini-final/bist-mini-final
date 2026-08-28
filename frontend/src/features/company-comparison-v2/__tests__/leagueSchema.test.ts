@@ -7,6 +7,7 @@ function company(index: number) {
     currency: 'KRW', scale: 'millions', rank: index, previous_rank: index, rank_change: 0,
     composite_score: 75, growth_score: 80, profitability_score: 70, stability_score: 75,
     revenue_cagr: 12, operating_margin: 18, liabilities_to_assets: 35, net_debt: -10, tier: 'A',
+    net_debt_to_revenue: -1,
     candles: Array.from({ length: 8 }, (_, offset) => ({
       year: 2021 + offset, period_type: offset < 5 ? 'historical' : 'forecast',
       open: 20, high: 30, low: 18, close: 28, revenue: 100,

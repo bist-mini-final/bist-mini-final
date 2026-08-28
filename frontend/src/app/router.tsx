@@ -12,9 +12,11 @@ function normalizePathname(pathname: string): string {
   return pathname.replace(/\/+$/, '') || '/';
 }
 
-function navigateTo(pathname: string, replace = false): void {
-  const nextPath = normalizePathname(pathname);
-  if (normalizePathname(window.location.pathname) === nextPath) return;
+export function navigateTo(to: string, replace = false): void {
+  const [pathname, search] = to.split('?');
+  const nextPath = normalizePathname(pathname) + (search ? `?${search}` : '');
+  const currentFull = normalizePathname(window.location.pathname) + (window.location.search || '');
+  if (currentFull === nextPath) return;
   window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);
   window.dispatchEvent(new Event(NAVIGATION_EVENT));
 }

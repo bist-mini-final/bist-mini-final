@@ -65,6 +65,7 @@ def create_api_router(
         completion_client=runtime.completion_client,
         bi_services=domain.bi_services,
         suggestion_service=domain.chat_suggestions,
+        pgvector_store=services.pgvector_store,
         prefix="",
     )
     router.include_router(chat_router, prefix="/chat")
@@ -76,9 +77,7 @@ def create_api_router(
     router.include_router(create_job_router(domain.job_monitor))
     pgvector_store = services.pgvector_store
     router.include_router(create_module_router())
-    router.include_router(
-        create_spreadsheet_artifact_router(paths.spreadsheet_artifact_dir)
-    )
+    router.include_router(create_spreadsheet_artifact_router(paths.spreadsheet_artifact_dir))
     router.include_router(
         create_workflow_router(
             workflow_store=workflow_store,

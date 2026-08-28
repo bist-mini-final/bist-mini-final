@@ -4,23 +4,62 @@
   color-scheme: light;
   --font-ui: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-code: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", "Noto Sans KR", monospace;
+
+  /* Brand Excel Green Palette */
   --brand-50: #effaf4;
   --brand-100: #d7f2e2;
   --brand-200: #aee4c6;
   --brand-500: #168653;
   --brand-600: #107c41;
   --brand-700: #0d6336;
-  --surface: #ffffff;
-  --surface-muted: #f7faf8;
-  --canvas: #f2f7f4;
-  --border: #dce7e1;
-  --text: #17231d;
-  --text-muted: #64746b;
-  --radius-sm: 0.625rem;
-  --radius-md: 0.875rem;
+  --brand-800: #084c28;
+  --brand-900: #05331b;
+
+  /* Light Surfaces & White Backgrounds */
+  --canvas: #f6f8f7;          /* Clean light slate page background */
+  --surface: #ffffff;         /* Pure white container & card surface */
+  --surface-muted: #f4f7f5;   /* Secondary light surface, table headers, inputs */
+  --surface-hover: #eaf6ef;   /* Row hover and active elements */
+
+  /* Borders */
+  --border: #dce7e1;          /* Crisp light green-slate border */
+  --border-subtle: #edf4f0;   /* Very subtle dividers */
+  --border-focus: #107c41;    /* Excel green focus border */
+
+  /* Typography */
+  --text: #17231d;            /* High contrast dark slate */
+  --text-muted: #64746b;      /* Soft muted text */
+  --text-secondary: #3b4e44;  /* Medium contrast secondary text */
+
+  /* Status Colors */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #2563eb;
+
+  /* Tier & Badge Colors (S, A, B, C) */
+  --tier-s-bg: #dcfce7;
+  --tier-s-text: #15803d;
+  --tier-s-border: #86efac;
+
+  --tier-a-bg: #e0f2fe;
+  --tier-a-text: #0369a1;
+  --tier-a-border: #7dd3fc;
+
+  --tier-b-bg: #fef3c7;
+  --tier-b-text: #b45309;
+  --tier-b-border: #fcd34d;
+
+  --tier-c-bg: #fee2e2;
+  --tier-c-text: #b91c1c;
+  --tier-c-border: #fca5a5;
+
+  /* Radii & Shadows */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
   --radius-lg: 1rem;
-  --shadow-card: 0 10px 30px -18px rgb(15 76 43 / 28%);
-  --shadow-float: 0 20px 45px -24px rgb(15 54 34 / 38%);
+  --shadow-card: 0 4px 16px -4px rgba(16, 124, 65, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 12px 32px -6px rgba(16, 124, 65, 0.16), 0 4px 12px rgba(0, 0, 0, 0.06);
   --header-h: 4.75rem;
 }
 
@@ -46,7 +85,7 @@ html {
 }
 
 body {
-  background: #f6f8f7;
+  background: var(--canvas);
   color: var(--text);
   font-family: var(--font-ui);
   font-feature-settings: "kern" 1;
@@ -58,6 +97,7 @@ input,
 select,
 textarea {
   font: inherit;
+  color: inherit;
 }
 
 button,

@@ -181,6 +181,7 @@ class LeagueCompany(BiContractModel):
     operating_margin: float
     liabilities_to_assets: float = Field(ge=0)
     net_debt: float
+    net_debt_to_revenue: float
     tier: FinancialTier
     candles: tuple[FinancialCandle, ...] = Field(min_length=8, max_length=8)
 

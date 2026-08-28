@@ -19,6 +19,17 @@ from backend.features.bi.models import (
 )
 
 from .calculator import ComparisonDataError
+from .league_scoring import (
+    COMPOSITE_TIER_THRESHOLDS,
+    GROWTH_SCORE_CEILING,
+    GROWTH_SCORE_FLOOR,
+    MARGIN_SCORE_CEILING,
+    MARGIN_SCORE_FLOOR,
+    composite_tier,
+    financial_stability_score,
+    growth_score,
+    profitability_score,
+)
 from .models import (
     ComparisonEvidence,
     FinancialCandle,
@@ -68,6 +79,7 @@ class LeagueCandidate(TypedDict):
     operating_margin: float
     liabilities_to_assets: float
     net_debt: float
+    net_debt_to_revenue: float
     tier: FinancialTier
     candles: tuple[FinancialCandle, ...]
     historical_score: float
@@ -78,51 +90,169 @@ class TemporaryCompanySpec:
     company_id: str
     display_name: str
     revenue_2021: float
-    annual_growth: float
-    margin_2021: float
-    annual_margin_gain: float
+    annual_growth_rates: tuple[float, float, float, float]
+    operating_margins: tuple[float, float, float, float, float]
     liabilities_to_assets: float
     net_debt: float
+    lineage: str
 
 
 TEMPORARY_COMPANY_SPECS: Final = (
-    TemporaryCompanySpec("temp-amesoft", "Amesoft", 9_360, 0.106, 10.6, 0.98, 34.0, -420),
-    TemporaryCompanySpec("temp-nexora-labs", "Nexora Labs", 6_480, 0.148, 5.8, 1.62, 46.0, 310),
+    # Bistelligence growth lineage: growth-oriented, with distinct margin and leverage paths.
     TemporaryCompanySpec(
-        "temp-veltrix-systems", "Veltrix Systems", 12_800, 0.081, 18.2, 0.48, 29.0, -860
-    ),
-    TemporaryCompanySpec("temp-lumena-ai", "Lumena AI", 4_250, 0.192, 2.6, 2.18, 52.0, 540),
-    TemporaryCompanySpec("temp-corevia-tech", "Corevia Tech", 15_300, 0.064, 13.4, 0.32, 38.0, 190),
-    TemporaryCompanySpec("temp-altiven", "Altiven", 7_920, 0.117, 9.1, 1.04, 41.0, -120),
-    TemporaryCompanySpec(
-        "temp-serenex-systems", "Serenex Systems", 11_400, 0.049, 21.6, 0.22, 25.0, -1_180
-    ),
-    TemporaryCompanySpec(
-        "temp-bluepeak-digital", "Bluepeak Digital", 5_780, 0.164, 4.4, 1.54, 49.0, 460
+        "temp-amesoft",
+        "Amesoft",
+        9_000,
+        (0.10, 0.111, 0.114, 0.118),
+        (10.2, 11.0, 12.0, 13.2, 14.6),
+        36.0,
+        -600,
+        "Bistelligence growth",
     ),
     TemporaryCompanySpec(
-        "temp-meridian-logic", "Meridian Logic", 13_650, 0.092, 12.1, 0.73, 36.0, -260
+        "temp-nexora-labs",
+        "Nexora Labs",
+        6_800,
+        (0.147, 0.154, 0.156, 0.154),
+        (3.5, 5.0, 7.0, 9.5, 12.5),
+        34.0,
+        -250,
+        "Bistelligence growth",
     ),
     TemporaryCompanySpec(
-        "temp-orbixa-networks", "Orbixa Networks", 8_840, 0.071, 16.8, 0.41, 31.0, -590
+        "temp-veltrix-systems",
+        "Veltrix Systems",
+        12_800,
+        (0.063, 0.088, 0.088, 0.093),
+        (18.0, 18.4, 18.9, 19.4, 20.0),
+        31.0,
+        -900,
+        "Bistelligence growth",
     ),
-    TemporaryCompanySpec("temp-primeforge", "Primeforge", 17_200, 0.038, 8.7, 0.16, 57.0, 1_420),
-    TemporaryCompanySpec("temp-solvanta", "Solvanta", 6_940, 0.128, 7.3, 1.12, 43.0, 230),
     TemporaryCompanySpec(
-        "temp-redwood-dynamics", "Redwood Dynamics", 14_100, 0.056, 14.9, 0.27, 33.0, -370
+        "temp-lumena-ai",
+        "Lumena AI",
+        4_200,
+        (0.19, 0.22, 0.18, 0.125),
+        (2.5, 4.0, 5.5, 7.0, 8.0),
+        58.0,
+        800,
+        "Bistelligence growth",
     ),
     TemporaryCompanySpec(
-        "temp-ironvale-tech", "Ironvale Tech", 10_250, 0.022, 6.2, -0.18, 63.0, 1_860
+        "temp-corevia-tech",
+        "Corevia Tech",
+        15_300,
+        (0.059, 0.056, 0.07, 0.077),
+        (13.2, 13.4, 13.8, 14.1, 14.6),
+        48.0,
+        -200,
+        "Bistelligence growth",
     ),
     TemporaryCompanySpec(
-        "temp-northstar-materials", "Northstar Materials", 19_500, -0.014, 11.5, -0.36, 54.0, 2_140
+        "temp-altiven",
+        "Altiven",
+        7_900,
+        (0.139, 0.117, 0.114, 0.098),
+        (8.8, 9.8, 10.9, 12.2, 13.4),
+        40.0,
+        615,
+        "Bistelligence growth",
+    ),
+    # Coldplay stable lineage: steadier revenue profiles with different capital structures.
+    TemporaryCompanySpec(
+        "temp-serenex-systems",
+        "Serenex Systems",
+        11_400,
+        (0.053, 0.05, 0.048, 0.045),
+        (21.5, 21.7, 22.0, 22.2, 22.5),
+        26.0,
+        -1_200,
+        "Coldplay stable",
+    ),
+    TemporaryCompanySpec(
+        "temp-bluepeak-digital",
+        "Bluepeak Digital",
+        5_800,
+        (0.103, 0.109, 0.127, 0.125),
+        (4.5, 5.8, 7.0, 8.5, 10.0),
+        55.0,
+        900,
+        "Coldplay stable",
+    ),
+    TemporaryCompanySpec(
+        "temp-meridian-logic",
+        "Meridian Logic",
+        13_650,
+        (0.048, 0.056, 0.06, 0.063),
+        (10.0, 10.5, 11.0, 11.5, 12.0),
+        52.0,
+        900,
+        "Coldplay stable",
+    ),
+    TemporaryCompanySpec(
+        "temp-orbixa-networks",
+        "Orbixa Networks",
+        8_840,
+        (0.046, 0.049, 0.057, 0.059),
+        (16.5, 16.9, 17.4, 17.9, 18.5),
+        42.0,
+        -600,
+        "Coldplay stable",
+    ),
+    TemporaryCompanySpec(
+        "temp-primeforge",
+        "Primeforge",
+        17_200,
+        (0.035, 0.017, -0.011, 0.028),
+        (8.8, 9.0, 8.7, 8.9, 9.4),
+        55.0,
+        920,
+        "Coldplay stable",
+    ),
+    TemporaryCompanySpec(
+        "temp-solvanta",
+        "Solvanta",
+        6_940,
+        (0.095, 0.118, 0.118, 0.095),
+        (7.0, 8.0, 9.0, 10.0, 11.0),
+        54.0,
+        1_500,
+        "Coldplay stable",
+    ),
+    # DH Innovation decline lineage: pressure or recovery patterns without copying the anchor.
+    TemporaryCompanySpec(
+        "temp-redwood-dynamics",
+        "Redwood Dynamics",
+        14_100,
+        (-0.035, -0.02, -0.04, -0.03),
+        (8.0, 7.0, 6.0, 4.5, 3.0),
+        63.0,
+        2_200,
+        "DH Innovation decline",
+    ),
+    TemporaryCompanySpec(
+        "temp-ironvale-tech",
+        "Ironvale Tech",
+        10_250,
+        (0.024, -0.038, -0.03, -0.02),
+        (6.2, 5.5, 4.2, 3.5, 3.0),
+        66.0,
+        1_440,
+        "DH Innovation decline",
+    ),
+    TemporaryCompanySpec(
+        "temp-northstar-materials",
+        "Northstar Materials",
+        19_500,
+        (-0.026, -0.032, -0.033, 0.017),
+        (11.5, 10.0, 8.5, 7.0, 7.8),
+        61.0,
+        3_260,
+        "DH Innovation decline",
     ),
 )
 TEMPORARY_COMPANY_COUNT: Final = len(TEMPORARY_COMPANY_SPECS)
-
-
-def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
-    return max(low, min(high, value))
 
 
 def _round(value: float) -> float:
@@ -218,14 +348,11 @@ def _base_from_snapshot(snapshot: BiDashboardSnapshot) -> BaseFinancials | None:
 def _temporary_bases() -> tuple[BaseFinancials, ...]:
     bases: list[BaseFinancials] = []
     for spec in TEMPORARY_COMPANY_SPECS:
-        revenues = {
-            year: spec.revenue_2021 * pow(1 + spec.annual_growth, year - 2021)
-            for year in HISTORICAL_YEARS
-        }
-        margins = {
-            year: spec.margin_2021 + spec.annual_margin_gain * (year - 2021)
-            for year in HISTORICAL_YEARS
-        }
+        annual_revenues = [spec.revenue_2021]
+        for growth_rate in spec.annual_growth_rates:
+            annual_revenues.append(annual_revenues[-1] * (1 + growth_rate))
+        revenues = dict(zip(HISTORICAL_YEARS, annual_revenues, strict=True))
+        margins = dict(zip(HISTORICAL_YEARS, spec.operating_margins, strict=True))
         bases.append(
             BaseFinancials(
                 company_id=CompanyId(spec.company_id),
@@ -242,7 +369,8 @@ def _temporary_bases() -> tuple[BaseFinancials, ...]:
                     sheet_name="Temporary_Scenario",
                     cell_coord="A1",
                     source_text=(
-                        f"{spec.display_name} AI 기업 비교 화면용 임시 재무 시나리오 데이터"
+                        f"{spec.display_name} AI 기업 비교 화면용 임시 재무 시나리오 데이터 "
+                        f"({spec.lineage} 계열 기반)"
                     ),
                 ),
             )
@@ -300,6 +428,7 @@ class FinancialLeagueService:
                 operating_margin=item["operating_margin"],
                 liabilities_to_assets=item["liabilities_to_assets"],
                 net_debt=item["net_debt"],
+                net_debt_to_revenue=item["net_debt_to_revenue"],
                 tier=item["tier"],
                 candles=item["candles"],
             )
@@ -353,36 +482,24 @@ class FinancialLeagueService:
         cagr = (pow(revenue_by_year[2028] / revenue_by_year[2025], 1 / 3) - 1) * 100
         margin = margin_by_year[2028]
         debt_ratio = base.liabilities_to_assets
-        net_debt = base.net_debt - (revenue_by_year[2028] - base.revenues[2025]) * 0.08
-        growth_score = _clamp((cagr + 5) / 30 * 100)
-        profitability_score = _clamp((margin + 5) / 30 * 100)
-        net_cash_bonus = (
-            14 if net_debt <= 0 else -min(22, net_debt / max(revenue_by_year[2028], 1) * 100)
-        )
-        stability_score = _clamp(100 - debt_ratio * 1.15 + net_cash_bonus)
-        growth_score = _round(growth_score)
-        profitability_score = _round(profitability_score)
+        net_debt = base.net_debt
+        net_debt_to_revenue = net_debt / max(base.revenues[2025], 1.0) * 100.0
+        growth_component = growth_score(cagr)
+        profitability_component = profitability_score(margin)
+        stability_score = financial_stability_score(debt_ratio, net_debt, base.revenues[2025])
         stability_score = _round(stability_score)
-        composite = growth_score * 0.35 + profitability_score * 0.35 + stability_score * 0.30
-        historical_margin = margin_by_year[2025]
-        historical_growth_score = _clamp((historical_growth * 100 + 5) / 30 * 100)
-        historical_profit_score = _clamp((historical_margin + 5) / 30 * 100)
-        historical_stability = _clamp(
-            100 - base.liabilities_to_assets * 1.15 + (14 if base.net_debt <= 0 else -8)
+        composite = (
+            growth_component * 0.35 + profitability_component * 0.35 + stability_score * 0.30
         )
+        overall_tier = composite_tier(_round(composite))
+        historical_margin = margin_by_year[2025]
+        historical_growth_score = growth_score(historical_growth * 100)
+        historical_profit_score = profitability_score(historical_margin)
+        historical_stability = stability_score
         historical_score = (
             historical_growth_score * 0.35
             + historical_profit_score * 0.35
             + historical_stability * 0.30
-        )
-        tier = (
-            FinancialTier.S
-            if composite >= 90
-            else FinancialTier.A
-            if composite >= 75
-            else FinancialTier.B
-            if composite >= 60
-            else FinancialTier.C
         )
         candles = tuple(
             self._candle(year, revenue_by_year[year], margin_by_year[year], evidence_id)
@@ -394,14 +511,15 @@ class FinancialLeagueService:
             "currency": base.currency,
             "scale": base.scale,
             "composite_score": _round(composite),
-            "growth_score": _round(growth_score),
-            "profitability_score": _round(profitability_score),
+            "growth_score": growth_component,
+            "profitability_score": profitability_component,
             "stability_score": _round(stability_score),
             "revenue_cagr": _round(cagr),
             "operating_margin": _round(margin),
             "liabilities_to_assets": _round(debt_ratio),
             "net_debt": _round(net_debt),
-            "tier": tier,
+            "net_debt_to_revenue": _round(net_debt_to_revenue),
+            "tier": overall_tier,
             "candles": candles,
             "historical_score": historical_score,
         }
@@ -445,7 +563,16 @@ class FinancialLeagueService:
 
 
 __all__ = [
+    "COMPOSITE_TIER_THRESHOLDS",
     "FinancialLeagueService",
     "FinancialLeagueStorePort",
+    "GROWTH_SCORE_CEILING",
+    "GROWTH_SCORE_FLOOR",
+    "MARGIN_SCORE_CEILING",
+    "MARGIN_SCORE_FLOOR",
     "TEMPORARY_COMPANY_COUNT",
+    "composite_tier",
+    "financial_stability_score",
+    "growth_score",
+    "profitability_score",
 ]

@@ -19,7 +19,7 @@ graph TD
     ROUTER --> P_BI["BiPage (/dashboard, alias /bi) -> BiPage / BiDashboard"]
     ROUTER --> P_CHAT["ChatbotPage (/chatbot) -> ChatbotView [운영중]"]
     ROUTER --> P_COMP["CompanyComparisonPage (/company-comparison) -> ComparisonView"]
-    ROUTER --> P_COMP_V2["CompanyComparisonV2Page (/company-comparison-v2) -> RAG comparison"]
+    ROUTER --> P_COMP_V2["CompanyComparisonV2Page (/company-comparison-v2) -> Financial League"]
     ROUTER --> P_JOBS["JobsPage (/jobs) -> KEDA/Job/Pod monitor"]
     ROUTER --> P_SET["SettingsPage (/settings) -> SettingsView"]
     ROUTER --> P_404["NotFoundPage (404 Fallback)"]
@@ -29,7 +29,7 @@ graph TD
     P_BI --> RECHARTS["Recharts (Area, Bar, Line, ResponsiveContainer)"]
     P_BI --> HEATMAP["FinancialHealthHeatmap (종합 재무 건전성 히트맵)"]
     P_CHAT --> CHAT_VIEW["ChatbotView (Session Sidebar, Message Bubble, MathJax, Inline Chart)"]
-    P_COMP_V2 --> RAG_COMPARE["Selected-company RAG comparison & evidence view"]
+    P_COMP_V2 --> LEAGUE_VIEW["Metric ranking + company insight + two-company comparison + BI deep link"]
     P_JOBS --> JOB_MONITOR["5-second read-only Kubernetes workload polling"]
 ```
 
@@ -45,6 +45,6 @@ graph TD
 | `/dashboard` (`/bi` 호환 별칭) | `Financial BI` | [`BiPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 21개 근거 기반 지표 차트 |
 | `/chatbot` | `AI Financial Chatbot` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 세션 기반 대화형 챗봇 & 인라인 시각화 |
 | `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 다중 기업 듀퐁 3단계 분해 비교 |
-| `/company-comparison-v2` | `AI Company Comparison` | [`CompanyComparisonV2Page`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonV2Page.tsx) | **[운영중]** 선택 기업만을 대상으로 하는 RAG 근거 기반 비교 |
+| `/company-comparison-v2` | `AI Company Comparison` | [`CompanyComparisonV2Page`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonV2Page.tsx) | **[운영중]** 지표별 재무 리그, 선택 기업 분석·2개 기업 비교 및 BI 딥링크 |
 | `/jobs` | `Jobs` | [`JobsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/JobsPage.tsx) | **[운영중]** KEDA/Job/Pod와 PostgreSQL 큐·Lease 읽기 전용 상관 관제 |
 | `/settings` | `Settings` | [`SettingsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/SettingsPage.tsx) | **[운영중]** 시스템·연결 설정 화면 |
