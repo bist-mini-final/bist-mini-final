@@ -78,6 +78,11 @@ def test_reader_tool_calling_execution():
                 sheet_names=["손익계산서"],
             ),
             items=["초안 컨텍스트 데이터"],
+            cells=[{
+                "cell_coord": "B10",
+                "sheet_name": "손익계산서",
+                "source_text": "영업이익 65,670억원",
+            }],
         )
     )
 
@@ -134,8 +139,85 @@ def test_reader_math_tool_calling_execution():
                 sheet_names=["손익계산서"],
             ),
             items=["2023년 영업이익: 65670억, 2024년 영업이익: 350000억"],
+            cells=[{
+                "cell_coord": "E60",
+                "sheet_name": "손익계산서",
+                "source_text": "2023년 영업이익: 65670억",
+            }],
         )
     )
 
     res = reader.execute(input_dto)
     assert "432.97%" in res["answer_json"]["answer"]
+
+
+def test_reader_rejects_numeric_answer_when_no_verifiable_cells_exist():
+    mock_llm = MagicMock()
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    input_dto = ReaderInputDTO(
+        context_json=ContextDTO(
+            query_context=QueryContextDTO(question_id="q3", question_text="IBM 총자산은 얼마인가요?"),
+            document_context=DocumentContextDTO(file_name="ibm.xlsx", workbook_hash="hash123"),
+            items=["IBM 총자산: 151,880"],
+        )
+    )
+
+    result = reader.execute(input_dto)
+
+    assert result["answer_json"]["answer"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert not mock_llm.create_response.called
+
+
+def test_reader_rejects_answer_with_an_unsupported_cell_citation():
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_answer",
+        content="IBM 총자산은 151,880입니다. [Sheet: Balance Sheet | Cell: Z99]",
+        usage={"prompt_tokens": 100, "completion_tokens": 20},
+        latency_seconds=0.1,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    input_dto = ReaderInputDTO(
+        context_json=ContextDTO(
+            query_context=QueryContextDTO(question_id="q4", question_text="IBM 총자산은 얼마인가요?"),
+            document_context=DocumentContextDTO(file_name="ibm.xlsx", workbook_hash="hash123"),
+            items=["IBM 총자산: 151,880"],
+            cells=[{
+                "cell_coord": "E50",
+                "sheet_name": "Balance Sheet",
+                "source_text": "IBM 총자산: 151,880",
+            }],
+        )
+    )
+
+    result = reader.execute(input_dto)
+
+    assert result["answer_json"]["answer"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+
+
+def test_reader_appends_verified_evidence_when_model_omits_citations():
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_answer",
+        content="IBM 총자산은 151,880입니다.",
+        usage={"prompt_tokens": 100, "completion_tokens": 20},
+        latency_seconds=0.1,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    input_dto = ReaderInputDTO(
+        context_json=ContextDTO(
+            query_context=QueryContextDTO(question_id="q5", question_text="IBM 총자산은 얼마인가요?"),
+            document_context=DocumentContextDTO(file_name="ibm.xlsx", workbook_hash="hash123"),
+            items=["IBM 총자산: 151,880"],
+            cells=[{
+                "cell_coord": "E50",
+                "sheet_name": "Balance Sheet",
+                "source_text": "IBM 총자산: 151,880",
+            }],
+        )
+    )
+
+    result = reader.execute(input_dto)
+
+    assert "**근거**" in result["answer_json"]["answer"]
+    assert "[Sheet: Balance Sheet | Cell: E50]" in result["answer_json"]["answer"]
