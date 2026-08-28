@@ -16,6 +16,7 @@ from backend.engine.workflows import (
 from backend.features.bi.api_services import BiApiServices
 from backend.providers.openai_responses import OpenAIResponsesClient, OpenAIResponsesError
 from backend.storage.db_manager import DatabaseManager
+from backend.storage.pgvector_store import PgVectorStore
 from modules.common.config import DEFAULT_READER_MODEL
 
 from .attachments import compact_evidence, save_upload
@@ -44,9 +45,168 @@ def _reader_answer(run: Any) -> str | None:
     return answer if isinstance(answer, str) and answer.strip() else None
 
 
+_INSUFFICIENT_EVIDENCE_ANSWER = "확인 가능한 근거가 부족해 답변할 수 없습니다."
+_CELL_CITATION_PATTERN = re.compile(
+    r"\[Sheet:\s*(?P<sheet>[^\]|]+?)\s*\|\s*Cell:\s*(?P<coord>[A-Za-z]{1,3}[1-9][0-9]{0,6})\]"
+)
+
+
+def _run_evidence_cells(run: Any) -> list[tuple[str, str, str]]:
+    """Return only source cells that the completed RAG run actually produced."""
+    node = run.nodes.get("expand-context") if getattr(run, "nodes", None) else None
+    output = node.output if node else None
+    context = output.get("context_json", output) if isinstance(output, dict) else None
+    cells = context.get("cells") if isinstance(context, dict) else None
+    if not isinstance(cells, list):
+        return []
+    evidence: list[tuple[str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        sheet = str(cell.get("sheet_name") or "").strip()
+        coord = str(cell.get("cell_coord") or "").strip().upper()
+        source = str(cell.get("source_text") or "").strip()
+        key = (sheet, coord)
+        if not sheet or not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", coord) or key in seen:
+            continue
+        seen.add(key)
+        evidence.append((sheet, coord, source))
+    return evidence
+
+
+def _recover_evidence_cells(run: Any, database: DatabaseManager | None) -> list[tuple[str, str, str]]:
+    """Recover source cells when a Kubernetes worker externalized context output."""
+    if database is None:
+        return []
+    try:
+        logs = database.get_node_execution_logs(run.id)
+        fusion = next((log for log in reversed(logs) if log["node_id"] == "fuse"), None)
+        reader = next((log for log in reversed(logs) if log["node_id"] == "read"), None)
+        fusion_output = fusion.get("output") if fusion else None
+        reader_output = reader.get("output") if reader else None
+        items = fusion_output.get("items") if isinstance(fusion_output, dict) else None
+        answer_json = reader_output.get("answer_json") if isinstance(reader_output, dict) else None
+        document = answer_json.get("document_context") if isinstance(answer_json, dict) else None
+        if not isinstance(items, list) or not isinstance(document, dict):
+            return []
+        cell_ids = [str(item.get("cell_id") or "") for item in items[:30] if isinstance(item, dict)]
+        records = PgVectorStore().fetch_cells_by_metadata(
+            cell_identifiers=cell_ids,
+            collection_name=document.get("index_id"),
+            workbook_hash=document.get("workbook_hash"),
+            company_name=document.get("company_name"),
+            limit=30,
+        )
+    except Exception:
+        return []
+    return [
+        (str(record["sheet_name"]), str(record["cell_coord"]).upper(), str(record.get("source_text") or ""))
+        for record in records
+        if record.get("sheet_name") and re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", str(record.get("cell_coord") or "").upper())
+    ]
+
+
+def _finalize_grounded_answer(
+    answer: str | None,
+    run: Any,
+    database: DatabaseManager | None = None,
+) -> str:
+    """Block unsupported RAG answers and attach source cells as chat citations."""
+    if not answer or answer.strip() == _INSUFFICIENT_EVIDENCE_ANSWER:
+        return _INSUFFICIENT_EVIDENCE_ANSWER
+    evidence = _run_evidence_cells(run) or _recover_evidence_cells(run, database)
+    if not evidence:
+        return _INSUFFICIENT_EVIDENCE_ANSWER
+    allowed = {(sheet.casefold(), coord) for sheet, coord, _ in evidence}
+    citations = list(_CELL_CITATION_PATTERN.finditer(answer))
+    if citations and not any(
+        (match.group("sheet").strip().casefold(), match.group("coord").upper()) in allowed
+        for match in citations
+    ):
+        return _INSUFFICIENT_EVIDENCE_ANSWER
+    if not citations:
+        sources = "\n".join(
+            f"- [Sheet: {sheet} | Cell: {coord}] {source}"
+            for sheet, coord, source in evidence[:6]
+        )
+        return f"{answer.rstrip()}\n\n**근거**\n{sources}"
+    return answer
+
+
 _RAG_TERMS = ("매출", "영업이익", "순이익", "자산", "부채", "자본", "현금흐름", "재무", "실적", "eps", "dps", "수치", "얼마", "몇", "분기", "연도")
 _CHART_TERMS = ("그래프", "차트", "추이", "추세", "변화", "비교", "연도별")
-_EXPLANATION_TERMS = ("뜻", "의미", "정의", "란", "무엇", "설명")
+_EXPLANATION_TERMS = (
+    "뜻",
+    "의미",
+    "정의",
+    "란",
+    "무엇",
+    "설명",
+    "뭐야",
+    "뭐예요",
+    "뭔가요",
+    "뭔지",
+    "무엇인가요",
+    "무엇이에요",
+)
+_DATA_REQUEST_TERMS = ("얼마", "몇", "20", "최신", "실적", "수치", "금액", "분기", "연도", "작년", "올해")
+_RECENT_QUESTION_PATTERNS = (
+    "방금 뭘 물어봤",
+    "방금 무엇을 물어봤",
+    "직전에 뭘 물어봤",
+    "직전에 무엇을 물어봤",
+    "내가 뭐 물어봤",
+)
+_COMPANY_ALIASES = {
+    "bistelligence": ("비스텔리젼스", "비스텔리전스"),
+}
+
+
+def _company_aliases(name: str) -> tuple[str, ...]:
+    """Return catalog, ticker, and supported Korean aliases for a company."""
+    base_name = name.split("(", 1)[0].strip()
+    tickers = re.findall(r"\b[A-Z]{2,8}\b", name)
+    normalized_name = base_name.casefold()
+    aliases = next(
+        (values for key, values in _COMPANY_ALIASES.items() if normalized_name.startswith(key)),
+        (),
+    )
+    return tuple(dict.fromkeys((name, base_name, *tickers, *aliases)))
+
+
+def _is_recent_question_request(question: str) -> bool:
+    normalized = re.sub(r"\s+", "", question)
+    return any(re.sub(r"\s+", "", pattern) in normalized for pattern in _RECENT_QUESTION_PATTERNS)
+
+
+def _company_identity_answer(company: str, question: str) -> str | None:
+    """Answer short company-name confirmation and correction questions deterministically."""
+    lowered = question.casefold()
+    if not any(term in lowered for term in ("알아", "회사", "회사명", "서비스", "브랜드명", "이름")):
+        return None
+    return (
+        f"네. 제공된 데이터 기준으로 **{company}**는 분석 대상 회사명입니다. "
+        "서비스명이나 일반적인 솔루션명이 아닙니다."
+    )
+
+
+def _needs_rag(question: str, visualization: dict[str, str] | None) -> bool:
+    """Route only requests for stored company data to the RAG workflow.
+
+    A financial term on its own can be a request for a general definition.  In
+    particular, Korean colloquialisms such as ``영업이익이 뭐야?`` must not
+    retrieve every indexed company's result merely because they contain a
+    financial metric name.
+    """
+    lowered = question.casefold()
+    if visualization is not None:
+        return True
+    if any(term in lowered for term in _EXPLANATION_TERMS) and not any(
+        marker in lowered for marker in _DATA_REQUEST_TERMS
+    ):
+        return False
+    return any(term in lowered for term in _RAG_TERMS)
 
 
 def _repair_inline_markdown_tables(answer: str) -> str:
@@ -79,7 +239,9 @@ def _repair_inline_markdown_tables(answer: str) -> str:
             *(f"| {' | '.join(row)} |" for row in rows),
         ]
         remainder = " | ".join(data_cells[row_count * len(header_cells):]).strip()
-        repaired_lines.append(f"{line[:table_start]}{'\n'.join(table)}{f'\n{remainder}' if remainder else ''}")
+        rendered_table = "\n".join(table)
+        suffix = f"\n{remainder}" if remainder else ""
+        repaired_lines.append(f"{line[:table_start]}{rendered_table}{suffix}")
     return "\n".join(repaired_lines)
 
 
@@ -89,7 +251,7 @@ def _format_user_facing_answer(answer: str) -> str:
     cleaned = re.sub(
         r"(?<![A-Za-z])NA(?![A-Za-z])\s*로?\s*근거가 부족(?:합니다|해요)?",
         "확인 가능한 근거가 부족해 요약에서 제외했습니다",
-        answer,
+        cleaned,
         flags=re.IGNORECASE,
     )
     cleaned = re.sub(
@@ -155,46 +317,44 @@ def create_chat_router(*, db_manager: DatabaseManager, workflow_store: WorkflowS
         if not any(term in lowered for term in _CHART_TERMS):
             return None
         for entry in bi_services.store.list_companies():
-            if entry.company.display_name.lower() in lowered:
+            if any(alias.casefold() in lowered for alias in _company_aliases(entry.company.display_name)):
                 if bi_services.store.get_current(entry.company.company_id) is not None:
                     return {"company_id": str(entry.company.company_id), "card_id": _card_id(question)}
         return None
 
-    def needs_rag(question: str, visualization: dict[str, str] | None) -> bool:
-        lowered = question.lower()
-        if visualization is not None:
-            return True
-        # 용어 정의는 사내 문서의 숫자 근거가 필요하지 않으므로, 별도 LLM
-        # 답변으로 보냅니다. 단, 연도/금액을 함께 묻는 경우는 RAG가 우선입니다.
-        if any(term in lowered for term in _EXPLANATION_TERMS) and not any(
-            marker in lowered for marker in ("얼마", "몇", "20", "최신", "실적")
-        ):
-            return False
-        return any(term in lowered for term in _RAG_TERMS)
-
-    def company_aliases(name: str) -> tuple[str, ...]:
-        base_name = name.split("(", 1)[0].strip()
-        tickers = re.findall(r"\b[A-Z]{2,8}\b", name)
-        return tuple(dict.fromkeys((name, base_name, *tickers)))
-
     def conversation_company(question: str, session_id: str) -> str | None:
         companies = repository.company_names()
         question_lower = question.casefold()
-        if any(alias.casefold() in question_lower for name in companies for alias in company_aliases(name)):
-            return None
+        for name in companies:
+            if any(alias.casefold() in question_lower for alias in _company_aliases(name)):
+                return name
         for message in repository.recent_user_messages(session_id):
             message_lower = message.casefold()
             for name in companies:
-                if any(alias.casefold() in message_lower for alias in company_aliases(name)):
+                if any(alias.casefold() in message_lower for alias in _company_aliases(name)):
                     return name
         return None
 
-    def direct_answer(question: str) -> str:
+    def direct_answer(question: str, *, company: str | None, recent_messages: list[str]) -> str:
+        context = "\n".join(f"- {message}" for message in recent_messages[:3])
         result = completion_client.create_response(
             model=DEFAULT_READER_MODEL,
-            instructions=("당신은 금융 서비스의 친절한 대화 도우미입니다. 제공된 사내 데이터는 조회하지 않습니다. "
-                          "일상 대화와 금융 용어의 일반적 정의만 간결하게 답하고, 특정 기업의 최신 수치·실적은 데이터 조회가 필요하다고 안내하십시오."),
-            input_items=[{"role": "user", "content": question}],
+            instructions=(
+                "당신은 금융 서비스의 친절한 대화 도우미입니다. 제공된 사내 데이터는 직접 조회하지 않습니다. "
+                "일상 대화와 금융 용어의 일반적 정의만 간결하게 답하고, 특정 기업의 최신 수치·실적은 데이터 조회가 필요하다고 안내하십시오. "
+                "현재 질문이 금융 용어의 뜻·의미·정의(예: '영업이익이 뭐야?')라면 일반적인 정의만 답하고, "
+                "최근 대화나 등록 기업의 이름, 기업별 수치·실적·표를 절대 덧붙이지 마십시오. "
+                "대화 문맥의 대상 기업이 있으면 그 기업은 이 서비스의 등록 분석 대상 회사라고만 말하고, "
+                "서비스명·제품명이라고 추측하지 마십시오. 최근 대화는 현재 질문의 대상 식별에만 사용하십시오."
+            ),
+            input_items=[{
+                "role": "user",
+                "content": (
+                    f"최근 사용자 대화:\n{context or '- 없음'}\n\n"
+                    f"대화 문맥의 대상 기업: {company or '없음'}\n\n"
+                    f"현재 질문: {question}"
+                ),
+            }],
             max_output_tokens=400,
             max_retries=0,
         )
@@ -299,11 +459,25 @@ def create_chat_router(*, db_manager: DatabaseManager, workflow_store: WorkflowS
                     attachment_answer(request.content, attachment),
                     attachment_meta,
                 )
-            visualization = visualization_for(request.content)
-            if not needs_rag(request.content, visualization):
-                return repository.create_direct_turn(session_id, request.content, direct_answer(request.content))
-            workflow = workflow_store.load("rag_query")
+            recent_messages = repository.recent_user_messages(session_id, limit=3)
             company = conversation_company(request.content, session_id)
+            if _is_recent_question_request(request.content) and recent_messages:
+                return repository.create_direct_turn(
+                    session_id,
+                    request.content,
+                    f"방금 전에는 “{recent_messages[0]}”라고 물으셨습니다.",
+                )
+            identity_answer = _company_identity_answer(company, request.content) if company else None
+            if identity_answer:
+                return repository.create_direct_turn(session_id, request.content, identity_answer)
+            visualization = visualization_for(request.content)
+            if not _needs_rag(request.content, visualization):
+                return repository.create_direct_turn(
+                    session_id,
+                    request.content,
+                    direct_answer(request.content, company=company, recent_messages=recent_messages),
+                )
+            workflow = workflow_store.load("rag_query")
             query = request.content if company is None else (
                 f"{request.content}\n\n[대화 문맥의 대상 기업: {company}]"
             )
@@ -326,14 +500,21 @@ def create_chat_router(*, db_manager: DatabaseManager, workflow_store: WorkflowS
             session_id = repository.session_id_for_run(run_id)
             recent_questions = repository.recent_user_messages(session_id, limit=1) if session_id else []
             company = conversation_company("", session_id) if session_id else None
-            answer = _with_company_intro(
-                _format_user_facing_answer(
-                    _reader_answer(run) or "답변 생성 결과를 읽지 못했습니다."
-                ),
-                company,
-                recent_questions[0] if recent_questions else "",
+            answer = _format_user_facing_answer(
+                _finalize_grounded_answer(_reader_answer(run), run, run_store.db_manager)
             )
-            message = repository.complete_turn(run_id, "completed", answer)
+            if answer != _INSUFFICIENT_EVIDENCE_ANSWER:
+                answer = _with_company_intro(
+                    answer,
+                    company,
+                    recent_questions[0] if recent_questions else "",
+                )
+            message = repository.complete_turn(
+                run_id,
+                "completed",
+                answer,
+                suppress_visualization=answer == _INSUFFICIENT_EVIDENCE_ANSWER,
+            )
         elif run.status in ("failed", "paused"):
             failed = next((node.error for node in run.nodes.values() if node.status == "failed" and node.error), "질문 처리가 중지되었습니다.")
             message = repository.complete_turn(run_id, "failed", failed)
