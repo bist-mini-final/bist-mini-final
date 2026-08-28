@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BiDashboardGrid } from './components/BiDashboardGrid';
 import { BiDataState } from './components/BiDataState';
 import { BiHeader } from './components/BiHeader';
@@ -24,6 +24,11 @@ const SELECTED_COMPANY_KEY = 'rag-flow:bi-selected-company:v1';
 
 function readSelectedCompanyId(): string {
   try {
+    const fromUrl = new URLSearchParams(window.location.search).get('companyId');
+    if (fromUrl) {
+      window.localStorage.setItem(SELECTED_COMPANY_KEY, fromUrl);
+      return fromUrl;
+    }
     return window.localStorage.getItem(SELECTED_COMPANY_KEY) ?? '';
   } catch (error) {
     if (error instanceof DOMException) return '';
@@ -43,6 +48,23 @@ export function BiPage() {
   const companiesController = useBiCompanies();
   const companiesState = companiesController.state;
   const [selectedCompanyId, setSelectedCompanyId] = useState(readSelectedCompanyId);
+
+  // Sync when URL companyId parameter changes
+  useEffect(() => {
+    const handleSync = () => {
+      const urlId = new URLSearchParams(window.location.search).get('companyId');
+      if (urlId && urlId !== selectedCompanyId) {
+        setSelectedCompanyId(urlId);
+        storeSelectedCompanyId(urlId);
+      }
+    };
+    window.addEventListener('popstate', handleSync);
+    window.addEventListener('rag-flow:navigation', handleSync);
+    return () => {
+      window.removeEventListener('popstate', handleSync);
+      window.removeEventListener('rag-flow:navigation', handleSync);
+    };
+  }, [selectedCompanyId]);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodRange>('최근 5개');
   const [isEditing, setIsEditing] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
