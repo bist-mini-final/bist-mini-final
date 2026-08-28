@@ -1,8 +1,16 @@
+from collections import Counter
+from math import isfinite
+
 from backend.features.bi.models import AmountScale, BiEvidence, CompanyId
 from backend.features.company_comparison.league_service import (
     BaseFinancials,
     FinancialLeagueService,
+    composite_tier,
+    financial_stability_score,
+    growth_score,
+    profitability_score,
 )
+from backend.features.company_comparison.models import FinancialTier
 
 
 class UnavailableStore:
@@ -65,6 +73,71 @@ def test_league_exposes_only_fifteen_page_scoped_temporary_companies_without_sto
     assert len(result.companies) == 15
     assert all(company.company_id.startswith("temp-") for company in result.companies)
     assert {item.file_name for item in result.evidence} == {"company-comparison-temporary-data"}
+
+
+def test_temporary_companies_have_balanced_composite_grades() -> None:
+    result = FinancialLeagueService(UnavailableStore()).build()
+
+    assert Counter(company.tier for company in result.companies) == {
+        FinancialTier.S: 3,
+        FinancialTier.A: 4,
+        FinancialTier.B: 5,
+        FinancialTier.C: 3,
+    }
+    assert all(company.tier == composite_tier(company.composite_score) for company in result.companies)
+    assert all(
+        isfinite(value)
+        for company in result.companies
+        for value in (
+            company.composite_score,
+            company.stability_score,
+            company.net_debt_to_revenue,
+            company.revenue_cagr,
+            company.operating_margin,
+        )
+    )
+
+
+def _anchor_composite(
+    revenue_2021: float,
+    revenue_2025: float,
+    margin: float,
+    liabilities_to_assets: float,
+    net_debt: float,
+) -> float:
+    cagr = (pow(revenue_2025 / revenue_2021, 1 / 4) - 1) * 100
+    return round(
+        growth_score(cagr) * 0.35
+        + profitability_score(margin) * 0.35
+        + financial_stability_score(
+            liabilities_to_assets, net_debt, revenue_2025
+        )
+        * 0.30,
+        2,
+    )
+
+
+def test_parsed_anchor_profiles_calibrate_the_absolute_score_scale() -> None:
+    bistelligence = _anchor_composite(12_000, 18_000, 14.5, 37.60, -1_800)
+    coldplay = _anchor_composite(15_600, 17_700, 10.197740112994351, 49.43, -354)
+    dh_innovation = _anchor_composite(17_400, 12_400, -3.0, 100.0, 3_968)
+
+    assert bistelligence == 93.02
+    assert composite_tier(bistelligence) == FinancialTier.S
+    assert coldplay == 67.41
+    assert composite_tier(coldplay) == FinancialTier.B
+    assert dh_innovation == 6.49
+    assert composite_tier(dh_innovation) == FinancialTier.C
+
+    virtual_companies = FinancialLeagueService(UnavailableStore()).build().companies
+    assert max(company.composite_score for company in virtual_companies) > bistelligence
+
+
+def test_overall_tier_uses_the_standard_one_hundred_point_scale() -> None:
+    assert composite_tier(90) == FinancialTier.S
+    assert composite_tier(75) == FinancialTier.A
+    assert composite_tier(50) == FinancialTier.B
+    assert composite_tier(49.99) == FinancialTier.C
 
 
 def test_league_score_uses_documented_weights_and_valid_candles() -> None:
