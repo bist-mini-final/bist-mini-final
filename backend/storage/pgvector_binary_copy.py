@@ -1,10 +1,11 @@
-"""Bounded-memory PostgreSQL binary COPY stream for float32 vector artifacts."""
+"""Canonical bounded-memory PostgreSQL binary COPY stream for pgvector rows."""
 
 from __future__ import annotations
 
 import io
 import json
 import struct
+import sys
 from array import array
 from collections import deque
 from typing import Any, Callable, Deque, Dict, Iterator, Optional, Sequence
@@ -26,19 +27,21 @@ def _field_prefix(length: int) -> bytes:
 
 
 class PgVectorBinaryCopyStream(io.RawIOBase):
-    """Pull-based COPY stream that never expands vectors into Python floats.
+    """Pull-based COPY stream for artifact-backed or ordinary float vectors.
 
     Artifact vectors are stored as little-endian float32. PostgreSQL's binary
     protocol expects network byte order, so each bounded raw batch is byte-swapped
     once with a C-backed ``array`` operation. Row framing is emitted as small
     memoryview segments and consumed by psycopg without constructing a full COPY
-    payload in memory.
+    payload in memory. Ordinary vector sequences use the same row framing and are
+    converted in bounded batches, keeping Binary COPY as the sole embedding write
+    path.
     """
 
     def __init__(
         self,
         documents: Sequence[Document],
-        vectors: EmbeddingArtifactVectors,
+        vectors: EmbeddingArtifactVectors | Sequence[Sequence[float]],
         collection_uuid: str,
         *,
         batch_size: int,
@@ -49,24 +52,35 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
             raise ModuleExecutionError(
                 "COPY 대상 문서 개수와 float32 벡터 개수가 일치하지 않습니다"
             )
-        if not 0 < vectors.dimension <= 32_767:
+        dimension = (
+            vectors.dimension
+            if isinstance(vectors, EmbeddingArtifactVectors)
+            else len(vectors[0])
+        )
+        if not 0 < dimension <= 32_767:
             raise ModuleExecutionError(
-                f"PostgreSQL vector 바이너리 차원이 올바르지 않습니다: {vectors.dimension}"
+                f"PostgreSQL vector 바이너리 차원이 올바르지 않습니다: {dimension}"
             )
         self._documents = documents
         self._vectors = vectors
         self._collection_uuid = UUID(collection_uuid).bytes
         self._batch_size = max(1, batch_size)
         self._progress_callback = progress_callback
-        self._raw_batches: Iterator[bytes] = vectors.iter_raw_batches(self._batch_size)
+        self._raw_batches: Iterator[bytes] | None = (
+            vectors.iter_raw_batches(self._batch_size)
+            if isinstance(vectors, EmbeddingArtifactVectors)
+            else None
+        )
+        self._sequence_batch_start = 0
         self._segments: Deque[memoryview] = deque([memoryview(_COPY_HEADER)])
         self._document_index = 0
         self._current_batch: Optional[memoryview] = None
         self._current_batch_position = 0
         self._current_batch_count = 0
         self._trailer_queued = False
-        self._bytes_per_vector = vectors.dimension * 4
-        self._vector_field_header = struct.pack("!HH", vectors.dimension, 0)
+        self._dimension = dimension
+        self._bytes_per_vector = dimension * 4
+        self._vector_field_header = struct.pack("!HH", dimension, 0)
         self._total_batches = max(
             1,
             (len(documents) + self._batch_size - 1) // self._batch_size,
@@ -81,26 +95,58 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         return True
 
     def _load_vector_batch(self) -> None:
-        try:
-            raw = next(self._raw_batches)
-        except StopIteration as error:
-            raise ModuleExecutionError(
-                "float32 아티팩트가 문서 개수보다 먼저 종료되었습니다"
-            ) from error
-        if len(raw) % self._bytes_per_vector != 0:
-            raise ModuleExecutionError(
-                "float32 아티팩트 배치가 벡터 경계에 맞지 않습니다"
+        if isinstance(self._vectors, EmbeddingArtifactVectors):
+            assert self._raw_batches is not None
+            try:
+                raw = next(self._raw_batches)
+            except StopIteration as error:
+                raise ModuleExecutionError(
+                    "float32 아티팩트가 문서 개수보다 먼저 종료되었습니다"
+                ) from error
+            if len(raw) % self._bytes_per_vector != 0:
+                raise ModuleExecutionError(
+                    "float32 아티팩트 배치가 벡터 경계에 맞지 않습니다"
+                )
+            vector_count = len(raw) // self._bytes_per_vector
+            words = array("I")
+            if words.itemsize != 4:
+                raise ModuleExecutionError(
+                    "현재 플랫폼의 32비트 word 크기가 PostgreSQL COPY 형식과 다릅니다"
+                )
+            words.frombytes(raw)
+            # Artifact bytes are little-endian and PostgreSQL binary values use
+            # network byte order. Swapping the raw words avoids float objects.
+            if sys.byteorder == "little":
+                words.byteswap()
+        else:
+            stop = min(
+                self._sequence_batch_start + self._batch_size,
+                len(self._vectors),
             )
-        vector_count = len(raw) // self._bytes_per_vector
-        words = array("I")
-        if words.itemsize != 4:
-            raise ModuleExecutionError(
-                "현재 플랫폼의 32비트 word 크기가 PostgreSQL COPY 형식과 다릅니다"
-            )
-        words.frombytes(raw)
-        # Artifact bytes are little-endian and PostgreSQL binary values use
-        # network byte order. Swapping the raw 4-byte words avoids float objects.
-        words.byteswap()
+            if stop <= self._sequence_batch_start:
+                raise ModuleExecutionError(
+                    "벡터 시퀀스가 문서 개수보다 먼저 종료되었습니다"
+                )
+            words = array("f")
+            for vector in self._vectors[self._sequence_batch_start:stop]:
+                if len(vector) != self._dimension:
+                    raise ModuleExecutionError(
+                        "COPY 벡터 차원이 컬렉션 메타데이터와 일치하지 않습니다"
+                    )
+                try:
+                    words.extend(float(value) for value in vector)
+                except (TypeError, ValueError, OverflowError) as error:
+                    raise ModuleExecutionError(
+                        "COPY 벡터에 float32로 변환할 수 없는 값이 있습니다"
+                    ) from error
+            if words.itemsize != 4:
+                raise ModuleExecutionError(
+                    "현재 플랫폼의 float32 word 크기가 PostgreSQL COPY 형식과 다릅니다"
+                )
+            if sys.byteorder == "little":
+                words.byteswap()
+            vector_count = stop - self._sequence_batch_start
+            self._sequence_batch_start = stop
         self._current_batch = memoryview(words).cast("B")
         self._current_batch_position = 0
         self._current_batch_count = vector_count
@@ -222,16 +268,16 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         super().close()
 
 
-def copy_float32_artifact_documents(
+def copy_documents(
     connection: Any,
     *,
     collection_uuid: str,
     documents: Sequence[Document],
-    vectors: EmbeddingArtifactVectors,
+    vectors: EmbeddingArtifactVectors | Sequence[Sequence[float]],
     batch_size: int,
     progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
 ) -> None:
-    """Stream documents and float32 vectors into an empty collection with COPY."""
+    """Stream documents and vectors into an empty collection using Binary COPY."""
     stream = PgVectorBinaryCopyStream(
         documents,
         vectors,
@@ -256,5 +302,5 @@ def copy_float32_artifact_documents(
 
 __all__ = [
     "PgVectorBinaryCopyStream",
-    "copy_float32_artifact_documents",
+    "copy_documents",
 ]

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from backend.core.state_stream import SharedStateStream
+from backend.core.state_stream_broker import StateStreamBroker
 from backend.engine.workflows import (
     ActiveWorkflowRunsError,
     DagExecutionError,
@@ -46,6 +47,7 @@ def create_workflow_router(
     workflow_store: WorkflowStore,
     run_store: RunStore,
     workflow_execution: WorkflowExecutionPort,
+    state_stream_broker: StateStreamBroker | None = None,
 ) -> APIRouter:
     """DAG 워크플로 저장소, 노드 실행 및 실시간 SSE 텔레메트리 스트리밍을 위한 FastAPI 라우터 생성."""
     router = APIRouter()
@@ -53,6 +55,8 @@ def create_workflow_router(
         run_store.load_summary,
         fingerprint=lambda run: run.updated_at,
         terminal=lambda run: run.status in ("completed", "failed", "paused"),
+        broker=state_stream_broker,
+        topic_prefix="workflow-run",
     )
 
     @router.delete(

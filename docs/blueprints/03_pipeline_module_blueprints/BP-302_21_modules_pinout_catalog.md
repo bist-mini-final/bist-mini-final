@@ -35,7 +35,7 @@ graph LR
 
 ### 1.2 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
 
-LLM 호출과 임베딩 처리의 보일러플레이트는 **`BaseLLMModule`과 `BaseEmbedderModule` 중간 추상 계층**에서 공유합니다. 아래 21개 분류도는 장기 확장 목표이며 현재 런타임의 canonical 등록 목록은 `ModuleRegistry`의 19개입니다.
+LLM 호출과 임베딩 처리의 보일러플레이트는 **`BaseLLMModule`과 `BaseEmbedderModule` 중간 추상 계층**에서 공유합니다. 아래 분류도는 장기 확장 후보를 함께 표시한 참조 구조이며, 현재 런타임의 canonical 등록 목록은 `ModuleRegistry`의 19개입니다. Cross-Encoder re-ranker는 프로젝트 범위에서 제외하며 후보·등록 목록에 포함하지 않습니다.
 
 ```mermaid
 classDiagram
@@ -79,8 +79,8 @@ classDiagram
     }
 
     class EmbeddingModules {
-        <<2 Modules>>
-        TextEmbedder, CrossEncoderReranker
+        <<1 Module>>
+        TextEmbedder
     }
 
     BaseModule <|-- BaseLLMModule : Inherits
@@ -94,13 +94,13 @@ classDiagram
 
 ### 1.3 장기 확장 목표 모듈 분류 매트릭스
 
-이 절의 21개 분류는 Cross-Encoder, Agentic Reasoner 등 향후 후보를 포함한 To-Be 카탈로그입니다. 현재 실행 가능한 모듈 수나 API 응답 수를 의미하지 않습니다.
+이 절의 분류는 Agentic Reasoner 등 향후 후보를 포함한 To-Be 카탈로그입니다. 현재 실행 가능한 모듈 수나 API 응답 수를 의미하지 않습니다. `retrieval.cross_encoder_reranker`는 범위 제외 결정에 따라 후보와 구현 계획에서 제거합니다.
 
-| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 (21개 모듈) | 부모 클래스 제공 핵심 메서드 및 역할 |
+| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 | 부모 클래스 제공 핵심 메서드 및 역할 |
 | :--- | :---: | :--- | :--- |
 | **`BaseLLMModule`** | **11개** | • `query.decomposer`<br>• `query.multi_query_expander`<br>• `query.hyde_generator`<br>• `structure.luna_vlm_structure_detector`<br>• `structure.document_profiler`<br>• `storage.company_entity_extractor`<br>• `generation.reader`<br>• `generation.agentic_reasoner`<br>• `generation.context_compressor`<br>• `generation.fact_checker`<br>• `generation.confidence_scorer` | • `complete_structured(...)` (1-Shot Pydantic 파싱)<br>• `complete_agentic(...)` (LangChain BaseTool 루프)<br>• 토큰 사용량/비용(USD)/지연시간 자동 집계 |
-| **`BaseEmbedderModule`** | **2개** | • `retrieval.text_embedder`<br>• `retrieval.cross_encoder_reranker` | • `encode_texts(...)` (배치 임베딩 & 3072d 검증)<br>• `encode_batches_streaming(...)` (스트리밍 인코딩) |
-| **`BaseModule` (직접)** | **8개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander`<br>• **`reader.financial_calculator`** | • 비동기 논블로킹 알고리즘/수식/I/O 실행 (`execute_async`)<br>• Pydantic DTO 자동 검증 & 중앙화 예외 가드<br>• 무손실 `Decimal` 재무 지표 40+ 산출 (지연 0ms, 비용 0원) |
+| **`BaseEmbedderModule`** | **1개** | • `retrieval.text_embedder` | • `encode_texts(...)` (배치 임베딩 & 3072d 검증)<br>• `encode_batches_streaming(...)` (스트리밍 인코딩) |
+| **`BaseModule` (직접)** | **7개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander` | • 결정론적 알고리즘·검색·I/O 실행 (`run/execute`)<br>• Pydantic DTO 검증 및 중앙화 예외 가드 |
 
 ---
 
@@ -242,15 +242,14 @@ classDiagram
 #### Domain Service B. `FinancialCalculator` (`backend.features.bi.calculator`)
 - **역할**: 관측된 원천 재무 수치로 현재 카탈로그의 파생 지표를 무손실 고정소수점(`Decimal`)으로 산출하고 감사 근거를 합성·바인딩.
 - **Input Pins**: `raw_metrics: Dict[str, Any]` (기간별 원천 관측 수치 맵), `evidence_cells: Optional[List[Dict[str, Any]]]` (원천 감사 셀 목록)
-- **Output Pins**: `derived_ratios: Dict[str, Any]` (40+ 산출 재무 비율 및 상태 플래그), `bound_evidence: Dict[str, List[Dict[str, Any]]]` (파생 지표별 합성 감사 근거)
+- **Output Pins**: `derived_ratios: Dict[str, Any]` (현재 카탈로그에서 구현된 파생 지표와 상태 플래그), `bound_evidence: Dict[str, List[Dict[str, Any]]]` (파생 지표별 합성 감사 근거)
 - **Config Pins**: `precision: int = 4`, `categories: List[str] = ["all"]` (또는 `["profitability", "stability", "activity", "growth"]`)
 
 ---
 
 ## 3. 리팩토링 타깃 (Refactoring Targets)
 
-1. **Pydantic v2 제네릭 포트 규격화**:
-   - As-Is: 각 모듈의 input/output이 개별 클래스로 분산 정의됨.
-   - To-Be: `BaseModule[TInput, TOutput, TConfig]` 제네릭 타입 파라미터 적용으로 타입 체커(`pyright`) 정적 분석 완벽 지원.
+1. **구현됨 — Pydantic v2 제네릭 포트 규격화**:
+   - `BaseModule[InputModelT, OutputModelT, ConfigModelT]`가 입력·출력·설정 DTO 타입 파라미터를 제공하고 `validate_config()`와 추상 `execute()` 계약을 정적으로 연결합니다. 기존 모듈은 점진적으로 구체 타입을 선언할 수 있으며 Pyright 검사를 통과합니다.
 2. **동적 플러그인 로더(Dynamic Plugin Loader)**:
    - 신규 모듈을 `modules/` 디렉터리에 추가할 때 `registry.py`를 수동 수정하지 않고 데코레이터(`@register_module`) 기반으로 자동 스캔 및 로드되도록 개편.

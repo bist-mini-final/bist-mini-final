@@ -16,21 +16,27 @@ classDiagram
         +config_model: Type[ModuleConfigDTO]
         +output_model: Type[ModuleDTO]
         +definition: ModuleDefinition
-        +execute_async(input_data, config)*
+        +execute(input_data, config)*
+        +execute_async(input_data, config) Compatibility Hook
         +run(input_data, config) Template Method
+        +run_async(input_data, config) Async Template Method
     }
 
     class BaseLLMModule {
         <<Abstract Intermediate>>
         +complete_structured(response_model, prompt)
+        +complete_structured_async(response_model, prompt)
         +complete_text(prompt, system_prompt)
+        +complete_text_async(prompt, system_prompt)
         +complete_agentic(tools, max_turns)
+        +complete_agentic_async(tools, max_turns)
         +calculate_token_cost_usd(usage)
     }
 
     class BaseEmbedderModule {
         <<Abstract Intermediate>>
         +encode_texts(texts, dimension=3072)
+        +encode_texts_async(texts, dimension=3072)
         +encode_batches_streaming(batches)
     }
 

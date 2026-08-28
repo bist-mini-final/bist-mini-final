@@ -45,6 +45,7 @@ import psycopg2.extras
 
 from backend.core.settings import PGVECTOR_URL
 
+from .audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
 from .connection_pool import get_pooled_raw_connection
 
 logger = logging.getLogger(__name__)
@@ -75,8 +76,13 @@ CREATE TABLE IF NOT EXISTS source_files (
     file_type VARCHAR(32) NOT NULL,
     file_size BIGINT NOT NULL,
     storage_path VARCHAR(512) NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE source_files ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE source_files ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS sheets (
     sheet_id VARCHAR(128) PRIMARY KEY,
@@ -209,6 +215,8 @@ CREATE TABLE IF NOT EXISTS node_execution_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_source_files_hash ON source_files(file_hash);
+CREATE INDEX IF NOT EXISTS idx_source_files_active
+    ON source_files(created_at DESC) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_sheets_file_id ON sheets(file_id);
 CREATE INDEX IF NOT EXISTS idx_langchain_cmetadata_gin ON langchain_pg_embedding USING gin (cmetadata jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_id ON workflow_runs(workflow_id);
@@ -225,7 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
 CREATE INDEX IF NOT EXISTS idx_node_logs_pgvector_index_id
     ON node_execution_logs ((output->>'index_id'))
     WHERE module_type = 'pgvector_index_writer';
-"""
+""" + AUDIT_SCHEMA_SQL + SOURCE_FILE_AUDIT_SQL
 
 
 class DatabaseManager:
@@ -400,14 +408,16 @@ class DatabaseManager:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, is_deleted, deleted_at, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, FALSE, NULL, NOW())
                     ON CONFLICT (file_id) DO UPDATE SET
                         file_name = EXCLUDED.file_name,
                         file_hash = EXCLUDED.file_hash,
                         file_type = EXCLUDED.file_type,
                         file_size = EXCLUDED.file_size,
-                        storage_path = EXCLUDED.storage_path;
+                        storage_path = EXCLUDED.storage_path,
+                        is_deleted = FALSE,
+                        deleted_at = NULL;
                     """,
                     (
                         file_id,
@@ -422,15 +432,23 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def delete_source_file(self, file_id_hash_or_name: str) -> bool:
-        """Delete a source file by ID, hash, or filename with cascading sheets."""
+    def delete_source_file(
+        self,
+        file_id_hash_or_name: str,
+        *,
+        actor_id: str = "system",
+        request_id: str | None = None,
+    ) -> bool:
+        """Soft-delete source metadata by ID, hash, or unambiguous filename."""
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
+                self._set_audit_context(cur, actor_id=actor_id, request_id=request_id)
                 cur.execute(
                     """
-                    DELETE FROM source_files
-                    WHERE file_id = %s OR file_hash = %s;
+                    UPDATE source_files
+                    SET is_deleted = TRUE, deleted_at = NOW()
+                    WHERE (file_id = %s OR file_hash = %s) AND is_deleted = FALSE;
                     """,
                     (file_id_hash_or_name, file_id_hash_or_name),
                 )
@@ -441,7 +459,7 @@ class DatabaseManager:
                         """
                         SELECT file_id
                         FROM source_files
-                        WHERE file_name = %s
+                        WHERE file_name = %s AND is_deleted = FALSE
                         ORDER BY created_at DESC
                         LIMIT 2;
                         """,
@@ -455,7 +473,9 @@ class DatabaseManager:
                         )
                     if matches:
                         cur.execute(
-                            "DELETE FROM source_files WHERE file_id = %s;",
+                            "UPDATE source_files SET is_deleted = TRUE, "
+                            "deleted_at = NOW() WHERE file_id = %s "
+                            "AND is_deleted = FALSE;",
                             (matches[0][0],),
                         )
                         deleted = cur.rowcount > 0
@@ -463,6 +483,19 @@ class DatabaseManager:
             return deleted
         finally:
             conn.close()
+
+    @staticmethod
+    def _set_audit_context(
+        cursor: Any,
+        *,
+        actor_id: str,
+        request_id: str | None,
+    ) -> None:
+        cursor.execute(
+            "SELECT set_config('app.audit_actor_id', %s, TRUE), "
+            "set_config('app.audit_request_id', %s, TRUE)",
+            (actor_id[:128], (request_id or "")[:128]),
+        )
 
     def save_sheets(self, file_id: str, sheets_info: List[Dict[str, Any]]) -> None:
         """Insert or replace sheet records for a source file."""
@@ -1655,6 +1688,61 @@ class DatabaseManager:
                 )
                 row = cur.fetchone()
                 return int(row[0]) if row else 0
+        finally:
+            conn.close()
+
+    def list_active_workflow_leases(
+        self,
+        *,
+        stale_after_seconds: int = 180,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Return bounded read-only queue/lease data for the operations portal."""
+        safe_limit = max(1, min(limit, 500))
+        conn = self._raw_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        run_id,
+                        workflow_id,
+                        queue_name,
+                        status,
+                        worker_id,
+                        priority,
+                        attempt_count,
+                        available_at,
+                        claimed_at,
+                        heartbeat_at,
+                        cancel_requested,
+                        created_at,
+                        updated_at,
+                        CASE WHEN heartbeat_at IS NULL THEN NULL ELSE
+                            GREATEST(0, EXTRACT(EPOCH FROM (NOW() - heartbeat_at)))
+                        END AS heartbeat_age_seconds,
+                        CASE WHEN status <> 'running' OR heartbeat_at IS NULL THEN NULL ELSE
+                            GREATEST(
+                                0,
+                                %s - EXTRACT(EPOCH FROM (NOW() - heartbeat_at))
+                            )
+                        END AS lease_ttl_seconds,
+                        CASE WHEN status = 'running' THEN (
+                            heartbeat_at IS NULL OR
+                            heartbeat_at < NOW() - (%s * INTERVAL '1 second')
+                        ) ELSE FALSE END AS lease_stale
+                    FROM workflow_runs
+                    WHERE queue_name IS NOT NULL
+                      AND status IN ('queued', 'running', 'paused')
+                    ORDER BY
+                        CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,
+                        priority DESC,
+                        updated_at DESC
+                    LIMIT %s
+                    """,
+                    (stale_after_seconds, stale_after_seconds, safe_limit),
+                )
+                return [dict(row) for row in cur.fetchall()]
         finally:
             conn.close()
 

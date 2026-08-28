@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from modules.common.base_module import QueryContextDTO
 from modules.embedding.query_embedder import EmbedderInputDTO, EmbedderModule
 from modules.query.decomposer import SubqueryItem
@@ -24,6 +26,7 @@ def test_query_embedder_batches_by_collection_model_contract() -> None:
     class Encoder:
         def __init__(self) -> None:
             self.calls: list[tuple[list[str], str]] = []
+            self.async_calls: list[tuple[list[str], str]] = []
             self.last_usage = {"total_tokens": 1}
 
         def encode_for_model(
@@ -32,6 +35,16 @@ def test_query_embedder_batches_by_collection_model_contract() -> None:
             model_name: str,
         ) -> list[list[float]]:
             self.calls.append((queries, model_name))
+            dimension = 1536 if model_name.endswith("small") else 3072
+            return [[0.1] * dimension for _ in queries]
+
+        async def encode_for_model_async(
+            self,
+            queries: list[str],
+            model_name: str,
+            _batch_size: int,
+        ) -> list[list[float]]:
+            self.async_calls.append((queries, model_name))
             dimension = 1536 if model_name.endswith("small") else 3072
             return [[0.1] * dimension for _ in queries]
 
@@ -62,3 +75,9 @@ def test_query_embedder_batches_by_collection_model_contract() -> None:
         (["Revenue"], "text-embedding-3-small"),
         (["Revenue"], "text-embedding-3-large"),
     ]
+
+    async_result = asyncio.run(
+        EmbedderModule(encoder).run_async(EmbedderInputDTO(retrieval_plan=plan))
+    )
+    assert async_result["items"] == result["items"]
+    assert encoder.async_calls == encoder.calls

@@ -1,6 +1,6 @@
 # [BP-501] REST API 엔드포인트 & DTO 규격서
-> **Document Code:** `BP-501` | **Category:** Interface & API Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`backend/api/module_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/module_routes.py), [`backend/features/bi/api_routes.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/api_routes.py), [`backend/api/error_mapping.py`](file:///c:/Repos/bist-mini-final/backend/api/error_mapping.py)
+> **Document Code:** `BP-501` | **Category:** Interface & API Blueprint | **Status:** Implemented & Operational
+> **Source Files:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/dependencies.py`](file:///c:/Repos/bist-mini-final/backend/api/dependencies.py), [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`backend/api/module_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/module_routes.py), [`backend/features/bi/api_routes.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/api_routes.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py)
 
 ---
 
@@ -56,16 +56,19 @@
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/data-sources/files` | 업로드된 파일 목록 조회 | 파일 목록 응답 |
 | `POST`| `/api/v1/data-sources/files/upload` | 파일 업로드 및 선택적 인제스천 큐 등록 | 업로드/작업 응답 |
-| `GET/DELETE` | `/api/v1/data-sources/files/{filename}` | 다운로드/삭제 | 파일 또는 삭제 응답 |
+| `GET` | `/api/v1/data-sources/files/{filename}/download` | 원본 파일 다운로드 | 파일 응답 |
+| `DELETE` | `/api/v1/data-sources/files/{filename}` | 파일과 연결 인덱스 삭제 | 삭제 응답 |
 | `GET` | `/api/v1/data-sources/files/{filename}/preview` | 스프레드시트 미리보기 | 미리보기 DTO |
 | `GET/POST` | `/api/v1/data-sources/ingestion-jobs` | 인제스천 작업 목록/등록 | 작업 DTO |
 | `GET/DELETE` | `/api/v1/data-sources/ingestion-jobs/{run_id}` | 인제스천 작업 조회/삭제 | 작업 DTO |
+| `GET` | `/api/v1/data-sources/ingestion-jobs/by-index/{index_id}` | 인덱스 ID 기준 최신 인제스천 작업 조회 | 작업 DTO |
 | `POST` | `/api/v1/data-sources/ingestion-jobs/{run_id}/resume` | 실패 작업 재등록 | 작업 DTO |
 | `POST` | `/api/v1/data-sources/ingestion-jobs/{run_id}/cancel` | 작업 취소 요청 | 작업 DTO |
 | `GET` | `/api/v1/data-sources/indexes` | pgvector 인덱스 목록 | 인덱스 목록 |
 | `GET/DELETE` | `/api/v1/data-sources/indexes/{index_id}` | 인덱스 조회/삭제 | 인덱스 DTO |
 | `POST` | `/api/v1/data-sources/indexes/{index_id}/search` | 인덱스 검색 | 검색 결과 |
 | `GET` | `/api/v1/data-sources/db-status` | PostgreSQL/pgvector 상태 | DB 상태 DTO |
+| `POST` | `/api/v1/data-sources/db-connect` | 외부 PostgreSQL/pgvector 연결 테스트 | 연결 상태 DTO |
 
 ### [Group 4: 재무 BI 및 프로파일러 (`/api/v1/bi`)]
 
@@ -99,6 +102,7 @@
 | `GET/POST` | `/api/v1/chat/sessions` | 최근 세션 목록/신규 세션 생성 | 세션 DTO |
 | `GET/PATCH/DELETE` | `/api/v1/chat/sessions/{session_id}` | 세션 상세/제목 수정/삭제 | 세션 DTO 또는 삭제 응답 |
 | `POST`| `/api/v1/chat/sessions/{session_id}/messages` | 메시지 전송 및 RAG 실행 등록 | 메시지 DTO |
+| `GET` | `/api/v1/chat/runs/{run_id}` | 비동기 RAG 실행 상태를 대화 메시지로 동기화 | 실행/메시지 DTO |
 | `POST`| `/api/v1/chat/sessions/{session_id}/attachments` | 파일 업로드 및 텍스트 추출 | 첨부 DTO |
 | `GET` | `/api/v1/chat/suggestions` | 추천 질문 조회 | 추천 질문 목록 |
 | `POST` | `/api/v1/chat/suggestions/refresh` | 추천 질문 재생성 | 추천 질문 목록 |
@@ -120,7 +124,7 @@
 | Method | Endpoint | 설명 | Request / Response |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/jobs` | React SPA 작업 관제 화면 | HTML / SPA route |
-| `GET` | `/api/v1/jobs` | ScaledJob, Job, Pod 요약 상태 조회 | `KubernetesWorkloadSnapshot` |
+| `GET` | `/api/v1/jobs` | ScaledJob, Job, Pod 및 활성 workflow queue/Lease 상관 상태 조회 | `KubernetesWorkloadSnapshot` (`workflow_runs`, heartbeat age, TTL 포함) |
 
 WebSocket 로그 터미널과 작업 취소/Lease 회수는 인증·감사·운영 정책이 필요한 To-Be 범위이며 현재 읽기 전용 API에는 포함하지 않습니다.
 
@@ -181,11 +185,9 @@ flowchart TD
 
 ---
 
-## 3. 리팩토링 타깃 (Refactoring Targets)
+## 3. 구현 기준선과 확장 규칙
 
-1. **FastAPI 의존성 주입(`Depends`) 표준화**:
-   - As-Is: `request.app.state.container`를 라우터 함수 내에서 직접 꺼내어 씀.
-   - To-Be: `def get_bi_services(container: ApplicationContainer = Depends(get_container)) -> BiApiServices:` 표준 `Depends` 패턴으로 전면 리팩토링.
-2. **API 버저닝 경로 도입**:
-   - `/api/v1/workflows`, `/api/v1/bi` 형식의 URI 네임스페이스 버저닝 적용.
+1. **구현됨 — API 버저닝**: `backend/main.py`가 같은 조립 router를 `/api/v1` 정식 경로와 OpenAPI 비노출 `/api` 호환 경로에 각각 등록합니다. 새 클라이언트와 문서는 `/api/v1`만 사용합니다.
+2. **구현됨 — DI 경계**: framework state 접근은 `backend/api/dependencies.py`에만 두고 `ContainerDependency`, `RuntimeServicesDependency`, `BiServicesDependency`를 제공합니다. 모듈 API는 이 `Depends` provider를 사용하며, 조립 시점 의존성은 `create_api_router()`의 명시적 constructor injection으로 전달합니다.
+3. **확장 규칙**: 새 request-scoped router는 `request.app.state`를 직접 읽지 말고 위 typed dependency를 추가합니다. 프로세스 수명 서비스는 router factory/Composition Root에서 명시적으로 주입합니다.
 

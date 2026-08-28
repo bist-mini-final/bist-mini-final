@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
+import './SpreadsheetResultModal.css';
 import '../../playground.css';
 import {
   Check,

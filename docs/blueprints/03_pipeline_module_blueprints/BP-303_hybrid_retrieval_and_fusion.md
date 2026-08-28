@@ -81,7 +81,12 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수�
 
 ## 4. 리팩토링 타깃 (Refactoring Targets)
 
-1. **Cross-Encoder Re-ranker 도입**:
-   - RRF 융합 후 상위 30개 후보에 대해 `bge-reranker-large` 또는 `Cohere Re-rank` 로컬 모델을 추가하여 의미론적 적합도 재검증.
+1. **Cross-Encoder Re-ranker — 범위 제외 (Out of Scope)**:
+   - 검색 순위는 pgvector Dense 검색, BM25 Sparse 검색, RRF 융합의 현재 경로를 기준선으로 유지한다.
+   - `bge-reranker-large`, Cohere Re-rank 등 별도 재순위 모델의 추가·운영은 이 프로젝트의 구현 범위에 포함하지 않는다.
 2. **동적 윈도우 크기(Adaptive Window Sizing)**:
    - 고정된 $\pm 3$행 확장이 아닌, Luna VLM이 감지한 `data_range` 경계 내에서만 스마트하게 확장하여 토큰 낭비 방지.
+3. **구현됨 — 비동기 검색 및 2D 컨텍스트 확장**:
+   - Dense와 keyword 검색은 `AsyncConnectionPool`을 사용하고 동일 배치에서 `TaskGroup`으로 병렬 실행합니다.
+   - Context Expander는 검색 후보를 컬렉션·시트별 행 집합으로 묶어 `fetch_rows_cells_async()`를 병렬 호출합니다. 동기·비동기 경로는 동일한 정규화·중복 제거·출력 렌더러를 공유합니다.
+   - Reader의 `lookup_cell_metadata` 도구도 LangChain `ainvoke()`에서 `fetch_cells_by_metadata_async()`를 직접 await하므로 도구 반복 중 이벤트 루프를 차단하지 않습니다.

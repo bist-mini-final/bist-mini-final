@@ -90,8 +90,8 @@ classDiagram
 
 ## 5. 리팩토링 타깃 (Refactoring Targets)
 
-1. **로컬 VLM 경량화 모델 지원 (Local VLM Support)**:
-   - As-Is: OpenAI GPT-5.6 Luna 클라우드 API에 의존.
-   - To-Be: `Qwen2-VL-7B` 또는 `PaliGemma-2` 로컬 ONNX/vLLM 추론 어댑터를 추가하여 에어갭(Air-gapped) 보안 환경 지원.
+1. **로컬 VLM 경량화 모델 지원 — 범위 제외 (Out of Scope)**:
+   - 현재 및 계획 기준선은 OpenAI GPT-5.6 Luna 클라우드 API를 사용한다.
+   - `Qwen2-VL-7B`, `PaliGemma-2`, ONNX/vLLM 기반 로컬 추론과 에어갭 배포는 이 프로젝트의 구현 범위에 포함하지 않는다.
 2. **동적 타일링(Dynamic Image Tiling)**:
    - 100행 이상의 거대 시트를 균등 분할 렌더링하고, 바운딩 박스 좌표를 합성하는 Multi-Tile VLM 결합 알고리즘 도입.

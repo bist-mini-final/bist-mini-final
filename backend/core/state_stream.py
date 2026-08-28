@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable, Hashable
+from collections.abc import AsyncGenerator, Callable, Hashable
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar, cast
 
 from anyio import to_thread
+
+from backend.core.state_stream_broker import StateStreamBroker
 
 KeyT = TypeVar("KeyT", bound=Hashable)
 StateT = TypeVar("StateT")
@@ -19,8 +21,10 @@ class _StateChannel(Generic[StateT]):
         default_factory=set
     )
     task: asyncio.Task[None] | None = None
+    broker_task: asyncio.Task[None] | None = None
     latest: StateT | None = None
     has_latest: bool = False
+    refresh_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class SharedStateStream(Generic[KeyT, StateT]):
@@ -38,6 +42,8 @@ class SharedStateStream(Generic[KeyT, StateT]):
         fingerprint: Callable[[StateT], object],
         terminal: Callable[[StateT], bool],
         interval_seconds: float = 0.5,
+        broker: StateStreamBroker | None = None,
+        topic_prefix: str = "state",
     ) -> None:
         if interval_seconds <= 0:
             raise ValueError("interval_seconds must be positive")
@@ -45,6 +51,8 @@ class SharedStateStream(Generic[KeyT, StateT]):
         self._fingerprint = fingerprint
         self._terminal = terminal
         self._interval_seconds = interval_seconds
+        self._broker = broker
+        self._topic_prefix = topic_prefix
         self._channels: dict[KeyT, _StateChannel[StateT]] = {}
         self._lock = asyncio.Lock()
 
@@ -53,7 +61,7 @@ class SharedStateStream(Generic[KeyT, StateT]):
         key: KeyT,
         *,
         initial: StateT | None = None,
-    ) -> AsyncIterator[StateT]:
+    ) -> AsyncGenerator[StateT, None]:
         queue: asyncio.Queue[StateT | BaseException | object] = asyncio.Queue(
             maxsize=2
         )
@@ -66,6 +74,10 @@ class SharedStateStream(Generic[KeyT, StateT]):
                     channel.has_latest = True
                 self._channels[key] = channel
                 channel.task = asyncio.create_task(self._pump(key, channel))
+                if self._broker is not None:
+                    channel.broker_task = asyncio.create_task(
+                        self._listen_for_changes(key, channel)
+                    )
             channel.subscribers.add(queue)
             if channel.has_latest:
                 queue.put_nowait(cast(StateT, channel.latest))
@@ -82,23 +94,18 @@ class SharedStateStream(Generic[KeyT, StateT]):
             await self._unsubscribe(key, channel, queue)
 
     async def _pump(self, key: KeyT, channel: _StateChannel[StateT]) -> None:
-        previous_fingerprint: object = object()
         use_initial = channel.has_latest
-        if channel.has_latest:
-            previous_fingerprint = self._fingerprint(cast(StateT, channel.latest))
         try:
             while True:
                 if use_initial:
                     state = cast(StateT, channel.latest)
                     use_initial = False
+                    changed = False
                 else:
-                    state = await to_thread.run_sync(self._loader, key)
-                current_fingerprint = self._fingerprint(state)
-                if current_fingerprint != previous_fingerprint:
-                    previous_fingerprint = current_fingerprint
-                    channel.latest = state
-                    channel.has_latest = True
+                    changed, state = await self._refresh(key, channel)
+                if changed:
                     self._broadcast(channel, state)
+                    await self._publish_change(key)
                 if self._terminal(state):
                     self._broadcast(channel, _END)
                     return
@@ -108,9 +115,65 @@ class SharedStateStream(Generic[KeyT, StateT]):
         except BaseException as error:
             self._broadcast(channel, error)
         finally:
+            if (
+                channel.broker_task is not None
+                and channel.broker_task is not asyncio.current_task()
+                and not channel.broker_task.done()
+            ):
+                channel.broker_task.cancel()
             async with self._lock:
                 if self._channels.get(key) is channel:
                     self._channels.pop(key, None)
+
+    async def _refresh(
+        self,
+        key: KeyT,
+        channel: _StateChannel[StateT],
+    ) -> tuple[bool, StateT]:
+        async with channel.refresh_lock:
+            state = await to_thread.run_sync(self._loader, key)
+            changed = (
+                not channel.has_latest
+                or self._fingerprint(state)
+                != self._fingerprint(cast(StateT, channel.latest))
+            )
+            if changed:
+                channel.latest = state
+                channel.has_latest = True
+            return changed, state
+
+    def _topic(self, key: KeyT) -> str:
+        return f"{self._topic_prefix}:{key}"
+
+    async def _publish_change(self, key: KeyT) -> None:
+        if self._broker is not None:
+            await self._broker.publish(self._topic(key))
+
+    async def _listen_for_changes(
+        self,
+        key: KeyT,
+        channel: _StateChannel[StateT],
+    ) -> None:
+        if self._broker is None:
+            return
+        try:
+            async for _ in self._broker.subscribe(self._topic(key)):
+                if self._channels.get(key) is not channel:
+                    return
+                changed, state = await self._refresh(key, channel)
+                if not changed:
+                    continue
+                self._broadcast(channel, state)
+                if self._terminal(state):
+                    self._broadcast(channel, _END)
+                    if channel.task is not None and not channel.task.done():
+                        channel.task.cancel()
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # A stream retains its polling fallback if the broker fails.
+            return
 
     @staticmethod
     def _broadcast(
@@ -137,4 +200,6 @@ class SharedStateStream(Generic[KeyT, StateT]):
                 return
             if channel.task is not None and not channel.task.done():
                 channel.task.cancel()
+            if channel.broker_task is not None and not channel.broker_task.done():
+                channel.broker_task.cancel()
             self._channels.pop(key, None)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Sequence
@@ -138,15 +139,96 @@ class OpenAIEmbeddingEncoder(Embeddings):
         """Return vectors using this encoder's default ingestion model."""
         return self.encode_for_model(queries, self.model_name, batch_size)
 
+    async def _fetch_batch_async(
+        self,
+        batch_index: int,
+        batch_items: Sequence[str],
+        model_name: str,
+    ) -> tuple[int, List[List[float]], int, int]:
+        try:
+            client = await self.provider.async_client
+            response = await client.embeddings.create(
+                model=model_name,
+                input=list(batch_items),
+            )
+        except (OpenAIError, OpenAIProviderError, ValueError) as error:
+            raise ModuleExecutionError(
+                f"OpenAI Embeddings API 호출에 실패했습니다: {error}"
+            ) from error
+        items_by_index = {item.index: list(item.embedding) for item in response.data}
+        expected_indices = set(range(len(batch_items)))
+        if set(items_by_index) != expected_indices:
+            raise ModuleExecutionError(
+                "OpenAI Embeddings API 응답 인덱스가 요청 범위와 일치하지 않습니다"
+            )
+        return (
+            batch_index,
+            [items_by_index[index] for index in range(len(batch_items))],
+            int(response.usage.prompt_tokens or 0),
+            int(response.usage.total_tokens or 0),
+        )
+
+    async def encode_for_model_async(
+        self,
+        queries: List[str],
+        model_name: str,
+        batch_size: int = 2048,
+    ) -> List[List[float]]:
+        """Encode bounded batches concurrently through the native async SDK."""
+        if not queries:
+            return []
+        effective_batch_size = min(max(1, batch_size), 2048)
+        batches = [
+            (index, queries[start : start + effective_batch_size])
+            for index, start in enumerate(range(0, len(queries), effective_batch_size))
+        ]
+        results = await asyncio.gather(
+            *(
+                self._fetch_batch_async(index, items, model_name)
+                for index, items in batches
+            )
+        )
+        results_by_index = {index: vectors for index, vectors, _, _ in results}
+        self.last_usage = {
+            "prompt_tokens": sum(item[2] for item in results),
+            "total_tokens": sum(item[3] for item in results),
+        }
+        ordered_vectors = [
+            vector
+            for index in range(len(batches))
+            for vector in results_by_index[index]
+        ]
+        return [_l2_normalize(vector) for vector in ordered_vectors]
+
+    async def encode_async(
+        self,
+        queries: List[str],
+        batch_size: int = 2048,
+    ) -> List[List[float]]:
+        return await self.encode_for_model_async(queries, self.model_name, batch_size)
+
     def close(self) -> None:
         if self._owns_provider:
             self.provider.close()
+
+    async def aclose(self) -> None:
+        if self._owns_provider:
+            await self.provider.aclose()
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return self.encode(texts)
 
     def embed_query(self, text: str) -> List[float]:
         vectors = self.encode([text])
+        if not vectors:
+            raise ValueError(f"Failed to embed query with model {self.model_name}")
+        return vectors[0]
+
+    async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
+        return await self.encode_async(texts)
+
+    async def aembed_query(self, text: str) -> List[float]:
+        vectors = await self.encode_async([text])
         if not vectors:
             raise ValueError(f"Failed to embed query with model {self.model_name}")
         return vectors[0]

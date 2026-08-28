@@ -1,0 +1,82 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "bist.fullname" . }}
+  labels:
+    {{- include "bist.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /redoc
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /openapi.json
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /livez
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bist.fullname" . }}-frontend
+                port:
+                  name: http
+{{- end }}

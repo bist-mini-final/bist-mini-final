@@ -1,5 +1,5 @@
 # [BP-404] AI Financial Chatbot 워크스페이스 명세서
-> **Document Code:** `BP-404` | **Category:** Workspace Blueprint | **Status:** Approved Baseline  
+> **Document Code:** `BP-404` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
 > **Source Files:** [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx), [`backend/features/chatbot/api_routes.py`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/api_routes.py), [`backend/features/chatbot/repository.py`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/repository.py)
 
 ---
@@ -38,6 +38,7 @@ flowchart TD
 * `GET /api/v1/chat/sessions/{session_id}`: 세션 상세 및 메시지 히스토리 조회
 * `PATCH /api/v1/chat/sessions/{session_id}`: 세션 제목 수정
 * `DELETE /api/v1/chat/sessions/{session_id}`: 세션 삭제
-* `POST /api/v1/chat/sessions/{session_id}/messages`: 메시지 전송 및 답변/시각화 생성
+* `POST /api/v1/chat/sessions/{session_id}/messages`: 메시지 전송 및 RAG 실행 등록(202)
+* `GET /api/v1/chat/runs/{run_id}`: durable RAG 실행 상태를 세션 메시지로 동기화
 * `POST /api/v1/chat/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
 * `GET /api/v1/chat/suggestions`: 동적 스마트 질문 추천

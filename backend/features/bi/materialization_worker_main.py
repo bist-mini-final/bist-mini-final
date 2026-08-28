@@ -7,7 +7,10 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from backend.bootstrap.container import RuntimeContainer
-from backend.engine.worker.lease import LeaseHeartbeat
+from backend.engine.worker.lease import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
 
 from .composition import create_bi_materialization_runner
 from .database_schema import ensure_bi_schema
@@ -39,6 +42,7 @@ def _run(container: RuntimeContainer) -> int:
         failure_message=(
             f"BI materialization heartbeat failed (job_id={claimed.job.job_id})"
         ),
+        on_lease_lost=terminate_process_on_lease_loss,
     )
     heartbeat.start()
     try:
@@ -46,6 +50,7 @@ def _run(container: RuntimeContainer) -> int:
             registry,
             completion_client,
         ).materialize(claimed.request, claimed.job.job_id)
+        heartbeat.raise_if_lost()
     except Exception as error:
         logger.exception(
             "BI materialization worker failed (job_id=%s)",

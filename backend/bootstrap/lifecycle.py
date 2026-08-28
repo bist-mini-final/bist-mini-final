@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -15,13 +15,15 @@ from fastapi import FastAPI
 
 from backend.bootstrap.container import ApplicationContainer
 from backend.core.settings import PROJECT_DIR
-from backend.storage.connection_pool import close_pool
+from backend.storage.connection_pool import close_async_pool, close_pool
 
 logger = logging.getLogger("backend.bootstrap.lifecycle")
 
 
 def create_lifespan(
     container: ApplicationContainer,
+    *,
+    on_shutdown: Callable[[], Awaitable[None]] | None = None,
 ) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     """Bind one explicit composition root to the FastAPI lifespan."""
 
@@ -30,8 +32,10 @@ def create_lifespan(
         started_at = time.perf_counter()
         (PROJECT_DIR / "data").mkdir(parents=True, exist_ok=True)
 
-        available_modules = container.runtime.services.module_registry.list_modules()
-        logger.info("등록된 파이프라인 모듈 %d개", len(available_modules))
+        module_types = (
+            container.runtime.services.module_registry.registered_module_types()
+        )
+        logger.info("등록된 파이프라인 모듈 %d개", len(module_types))
         try:
             recovered = await to_thread.run_sync(
                 container.execution.recover_pending_runs
@@ -73,7 +77,10 @@ def create_lifespan(
             suggestions_task.cancel()
             with suppress(asyncio.CancelledError):
                 await suggestions_task
-            container.close()
+            if on_shutdown is not None:
+                await on_shutdown()
+            await container.aclose()
+            await close_async_pool()
             close_pool()
             logger.info("애플리케이션 리소스를 종료했습니다")
 

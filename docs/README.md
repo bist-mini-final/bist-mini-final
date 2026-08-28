@@ -8,6 +8,8 @@
 
 `bist-mini-final`의 기술 문서는 **"비즈니스 서사 및 소프트웨어 공학 설계를 완결성 있게 설명하는 [최종 프로젝트 보고서]"**와 **"개발 및 리팩토링 시 실시간으로 참조하는 [엔지니어링 청사진 규격서]"**의 2대 트랙으로 체계적으로 분리되어 있습니다:
 
+> **문서 해석 기준:** `blueprints/`는 현재 구현과 다음 리팩토링의 기준 문서입니다. `final_report/`의 MVP 일정·진화 서술은 프로젝트 이력을 보존하므로, 과거 시점의 `2-Tier`, `21개 모듈`, 로컬 VLM 등의 표현이 남을 수 있습니다. 현재 운영 구조는 버전형 API, 19개 파이프라인 모듈과 2개 BI 도메인 서비스, PostgreSQL 영속 상태, Redis 상태 변경 신호, KEDA 작업 런타임을 기준으로 합니다. 로컬 VLM과 reranker는 현재 범위에서 제외합니다.
+
 ```mermaid
 flowchart TD
     ROOT["docs/README.md (마스터 게이트웨이 포털)"]
@@ -22,9 +24,9 @@ flowchart TD
     end
 
     subgraph BlueprintTrack ["📐 Track 2: blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
-        B1["01_system_blueprints/ (BP-101~104: 2-Tier, 7계층, 3-Level 락, K8s)"]
+        B1["01_system_blueprints/ (BP-101~104: durable job, 7계층, 3-Level 락, K8s)"]
         B2["02_data_engine_blueprints/ (BP-201~203: 2D 파서, Luna VLM, Binary COPY)"]
-        B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 21개 모듈 Pinout, RRF 융합)"]
+        B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 19개 모듈·BI 서비스, RRF 융합)"]
         B4["04_workspace_blueprints/ (BP-401~405: 5대 워크스페이스 세부 명세)"]
         B5["05_interface_blueprints/ (BP-501~503: REST API, SSE, PostgreSQL DDL)"]
         B6["06_frontend_blueprints/ (BP-601: React 18 결선도)"]
@@ -52,9 +54,9 @@ flowchart TD
 * [`SEC-204`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-204_use_case_modeling_and_traceability.md): 유스케이스 모델링 (UC-1~UC-5) 및 전구간 6차원 추적성 매트릭스
 
 ### 제3장. 시스템 아키텍처 및 상세 설계 (Chapter 3. System Architecture & Design)
-* [`SEC-301`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-301_system_topology_and_runtime.md): 시스템 전체 토폴로지 및 2-Tier 런타임 조감도 (Tier 1 In-Memory + Tier 2 KEDA)
-* [`SEC-302`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-302_class_diagrams_and_contracts.md): 클래스 다이어그램 & 21개 모듈 입출력 계약 (`BaseLLMModule` 3단계 상속 계층)
-* [`SEC-303`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-303_sequence_diagrams.md): 동적 시퀀스 다이어그램 & 분산 동시성 런북 (Fast RAG & 3-Level 분산 락)
+* [`SEC-301`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-301_system_topology_and_runtime.md): 시스템 전체 토폴로지 및 durable job 런타임 조감도 (PostgreSQL·Redis·KEDA)
+* [`SEC-302`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-302_class_diagrams_and_contracts.md): 클래스 다이어그램 & 19개 파이프라인 모듈 입출력 계약
+* [`SEC-303`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-303_sequence_diagrams.md): 동적 시퀀스 다이어그램 & 분산 동시성 런북 (REST/SSE 작업 상태와 3-Level 분산 락)
 * [`SEC-304`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-304_database_erd_and_vector_schema.md): 데이터베이스 물리 설계 & 10대 정규 테이블 ERD (PostgreSQL + pgvector 3072d)
 * [`SEC-305`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-305_interface_specification.md): 인터페이스 설계 (FastAPI REST API 엔드포인트 & SSE 스트리밍 규격)
 * [`SEC-306`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-306_infrastructure_and_deployment.md): 인프라 토폴로지 및 배포 환경 (Kubernetes KEDA ScaledJob & Docker)
@@ -62,8 +64,8 @@ flowchart TD
 
 ### 제4장. 시스템 구현 및 3단계 MVP 진화 과정 (Chapter 4. Implementation & MVP Evolution)
 * [`SEC-401`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-401_mvp1_data_and_vision_pipeline.md): [1차 MVP] 엑셀 2D 파싱, Luna VLM 표 감지 & Binary COPY 적재 파이프라인
-* [`SEC-402`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-402_mvp2_orchestration_and_bi.md): [2차 MVP] 2-Tier DAG 오케스트레이션, 쿼리 라우팅 & Financial BI 대시보드 구축
-* [`SEC-403`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-403_mvp3_chatbot_and_comparison.md): [3차 MVP] AI 금융 챗봇(Fast RAG), 기업 듀퐁 비교 & UI/a11y 고도화 완성
+* [`SEC-402`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-402_mvp2_orchestration_and_bi.md): [2차 MVP 이력] 초기 DAG 오케스트레이션, 쿼리 라우팅 & Financial BI 대시보드 구축
+* [`SEC-403`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-403_mvp3_chatbot_and_comparison.md): [3차 MVP 이력] AI 금융 챗봇, 기업 듀퐁 비교 & UI/a11y 고도화
 * [`SEC-404`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-404_refactoring_and_code_governance.md): 전사 코드베이스 리팩토링 및 아키텍처 거버넌스
 
 ### 제5장. 품질 검증 및 결론 (Chapter 5. Validation & Conclusion)
@@ -77,20 +79,20 @@ flowchart TD
 
 | 도메인 | 청사진 번호 & 문서명 | 핵심 기술 스펙 및 내용 |
 | :--- | :--- | :--- |
-| **01. System** | [`BP-101`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-101_system_architecture_blueprint.md) | 엔터프라이즈 멀티 티어 토폴로지 & 런타임 물리 배치도 |
+| **01. System** | [`BP-101`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-101_system_architecture_blueprint.md) | durable job 토폴로지, PostgreSQL 영속 상태, Redis 신호 및 KEDA 런타임 |
 | | [`BP-102`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-102_backend_layered_architecture.md) | 7계층 클린 아키텍처 & 의존성 역전 원칙(DIP) |
 | | [`BP-103`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | 3-Level 분산 락, 하트비트 Lease & 장애 복구 런북 |
-| | [`BP-104`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | Kubernetes KEDA ScaledJob 및 `/jobs` 모니터링 포털 |
+| | [`BP-104`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | Helm·Kubernetes KEDA ScaledJob, TriggerAuthentication 및 `/api/v1/jobs` |
 | **02. Data Engine** | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md) | OpenPyXL 병합 해제 및 2D 직교 좌표계 정규화 |
-| | [`BP-202`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) | GPT-5.6 Luna VLM 1-Shot 표 바운딩박스 검출 |
+| | [`BP-202`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) | 로컬 VLM 표 바운딩박스 검출 설계 (현재 구현 범위 제외) |
 | | [`BP-203`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | PostgreSQL Native `Binary COPY` 3072d 고속 벌크 주입 |
-| **03. Pipeline** | [`BP-301`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | Kahn 위상정렬 기반 2-Tier DAG 실행 엔진 & FSM |
-| | [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md) | 21개 원자적 파이프라인 모듈 Pinout 입출력 DTO |
+| **03. Pipeline** | [`BP-301`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | Kahn 위상정렬 DAG, durable queue 실행 및 FSM |
+| | [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md) | 19개 원자적 파이프라인 모듈과 2개 BI 도메인 서비스 DTO |
 | | [`BP-303`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | Dense(3072d) + Sparse(BM25) + RRF($k=60$) 융합 검색 |
-| **04. Workspaces** | [`BP-401`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md) | React Flow 2D DAG 빌더 & 실시간 샌드박스 |
-| | [`BP-402`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-402_ws_data_sources_management.md) | 스프레드시트 뷰어 & VLM 바운딩박스 오버레이 |
-| | [`BP-403`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md) | 40+ 전사 재무비율 계산기 & 5개년 건전성 히트맵 |
-| | [`BP-404`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-404_ws_ai_financial_chatbot.md) | Fast RAG 인메모리 어댑터 & 실시간 대화형 챗봇 |
+| **04. Workspaces** | [`BP-401`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md) | 모듈 카탈로그, DAG 실행 및 SSE 상태 스트림 |
+| | [`BP-402`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-402_ws_data_sources_management.md) | 스프레드시트 미리보기 및 영속 ingestion job 관리 |
+| | [`BP-403`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md) | 21개 근거 기반 BI 지표와 재무 분석 화면 |
+| | [`BP-404`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-404_ws_ai_financial_chatbot.md) | RAG 실행 작업, 상태 조회 및 대화형 챗봇 |
 | | [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md) | 다중 기업 듀퐁 3단계 분해 트리 & 5각 레이더 차트 |
 | **05. Interface** | [`BP-501`](file:///c:/Repos/bist-mini-final/docs/blueprints/05_interface_blueprints/BP-501_rest_api_specification.md) | FastAPI REST API 엔드포인트 & 표준 에러 엔벨로프 |
 | | [`BP-502`](file:///c:/Repos/bist-mini-final/docs/blueprints/05_interface_blueprints/BP-502_sse_streaming_protocol.md) | Server-Sent Events(SSE) 실시간 스트리밍 프로토콜 |

@@ -40,7 +40,13 @@ function PlaygroundWorkspace() {
   useEffect(() => {
     const controller = new AbortController();
     pipelineApi.listWorkflows(controller.signal).then(({ workflows: list }) => {
-      const options: WorkflowOption[] = list.map((wf) => ({ id: wf.id, name: wf.name }));
+      const options: WorkflowOption[] = list.map((wf) => ({
+        id: wf.id,
+        name: wf.name,
+        nodeCount: wf.graph.nodes.length,
+        edgeCount: wf.graph.edges.length,
+        moduleTypes: wf.graph.nodes.map((node) => node.module_type),
+      }));
       // Keep the primary RAG job first.
       options.sort((a, b) => {
         if (a.id === DEFAULT_WORKFLOW_ID) return -1;
@@ -140,7 +146,13 @@ function PlaygroundWorkspace() {
 
   const refreshWorkflows = async () => {
     const { workflows: list } = await pipelineApi.listWorkflows();
-    const options = list.map((item) => ({ id: item.id, name: item.name }));
+    const options = list.map((item) => ({
+      id: item.id,
+      name: item.name,
+      nodeCount: item.graph.nodes.length,
+      edgeCount: item.graph.edges.length,
+      moduleTypes: item.graph.nodes.map((node) => node.module_type),
+    }));
     options.sort((a, b) => {
       if (a.id === DEFAULT_WORKFLOW_ID) return -1;
       if (b.id === DEFAULT_WORKFLOW_ID) return 1;
@@ -183,6 +195,31 @@ function PlaygroundWorkspace() {
         handleSelectWorkflow(id);
       })
       .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 복제하지 못했습니다.'));
+  };
+
+  const handleCreateFromTemplate = async (templateId: string) => {
+    const template = workflows.find((item) => item.id === templateId);
+    if (!template) return;
+    const name = window.prompt(
+      '템플릿으로 만들 워크플로 이름을 입력하세요.',
+      `${template.name} 복사본`,
+    );
+    if (!name?.trim()) return;
+    const baseId = workflowIdFromName(name) || 'workflow-template';
+    let id = baseId;
+    let suffix = 2;
+    while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
+
+    try {
+      const source = await pipelineApi.getWorkflow(templateId);
+      await pipelineApi.saveWorkflow(id, name.trim(), source.graph);
+      await refreshWorkflows();
+      handleSelectWorkflow(id);
+    } catch (error: unknown) {
+      controller.reportError(
+        error instanceof Error ? error.message : '템플릿을 불러오지 못했습니다.'
+      );
+    }
   };
 
   const handleRenameWorkflow = () => {
@@ -340,6 +377,7 @@ function PlaygroundWorkspace() {
             onSelectWorkflow={handleSelectWorkflow}
             onCreateWorkflow={handleCreateWorkflow}
             onDuplicateWorkflow={handleDuplicateWorkflow}
+            onCreateFromTemplate={(templateId) => void handleCreateFromTemplate(templateId)}
             onRenameWorkflow={handleRenameWorkflow}
             onDeleteWorkflow={handleDeleteWorkflow}
           />

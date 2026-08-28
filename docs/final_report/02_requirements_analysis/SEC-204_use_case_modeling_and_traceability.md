@@ -1,5 +1,5 @@
 # [SEC-204] 유스케이스 모델링 및 6차원 추적성 매트릭스
-> **Chapter:** 2. 프로젝트 요구 분석 | **Section:** 2.4 | **Status:** Approved Baseline  
+> **Chapter:** 2. 프로젝트 요구 분석 | **Section:** 2.4 | **Status:** Implementation-aligned reference
 > **Classification:** Use Case Modeling (UC-1 ~ UC-5) & 6D Requirements Traceability Matrix
 
 ---
@@ -25,8 +25,8 @@ flowchart LR
 
 ### 📌 UC-2: 파이프라인 시각적 튜닝 및 실시간 샌드박스 (Pipeline Playground)
 * **액터**: AI/RAG 연구원, 파이프라인 엔지니어
-* **목적**: 21개 원자적 모듈을 React Flow 2D 캔버스에서 결선하고, SSE 스트리밍으로 지연시간/비용 실시간 관제.
-* **워크플로우**: 2D 노드 배치 및 핀 연결 ➡️ Kahn 위상정렬 DAG FSM 병렬 실행 ➡️ Server-Sent Events(`SSE`) 실시간 상태 스트리밍.
+* **목적**: 현재 등록된 19개 원자적 모듈을 React Flow 2D 캔버스에서 결선하고, durable 실행과 SSE 상태를 관제.
+* **워크플로우**: 2D 노드 배치 및 핀 연결 ➡️ PostgreSQL queue 실행 등록 ➡️ KEDA worker 처리 ➡️ Server-Sent Events(`SSE`) 상태 스트리밍.
 
 ### 📌 UC-3: 40+ 전사 재무 BI 분석 및 건전성 히트맵 (Financial BI Analytics)
 * **액터**: CFO, 투자 심사역, 기업 분석관, 경영진
@@ -35,8 +35,8 @@ flowchart LR
 
 ### 📌 UC-4: AI 금융 대화형 질의응답 (AI Financial Chatbot)
 * **액터**: 펀드 매니저, 금융 리서치 애널리스트
-* **목적**: 자연어로 복잡한 재무 질문을 입력하면, 300ms 이내에 표와 수식 근거가 첨부된 전문 답변 제공.
-* **워크플로우**: Fast RAG Dense 3072d + BM25 + RRF($k=60$) 인메모리 검색 ➡️ 2D 문맥 확장 ➡️ GPT-5.6 Luna Reader 마크다운/LaTeX 답변 스트리밍.
+* **목적**: 자연어 재무 질문을 세션에 기록하고, RAG 실행 결과와 근거를 대화 화면에 제공.
+* **워크플로우**: 세션 메시지 등록 ➡️ durable RAG run 생성 ➡️ 상태 조회로 결과 동기화 ➡️ 근거가 포함된 답변 표시.
 
 ### 📌 UC-5: 다중 기업 회계/통화 정규화 및 듀퐁 크로스 비교 (Company Comparison)
 * **액터**: M&A 실사팀, 산업 섹터 수석 연구원, 전략기획실
@@ -49,8 +49,8 @@ flowchart LR
 
 | 유즈케이스 (UC) | 관련 핵심 RAG 모듈 ([`SEC-302`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-302_class_diagrams_and_contracts.md)) | REST API & SSE 규격 ([`SEC-305`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-305_interface_specification.md)) | PostgreSQL 10대 테이블 ([`SEC-304`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-304_database_erd_and_vector_schema.md)) | 프론트엔드 React 컴포넌트 ([`SEC-402`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-402_mvp2_orchestration_and_bi.md)) | 품질 검증 & AST 테스트 ([`SEC-502`](file:///c:/Repos/bist-mini-final/docs/final_report/05_validation_and_conclusion/SEC-502_contract_testing_results.md)) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **UC-1: 재무 시트 고속 색인** | • `structure.cell_text_serializer`<br>• `structure.luna_vlm_structure_detector`<br>• `retrieval.text_embedder`<br>• `storage.pgvector_index_writer` | • `POST /api/data-sources/upload`<br>• `POST /api/data-sources/index`<br>• `GET /api/data-sources/probe` | • `source_files`<br>• `sheets`<br>• `langchain_pg_collection`<br>• `langchain_pg_embedding` | • `DataSourcesPage`<br>• `SpreadsheetViewer`<br>• `VlmOverlayInspector` | • `tests/storage/test_pgvector_copy.py`<br>• `test_architecture_contracts.py` |
-| **UC-2: 파이프라인 샌드박스** | • `query.*` (M1, M2, M3, M4, M5)<br>• `retrieval.*` (M6, M8, M9, M10, M11)<br>• `generation.*` (M12, M13, M14, M15, M16) | • `POST /api/workflows/run`<br>• `GET /api/workflows/{id}/stream` (SSE)<br>• `GET /api/pipeline/modules` | • `workflow_runs`<br>• `node_execution_logs` | • `PlaygroundPage`<br>• `@xyflow/react` Canvas<br>• `NodePropertiesPanel` | • `tests/engine/test_dag_executor.py`<br>• `test_modules_pinout.py` |
-| **UC-3: 40+ 전사 재무 BI** | • `structure.document_profiler` (M20)<br>• `retrieval.pgvector_retriever` (M8)<br>• `retrieval.sparse_bm25_retriever` (M9)<br>• `retrieval.rrf_fuser` (M10)<br>• `reader.financial_calculator` (M21) | • `GET /api/bi/companies`<br>• `GET /api/bi/companies/{id}/dashboard`<br>• `POST /api/bi/companies/{id}/refresh`<br>• `POST /api/bi/companies/{id}/reset` | • `bi_companies`<br>• `bi_questions`<br>• `bi_answers`<br>• `bi_dashboard_snapshots`<br>• `bi_materialization_jobs` | • `BiPage`<br>• `BiHeader`<br>• `FinancialHealthHeatmap`<br>• `ProfitabilityChart`<br>• `EvidenceDialog` | • `tests/features/bi/test_bi_calculator.py`<br>• `test_chart_viewmodel.ts` |
-| **UC-4: AI 금융 대화형 질의** | • `query.decomposer` (M2)<br>• `retrieval.context_expander` (M11)<br>• `generation.reader` (M12)<br>• `generation.confidence_scorer` (M16) | • `POST /api/chatbot/sessions`<br>• `POST /api/chatbot/sessions/{id}/messages`<br>• `GET /api/chatbot/sessions/{id}/stream` (SSE) | • `workflow_runs` (`wf-ai-chatbot-session`)<br>• `node_execution_logs` | • `ChatbotPage`<br>• `ChatMessageList`<br>• `EvidenceCellModal` | • `tests/features/chatbot/test_fast_rag.py`<br>• `test_chatbot_latency.py` |
+| **UC-1: 재무 시트 고속 색인** | • `structure.cell_text_serializer`<br>• `structure.luna_vlm_structure_detector`<br>• `retrieval.text_embedder`<br>• `storage.pgvector_index_writer` | • `POST /api/v1/data-sources/files/upload`<br>• `POST /api/v1/data-sources/ingestion-jobs`<br>• `GET /api/v1/data-sources/db-status` | • `source_files`<br>• `sheets`<br>• `langchain_pg_collection`<br>• `langchain_pg_embedding` | • `DataSourcesPage`<br>• `SpreadsheetViewer` | • `tests/storage/test_pgvector_copy.py`<br>• `test_architecture_contracts.py` |
+| **UC-2: 파이프라인 샌드박스** | • `query.*`<br>• `retrieval.*`<br>• `generation.*` | • `POST /api/v1/workflows/{id}/runs`<br>• `GET /api/v1/runs/{id}/stream` (SSE)<br>• `GET /api/v1/modules` | • `workflow_runs`<br>• `node_execution_logs` | • `PlaygroundPage`<br>• `@xyflow/react` Canvas<br>• `ModuleSettingsModal` | • `test_workflow_http_queue_sse_integration.py`<br>• `test_modules_pinout.py` |
+| **UC-3: 재무 BI** | • `structure.document_profiler`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `reader.financial_calculator` | • `GET /api/v1/bi/companies`<br>• `GET /api/v1/bi/companies/{id}/dashboard`<br>• `POST /api/v1/bi/companies/{id}/refresh`<br>• `POST /api/v1/bi/companies/{id}/reset` | • `bi_companies`<br>• `bi_questions`<br>• `bi_answers`<br>• `bi_dashboard_snapshots`<br>• `bi_materialization_jobs` | • `BiPage`<br>• `BiHeader`<br>• `FinancialHealthHeatmap`<br>• `ProfitabilityChart`<br>• `EvidenceDialog` | • `tests/features/bi/test_bi_calculator.py`<br>• `test_chart_viewmodel.ts` |
+| **UC-4: AI 금융 대화형 질의** | • `query.decomposer`<br>• `retrieval.context_expander`<br>• `generation.reader`<br>• `generation.confidence_scorer` | • `POST /api/v1/chat/sessions`<br>• `POST /api/v1/chat/sessions/{id}/messages`<br>• `GET /api/v1/chat/runs/{run_id}` | • `workflow_runs`<br>• `node_execution_logs` | • `ChatbotPage`<br>• `ChatMessageList`<br>• `EvidenceCellModal` | • chatbot route·RAG regression tests |
 | **UC-5: 다중 기업 듀퐁 비교** | • `storage.company_entity_extractor` (M19)<br>• `reader.financial_calculator` (M21)<br>• `DocumentProfilerModule` (M20) | • `GET /api/v1/company-comparisons/league`<br>• `POST /api/v1/company-comparisons/analyze` | • `bi_companies`<br>• `bi_dashboard_snapshots` | • `CompanyComparisonPage`<br>• `DupontTreeChart`<br>• `MultiCompanyRadar` | • `tests/features/bi/test_comparison.py`<br>• `test_currency_normalizer.py` |

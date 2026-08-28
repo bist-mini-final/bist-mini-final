@@ -35,12 +35,12 @@ graph TD
 
 | 레이어 번호 및 계층명 | 주 책임 (Primary Responsibility) | 주요 구성 파일 및 심볼 | 의존성 방향 (Dependencies) |
 | :--- | :--- | :--- | :--- |
-| **Layer 1: Presentation & API** | • HTTP 라우팅, CORS 및 요청 계측<br>• 입력 DTO 검증 및 OpenAPI 스키마 생성<br>• 전역 표준 에러 엔벨로프 매핑 | • [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py)<br>• [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py)<br>• [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py)<br>• [`backend/api/error_mapping.py`](file:///c:/Repos/bist-mini-final/backend/api/error_mapping.py) | Layer 2, Layer 3, Layer 4 (DTO 수준) |
+| **Layer 1: Presentation & API** | • HTTP 라우팅, CORS 및 요청 계측<br>• 입력 DTO 검증 및 OpenAPI 스키마 생성<br>• 전역 표준 에러 엔벨로프 매핑 | • [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py)<br>• [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py)<br>• [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py)<br>• [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py) | Layer 2, Layer 3, Layer 4 (DTO 수준) |
 | **Layer 2: Bootstrap & DI** | • 전체 애플리케이션 싱글톤 그래프 조립<br>• 도메인(Domain)과 인프라(Infra)의 단방향 하향식 의존성 결선<br>• 서버 기동/종료 수명주기(Lifespan) 관리<br>• 미완료 분산 큐 복구(`recover_pending_runs`) | • [`backend/bootstrap/container.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py)<br>• `ApplicationContainer`, `DomainServicesContainer`<br>• `PipelineExecutionEngine`, `InfrastructureContainer` | Layer 3 ~ Layer 7 전체 조립자 |
-| **Layer 3: Domain & Features** | • 재무제표 자동 분류 및 40+ 재무비율 계산 도메인<br>• [예정] AI 금융 챗봇 세션 및 Fast RAG 조율 도메인<br>• [예정] 다중 기업 크로스 비교 및 듀퐁 분석 도메인<br>• 파이프라인 품질/정확도 평가 벤치마크 도메인 | • [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/) (`catalog.py`, `calculator.py`, `profiler.py`)<br>• `FastRagPipelineAdapter` ([`fast_rag_adapter.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/fast_rag_adapter.py))<br>• [`backend/features/benchmark/service.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/service.py) | Layer 4 (DAG 실행), Layer 7 (저장소) |
-| **Layer 4: Execution & Orchestration** | • DAG 위상 정렬 및 순환 참조 방지<br>• 인메모리 제로 I/O 파이프라인 버스 중계<br>• KEDA 큐 디스패치 및 워커 Lease 토큰 락 | • [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py)<br>• [`backend/engine/workflows/dispatcher.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/dispatcher.py)<br>• [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py) | Layer 5 (모듈 실행), Layer 7 (Run 저장) |
-| **Layer 5: Modular Contracts** | • `BaseModule` 추상 기반 클래스 계약 준수<br>• 21개 단품 모듈 (파싱, VLM, 프로파일러, 임베딩, 검색, 생성, 재무계산)<br>• 모듈 레지스트리 인트로스펙션 | • [`modules/common/base_module.py`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)<br>• [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)<br>• [`modules/`](file:///c:/Repos/bist-mini-final/modules/) (21개 모듈) | Layer 6 (AI 클라이언트), Layer 7 (DB) |
-| **Layer 6: External Providers** | • OpenAI Responses 클라이언트 (JSON 모드/비전)<br>• 임베딩 포트 인터페이스 (`EmbeddingEncoder`)<br>• OpenAI / BGE 임베딩 어댑터 구현체 | • [`backend/providers/openai_provider.py`](file:///c:/Repos/bist-mini-final/backend/providers/openai_provider.py)<br>• [`backend/providers/openai_responses.py`](file:///c:/Repos/bist-mini-final/backend/providers/openai_responses.py)<br>• [`backend/providers/embeddings/ports.py`](file:///c:/Repos/bist-mini-final/backend/providers/embeddings/ports.py) | 외부 OpenAI API, Local PyTorch 모델 |
+| **Layer 3: Domain & Features** | • 재무제표 자동 분류 및 현재 21개 근거 기반 지표 계산<br>• AI 금융 챗봇 세션·durable RAG run 조율<br>• 다중 기업 비교·듀퐁 분석<br>• 파이프라인 품질/정확도 평가 벤치마크 | • [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/)<br>• [`backend/features/chatbot/`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/)<br>• [`backend/features/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/features/company_comparison/)<br>• [`backend/features/benchmark/service.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/service.py) | Layer 4 (DAG 실행), Layer 7 (저장소) |
+| **Layer 4: Execution & Orchestration** | • DAG 위상 정렬 및 순환 참조 방지<br>• PostgreSQL durable queue, KEDA 큐 디스패치 및 워커 Lease 토큰 락<br>• 영속 상태를 SSE로 관찰 | • [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py)<br>• [`backend/engine/orchestration/kubernetes.py`](file:///c:/Repos/bist-mini-final/backend/engine/orchestration/kubernetes.py)<br>• [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py) | Layer 5 (모듈 실행), Layer 7 (Run 저장) |
+| **Layer 5: Modular Contracts** | • `BaseModule` 추상 기반 클래스 계약 준수<br>• 19개 등록 모듈 (파싱, 원격 VLM, 임베딩, 검색, 생성 등)<br>• 모듈 레지스트리 인트로스펙션 | • [`modules/common/base_module.py`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)<br>• [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)<br>• [`modules/`](file:///c:/Repos/bist-mini-final/modules/) (19개 등록 모듈) | Layer 6 (AI 클라이언트), Layer 7 (DB) |
+| **Layer 6: External Providers** | • OpenAI Responses 클라이언트 (JSON 모드/비전)<br>• 임베딩 포트 인터페이스 (`EmbeddingEncoder`)<br>• OpenAI 임베딩 어댑터 | • [`backend/providers/openai_provider.py`](file:///c:/Repos/bist-mini-final/backend/providers/openai_provider.py)<br>• [`backend/providers/openai_responses.py`](file:///c:/Repos/bist-mini-final/backend/providers/openai_responses.py)<br>• [`backend/providers/embeddings/ports.py`](file:///c:/Repos/bist-mini-final/backend/providers/embeddings/ports.py) | 외부 OpenAI API. 로컬 VLM·reranker는 범위 제외 |
 | **Layer 7: Storage & Persistence** | • PostgreSQL DDL 초기화 및 스키마 마이그레이션<br>• pgvector HNSW 임베딩 저장 및 유사도 검색<br>• 초고속 Binary COPY 프로토콜 파이프라인<br>• 스레드 안전 커넥션 풀링 | • [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py)<br>• [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py)<br>• [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py)<br>• [`backend/storage/connection_pool.py`](file:///c:/Repos/bist-mini-final/backend/storage/connection_pool.py) | PostgreSQL 16 + pgvector, 디스크 I/O |
 
 ---
@@ -51,7 +51,7 @@ graph TD
 
 ```text
 bist-mini-final/
-├── modules/                        # [Layer 5] 21개 순수 RAG 파이프라인 모듈 라이브러리 (루트 독립)
+├── modules/                        # [Layer 5] 19개 등록 RAG 파이프라인 모듈 라이브러리 (루트 독립)
 │   ├── query/                      # 질의 분해, 라우터, 시맨틱 매처
 │   ├── retrieval/                  # 하이브리드 검색, 키워드 검색, RRF 퓨전
 │   ├── vision/                     # 시트 래스터라이저, Luna VLM 구조 감지, 셀 직렬화
@@ -78,7 +78,7 @@ bist-mini-final/
 │   │   └── factories/              # 4대 도메인 모듈 팩토리 (Query, Retrieval, Vision, Reader)
 │   │
 │   ├── features/                   # [Layer 3: Domain & Features]
-│   │   ├── bi/                     # 재무제표 프로파일러, 40+ 재무비율 계산기
+│   │   ├── bi/                     # 재무제표 프로파일러, 21개 근거 기반 지표 계산기
 │   │   ├── chatbot/                # AI 금융 챗봇 세션/메시지/첨부파일 관리자
 │   │   ├── company_comparison/     # 다중 기업 크로스 비교 & 듀퐁 정규화 및 파이낸셜 리그
 │   │   └── benchmark/              # 파이프라인 정확도 평가 벤치마크 서비스
@@ -111,7 +111,7 @@ sequenceDiagram
     participant L3 as Layer 3 (BI Feature Service)
     participant L4 as Layer 4 (Async Workflow Executor)
     participant L5 as Layer 5 (Module: PgVectorRetriever)
-    participant L7 as Layer 7 (PgVectorStore - asyncpg)
+    participant L7 as Layer 7 (PgVectorStore - psycopg pool)
 
     L1->>L3: await get_answer(BiQuestionAnswerRequest)
     L3->>L4: await execute_dag_async(dag_definition, inputs)
@@ -130,16 +130,19 @@ sequenceDiagram
 
 ### 불변식 아키텍처 계약 (Architecture Contracts)
 - **하향식 의존성 엄수**: 하위 계층(Layer 7, 6, 5)은 상위 계층(Layer 1, 2, 3)을 절대 import할 수 없습니다. (CI에서 `test_architecture_contracts.py`로 검증)
-- **전면 비동기 논블로킹 불변식 (Full-Async Invariant)**: FastAPI 이벤트 루프를 블로킹하는 모든 동기 I/O 함수(`time.sleep`, 블로킹 `requests`, 동기 DB 쿼리)를 엄격히 금지합니다. 모든 계층은 `async/await` 논블로킹 계약을 준수해야 합니다.
+- **API 이벤트 루프 비차단 불변식**: FastAPI의 이벤트 루프에서 `time.sleep`, 블로킹 HTTP·DB I/O를 직접 실행하지 않습니다. 네이티브 async 구현을 우선하고, 아직 동기인 어댑터는 명시적으로 worker thread에 격리합니다.
 - **CPU/디스크 I/O 스레드 격리**: `openpyxl.load_workbook` 등 비동기 미지원 고부하 파싱 로직은 반드시 `await asyncio.to_thread(...)`로 메인 루프에서 격리합니다.
-- **DB 커넥션 누수 방지**: Layer 7은 항상 비동기 컨텍스트 매니저(`async with get_async_connection():`)를 통해 풀에 반환해야 합니다.
+- **DB 커넥션 누수 방지**: Layer 7은 동기/비동기 구현에 맞는 컨텍스트 매니저(`with get_pooled_connection(...)` 또는 `async with get_pooled_async_connection(...)`)를 통해 연결을 풀에 반환해야 합니다.
 
 ### As-Is 부채 및 To-Be 개선안
-1. **백엔드 디렉토리의 Screaming Architecture 정렬**:
-   - 과거 20여 개로 분산된 평면 디렉토리(`spreadsheets/`, `vision/`, `llm/` 등)를 7개 계층(`api/`, `bootstrap/`, `features/`, `engine/`, `modules/`, `providers/`, `storage/`)으로 1:1 완벽 정렬.
-2. **전 계층 Full-Async 논블로킹 전환**:
-   - `BaseModule.execute()` 및 `WorkflowExecutor` 내부를 `async def execute_async()` 및 `asyncio.TaskGroup` 기반 네이티브 비동기 스케줄러로 전면 전환하고, `AsyncOpenAI`와 `AsyncConnectionPool` 바인딩.
-3. **`features/bi`와 `storage/db_manager` 간의 결합 완화**:
-   - `BiRepositoryPort` 비동기 인터페이스를 정의하고, `SqlAlchemyBiRepository` 또는 `AsyncPsycopgBiRepository` 어댑터로 격리.
-4. **모듈과 스토어의 직접 결합 완화**:
-   - `VectorSearchPort` 비동기 추상 인터페이스를 주입받아 Milvus, Pinecone, pgvector 등 다중 백엔드 교체 가능 구조로 리팩토링.
+1. **구현됨 — 백엔드 디렉토리의 Screaming Architecture 정렬**:
+   - 현재 코드는 `api/`, `bootstrap/`, `features/`, `engine/`, `modules/`, `providers/`, `storage/` 계층으로 정렬되어 있습니다.
+2. **부분 구현됨 — 전 계층 Full-Async 논블로킹 전환**:
+   - `BaseModule.run_async()`는 leaf module의 `execute_async()` override를 감지해 동일한 Pydantic 검증·오류 분류·출력 계약을 적용하고, override가 없는 기존 모듈만 worker thread로 격리합니다. `WorkflowExecutor`는 이 registry async 경계를 직접 await합니다.
+   - Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구는 `AsyncOpenAI` Responses/Embedding과 `AsyncConnectionPool`을 직접 사용합니다. 인제스천·BI 저장소의 네이티브 async 전환은 잔여 범위입니다.
+3. **구현됨 — `features/bi` 저장소 포트 분리**:
+   - BI API, 질문, 스냅샷, 프로파일, materialization 경계가 각 유스케이스별 `Protocol` 포트를 사용하고 PostgreSQL 구현체를 composition에서 주입합니다.
+4. **구현됨 — 검색 모듈과 pgvector 연결 분리**:
+   - Dense, keyword, context expansion, data scope 모듈은 `modules/retrieval/ports.py`의 포트를 주입받습니다. 네 포트 모두 동기·비동기 계약을 함께 제공하며, SQL과 결과 변환은 `PgVectorStore`의 공통 query/row helper에 캡슐화됩니다.
+5. **구현됨 — async 비차단 호환 경계와 병렬 상태 병합**:
+   - `BaseModule.run_async()`와 `BaseModuleRegistry.execute_async()`가 네이티브 async leaf를 우선 실행하고 동기 leaf만 worker thread로 격리합니다. 동일 run의 병렬 노드는 독립 상태 스냅샷으로 실행한 뒤 잠금 하에 병합해 lost update를 막습니다.

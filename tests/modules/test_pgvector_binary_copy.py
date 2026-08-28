@@ -88,6 +88,35 @@ def test_float32_raw_batches_use_one_contiguous_file_reader(tmp_path: Path) -> N
     assert struct.unpack("<2f", batches[1]) == pytest.approx((0.5, 0.6))
 
 
+def test_binary_copy_stream_supports_ordinary_vector_sequences() -> None:
+    stream = PgVectorBinaryCopyStream(
+        [
+            Document(page_content="first", metadata={}),
+            Document(page_content="second", metadata={}),
+        ],
+        [[0.25, -0.5], [1.0, 0.125]],
+        "11111111-1111-1111-1111-111111111111",
+        batch_size=1,
+    )
+    payload = b"".join(iter(lambda: stream.read(11), b""))
+    stream.close()
+
+    offset = len(b"PGCOPY\n\xff\r\n\x00") + 8
+    decoded_vectors: list[tuple[float, float]] = []
+    for _ in range(2):
+        field_count = struct.unpack_from("!h", payload, offset)[0]
+        offset += 2
+        fields = []
+        for _field in range(field_count):
+            field_length = struct.unpack_from("!i", payload, offset)[0]
+            offset += 4
+            fields.append(payload[offset : offset + field_length])
+            offset += field_length
+        decoded_vectors.append(struct.unpack_from("!2f", fields[2], 4))
+
+    assert decoded_vectors == pytest.approx([(0.25, -0.5), (1.0, 0.125)])
+
+
 def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -104,7 +133,7 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
     ]
 
     binary_copy = MagicMock()
-    monkeypatch.setattr(store_module, "copy_float32_artifact_documents", binary_copy)
+    monkeypatch.setattr(store_module, "copy_documents", binary_copy)
 
     copy_connection = MagicMock()
     publish_connection = MagicMock()
@@ -148,7 +177,7 @@ def test_binary_copy_failure_rolls_back_and_removes_staging_collection(
     vectors = artifact_store.vector_sequence(artifact_id, 1, 2)
     monkeypatch.setattr(
         store_module,
-        "copy_float32_artifact_documents",
+        "copy_documents",
         MagicMock(side_effect=RuntimeError("copy failed")),
     )
     copy_connection = MagicMock()

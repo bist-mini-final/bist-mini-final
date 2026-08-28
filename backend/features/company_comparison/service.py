@@ -158,7 +158,11 @@ class CompanyComparisonService:
         )
         evidence = self._merge_rag_evidence(evidence, snapshots, contexts)
 
-        warnings = [*planning_warnings, *retrieval_warnings]
+        warnings = [
+            *planning_warnings,
+            *retrieval_warnings,
+            *calculated.alignment_warnings,
+        ]
         if calculated.stability_basis_year < request.end_year:
             warnings.append(
                 f"{request.end_year}년까지의 손익 지표는 예상치이며, 재무 안정성은 "

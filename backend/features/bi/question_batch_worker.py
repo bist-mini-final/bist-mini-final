@@ -29,7 +29,10 @@ from typing import Final, Protocol
 
 from pydantic import ValidationError
 
-from backend.engine.worker.lease import LeaseHeartbeat
+from backend.engine.worker.lease import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
 from backend.providers.openai_responses import OpenAIResponsesError
 from modules.common.exceptions import ModuleExecutionError
 
@@ -266,28 +269,18 @@ class BiQuestionBatchWorker:
         if workflow_run_id is None:
             raise RuntimeError("claimed BI question has no workflow_run_id")
 
-        def _safe_heartbeat() -> bool:
-            try:
-                return self._service.heartbeat(
-                    question.question_id,
-                    workflow_run_id,
-                )
-            except Exception as e:
-                logger.warning(
-                    "BI question heartbeat transient error (question_id=%s): %s",
-                    question.question_id,
-                    e,
-                )
-                return True
-
         heartbeat = LeaseHeartbeat(
-            _safe_heartbeat,
+            lambda: self._service.heartbeat(
+                question.question_id,
+                workflow_run_id,
+            ),
             interval_seconds=30,
             thread_name=f"bi-hb-{question.question_id}",
             logger=logger,
             failure_message=(
                 f"BI question heartbeat failed (question_id={question.question_id})"
             ),
+            on_lease_lost=terminate_process_on_lease_loss,
         )
         heartbeat.start()
 
@@ -301,6 +294,7 @@ class BiQuestionBatchWorker:
             else:
                 timing = self._timing(claimed_at, started)
                 answer = self._completed_answer(question, result, timing)
+            heartbeat.raise_if_lost()
         finally:
             heartbeat.stop()
 

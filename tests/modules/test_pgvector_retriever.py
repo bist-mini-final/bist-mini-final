@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import QueryContextDTO
@@ -47,9 +48,12 @@ def test_dense_retrieval_searches_only_the_routed_collection() -> None:
             )
         ],
     )
-    result = PgVectorRetrieverModule(store).run(
-        PgVectorRetrieverInputDTO(query_input=embeddings),
-        PgVectorRetrieverConfigDTO(top_k=5),
+    module = PgVectorRetrieverModule(store)
+    input_data = PgVectorRetrieverInputDTO(query_input=embeddings)
+    config = PgVectorRetrieverConfigDTO(top_k=5)
+    result = module.run(
+        input_data,
+        config,
     )
 
     assert result["items"][0]["index_id"] == "idx-routed"
@@ -61,6 +65,11 @@ def test_dense_retrieval_searches_only_the_routed_collection() -> None:
         sheet_names=["Financials"],
         company_name="Example Corp",
     )
+
+    store.similarity_search_by_vector_with_score_async = AsyncMock(return_value=[(document, 0.15)])
+    async_result = asyncio.run(module.run_async(input_data, config))
+    assert async_result["items"] == result["items"]
+    store.similarity_search_by_vector_with_score_async.assert_awaited_once()
 
 
 def test_direct_dense_sql_uses_single_character_like_escape() -> None:
@@ -94,9 +103,7 @@ def test_direct_dense_sql_uses_single_character_like_escape() -> None:
 
     cursor = Cursor()
     store = PgVectorStore()
-    store._collection_uuid_cache["idx-test"] = (
-        "00000000-0000-0000-0000-000000000001"
-    )
+    store._collection_uuid_cache["idx-test"] = "00000000-0000-0000-0000-000000000001"
     store._read_connection = lambda: Connection(cursor)  # type: ignore[method-assign]
 
     result = store.similarity_search_by_vector_with_score(

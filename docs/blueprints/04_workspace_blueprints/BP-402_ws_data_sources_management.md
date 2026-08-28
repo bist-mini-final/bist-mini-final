@@ -34,7 +34,7 @@ flowchart TD
 | | `structure.cell_text_serializer`<br>([`cell_text_serializer.py`](file:///c:/Repos/bist-mini-final/modules/structure/cell_text_serializer.py)) | • 감지된 2D 좌표계를 단일 표준 규격(`header_with_value`) 텍스트 라인으로 직렬화 |
 | | `retrieval.text_embedder`<br>([`text_embedder.py`](file:///c:/Repos/bist-mini-final/modules/embedding/cell_text_embedder.py)) | • 직렬화된 셀 텍스트를 `text-embedding-3-large`를 통해 **3072차원 고밀도 벡터**로 배치 임베딩 |
 | | `storage.pgvector_index_writer`<br>([`BP-302 Module 7`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_21_modules_pinout_catalog.md#7-pgvectorindexwritermodule-storagepgvector_index_writer)) | • **[Layer 5 모듈화]** 임베딩 벡터와 메타데이터를 Layer 7 Binary COPY 엔진을 통해 PostgreSQL `langchain_pg_embedding` 테이블로 초고속 벌크 주입 |
-| **Layer 7<br>(스토리지 인프라)** | `backend/storage/db_manager.py`<br>`backend/storage/connection_pool.py` | • PostgreSQL 커넥션 풀링 및 HNSW 인덱스 상태 헬스 프로브(`GET /api/data-sources/probe`) |
+| **Layer 7<br>(스토리지 인프라)** | `backend/storage/db_manager.py`<br>`backend/storage/connection_pool.py` | • PostgreSQL 커넥션 풀링 및 pgvector 상태 조회(`GET /api/v1/data-sources/db-status`), 외부 DB 연결 확인(`POST /api/v1/data-sources/db-connect`) |
 
 ---
 
@@ -95,54 +95,38 @@ graph TD
 
 ---
 
-## 3. 2단계 인제스천 & 사용자 피드백 분기점 (Two-Stage Ingestion & Review Checkpoint)
+## 3. 현재 인제스천 작업 흐름 (Durable Ingestion Job)
 
-VLM의 잘못된 구조 인식이 벡터 스토어로 전파되는 것을 원천 차단하기 위해, 일괄 자동 실행 대신 **VLM 감지 후 사용자의 시각적 검증 및 승인을 거쳐 인덱싱을 진행하는 휴먼인더루프(Human-in-the-Loop) 분기점**을 적용합니다.
+현재 제품 경로는 파일 업로드와 durable ingestion job을 중심으로 동작합니다. 과거 설계의 `detect-structure`, 수동 오버레이 승인, `ingest` REST 경로는 구현되어 있지 않으며 API 계약으로 사용하면 안 됩니다. 로컬 VLM 런타임도 범위에서 제외되어 있습니다.
 
 ```mermaid
 flowchart TD
-    UPLOAD["1. 엑셀 워크북 업로드 및 시트 선택"] --> DETECT["2. Luna VLM 구조 감지 (POST /api/data-sources/detect-structure)"]
-    DETECT --> OVERLAY["3. 그리드 위 바운딩 박스 시각적 렌더링 (헤더/스터브/데이터)"]
-    
-    subgraph ReviewCheckpoint ["★ 사용자 피드백 & 검증 분기점 (Human Review Checkpoint)"]
-        OVERLAY --> USER_DECISION{"사용자 구조 검증"}
-        USER_DECISION -- "구조 보정 필요" --> EDIT["바운딩 박스 드래그 수동 보정 / VLM 재감지"]
-        EDIT --> OVERLAY
-        USER_DECISION -- "구조 승인 (Confirm & Index)" --> PROCEED["사용자 승인 확인 (User Approved)"]
-    end
-
-    PROCEED --> INGEST["4. 확정 구조 기반 인덱싱 (POST /api/data-sources/ingest)"]
-    
-    subgraph IndexingPipeline ["5. 확정 인덱싱 파이프라인 (SSE 실시간 스트리밍)"]
-        INGEST --> SERIAL["단일 표준 직렬화 (header_with_value)"]
-        SERIAL --> EMBED["text-embedding-3-large (3072d 배치 임베딩)"]
-        EMBED --> COPY["PostgreSQL Binary COPY 고속 주입"]
-    end
+    UPLOAD["1. 파일 업로드<br>POST /api/v1/data-sources/files/upload"] --> QUEUE["2. auto_ingest=true면 ingestion job 생성 (202 성격의 작업 응답)"]
+    MANUAL["POST /api/v1/data-sources/ingestion-jobs"] --> QUEUE
+    QUEUE --> WORKER["3. KEDA ingestion workflow worker"]
+    WORKER --> SERIAL["셀 직렬화 및 임베딩"]
+    SERIAL --> COPY["PostgreSQL/pgvector Binary COPY"]
+    COPY --> STATUS["GET /api/v1/data-sources/ingestion-jobs/{run_id}<br>또는 by-index/{index_id}로 상태 조회"]
+    UPLOAD --> PREVIEW["GET /files/{filename}/preview로 원본 시트 미리보기"]
 ```
 
 ---
 
 ### 3.1 단계별 실행 및 피드백 프로토콜
 
-1. **Stage 1 (VLM 구조 감지 및 프리뷰)**:
-   - 사용자가 워크북 시트를 선택하면 `POST /api/data-sources/detect-structure`를 호출하여 Luna VLM이 표 경계(`TableBoundary`), 열 헤더, 행 스터브를 감지하고 캔버스에 색상별 오버레이 박스를 렌더링합니다.
-2. **중간 검증 분기점 (Human-in-the-Loop Review & Approval)**:
-   - 사용자는 캔버스에서 감지된 헤더 계층 구조와 데이터 셀 영역을 시각적으로 확인합니다.
-   - 오인식된 영역이 있을 경우 사용자가 직접 영역을 마우스로 보정할 수 있으며, 구조가 정확할 때만 **"구조 확정 및 색인 시작"** 버튼을 클릭합니다.
-3. **Stage 2 (확정 구조 기반 벡터 인덱싱)**:
-   - 사용자가 승인한 확정 좌표계를 바탕으로 `POST /api/data-sources/ingest`를 호출하여 직렬화 ➡️ 3072d 임베딩 ➡️ PostgreSQL Binary COPY 주입을 실행하며, SSE(`event: progress`)를 통해 진행률을 실시간 수신합니다.
-4. **Database Connection Probe**:
-   - 우측 상단 인디케이터가 페이지 진입(Mount) 시 `GET /api/data-sources/probe`를 단 1회 호출하여 PostgreSQL 및 pgvector 정상 가동 여부를 확인 및 표시합니다 (주기적 폴링 없음, 필요 시 새로고침 버튼으로 1회 수동 재조회).
+1. **업로드와 자동 등록**: `POST /api/v1/data-sources/files/upload`는 원본 파일을 저장하고 `auto_ingest=true`일 때 ingestion job을 생성합니다. `auto_ingest=false`이면 사용자가 나중에 `POST /api/v1/data-sources/ingestion-jobs`로 등록할 수 있습니다.
+2. **상태 확인**: ingestion job은 워크플로 실행으로 저장됩니다. 목록, 단일 run, index 기준 조회 및 resume/cancel/delete API를 제공하며 현재 데이터 소스 UI는 이 상태를 조회합니다.
+3. **원본 확인**: 파일 preview/download와 인덱스 조회/search API로 입력과 결과를 검증합니다. 인제스천 전용 SSE나 수동 바운딩 박스 편집기는 현재 계약에 없습니다.
+4. **Database Connection Probe**: `GET /api/v1/data-sources/db-status`가 현재 저장소 상태를, `POST /api/v1/data-sources/db-connect`가 지정 연결의 검증을 담당합니다.
 
 ---
 
 ## 4. 리팩토링 타깃 (Refactoring Targets)
 
-1. **레거시 multi-row INSERT 코드 완전 삭제 (Zero Legacy Code Policy)**:
-   - As-Is: `PgVectorIndexWriterModule` 및 `pgvector_store.py` 내부에 과거 청크 단위 multi-row `INSERT INTO ... VALUES (...)` 로직 잔존.
-   - To-Be: 이전의 모든 `INSERT` SQL 포매팅 및 일반 적재 코드를 100% 완전 삭제하고, 오직 **Binary COPY 단일 스트리밍 경로(Single Canonical Path)**로만 일원화하여 유지보수 부채 및 레거시 버그 발생 원천 차단.
-2. **가상 스크롤(Virtual Scrolling) 그리드**:
-   - As-Is: 1,000행 이상의 거대 시트 렌더링 시 DOM 노드 과다로 프레임 드롭 발생.
-   - To-Be: `@tanstack/react-virtual`을 도입하여 뷰포트 내 가시 셀만 렌더링하는 가상화 그리드 적용.
+1. **구현됨 — Binary COPY 단일 스트리밍 경로 (Zero Legacy Code Policy)**:
+   - `PgVectorIndexWriterModule`의 artifact 경로와 `PgVectorStore`의 동적 임베딩 경로가 모두 `PgVectorBinaryCopyStream`을 사용합니다. embedding row의 multi-row INSERT 구현은 제거했습니다.
+2. **구현 방식 변경 — raster viewport 기반 대용량 시트 검사**:
+   - 현재 UI는 셀마다 DOM 노드를 생성하는 grid가 아니라 서버가 만든 시트 raster image 한 장과 감지 region overlay만 렌더링합니다. 따라서 행 수에 비례하는 DOM 증가가 없어 `@tanstack/react-virtual` 의존성이 필요하지 않습니다.
+   - 시트 이미지 자체는 zoom 가능한 scroll viewport에서 표시하고, 영역 목록만 제한된 sidebar scroll container에 렌더링합니다. 향후 실제 편집형 cell grid를 추가할 때만 row/column virtualization을 도입합니다.
 3. **수동 바운딩 박스 드래그 편집기**:
-   - VLM이 감지하지 못한 특수 레이아웃을 사용자가 마우스 드래그로 직접 영역 지정(Draw Bounding Box)할 수 있는 UI 툴킷 추가.
+   - 원격 VLM 결과를 사용자 승인·수정 가능한 좌표 계약과 함께 저장하는 별도 기능으로 재설계가 필요합니다. 로컬 VLM 구현은 프로젝트 범위에서 제외합니다.

@@ -104,6 +104,10 @@ class RuntimeContainer:
         if self._owns_openai_provider:
             self.openai_provider.close()
 
+    async def aclose(self) -> None:
+        if self._owns_openai_provider:
+            await self.openai_provider.aclose()
+
 
 @dataclass
 class ExecutionContainer:
@@ -154,7 +158,7 @@ class DomainServicesContainer:
                 runtime.services.db_manager,
                 bi_services,
             ),
-            job_monitor=KubernetesMonitor(),
+            job_monitor=KubernetesMonitor(queue_reader=runtime.services.db_manager),
         )
 
 
@@ -206,6 +210,10 @@ class ApplicationContainer:
         # code change; cancelling here would turn an unrelated reload into a
         # user-visible "질문 처리가 중지되었습니다" failure.
         self.runtime.close()
+
+    async def aclose(self) -> None:
+        # FastAPI owns an event loop and can close AsyncOpenAI/httpx pools cleanly.
+        await self.runtime.aclose()
 
 
 __all__ = [

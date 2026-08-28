@@ -41,6 +41,8 @@ spec:
                 secretKeyRef:
                   name: bist-batch-env
                   key: OPENAI_BASE_URL
+            - name: REDIS_URL
+              value: redis://bist-redis:6379/0
             - name: KUBERNETES_NAMESPACE
               valueFrom:
                 fieldRef:

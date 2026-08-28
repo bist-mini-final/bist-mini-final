@@ -1,7 +1,7 @@
-# 기업 비교 V2 RAG 설계 및 구현 착수서
+# 기업 비교 V2 RAG 설계 및 구현 기준서
 
-> 상태: 구현 전 설계 확정본
-> 대상 레포: `C:\Users\baming320\bist-mini-final`
+> 상태: 구현됨 — 운영·검증 기준서
+> 대상 레포: `C:\Repos\bist-mini-final`
 > 원칙: 기존 `/company-comparison` V1은 유지하고, 별도 V2 화면과 API를 추가한다.
 
 ## 1. 목표와 완료 기준
@@ -467,23 +467,16 @@ npm run build
 
 녹화 전에는 API와 모델 연결을 한 번 warm-up하고 실제 소요 시간을 측정한다. 처리 시간이 길면 영상만 배속하며 제품 코드에 가짜 지연이나 가짜 진행 단계를 넣지 않는다.
 
-## 16. 내일 바로 시작하는 체크리스트
+## 16. 구현 검증 체크리스트
 
-- [ ] `git status`로 오늘 V1 변경 범위 재확인
-- [ ] V1 페이지, `/api/bi/companies`, 3개 dashboard API 정상 여부 확인
-- [ ] 현재 변경을 별도 커밋으로 보존
-- [ ] V2 작업 브랜치 생성
-- [ ] backend request/response Pydantic 모델 작성
-- [ ] calculator와 단위 테스트 먼저 작성
-- [ ] evidence registry와 allow-list 테스트 작성
-- [ ] 선택 회사별 병렬 RAG retrieval 구현
-- [ ] structured brief generator와 후검증 구현
-- [ ] V2 API route 및 router 한 줄 통합
-- [ ] API를 curl/Swagger로 2개 회사부터 확인
-- [ ] V2 화면 복제 후 API 연결
-- [ ] 선택 변경/재분석/loading/partial failure 상태 구현
-- [ ] V1/V2 회귀 테스트
-- [ ] 실제 AI DX 3종으로 데모 녹화
+- [x] V1 `/company-comparison`과 V2 `/company-comparison-v2`를 별도 라우트로 유지
+- [x] `CompanyComparisonRequest`/`CompanyComparisonResponse` 계약과 결정론적 calculator 구현
+- [x] 선택 기업 2~3개, 기간, question을 받는 `POST /api/v1/company-comparisons/analyze` 통합
+- [x] V2 프런트엔드가 정식 API를 직접 호출하고 응답 schema를 검증
+- [x] evidence allow-list, 선택 기업 제외, 2·3개 기업 비교를 포함한 Python 및 TypeScript 회귀 테스트
+- [ ] 실제 OpenAI 연결 상태의 AI DX 3종으로 데모를 녹화하고 응답 시간·비용을 발표 자료에 기록
+
+V1 상태 확인에는 `GET /api/v1/bi/companies`와 각 기업의 `GET /api/v1/bi/companies/{company_id}/dashboard`를 사용합니다. 과거 `/api/bi/companies` 표기는 정식 계약이 아닙니다.
 
 ## 17. 구현 중 중단하고 확인할 조건
 

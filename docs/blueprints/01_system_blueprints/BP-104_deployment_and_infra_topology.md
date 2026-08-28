@@ -1,6 +1,6 @@
 # [BP-104] K8s, KEDA ScaledJob & 인프라 토폴로지
 > **Document Code:** `BP-104` | **Category:** Infrastructure & DevOps Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/manifests/), [`deploy/docker/`](file:///c:/Repos/bist-mini-final/deploy/docker/), [`deploy/compose/docker-compose.yml`](file:///c:/Repos/bist-mini-final/deploy/compose/docker-compose.yml)
+> **Source Files:** [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/manifests/), [`deploy/helm/bist/`](file:///c:/Repos/bist-mini-final/deploy/helm/bist/), [`deploy/docker/`](file:///c:/Repos/bist-mini-final/deploy/docker/), [`deploy/compose/docker-compose.yml`](file:///c:/Repos/bist-mini-final/deploy/compose/docker-compose.yml)
 
 ---
 
@@ -22,8 +22,10 @@ graph TB
         end
 
         subgraph BackendGroup ["Backend API & Admin Pods (FastAPI)"]
-            BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• K8s Job Dashboard (/jobs)"]
+            BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/v1/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• K8s Job Dashboard (/jobs)"]
         end
+
+        REDIS["bist-redis<br>Pub/Sub state-change relay"]
 
         subgraph OptionalStorageGroup ["Storage Layer (선택적 로컬 프로비저닝)"]
             PG_INTERNAL["[선택 옵션] 내장 bist-postgres (StatefulSet)<br>pgvector 0.7.0 / PG 16 (PVC: 10Gi)"]
@@ -31,9 +33,11 @@ graph TB
 
         subgraph KedaGroup ["Event-Driven Autoscaling (KEDA)"]
             KEDA_OP["KEDA Operator & Metrics Server"]
-            SCALED_JOB["KEDA ScaledJob: workflow-core-scaledjob"]
-            WORKER_PODS["Workflow Worker Pods (0 ~ N AutoScaled)"]
+            SCALED_JOB["4 ScaledJobs: workflow / BI materialization / BI question / benchmark"]
+            AUTH["TriggerAuthentication<br>bist-keda-postgresql Secret"]
+            WORKER_PODS["One-shot Worker Pods (0 ~ N AutoScaled)"]
             SCALED_JOB -.->|Spawns| WORKER_PODS
+            AUTH -.->|PostgreSQL connection| SCALED_JOB
         end
     end
 
@@ -43,6 +47,7 @@ graph TB
     INGRESS -->|/jobs -> K8s Job Monitor| BE
     
     BE -->|기본: 외부 DB 연결| PG_EXTERNAL
+    BE -->|SSE state-change signal| REDIS
     BE -.->|선택: 내장 DB 활성화 시| PG_INTERNAL
     WORKER_PODS -->|기본: 외부 DB 연결| PG_EXTERNAL
     WORKER_PODS -.->|선택: 내장 DB 활성화 시| PG_INTERNAL
@@ -59,10 +64,10 @@ graph TB
 
 ```mermaid
 flowchart TD
-    START["🚀 배포 스크립트 실행<br>(./deploy/kubernetes/local.sh all 또는 local.ps1)"] --> PREFLIGHT{"1. Pre-Flight 환경 진단"}
+    START["🚀 배포 스크립트 실행<br>(./deploy/kubernetes/local.sh all)"] --> PREFLIGHT{"1. Pre-Flight 환경 진단"}
 
     subgraph PreflightChecks ["5대 Pre-Flight 진단 항목"]
-        C1["① OS & 쉘 환경 감지 (Win / Mac / Linux)"]
+        C1["① Bash 실행 환경 감지 (WSL / Git Bash / macOS / Linux)"]
         C2["② 하드웨어 리소스 진단 (RAM >= 4GB, Disk >= 10GB)"]
         C3["③ 포트 충돌 검사 (Port 8080, 5432 점유 여부)"]
         C4["④ Docker 엔진 설치 및 데몬 기동 여부 검증"]
@@ -86,7 +91,7 @@ flowchart TD
     end
 
     TRACK_DECISION -- "K8s 지원 환경 (기본값)" --> TrackA
-    TRACK_DECISION -- "K8s 비활성 / 경량 실행" --> TrackB
+    TRACK_DECISION -- "K8s 비활성 / DB만 필요" --> TrackB
 
     TrackA --> READY["✅ 배포 완료! http://localhost:8080 즉시 접속"]
     TrackB --> READY
@@ -98,7 +103,7 @@ flowchart TD
 
 | 진단 항목 | 발생 가능한 문제점 (Risk) | 자동 복구 및 자가 설치 동작 (Self-Healing) |
 | :--- | :--- | :--- |
-| **① OS & 쉘 호환성** | Windows 환경에서 bash `.sh` 미지원 | Windows 전용 **PowerShell 배포기(`deploy/kubernetes/local.ps1`)**와 POSIX bash(`local.sh`)를 듀얼 제공하여 크로스 플랫폼 지원. |
+| **① OS & 쉘 호환성** | Windows 환경에서 bash `.sh` 미지원 | 단일 POSIX bash 배포기(`deploy/kubernetes/local.sh`)를 사용합니다. Windows에서는 WSL2 또는 Git Bash에서 실행합니다. |
 | **② 하드웨어 리소스** | 메모리 부족으로 K8s Pod OOM 크래시 | 가용 RAM을 사전 검사하여 4GB 미만일 경우 경고 알림 및 **경량 Track B(docker-compose) 전환 권고**. |
 | **③ 포트 충돌 검사** | 기존 8080, 5432 포트 중복 점유 | 포트 충돌 감지 시 에러로 죽지 않고 환경 변수(`PORT=8081`)로 대체 포트 자동 바인딩 제안. |
 | **④ Docker 엔진 검증** | Docker 미설치 또는 데몬 정지 | OS별 다중 Fallback(winget, curl 쉘, direct DMG/EXE 다운로드)을 통해 설치 가이드 및 데몬 기동 루프 실행. |
@@ -153,37 +158,36 @@ flowchart TD
 
 ### 2.3 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
 
-1. **Track A (권장): Kubernetes + KEDA 분산 클러스터 (`deploy/kubernetes/local.sh all` 또는 `local.ps1 all`)**
-   - 실제 운영 환경과 100% 동일하게 로컬 k3d 클러스터를 생성하고, KEDA 오토스케일러와 Ingress Controller를 통한 엔터프라이즈 멀티 티어 배포를 검증합니다.
-2. **Track B (대체): Zero-K8s 경량 Docker-Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
-   - K8s를 구동하기 어려운 저사양 노트북이나 CI 파이프라인에서 k3d 설치 없이 **동일한 프론트엔드/백엔드/PostgreSQL/워커 스택을 즉시 구동**하는 Fallback 트랙을 완벽히 보장합니다.
+1. **Track A (로컬 통합 검증): Kubernetes + KEDA (`deploy/kubernetes/local.sh all`)**
+   - k3d, Redis, KEDA, NGINX Ingress, API/UI, 4개 워커 종류를 한 번에 배치합니다. 기존 클러스터에 8080/8443 포트가 없으면 스크립트가 삭제하지 않고 `recreate` 또는 `kubectl port-forward`를 안내합니다.
+2. **Track B (DB 개발): Docker Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
+   - Compose 파일은 PostgreSQL/pgvector 개발 DB만 관리합니다. API/UI는 README의 개발 서버 명령으로 별도 실행하고, one-shot 워커는 필요한 경우 수동 실행합니다.
 
 ---
 
-### 2.4 선택적 DB 프로비저닝 (External Managed DB 기본값 vs Internal StatefulSet 선택)
+### 2.4 데이터베이스 연결 안전성 (External DB vs Local Compose DB)
 
-엔터프라이즈 프로덕션 환경과의 일치성을 위해 **외부 관리형 DB(External Managed PostgreSQL + pgvector) 연결이 기본값(Default)**으로 동작하며, 별도 DB가 없는 환경을 위해 **내장 DB 컨테이너 기동은 선택 옵션(Optional)**으로 제공됩니다:
+애플리케이션과 KEDA는 PostgreSQL/pgvector를 공통 상태 저장소와 큐로 사용합니다. `local.sh`의 연결 우선순위는 `KUBERNETES_DATABASE_URL` → `DATABASE_URL` → `PGVECTOR_URL`입니다.
 
-| 구분 | [기본값] 외부 관리형 DB 연결 (Default Baseline) | [선택 옵션] 내장 DB 컨테이너 배포 (Optional Local DB) |
+| 구분 | 외부 관리형 PostgreSQL | 로컬 Compose PostgreSQL |
 | :--- | :--- | :--- |
-| **적용 시나리오** | **AWS RDS, Neon, Supabase, 호스트 자체 PostgreSQL 연결** | 로컬 머신에 별도 DB가 전혀 없는 개발/테스트 환경 |
-| **실행 옵션** | `./deploy/kubernetes/local.sh all`<br>(기본값: 환경변수 `POSTGRES_HOST` / `.env` 참조) | `./deploy/kubernetes/local.sh all --with-embedded-postgres`<br>(내장 DB 자동 기동 플래그 명시 시) |
-| **DB 컨테이너** | **내부 DB 컨테이너 생성 스킵** (5432 포트 충돌 및 메모리 낭비 0) | K8s `bist-postgres` StatefulSet 자동 기동 (PVC 10Gi) |
-| **연결 바인딩** | 제공된 외부 DB 접속 정보(`Secret`/`ConfigMap`)를 백엔드/워커에 주입 | 클러스터 내부 서비스 DNS (`bist-postgres:5432`) 주입 |
-| **KEDA 트리거** | 외부 DB `workflow_runs` 테이블을 원격 폴링하여 오토스케일링 | 내부 DB 큐 카운트 감지 |
+| **사용 시나리오** | 운영/스테이징 또는 원격 DB 검증 | k3d 및 개발 서버 로컬 검증 |
+| **연결 전달** | `bist-batch-env`와 KEDA 전용 `bist-keda-postgresql` Secret | `KUBERNETES_DATABASE_URL=...localhost:5432/rag_flow` 일회성 재정의 |
+| **사전 검증** | 인증 연결과 `SELECT 1` 성공 후에만 마이그레이션/배포 진행 | Compose DB healthcheck와 Alembic migration 확인 |
+| **실패 처리** | 기존 로컬 DB 컨테이너와 클러스터를 건드리지 않고 중단 | 오류 원인을 출력하고 배포 중단 |
 
 ---
 
 ## 3. KEDA ScaledJob 이벤트 기반 자동 확장 메커니즘 (KEDA ScaledJob Specs)
 
-PostgreSQL 대기열 테이블 `workflow_runs`의 미처리 큐 개수에 따라 워커 Pod를 0개에서 최대 `KUBERNETES_MAX_JOBS`까지 동적으로 스케일아웃합니다.
+PostgreSQL 대기열 테이블의 미처리 작업 수에 따라 워커 Pod를 0개에서 최대 `KUBERNETES_MAX_JOBS`까지 동적으로 스케일아웃합니다. 현재 `workflow-worker`, `bi-materialization`, `bi-question`, `benchmark`의 네 ScaledJob을 사용하며, 각 트리거의 PostgreSQL 접속 문자열은 워커 환경 변수와 분리된 `TriggerAuthentication`에서 읽습니다.
 
 ### ScaledJob 매니페스트 발췌 (`deploy/kubernetes/manifests/scaledjob.yaml`)
 ```yaml
 apiVersion: keda.sh/v1alpha1
 kind: ScaledJob
 metadata:
-  name: workflow-worker-scaler
+  name: workflow-worker
   namespace: bist-batch
 spec:
   jobTargetRef:
@@ -204,15 +208,12 @@ spec:
   pollingInterval: 5
   successfulJobsHistoryLimit: 5
   failedJobsHistoryLimit: 10
-  maxReplicaCount: 8
+  maxReplicaCount: 10
   triggers:
   - type: postgresql
+    authenticationRef:
+      name: bist-postgresql
     metadata:
-      dbOwner: postgres
-      host: bist-postgres
-      port: "5432"
-      userName: postgres
-      passwordFromEnv: PG_PASSWORD
       query: "SELECT COUNT(*) FROM workflow_runs WHERE status = 'queued' AND available_at <= NOW();"
       targetQueryValue: "1"
 ```
@@ -221,7 +222,7 @@ spec:
 
 ## 4. 읽기 전용 K8s 배치 잡 & 워커 관제 (`/jobs`, `GET /api/v1/jobs`)
 
-현재 승인 기준선은 React SPA의 `/jobs` 화면이 FastAPI의 `GET /api/v1/jobs`를 5초마다 조회하는 구조입니다. API는 KEDA `ScaledJob`, `batch/v1 Job`, `core/v1 Pod`의 요약 상태만 반환합니다. 클러스터 내부에서는 전용 ServiceAccount와 네임스페이스 한정 Role을 사용하고, 로컬 개발에서는 현재 `kubectl` context를 읽기 전용으로 조회합니다.
+현재 승인 기준선은 React SPA의 `/jobs` 화면이 FastAPI의 `GET /api/v1/jobs`를 5초마다 조회하는 구조입니다. API는 KEDA `ScaledJob`, `batch/v1 Job`, `core/v1 Pod` 요약과 PostgreSQL `workflow_runs`의 활성 큐/Lease 상태를 함께 반환합니다. 클러스터 내부에서는 전용 ServiceAccount와 네임스페이스 한정 Role을 사용하고, 로컬 개발에서는 현재 `kubectl` context를 읽기 전용으로 조회합니다.
 
 ```mermaid
 sequenceDiagram
@@ -231,12 +232,15 @@ sequenceDiagram
     participant SPA as React Jobs Page
     participant FastAPI as FastAPI Job Router (GET /api/v1/jobs)
     participant K8s as Kubernetes API (keda.sh, batch/v1, core/v1)
+    participant DB as PostgreSQL workflow_runs
 
     Admin->>Ingress: GET /jobs (브라우저 접속)
     Ingress->>SPA: 정적 SPA 및 /jobs route 반환
     SPA->>FastAPI: GET /api/v1/jobs (5초 polling)
     FastAPI->>K8s: list ScaledJobs, Jobs, Pods (bist-batch)
     K8s-->>FastAPI: resource status JSON
+    FastAPI->>DB: active queue/lease read-only query
+    DB-->>FastAPI: run, worker, heartbeat age, TTL, attempts
     FastAPI-->>SPA: KubernetesWorkloadSnapshot
     SPA-->>Admin: 상태 카드와 읽기 전용 표 갱신
 ```
@@ -244,7 +248,7 @@ sequenceDiagram
 ### 대시보드 주요 기능 및 관제 항목
 1. **구현됨 — KEDA/Job/Pod 상태 모니터링**: 이름, 상태, Ready, 성공/실패 수, 생성 시각, condition 메시지 표시.
 2. **구현됨 — 최소 권한**: `pods`, `jobs`, `scaledjobs`의 `get/list/watch`만 허용하며 Secret, 로그, 생성·수정·삭제 권한은 부여하지 않음.
-3. **To-Be — Lease/큐 상세 관제**: `workflow_runs`의 작업 ID, TTL, 하트비트와 Kubernetes 리소스의 상관관계 표시.
+3. **구현됨 — Lease/큐 상세 관제**: `workflow_runs`의 작업 ID, 큐, priority, 재시도 횟수, 하트비트 경과, 잔여 TTL, stale 여부와 Kubernetes Job/Pod 이름의 상관관계를 표시합니다. lease token 원문은 노출하지 않습니다.
 4. **To-Be — 로그 및 운영 명령**: 인증·감사·RBAC 정책이 확정되기 전까지 로그 스트리밍과 취소/회복 명령은 제공하지 않음.
 
 ---
@@ -256,6 +260,8 @@ sequenceDiagram
 | `OPENAI_API_KEY` | *(필수)* | GPT-5.6 Luna 추론 및 text-embedding-3-large (3072차원) 임베딩 호출 키 |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API 게이트웨이 엔드포인트 |
 | `PGVECTOR_URL` | `postgresql://postgres:postgres@localhost:5432/rag_flow` | PostgreSQL 16 + pgvector 데이터베이스 접속 DSN |
+| `REDIS_URL` | 없음 (k8s에서는 `redis://bist-redis:6379/0`) | API Pod 간 SSE 상태 변경 알림. 도메인 상태의 원본은 PostgreSQL이며 Redis 불능 시 폴링으로 대체 |
+| `KUBERNETES_DATABASE_URL` | 없음 | `local.sh`에서 K8s용 DB를 별도 지정할 때의 최우선 DSN |
 | `KUBERNETES_WORKFLOW_QUEUE`| `workflow-core` | KEDA 및 워커가 소비하는 기본 대기열 명칭 |
 | `KUBERNETES_MAX_JOBS` | *(자동 감지)* | 최대 동시 스케일링 워커 Pod 수 |
 | `KUBERNETES_JOB_CPU_REQUEST` | `1000m` | 워커 Pod CPU 요청량 (최소 1 코어) |
@@ -264,10 +270,9 @@ sequenceDiagram
 
 ---
 
-## 6. 리팩토링 타깃 (Refactoring Targets)
+## 6. 구현 기준선과 남은 운영 과제
 
-1. **Helm Chart 표준화**:
-   - As-Is: `deploy/kubernetes/manifests/` 디렉터리의 고정 yaml 파일들을 `kubectl apply`로 배포.
-   - To-Be: Helm v3 Chart(`values.yaml`, `templates/`)로 통합하여 dev/staging/prod 환경 파라미터 분리.
-2. **KEDA Trigger 인증 Secret 분리**:
-   - `TriggerAuthentication` 리소스를 사용하여 DB 접속 비밀번호를 암호화된 K8s Secret으로 안전하게 바인딩.
+1. **구현됨 — Helm Chart 표준화**: `deploy/helm/bist/`가 API/UI/Redis, migration hook, RBAC, Ingress, 네 ScaledJob, `TriggerAuthentication`을 하나의 release로 렌더링합니다. `values.yaml`은 운영 기준, `values-k3d.yaml`은 로컬 검증 기준입니다.
+2. **구현됨 — KEDA Trigger 인증 Secret 분리**: `bist-keda-postgresql` Secret의 `PGVECTOR_URL`을 `bist-postgresql` TriggerAuthentication이 참조합니다. DB URL은 ScaledJob metadata와 로그에 직접 넣지 않습니다.
+3. **구현됨 — 다중 Pod SSE 알림**: `bist-redis`와 `REDIS_URL`이 Pub/Sub 변경 신호를 전달합니다. PostgreSQL 재조회와 0.5초 폴링 fallback으로 Pub/Sub 유실·장애가 상태 정합성을 손상시키지 않습니다.
+4. **부분 구현 — 운영 관제 확장**: 읽기 전용 큐/Lease 상관관계는 구현됐습니다. 로그 스트리밍과 인증·감사가 수반되는 작업 제어는 별도 운영 정책이 확정될 때까지 제공하지 않습니다.
