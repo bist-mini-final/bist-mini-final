@@ -15,7 +15,8 @@ const CompanySchema = z.object({
   composite_score: z.number().min(0).max(100), growth_score: z.number().min(0).max(100),
   profitability_score: z.number().min(0).max(100), stability_score: z.number().min(0).max(100),
   revenue_cagr: z.number(), operating_margin: z.number(), liabilities_to_assets: z.number(),
-  net_debt: z.number(), tier: z.enum(['S', 'A', 'B', 'C']), candles: z.array(CandleSchema).length(8),
+  net_debt: z.number(), net_debt_to_revenue: z.number(),
+  tier: z.enum(['S', 'A', 'B', 'C']), candles: z.array(CandleSchema).length(8),
 }).strict();
 
 const EvidenceSchema = z.object({
@@ -49,6 +50,7 @@ export function parseFinancialLeague(value: unknown): FinancialLeagueResponse {
       profitabilityScore: company.profitability_score, stabilityScore: company.stability_score,
       revenueCagr: company.revenue_cagr, operatingMargin: company.operating_margin,
       liabilitiesToAssets: company.liabilities_to_assets, netDebt: company.net_debt,
+      netDebtToRevenue: company.net_debt_to_revenue,
       tier: company.tier,
       candles: company.candles.map((candle) => ({
         year: candle.year, periodType: candle.period_type, open: candle.open, high: candle.high,

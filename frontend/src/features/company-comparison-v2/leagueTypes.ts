@@ -29,6 +29,7 @@ export interface LeagueCompany {
   readonly operatingMargin: number;
   readonly liabilitiesToAssets: number;
   readonly netDebt: number;
+  readonly netDebtToRevenue: number;
   readonly tier: FinancialTier;
   readonly candles: readonly FinancialCandle[];
 }
