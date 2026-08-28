@@ -102,3 +102,6 @@ flowchart TD
 2. **구현됨 — 비교 가능 기간 정렬기(Calendar-Period Normalizer)**:
    - `calendar_periods.py`가 FY 종료일을 글로벌 달력 축 `YYYY-Q1`~`YYYY-Q4`로 정규화하고, 날짜가 없는 레거시 기간은 `YYYY-FY`로 명시적으로 구분합니다.
    - 기업비교 계산기는 이 정규화 인덱스를 사용해 기간을 결정하며, 12월 결산법인과 3월 결산법인이 같은 연도에 섞이면 각 기업의 실제 달력 분기 축을 응답 경고에 포함합니다. 연간 수치를 임의의 분기 실적으로 환산하지 않습니다.
+3. **구현됨 — BI API와 SSE의 네이티브 async 저장소 경계**:
+   - 기업 목록·대시보드·materialization 조회/등록과 질문 진행률 API가 `PostgresBiStore` 및 질문 저장소의 async 메서드를 직접 await합니다. 독립 조회는 `asyncio.gather()`로 병렬화합니다.
+   - materialization 및 질문 SSE의 최초 상태 조회도 `SharedStateStream.async_loader`를 통해 async pool을 사용하며, 이후 Redis 변경 신호와 PostgreSQL polling fallback의 정합성 계약은 그대로 유지합니다.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from threading import Barrier
+import asyncio
+from threading import Barrier, get_ident
 
 from pydantic import BaseModel
 
@@ -149,3 +150,71 @@ def test_task_group_uses_native_async_module_hook(tmp_path) -> None:
     completed = executor.execute_scheduled_batch(run.id, ("native",))
 
     assert completed.nodes["native"].output == {"result": "async:ok"}
+
+
+def test_async_batch_moves_run_store_io_off_event_loop(tmp_path) -> None:
+    class NativeAsyncModule(BaseModule):
+        definition = ModuleDefinition(
+            type="native_async_store_probe",
+            label="native_async_store_probe",
+            category="test",
+            description="RunStore event-loop isolation probe",
+            inputs=["value"],
+            outputs=["result"],
+            config_fields=[],
+        )
+        input_model = ParallelInput
+        config_model = EmptyModuleConfigDTO
+        output_model = ParallelOutput
+
+        def execute(self, input_data, config=None):
+            raise AssertionError("workflow called sync execute")
+
+        async def execute_async(self, input_data, config=None):
+            await asyncio.sleep(0)
+            return ParallelOutput(result=input_data.value)
+
+    class RecordingRunStore(RunStore):
+        def __init__(self) -> None:
+            super().__init__()
+            self.record = False
+            self.io_threads: list[int] = []
+
+        def load(self, run_id: str):
+            if self.record:
+                self.io_threads.append(get_ident())
+            return super().load(run_id)
+
+        def save_node(self, run, node_id: str):
+            if self.record:
+                self.io_threads.append(get_ident())
+            return super().save_node(run, node_id)
+
+    registry = BaseModuleRegistry(EmbeddingArtifactStore(tmp_path / "artifacts"))
+    registry.register((NativeAsyncModule(),))
+    run_store = RecordingRunStore()
+    executor = WorkflowExecutor(registry, run_store, ResultCache())
+    workflow = WorkflowDocument(
+        id="async-store-workflow",
+        name="Async store workflow",
+        updated_at="2026-08-28T00:00:00+00:00",
+        graph=WorkflowGraph(
+            nodes=[
+                WorkflowNode(
+                    id="native",
+                    module_type="native_async_store_probe",
+                    position=CanvasPosition(x=0, y=0),
+                    values={"value": "ok"},
+                )
+            ]
+        ),
+    )
+    run = executor.create_run(workflow, WorkflowExecutionRequest(use_cache=False))
+    event_loop_thread = get_ident()
+    run_store.record = True
+
+    completed = asyncio.run(executor.execute_scheduled_batch_async(run.id, ("native",)))
+
+    assert completed.nodes["native"].status == "succeeded"
+    assert run_store.io_threads
+    assert all(thread_id != event_loop_thread for thread_id in run_store.io_threads)

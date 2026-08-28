@@ -25,12 +25,22 @@ class RecordingBiStore:
         self.enqueued: list[BiMaterializationJob] = []
 
     def find_latest_job(self, *_args: object) -> None:
+        raise AssertionError("async API must not call sync find_latest_job")
+
+    async def find_latest_job_async(self, *_args: object) -> None:
         return None
 
     def get_latest_job(self, *_args: object) -> None:
         return None
 
     def enqueue(self, _request: object, job: BiMaterializationJob) -> BiMaterializationJob:
+        raise AssertionError("async API must not call sync enqueue")
+
+    async def enqueue_async(
+        self,
+        _request: object,
+        job: BiMaterializationJob,
+    ) -> BiMaterializationJob:
         self.enqueued.append(job)
         return job
 

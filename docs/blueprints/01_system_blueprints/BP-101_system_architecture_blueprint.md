@@ -211,18 +211,18 @@ classDiagram
 ## 4. 리팩토링 타깃 및 기술 부채 (Refactoring Targets & Debts)
 
 ### As-Is 분석 및 기술 부채
-1. **부분 잔존 — 동기 모듈 및 저장소 부채**:
-   - 핵심 질의 체인의 Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구는 네이티브 async 구현을 제공합니다. 인제스천·일부 BI 저장소는 아직 동기 구현이며 `asyncio.to_thread()` 호환 경계로 격리합니다. `openpyxl` 같은 본질적 동기 라이브러리는 계속 worker thread에서 실행하는 것이 의도된 설계입니다.
+1. **구현됨 — 비동기 핫패스와 동기 격리 경계 정리**:
+   - 핵심 질의 체인뿐 아니라 BI 조회·작업 등록·질문 진행률·SSE 초기 상태 조회와 데이터 소스 업로드 메타데이터 저장도 `AsyncConnectionPool` 기반 네이티브 async 경로를 사용합니다. 채팅 첨부 저장과 async DAG의 `RunStore` 준비·병합·취소 확인처럼 동기 계약을 보존해야 하는 경계는 worker thread로 격리합니다. `openpyxl` 파싱과 Binary COPY 같은 CPU·디스크·대량 스트리밍 작업은 one-shot worker 프로세스의 동기 처리로 유지하는 것이 의도된 설계입니다.
 2. **구현됨 — 조립 컨테이너와 모듈 생성 책임 분리**:
    - `ApplicationContainer`는 `RuntimeContainer`, `ExecutionContainer`, `DomainServicesContainer`로 분리되어 있습니다. `ModuleRegistry`는 도메인별 factory recipe만 등록하고 실제 모듈은 최초 `get()` 시 한 번 생성합니다.
 3. **구현됨 — 런타임 실행 포트와 컨트롤러 분리**:
    - `WorkflowExecutionPort`와 `WorkflowExecutionService`가 실행 제출·재개·취소·캐시 정리 유스케이스를 캡슐화합니다. `workflow_routes.py`와 `benchmark_routes.py`는 실행기/dispatcher 선택 분기를 직접 수행하지 않습니다.
 
 ### To-Be 권장 리팩토링 설계 (Refactoring Blueprint)
-1. **부분 구현됨 — Full-Async 논블로킹 전환 (`async def execute_async`)**:
+1. **구현됨 — Full-Async 논블로킹 전환 (`async def execute_async`)**:
    - `WorkflowExecutor`는 같은 위상 배치의 노드를 `asyncio.TaskGroup`으로 실행하고 `BaseModuleRegistry.execute_async()`를 직접 await합니다. 노드별 격리 스냅샷을 잠금 하에 병합해 병렬 상태 유실을 방지합니다. 하드 타임아웃 노드는 Unix signal 기반 제한을 보존하기 위해 순차 경로를 사용합니다.
    - Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구가 `AsyncOpenAI` Responses/Embedding과 `psycopg_pool.AsyncConnectionPool`을 직접 사용합니다. 동기 모듈은 공통 `run_async()`가 이벤트 루프 밖 worker thread로 자동 격리합니다.
-   - 남은 전환 범위는 인제스천·BI의 동기 PostgreSQL 어댑터입니다. CPU·디스크 중심 Excel 처리는 async DB 전환 대상이 아니라 명시적 스레드 격리 대상으로 유지합니다.
+   - BI REST/SSE와 업로드 메타데이터 저장은 네이티브 async PostgreSQL 어댑터를 사용합니다. async DAG의 동기 `RunStore` I/O, 채팅 첨부 저장, CPU·디스크 중심 Excel 처리와 Binary COPY는 이벤트 루프 밖 worker thread 또는 one-shot worker 프로세스로 격리하므로 API 이벤트 루프에서 블로킹 I/O를 직접 실행하지 않습니다.
 2. **구현됨 — `WorkflowExecutionPort` 인터페이스 추상화**:
    ```python
    class ExecutionPort(ABC):

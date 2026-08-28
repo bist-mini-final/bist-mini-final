@@ -128,5 +128,8 @@ flowchart TD
 2. **구현 방식 변경 — raster viewport 기반 대용량 시트 검사**:
    - 현재 UI는 셀마다 DOM 노드를 생성하는 grid가 아니라 서버가 만든 시트 raster image 한 장과 감지 region overlay만 렌더링합니다. 따라서 행 수에 비례하는 DOM 증가가 없어 `@tanstack/react-virtual` 의존성이 필요하지 않습니다.
    - 시트 이미지 자체는 zoom 가능한 scroll viewport에서 표시하고, 영역 목록만 제한된 sidebar scroll container에 렌더링합니다. 향후 실제 편집형 cell grid를 추가할 때만 row/column virtualization을 도입합니다.
-3. **수동 바운딩 박스 드래그 편집기**:
+3. **구현됨 — 업로드 메타데이터의 네이티브 async 저장**:
+   - async 파일 업로드 route는 연결 확인과 `source_files` 메타데이터 저장을 `DatabaseManager`의 async pool로 직접 await합니다. 파일 이동·해시·Excel 파싱처럼 비동기 API가 없는 디스크/CPU 작업만 worker thread로 격리합니다.
+   - Binary COPY는 대량 입력 스트림의 트랜잭션 일관성과 one-shot ingestion worker의 프로세스 격리를 활용하므로 동기 구현을 의도적으로 유지합니다.
+4. **수동 바운딩 박스 드래그 편집기**:
    - 원격 VLM 결과를 사용자 승인·수정 가능한 좌표 계약과 함께 저장하는 별도 기능으로 재설계가 필요합니다. 로컬 VLM 구현은 프로젝트 범위에서 제외합니다.

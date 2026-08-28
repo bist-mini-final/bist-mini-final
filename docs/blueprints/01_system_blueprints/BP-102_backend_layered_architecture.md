@@ -137,9 +137,9 @@ sequenceDiagram
 ### As-Is 부채 및 To-Be 개선안
 1. **구현됨 — 백엔드 디렉토리의 Screaming Architecture 정렬**:
    - 현재 코드는 `api/`, `bootstrap/`, `features/`, `engine/`, `modules/`, `providers/`, `storage/` 계층으로 정렬되어 있습니다.
-2. **부분 구현됨 — 전 계층 Full-Async 논블로킹 전환**:
+2. **구현됨 — 전 계층 Full-Async 논블로킹 전환**:
    - `BaseModule.run_async()`는 leaf module의 `execute_async()` override를 감지해 동일한 Pydantic 검증·오류 분류·출력 계약을 적용하고, override가 없는 기존 모듈만 worker thread로 격리합니다. `WorkflowExecutor`는 이 registry async 경계를 직접 await합니다.
-   - Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구는 `AsyncOpenAI` Responses/Embedding과 `AsyncConnectionPool`을 직접 사용합니다. 인제스천·BI 저장소의 네이티브 async 전환은 잔여 범위입니다.
+   - Decomposer, LLM Router, Query Embedder, data scope, dense/keyword Retriever, context expansion, Reader와 Reader 셀 조회 도구뿐 아니라 BI API/SSE와 데이터 소스 업로드 메타데이터 저장도 `AsyncOpenAI` 또는 `AsyncConnectionPool`을 직접 사용합니다. 동기 `RunStore`, 채팅 첨부 저장, OpenPyXL/Binary COPY처럼 동기 계약이 필요한 작업은 worker thread 또는 one-shot worker 프로세스에 격리합니다.
 3. **구현됨 — `features/bi` 저장소 포트 분리**:
    - BI API, 질문, 스냅샷, 프로파일, materialization 경계가 각 유스케이스별 `Protocol` 포트를 사용하고 PostgreSQL 구현체를 composition에서 주입합니다.
 4. **구현됨 — 검색 모듈과 pgvector 연결 분리**:
