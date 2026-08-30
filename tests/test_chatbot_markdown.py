@@ -1,4 +1,6 @@
-from backend.features.chatbot.api_routes import _format_user_facing_answer
+from backend.domains.chatbot.application.answer_formatting import (
+    format_user_facing_answer,
+)
 
 
 def test_format_user_facing_answer_restores_large_escaped_inline_table() -> None:
@@ -8,7 +10,7 @@ def test_format_user_facing_answer_restores_large_escaped_inline_table() -> None
         r" |---|---:|---:|---:|---:| | 영업활동 현금흐름 | 558 | 646 | 750 | 861 |"
     )
 
-    formatted = _format_user_facing_answer(answer)
+    formatted = format_user_facing_answer(answer)
 
     assert formatted == "\n".join(
         [
