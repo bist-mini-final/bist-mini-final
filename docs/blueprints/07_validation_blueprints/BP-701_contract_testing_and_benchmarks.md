@@ -75,7 +75,7 @@ npm test -- --run
 npm run build
 ```
 
-현재 문서 기준의 최근 전체 결과는 backend **166 passed, 2 skipped**, frontend **112 passed**, Ruff/Pyright/typecheck/build 통과입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
+2026-08-31 기준 최근 전체 결과는 backend **196 passed, 2 skipped**, frontend **168 passed**, Ruff/Pyright/typecheck/build 통과입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
 
 ---
 

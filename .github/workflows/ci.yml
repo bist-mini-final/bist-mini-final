@@ -90,7 +90,7 @@ jobs:
             --max-replicas 4 \
             --connection-hash aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
             > /tmp/bist-scaledjobs.yaml
-          uv run python -c "import pathlib,yaml; docs=list(yaml.safe_load_all(pathlib.Path('/tmp/bist-scaledjobs.yaml').read_text())); assert len(docs)==4 and all(item['kind']=='ScaledJob' for item in docs)"
+          uv run python -c "import pathlib,yaml; from jobs import ALL_JOBS; from jobs.kubernetes import kubernetes_worker_specs; docs=list(yaml.safe_load_all(pathlib.Path('/tmp/bist-scaledjobs.yaml').read_text())); expected=kubernetes_worker_specs(ALL_JOBS); assert len(docs)==len(expected) and all(item['kind']=='ScaledJob' for item in docs)"
 
   frontend-unit-tests:
     name: Frontend Unit Tests & Build (Vitest)
