@@ -40,6 +40,7 @@ import asyncio
 import logging
 import re
 from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from openpyxl.utils.cell import coordinate_to_tuple
@@ -170,55 +171,79 @@ class PgContextExpanderConfigDTO(ModuleConfigDTO):
 # ==============================================================================
 # 3. Coordinate Helper Functions
 # ==============================================================================
+def _cell_identity_parts(cell_id: str) -> Tuple[str, str, str]:
+    parts = cell_id.split(":")
+    if len(parts) >= 3:
+        return parts[0].strip(), parts[1].strip(), parts[2].strip()
+    if len(parts) == 2:
+        return "", parts[0].strip(), parts[1].strip()
+    return "", "", parts[0].strip()
+
+
+def _infer_sheet(cell_id: str, text: str) -> str:
+    match = re.search(r"Sheet:\s*([^|]+)", text)
+    if match:
+        return match.group(1).strip()
+    sheet_markers = {
+        "Income_Statement": ("IS ", "Income_Statement"),
+        "Balance_Sheet": ("BS ", "Balance_Sheet"),
+        "Cash_Flow": ("CF ", "Cash_Flow"),
+        "Key_Stats": ("KS ", "Key_Stats"),
+    }
+    return next(
+        (
+            sheet
+            for sheet, markers in sheet_markers.items()
+            if cell_id.startswith(markers[0]) or markers[1] in cell_id
+        ),
+        "",
+    )
+
+
+def _coordinate_indexes(coord: str) -> Tuple[Optional[int], Optional[int]]:
+    match = re.search(r"([A-Za-z]+)(\d+)", coord)
+    if match is None:
+        return None, None
+    try:
+        return coordinate_to_tuple(match.group(0))
+    except Exception:
+        return int(match.group(2)), None
+
+
 def _parse_cell_id_coords(
     cell_id: str, text: str = ""
 ) -> Tuple[str, str, Optional[int], Optional[int]]:
-    """Parses cell_id string and candidate text into (company, sheet_name, row_idx, col_idx)."""
-    company = ""
-    sheet = ""
-    coord = ""
+    """Parse candidate identity into company, sheet, row, and column."""
+    company, sheet, coord = _cell_identity_parts(cell_id)
 
-    parts = cell_id.split(":")
-    if len(parts) >= 3:
-        company = parts[0].strip()
-        sheet = parts[1].strip()
-        coord = parts[2].strip()
-    elif len(parts) == 2:
-        sheet = parts[0].strip()
-        coord = parts[1].strip()
-    else:
-        coord = parts[0].strip()
-
-    # If sheet is not in cell_id, extract from candidate text (e.g. "Sheet: Income_Statement | ...")
-    if not sheet and text:
-        match_sheet = re.search(r"Sheet:\s*([^|]+)", text)
-        if match_sheet:
-            sheet = match_sheet.group(1).strip()
-
-    # Fallback to standard sheet prefixes if still empty
     if not sheet:
-        if cell_id.startswith("IS ") or "Income_Statement" in cell_id:
-            sheet = "Income_Statement"
-        elif cell_id.startswith("BS ") or "Balance_Sheet" in cell_id:
-            sheet = "Balance_Sheet"
-        elif cell_id.startswith("CF ") or "Cash_Flow" in cell_id:
-            sheet = "Cash_Flow"
-        elif cell_id.startswith("KS ") or "Key_Stats" in cell_id:
-            sheet = "Key_Stats"
+        sheet = _infer_sheet(cell_id, text)
+    row_index, column_index = _coordinate_indexes(coord)
+    return company, sheet, row_index, column_index
 
-    row_idx = None
-    col_idx = None
-    if coord:
-        match = re.search(r"([A-Za-z]+)(\d+)", coord)
-        if match:
-            try:
-                r_tuple, c_tuple = coordinate_to_tuple(match.group(0))
-                row_idx = r_tuple
-                col_idx = c_tuple
-            except Exception:
-                row_idx = int(match.group(2))
 
-    return company, sheet, row_idx, col_idx
+@dataclass
+class _ContextAccumulator:
+    blocks: List[str] = field(default_factory=list)
+    seen_blocks: Set[str] = field(default_factory=set)
+    cells: List[Dict[str, Any]] = field(default_factory=list)
+    seen_coordinates: Set[Tuple[str, str]] = field(default_factory=set)
+    fallbacks: List[Dict[str, Any]] = field(default_factory=list)
+
+    def add_block(self, text: str) -> None:
+        if text and text not in self.seen_blocks:
+            self.seen_blocks.add(text)
+            self.blocks.append(text)
+
+    def add_cell(self, cell: Dict[str, Any]) -> None:
+        key = (str(cell["sheet_name"]), str(cell["cell_coord"]))
+        if key not in self.seen_coordinates:
+            self.seen_coordinates.add(key)
+            self.cells.append(cell)
+
+    def add_fallbacks(self) -> None:
+        for cell in self.fallbacks:
+            self.add_cell(cell)
 
 
 # ==============================================================================
@@ -269,6 +294,125 @@ class PgContextExpanderModule(BaseModule):
                     target_rows_by_scope[scope_key].add(row_index)
         return target_rows_by_scope
 
+    @staticmethod
+    def _seed_context(
+        retrieval_items: List[Any],
+        fallback_company: str,
+    ) -> _ContextAccumulator:
+        accumulator = _ContextAccumulator()
+        for candidate in retrieval_items:
+            text = candidate.text.strip()
+            _, sheet, _, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
+            coordinate_match = re.search(r"([A-Za-z]+)(\d+)", candidate.cell_id)
+            coordinate = coordinate_match.group(0) if coordinate_match else ""
+            canonical = _canonical_source_text(
+                {"source_text": text},
+                fallback_company=fallback_company,
+                fallback_sheet=sheet,
+            )
+            if canonical:
+                accumulator.add_block(canonical)
+            elif text and not _structured_fields(text):
+                accumulator.add_block(text)
+            if canonical and sheet and coordinate:
+                accumulator.fallbacks.append(
+                    {
+                        "cell_id": candidate.cell_id,
+                        "sheet_name": sheet,
+                        "cell_coord": coordinate,
+                        "source_text": canonical,
+                    }
+                )
+        return accumulator
+
+    @staticmethod
+    def _evidence_cell(
+        cell: Dict[str, Any],
+        *,
+        raw_text: str,
+        actual_value: str,
+        fallback_sheet: str,
+    ) -> Optional[Dict[str, Any]]:
+        coordinate = str(cell.get("cell_coord") or "")
+        sheet_name = str(cell.get("sheet_name") or fallback_sheet)
+        if not (raw_text and actual_value and coordinate and sheet_name):
+            return None
+        return {
+            "cell_id": cell.get("cell_id") or f"{sheet_name} Cell {coordinate}",
+            "sheet_name": sheet_name,
+            "cell_coord": coordinate,
+            "source_text": raw_text,
+            "cell_value": actual_value,
+        }
+
+    @classmethod
+    def _consume_rows(
+        cls,
+        accumulator: _ContextAccumulator,
+        rows: List[Dict[str, Any]],
+        *,
+        fallback_company: str,
+        fallback_sheet: str,
+        max_blocks: int,
+    ) -> bool:
+        ordered = sorted(
+            rows,
+            key=lambda value: (
+                value.get("col_index") is None,
+                value.get("col_index") or 0,
+            ),
+        )
+        for cell in ordered:
+            actual_value = _real_cell_value(cell.get("cell_value"))
+            raw_text = _canonical_source_text(
+                cell,
+                fallback_company=fallback_company,
+                fallback_sheet=fallback_sheet,
+            )
+            accumulator.add_block(raw_text)
+            evidence = cls._evidence_cell(
+                cell,
+                raw_text=raw_text,
+                actual_value=actual_value,
+                fallback_sheet=fallback_sheet,
+            )
+            if evidence is not None:
+                accumulator.add_cell(evidence)
+            if len(accumulator.blocks) >= max_blocks:
+                return True
+        return False
+
+    def _expand_targets(
+        self,
+        accumulator: _ContextAccumulator,
+        targets: Dict[Tuple[str, str], Set[int]],
+        *,
+        prefetched_rows: Optional[Dict[Tuple[str, str], Dict[int, List[Dict[str, Any]]]]],
+        fallback_company: str,
+        max_blocks: int,
+    ) -> None:
+        for (collection_name, sheet), row_indices in targets.items():
+            rows_by_index = (
+                prefetched_rows.get((collection_name, sheet), {})
+                if prefetched_rows is not None
+                else self.pgvector_store.fetch_rows_cells(
+                    collection_name=collection_name,
+                    workbook_hash=None,
+                    sheet_name=sheet,
+                    row_indices=sorted(row_indices),
+                    limit_per_row=100,
+                )
+            )
+            for row_index in sorted(row_indices):
+                if self._consume_rows(
+                    accumulator,
+                    rows_by_index.get(row_index, []),
+                    fallback_company=fallback_company,
+                    fallback_sheet=sheet,
+                    max_blocks=max_blocks,
+                ):
+                    break
+
     def execute(
         self,
         input_data: PgContextExpanderInputDTO,
@@ -294,124 +438,25 @@ class PgContextExpanderModule(BaseModule):
                 "items": ["[No context blocks available]"],
             }
 
-        # Step 1: Collect candidate cell targets
-        context_blocks: List[str] = []
-        seen_blocks: Set[str] = set()
-        expanded_cells: List[Dict[str, Any]] = []
-        seen_cell_coords: Set[Tuple[str, str]] = set()
-        fallback_cells: List[Dict[str, Any]] = []
-
-        for candidate in retrieval_items:
-            t = candidate.text.strip()
-            _, sheet, _, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
-            coord_match = re.search(r"([A-Za-z]+)(\d+)", candidate.cell_id)
-            coord_str = coord_match.group(0) if coord_match else ""
-            canonical_candidate = _canonical_source_text(
-                {"source_text": t},
-                fallback_company=str(doc_context_dict.get("company_name") or ""),
-                fallback_sheet=sheet,
-            )
-            if canonical_candidate and canonical_candidate not in seen_blocks:
-                seen_blocks.add(canonical_candidate)
-                context_blocks.append(canonical_candidate)
-            elif t and not _structured_fields(t) and t not in seen_blocks:
-                # An unstructured retrieval hit may still help expansion/routing,
-                # but it is never promoted to a verifiable citation cell.
-                seen_blocks.add(t)
-                context_blocks.append(t)
-            if canonical_candidate and sheet and coord_str:
-                fallback_cells.append(
-                    {
-                        "cell_id": candidate.cell_id,
-                        "sheet_name": sheet,
-                        "cell_coord": coord_str,
-                        "source_text": canonical_candidate,
-                    }
-                )
-
-        # Step 2: Target the exact rows for all candidate cells
-        target_rows_by_scope = self._target_rows(retrieval_items, cfg)
-
-        if target_rows_by_scope:
-            for (collection_name, sheet), row_indices in target_rows_by_scope.items():
-                rows_by_index = (
-                    prefetched_rows.get((collection_name, sheet), {})
-                    if prefetched_rows is not None
-                    else self.pgvector_store.fetch_rows_cells(
-                        collection_name=collection_name,
-                        workbook_hash=None,
-                        sheet_name=sheet,
-                        row_indices=sorted(row_indices),
-                        limit_per_row=100,
-                    )
-                )
-                for r_idx in sorted(row_indices):
-                    rows = rows_by_index.get(r_idx, [])
-                    if not rows:
-                        continue
-
-                    for cell in sorted(
-                        rows,
-                        key=lambda value: (
-                            value.get("col_index") is None,
-                            value.get("col_index") or 0,
-                        ),
-                    ):
-                        actual_value = _real_cell_value(cell.get("cell_value"))
-                        raw_text = _canonical_source_text(
-                            cell,
-                            fallback_company=str(doc_context_dict.get("company_name") or ""),
-                            fallback_sheet=sheet,
-                        )
-
-                        if raw_text and raw_text not in seen_blocks:
-                            seen_blocks.add(raw_text)
-                            context_blocks.append(raw_text)
-
-                        coord = cell.get("cell_coord") or ""
-                        s_name = cell.get("sheet_name") or sheet
-                        if (
-                            raw_text
-                            and actual_value
-                            and coord
-                            and s_name
-                            and (s_name, coord) not in seen_cell_coords
-                        ):
-                            seen_cell_coords.add((s_name, coord))
-                            cid = cell.get("cell_id") or f"{s_name} Cell {coord}"
-                            expanded_cells.append(
-                                {
-                                    "cell_id": cid,
-                                    "sheet_name": s_name,
-                                    "cell_coord": coord,
-                                    "source_text": raw_text,
-                                    "cell_value": actual_value,
-                                }
-                            )
-
-                        if len(context_blocks) >= cfg.max_blocks:
-                            break
-                    if len(context_blocks) >= cfg.max_blocks:
-                        break
-
-        # Use a value-bearing retrieval candidate only when DB row expansion did
-        # not return that coordinate. Header-only (`Cell Value: ?`) candidates
-        # never become evidence.
-        for cell in fallback_cells:
-            key = (cell["sheet_name"], cell["cell_coord"])
-            if key not in seen_cell_coords:
-                seen_cell_coords.add(key)
-                expanded_cells.append(cell)
-
-        context_blocks = context_blocks[: cfg.max_blocks]
-        if not context_blocks:
-            context_blocks = ["[No context blocks available]"]
+        fallback_company = str(doc_context_dict.get("company_name") or "")
+        accumulator = self._seed_context(retrieval_items, fallback_company)
+        self._expand_targets(
+            accumulator,
+            self._target_rows(retrieval_items, cfg),
+            prefetched_rows=prefetched_rows,
+            fallback_company=fallback_company,
+            max_blocks=cfg.max_blocks,
+        )
+        # Header-only retrieval candidates never enter fallbacks because their
+        # canonical source text has no concrete cell value.
+        accumulator.add_fallbacks()
+        context_blocks = accumulator.blocks[: cfg.max_blocks] or ["[No context blocks available]"]
 
         return {
             "query_context": query_context_dict,
             "document_context": doc_context_dict,
             "items": context_blocks,
-            "cells": expanded_cells,
+            "cells": accumulator.cells,
         }
 
     async def execute_async(

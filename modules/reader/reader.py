@@ -199,53 +199,69 @@ _ALLOWED_UNARY_OPERATORS = {
 }
 
 
-def _evaluate_math_ast(node: ast.AST, variables: Optional[Dict[str, float]] = None) -> float:
-    """Recursively evaluates an AST node with whitelist operators and functions."""
-    vars_map = variables or {}
-    if isinstance(node, ast.Constant):
-        if isinstance(node.value, (int, float)):
-            return float(node.value)
-        raise ValueError(f"지원되지 않는 상수 타입: {type(node.value)}")
-    elif isinstance(node, ast.Name):
-        if node.id in vars_map:
-            return float(vars_map[node.id])
-        raise ValueError(f"정의되지 않은 수식 변수: {node.id}")
-    elif isinstance(node, ast.Call):
-        if isinstance(node.func, ast.Name):
-            fname = node.func.id
-            arg_vals = [_evaluate_math_ast(arg, vars_map) for arg in node.args]
-            if fname == "abs" and len(arg_vals) == 1:
-                return float(abs(arg_vals[0]))
-            elif fname == "round":
-                if len(arg_vals) == 1:
-                    return float(round(arg_vals[0]))
-                elif len(arg_vals) == 2:
-                    return float(round(arg_vals[0], int(arg_vals[1])))
-            elif fname == "min" and arg_vals:
-                return float(min(arg_vals))
-            elif fname == "max" and arg_vals:
-                return float(max(arg_vals))
-            elif fname == "sum" and arg_vals:
-                return float(sum(arg_vals))
+def _evaluate_math_call(node: ast.Call, variables: Dict[str, float]) -> float:
+    if not isinstance(node.func, ast.Name):
         raise ValueError(f"허용되지 않는 함수 호출: {ast.dump(node)}")
-    elif isinstance(node, ast.UnaryOp):
-        op_type = type(node.op)
-        if op_type in _ALLOWED_UNARY_OPERATORS:
-            return float(
-                _ALLOWED_UNARY_OPERATORS[op_type](_evaluate_math_ast(node.operand, vars_map))
-            )
-        raise ValueError(f"지원되지 않는 단항 연산자: {op_type}")
-    elif isinstance(node, ast.BinOp):
-        op_type = type(node.op)
-        if op_type in _ALLOWED_BINARY_OPERATORS:
-            left_val = _evaluate_math_ast(node.left, vars_map)
-            right_val = _evaluate_math_ast(node.right, vars_map)
-            return float(_ALLOWED_BINARY_OPERATORS[op_type](left_val, right_val))
-        raise ValueError(f"지원되지 않는 이항 연산자: {op_type}")
-    elif isinstance(node, ast.Expression):
-        return _evaluate_math_ast(node.body, vars_map)
-    else:
-        raise ValueError(f"허용되지 않는 AST 노드: {type(node)}")
+    name = node.func.id
+    arguments = [_evaluate_math_ast(argument, variables) for argument in node.args]
+    if name == "abs" and len(arguments) == 1:
+        return float(abs(arguments[0]))
+    if name == "round" and len(arguments) in {1, 2}:
+        precision = int(arguments[1]) if len(arguments) == 2 else None
+        return float(round(arguments[0], precision))
+    reducers = {"min": min, "max": max, "sum": sum}
+    if name in reducers and arguments:
+        return float(reducers[name](arguments))
+    raise ValueError(f"허용되지 않는 함수 호출: {ast.dump(node)}")
+
+
+def _numeric_constant(node: ast.Constant) -> float:
+    if isinstance(node.value, (int, float)):
+        return float(node.value)
+    raise ValueError(f"지원되지 않는 상수 타입: {type(node.value)}")
+
+
+def _named_value(node: ast.Name, variables: Dict[str, float]) -> float:
+    if node.id not in variables:
+        raise ValueError(f"정의되지 않은 수식 변수: {node.id}")
+    return float(variables[node.id])
+
+
+def _unary_value(node: ast.UnaryOp, variables: Dict[str, float]) -> float:
+    operation = _ALLOWED_UNARY_OPERATORS.get(type(node.op))
+    if operation is None:
+        raise ValueError(f"지원되지 않는 단항 연산자: {type(node.op)}")
+    return float(operation(_evaluate_math_ast(node.operand, variables)))
+
+
+def _binary_value(node: ast.BinOp, variables: Dict[str, float]) -> float:
+    operation = _ALLOWED_BINARY_OPERATORS.get(type(node.op))
+    if operation is None:
+        raise ValueError(f"지원되지 않는 이항 연산자: {type(node.op)}")
+    return float(
+        operation(
+            _evaluate_math_ast(node.left, variables),
+            _evaluate_math_ast(node.right, variables),
+        )
+    )
+
+
+def _evaluate_math_ast(node: ast.AST, variables: Optional[Dict[str, float]] = None) -> float:
+    """Recursively evaluate a math AST through a small operator whitelist."""
+    variables = variables or {}
+    if isinstance(node, ast.Constant):
+        return _numeric_constant(node)
+    if isinstance(node, ast.Name):
+        return _named_value(node, variables)
+    if isinstance(node, ast.Call):
+        return _evaluate_math_call(node, variables)
+    if isinstance(node, ast.UnaryOp):
+        return _unary_value(node, variables)
+    if isinstance(node, ast.BinOp):
+        return _binary_value(node, variables)
+    if isinstance(node, ast.Expression):
+        return _evaluate_math_ast(node.body, variables)
+    raise ValueError(f"허용되지 않는 AST 노드: {type(node)}")
 
 
 def safe_calculate_expression(expression: str, variables: Optional[Dict[str, float]] = None) -> str:
