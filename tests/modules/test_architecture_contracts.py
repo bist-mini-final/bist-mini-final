@@ -27,7 +27,10 @@ from backend.storage.repositories import (
     PgVectorRetrievalMixin,
     PgVectorWriteMixin,
     SourceFileRepositoryMixin,
+    WorkflowRunHistoryRepositoryMixin,
+    WorkflowRunQueueRepositoryMixin,
     WorkflowRunRepositoryMixin,
+    WorkflowRunStateRepositoryMixin,
 )
 from jobs import ALL_JOBS, WorkerJobDefinition
 from jobs.kubernetes import kubernetes_worker_specs
@@ -142,6 +145,9 @@ def test_chat_repository_uses_shared_postgres_repository_boundary() -> None:
 def test_database_facades_compose_focused_storage_capabilities() -> None:
     assert issubclass(DatabaseManager, SourceFileRepositoryMixin)
     assert issubclass(DatabaseManager, WorkflowRunRepositoryMixin)
+    assert issubclass(WorkflowRunRepositoryMixin, WorkflowRunQueueRepositoryMixin)
+    assert issubclass(WorkflowRunRepositoryMixin, WorkflowRunStateRepositoryMixin)
+    assert issubclass(WorkflowRunRepositoryMixin, WorkflowRunHistoryRepositoryMixin)
     assert issubclass(PgVectorStore, PgVectorWriteMixin)
     assert issubclass(PgVectorStore, PgVectorCatalogMixin)
     assert issubclass(PgVectorStore, PgVectorRetrievalMixin)
