@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Protocol, TypeVar
+
 from backend.storage.spreadsheets.structured_cell_text import (
     extract_resolved_cell_value,
 )
 
-from .extraction_models import BiContextCell
+
+class SourceCell(Protocol):
+    """Structural evidence contract shared by retrieval and snapshot models."""
+
+    source_text: str
+
+
+SourceCellT = TypeVar("SourceCellT", bound=SourceCell)
 
 
 def source_cell_value(source_text: str) -> str | None:
@@ -15,16 +24,21 @@ def source_cell_value(source_text: str) -> str | None:
     return extract_resolved_cell_value(source_text)
 
 
-def is_verifiable_cell(cell: BiContextCell) -> bool:
+def is_verifiable_cell(cell: SourceCell) -> bool:
     """Whether a context cell contains a concrete value suitable for evidence."""
 
     return source_cell_value(cell.source_text) is not None
 
 
-def verifiable_cells(cells: tuple[BiContextCell, ...]) -> tuple[BiContextCell, ...]:
+def verifiable_cells(cells: tuple[SourceCellT, ...]) -> tuple[SourceCellT, ...]:
     """Filter placeholder and malformed cells while preserving retrieval order."""
 
     return tuple(cell for cell in cells if is_verifiable_cell(cell))
 
 
-__all__ = ["is_verifiable_cell", "source_cell_value", "verifiable_cells"]
+__all__ = [
+    "SourceCell",
+    "is_verifiable_cell",
+    "source_cell_value",
+    "verifiable_cells",
+]

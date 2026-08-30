@@ -22,6 +22,7 @@ from starlette import status
 from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
 from backend.core.state_stream import SharedStateStream
 from backend.core.state_stream_broker import StateStreamBroker
+from backend.domains.bi.application import BiApiServices
 
 from .api_models import (
     BiCompanyListResponse,
@@ -30,7 +31,6 @@ from .api_models import (
     BiMaterializationAccepted,
     BiMaterializationCandidateListResponse,
 )
-from backend.domains.bi.application import BiApiServices
 from .api_state import (
     accepted,
     build_company_summary,
