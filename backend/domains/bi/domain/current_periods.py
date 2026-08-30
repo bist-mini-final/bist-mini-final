@@ -36,3 +36,4 @@ def select_current_periods(
             case unreachable:
                 assert_never(unreachable)
     return (*fiscal_periods[-HISTORICAL_FY_LIMIT:], *ltm_periods[-1:])
+

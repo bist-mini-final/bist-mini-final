@@ -7,13 +7,13 @@ reducing the number of embedding API calls and increasing LLM throughput signifi
 
 import os
 
+from backend.bootstrap.bi import create_bi_question_batch_worker
 from backend.bootstrap.container import RuntimeContainer
+from backend.domains.bi.domain.question_records import WorkflowRunId
 from backend.engine.worker.base import default_worker_id
 
-from .composition import create_bi_question_batch_worker
 from .database_schema import ensure_bi_schema
 from .question_batch_worker import DEFAULT_BATCH_SIZE, DEFAULT_MAX_WORKERS
-from .question_records import WorkflowRunId
 
 
 def _run(container: RuntimeContainer) -> int:

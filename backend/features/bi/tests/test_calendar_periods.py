@@ -1,12 +1,12 @@
 from datetime import date
 
-from backend.features.bi.calendar_periods import (
+from backend.domains.bi.domain.calendar_periods import (
     CalendarPeriod,
     CalendarQuarter,
     index_fiscal_periods_by_calendar_year,
     normalize_fiscal_period,
 )
-from backend.features.bi.models import BiPeriod, PeriodId, PeriodKind
+from backend.domains.bi.domain.models import BiPeriod, PeriodId, PeriodKind
 
 
 def period(

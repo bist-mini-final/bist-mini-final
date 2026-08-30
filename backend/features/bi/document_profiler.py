@@ -5,20 +5,21 @@ from typing import Final, Protocol
 
 from pydantic import ValidationError
 
-from .extraction_models import BiRetrievedContext
-from .materialization_models import (
+from backend.domains.bi.domain.extraction_models import BiRetrievedContext
+from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
     BiProfilingFailure,
     BiProfilingResult,
 )
-from .metric_reader import StructuredCompletionPort
-from .models import (
+from backend.domains.bi.domain.models import (
     BiEvidence,
     BiMaterializationRequest,
     BiMaterializationSource,
     BiPeriod,
     PeriodId,
 )
+
+from .metric_reader import StructuredCompletionPort
 from .profile_models import (
     BiPeriodDiscoveryReaderResponse,
     BiPeriodReaderPayload,

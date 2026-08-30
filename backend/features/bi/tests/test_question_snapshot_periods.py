@@ -1,10 +1,10 @@
 from datetime import UTC, date, datetime
 
-from backend.features.bi.materialization_models import (
+from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
     BiSnapshotBuildInput,
 )
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     AmountScale,
     BiDashboardSnapshot,
     BiMaterializationJob,
@@ -18,7 +18,7 @@ from backend.features.bi.models import (
     PeriodId,
     PeriodKind,
 )
-from backend.features.bi.question_records import (
+from backend.domains.bi.domain.question_records import (
     BiQuestionJobProgress,
     BiQuestionRecord,
     BiQuestionStatus,

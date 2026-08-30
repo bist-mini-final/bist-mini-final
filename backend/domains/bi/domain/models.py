@@ -237,3 +237,4 @@ class BiMaterializationJob(BiContractModel):
     message: str | None = Field(default=None, max_length=500)
     started_at: datetime
     updated_at: datetime
+

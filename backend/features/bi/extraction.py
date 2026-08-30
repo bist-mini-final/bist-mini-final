@@ -1,8 +1,11 @@
 from typing import Final, Literal, Protocol, assert_never, cast
 
-from .catalog import METRIC_CATALOG, DerivedMetricDefinition, SourceMetricDefinition
-from .evidence import is_verifiable_cell
-from .extraction_models import (
+from backend.domains.bi.domain.catalog import (
+    METRIC_CATALOG,
+    DerivedMetricDefinition,
+    SourceMetricDefinition,
+)
+from backend.domains.bi.domain.extraction_models import (
     BiMetricExtractionRequest,
     BiMetricExtractionResult,
     BiMetricExtractionStatusError,
@@ -12,8 +15,8 @@ from .extraction_models import (
     MetricReaderResult,
     ReaderContractFailure,
 )
-from .materialization_models import BiDocumentProfile
-from .models import (
+from backend.domains.bi.domain.materialization_models import BiDocumentProfile
+from backend.domains.bi.domain.models import (
     AmountScale,
     AvailableObservation,
     BiEvidence,
@@ -22,6 +25,8 @@ from .models import (
     UnavailableObservation,
     ValueKind,
 )
+
+from .evidence import is_verifiable_cell
 
 MISSING_TOKENS: Final = frozenset({"", "-", "NA", "N/A", "NM", "#PEND", "NULL"})
 

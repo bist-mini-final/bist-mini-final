@@ -2,10 +2,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from .catalog import METRIC_CATALOG, SourceMetricDefinition
-from .extraction_models import BiMetricExtractionResult
-from .materialization_models import BiSnapshotRefreshInput
-from .models import BiDashboardSnapshot, CompanyId, JobId, MetricId, PeriodId
+from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
+from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
+from backend.domains.bi.domain.materialization_models import BiSnapshotRefreshInput
+from backend.domains.bi.domain.models import (
+    BiDashboardSnapshot,
+    CompanyId,
+    JobId,
+    MetricId,
+    PeriodId,
+)
+
 from .snapshot_builder import BiSnapshotBuilder
 
 

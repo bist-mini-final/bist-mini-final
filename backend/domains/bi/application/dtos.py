@@ -4,7 +4,7 @@ from typing import assert_never
 
 from pydantic import Field, field_validator
 
-from .models import (
+from backend.domains.bi.domain.models import (
     BiContractModel,
     BiMaterializationJob,
     BiMaterializationSource,
@@ -122,3 +122,4 @@ def _should_list_company(company: BiCompanySummary) -> bool:
                     assert_never(unreachable)
         case unreachable:
             assert_never(unreachable)
+

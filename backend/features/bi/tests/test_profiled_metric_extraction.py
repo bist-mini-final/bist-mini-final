@@ -1,15 +1,14 @@
 from decimal import Decimal
 
-from backend.features.bi.extraction import BiMetricExtractionService
-from backend.features.bi.extraction_models import (
+from backend.domains.bi.domain.extraction_models import (
     BiContextCell,
     BiMetricExtractionRequest,
     BiMetricReaderResponse,
     BiRetrievalRequest,
     BiRetrievedContext,
 )
-from backend.features.bi.materialization_models import BiDocumentProfile
-from backend.features.bi.models import (
+from backend.domains.bi.domain.materialization_models import BiDocumentProfile
+from backend.domains.bi.domain.models import (
     AmountScale,
     BiMaterializationSource,
     BiPeriod,
@@ -19,6 +18,7 @@ from backend.features.bi.models import (
     PeriodId,
     PeriodKind,
 )
+from backend.features.bi.extraction import BiMetricExtractionService
 
 
 class FixedRetriever:

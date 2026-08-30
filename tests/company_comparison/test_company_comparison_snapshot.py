@@ -9,13 +9,8 @@ from fastapi.testclient import TestClient
 
 from backend.api.company_comparison_routes import create_company_comparison_router
 from backend.contracts.snapshots import VersionedSnapshotRecord
-from backend.domains.company_comparison.application import CompanyComparisonService
-from backend.domains.company_comparison.errors import ComparisonDataError
-from backend.domains.company_comparison.snapshot_builder import (
-    CompanyComparisonSnapshotBuilder,
-)
-from backend.features.bi.materialization_models import BiCompanyIndexEntry
-from backend.features.bi.models import (
+from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
+from backend.domains.bi.domain.models import (
     AmountScale,
     AvailableObservation,
     BiCompany,
@@ -36,6 +31,11 @@ from backend.features.bi.models import (
     SnapshotId,
     SnapshotStatus,
     ValueKind,
+)
+from backend.domains.company_comparison.application import CompanyComparisonService
+from backend.domains.company_comparison.errors import ComparisonDataError
+from backend.domains.company_comparison.snapshot_builder import (
+    CompanyComparisonSnapshotBuilder,
 )
 
 

@@ -1,19 +1,7 @@
 from hashlib import sha256
 from typing import Final, assert_never
 
-from .calculator import (
-    DebtComponents,
-    calculate_debt_ratio,
-    calculate_free_cash_flow,
-    calculate_free_cash_flow_margin,
-    calculate_net_debt,
-    calculate_net_debt_ratio,
-    calculate_net_margin,
-    calculate_operating_margin,
-    calculate_revenue_yoy_growth,
-    calculate_total_debt,
-)
-from .catalog import (
+from backend.domains.bi.domain.catalog import (
     CATALOG_VERSION,
     FORMULA_VERSION,
     METRIC_CATALOG,
@@ -21,8 +9,11 @@ from .catalog import (
     MetricDisplayRole,
     SourceMetricDefinition,
 )
-from .materialization_models import BiSnapshotBuildInput, BiSnapshotRefreshInput
-from .models import (
+from backend.domains.bi.domain.materialization_models import (
+    BiSnapshotBuildInput,
+    BiSnapshotRefreshInput,
+)
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiDashboardSnapshot,
     BiIssue,
@@ -39,6 +30,19 @@ from .models import (
     SnapshotStatus,
     UnavailableObservation,
     ValueKind,
+)
+
+from .calculator import (
+    DebtComponents,
+    calculate_debt_ratio,
+    calculate_free_cash_flow,
+    calculate_free_cash_flow_margin,
+    calculate_net_debt,
+    calculate_net_debt_ratio,
+    calculate_net_margin,
+    calculate_operating_margin,
+    calculate_revenue_yoy_growth,
+    calculate_total_debt,
 )
 from .snapshot_projection import (
     BiSnapshotProjection,

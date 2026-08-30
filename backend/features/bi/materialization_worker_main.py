@@ -3,16 +3,16 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+from backend.bootstrap.bi import create_bi_materialization_runner
 from backend.bootstrap.container import RuntimeContainer
+from backend.domains.bi.domain.materialization_models import BiMaterializationOutcome
 from backend.engine.worker.base import (
     LeasedWorker,
     WorkerLeaseSpec,
     default_worker_id,
 )
 
-from .composition import create_bi_materialization_runner
 from .database_schema import ensure_bi_schema
-from .materialization_models import BiMaterializationOutcome
 from .postgres_store import ClaimedBiMaterialization, PostgresBiStore
 
 logger = logging.getLogger(__name__)

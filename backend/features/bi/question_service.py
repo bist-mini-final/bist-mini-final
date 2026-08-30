@@ -2,9 +2,9 @@ from collections import Counter
 from dataclasses import replace
 from typing import Protocol
 
-from .current_periods import select_current_periods
-from .question_batch import BiQuestionBatchPlan, build_question_batch
-from .question_records import (
+from backend.domains.bi.domain.current_periods import select_current_periods
+from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan, build_question_batch
+from backend.domains.bi.domain.question_records import (
     BiAnswerRecord,
     BiCompletedAnswerRecord,
     BiLatestAnswerQuery,

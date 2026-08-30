@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from backend.features.bi.formula_dsl import (
+from backend.domains.bi.domain.formula_dsl import (
     FormulaDefinitionError,
     FormulaEvaluationError,
     evaluate_formula,

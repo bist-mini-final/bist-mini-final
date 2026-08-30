@@ -4,15 +4,13 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from .models import (
+from backend.domains.bi.domain.models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
     JobId,
     MaterializationStatus,
 )
-from .postgres_store import BiPostgresStoreError
-from .profile_repository import BiDocumentProfileRepositoryError
-from .question_records import (
+from backend.domains.bi.domain.question_records import (
     BiAnswerRecord,
     BiQuestionClaim,
     BiQuestionJobProgress,
@@ -20,6 +18,9 @@ from .question_records import (
     QuestionId,
     WorkflowRunId,
 )
+
+from .postgres_store import BiPostgresStoreError
+from .profile_repository import BiDocumentProfileRepositoryError
 from .question_repository import BiQuestionRepositoryError
 from .question_snapshot import BiQuestionSnapshotDataError
 from .question_snapshot_repository import BiQuestionSnapshotRepositoryError

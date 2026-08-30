@@ -88,3 +88,4 @@ def build_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
                     f"지원하지 않는 BI metric definition: {type(definition).__name__}"
                 )
     return BiQuestionBatch(questions=tuple(questions))
+

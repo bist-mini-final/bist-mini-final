@@ -14,13 +14,8 @@ from psycopg2.extras import Json, RealDictCursor
 from pydantic import ValidationError
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import (
-    get_pooled_async_connection,
-    get_pooled_raw_connection,
-)
-
-from .materialization_models import BiCompanyIndexEntry
-from .models import (
+from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiDashboardSnapshot,
     BiMaterializationJob,
@@ -32,6 +27,11 @@ from .models import (
     MaterializationStatus,
     SnapshotId,
 )
+from backend.storage.connection_pool import (
+    get_pooled_async_connection,
+    get_pooled_raw_connection,
+)
+
 from .snapshot_compatibility import normalize_snapshot_payload
 
 MATERIALIZATION_JOB_COLUMNS: Final = (

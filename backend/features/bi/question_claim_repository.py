@@ -5,13 +5,13 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
-
-from .question_records import (
+from backend.domains.bi.domain.question_records import (
     BiQuestionClaim,
     BiQuestionRecord,
     BiQuestionStatus,
 )
+from backend.storage.connection_pool import get_pooled_raw_connection
+
 from .question_repository_queries import BiQuestionRepositoryError
 
 

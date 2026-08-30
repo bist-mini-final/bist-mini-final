@@ -1,15 +1,9 @@
 from hashlib import sha256
 from typing import assert_never
 
-from .api_models import (
-    BiCompanySummary,
-    BiMaterializationAccepted,
-    BiMaterializationCandidate,
-    BiMaterializationCandidateReason,
-)
-from .catalog import CATALOG_VERSION, FORMULA_VERSION
-from .materialization_models import BiCompanyIndexEntry
-from .models import (
+from backend.domains.bi.domain.catalog import CATALOG_VERSION, FORMULA_VERSION
+from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
+from backend.domains.bi.domain.models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
     BiMaterializationRequest,
@@ -17,6 +11,13 @@ from .models import (
     JobId,
     MaterializationStatus,
     RefreshStatus,
+)
+
+from .dtos import (
+    BiCompanySummary,
+    BiMaterializationAccepted,
+    BiMaterializationCandidate,
+    BiMaterializationCandidateReason,
 )
 
 
@@ -183,3 +184,5 @@ def _refresh_job(
     if latest_job.updated_at > snapshot.snapshot.generated_at:
         return latest_job
     return None
+
+

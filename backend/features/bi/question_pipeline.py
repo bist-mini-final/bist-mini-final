@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
-from .extraction_models import BiMetricExtractionRequest, BiMetricExtractionResult
-from .models import BiMaterializationSource, IndexId
-from .question_records import BiQuestionRecord
+from backend.domains.bi.domain.extraction_models import (
+    BiMetricExtractionRequest,
+    BiMetricExtractionResult,
+)
+from backend.domains.bi.domain.models import BiMaterializationSource, IndexId
+from backend.domains.bi.domain.question_records import BiQuestionRecord
 
 
 class BiQuestionExtractorPort(Protocol):

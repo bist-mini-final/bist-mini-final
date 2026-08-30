@@ -199,3 +199,4 @@ class BiLatestAnswerQuery(BiContractModel):
     company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
     workbook_hash: str = Field(pattern=WORKBOOK_HASH_PATTERN)
     index_id: IndexId = Field(pattern=IDENTIFIER_PATTERN)
+

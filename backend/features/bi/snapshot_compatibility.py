@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, overload
 
-from backend.features.bi.models import MetricId
+from backend.domains.bi.domain.models import MetricId
 
 SUPPORTED_METRIC_IDS = frozenset(metric.value for metric in MetricId)
 

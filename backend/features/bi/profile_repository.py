@@ -7,13 +7,12 @@ from psycopg2.extras import Json, RealDictCursor
 from pydantic import ValidationError
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
-
-from .materialization_models import (
+from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
     BiProfilingResult,
 )
-from .models import BiMaterializationRequest, BiMaterializationSource
+from backend.domains.bi.domain.models import BiMaterializationRequest, BiMaterializationSource
+from backend.storage.connection_pool import get_pooled_raw_connection
 
 PROFILE_VERSION: Final = "7"
 

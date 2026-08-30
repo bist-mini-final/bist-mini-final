@@ -3,16 +3,16 @@ from typing import Protocol, TypeAlias, assert_never, cast
 
 from pydantic import ValidationError
 
-from backend.providers.openai_responses import OpenAIResponsesClient
-
-from .evidence import verifiable_cells
-from .extraction_models import (
+from backend.domains.bi.domain.extraction_models import (
     BiMetricExtractionRequest,
     BiMetricReaderResponse,
     BiRetrievedContext,
     MetricReaderResult,
     ReaderContractFailure,
 )
+from backend.providers.openai_responses import OpenAIResponsesClient
+
+from .evidence import verifiable_cells
 
 JsonValue: TypeAlias = str | int | float | bool | list["JsonValue"] | dict[str, "JsonValue"] | None
 

@@ -11,8 +11,7 @@ from math import pow
 from statistics import fmean
 from typing import Final, TypedDict
 
-from backend.features.bi.evidence import verifiable_cells
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     AmountScale,
     AvailableObservation,
     BiDashboardSnapshot,
@@ -21,6 +20,7 @@ from backend.features.bi.models import (
     MetricId,
     SnapshotStatus,
 )
+from backend.features.bi.evidence import verifiable_cells
 
 from .errors import ComparisonDataError
 from .league_scoring import (
@@ -619,4 +619,3 @@ __all__ = [
     "BaseFinancials",
     "CompanyComparisonSnapshotBuilder",
 ]
-

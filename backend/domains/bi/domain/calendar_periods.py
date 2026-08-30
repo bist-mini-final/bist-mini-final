@@ -110,3 +110,4 @@ __all__ = [
     "index_fiscal_periods_by_calendar_year",
     "normalize_fiscal_period",
 ]
+

@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     BiMaterializationRequest,
     BiMaterializationSource,
     BiPeriod,
@@ -10,8 +10,8 @@ from backend.features.bi.models import (
     PeriodId,
     PeriodKind,
 )
-from backend.features.bi.question_batch import BiQuestionBatchPlan
-from backend.features.bi.question_records import (
+from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
+from backend.domains.bi.domain.question_records import (
     BiAnswerRecord,
     BiCompletedAnswerRecord,
     BiLatestAnswerQuery,
