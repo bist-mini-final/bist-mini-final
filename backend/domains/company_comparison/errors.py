@@ -14,3 +14,4 @@ class ComparisonSnapshotIntegrityError(RuntimeError):
 
 
 __all__ = ["ComparisonDataError", "ComparisonSnapshotIntegrityError"]
+

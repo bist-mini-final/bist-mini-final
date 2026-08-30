@@ -1,4 +1,4 @@
-"""HTTP adapter for the company-comparison snapshot."""
+"""HTTP presentation for the company-comparison snapshot."""
 
 from typing import Any
 
@@ -7,9 +7,8 @@ from starlette import status
 
 from backend.contracts import ApiErrorEnvelope
 from backend.domains.company_comparison.application import CompanyComparisonService
-
-from .errors import ComparisonDataError
-from .models import CompanyComparisonSnapshot
+from backend.domains.company_comparison.errors import ComparisonDataError
+from backend.domains.company_comparison.models import CompanyComparisonSnapshot
 
 
 def create_company_comparison_router(

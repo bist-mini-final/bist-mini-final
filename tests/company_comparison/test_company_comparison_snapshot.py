@@ -7,7 +7,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.api.company_comparison_routes import create_company_comparison_router
 from backend.contracts.snapshots import VersionedSnapshotRecord
+from backend.domains.company_comparison.application import CompanyComparisonService
+from backend.domains.company_comparison.errors import ComparisonDataError
+from backend.domains.company_comparison.snapshot_builder import (
+    CompanyComparisonSnapshotBuilder,
+)
 from backend.features.bi.materialization_models import BiCompanyIndexEntry
 from backend.features.bi.models import (
     AmountScale,
@@ -30,12 +36,6 @@ from backend.features.bi.models import (
     SnapshotId,
     SnapshotStatus,
     ValueKind,
-)
-from backend.features.company_comparison.api_routes import create_company_comparison_router
-from backend.features.company_comparison.errors import ComparisonDataError
-from backend.features.company_comparison.service import CompanyComparisonService
-from backend.features.company_comparison.snapshot_builder import (
-    CompanyComparisonSnapshotBuilder,
 )
 
 

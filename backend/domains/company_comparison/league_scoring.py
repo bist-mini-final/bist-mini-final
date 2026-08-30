@@ -73,3 +73,4 @@ __all__ = [
     "growth_score",
     "profitability_score",
 ]
+

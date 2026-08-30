@@ -1,4 +1,4 @@
-"""Composition boundary for the company-comparison domain."""
+"""Composition boundary for company-comparison domain adapters."""
 
 from __future__ import annotations
 
