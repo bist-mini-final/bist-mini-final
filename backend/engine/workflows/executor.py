@@ -10,6 +10,19 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from backend.core.telemetry import trace_node_execution
+from backend.domains.workflow.application import (
+    WorkflowGraphValidator,
+    WorkflowInputAssembler,
+    WorkflowPortResolver,
+    WorkflowResultCache,
+    WorkflowRunRepository,
+)
+from backend.domains.workflow.domain import (
+    DagExecutionCancelled,
+    DagExecutionError,
+    WorkflowRunStateReducer,
+    format_execution_error,
+)
 from backend.engine.runtime.registry_base import BaseModuleRegistry
 from backend.providers.openai_pricing import calculate_openai_cost
 from modules.common.base_module import BaseModule, ModuleExecutionError
@@ -26,7 +39,6 @@ from .models import (
     WorkflowRun,
     utc_now_iso,
 )
-from .store import ResultCache, RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -43,22 +55,14 @@ class _PreparedNodeExecution:
     progress_callback: Callable[[Dict[str, Any]], None]
 
 
-class DagExecutionError(ValueError):
-    """Raised when a workflow graph or its persisted execution is invalid."""
-
-
-class DagExecutionCancelled(RuntimeError):
-    """Raised after a user-requested run cancellation has been persisted."""
-
-
 class WorkflowExecutor:
     """Runs ready DAG nodes in batches and persists every node transition."""
 
     def __init__(
         self,
         module_registry: BaseModuleRegistry,
-        run_store: RunStore,
-        result_cache: ResultCache,
+        run_store: WorkflowRunRepository,
+        result_cache: WorkflowResultCache,
     ) -> None:
         self.module_registry = module_registry
         self.run_store = run_store
@@ -67,93 +71,19 @@ class WorkflowExecutor:
         self._cancellation_lock = Lock()
         self._active_run_ids: Set[str] = set()
         self._cancelled_run_ids: Set[str] = set()
+        self._port_resolver = WorkflowPortResolver(module_registry)
+        self._graph_validator = WorkflowGraphValidator(
+            module_registry,
+            self._port_resolver,
+        )
+        self._input_assembler = WorkflowInputAssembler(
+            module_registry,
+            self._port_resolver,
+        )
+        self._state_reducer = WorkflowRunStateReducer()
 
     def validate_graph(self, graph: WorkflowGraph) -> List[List[str]]:
-        if not graph.nodes:
-            raise DagExecutionError("실행할 노드가 없습니다")
-
-        node_by_id: Dict[str, WorkflowNode] = {}
-        for node in graph.nodes:
-            if node.id in node_by_id:
-                raise DagExecutionError(f"중복 노드 ID입니다: {node.id}")
-            try:
-                module = self.module_registry.get(node.module_type)
-            except KeyError as error:
-                raise DagExecutionError(str(error)) from error
-            unknown_config = set(node.config) - set(module.config_fields)
-            if unknown_config:
-                raise DagExecutionError(
-                    f"노드 {node.id}의 config에 설정 필드가 아닌 값이 있습니다: "
-                    + ", ".join(sorted(unknown_config))
-                )
-            try:
-                module.validate_config(node.config)
-            except ValidationError as error:
-                raise DagExecutionError(
-                    f"노드 {node.id}의 config가 유효하지 않습니다: " + self._format_error(error)
-                ) from error
-            allowed_value_fields = (
-                set(module.definition.inputs)
-                if module.definition.raw_input
-                else set(module.input_fields)
-            )
-            unknown_values = set(node.values) - allowed_value_fields
-            if unknown_values:
-                raise DagExecutionError(
-                    f"노드 {node.id}의 values에 Input DTO 필드가 아닌 값이 있습니다: "
-                    + ", ".join(sorted(unknown_values))
-                )
-            node_by_id[node.id] = node
-
-        import networkx as nx
-
-        edge_ids: Set[str] = set()
-        occupied_inputs: Dict[Tuple[str, str], List[WorkflowEdge]] = defaultdict(list)
-        graph_dag = nx.DiGraph()
-        for node in graph.nodes:
-            graph_dag.add_node(node.id)
-
-        for edge in graph.edges:
-            if edge.id in edge_ids:
-                raise DagExecutionError(f"중복 연결 ID입니다: {edge.id}")
-            edge_ids.add(edge.id)
-            if edge.source not in node_by_id or edge.target not in node_by_id:
-                raise DagExecutionError(f"연결 {edge.id}이 존재하지 않는 노드를 참조합니다")
-            if edge.source == edge.target:
-                raise DagExecutionError(f"자기 자신으로 연결할 수 없습니다: {edge.id}")
-
-            _, target_input = self._resolve_ports(edge, node_by_id)
-            occupied = (edge.target, target_input)
-            alternatives = occupied_inputs[occupied]
-            if alternatives:
-                existing_branches = {candidate.source_branch for candidate in alternatives}
-                is_valid_branch_group = (
-                    edge.source_branch is not None
-                    and None not in existing_branches
-                    and edge.source_branch not in existing_branches
-                    and all(candidate.source == edge.source for candidate in alternatives)
-                )
-                if not is_valid_branch_group:
-                    raise DagExecutionError(
-                        f"노드 {edge.target}의 입력 {target_input}에 호환되지 않는 여러 연결이 들어옵니다"
-                    )
-            alternatives.append(edge)
-            graph_dag.add_edge(edge.source, edge.target)
-
-        if not nx.is_directed_acyclic_graph(graph_dag):
-            try:
-                cycle = nx.find_cycle(graph_dag, orientation="original")
-                cycle_str = " -> ".join([u for u, v, _ in cycle] + [cycle[0][0]])
-                raise DagExecutionError(f"순환 연결이 감지되었습니다: {cycle_str}")
-            except DagExecutionError:
-                raise
-            except Exception:
-                raise DagExecutionError("순환 연결이 감지되었습니다")
-
-        batches: List[List[str]] = [
-            list(generation) for generation in nx.topological_generations(graph_dag)
-        ]
-        return batches
+        return self._graph_validator.validate(graph)
 
     def create_run(
         self,
@@ -516,58 +446,11 @@ class WorkflowExecutor:
         Parameters:
                 state (RunNodeState): The node state to reset.
         """
-        state.status = "pending"
-        state.input_payload = None
-        state.config_payload = {}
-        state.output = None
-        state.error = None
-        state.cache_key = None
-        state.cache_hit = False
-        state.outcome = None
-        state.skip_reason = None
-        state.started_at = None
-        state.completed_at = None
-        state.elapsed_ms = None
-        state.cost_usd = None
-        state.usage = None
-        state.progress = {}
+        WorkflowRunStateReducer.reset_node(state)
 
     @staticmethod
     def _refresh_run_status(run: WorkflowRun) -> None:
-        completed_statuses = {"succeeded", "skipped"}
-        for batch in run.batches:
-            states = [run.nodes[node_id] for node_id in batch.node_ids]
-            if any(state.status == "running" for state in states):
-                batch.status = "running"
-                batch.completed_at = None
-            elif any(state.status == "failed" for state in states):
-                batch.status = "failed"
-                batch.completed_at = utc_now_iso()
-            elif all(state.status in completed_statuses for state in states):
-                batch.status = "completed"
-                batch.completed_at = utc_now_iso()
-            else:
-                batch.status = "pending"
-                batch.completed_at = None
-
-        states = list(run.nodes.values())
-        if any(state.status == "running" for state in states):
-            run.status = "running"
-        elif any(state.status == "failed" for state in states):
-            run.status = "failed"
-        elif all(state.status in completed_statuses for state in states):
-            source_node_ids = {edge.source for edge in run.graph.edges}
-            sink_node_ids = set(run.nodes) - source_node_ids
-            run.status = (
-                "completed"
-                if any(run.nodes[node_id].status == "succeeded" for node_id in sink_node_ids)
-                else "failed"
-            )
-        else:
-            # A claimed worker remains the owner between node transitions.
-            # Returning to ``queued`` here makes KEDA count the live run as new
-            # backlog and creates an unnecessary no-op Job.
-            run.status = "running" if run.status == "running" else "queued"
+        WorkflowRunStateReducer.refresh(run)
 
     def prepare_resume(self, run_id: str) -> WorkflowRun:
         """Reset failed/paused state and persist it without executing the run.
@@ -1003,186 +886,21 @@ class WorkflowExecutor:
         Returns:
             Tuple[bool, Optional[str]]: Whether the node can execute and, when it cannot, the reason it will be skipped.
         """
-        incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
-        if not incoming_edges:
-            module = self.module_registry.get(node.module_type)
-            supplied_fields = set(node.values) | set(run.runtime_inputs.get(node.id, {}))
-            required_inputs = (
-                list(module.definition.inputs)
-                if module.definition.raw_input
-                else module.required_input_fields
-            )
-            missing_inputs = [field for field in required_inputs if field not in supplied_fields]
-            if missing_inputs:
-                return (
-                    False,
-                    "연결되지 않은 필수 입력이 있어 건너뜁니다: " + ", ".join(missing_inputs),
-                )
-            return True, None
-
-        node_by_id = {item.id: item for item in run.graph.nodes}
-        edges_by_input: Dict[str, List[WorkflowEdge]] = defaultdict(list)
-        for edge in incoming_edges:
-            _, target_input = self._resolve_ports(edge, node_by_id)
-            edges_by_input[target_input].append(edge)
-
-        module = self.module_registry.get(node.module_type)
-        supplied_inputs = (
-            set(node.values) | set(run.runtime_inputs.get(node.id, {})) | set(edges_by_input)
-        )
-        # A raw object connected to the conventional ``input`` port is merged
-        # into a structured target DTO by ``_assemble_input``.  Account for the
-        # source DTO fields here as well; otherwise a valid typed-object edge is
-        # incorrectly skipped before input assembly can validate it.
-        if not module.definition.raw_input:
-            for target_input, alternatives in edges_by_input.items():
-                if target_input != "input":
-                    continue
-                for edge in alternatives:
-                    source_node = node_by_id[edge.source]
-                    source_module = self.module_registry.get(source_node.module_type)
-                    if source_module.definition.raw_output:
-                        supplied_inputs.update(source_module.output_model.model_fields)
-        missing_inputs = [
-            field for field in module.required_input_fields if field not in supplied_inputs
-        ]
-        if missing_inputs:
-            return (
-                False,
-                "연결되지 않은 필수 입력이 있어 건너뜁니다: " + ", ".join(missing_inputs),
-            )
-
-        for target_input, alternatives in edges_by_input.items():
-            if not any(self._edge_is_active(run, edge) for edge in alternatives):
-                return (
-                    False,
-                    f"입력 {target_input}에 활성화된 분기 출력이 없어 건너뜁니다",
-                )
-        return True, None
+        return self._input_assembler.should_execute(run, node)
 
     @staticmethod
     def _edge_is_active(run: WorkflowRun, edge: WorkflowEdge) -> bool:
-        source_state = run.nodes[edge.source]
-        if edge.source_branch is None:
-            return source_state.status == "succeeded"
-        return source_state.outcome == edge.source_branch
+        return WorkflowInputAssembler.edge_is_active(run, edge)
 
     def _assemble_input(self, run: WorkflowRun, node: WorkflowNode) -> Any:
-        payload = dict(node.values)
-        target_module = self.module_registry.get(node.module_type)
-        payload.update(run.runtime_inputs.get(node.id, {}))
-        node_by_id = {item.id: item for item in run.graph.nodes}
-        incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
-        edges_by_input: Dict[str, List[Tuple[WorkflowEdge, str]]] = defaultdict(list)
-        for edge in incoming_edges:
-            source_output, target_input = self._resolve_ports(edge, node_by_id)
-            edges_by_input[target_input].append((edge, source_output))
-
-        for target_input, alternatives in edges_by_input.items():
-            active_edges = [
-                (edge, source_output)
-                for edge, source_output in alternatives
-                if self._edge_is_active(run, edge)
-            ]
-            if len(active_edges) != 1:
-                raise DagExecutionError(
-                    f"노드 {node.id}의 입력 {target_input}에 활성 분기가 {len(active_edges)}개입니다"
-                )
-            edge, source_output = active_edges[0]
-            source_state = run.nodes[edge.source]
-            if source_state.status != "succeeded":
-                raise DagExecutionError(
-                    f"선행 노드 {edge.source}의 출력이 아직 준비되지 않았습니다"
-                )
-            source_module = self.module_registry.get(node_by_id[edge.source].module_type).definition
-            if source_module.raw_output:
-                source_value = source_state.output
-            else:
-                if (
-                    not isinstance(source_state.output, Mapping)
-                    or source_output not in source_state.output
-                ):
-                    raise DagExecutionError(
-                        f"선행 노드 {edge.source}에 출력 {source_output}이 없습니다"
-                    )
-                source_value = source_state.output[source_output]
-            if (
-                source_module.raw_output
-                and not target_module.definition.raw_input
-                and target_input == "input"
-            ):
-                if not isinstance(source_value, Mapping):
-                    raise DagExecutionError(
-                        f"선행 노드 {edge.source}의 원본 출력이 객체가 아닙니다"
-                    )
-                duplicate_fields = set(payload).intersection(source_value)
-                if duplicate_fields:
-                    raise DagExecutionError(
-                        f"노드 {node.id}의 입력과 설정 필드가 충돌합니다: "
-                        + ", ".join(sorted(duplicate_fields))
-                    )
-                payload.update(source_value)
-            else:
-                payload[target_input] = source_value
-
-        if not target_module.definition.raw_input:
-            return payload
-        if len(target_module.definition.inputs) != 1:
-            raise DagExecutionError(
-                f"원본 입력 모듈 {node.module_type}은 입력 포트가 정확히 하나여야 합니다"
-            )
-        input_port = target_module.definition.inputs[0]
-        unknown_fields = set(payload) - {input_port}
-        if unknown_fields:
-            raise DagExecutionError(
-                f"원본 입력 모듈 {node.module_type}에 알 수 없는 값이 있습니다: "
-                + ", ".join(sorted(unknown_fields))
-            )
-        if input_port not in payload:
-            raise DagExecutionError(
-                f"원본 입력 모듈 {node.module_type}에 {input_port} 값이 없습니다"
-            )
-        return payload[input_port]
+        return self._input_assembler.assemble(run, node)
 
     def _resolve_ports(
         self,
         edge: WorkflowEdge,
         node_by_id: Mapping[str, WorkflowNode],
     ) -> Tuple[str, str]:
-        source_module = self.module_registry.get(node_by_id[edge.source].module_type).definition
-        target_module = self.module_registry.get(node_by_id[edge.target].module_type).definition
-
-        source_output = edge.source_output
-        if edge.source_branch is not None:
-            branch_output = source_module.branch_outputs.get(edge.source_branch)
-            if branch_output is None:
-                raise DagExecutionError(
-                    f"모듈 {source_module.type}에 {edge.source_branch} 분기 출력이 없습니다"
-                )
-            if source_output is not None and source_output != branch_output:
-                raise DagExecutionError(
-                    f"{edge.source_branch} 분기는 {branch_output} 출력만 사용할 수 있습니다"
-                )
-            source_output = branch_output
-        if source_output is None:
-            if len(source_module.outputs) != 1:
-                raise DagExecutionError(f"연결 {edge.id}의 source_output을 지정해야 합니다")
-            source_output = source_module.outputs[0]
-        if source_output not in source_module.outputs:
-            raise DagExecutionError(
-                f"모듈 {source_module.type}에 출력 포트 {source_output}이 없습니다"
-            )
-
-        target_input = edge.target_input
-        if target_input is None:
-            if len(target_module.inputs) != 1:
-                raise DagExecutionError(f"연결 {edge.id}의 target_input을 지정해야 합니다")
-            target_input = target_module.inputs[0]
-        if target_input not in target_module.inputs:
-            raise DagExecutionError(
-                f"모듈 {target_module.type}에 입력 포트 {target_input}이 없습니다"
-            )
-        return source_output, target_input
+        return self._port_resolver.resolve(edge, node_by_id)
 
     @staticmethod
     def _format_error(error: Exception, *, include_type: bool = False) -> str:
@@ -1196,20 +914,4 @@ class WorkflowExecutor:
         Returns:
             str: The formatted error message, truncated to 4,000 characters when necessary.
         """
-        if isinstance(error, ValidationError):
-            messages = [
-                f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
-                for item in error.errors(include_url=False)
-            ]
-            message = "; ".join(messages)
-        else:
-            message = str(error)
-            for marker in ("\n[SQL:", " [SQL:"):
-                if marker in message:
-                    message = message.split(marker, 1)[0].rstrip()
-                    break
-            if include_type:
-                message = f"{type(error).__name__}: {message}"
-        if len(message) > 4000:
-            return message[:4000].rstrip() + "…"
-        return message
+        return format_execution_error(error, include_type=include_type)
