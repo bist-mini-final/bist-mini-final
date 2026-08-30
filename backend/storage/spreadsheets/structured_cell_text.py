@@ -124,45 +124,36 @@ def normalize_row_headers(
     return values
 
 
+def _header_sub_variants(headers: List[str]) -> List[List[str]]:
+    """Return stable, de-duplicated hierarchy variants for one header axis."""
+    if not headers:
+        return [[]]
+    candidates = [
+        headers,
+        *([header] for header in headers),
+        *(headers[:index] for index in range(1, len(headers))),
+        *(headers[index:] for index in range(1, len(headers))),
+    ]
+    variants: List[List[str]] = []
+    seen: set[Tuple[str, ...]] = set()
+    for candidate in candidates:
+        key = tuple(candidate)
+        if key and key not in seen:
+            seen.add(key)
+            variants.append(candidate)
+    return variants or [headers]
+
+
 def generate_header_combinations(
     row_headers: List[str],
     column_headers: List[str],
 ) -> List[Tuple[List[str], List[str]]]:
-    """Generate the comprehensive full header path plus granular single/sub-level header combinations for RAG retrieval."""
+    """Generate full and hierarchy-separated header forms for retrieval."""
     if not row_headers and not column_headers:
         return [([], [])]
 
-    def _sub_variants(headers: List[str]) -> List[List[str]]:
-        if not headers:
-            return [[]]
-        variants: List[List[str]] = []
-        seen: set[Tuple[str, ...]] = set()
-
-        def _add(variant: List[str]):
-            key = tuple(variant)
-            if key and key not in seen:
-                seen.add(key)
-                variants.append(variant)
-
-        # 1. Full chain (Comprehensive)
-        _add(headers)
-
-        # 2. Individual single items (e.g. leaf metric, individual categories)
-        for h in headers:
-            _add([h])
-
-        # 3. Cumulative prefix sub-paths (e.g., A, A > B, A > B > C)
-        for i in range(1, len(headers)):
-            _add(headers[:i])
-
-        # 4. Suffix sub-paths (e.g., B > C)
-        for i in range(1, len(headers)):
-            _add(headers[i:])
-
-        return variants or [headers]
-
-    row_variants = _sub_variants(row_headers)
-    col_variants = _sub_variants(column_headers)
+    row_variants = _header_sub_variants(row_headers)
+    col_variants = _header_sub_variants(column_headers)
 
     combinations: List[Tuple[List[str], List[str]]] = []
     seen_combos: set[Tuple[Tuple[str, ...], Tuple[str, ...]]] = set()
