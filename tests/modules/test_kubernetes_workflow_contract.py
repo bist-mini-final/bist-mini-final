@@ -77,6 +77,18 @@ class RecordingDatabase:
     def get_workflow_run_summary(self, run_id: str) -> dict[str, Any] | None:
         return self.get_workflow_run(run_id)
 
+    def get_workflow_node_execution_log(
+        self,
+        run_id: str,
+        node_id: str,
+    ) -> dict[str, Any] | None:
+        if self.saved is None or self.saved.id != run_id:
+            return None
+        state = self.saved.nodes.get(node_id)
+        if state is None:
+            return None
+        return state.model_dump(mode="json")
+
     def enqueue_workflow_run(
         self,
         run_id: str,
@@ -145,6 +157,8 @@ def workflow_run_with_output(output: Any) -> WorkflowRun:
                 module_type=node.module_type,
                 batch_index=0,
                 status="succeeded",
+                input_payload={"query": "현재 질문"},
+                config_payload={"mode": "current"},
                 output=output,
             )
         },
@@ -236,6 +250,30 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["runs"][0]["id"], "run-artifact-test")
+
+    def test_node_detail_endpoint_returns_current_dto_values(self) -> None:
+        database = RecordingDatabase()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_store = RunStore(root / "runs", db_manager=database)
+            run_store.save(workflow_run_with_output({"answer": "현재 답변"}))
+            app = FastAPI()
+            app.include_router(
+                create_workflow_router(
+                    workflow_store=WorkflowStore(root / "workflows"),
+                    run_store=run_store,
+                    workflow_execution=object(),  # type: ignore[arg-type]
+                )
+            )
+
+            response = TestClient(app).get(
+                "/runs/run-artifact-test/nodes/query"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["input_payload"], {"query": "현재 질문"})
+        self.assertEqual(response.json()["config_payload"], {"mode": "current"})
+        self.assertEqual(response.json()["output"], {"answer": "현재 답변"})
 
     def test_large_node_output_is_externalized_and_hydrated(self) -> None:
         database = RecordingDatabase()

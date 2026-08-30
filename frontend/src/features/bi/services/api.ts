@@ -54,6 +54,14 @@ export async function fetchBiDashboard(
   return { kind: 'snapshot', dashboard: parseBiDashboard(payload) };
 }
 
+export async function deleteBiDashboard(
+  companyId: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const endpoint = `${BI_API_PREFIX}/companies/${encodeURIComponent(companyId)}/dashboard`;
+  await requestResponse(endpoint, { method: 'DELETE', signal });
+}
+
 export async function createBiMaterialization(
   request: BiMaterializationRequest,
   signal: AbortSignal,

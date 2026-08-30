@@ -1,33 +1,22 @@
 import {
   AlertCircle,
-  ArrowUpDown,
-  ChevronDown,
   Clock,
   Database,
   RefreshCw,
-  X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import {
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { AppLink } from '../app/router';
 import { Button } from '../shared/ui';
 import { CompanyLogoBadge } from '../features/company-comparison/CompanyLogoBadge';
 import {
-  BenchmarkScatterTooltip,
+  CompanyRankingTable,
+  ComparisonRankingToolbar,
+} from '../features/company-comparison/ComparisonRanking';
+import {
   ComparisonTrendChart,
   FinancialTrendChart,
-  renderBenchmarkScatterMarker,
   type BenchmarkScatterPoint,
 } from '../features/company-comparison/CompanyComparisonCharts';
+import { ComparisonPositionPanel } from '../features/company-comparison/ComparisonPositionPanel';
 import {
   formatAmount,
   forecastPeriods,
@@ -41,7 +30,6 @@ import {
 } from '../features/company-comparison/analysis';
 import {
   RANKING_METRICS,
-  latestHistoricalPeriod,
   orderForDisplay,
   rankCompaniesByComposite,
   rankCompaniesByMetric,
@@ -52,13 +40,6 @@ import {
 import { useCompanyComparisonSnapshot } from '../features/company-comparison/useCompanyComparisonSnapshot';
 import type { ComparisonCompany } from '../features/company-comparison/types';
 import '../features/company-comparison/company-comparison.css';
-
-const FACTOR_LABELS: Record<'Overall' | 'Revenue' | 'Profit' | 'Growth', string> = {
-  Overall: '종합순위',
-  Revenue: '매출액',
-  Profit: '영업이익',
-  Growth: '성장률',
-};
 
 export function CompanyComparisonPage() {
   const [reloadKey, setReloadKey] = useState(0);
@@ -138,41 +119,29 @@ export function CompanyComparisonPage() {
 
   if (state.status === 'loading') {
     return (
-      <main className="financial-league-page league-loading" aria-live="polite">
+      <section className="financial-league-page league-loading" aria-live="polite">
         <RefreshCw size={24} className="spin" />
         <strong>기업 비교 스냅샷을 불러오고 있습니다...</strong>
-      </main>
+      </section>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <main className="financial-league-page league-loading" role="alert">
+      <section className="financial-league-page league-loading" role="alert">
         <AlertCircle size={28} color="#dc2626" />
         <strong>데이터 로드 실패</strong>
         <p>{state.message}</p>
         <Button variant="primary" type="button" onClick={() => setReloadKey((k) => k + 1)}>
           스냅샷 생성
         </Button>
-      </main>
+      </section>
     );
   }
 
   return (
-    <main className="financial-league-page" aria-label="기업 랭킹 리그 화면">
-      <header className="league-page-heading">
-        <div>
-          <span className="league-page-eyebrow">COMPANY COMPARISON</span>
-          <div className="league-page-title-row">
-            <h1>기업 비교</h1>
-            <span>{filteredCompanies.length}개 기업</span>
-          </div>
-          <p>{state.data.historicalStartYear}~{state.data.historicalEndYear} 관측 재무 성과와 명시된 예측 가정을 기준으로 성장성·수익성·안정성을 비교합니다.</p>
-        </div>
-        <Button type="button" onClick={() => setReloadKey((key) => key + 1)}>
-          <RefreshCw size={14} /> 스냅샷 새로고침
-        </Button>
-      </header>
+    <section className="financial-league-page" aria-label="기업 랭킹 리그 화면">
+      <h1 className="page-visually-hidden">기업 비교</h1>
 
       {state.data.snapshot.status === 'partial' && (
         <section className="comparison-state-card comparison-state-card--error" role="status">
@@ -181,221 +150,36 @@ export function CompanyComparisonPage() {
         </section>
       )}
 
-      {/* =========================================================================
-          1. Top Control Bar: Ranking Controls | Live Sorting
-         ========================================================================= */}
-      <section className="league-top-filter-bar" aria-label="순위 정렬 제어">
-        {/* Left: Quick ranking metric controls */}
-        <div className="filter-section-block">
-          <span className="filter-section-label">빠른 표시 정렬</span>
-          <div className="filter-pills-row">
-            {(['Overall', 'Revenue', 'Profit', 'Growth'] as const).map((factor) => {
-              const factorMetric: Record<typeof factor, RankingMetric> = {
-                Overall: 'composite', Revenue: 'revenue', Profit: 'operatingIncome', Growth: 'revenueCagr',
-              };
-              const isActive = rankingMetric === factorMetric[factor];
-              return (
-                <button
-                  type="button"
-                  key={factor}
-                  className={`dropdown-filter-pill ${isActive ? 'is-active' : ''}`}
-                  onClick={() => handleRankingMetric(factorMetric[factor])}
-                  aria-pressed={isActive}
-                >
-                  <span>{FACTOR_LABELS[factor]}</span>
-                  <ChevronDown size={11} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Live sorting pills */}
-        <div className="filter-section-block">
-          <span className="filter-section-label">실시간 정렬 기준</span>
-          <div className="filter-pills-row">
-            <div className="sort-status-pill">
-              <ArrowUpDown size={11} />
-              <span>
-                {activeRankingLabel} · {metricDirectionLabel}
-              </span>
-              <button
-                type="button"
-                className="sort-clear-btn"
-                onClick={() => {
-                  setRankingMetric('composite');
-                  setDisplayDirection('best-first');
-                }}
-                aria-label="정렬 초기화"
-                title="정렬 초기화"
-              >
-                <X size={10} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ComparisonRankingToolbar
+        rankingMetric={rankingMetric}
+        activeRankingLabel={activeRankingLabel}
+        metricDirectionLabel={metricDirectionLabel}
+        onMetricChange={handleRankingMetric}
+        onReset={() => {
+          setRankingMetric('composite');
+          setDisplayDirection('best-first');
+        }}
+        onRefresh={() => setReloadKey((key) => key + 1)}
+      />
 
       {/* =========================================================================
           2. Main Layout: Left Table (70%) vs Right Spotlight Cards & Metrics (30%)
          ========================================================================= */}
       <div className="league-main-grid">
-        {/* Left Column: League Ranking Table */}
-        <div className="league-table-card">
-          <div className="league-table-scroll-wrap">
-            <table className="league-pixel-table">
-              <thead>
-                <tr>
-                  <th className="col-th-rank">{activeRankingLabel}</th>
-                  <th className="col-th-select">비교</th>
-                  <th className="col-th-company">기업명</th>
-                  {([
-                    ['revenue', '매출액'],
-                    ['operatingIncome', '영업이익'],
-                    ['revenueCagr', '관측 구간 매출 성장률'],
-                    ['operatingMargin', '영업이익률'],
-                  ] as const).map(([metric, label]) => (
-                    <th
-                      key={metric}
-                      className={`metric-rank-header col-th-${metric} ${rankingMetric === metric ? 'is-active' : ''}`}
-                      aria-sort={rankingMetric === metric
-                        ? (displayDirection === 'best-first' ? 'descending' : 'ascending')
-                        : 'none'}
-                    >
-                      <button type="button" onClick={() => handleRankingMetric(metric)}>
-                        {label}<span aria-hidden="true">{rankingMetric === metric
-                          ? (displayDirection === 'best-first' ? '▼' : '▲')
-                          : '↕'}</span>
-                      </button>
-                    </th>
-                  ))}
-                  <th className="col-th-debtRatio">부채비율</th>
-                  <th
-                    className={`metric-rank-header col-th-composite ${rankingMetric === 'composite' ? 'is-active' : ''}`}
-                    aria-sort={rankingMetric === 'composite'
-                      ? (displayDirection === 'best-first' ? 'descending' : 'ascending')
-                      : 'none'}
-                  >
-                    <button type="button" onClick={() => handleRankingMetric('composite')}>
-                      종합점수<span aria-hidden="true">{rankingMetric === 'composite'
-                        ? (displayDirection === 'best-first' ? '▼' : '▲')
-                        : '↕'}</span>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedCompanies.map(({ company, rank }) => {
-                  const isFocused = company.companyId === focusedCompanyId;
-                  const isSelected = selectedCompanyIds.has(company.companyId);
-                  const latest = latestHistoricalPeriod(company);
-
-                  return (
-                    <tr
-                      key={company.companyId}
-                      className={`league-table-row ${isFocused ? 'is-selected' : ''}`}
-                      onClick={() => setFocusedCompanyId(company.companyId)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setFocusedCompanyId(company.companyId);
-                        }
-                      }}
-                      tabIndex={0}
-                      aria-selected={isFocused}
-                    >
-                      {/* 1. Rank */}
-                      <td className="col-th-rank">
-                        <div className="rank-cell-display">
-                          <span>{rank}</span>
-                        </div>
-                      </td>
-
-                      <td className="col-th-select">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          aria-label={`${company.displayName} 비교 선택`}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => {
-                            if (!isSelected) setFocusedCompanyId(company.companyId);
-                            setSelectedCompanyIds((current) =>
-                              toggleCompanySelection(current, company.companyId));
-                          }}
-                        />
-                      </td>
-
-                      {/* 2. Company Logo + Name */}
-                      <td className="col-th-company">
-                        <div className="company-cell-flex">
-                          <CompanyLogoBadge
-                            companyId={company.companyId}
-                            companyName={company.displayName}
-                            size={22}
-                          />
-                          <AppLink
-                            to={`/dashboard?companyId=${encodeURIComponent(company.companyId)}`}
-                            className="company-name-text"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                            title={`${company.displayName} BI 대시보드 바로가기`}
-                          >
-                            {company.displayName}
-                          </AppLink>
-                        </div>
-                      </td>
-
-                      <td className={`col-th-revenue ${rankingMetric === 'revenue' ? 'is-ranked' : ''}`}>
-                        <strong>{latest ? formatAmount(latest.revenue, company) : '—'}</strong>
-                      </td>
-                      <td className={`col-th-operatingIncome ${rankingMetric === 'operatingIncome' ? 'is-ranked' : ''}`}>
-                        <strong>{latest ? formatAmount(latest.operatingIncome, company) : '—'}</strong>
-                      </td>
-                      <td className={`col-th-revenueCagr ${rankingMetric === 'revenueCagr' ? 'is-ranked' : ''}`}>
-                        <strong
-                          className={`growth-rate ${company.revenueCagr > 0
-                            ? 'is-positive'
-                            : company.revenueCagr < 0
-                              ? 'is-negative'
-                              : 'is-neutral'}`}
-                          aria-label={`관측 구간 매출 성장률 ${company.revenueCagr.toFixed(1)}%, ${company.revenueCagr > 0
-                            ? '상승'
-                            : company.revenueCagr < 0
-                              ? '하락'
-                              : '변동 없음'}`}
-                        >
-                          <span className="growth-rate-arrow" aria-hidden="true">
-                            {company.revenueCagr > 0 ? '▲' : company.revenueCagr < 0 ? '▼' : '—'}
-                          </span>
-                          <span>{company.revenueCagr.toFixed(1)}%</span>
-                        </strong>
-                      </td>
-                      <td className={`col-th-operatingMargin ${rankingMetric === 'operatingMargin' ? 'is-ranked' : ''}`}>
-                        <strong className={company.operatingMargin < 0 ? 'metric-negative' : ''}>
-                          {company.operatingMargin.toFixed(1)}%
-                        </strong>
-                      </td>
-                      <td className="col-th-debtRatio">
-                        <strong title={`순부채/매출 ${company.netDebtToRevenue.toFixed(1)}%`}>
-                          {company.liabilitiesToAssets.toFixed(1)}%
-                        </strong>
-                      </td>
-                      <td className={`col-th-composite ${rankingMetric === 'composite' ? 'is-ranked' : ''}`}>
-                        <div className="debt-grade-cell" title="성장성 35% + 수익성 35% + 안정성 30%">
-                          <span className={`tier-round-pill pill-${company.tier.toLowerCase()}`}>
-                            {company.tier}
-                          </span>
-                          <strong>{company.compositeScore.toFixed(1)}</strong>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <CompanyRankingTable
+          companies={displayedCompanies}
+          rankingMetric={rankingMetric}
+          displayDirection={displayDirection}
+          activeRankingLabel={activeRankingLabel}
+          focusedCompanyId={focusedCompanyId}
+          selectedCompanyIds={selectedCompanyIds}
+          onMetricChange={handleRankingMetric}
+          onFocusCompany={setFocusedCompanyId}
+          onToggleCompany={(companyId) => {
+            if (!selectedCompanyIds.has(companyId)) setFocusedCompanyId(companyId);
+            setSelectedCompanyIds((current) => toggleCompanySelection(current, companyId));
+          }}
+        />
 
         {/* Right Column: selection-driven company analysis */}
         <div className="league-side-column">
@@ -624,80 +408,14 @@ export function CompanyComparisonPage() {
             ) : null}
           </section>
 
-          <section className="interactive-distribution-panel position-analysis-panel" aria-label="기업군 내 성장성과 수익성 위치">
-            <div className="distribution-title-row">
-              <div>
-                <span className="distribution-main-title">성장성 × 수익성 포지션</span>
-                <p className="distribution-description">선택 기업이 전체 {filteredCompanies.length}개 기업에서 어디에 위치하는지 확인하세요.</p>
-              </div>
-              <span className="distribution-scope">{filteredCompanies.length}개 기업</span>
-            </div>
-            <div className="distribution-sub-widget benchmark-scatter-widget is-standalone">
-              <div className="benchmark-scatter-title-row">
-                <span className="dist-widget-heading">평균 기준선: 성장률 {averageCagr.toFixed(1)}% · 이익률 {averageMargin.toFixed(1)}%</span>
-                <div className="benchmark-scatter-legend" aria-label="산점도 범례">
-                  {comparisonCompanies.length === 2 ? (
-                    <><span><i className="is-compare-a" />기업 A</span><span><i className="is-compare-b" />기업 B</span></>
-                  ) : <span><i className="is-selected" />선택 기업</span>}
-                  <span><i />기타</span>
-                </div>
-              </div>
-              <div
-                className="benchmark-scatter-chart"
-                role="img"
-                aria-label="기업별 매출 성장률과 영업이익률 산점도. 점을 선택하면 표에서 기업이 강조됩니다."
-              >
-                <span className="quadrant-label is-top-left">안정 수익형</span>
-                <span className="quadrant-label is-top-right">고성장·고수익</span>
-                <span className="quadrant-label is-bottom-left">관찰 필요</span>
-                <span className="quadrant-label is-bottom-right">성장 투자형</span>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 22, right: 16, bottom: 6, left: -4 }}>
-                    <CartesianGrid stroke="#e5ece8" strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      dataKey="growth"
-                      name="매출 성장률"
-                      unit="%"
-                      tick={{ fill: '#64746b', fontSize: 9 }}
-                      tickLine={false}
-                      axisLine={{ stroke: '#cbd8d1' }}
-                      tickCount={5}
-                      domain={['auto', 'auto']}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="margin"
-                      name="영업이익률"
-                      unit="%"
-                      width={42}
-                      tick={{ fill: '#64746b', fontSize: 9 }}
-                      tickLine={false}
-                      axisLine={{ stroke: '#cbd8d1' }}
-                      tickCount={5}
-                      domain={['auto', 'auto']}
-                    />
-                    <ReferenceLine x={averageCagr} stroke="#2563eb" strokeDasharray="4 3" />
-                    <ReferenceLine y={averageMargin} stroke="#107c41" strokeDasharray="4 3" />
-                    <Tooltip cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }} content={<BenchmarkScatterTooltip />} />
-                    <Scatter
-                      data={benchmarkScatterData}
-                      shape={renderBenchmarkScatterMarker}
-                      onClick={(point) => {
-                        const companyId = (point as { payload?: BenchmarkScatterPoint }).payload?.companyId;
-                        if (companyId) setFocusedCompanyId(companyId);
-                      }}
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="benchmark-scatter-axis-labels" aria-hidden="true">
-                <span>낮은 성장</span>
-                <strong>매출 성장률</strong>
-                <span>높은 성장</span>
-              </div>
-            </div>
-          </section>
+          <ComparisonPositionPanel
+            companiesCount={filteredCompanies.length}
+            averageCagr={averageCagr}
+            averageMargin={averageMargin}
+            comparisonMode={comparisonCompanies.length === 2}
+            points={benchmarkScatterData}
+            onSelectCompany={setFocusedCompanyId}
+          />
         </div>
       </div>
 
@@ -719,6 +437,6 @@ export function CompanyComparisonPage() {
           </span>
         </div>
       </footer>
-    </main>
+    </section>
   );
 }

@@ -1,12 +1,13 @@
-import { CheckCircle2, CircleAlert, Clock3, DatabaseZap, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Clock3, DatabaseZap, FileSpreadsheet, RefreshCw, Trash2 } from 'lucide-react';
 import { Button, StatusBadge } from '../../../shared/ui';
 import type { BiDashboardSnapshot } from '../types';
 
 interface BiHeaderProps {
   readonly dashboard: BiDashboardSnapshot;
-  readonly activeAction: 'refresh' | 'reset' | null;
+  readonly activeAction: 'refresh' | 'reset' | 'delete' | null;
   readonly onRefresh: () => void;
   readonly onReset: () => void;
+  readonly onDelete: () => void;
 }
 
 const KOREA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('sv-SE', {
@@ -25,7 +26,7 @@ function formatGeneratedAt(generatedAt: string): string {
     .replace(/-/g, '.');
 }
 
-export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHeaderProps) {
+export function BiHeader({ dashboard, activeAction, onRefresh, onReset, onDelete }: BiHeaderProps) {
   const isPartial = dashboard.snapshot.status === 'partial';
   const generatedAt = formatGeneratedAt(dashboard.snapshot.generatedAt);
   const canStartAction = activeAction === null;
@@ -46,14 +47,14 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHead
             : <CheckCircle2 size={15} aria-hidden="true" />}
           {isPartial ? '부분 완료 스냅샷' : '사용 가능한 스냅샷'}
         </StatusBadge>
-        <dl className="bi-header__metadata">
+        <dl className="bi-header__info bi-header__metadata">
           <div>
             <dt><FileSpreadsheet size={15} aria-hidden="true" />선택 파일</dt>
             <dd title={dashboard.source.fileName}>{dashboard.source.fileName}</dd>
           </div>
         </dl>
         <div className="bi-header__data-actions">
-          <dl className="bi-header__updated-at">
+          <dl className="bi-header__info bi-header__updated-at">
             <div>
               <dt><Clock3 size={15} aria-hidden="true" />업데이트</dt>
               <dd title={generatedAt}>{generatedAt}</dd>
@@ -84,6 +85,21 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHead
           >
             <DatabaseZap className={activeAction === 'reset' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
             {activeAction === 'reset' ? '데이터 재생성 중' : '데이터 초기화 및 재생성'}
+          </Button>
+          <Button
+            variant="danger"
+            size="lg"
+            busy={activeAction === 'delete'}
+            type="button"
+            aria-disabled={!canStartAction}
+            onClick={() => {
+              if (canStartAction) onDelete();
+            }}
+          >
+            {activeAction === 'delete'
+              ? <RefreshCw className="bi-refresh-button__spinner" size={15} aria-hidden="true" />
+              : <Trash2 size={15} aria-hidden="true" />}
+            {activeAction === 'delete' ? '스냅샷 삭제 중' : '스냅샷 삭제'}
           </Button>
         </div>
       </div>

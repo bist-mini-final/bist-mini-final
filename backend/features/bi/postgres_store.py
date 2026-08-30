@@ -65,6 +65,14 @@ class BiPostgresStoreError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class BiDashboardDeleteActiveError(RuntimeError):
+    company_id: CompanyId
+
+    def __str__(self) -> str:
+        return f"BI work is active for company: {self.company_id}"
+
+
+@dataclass(frozen=True, slots=True)
 class ClaimedBiMaterialization:
     request: BiMaterializationRequest
     job: BiMaterializationJob
@@ -663,6 +671,60 @@ class PostgresBiStore:
             "find_latest_job",
         )
         return self._validate_job(row, "find_latest_job") if row is not None else None
+
+    async def delete_dashboard_snapshot_async(self, company_id: CompanyId) -> bool:
+        """Delete one company's BI-derived data while preserving its indexed source."""
+        try:
+            async with get_pooled_async_connection(self._database_url) as connection:
+                async with connection.cursor(row_factory=dict_row) as cursor:
+                    await cursor.execute(
+                        "SELECT current_snapshot_id FROM bi_companies "
+                        "WHERE company_id = %s AND is_deleted = FALSE FOR UPDATE",
+                        (company_id,),
+                    )
+                    company_row = await cursor.fetchone()
+                    if company_row is None or company_row["current_snapshot_id"] is None:
+                        await connection.commit()
+                        return False
+
+                    await cursor.execute(
+                        "SELECT EXISTS ("
+                        "SELECT 1 FROM bi_materialization_jobs WHERE company_id = %s "
+                        "AND status IN ('queued', 'indexing', 'profiling', 'extracting', 'materializing')"
+                        ") OR EXISTS ("
+                        "SELECT 1 FROM bi_questions WHERE company_id = %s "
+                        "AND status IN ('queued', 'running')"
+                        ") AS has_active_work",
+                        (company_id, company_id),
+                    )
+                    active_row = await cursor.fetchone()
+                    if active_row is not None and bool(active_row["has_active_work"]):
+                        raise BiDashboardDeleteActiveError(company_id)
+
+                    # Answers are removed through the bi_questions ON DELETE CASCADE rule.
+                    await cursor.execute(
+                        "DELETE FROM bi_questions WHERE company_id = %s",
+                        (company_id,),
+                    )
+                    await cursor.execute(
+                        "DELETE FROM bi_materialization_jobs WHERE company_id = %s",
+                        (company_id,),
+                    )
+                    await cursor.execute(
+                        "UPDATE bi_companies SET current_snapshot_id = NULL, updated_at = NOW() "
+                        "WHERE company_id = %s AND is_deleted = FALSE",
+                        (company_id,),
+                    )
+                    await cursor.execute(
+                        "DELETE FROM bi_dashboard_snapshots WHERE company_id = %s",
+                        (company_id,),
+                    )
+                await connection.commit()
+        except BiDashboardDeleteActiveError:
+            raise
+        except psycopg.Error as error:
+            raise BiPostgresStoreError("delete_dashboard_snapshot", str(error)) from error
+        return True
 
     def soft_delete_company(
         self,

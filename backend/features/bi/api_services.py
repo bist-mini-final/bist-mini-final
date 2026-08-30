@@ -87,6 +87,11 @@ class BiApiStorePort(Protocol):
         company_id: CompanyId,
     ) -> BiMaterializationJob | None: ...
 
+    async def delete_dashboard_snapshot_async(
+        self,
+        company_id: CompanyId,
+    ) -> bool: ...
+
 
 class BiMaterializationQueuePort(Protocol):
     def enqueue(

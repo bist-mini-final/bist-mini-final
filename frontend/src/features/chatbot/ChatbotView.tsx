@@ -1,17 +1,19 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Bot, CircleStop, FileText, MessageSquarePlus, Paperclip, Pencil, RefreshCw, Send, Trash2, X } from 'lucide-react';
-import { MarkdownAnswer } from '../playground/components/MarkdownAnswer';
 import { pipelineApi } from '../playground/services/api';
 import { requestJson } from '../../shared/api/httpClient';
 import type { WorkflowRun } from '../playground/types';
-import { BiCardChart } from '../bi/components/charts/BiCardChart';
-import { fetchBiDashboard } from '../bi/services/api';
-import type { BiCardId, BiDashboardSnapshot } from '../bi/types';
-import { normalizeChatMarkdown } from './chatMarkdown';
-import { Button, IconButton } from '../../shared/ui';
-import '../bi/bi.css';
-import '../bi/bi-reference.css';
+import type { BiCardId } from '../bi/types';
+import { Button, ConfirmDialog, IconButton, PromptDialog } from '../../shared/ui';
+import { SidebarContextPortal } from '../../app/SidebarContextPortal';
 import './chatbot.css';
+
+const DeferredChatAnswer = lazy(() =>
+  import('./ChatAnswer').then((module) => ({ default: module.ChatAnswer }))
+);
+const DeferredChatVisualization = lazy(() =>
+  import('./ChatVisualization').then((module) => ({ default: module.ChatVisualization }))
+);
 
 type Visualization = { company_id: string; card_id: BiCardId };
 type Attachment = { id: string; name: string; content_type: string | null; size: number; created_at?: string };
@@ -35,12 +37,6 @@ const chatApi = {
   sync: (runId: string, id: string, signal?: AbortSignal) => requestJson<Turn>(`/api/chat/runs/${encodeURIComponent(runId)}?client_id=${encodeURIComponent(id)}`, { signal }),
 };
 
-function ChatVisualization({ visualization }: { visualization: Visualization }) {
-  const [dashboard, setDashboard] = useState<BiDashboardSnapshot | null>(null);
-  useEffect(() => { const controller = new AbortController(); void fetchBiDashboard(visualization.company_id, controller.signal).then((result) => { if (result.kind === 'snapshot') setDashboard(result.dashboard); }).catch(() => undefined); return () => controller.abort(); }, [visualization.company_id]);
-  return dashboard ? <div className="chatbot-visualization bi-card" data-card-id={visualization.card_id}><BiCardChart cardId={visualization.card_id} dashboard={dashboard} range="최근 5개" size="M" /></div> : null;
-}
-
 function progressForEvent(event: { event: string; data: unknown }): ProgressStep[] {
   if (event.event === 'run_started') return [{ id: 'analysis', label: '질문을 분석하고 있습니다', state: 'active' }];
   if (!event.event.startsWith('node_') || !event.data || typeof event.data !== 'object') return [];
@@ -59,34 +55,61 @@ function formatDate(date: string) {
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date));
 }
 
-function ChatAnswer({ markdown }: { markdown: string }) {
-  const clean = normalizeChatMarkdown(markdown);
-  return <MarkdownAnswer markdown={clean} />;
-}
-
 export function ChatbotView() {
-  const [client] = useState(clientId); const [sessions, setSessions] = useState<Session[]>([]); const [examples, setExamples] = useState(EXAMPLES); const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false); const [active, setActive] = useState<Session | null>(null); const [draft, setDraft] = useState(''); const [attachment, setAttachment] = useState<File | null>(null); const [isRunning, setIsRunning] = useState(false); const [requestError, setRequestError] = useState(''); const [progress, setProgress] = useState<ProgressStep[]>([]); const [dialog, setDialog] = useState<{ type: 'rename' | 'delete'; session: Session } | null>(null); const [titleDraft, setTitleDraft] = useState(''); const aborter = useRef<AbortController | null>(null); const activeRunId = useRef<string | null>(null); const attachmentInput = useRef<HTMLInputElement>(null);
+  const [client] = useState(clientId);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [examples, setExamples] = useState(EXAMPLES);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
+  const [active, setActive] = useState<Session | null>(null);
+  const [draft, setDraft] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [requestError, setRequestError] = useState('');
+  const [progress, setProgress] = useState<ProgressStep[]>([]);
+  const [dialog, setDialog] = useState<{ type: 'rename' | 'delete'; session: Session } | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [isDialogBusy, setIsDialogBusy] = useState(false);
+  const aborter = useRef<AbortController | null>(null);
+  const activeRunId = useRef<string | null>(null);
+  const attachmentInput = useRef<HTMLInputElement>(null);
   const refresh = async () => { const loaded = await chatApi.list(client); setSessions(loaded.sessions); return loaded.sessions; };
   const select = async (id: string) => setActive(await chatApi.get(id, client));
   useEffect(() => { void refresh().catch(() => undefined); void chatApi.suggestions().then(({ questions }) => { if (questions.length) setExamples(questions); }).catch(() => undefined); }, [client]);
   const refreshSuggestions = async () => { if (isRefreshingSuggestions) return; setIsRefreshingSuggestions(true); try { const { questions } = await chatApi.refreshSuggestions(); if (questions.length) setExamples(questions); } finally { setIsRefreshingSuggestions(false); } };
   const newSession = () => { if (isRunning) return; setActive(null); setDraft(''); setAttachment(null); setRequestError(''); setProgress([]); };
-  const renameSession = async () => {
+  const renameSession = async (nextTitle: string) => {
     if (!dialog || dialog.type !== 'rename') return;
-    const { session } = dialog; const title = titleDraft.trim();
+    const { session } = dialog;
+    const title = nextTitle.trim();
     if (!title || title === session.title) return;
-    const updated = await chatApi.rename(session.id, client, title);
-    setSessions((items) => items.map((item) => item.id === updated.id ? updated : item));
-    setActive((current) => current?.id === updated.id ? { ...current, title: updated.title, updated_at: updated.updated_at } : current);
-    setDialog(null);
+    setIsDialogBusy(true);
+    setDialogError(null);
+    try {
+      const updated = await chatApi.rename(session.id, client, title);
+      setSessions((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setActive((current) => current?.id === updated.id ? { ...current, title: updated.title, updated_at: updated.updated_at } : current);
+      setDialog(null);
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : '대화 이름을 변경하지 못했습니다.');
+    } finally {
+      setIsDialogBusy(false);
+    }
   };
   const deleteSession = async () => {
     if (!dialog || dialog.type !== 'delete') return;
     const { session } = dialog;
-    await chatApi.remove(session.id, client);
-    setSessions((items) => items.filter((item) => item.id !== session.id));
-    if (active?.id === session.id) newSession();
-    setDialog(null);
+    setIsDialogBusy(true);
+    setDialogError(null);
+    try {
+      await chatApi.remove(session.id, client);
+      setSessions((items) => items.filter((item) => item.id !== session.id));
+      if (active?.id === session.id) newSession();
+      setDialog(null);
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : '대화를 삭제하지 못했습니다.');
+    } finally {
+      setIsDialogBusy(false);
+    }
   };
   const streamAnswer = async (message: Message) => {
     const chunkSize = 12;
@@ -148,21 +171,17 @@ export function ChatbotView() {
   const messages = active?.messages ?? [];
   return (
     <div className="chatbot-page">
-      <header className="chatbot-header">
-        <span className="chatbot-header__icon"><Bot size={22} /></span>
-        <div>
-          <span className="chatbot-header__eyebrow">FINANCIAL RAG ASSISTANT</span>
-          <h1>AI 금융 챗봇</h1>
-          <p>내 대화에서 재무 문서 기반 답변을 확인하세요.</p>
-        </div>
-      </header>
+      <h1 className="page-visually-hidden">AI 금융 챗봇</h1>
 
-      <div className="chatbot-layout chatbot-layout--sessions">
-        <aside className="chatbot-sessions">
-          <Button variant="primary" onClick={newSession} className="chatbot-new-session">
+      <SidebarContextPortal>
+        <section className="chatbot-sessions" aria-label="대화 이력">
+          <Button variant="secondary" onClick={newSession} className="chatbot-new-session">
             <MessageSquarePlus size={16} /> 새 대화
           </Button>
-          <span>내 대화</span>
+          <span>대화 이력</span>
+          {sessions.length === 0 && (
+            <p className="chatbot-sessions__empty">저장된 대화가 없습니다.</p>
+          )}
           {sessions.map((session) => (
             <div
               key={session.id}
@@ -178,7 +197,7 @@ export function ChatbotView() {
                   variant="ghost"
                   aria-label={`${session.title} 제목 편집`}
                   onClick={() => {
-                    setTitleDraft(session.title);
+                    setDialogError(null);
                     setDialog({ type: 'rename', session });
                   }}
                 >
@@ -188,15 +207,20 @@ export function ChatbotView() {
                   size="sm"
                   variant="ghost"
                   aria-label={`${session.title} 삭제`}
-                  onClick={() => setDialog({ type: 'delete', session })}
+                  onClick={() => {
+                    setDialogError(null);
+                    setDialog({ type: 'delete', session });
+                  }}
                 >
                   <Trash2 size={13} />
                 </IconButton>
               </span>
             </div>
           ))}
-        </aside>
+        </section>
+      </SidebarContextPortal>
 
+      <div className="chatbot-layout">
         <section className="chatbot-panel">
           <div className="chatbot-messages" aria-live="polite">
             {messages.length === 0 && (
@@ -242,7 +266,9 @@ export function ChatbotView() {
                       )}
                     </div>
                   ) : message.role === 'assistant' ? (
-                    <ChatAnswer markdown={message.content} />
+                    <Suspense fallback={<span className="chatbot-content-loading">답변 표시 준비 중...</span>}>
+                      <DeferredChatAnswer markdown={message.content} />
+                    </Suspense>
                   ) : (
                     <>
                       <p>{message.content}</p>
@@ -251,7 +277,11 @@ export function ChatbotView() {
                       ))}
                     </>
                   )}
-                  {message.visualization && message.status === 'completed' && <ChatVisualization visualization={message.visualization} />}
+                  {message.visualization && message.status === 'completed' && (
+                    <Suspense fallback={<div className="chatbot-visualization chatbot-visualization--loading">차트를 불러오는 중...</div>}>
+                      <DeferredChatVisualization visualization={message.visualization} />
+                    </Suspense>
+                  )}
                   {message.status === 'failed' && <small>답변 생성에 실패했습니다.</small>}
                 </div>
               </article>
@@ -317,42 +347,38 @@ export function ChatbotView() {
         </section>
       </div>
 
-      {dialog && (
-        <div className="chatbot-dialog-backdrop" role="presentation" onMouseDown={() => setDialog(null)}>
-          <section
-            className="chatbot-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chatbot-dialog-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header>
-              <h2 id="chatbot-dialog-title">{dialog.type === 'delete' ? '대화를 삭제하시겠습니까?' : '채팅 이름 변경'}</h2>
-              <IconButton size="sm" variant="ghost" aria-label="닫기" onClick={() => setDialog(null)}>
-                <X size={18} />
-              </IconButton>
-            </header>
-            {dialog.type === 'delete' ? (
-              <p><strong>{dialog.session.title}</strong> 대화와 모든 메시지가 삭제됩니다.</p>
-            ) : (
-              <form onSubmit={(event) => { event.preventDefault(); void renameSession(); }}>
-                <label htmlFor="chatbot-title">채팅 이름</label>
-                <input id="chatbot-title" value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} maxLength={80} autoFocus />
-              </form>
-            )}
-            <footer>
-              <Button size="sm" variant="secondary" onClick={() => setDialog(null)}>취소</Button>
-              <Button
-                size="sm"
-                variant={dialog.type === 'delete' ? 'danger-solid' : 'primary'}
-                onClick={() => void (dialog.type === 'delete' ? deleteSession() : renameSession())}
-              >
-                {dialog.type === 'delete' ? '삭제' : '변경'}
-              </Button>
-            </footer>
-          </section>
-        </div>
-      )}
+      <ConfirmDialog
+        open={dialog?.type === 'delete'}
+        tone="danger"
+        title="대화를 삭제하시겠습니까?"
+        description="대화와 포함된 모든 메시지가 영구 삭제됩니다."
+        detail={dialog?.type === 'delete' ? dialog.session.title : undefined}
+        confirmLabel="대화 삭제"
+        busy={isDialogBusy}
+        error={dialogError}
+        onClose={() => {
+          if (isDialogBusy) return;
+          setDialog(null);
+          setDialogError(null);
+        }}
+        onConfirm={() => { void deleteSession(); }}
+      />
+      <PromptDialog
+        open={dialog?.type === 'rename'}
+        title="대화 이름 변경"
+        description="사이드바에서 구분하기 쉬운 이름을 입력하세요."
+        label="대화 이름"
+        initialValue={dialog?.type === 'rename' ? dialog.session.title : ''}
+        confirmLabel="이름 변경"
+        busy={isDialogBusy}
+        error={dialogError}
+        onClose={() => {
+          if (isDialogBusy) return;
+          setDialog(null);
+          setDialogError(null);
+        }}
+        onConfirm={(title) => { void renameSession(title); }}
+      />
     </div>
   );
 }

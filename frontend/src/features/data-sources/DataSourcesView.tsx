@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { ConfirmDialog } from '../../shared/ui';
 import { DataSourcesSummary } from './components/DataSourcesSummary';
 import { FileUploadModal } from './components/FileUploadModal';
 import { IndexDetailModal } from './components/IndexDetailModal';
@@ -29,6 +30,10 @@ export function findRestorableIngestionJob(
 function isServerRun(pipelineId?: string): boolean {
   return Boolean(pipelineId?.startsWith('run-'));
 }
+
+type DeleteTarget =
+  | { readonly type: 'index'; readonly indexId: string }
+  | { readonly type: 'pipeline'; readonly run: PipelineRunState };
 
 /**
  * Collects the latest failed pipeline run for each file.
@@ -65,6 +70,9 @@ export function DataSourcesView() {
   const [isViewingTracker, setIsViewingTracker] = useState(false);
   const [isCancellingPipeline, setIsCancellingPipeline] = useState(false);
   const [deletingPipelineId, setDeletingPipelineId] = useState<string | null>(null);
+  const [deletingIndexId, setDeletingIndexId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [failedRuns, setFailedRuns] = useState<PipelineRunState[]>([]);
 
@@ -219,15 +227,23 @@ export function DataSourcesView() {
     }
   };
 
-  const handleDeleteIndex = async (indexId: string) => {
-    if (!window.confirm(`선택한 pgvector 컬렉션을 데이터베이스에서 영구 삭제하시겠습니까?\nID: ${indexId}`)) {
-      return;
-    }
+  const handleDeleteIndex = (indexId: string) => {
+    if (deletingIndexId) return;
+    setDeleteError(null);
+    setDeleteTarget({ type: 'index', indexId });
+  };
+
+  const deleteIndex = async (indexId: string) => {
+    setDeletingIndexId(indexId);
+    setError(null);
     try {
       await dataSourceApi.deleteIndex(indexId);
       await fetchData();
+      setDeleteTarget(null);
     } catch (err: any) {
-      alert(err.message || '컬렉션 삭제에 실패했습니다.');
+      setDeleteError(err.message || '컬렉션 삭제에 실패했습니다.');
+    } finally {
+      setDeletingIndexId(null);
     }
   };
 
@@ -277,12 +293,13 @@ export function DataSourcesView() {
     }
   };
 
-  const handleDeletePipeline = async (run: PipelineRunState) => {
+  const handleDeletePipeline = (run: PipelineRunState) => {
     if (!isServerRun(run.pipelineId)) return;
-    if (!window.confirm(
-      `인덱싱 작업 기록과 생성 중인 부분 컬렉션을 삭제하시겠습니까?\n\n${run.fileName}\n원본 Excel 파일은 삭제되지 않습니다.`
-    )) return;
+    setDeleteError(null);
+    setDeleteTarget({ type: 'pipeline', run });
+  };
 
+  const deletePipeline = async (run: PipelineRunState) => {
     setDeletingPipelineId(run.pipelineId);
     setError(null);
     try {
@@ -297,17 +314,50 @@ export function DataSourcesView() {
         setIsViewingTracker(false);
       }
       await fetchData();
+      setDeleteTarget(null);
     } catch (err: any) {
-      setError(err.message || '인덱싱 작업을 삭제하지 못했습니다.');
+      setDeleteError(err.message || '인덱싱 작업을 삭제하지 못했습니다.');
     } finally {
       setDeletingPipelineId(null);
     }
   };
 
+  const confirmDeleteTarget = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'index') {
+      void deleteIndex(deleteTarget.indexId);
+      return;
+    }
+    void deletePipeline(deleteTarget.run);
+  };
+
+  const deleteDialog = (
+    <ConfirmDialog
+      open={deleteTarget !== null}
+      tone="danger"
+      title={deleteTarget?.type === 'pipeline' ? '인덱싱 작업을 삭제하시겠습니까?' : '컬렉션을 삭제하시겠습니까?'}
+      description={deleteTarget?.type === 'pipeline'
+        ? '작업 기록과 생성 중인 부분 컬렉션이 삭제됩니다. 원본 Excel 파일은 유지됩니다.'
+        : '선택한 pgvector 컬렉션이 데이터베이스에서 영구 삭제됩니다.'}
+      detail={deleteTarget?.type === 'pipeline'
+        ? deleteTarget.run.fileName
+        : deleteTarget?.type === 'index' ? `Collection ID · ${deleteTarget.indexId}` : undefined}
+      confirmLabel="삭제"
+      busy={Boolean(deletingIndexId || deletingPipelineId)}
+      error={deleteError}
+      onClose={() => {
+        setDeleteTarget(null);
+        setDeleteError(null);
+      }}
+      onConfirm={confirmDeleteTarget}
+    />
+  );
+
   // If Full-Page Pipeline Tracker is active, render it exclusively
   if (activePipelineRun && isViewingTracker) {
     return (
       <div className="ds-page">
+        <h1 className="page-visually-hidden">데이터 적재 작업</h1>
         <PipelineTrackerView
           pipeline={activePipelineRun}
           onBack={() => {
@@ -328,12 +378,14 @@ export function DataSourcesView() {
           isCancelling={isCancellingPipeline}
           isDeleting={deletingPipelineId === activePipelineRun.pipelineId}
         />
+        {deleteDialog}
       </div>
     );
   }
 
   return (
     <div className="ds-page">
+      <h1 className="page-visually-hidden">데이터 소스</h1>
       {/* Summary KPI Cards */}
       <DataSourcesSummary indexes={indexes} dbStatus={dbStatus} />
 
@@ -363,6 +415,7 @@ export function DataSourcesView() {
             onViewFailedLog={handleViewFailedRunLog}
             onDeletePipeline={handleDeletePipeline}
             deletingPipelineId={deletingPipelineId}
+            deletingIndexId={deletingIndexId}
             onRefresh={fetchData}
             onDetailClick={(id) => setDetailIndexId(id)}
             onSearchClick={(idx) => setSearchTargetIndex(idx)}
@@ -409,6 +462,7 @@ export function DataSourcesView() {
           onClose={() => setSearchTargetIndex(null)}
         />
       )}
+      {deleteDialog}
     </div>
   );
 }

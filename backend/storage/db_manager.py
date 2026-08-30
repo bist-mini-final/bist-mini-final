@@ -1951,6 +1951,70 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    @staticmethod
+    def _node_execution_log_from_row(row: Any) -> Dict[str, Any]:
+        """Convert a full node execution row into the runtime DTO shape."""
+
+        return {
+            "log_id": row[0],
+            "run_id": row[1],
+            "node_id": row[2],
+            "module_type": row[3],
+            "batch_index": row[4],
+            "status": row[5],
+            "input_payload": row[6],
+            "config_payload": row[7] or {},
+            "output": row[8],
+            "error": row[9],
+            "cache_hit": bool(row[10]),
+            "outcome": row[11],
+            "progress": row[12] or {},
+            "elapsed_ms": row[13],
+            "cost_usd": row[14],
+            "usage": row[15],
+            "started_at": row[16].isoformat()
+            if hasattr(row[16], "isoformat")
+            else str(row[16])
+            if row[16]
+            else None,
+            "completed_at": row[17].isoformat()
+            if hasattr(row[17], "isoformat")
+            else str(row[17])
+            if row[17]
+            else None,
+            "created_at": row[18].isoformat()
+            if hasattr(row[18], "isoformat")
+            else str(row[18]),
+        }
+
+    def get_workflow_node_execution_log(
+        self,
+        run_id: str,
+        node_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Load one node's complete current DTO state for the settings monitor."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT log_id, run_id, node_id, module_type, batch_index,
+                           status, input_payload, config_payload, output, error,
+                           cache_hit, outcome, progress, elapsed_ms, cost_usd,
+                           usage, started_at, completed_at, created_at
+                    FROM node_execution_logs
+                    WHERE run_id = %s AND node_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1;
+                    """,
+                    (run_id, node_id),
+                )
+                row = cur.fetchone()
+            return self._node_execution_log_from_row(row) if row else None
+        finally:
+            conn.close()
+
     def get_node_execution_logs(self, run_id: str) -> List[Dict[str, Any]]:
         """Get execution logs for all nodes of a given workflow run."""
         conn = self._raw_connection()
@@ -1969,42 +2033,7 @@ class DatabaseManager:
                     (run_id,),
                 )
                 rows = cur.fetchall()
-                logs = []
-                for row in rows:
-                    logs.append(
-                        {
-                            "log_id": row[0],
-                            "run_id": row[1],
-                            "node_id": row[2],
-                            "module_type": row[3],
-                            "batch_index": row[4],
-                            "status": row[5],
-                            "input_payload": row[6],
-                            "config_payload": row[7] or {},
-                            "output": row[8],
-                            "error": row[9],
-                            "cache_hit": bool(row[10]),
-                            "outcome": row[11],
-                            "progress": row[12] or {},
-                            "elapsed_ms": row[13],
-                            "cost_usd": row[14],
-                            "usage": row[15],
-                            "started_at": row[16].isoformat()
-                            if hasattr(row[16], "isoformat")
-                            else str(row[16])
-                            if row[16]
-                            else None,
-                            "completed_at": row[17].isoformat()
-                            if hasattr(row[17], "isoformat")
-                            else str(row[17])
-                            if row[17]
-                            else None,
-                            "created_at": row[18].isoformat()
-                            if hasattr(row[18], "isoformat")
-                            else str(row[18]),
-                        }
-                    )
-                return logs
+                return [self._node_execution_log_from_row(row) for row in rows]
         finally:
             conn.close()
 

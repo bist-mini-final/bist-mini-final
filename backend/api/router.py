@@ -9,6 +9,7 @@ from backend.features.company_comparison import (
 )
 
 from .benchmark_routes import create_benchmark_router
+from .cell_evidence_routes import create_cell_evidence_router
 from .data_source_routes import create_data_source_router
 from .job_routes import create_job_router
 from .module_routes import create_module_router
@@ -64,6 +65,13 @@ def create_api_router(
     pgvector_store = services.pgvector_store
     router.include_router(create_module_router())
     router.include_router(create_spreadsheet_artifact_router(paths.spreadsheet_artifact_dir))
+    router.include_router(
+        create_cell_evidence_router(
+            pgvector_store=pgvector_store,
+            processed_dir=paths.processed_dir,
+            artifact_dir=paths.spreadsheet_artifact_dir,
+        )
+    )
     router.include_router(
         create_workflow_router(
             workflow_store=workflow_store,

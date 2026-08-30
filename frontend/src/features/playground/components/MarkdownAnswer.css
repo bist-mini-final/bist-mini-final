@@ -14,7 +14,13 @@
   line-height: 1.35;
   vertical-align: baseline;
   white-space: nowrap;
-  cursor: help;
+  cursor: pointer;
+}
+
+.reader-citation:hover {
+  border-color: var(--brand-400, var(--brand-600));
+  background: color-mix(in srgb, var(--brand-50) 72%, white);
+  box-shadow: 0 1px 4px rgb(15 118 64 / 14%);
 }
 
 .reader-citation:focus-visible {
@@ -64,6 +70,15 @@
   min-inline-size: 0;
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.reader-citation-tooltip > p {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+  color: var(--brand-700);
+  font-size: 0.62rem;
+  font-weight: 700;
 }
 
 .reader-markdown ul:has(> li .reader-citation),

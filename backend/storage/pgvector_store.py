@@ -1579,7 +1579,7 @@ class PgVectorStore:
         try:
             if embedding_encoder is None:
                 raise PgVectorStoreError("유사도 검색에는 embedding_encoder 주입이 필요합니다")
-            vectors = embedding_encoder.encode([query_text])
+            vectors = embedding_encoder.encode_for_model([query_text], model_name)
             if not vectors:
                 raise PgVectorStoreError("검색 질의 임베딩 결과가 비어 있습니다")
             query_vector = vectors[0]
@@ -1998,6 +1998,12 @@ class PgVectorStore:
                 column_header,
                 company_name,
             ) = row
+            metadata = _metadata if isinstance(_metadata, dict) else {}
+            if isinstance(_metadata, str):
+                try:
+                    metadata = json.loads(_metadata)
+                except Exception:
+                    metadata = {}
             if isinstance(row_header, str):
                 try:
                     row_header = json.loads(row_header)
@@ -2025,6 +2031,9 @@ class PgVectorStore:
                         else ([column_header] if column_header else [])
                     ),
                     "company_name": company_name,
+                    "file_name": metadata.get("file_name", ""),
+                    "workbook_hash": metadata.get("workbook_hash", ""),
+                    "index_id": metadata.get("index_id", ""),
                     "source_text": text,
                 }
             )
