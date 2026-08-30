@@ -65,7 +65,6 @@ from typing import Annotated, Any, Dict, List, Optional
 from langchain_core.tools import ArgsSchema, BaseTool
 from pydantic import BaseModel, Field
 
-from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.spreadsheets.structured_cell_text import (
     extract_resolved_cell_value,
     resolved_cell_value,
@@ -83,6 +82,7 @@ from modules.common.base_llm import (
 )
 from modules.common.config import DEFAULT_READER_MODEL
 from modules.retrieval.context_expander import ContextDTO
+from modules.retrieval.ports import CellMetadataLookupPort
 
 logger = logging.getLogger(__name__)
 
@@ -536,7 +536,7 @@ class ReaderModule(BaseLLMModule):
     def __init__(
         self,
         completion_client: Any,
-        pgvector_store: PgVectorStore,
+        pgvector_store: CellMetadataLookupPort,
     ) -> None:
         super().__init__(completion_client=completion_client)
         self.pgvector_store = pgvector_store
