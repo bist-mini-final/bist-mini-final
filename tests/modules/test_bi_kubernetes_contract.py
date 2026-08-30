@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, call, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.features.bi.api_routes import create_bi_router
+from backend.api.bi_routes import create_bi_router
 from backend.features.bi.api_services import BiApiServices
 from backend.features.bi.database_schema import (
     BI_SCHEMA_LOCK_KEY,
