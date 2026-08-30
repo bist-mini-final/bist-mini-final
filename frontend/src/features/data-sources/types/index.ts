@@ -61,8 +61,8 @@ export interface VectorIndexDetail {
   estimated_cost_krw?: number;
   batch_size?: number;
   sheet_names?: string[];
-  tables?: any[];
-  luna_output?: any;
+  tables?: unknown[];
+  luna_output?: LunaInspectionOutput;
 }
 
 export interface LunaInspectionOutput {
@@ -80,7 +80,7 @@ export interface IngestionJobResponse {
   run: WorkflowRun;
   index: VectorIndexInfo & {
     sheet_names?: string[];
-    tables?: any[];
+    tables?: unknown[];
     luna_output?: LunaInspectionOutput;
   } | null;
   luna_output?: LunaInspectionOutput | null;

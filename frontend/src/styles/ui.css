@@ -25,9 +25,9 @@
 .ui-button--md { block-size: var(--control-h-md); font-size: var(--control-font-md); }
 .ui-button--lg { block-size: var(--control-h-lg); padding-inline: var(--control-pad-lg); font-size: var(--control-font-lg); }
 
-.ui-button--primary { border-color: var(--brand-600); background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: var(--text-inverse); box-shadow: 0 1px 2px rgb(9 72 40 / 20%), 0 7px 16px -12px rgb(9 72 40 / 70%); }
-.ui-button--primary:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--brand-700); background: linear-gradient(180deg, var(--brand-600), var(--brand-700)); box-shadow: 0 2px 4px rgb(9 72 40 / 18%), 0 10px 20px -13px rgb(9 72 40 / 80%); transform: translateY(-1px); }
-.ui-button--secondary { border-color: var(--border-strong); background: linear-gradient(180deg, var(--surface), var(--surface-subtle)); color: var(--text-secondary); box-shadow: 0 1px 2px rgb(15 33 24 / 3%); }
+.ui-button--primary { border-color: var(--brand-600); background: var(--brand-600); color: var(--text-inverse); box-shadow: 0 1px 2px rgb(9 72 40 / 18%), 0 7px 16px -12px rgb(9 72 40 / 52%); }
+.ui-button--primary:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--brand-700); background: var(--brand-700); box-shadow: 0 2px 4px rgb(9 72 40 / 16%), 0 10px 20px -13px rgb(9 72 40 / 62%); transform: translateY(-1px); }
+.ui-button--secondary { border-color: var(--border-strong); background: var(--surface); color: var(--text-secondary); box-shadow: 0 1px 2px rgb(15 33 24 / 3%); }
 .ui-button--secondary:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--brand-300); background: var(--brand-50); color: var(--brand-700); box-shadow: 0 5px 14px -10px rgb(13 99 63 / 48%); transform: translateY(-1px); }
 .ui-button--ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
 .ui-button--ghost:hover:not(:disabled, [aria-disabled='true']) { background: var(--surface-muted); color: var(--text); }
@@ -167,6 +167,7 @@
 
 .ui-dialog--sm { width: min(100%, 27rem); }
 .ui-dialog--lg { width: min(100%, 54rem); }
+.ui-dialog--xl { width: min(100%, 96rem); }
 
 .ui-dialog__header {
   display: flex;

@@ -18,7 +18,8 @@ function definitionValues(
   values: JsonRecord | undefined,
 ): JsonRecord {
   if (moduleType !== 'query_input') return values ?? {};
-  const { query: _runtimeQuery, ...definition } = values ?? {};
+  const definition = { ...values };
+  delete definition.query;
   return definition;
 }
 

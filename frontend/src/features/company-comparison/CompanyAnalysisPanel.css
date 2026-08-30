@@ -1,0 +1,339 @@
+/* Selection-driven company analysis */
+.company-analysis-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px 16px;
+  border: 1px solid var(--bm-border);
+  border-radius: var(--bm-radius);
+  background: #ffffff;
+  box-shadow: var(--bm-shadow-sm);
+}
+.analysis-panel-heading,
+.analysis-section-title,
+.analysis-company-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.analysis-panel-heading {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--bm-border-subtle);
+}
+.analysis-panel-heading > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+.analysis-panel-heading > div > span {
+  color: var(--bm-primary);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+.analysis-panel-heading > div > strong {
+  color: var(--bm-text-main);
+  font-size: 13px;
+  font-weight: 850;
+}
+.analysis-panel-heading > small {
+  flex: none;
+  color: var(--bm-text-muted);
+  font-size: 9.5px;
+  font-weight: 650;
+}
+.analysis-company-summary {
+  min-height: 48px;
+  padding: 2px 0;
+}
+.analysis-company-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.analysis-company-identity > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.analysis-company-identity > div > strong {
+  overflow: hidden;
+  color: #17231d;
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.analysis-company-identity > div > span {
+  color: var(--bm-text-muted);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.analysis-total-score {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-items: end;
+  gap: 0 6px;
+}
+.analysis-total-score > strong {
+  color: var(--bm-primary-dark);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+.analysis-total-score > small {
+  grid-column: 1 / -1;
+  color: var(--bm-text-muted);
+  font-size: 8.5px;
+}
+.analysis-section-block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bm-border-subtle);
+}
+.analysis-section-title > strong {
+  color: #24372d;
+  font-size: 11.5px;
+  font-weight: 820;
+}
+.analysis-section-title > span {
+  color: #7a8a82;
+  font-size: 8.5px;
+  font-weight: 600;
+}
+.score-contribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.score-contribution-row {
+  display: grid;
+  grid-template-columns: 62px minmax(60px, 1fr) 32px 38px;
+  align-items: center;
+  gap: 7px;
+  font-size: 9.5px;
+}
+.score-contribution-row > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #52625a;
+  font-weight: 700;
+}
+.score-contribution-row > span small {
+  color: var(--bm-secondary-dark);
+  font-size: 8px;
+}
+.score-contribution-row > i {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2ef;
+}
+.score-contribution-row > i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--bm-primary), #45a971);
+}
+.score-contribution-row:nth-child(2) > i b { background: linear-gradient(90deg, var(--bm-secondary), #60a5fa); }
+.score-contribution-row:nth-child(3) > i b { background: linear-gradient(90deg, #64748b, #94a3b8); }
+.score-contribution-row > strong {
+  color: #24372d;
+  font-size: 10px;
+  text-align: right;
+}
+.score-contribution-row > small {
+  color: var(--bm-text-muted);
+  font-size: 8.5px;
+  text-align: right;
+}
+.rank-reason-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 8px;
+  border-left: 3px solid var(--bm-primary);
+  background: var(--bm-primary-light);
+}
+.rank-reason-copy p {
+  margin: 0;
+  color: #3d5146;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.benchmark-compare-list,
+.comparison-metric-grid,
+.comparison-score-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.benchmark-compare-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) 48px 66px 65px;
+  align-items: center;
+  gap: 6px;
+  min-height: 25px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #f8faf9;
+  font-size: 9.5px;
+}
+.benchmark-compare-row > span { color: #52625a; font-weight: 700; }
+.benchmark-compare-row > strong { color: #17231d; text-align: right; }
+.benchmark-compare-row > small { color: #7a8a82; text-align: right; }
+.benchmark-compare-row > b {
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #eef2f1;
+  color: #64748b;
+  font-size: 8.5px;
+  text-align: center;
+}
+.benchmark-compare-row > b.is-favorable { background: var(--bm-primary-light); color: var(--bm-primary-dark); }
+.benchmark-compare-row > b.is-unfavorable { background: #fef2f2; color: #dc2626; }
+.single-trend-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 66px;
+}
+.single-trend-row > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1px 5px;
+}
+.single-trend-row > div > span {
+  grid-column: 1 / -1;
+  color: var(--bm-text-muted);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+.single-trend-row > div > strong { color: #24372d; font-size: 10px; }
+.single-trend-row > div > small { color: var(--bm-primary); font-size: 8.5px; font-weight: 800; }
+.single-trend-row > div > small.is-down { color: #dc2626; }
+.analysis-trend-chart {
+  width: 100%;
+  height: 66px;
+  min-width: 0;
+}
+.analysis-trend-chart.is-comparison { height: 82px; }
+.analysis-trend-chart .recharts-tooltip-wrapper { z-index: 4; }
+.analysis-trend-chart .recharts-surface { overflow: visible; }
+/* Two-company comparison mode */
+.analysis-company-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.analysis-company-pair .analysis-company-identity {
+  position: relative;
+  min-height: 54px;
+  padding: 8px;
+  border: 1px solid #dce7e1;
+  border-radius: 7px;
+  background: #fafcfb;
+}
+.analysis-company-pair .analysis-company-identity.is-a { border-top: 2px solid var(--bm-primary); }
+.analysis-company-pair .analysis-company-identity.is-b { border-top: 2px solid var(--bm-secondary); }
+.analysis-company-pair .analysis-company-identity > div > strong { font-size: 10.5px; }
+.analysis-company-pair .analysis-company-identity > div > span { font-size: 8px; }
+.analysis-compare-key {
+  position: absolute;
+  top: -7px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  background: var(--bm-primary);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+}
+.analysis-company-identity.is-b .analysis-compare-key { background: var(--bm-secondary); }
+.comparison-metric-row {
+  display: grid;
+  grid-template-columns: 1fr 86px 1fr;
+  align-items: center;
+  min-height: 25px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: #f8faf9;
+  font-size: 9.5px;
+}
+.comparison-metric-row > span { color: #64746b; text-align: center; }
+.comparison-metric-row > strong:first-child { text-align: left; }
+.comparison-metric-row > strong:last-child { text-align: right; }
+.is-winner-a { color: var(--bm-primary-dark) !important; }
+.is-winner-b { color: var(--bm-secondary-dark) !important; }
+.comparison-score-row > span {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  color: #52625a;
+  font-size: 9px;
+  font-weight: 700;
+}
+.comparison-score-row > span small { color: #84928b; }
+.comparison-score-values {
+  display: grid;
+  grid-template-columns: 48px minmax(80px, 1fr) 48px;
+  align-items: center;
+  gap: 6px;
+}
+.comparison-score-values > strong { color: #65766d; font-size: 8.5px; }
+.comparison-score-values > strong:last-child { text-align: right; }
+.comparison-score-values > i {
+  display: grid;
+  gap: 2px;
+}
+.comparison-score-values > i > b {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bm-primary);
+}
+.comparison-score-values > i > b:last-child { justify-self: end; background: var(--bm-secondary); }
+.comparison-trend-legend {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  color: #64746b;
+  font-size: 8px;
+}
+.comparison-trend-legend > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comparison-trend-legend i,
+.benchmark-scatter-legend i.is-compare-a,
+.benchmark-scatter-legend i.is-compare-b {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bm-primary);
+}
+.comparison-trend-legend i.is-b,
+.benchmark-scatter-legend i.is-compare-b { background: var(--bm-secondary); }
+.analysis-company-pair + .analysis-section-block .comparison-metric-row strong { font-size: 10px; }

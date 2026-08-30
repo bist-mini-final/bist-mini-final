@@ -17,6 +17,7 @@ export const QueryNode = ({ data, selected }: QueryNodeProps) => {
   const { queryText, setQueryText } = data;
   const [draftQuery, setDraftQuery] = useState(queryText);
   const isComposing = useRef(false);
+  const inputId = 'playground-query-input';
 
   useEffect(() => {
     if (!isComposing.current) setDraftQuery(queryText);
@@ -41,10 +42,11 @@ export const QueryNode = ({ data, selected }: QueryNodeProps) => {
       bodyClassName="space-y-3"
     >
         <div className="space-y-2">
-          <label className="node-field-label">
+          <label className="node-field-label" htmlFor={inputId}>
             자연어 재무 질문 입력
           </label>
           <textarea
+            id={inputId}
             value={draftQuery}
             onCompositionStart={() => {
               isComposing.current = true;

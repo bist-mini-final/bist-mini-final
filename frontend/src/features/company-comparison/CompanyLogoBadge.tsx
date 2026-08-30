@@ -17,6 +17,35 @@ function hashString(str: string): number {
   return Math.abs(hash);
 }
 
+const COMPANY_LOGO_REGISTRY = [
+  { id: 'microsoft', aliases: ['microsoft', 'amesoft'] },
+  { id: 'google', aliases: ['google'] },
+  { id: 'ibm', aliases: ['ibm'] },
+  { id: 'tesla', aliases: ['telelvans', 'tesla'] },
+  { id: 'healthcare', aliases: ['health', 'serenex'] },
+  { id: 'veltrix', aliases: ['veltrix', 'itintier'] },
+  { id: 'kidartine', aliases: ['kidartine'] },
+  { id: 'coloetric', aliases: ['coloetric'] },
+  { id: 'corporate', aliases: ['corporate'] },
+  { id: 'mireons', aliases: ['mireons'] },
+  { id: 'uber', aliases: ['uber', 'altiven'] },
+  { id: 'kbm', aliases: ['kbm'] },
+  { id: 'pixy', aliases: ['pixy'] },
+  { id: 'primeforge', aliases: ['primeforge'] },
+  { id: 'corevia', aliases: ['corevia'] },
+  { id: 'meridian', aliases: ['meridian'] },
+  { id: 'northstar', aliases: ['northstar'] },
+  { id: 'bistelligence', aliases: ['bistelligence'] },
+  { id: 'lumena', aliases: ['lumena'] },
+] as const;
+
+type RegisteredLogoId = typeof COMPANY_LOGO_REGISTRY[number]['id'];
+
+function resolveRegisteredLogo(normalizedCompanyId: string): RegisteredLogoId | undefined {
+  return COMPANY_LOGO_REGISTRY.find(({ aliases }) =>
+    aliases.some((alias) => normalizedCompanyId.includes(alias)))?.id;
+}
+
 export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   companyId,
   companyName,
@@ -24,9 +53,10 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   className = '',
 }) => {
   const normId = companyId.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const registeredLogo = resolveRegisteredLogo(normId);
 
   // 1. Microsoft / Amesoft (4-Color Grid Logo)
-  if (normId.includes('microsoft') || normId.includes('amesoft')) {
+  if (registeredLogo === 'microsoft') {
     return (
       <svg
         width={size}
@@ -34,7 +64,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" />
         <rect x="5" y="5" width="6.5" height="6.5" rx="1.5" fill="#f25022" />
@@ -46,7 +75,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 2. Google (4-Color 'G' / Rainbow Arc)
-  if (normId.includes('google')) {
+  if (registeredLogo === 'google') {
     return (
       <svg
         width={size}
@@ -54,7 +83,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#ffffff" stroke="#e2e8f0" strokeWidth="1" />
         <path
@@ -78,7 +106,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 3. IBM (Striped Tech Logo)
-  if (normId.includes('ibm')) {
+  if (registeredLogo === 'ibm') {
     return (
       <svg
         width={size}
@@ -86,7 +114,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#0062ff" />
         <rect x="4" y="6" width="16" height="1.8" fill="#ffffff" />
@@ -100,7 +127,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
           fill="#0062ff"
           fontSize="7.5"
           fontWeight="900"
-          fontFamily="system-ui, -apple-system, sans-serif"
           letterSpacing="0.8"
         >
           IBM
@@ -110,7 +136,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 4. Telelvans / Tesla (Red Shield Emblem)
-  if (normId.includes('telelvans') || normId.includes('tesla')) {
+  if (registeredLogo === 'tesla') {
     return (
       <svg
         width={size}
@@ -118,7 +144,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#dc2626" />
         <path
@@ -130,7 +155,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 5. Healthcare / Serenex (Cyan & Emerald Leaf Cross)
-  if (normId.includes('health') || normId.includes('serenex')) {
+  if (registeredLogo === 'healthcare') {
     return (
       <svg
         width={size}
@@ -138,7 +163,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#0284c7" />
         <circle cx="12" cy="12" r="8.5" fill="#38bdf8" fillOpacity="0.3" />
@@ -151,7 +175,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 6. Veltrix / Itintier (Indigo Tech Prism)
-  if (normId.includes('veltrix') || normId.includes('itintier')) {
+  if (registeredLogo === 'veltrix') {
     return (
       <svg
         width={size}
@@ -159,7 +183,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#4338ca" />
         <path d="M12 4.5l6.5 3.8v7.4L12 19.5l-6.5-3.8V8.3L12 4.5z" fill="#6366f1" />
@@ -170,7 +193,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 7. Kidartine (Ocean Blue Wave Capsule)
-  if (normId.includes('kidartine')) {
+  if (registeredLogo === 'kidartine') {
     return (
       <svg
         width={size}
@@ -178,7 +201,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#0284c7" />
         <rect x="4.5" y="8" width="15" height="8" rx="4" fill="#ffffff" fillOpacity="0.25" />
@@ -193,7 +215,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 8. Coloetric (Cyan Layered Badge)
-  if (normId.includes('coloetric')) {
+  if (registeredLogo === 'coloetric') {
     return (
       <svg
         width={size}
@@ -201,7 +223,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#0891b2" />
         <rect x="5.5" y="6.5" width="13" height="11" rx="2.5" fill="#ffffff" />
@@ -211,7 +232,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 9. Corporate (Multi-color Orbital Ring)
-  if (normId.includes('corporate')) {
+  if (registeredLogo === 'corporate') {
     return (
       <svg
         width={size}
@@ -219,7 +240,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#ffffff" stroke="#e2e8f0" strokeWidth="1" />
         <circle cx="12" cy="12" r="7" stroke="#f97316" strokeWidth="2.2" strokeDasharray="9 4" />
@@ -231,7 +251,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 10. Mireons (4-Color Diamond Prism)
-  if (normId.includes('mireons')) {
+  if (registeredLogo === 'mireons') {
     return (
       <svg
         width={size}
@@ -239,7 +259,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#ffffff" stroke="#e2e8f0" strokeWidth="1" />
         <g transform="translate(12, 12) rotate(45) translate(-12, -12)">
@@ -253,7 +272,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 11. Uber / Altiven (Dark Minimalist Tile)
-  if (normId.includes('uber') || normId.includes('altiven')) {
+  if (registeredLogo === 'uber') {
     return (
       <svg
         width={size}
@@ -261,7 +280,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#18181b" />
         <rect x="6" y="6" width="12" height="12" rx="3" stroke="#22c55e" strokeWidth="1.8" />
@@ -271,7 +289,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 12. KBM (Navy & Gold Geometric Emblem)
-  if (normId.includes('kbm')) {
+  if (registeredLogo === 'kbm') {
     return (
       <svg
         width={size}
@@ -279,7 +297,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#1e3a8a" />
         <path d="M7 6h3v4.5L14 6h3.5l-4.5 5.5L18 18h-3.5l-4.5-6.5V18H7V6z" fill="#f59e0b" />
@@ -288,7 +305,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 13. Pixy (Indigo Starburst)
-  if (normId.includes('pixy')) {
+  if (registeredLogo === 'pixy') {
     return (
       <svg
         width={size}
@@ -296,7 +313,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#065f46" />
         <circle cx="12" cy="12" r="6" fill="#10b981" />
@@ -307,7 +323,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 14. Primeforge (Industrial Forge Hex)
-  if (normId.includes('primeforge')) {
+  if (registeredLogo === 'primeforge') {
     return (
       <svg
         width={size}
@@ -315,7 +331,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#c2410c" />
         <path d="M12 5l6 3.5v7L12 19l-6-3.5v-7L12 5z" fill="#ea580c" stroke="#fed7aa" strokeWidth="1.2" />
@@ -325,7 +340,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 15. Corevia Tech (Neural Node Grid)
-  if (normId.includes('corevia')) {
+  if (registeredLogo === 'corevia') {
     return (
       <svg
         width={size}
@@ -333,7 +348,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#312e81" />
         <circle cx="8" cy="8" r="2" fill="#38bdf8" />
@@ -345,7 +359,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 16. Meridian Logic (Quantum Radar / Compass)
-  if (normId.includes('meridian')) {
+  if (registeredLogo === 'meridian') {
     return (
       <svg
         width={size}
@@ -353,7 +367,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#064e3b" />
         <circle cx="12" cy="12" r="7" stroke="#34d399" strokeWidth="1.5" fill="none" />
@@ -364,7 +377,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 17. Northstar Materials (Sapphire Compass Star)
-  if (normId.includes('northstar')) {
+  if (registeredLogo === 'northstar') {
     return (
       <svg
         width={size}
@@ -372,7 +385,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#1e1b4b" />
         <path
@@ -385,7 +397,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 18. Bistelligence (Emerald & Gold AI Prism)
-  if (normId.includes('bistelligence')) {
+  if (registeredLogo === 'bistelligence') {
     return (
       <svg
         width={size}
@@ -393,7 +405,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#107c41" />
         <polygon points="12,5 18,12 12,19 6,12" fill="#22c55e" />
@@ -404,7 +415,7 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   }
 
   // 19. Lumena AI (Radiant Gold Sunburst)
-  if (normId.includes('lumena')) {
+  if (registeredLogo === 'lumena') {
     return (
       <svg
         width={size}
@@ -412,7 +423,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
         viewBox="0 0 24 24"
         fill="none"
         className={`company-custom-logo-svg ${className}`}
-        style={{ borderRadius: '5px', flexShrink: 0 }}
       >
         <rect width="24" height="24" rx="5" fill="#78350f" />
         <circle cx="12" cy="12" r="5" fill="#f59e0b" />
@@ -446,7 +456,6 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
       viewBox="0 0 24 24"
       fill="none"
       className={`company-custom-logo-svg ${className}`}
-      style={{ borderRadius: '5px', flexShrink: 0 }}
     >
       <rect width="24" height="24" rx="5" fill={color.bg} />
       {shapeMode === 0 && (

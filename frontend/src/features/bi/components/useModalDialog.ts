@@ -11,9 +11,9 @@ export function useModalDialog() {
 
   useEffect(() => {
     if (dialogRef.current && !dialogRef.current.open) dialogRef.current.showModal();
+    const returnFocusElement = returnFocusRef.current;
 
     return () => {
-      const returnFocusElement = returnFocusRef.current;
       if (returnFocusElement) queueMicrotask(() => returnFocusElement.focus());
     };
   }, []);

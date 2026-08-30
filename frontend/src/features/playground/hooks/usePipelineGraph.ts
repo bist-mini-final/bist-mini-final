@@ -16,20 +16,26 @@ import {
   NODE_MODULE_TYPES,
 } from '../config/pipeline';
 import { nodeModuleType } from '../adapters/reactFlowGraph';
-import { collectDescendantNodeIds, summarizeDag } from '../domain/graph';
-import { persistentNodeValues, runtimeQueryFromRun } from '../domain/execution';
+import { summarizeDag } from '../domain/graph';
 import {
   moduleConfigDefaults,
   moduleInputDefaults,
-  numericRecord,
   objectConfig,
   resolveTargetInput,
 } from '../domain/moduleDefaults';
+import {
+  BRANCH_COLORS,
+  EXECUTION_BRANCHES,
+  restorePipelineEdges,
+  restorePipelineNodes,
+  serializePipelineGraph,
+} from '../domain/pipelineGraphPersistence';
+import { usePipelineNodeActions } from './usePipelineNodeActions';
+import { usePipelineRuntimeProjection } from './usePipelineRuntimeProjection';
 import type {
   ModuleDefinition,
   ModuleType,
   WorkflowGraph,
-  WorkflowRun,
   WorkflowViewport,
 } from '../types';
 
@@ -41,11 +47,6 @@ interface PipelineGraphOptions {
 }
 
 const DEFAULT_VIEWPORT: WorkflowViewport = { x: 0, y: 0, zoom: 1 };
-const EXECUTION_BRANCHES = new Set(['generated', 'cached']);
-const BRANCH_COLORS: Record<string, string> = {
-  generated: '#16a34a',
-  cached: '#2563eb',
-};
 export function usePipelineGraph(options: PipelineGraphOptions) {
   const {
     queryText,
@@ -86,6 +87,32 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
   const [edges, setEdges, _onEdgesChange] = useEdgesState<Edge>([]);
 
+  const {
+    updateNodeConfig,
+    updateNodeValues,
+    updateNodeWidth,
+    updateNodeHeight,
+    updateNodeColumnWidth,
+    clearGraph,
+    selectNode,
+    duplicateNode,
+    deleteNode,
+  } = usePipelineNodeActions({ setNodes, setEdges, updateNodeInternals });
+
+  const {
+    applyRun,
+    restoreRuntimeInputs,
+    clearExecutionState,
+    clearNodeExecutionState,
+    resumeNodeExecution,
+  } = usePipelineRuntimeProjection({
+    edges,
+    setNodes,
+    setEdges,
+    setQueryText,
+    stoppedNodeIdsRef,
+  });
+
   const onNodesChange = useCallback<typeof _onNodesChange>(
     (changes) => {
       const removedNodeIds = new Set(
@@ -119,94 +146,6 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
   );
 
   const dagSummary = useMemo(() => summarizeDag(nodes, edges), [edges, nodes]);
-
-  const updateNodeConfig = useCallback(
-    (nodeId: string, patch: Record<string, unknown>) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  config: { ...objectConfig(node.data.config), ...patch },
-                },
-              }
-            : node
-        )
-      );
-    },
-    [setNodes]
-  );
-
-  const updateNodeValues = useCallback(
-    (nodeId: string, patch: Record<string, unknown>) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  values: { ...objectConfig(node.data.values), ...patch },
-                },
-              }
-            : node
-        )
-      );
-    },
-    [setNodes]
-  );
-
-  const updateNodeWidth = useCallback(
-    (nodeId: string, width: number) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...node.data, nodeWidth: width } }
-            : node
-        )
-      );
-      window.requestAnimationFrame(() => updateNodeInternals(nodeId));
-    },
-    [setNodes, updateNodeInternals]
-  );
-
-  const updateNodeHeight = useCallback(
-    (nodeId: string, height: number) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...node.data, nodeHeight: height } }
-            : node
-        )
-      );
-      window.requestAnimationFrame(() => updateNodeInternals(nodeId));
-    },
-    [setNodes, updateNodeInternals]
-  );
-
-  const updateNodeColumnWidth = useCallback(
-    (nodeId: string, column: string, width: number) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  columnWidths: {
-                    ...numericRecord(node.data.columnWidths),
-                    [column]: width,
-                  },
-                },
-              }
-            : node
-        )
-      );
-    },
-    [setNodes]
-  );
 
   const decorateNodeData = useCallback(
     (nodeId: string, nodeType: string | undefined, existing: Record<string, unknown>) => {
@@ -288,13 +227,16 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     });
   }, [modules, nodes, setEdges]);
 
+  const nodeIdSignature = nodes.map((node) => node.id).join('\u0000');
+
   useEffect(() => {
     if (modules.length === 0) return;
+    const nodeIds = nodeIdSignature ? nodeIdSignature.split('\u0000') : [];
     const frame = window.requestAnimationFrame(() => {
-      nodes.forEach((node) => updateNodeInternals(node.id));
+      nodeIds.forEach((nodeId) => updateNodeInternals(nodeId));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [modules, nodes.length, updateNodeInternals]);
+  }, [modules, nodeIdSignature, updateNodeInternals]);
 
   useEffect(() => {
     viewportRef.current = viewport;
@@ -414,53 +356,10 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
     setViewport(nextViewport);
   }, []);
 
-  const exportGraph = useCallback((): WorkflowGraph => ({
-    nodes: nodes.flatMap((node) => {
-      const moduleType = nodeModuleType(node);
-      if (!moduleType) return [];
-      return [{
-        id: node.id,
-        module_type: moduleType,
-        position: { x: node.position.x, y: node.position.y },
-        config: objectConfig(node.data.config),
-        values: persistentNodeValues(moduleType, objectConfig(node.data.values)),
-        ui: {
-          ...(typeof node.data.nodeWidth === 'number'
-            ? { width: node.data.nodeWidth }
-            : {}),
-          ...(typeof node.data.nodeHeight === 'number'
-            ? { height: node.data.nodeHeight }
-            : {}),
-          execution_stopped: node.data.executionStopped === true,
-          column_widths: numericRecord(node.data.columnWidths),
-        },
-      }];
-    }),
-    edges: edges.map((edge) => {
-      const sourceOutput = typeof edge.data?.source_output === 'string' && edge.data.source_output
-        ? edge.data.source_output
-        : typeof edge.sourceHandle === 'string' && edge.sourceHandle !== 'out'
-          ? edge.sourceHandle
-          : undefined;
-      const targetInput = typeof edge.data?.target_input === 'string' && edge.data.target_input
-        ? edge.data.target_input
-        : typeof edge.targetHandle === 'string' && edge.targetHandle !== 'in'
-          ? edge.targetHandle
-          : undefined;
-      return {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        ...(sourceOutput ? { source_output: sourceOutput } : {}),
-        ...(targetInput ? { target_input: targetInput } : {}),
-        ...(typeof edge.data?.source_branch === 'string' &&
-        EXECUTION_BRANCHES.has(edge.data.source_branch)
-          ? { source_branch: edge.data.source_branch as WorkflowGraph['edges'][number]['source_branch'] }
-          : {}),
-      };
-    }),
-    viewport: viewportRef.current,
-  }), [edges, nodes]);
+  const exportGraph = useCallback(
+    (): WorkflowGraph => serializePipelineGraph(nodes, edges, viewportRef.current),
+    [edges, nodes],
+  );
 
   const replaceGraph = useCallback(
     (graph: WorkflowGraph) => {
@@ -475,63 +374,8 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
           .map((workflowNode) => workflowNode.id)
       );
 
-      setNodes(
-        graph.nodes.map((workflowNode) => {
-          const nodeType = MODULE_NODE_TYPES[workflowNode.module_type] ?? 'generic_module';
-          return {
-            id: workflowNode.id,
-            type: nodeType,
-            position: workflowNode.position,
-            data: decorateNodeData(workflowNode.id, nodeType, {
-              moduleType: workflowNode.module_type,
-              config: workflowNode.config,
-              values: workflowNode.values,
-              nodeWidth: workflowNode.ui?.width ?? undefined,
-              nodeHeight: workflowNode.ui?.height ?? undefined,
-              columnWidths: workflowNode.ui?.column_widths ?? {},
-              executionStopped: workflowNode.ui?.execution_stopped === true,
-            }),
-          };
-        })
-      );
-      setEdges(
-        graph.edges.map((workflowEdge): Edge => {
-          const targetNode = graph.nodes.find((node) => node.id === workflowEdge.target);
-          const targetDefinition = modules.find(
-            (module) => module.type === targetNode?.module_type
-          );
-          const sourceNode = graph.nodes.find((node) => node.id === workflowEdge.source);
-          const sourceDefinition = modules.find(
-            (module) => module.type === sourceNode?.module_type
-          );
-          const targetHandle = resolveTargetInput(
-            targetDefinition,
-            workflowEdge.target_input,
-          ) ?? 'in';
-          const hasMultipleOutputs = (sourceDefinition?.outputs.length ?? 0) > 1
-            || Object.keys(sourceDefinition?.branch_outputs ?? {}).length > 0;
-          const sourceHandle = workflowEdge.source_branch
-            ?? (hasMultipleOutputs && workflowEdge.source_output ? workflowEdge.source_output : 'out');
-          return {
-            id: workflowEdge.id,
-            source: workflowEdge.source,
-            target: workflowEdge.target,
-            sourceHandle,
-            targetHandle,
-            type: 'customEdge',
-            data: {
-              active: false,
-              done: false,
-              source_output: workflowEdge.source_output,
-              target_input: workflowEdge.target_input,
-              source_branch: workflowEdge.source_branch,
-              color: workflowEdge.source_branch
-                ? BRANCH_COLORS[workflowEdge.source_branch]
-                : NODE_COLORS.queryNode,
-            },
-          };
-        })
-      );
+      setNodes(restorePipelineNodes(graph, decorateNodeData));
+      setEdges(restorePipelineEdges(graph, modules));
       viewportRef.current = graph.viewport;
       setViewport(graph.viewport);
       window.requestAnimationFrame(() => {
@@ -540,203 +384,6 @@ export function usePipelineGraph(options: PipelineGraphOptions) {
       });
     },
     [decorateNodeData, modules, setEdges, setNodes, setQueryText, updateNodeInternals]
-  );
-
-  const applyRun = useCallback(
-    (run: WorkflowRun) => {
-      const stoppedNodeIds = stoppedNodeIdsRef.current;
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
-          const state = run.nodes[node.id];
-          if (!state) return node;
-          if (stoppedNodeIds.has(node.id)) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                executionStopped: true,
-                executionState: 'idle',
-                executionOutput: null,
-                executionInput: null,
-                executionError: null,
-                executionOutcome: null,
-                cacheHit: false,
-                batchIndex: undefined,
-              },
-            };
-          }
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              executionStopped: false,
-              executionState: state.status,
-              executionOutput: state.output,
-              executionInput: state.input_payload,
-              executionConfig: state.config_payload,
-              executionError: state.error,
-              executionOutcome: state.outcome,
-              cacheHit: state.cache_hit,
-              batchIndex: state.batch_index,
-              elapsedMs: state.elapsed_ms,
-              costUsd: state.cost_usd,
-              usage: state.usage,
-            },
-          };
-        })
-      );
-      setEdges((currentEdges) =>
-        currentEdges.map((edge) => {
-          if (stoppedNodeIds.has(edge.source) || stoppedNodeIds.has(edge.target)) {
-            return {
-              ...edge,
-              data: { ...edge.data, active: false, done: false },
-            };
-          }
-          const sourceState = run.nodes[edge.source]?.status;
-          const sourceOutcome = run.nodes[edge.source]?.outcome;
-          const targetState = run.nodes[edge.target]?.status;
-          const sourceBranch = edge.data?.source_branch;
-          const branchMatches = typeof sourceBranch === 'string'
-            ? sourceOutcome === sourceBranch
-            : sourceState === 'succeeded';
-          return {
-            ...edge,
-            data: {
-              ...edge.data,
-              done: branchMatches && targetState === 'succeeded',
-              active: branchMatches && targetState === 'running',
-            },
-          };
-        })
-      );
-    },
-    [setEdges, setNodes]
-  );
-
-  const restoreRuntimeInputs = useCallback((run: WorkflowRun) => {
-    const query = runtimeQueryFromRun(run);
-    if (query !== undefined) setQueryText(query);
-  }, [setQueryText]);
-
-  const clearExecutionState = useCallback(() => {
-    stoppedNodeIdsRef.current = new Set();
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          executionStopped: false,
-          executionState: undefined,
-          executionOutput: null,
-          executionInput: null,
-          executionError: null,
-          executionOutcome: null,
-          cacheHit: false,
-          batchIndex: undefined,
-        },
-      }))
-    );
-    setEdges((currentEdges) =>
-      currentEdges.map((edge) => ({
-        ...edge,
-        data: { ...edge.data, active: false, done: false },
-      }))
-    );
-  }, [setEdges, setNodes]);
-
-  const clearNodeExecutionState = useCallback((nodeId: string) => {
-    const resetNodeIds = collectDescendantNodeIds(nodeId, edges);
-    stoppedNodeIdsRef.current = new Set([
-      ...stoppedNodeIdsRef.current,
-      ...resetNodeIds,
-    ]);
-    setNodes((currentNodes) =>
-      currentNodes.map((node) =>
-        resetNodeIds.has(node.id)
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                executionStopped: true,
-                executionState: 'idle',
-                executionOutput: null,
-                executionInput: null,
-                executionError: null,
-                executionOutcome: null,
-                cacheHit: false,
-                batchIndex: undefined,
-              },
-            }
-          : node
-      )
-    );
-    setEdges((currentEdges) =>
-      currentEdges.map((edge) =>
-        resetNodeIds.has(edge.source) || resetNodeIds.has(edge.target)
-          ? { ...edge, data: { ...edge.data, active: false, done: false } }
-          : edge
-      )
-    );
-  }, [edges, setEdges, setNodes]);
-
-  const resumeNodeExecution = useCallback((nodeId: string) => {
-    const resumedNodeIds = collectDescendantNodeIds(nodeId, edges);
-    stoppedNodeIdsRef.current = new Set(
-      [...stoppedNodeIdsRef.current].filter((stoppedId) => !resumedNodeIds.has(stoppedId))
-    );
-    setNodes((currentNodes) =>
-      currentNodes.map((node) =>
-        resumedNodeIds.has(node.id)
-          ? {
-              ...node,
-              data: { ...node.data, executionStopped: false },
-            }
-          : node
-      )
-    );
-  }, [edges, setNodes]);
-
-  const clearGraph = useCallback(() => {
-    setNodes([]);
-    setEdges([]);
-  }, [setEdges, setNodes]);
-
-  const selectNode = useCallback((nodeId: string) => {
-    setNodes((currentNodes) => currentNodes.map((node) => ({
-      ...node,
-      selected: node.id === nodeId,
-    })));
-  }, [setNodes]);
-
-  const duplicateNode = useCallback((nodeId: string) => {
-    setNodes((currentNodes) => {
-      const original = currentNodes.find((node) => node.id === nodeId);
-      if (!original) return currentNodes;
-      const clone: Node = {
-        ...original,
-        id: `node-${Date.now()}`,
-        position: { x: original.position.x + 36, y: original.position.y + 36 },
-        data: { ...original.data, executionState: undefined, executionOutput: null, executionError: null },
-        selected: true,
-      };
-      return currentNodes.map((node): Node => ({ ...node, selected: false })).concat(clone);
-    });
-  }, [setNodes]);
-
-  /** Explicitly remove a node and all edges connected to it. */
-  const deleteNode = useCallback(
-    (nodeId: string) => {
-      setEdges((currentEdges) =>
-        currentEdges.filter(
-          (edge) => edge.source !== nodeId && edge.target !== nodeId
-        )
-      );
-      setNodes((currentNodes) =>
-        currentNodes.filter((node) => node.id !== nodeId)
-      );
-    },
-    [setEdges, setNodes]
   );
 
   return {

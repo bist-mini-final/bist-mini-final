@@ -71,7 +71,7 @@ interface ModulePaletteProps {
   onClose?: () => void;
   onAddNode: (type: ModuleType) => void;
   width: number;
-  onResizeStart: (event: PointerEvent<HTMLDivElement>) => void;
+  onResizeStart: (event: PointerEvent<HTMLButtonElement>) => void;
   onResizeBy: (delta: number) => void;
 }
 
@@ -92,7 +92,7 @@ export function ModulePalette({
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
     onResizeBy(event.key === 'ArrowLeft' ? -16 : 16);
@@ -173,9 +173,10 @@ export function ModulePalette({
       </div>
       </div>
       {isOpen && (
-        <div
+        <button
+          type="button"
           className="module-palette__resize-handle"
-          role="separator"
+          role="slider"
           aria-label="모듈 패널 너비 조절"
           aria-orientation="vertical"
           aria-valuemin={MODULE_PANEL_MIN_WIDTH}

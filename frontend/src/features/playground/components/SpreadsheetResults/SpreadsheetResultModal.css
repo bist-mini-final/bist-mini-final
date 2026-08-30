@@ -403,6 +403,7 @@
   color: #94a3b8;
   cursor: col-resize;
   outline: none;
+  padding: 0;
   touch-action: none;
 }
 
@@ -784,6 +785,13 @@ body.spreadsheet-result-is-resizing * {
   background-image: radial-gradient(#c6d7cf 0.75px, transparent 0.75px);
   background-size: 18px 18px;
   padding: 1.5rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.spreadsheet-result-viewport.is-dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .spreadsheet-result-stage-shell {
@@ -885,4 +893,96 @@ body.spreadsheet-result-is-resizing * {
   border: 1px dashed #cbd5e1;
   border-radius: 0.9rem;
   background: rgb(255 255 255 / 70%);
+}
+
+@media (max-width: 1023px) {
+  .spreadsheet-result-overlay {
+    padding: 0.75rem;
+  }
+
+  .spreadsheet-result-modal__body {
+    grid-template-columns: var(--spreadsheet-sidebar-width, 21rem) 0.6rem minmax(0, 1fr);
+  }
+
+  .spreadsheet-result-toolbar__legend,
+  .spreadsheet-result-toolbar__file code {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .spreadsheet-result-overlay {
+    padding: 0;
+  }
+
+  .spreadsheet-result-modal {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .spreadsheet-result-modal__header {
+    align-items: flex-start;
+    padding: 0.75rem;
+  }
+
+  .spreadsheet-result-modal__mark,
+  .spreadsheet-result-modal__summary,
+  .spreadsheet-result-toolbar__file {
+    display: none;
+  }
+
+  .spreadsheet-result-modal__heading p {
+    white-space: normal;
+  }
+
+  .spreadsheet-result-toolbar {
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding: 0.45rem;
+  }
+
+  .spreadsheet-result-toolbar label {
+    min-width: 10rem;
+    flex: none;
+  }
+
+  .spreadsheet-result-toolbar select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .spreadsheet-result-modal__body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .spreadsheet-result-sidebar-resizer {
+    display: none;
+  }
+
+  .spreadsheet-result-sidebar {
+    max-height: 14rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .spreadsheet-result-sidebar__list {
+    display: grid;
+    flex: none;
+    grid-auto-columns: minmax(13rem, 1fr);
+    grid-auto-flow: column;
+    overflow-x: auto;
+  }
+
+  .spreadsheet-result-detail {
+    display: none;
+  }
+
+  .spreadsheet-result-viewport {
+    flex: 1;
+    padding: 0.75rem;
+  }
 }

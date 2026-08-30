@@ -2,8 +2,10 @@
 
 :root {
   color-scheme: light;
-  --font-ui: "Pretendard Variable", Pretendard, Inter, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-ui: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-code: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", "Noto Sans KR", monospace;
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-code);
 
   /* Brand Excel Green Palette */
   --brand-50: #f0faf4;
@@ -139,6 +141,21 @@ body {
   font-family: var(--font-ui);
   font-feature-settings: "kern" 1;
   letter-spacing: -0.01em;
+}
+
+button,
+input,
+select,
+textarea,
+table {
+  font-family: var(--font-ui);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-code);
 }
 
 ::selection {

@@ -28,7 +28,7 @@ export function useResizablePanel() {
     window.localStorage.setItem(STORAGE_KEY, String(next));
   }, []);
 
-  const startResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+  const startResize = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     cleanupRef.current?.();
     const startX = event.clientX;

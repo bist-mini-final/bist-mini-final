@@ -92,3 +92,6 @@
 .reader-markdown li:has(.reader-citation) {
   list-style: none;
 }
+.reader-citation-tooltip__row {
+  display: contents;
+}

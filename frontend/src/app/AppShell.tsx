@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   BookOpen,
@@ -8,7 +8,9 @@ import {
   Workflow,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { CellEvidenceProvider } from '../shared/evidence/CellEvidenceProvider';
 import { Button, IconButton } from '../shared/ui';
+import { useFocusTrap } from '../shared/ui/useFocusTrap';
 import type { AppRoute } from './routes';
 import { APP_ROUTES } from './routes';
 import { AppLink } from './router';
@@ -30,6 +32,10 @@ function preloadRoute(route: AppRoute): void {
 
 export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const mobileTriggerRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPathRef = useRef(pathname);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -59,19 +65,45 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
     setIsMobileNavOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (previousPathRef.current === pathname) return;
+    previousPathRef.current = pathname;
+    const frame = window.requestAnimationFrame(() => {
+      if (mainRef.current) {
+        mainRef.current.scrollTop = 0;
+        mainRef.current.focus();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname]);
+
+  useFocusTrap({
+    active: isMobileNavOpen,
+    containerRef: sidebarRef,
+    restoreFocusRef: mobileTriggerRef,
+    initialFocusSelector: '.product-brand__link',
+    onEscape: () => setIsMobileNavOpen(false),
+  });
+
   return (
-    <div className={clsx('product-shell', isSidebarCollapsed && 'product-shell--collapsed')}>
+    <CellEvidenceProvider>
+      <div className={clsx('product-shell', isSidebarCollapsed && 'product-shell--collapsed')}>
       <IconButton
+        ref={mobileTriggerRef}
         className="product-mobile-trigger"
         variant="secondary"
         type="button"
         onClick={() => setIsMobileNavOpen(true)}
         aria-label="메뉴 열기"
+        aria-controls="product-sidebar"
+        aria-expanded={isMobileNavOpen}
       >
         <Menu size={19} />
       </IconButton>
 
       <aside
+        ref={sidebarRef}
+        id="product-sidebar"
         className={clsx(
           'product-sidebar',
           isSidebarCollapsed && 'product-sidebar--collapsed',
@@ -79,6 +111,9 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           hasSidebarContext && 'product-sidebar--with-context',
         )}
         aria-label="서비스 내비게이션"
+        role={isMobileNavOpen ? 'dialog' : undefined}
+        aria-modal={isMobileNavOpen || undefined}
+        tabIndex={isMobileNavOpen ? -1 : undefined}
       >
         <div className="product-brand">
           <AppLink to="/" className="product-brand__link" title="RAG Flow 홈">
@@ -199,6 +234,8 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
       )}
 
       <main
+        ref={mainRef}
+        tabIndex={-1}
         className={clsx(
           'product-page',
           isFullBleedPage && 'product-page--playground'
@@ -215,6 +252,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </CellEvidenceProvider>
   );
 }

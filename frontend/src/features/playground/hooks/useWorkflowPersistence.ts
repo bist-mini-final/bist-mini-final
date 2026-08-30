@@ -9,6 +9,8 @@ import {
 import {
   isWorkflowNodeEvent,
   isWorkflowTerminalEvent,
+  workflowNodeUpdateFromEventData,
+  workflowRunFromEventData,
 } from '../../../shared/workflows/observeRun';
 import type {
   SaveStatus,
@@ -218,8 +220,8 @@ export function useWorkflowPersistence(
             run.id,
             (event) => {
               if (isWorkflowNodeEvent(event.event)) {
-                const nodeUpdate = event.data;
-                if (nodeUpdate?.node_id) {
+                const nodeUpdate = workflowNodeUpdateFromEventData(event.data);
+                if (nodeUpdate) {
                   const current = latestRunRef.current;
                   if (!current) return;
                   const updated = mergeRunNodeUpdate(current, nodeUpdate);
@@ -228,10 +230,11 @@ export function useWorkflowPersistence(
                 }
               } else if (
                 isWorkflowTerminalEvent(event.event)
-                && event.data?.run
               ) {
-                applyRun(event.data.run);
-                onBatch?.(event.data.run);
+                const completedRun = workflowRunFromEventData(event.data);
+                if (!completedRun) return;
+                applyRun(completedRun);
+                onBatch?.(completedRun);
               }
             },
             controller.signal
