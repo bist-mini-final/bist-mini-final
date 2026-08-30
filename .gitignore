@@ -1,14 +1,42 @@
-# Python
+# Python & Bytecode Cache
 __pycache__/
+**/__pycache__/
 *.py[cod]
+*$$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & Test Caches
 .pytest_cache/
+**/.pytest_cache/
 .mypy_cache/
+**/.mypy_cache/
 .ruff_cache/
+**/.ruff_cache/
+.hypothesis/
+**/.hypothesis/
+.cache/
+**/.cache/
+.tox/
+.nox/
+
+# Coverage & Test Reports
 .coverage
+.coverage.*
 coverage.xml
+*.cover
+*.py,cover
 htmlcov/
+nosetests.xml
+junit.xml
+pytestdebug.log
+
+# Virtual Environments
 .venv/
 venv/
+ENV/
+env/
 .tools/
 
 # Local environment
@@ -26,8 +54,18 @@ frontend/dist/
 .vite/
 dist/
 
-# Runtime output
+# Logs & Runtime output
 *.log
+**/*.log
+*.log.*
+**/*.log.*
+logs/
+**/logs/
+*.log.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 outputs/
 output/
 data/runs/*
@@ -36,7 +74,8 @@ data/raw/*
 data/cache/*
 !data/cache/.gitkeep
 # data/artifacts/ — 모든 런타임 생성 파일 무시
-# 포함: Luna VLM 렌더/타일 이미지, serialized_docs.json 캐시, 임베딩 .npy 파일
+# 포함: Luna VLM 렌더/타일 이미지, serialized_docs.json 캐시,
+# 임베딩 .f32 및 ingestion shard manifest/part 파일
 data/artifacts/*
 data/artifacts/**
 !data/artifacts/embeddings/
@@ -53,12 +92,15 @@ data/source_files/*
 !data/source_files/.gitkeep
 data/sources/*
 !data/sources/.gitkeep
+data/chat_uploads/*
+!data/chat_uploads/.gitkeep
 data/virtual/
 data/virtual/*
 !data/virtual/.gitkeep
-data/workflows/workflow.json
+data/workflows/*
+!data/workflows/.gitkeep
 tmp/
-data/bencmarks/*
+data/benchmarks/*
 
 # OS / editors
 .DS_Store
