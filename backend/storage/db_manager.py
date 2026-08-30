@@ -44,9 +44,10 @@ from uuid import uuid4
 import psycopg2.extras
 
 from backend.core.settings import PGVECTOR_URL
+from backend.shared.infrastructure.database import SyncPostgresRepository
 
 from .audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
-from .connection_pool import get_pooled_async_connection, get_pooled_raw_connection
+from .connection_pool import get_pooled_async_connection
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +267,7 @@ CREATE INDEX IF NOT EXISTS idx_node_logs_pgvector_index_id
 )
 
 
-class DatabaseManager:
+class DatabaseManager(SyncPostgresRepository):
     """PostgreSQL full ERD database manager."""
 
     def __init__(
@@ -275,13 +276,16 @@ class DatabaseManager:
         *,
         ensure_schema: bool = True,
     ) -> None:
-        self.database_url = database_url
+        super().__init__(database_url)
 
     def _raw_connection(self) -> Any:
-        raw_url = getattr(self, "database_url", PGVECTOR_URL).replace(
-            "postgresql+psycopg://", "postgresql://"
-        )
-        return get_pooled_raw_connection(raw_url)
+        """Compatibility alias for legacy code inside this repository.
+
+        New repositories use the public ``connection`` boundary inherited from
+        ``SyncPostgresRepository``.
+        """
+
+        return self.connection()
 
     def _advisory_lock_connection(self) -> Any:
         """Open a dedicated session whose close guarantees advisory-lock release."""

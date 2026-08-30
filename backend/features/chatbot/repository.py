@@ -5,18 +5,21 @@ from uuid import uuid4
 
 import psycopg2.extras
 
-from backend.storage.db_manager import DatabaseManager
+from backend.shared.infrastructure.database import (
+    DatabaseUrlProvider,
+    SyncPostgresRepository,
+)
 
 
-class ChatSessionRepository:
+class ChatSessionRepository(SyncPostgresRepository):
     """PostgreSQL persistence for chat sessions; auth can replace client_id later."""
 
-    def __init__(self, database: DatabaseManager) -> None:
-        self._database = database
+    def __init__(self, database: str | DatabaseUrlProvider) -> None:
+        super().__init__(database)
 
     def create_session(self, client_id: str, title: str) -> dict[str, Any]:
         session_id = f"chat-{uuid4().hex}"
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """INSERT INTO chat_sessions (session_id, client_id, title)
@@ -28,7 +31,7 @@ class ChatSessionRepository:
         return self._session_payload(row)
 
     def list_sessions(self, client_id: str) -> list[dict[str, Any]]:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """SELECT session_id, title, created_at, updated_at FROM chat_sessions
@@ -38,7 +41,7 @@ class ChatSessionRepository:
                 return [self._session_payload(dict(row)) for row in cursor.fetchall()]
 
     def get_session(self, session_id: str, client_id: str) -> dict[str, Any] | None:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """SELECT session_id, title, created_at, updated_at FROM chat_sessions
@@ -59,7 +62,7 @@ class ChatSessionRepository:
 
     def recent_user_messages(self, session_id: str, limit: int = 6) -> list[str]:
         """Return recent user prompts for lightweight conversational retrieval context."""
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """SELECT content FROM chat_messages
@@ -70,13 +73,13 @@ class ChatSessionRepository:
                 return [str(row[0]) for row in cursor.fetchall()]
 
     def company_names(self) -> list[str]:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT display_name FROM bi_companies ORDER BY display_name")
                 return [str(row[0]) for row in cursor.fetchall()]
 
     def session_id_for_run(self, run_id: str) -> str | None:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT session_id FROM chat_messages WHERE workflow_run_id = %s",
@@ -86,7 +89,7 @@ class ChatSessionRepository:
         return str(row[0]) if row else None
 
     def rename_session(self, session_id: str, client_id: str, title: str) -> dict[str, Any]:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """UPDATE chat_sessions SET title = %s, updated_at = NOW()
@@ -101,7 +104,7 @@ class ChatSessionRepository:
         return self._session_payload(dict(row))
 
     def delete_session(self, session_id: str, client_id: str) -> None:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     "DELETE FROM chat_sessions WHERE session_id = %s AND client_id = %s",
@@ -120,7 +123,7 @@ class ChatSessionRepository:
         storage_path: str,
         extracted_text: str,
     ) -> dict[str, Any]:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """INSERT INTO chat_attachments (attachment_id, session_id, file_name, content_type, file_size, storage_path, extracted_text)
@@ -147,7 +150,7 @@ class ChatSessionRepository:
         }
 
     def get_attachment(self, session_id: str, attachment_id: str) -> dict[str, Any] | None:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """SELECT attachment_id, file_name, content_type, file_size, extracted_text, created_at
@@ -166,7 +169,7 @@ class ChatSessionRepository:
         attachments: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         user_id, assistant_id = f"message-{uuid4().hex}", f"message-{uuid4().hex}"
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """INSERT INTO chat_messages (message_id, session_id, role, content, status, attachments)
@@ -201,7 +204,7 @@ class ChatSessionRepository:
         attachments: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         user_id, assistant_id = f"message-{uuid4().hex}", f"message-{uuid4().hex}"
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     "INSERT INTO chat_messages (message_id, session_id, role, content, status, attachments) VALUES (%s, %s, 'user', %s, 'completed', %s)",
@@ -228,7 +231,7 @@ class ChatSessionRepository:
         *,
         suppress_visualization: bool = False,
     ) -> dict[str, Any] | None:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """UPDATE chat_messages SET status = %s, content = %s,
@@ -242,7 +245,7 @@ class ChatSessionRepository:
         return self._message_payload(dict(row)) if row else None
 
     def owns_run(self, run_id: str, client_id: str) -> bool:
-        with self._database._raw_connection() as connection:
+        with self.connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """SELECT 1 FROM chat_messages message JOIN chat_sessions session
