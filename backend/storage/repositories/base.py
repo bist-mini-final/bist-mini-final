@@ -21,6 +21,8 @@ class PgVectorConnectionCapability:
     """Connection and collection lookup surface supplied by PgVectorStore."""
 
     database_url: str
+    _collection_uuid_cache: dict[str, str]
+    _collection_uuid_lock: Any
 
     def _raw_connection(self) -> Any:
         raise NotImplementedError
@@ -32,6 +34,16 @@ class PgVectorConnectionCapability:
         raise NotImplementedError
 
     async def _collection_uuid_async(self, collection_name: str) -> str | None:
+        raise NotImplementedError
+
+    def _drop_collection_vector_index(
+        self,
+        collection_uuid: str,
+        dimension: int,
+    ) -> None:
+        raise NotImplementedError
+
+    def ensure_optimized_indexes(self) -> None:
         raise NotImplementedError
 
 

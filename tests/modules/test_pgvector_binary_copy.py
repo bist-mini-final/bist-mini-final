@@ -154,7 +154,7 @@ def test_binary_copy_stream_accepts_retry_stable_document_ids() -> None:
 def test_prepared_copy_reuses_deterministic_ids_on_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import backend.storage.pgvector_store as store_module
+    import backend.storage.repositories.pgvector_writes as store_module
 
     copied = MagicMock()
     monkeypatch.setattr(store_module, "copy_documents", copied)
@@ -193,7 +193,7 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import backend.storage.pgvector_store as store_module
+    import backend.storage.repositories.pgvector_writes as store_module
 
     artifact_store = EmbeddingArtifactStore(tmp_path)
     artifact_id = "f" * 64
@@ -217,9 +217,7 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
     cast(Any, store)._create_collection = MagicMock(
         return_value="11111111-1111-1111-1111-111111111111"
     )
-    cast(Any, store)._raw_connection = MagicMock(
-        side_effect=[copy_connection, publish_connection]
-    )
+    cast(Any, store)._raw_connection = MagicMock(side_effect=[copy_connection, publish_connection])
     cast(Any, store).ensure_collection_vector_index = MagicMock()
     cast(Any, store).ensure_optimized_indexes = MagicMock()
 
@@ -241,7 +239,7 @@ def test_binary_copy_failure_rolls_back_and_removes_staging_collection(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import backend.storage.pgvector_store as store_module
+    import backend.storage.repositories.pgvector_writes as store_module
 
     artifact_store = EmbeddingArtifactStore(tmp_path)
     artifact_id = "1" * 64

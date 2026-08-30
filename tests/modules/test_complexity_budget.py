@@ -37,8 +37,6 @@ LEGACY_COMPLEXITY_BUDGETS = {
     ("backend/providers/openai_responses.py", "create_response"): 14,
     ("backend/providers/openai_responses.py", "create_response_async"): 14,
     ("backend/storage/pgvector_binary_copy.py", "_load_vector_batch"): 12,
-    ("backend/storage/pgvector_store.py", "put_documents"): 32,
-    ("backend/storage/pgvector_store.py", "get_index_detail"): 11,
     ("backend/storage/repositories/pgvector_retrieval.py", "_cell_metadata_query"): 18,
     ("backend/storage/repositories/pgvector_retrieval.py", "fetch_rows_cells"): 12,
     ("backend/storage/spreadsheets/cell_semantics.py", "collect_non_empty_cells"): 12,
