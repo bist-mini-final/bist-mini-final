@@ -6,10 +6,9 @@ reducing the number of embedding API calls and increasing LLM throughput signifi
 """
 
 import os
-import socket
-from uuid import uuid4
 
 from backend.bootstrap.container import RuntimeContainer
+from backend.engine.worker.base import default_worker_id
 
 from .composition import create_bi_question_batch_worker
 from .database_schema import ensure_bi_schema
@@ -31,19 +30,13 @@ def _run(container: RuntimeContainer) -> int:
         batch_size=batch_size,
         max_workers=max_workers,
     )
-    kubernetes_job_name = os.getenv("KUBERNETES_JOB_NAME")
-    worker_id = WorkflowRunId(
-        kubernetes_job_name
-        or f"{socket.gethostname()}-{uuid4().hex[:12]}"
-    )
+    worker_id = WorkflowRunId(default_worker_id())
     saved = worker.run_batch(worker_id)
     if not saved:
         print("BI question queue empty")
     else:
         statuses = ", ".join(q.status.value for q in saved)
-        print(
-            f"BI question batch of {len(saved)} finished [{statuses}]"
-        )
+        print(f"BI question batch of {len(saved)} finished [{statuses}]")
     return 0
 
 

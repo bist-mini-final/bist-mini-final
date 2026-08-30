@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import logging
 import os
-import socket
-import time
 from typing import Any
-from uuid import uuid4
 
 from backend.bootstrap.container import RuntimeContainer
-from backend.engine.worker.lease import LeaseHeartbeat, terminate_process_on_lease_loss
+from backend.engine.worker.base import (
+    LeasedWorker,
+    WorkerLeaseSpec,
+    default_worker_id,
+)
 from backend.storage.data_sources.ingestion_shards import (
+    IngestionShard,
     PostgresIngestionShardRepository,
 )
 from backend.storage.data_sources.shard_artifacts import IngestionShardArtifactStore
@@ -20,10 +22,6 @@ from backend.storage.spreadsheets.langchain_document import lazy_cell_documents
 from modules.common.exceptions import ModuleExecutionError
 
 logger = logging.getLogger(__name__)
-
-
-def _worker_id() -> str:
-    return os.getenv("KUBERNETES_JOB_NAME") or f"{socket.gethostname()}-{uuid4().hex[:12]}"
 
 
 def _copy_shard(container: RuntimeContainer, payload: dict[str, Any]) -> None:
@@ -72,50 +70,75 @@ def _copy_shard(container: RuntimeContainer, payload: dict[str, Any]) -> None:
     )
 
 
+class VectorShardWorker(LeasedWorker[IngestionShard, None]):
+    def __init__(
+        self,
+        container: RuntimeContainer,
+        repository: PostgresIngestionShardRepository,
+        worker_id: str,
+    ) -> None:
+        super().__init__(logger)
+        self._container = container
+        self._repository = repository
+        self._worker_id = worker_id
+
+    def claim(self) -> IngestionShard | None:
+        return self._repository.claim_next("vector_copy", self._worker_id)
+
+    def lease_spec(self, claim: IngestionShard) -> WorkerLeaseSpec:
+        return WorkerLeaseSpec(
+            job_id=f"{claim.operation_id}:vector_copy:{claim.shard_index}",
+            worker_id=self._worker_id,
+            renew=lambda: self._repository.heartbeat(claim),
+            thread_name="ingestion-vector-heartbeat",
+            failure_message="vector COPY shard lease heartbeat 실패",
+        )
+
+    def execute(self, claim: IngestionShard) -> None:
+        payload = {**claim.payload, "shard_index": claim.shard_index}
+        _copy_shard(self._container, payload)
+
+    def complete(
+        self,
+        claim: IngestionShard,
+        output: None,
+        duration_seconds: float,
+    ) -> None:
+        self._repository.complete(claim, duration_seconds=duration_seconds)
+
+    def fail(
+        self,
+        claim: IngestionShard,
+        error: Exception,
+        duration_seconds: float,
+    ) -> None:
+        self._repository.fail(claim, str(error))
+
+    def empty_message(self) -> str:
+        return "claim 가능한 vector COPY shard가 없어 종료합니다"
+
+    def completed_message(self, claim: IngestionShard, output: None) -> str:
+        return (
+            f"vector COPY shard 완료 (operation={claim.operation_id} "
+            f"shard={claim.shard_index} count={claim.payload.get('count')})"
+        )
+
+    def failed_message(self, claim: IngestionShard, error: Exception) -> str:
+        return (
+            f"vector COPY shard 실패 (operation={claim.operation_id} "
+            f"shard={claim.shard_index})"
+        )
+
+
 def _run(container: RuntimeContainer) -> int:
     repository = PostgresIngestionShardRepository(
         container.services.db_manager.database_url
     )
-    worker_id = _worker_id()
-    shard = repository.claim_next("vector_copy", worker_id)
-    if shard is None:
-        logger.info("claim 가능한 vector COPY shard가 없어 종료합니다")
-        return 0
-    payload = {**shard.payload, "shard_index": shard.shard_index}
-    heartbeat = LeaseHeartbeat(
-        lambda: repository.heartbeat(shard),
-        interval_seconds=30,
-        thread_name="ingestion-vector-heartbeat",
-        logger=logger,
-        failure_message="vector COPY shard lease heartbeat 실패",
-        on_lease_lost=terminate_process_on_lease_loss,
-    )
-    started = time.perf_counter()
-    heartbeat.start()
-    try:
-        _copy_shard(container, payload)
-        heartbeat.raise_if_lost()
-        repository.complete(
-            shard,
-            duration_seconds=round(time.perf_counter() - started, 3),
-        )
-        logger.info(
-            "vector COPY shard 완료 (operation=%s shard=%d count=%s)",
-            shard.operation_id,
-            shard.shard_index,
-            shard.payload.get("count"),
-        )
-        return 0
-    except Exception as error:
-        logger.exception(
-            "vector COPY shard 실패 (operation=%s shard=%d)",
-            shard.operation_id,
-            shard.shard_index,
-        )
-        repository.fail(shard, str(error))
-        return 1
-    finally:
-        heartbeat.stop()
+    return VectorShardWorker(
+        container,
+        repository,
+        default_worker_id(),
+    ).run_once()
 
 
 def main() -> int:

@@ -1,76 +1,119 @@
 from __future__ import annotations
 
 import logging
-import os
-import socket
 from datetime import UTC, datetime
-from uuid import uuid4
 
 from backend.bootstrap.container import RuntimeContainer
-from backend.engine.worker.lease import (
-    LeaseHeartbeat,
-    terminate_process_on_lease_loss,
+from backend.engine.worker.base import (
+    LeasedWorker,
+    WorkerLeaseSpec,
+    default_worker_id,
 )
 
 from .composition import create_bi_materialization_runner
 from .database_schema import ensure_bi_schema
-from .postgres_store import PostgresBiStore
+from .materialization_models import BiMaterializationOutcome
+from .postgres_store import ClaimedBiMaterialization, PostgresBiStore
 
 logger = logging.getLogger(__name__)
 
 
-def _run(container: RuntimeContainer) -> int:
-    completion_client = container.completion_client
-    registry = container.services.module_registry
-    database_url = registry.db_manager.database_url
-    ensure_bi_schema(database_url)
-    store = PostgresBiStore(database_url)
-    worker_id = (
-        os.getenv("KUBERNETES_JOB_NAME")
-        or f"{socket.gethostname()}-{uuid4().hex[:12]}"
-    )
-    claimed = store.claim_next_materialization(worker_id, datetime.now(UTC))
-    if claimed is None:
-        print("BI materialization queue empty")
-        return 0
+class BiMaterializationWorker(
+    LeasedWorker[ClaimedBiMaterialization, BiMaterializationOutcome]
+):
+    def __init__(
+        self,
+        container: RuntimeContainer,
+        store: PostgresBiStore,
+        worker_id: str,
+    ) -> None:
+        super().__init__(logger)
+        self._container = container
+        self._store = store
+        self._worker_id = worker_id
 
-    heartbeat = LeaseHeartbeat(
-        lambda: store.heartbeat_materialization(claimed.job.job_id, worker_id),
-        interval_seconds=30,
-        thread_name=f"bi-materialization-heartbeat-{claimed.job.job_id}",
-        logger=logger,
-        failure_message=(
-            f"BI materialization heartbeat failed (job_id={claimed.job.job_id})"
-        ),
-        on_lease_lost=terminate_process_on_lease_loss,
-    )
-    heartbeat.start()
-    try:
-        outcome = create_bi_materialization_runner(
-            registry,
-            completion_client,
-        ).materialize(claimed.request, claimed.job.job_id)
-        heartbeat.raise_if_lost()
-    except Exception as error:
-        logger.exception(
-            "BI materialization worker failed (job_id=%s)",
-            claimed.job.job_id,
+    def claim(self) -> ClaimedBiMaterialization | None:
+        return self._store.claim_next_materialization(
+            self._worker_id,
+            datetime.now(UTC),
         )
-        store.fail_claim(
-            claimed.job.job_id,
-            worker_id,
+
+    def lease_spec(self, claim: ClaimedBiMaterialization) -> WorkerLeaseSpec:
+        job_id = str(claim.job.job_id)
+        return WorkerLeaseSpec(
+            job_id=job_id,
+            worker_id=self._worker_id,
+            renew=lambda: self._store.heartbeat_materialization(
+                claim.job.job_id,
+                self._worker_id,
+            ),
+            thread_name=f"bi-materialization-heartbeat-{job_id}",
+            failure_message=(
+                f"BI materialization heartbeat failed (job_id={job_id})"
+            ),
+        )
+
+    def execute(
+        self,
+        claim: ClaimedBiMaterialization,
+    ) -> BiMaterializationOutcome:
+        return create_bi_materialization_runner(
+            self._container.services.module_registry,
+            self._container.completion_client,
+        ).materialize(claim.request, claim.job.job_id)
+
+    def complete(
+        self,
+        claim: ClaimedBiMaterialization,
+        output: BiMaterializationOutcome,
+        duration_seconds: float,
+    ) -> None:
+        # The queued materializer atomically persists its own outcome because a
+        # successful worker can legitimately publish an unavailable snapshot.
+        return None
+
+    def fail(
+        self,
+        claim: ClaimedBiMaterialization,
+        error: Exception,
+        duration_seconds: float,
+    ) -> None:
+        self._store.fail_claim(
+            claim.job.job_id,
+            self._worker_id,
             datetime.now(UTC),
             str(error) or type(error).__name__,
         )
-        return 1
-    finally:
-        heartbeat.stop()
 
-    print(
-        f"BI materialization {outcome.job.job_id} "
-        f"finished with {outcome.job.status.value}"
-    )
-    return 0
+    def empty_message(self) -> str:
+        return "BI materialization queue empty"
+
+    def completed_message(
+        self,
+        claim: ClaimedBiMaterialization,
+        output: BiMaterializationOutcome,
+    ) -> str:
+        return (
+            f"BI materialization {output.job.job_id} "
+            f"finished with {output.job.status.value}"
+        )
+
+    def failed_message(
+        self,
+        claim: ClaimedBiMaterialization,
+        error: Exception,
+    ) -> str:
+        return f"BI materialization worker failed (job_id={claim.job.job_id})"
+
+
+def _run(container: RuntimeContainer) -> int:
+    database_url = container.services.module_registry.db_manager.database_url
+    ensure_bi_schema(database_url)
+    return BiMaterializationWorker(
+        container,
+        PostgresBiStore(database_url),
+        default_worker_id(),
+    ).run_once()
 
 
 def main() -> int:
