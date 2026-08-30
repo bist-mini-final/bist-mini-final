@@ -20,14 +20,14 @@ from backend.domains.bi.application import (
     BiApplicationService,
     BiDashboardResult,
 )
-from backend.domains.bi.application.use_cases import MATERIALIZATION_ACTIVE
-from backend.features.bi.api_models import (
+from backend.domains.bi.application.dtos import (
     BiCompanyListResponse,
     BiDashboardPendingResponse,
     BiMaterializationAccepted,
     BiMaterializationCandidateListResponse,
 )
-from backend.features.bi.models import (
+from backend.domains.bi.application.use_cases import MATERIALIZATION_ACTIVE
+from backend.domains.bi.domain.models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
     BiMaterializationRequest,
@@ -35,8 +35,8 @@ from backend.features.bi.models import (
     JobId,
     MaterializationStatus,
 )
+from backend.domains.bi.domain.question_records import BiQuestionJobProgress
 from backend.features.bi.postgres_store import BiPostgresStoreError
-from backend.features.bi.question_records import BiQuestionJobProgress
 
 IdentifierPath = Annotated[
     str,

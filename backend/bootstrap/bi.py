@@ -3,42 +3,44 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 from backend.domains.bi.application import BiApiServices
-from backend.providers.openai_responses import OpenAIResponsesClient
-
-from .document_profiler import BiDocumentProfiler
-from .extraction import BiMetricExtractionService
-from .fast_rag_adapter import FastRagPipelineAdapter
-from .materializer import SystemClock
-from .metric_reader import BiMetricReader, BiStructuredCompletionAdapter
-from .postgres_store import PostgresBiStore
-from .profile_repository import (
+from backend.features.bi.document_profiler import BiDocumentProfiler
+from backend.features.bi.extraction import BiMetricExtractionService
+from backend.features.bi.fast_rag_adapter import FastRagPipelineAdapter
+from backend.features.bi.materializer import SystemClock
+from backend.features.bi.metric_reader import BiMetricReader, BiStructuredCompletionAdapter
+from backend.features.bi.postgres_store import PostgresBiStore
+from backend.features.bi.profile_repository import (
     PersistedBiDocumentProfiler,
     PostgresBiDocumentProfileRepository,
 )
-from .profile_sheet_catalog import (
+from backend.features.bi.profile_sheet_catalog import (
     PostgresBiProfileEvidenceRetriever,
     PostgresBiProfileSheetCatalog,
 )
-from .question_batch_worker import (
+from backend.features.bi.question_batch_worker import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_MAX_WORKERS,
     BiQuestionBatchWorker,
     SystemBiQuestionBatchWorkerClock,
 )
-from .question_pipeline import BiQuestionPipeline, PgVectorQuestionSourceResolver
-from .question_publishing import (
+from backend.features.bi.question_pipeline import BiQuestionPipeline, PgVectorQuestionSourceResolver
+from backend.features.bi.question_publishing import (
     BiPublishingQuestionService,
     BiQuestionPublicationFailureReporter,
 )
-from .question_repository import PostgresBiQuestionRepository
-from .question_service import BiQuestionService
-from .question_snapshot import (
+from backend.features.bi.question_repository import PostgresBiQuestionRepository
+from backend.features.bi.question_service import BiQuestionService
+from backend.features.bi.question_snapshot import (
     BiQuestionSnapshotMaterializer,
     BiQuestionSnapshotMaterializerServices,
 )
-from .question_snapshot_repository import PostgresBiQuestionSnapshotRepository
-from .question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
-from .queued_materializer import BiQueuedMaterializer, BiQueuedMaterializerServices
+from backend.features.bi.question_snapshot_repository import PostgresBiQuestionSnapshotRepository
+from backend.features.bi.question_worker import BiQuestionWorker, SystemBiQuestionWorkerClock
+from backend.features.bi.queued_materializer import (
+    BiQueuedMaterializer,
+    BiQueuedMaterializerServices,
+)
+from backend.providers.openai_responses import OpenAIResponsesClient
 
 if TYPE_CHECKING:
     from backend.engine.runtime.registry import ModuleRegistry
@@ -187,3 +189,4 @@ def create_bi_question_batch_worker(
         batch_size=batch_size,
         max_workers=max_workers,
     )
+

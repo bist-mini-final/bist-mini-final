@@ -3,17 +3,17 @@ from __future__ import annotations
 import json
 from threading import Barrier
 
-from backend.features.bi.document_profiler import BiDocumentProfiler
-from backend.features.bi.extraction_models import BiContextCell, BiRetrievedContext
-from backend.features.bi.materialization_models import BiDocumentProfile
-from backend.features.bi.metric_reader import JsonValue
-from backend.features.bi.models import (
+from backend.domains.bi.domain.extraction_models import BiContextCell, BiRetrievedContext
+from backend.domains.bi.domain.materialization_models import BiDocumentProfile
+from backend.domains.bi.domain.models import (
     AmountScale,
     BiMaterializationRequest,
     BiMaterializationSource,
     CompanyId,
     IndexId,
 )
+from backend.features.bi.document_profiler import BiDocumentProfiler
+from backend.features.bi.metric_reader import JsonValue
 from backend.features.bi.profile_models import BiProfileRetrievalRequest
 
 

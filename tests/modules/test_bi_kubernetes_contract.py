@@ -10,19 +10,19 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.api.bi_routes import create_bi_router
-from backend.features.bi.api_services import BiApiServices
-from backend.features.bi.database_schema import (
-    BI_SCHEMA_LOCK_KEY,
-    BI_SCHEMA_SQL,
-    ensure_bi_schema,
-)
-from backend.features.bi.materialization_models import BiCompanyIndexEntry
-from backend.features.bi.models import (
+from backend.domains.bi.application import BiApiServices
+from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiMaterializationJob,
     BiMaterializationSource,
     CompanyId,
     IndexId,
+)
+from backend.features.bi.database_schema import (
+    BI_SCHEMA_LOCK_KEY,
+    BI_SCHEMA_SQL,
+    ensure_bi_schema,
 )
 from jobs import BI_MATERIALIZATION_JOB, BI_QUESTION_JOB
 

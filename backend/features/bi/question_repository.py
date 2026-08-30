@@ -5,10 +5,7 @@ import psycopg2
 from psycopg2.extras import Json, RealDictCursor, execute_values
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
-
-from .question_claim_repository import PostgresBiQuestionClaimer
-from .question_records import (
+from backend.domains.bi.domain.question_records import (
     BiAnswerRecord,
     BiCompletedAnswerRecord,
     BiFailedAnswerRecord,
@@ -22,6 +19,9 @@ from .question_records import (
     QuestionId,
     WorkflowRunId,
 )
+from backend.storage.connection_pool import get_pooled_raw_connection
+
+from .question_claim_repository import PostgresBiQuestionClaimer
 from .question_repository_queries import (
     QUESTION_COLUMNS,
     BiQuestionRepositoryError,

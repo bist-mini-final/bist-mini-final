@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final, assert_never
 
-from .formula_dsl import FormulaEvaluationError, evaluate_formula
-from .models import (
+from backend.domains.bi.domain.formula_dsl import FormulaEvaluationError, evaluate_formula
+from backend.domains.bi.domain.models import (
     AvailableObservation,
     BiEvidence,
     MetricObservation,

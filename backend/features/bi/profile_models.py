@@ -2,7 +2,7 @@ from datetime import date
 
 from pydantic import Field
 
-from .models import (
+from backend.domains.bi.domain.models import (
     IDENTIFIER_PATTERN,
     AmountScale,
     BiContractModel,

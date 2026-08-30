@@ -1,15 +1,15 @@
 from decimal import Decimal
 
-from backend.features.bi.calculator import (
-    calculate_debt_ratio,
-    calculate_free_cash_flow_margin,
-    calculate_net_debt_ratio,
-)
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     AvailableObservation,
     MetricStatus,
     PeriodId,
     UnavailableObservation,
+)
+from backend.features.bi.calculator import (
+    calculate_debt_ratio,
+    calculate_free_cash_flow_margin,
+    calculate_net_debt_ratio,
 )
 
 PERIOD_ID = PeriodId("fy-2025")

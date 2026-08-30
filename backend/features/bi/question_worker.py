@@ -7,17 +7,9 @@ from typing import Final, Protocol, assert_never
 
 from pydantic import ValidationError
 
-from backend.engine.worker.lease import (
-    LeaseHeartbeat,
-    terminate_process_on_lease_loss,
-)
-from backend.providers.openai_responses import OpenAIResponsesError
-from modules.common.exceptions import ModuleExecutionError
-
-from .extraction_models import BiMetricExtractionResult
-from .models import AvailableObservation, UnavailableObservation
-from .question_pipeline import BiQuestionSourceError
-from .question_records import (
+from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
+from backend.domains.bi.domain.models import AvailableObservation, UnavailableObservation
+from backend.domains.bi.domain.question_records import (
     AnswerId,
     BiAnswerOutcome,
     BiAnswerRecord,
@@ -28,6 +20,14 @@ from .question_records import (
     QuestionId,
     WorkflowRunId,
 )
+from backend.engine.worker.lease import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
+from backend.providers.openai_responses import OpenAIResponsesError
+from modules.common.exceptions import ModuleExecutionError
+
+from .question_pipeline import BiQuestionSourceError
 from .rag_errors import RagPipelineContractError
 
 BI_WORKER_MODEL: Final = "gpt-5.6-luna"

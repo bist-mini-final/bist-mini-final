@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from pydantic import Field
 
-from .models import BiContractModel
+from backend.domains.bi.domain.models import BiContractModel
 
 
 class FastRagPipelineSettings(BiContractModel):

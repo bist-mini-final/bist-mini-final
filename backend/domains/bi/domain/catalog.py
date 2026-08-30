@@ -179,3 +179,4 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
         ),
     }
 )
+

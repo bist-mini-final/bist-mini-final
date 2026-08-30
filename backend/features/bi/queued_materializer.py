@@ -3,19 +3,15 @@ from typing import Protocol, assert_never
 
 from pydantic import ValidationError
 
-from backend.providers.openai_responses import OpenAIResponsesError
-from modules.common.exceptions import ModuleExecutionError
-
-from .catalog import METRIC_CATALOG, SourceMetricDefinition
-from .extraction_models import BiMetricExtractionResult
-from .materialization_models import (
+from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
+from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
+from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
     BiMaterializationOutcome,
     BiProfilingFailure,
     BiSnapshotBuildInput,
 )
-from .materializer import BiDocumentProfilerPort, ClockPort
-from .models import (
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiDashboardSnapshot,
     BiMaterializationJob,
@@ -25,9 +21,13 @@ from .models import (
     MetricStatus,
     UnavailableObservation,
 )
+from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
+from backend.domains.bi.domain.question_records import BiQuestionJobProgress
+from backend.providers.openai_responses import OpenAIResponsesError
+from modules.common.exceptions import ModuleExecutionError
+
+from .materializer import BiDocumentProfilerPort, ClockPort
 from .profile_repository import BiDocumentProfileRepositoryError
-from .question_batch import BiQuestionBatchPlan
-from .question_records import BiQuestionJobProgress
 from .question_repository import BiQuestionRegistrationError
 from .question_repository_queries import BiQuestionRepositoryError
 from .rag_errors import RagPipelineContractError

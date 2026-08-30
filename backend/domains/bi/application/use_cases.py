@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Final
 
-from backend.features.bi.api_models import (
+from backend.domains.bi.application.dtos import (
     BiCompanyListResponse,
     BiCompanySummary,
     BiMaterializationAccepted,
     BiMaterializationCandidateListResponse,
 )
-from backend.features.bi.api_state import (
+from backend.domains.bi.application.projections import (
     accepted,
     build_company_summary,
     build_materialization_candidate,
@@ -21,11 +21,7 @@ from backend.features.bi.api_state import (
     job_id_for,
     with_refresh_state,
 )
-from backend.features.bi.dashboard_recalculation import (
-    BiDashboardRecalculationError,
-    recalculate_dashboard,
-)
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiDashboardSnapshot,
     BiMaterializationJob,
@@ -34,12 +30,16 @@ from backend.features.bi.models import (
     JobId,
     MaterializationStatus,
 )
+from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
+from backend.domains.bi.domain.question_records import BiQuestionJobProgress
+from backend.features.bi.dashboard_recalculation import (
+    BiDashboardRecalculationError,
+    recalculate_dashboard,
+)
 from backend.features.bi.postgres_store import (
     BiDashboardDeleteActiveError,
     BiPostgresStoreError,
 )
-from backend.features.bi.question_batch import BiQuestionBatchPlan
-from backend.features.bi.question_records import BiQuestionJobProgress
 from backend.features.bi.question_repository import (
     BiQuestionRegistrationError,
     BiQuestionResetActiveError,

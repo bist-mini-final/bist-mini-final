@@ -2,14 +2,14 @@ from datetime import UTC, datetime
 
 import pytest
 
-from backend.features.bi.api_models import (
+from backend.domains.bi.application.dtos import (
     BiCompanyListResponse,
     BiCompanySummary,
     BiMaterializationCandidateReason,
 )
-from backend.features.bi.api_state import build_materialization_candidate
-from backend.features.bi.materialization_models import BiCompanyIndexEntry
-from backend.features.bi.models import (
+from backend.domains.bi.application.projections import build_materialization_candidate
+from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiDashboardSnapshot,
     BiMaterializationJob,

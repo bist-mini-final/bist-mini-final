@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     IDENTIFIER_PATTERN,
     AmountScale,
     BiContractModel,
@@ -210,4 +210,3 @@ __all__ = [
     "ComparisonSpotlight",
     "FinancialTier",
 ]
-

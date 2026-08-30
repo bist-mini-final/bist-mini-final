@@ -2,10 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, assert_never
 
-from .catalog import METRIC_CATALOG, SourceMetricDefinition
-from .extraction_models import BiMetricExtractionResult
-from .materialization_models import BiDocumentProfile, BiSnapshotRefreshInput
-from .models import (
+from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
+from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
+from backend.domains.bi.domain.materialization_models import (
+    BiDocumentProfile,
+    BiSnapshotRefreshInput,
+)
+from backend.domains.bi.domain.models import (
     BiDashboardSnapshot,
     BiMaterializationJob,
     BiMaterializationRequest,
@@ -18,11 +21,12 @@ from .models import (
     SnapshotStatus,
     UnavailableObservation,
 )
-from .question_records import (
+from backend.domains.bi.domain.question_records import (
     BiQuestionJobProgress,
     BiQuestionRecord,
     BiQuestionStatus,
 )
+
 from .snapshot_builder import BiSnapshotBuilder
 
 

@@ -84,3 +84,4 @@ class BiMetricExtractionResult(BiContractModel):
     currency: Annotated[str | None, Field(pattern=r"^[A-Z]{3}$")]
     scale: AmountScale | None
     observation: MetricObservation
+

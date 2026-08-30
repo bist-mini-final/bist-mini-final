@@ -1,6 +1,11 @@
 from hashlib import sha256
 from typing import assert_never
 
+from backend.domains.bi.domain.extraction_models import (
+    BiContextCell,
+    BiRetrievalRequest,
+    BiRetrievedContext,
+)
 from modules.common.base_module import QueryContextDTO
 from modules.embedding.query_embedder import EmbeddingsDTO
 from modules.query.decomposer import SubqueriesDTO
@@ -13,11 +18,6 @@ from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
 from modules.retrieval.rrf_fusion import RetrievalDTO
 from modules.storage.pgvector_data_scope import DataScopeCatalogDTO, DataScopeDTO
 
-from .extraction_models import (
-    BiContextCell,
-    BiRetrievalRequest,
-    BiRetrievedContext,
-)
 from .fast_rag_models import (
     FastRagPipelineSettings,
     RankedEvidenceCell,

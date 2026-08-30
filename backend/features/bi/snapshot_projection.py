@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from .current_periods import select_current_periods
-from .extraction_models import BiMetricExtractionResult
-from .materialization_models import BiSnapshotBuildInput, BiSnapshotRefreshInput
-from .models import (
+from backend.domains.bi.domain.current_periods import select_current_periods
+from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
+from backend.domains.bi.domain.materialization_models import (
+    BiSnapshotBuildInput,
+    BiSnapshotRefreshInput,
+)
+from backend.domains.bi.domain.models import (
     AmountScale,
     BiMaterializationRequest,
     BiPeriod,

@@ -13,7 +13,7 @@ from backend.domains.bi.application.use_cases import (
     BiConflictError,
     BiNotFoundError,
 )
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     BiMaterializationJob,
     BiMaterializationRequest,
     BiMaterializationSource,
@@ -22,7 +22,7 @@ from backend.features.bi.models import (
     JobId,
     MaterializationStatus,
 )
-from backend.features.bi.question_records import BiQuestionJobProgress
+from backend.domains.bi.domain.question_records import BiQuestionJobProgress
 
 NOW = datetime(2026, 8, 31, 12, tzinfo=UTC)
 

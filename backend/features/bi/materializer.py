@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from typing import Protocol
 
-from .materialization_models import BiProfilingResult
-from .models import BiMaterializationRequest
+from backend.domains.bi.domain.materialization_models import BiProfilingResult
+from backend.domains.bi.domain.models import BiMaterializationRequest
 
 
 class BiDocumentProfilerPort(Protocol):

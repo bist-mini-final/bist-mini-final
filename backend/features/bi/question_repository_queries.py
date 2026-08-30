@@ -7,12 +7,7 @@ from psycopg.rows import dict_row
 from psycopg2.extras import RealDictCursor
 from pydantic import TypeAdapter
 
-from backend.storage.connection_pool import (
-    get_pooled_async_connection,
-    get_pooled_raw_connection,
-)
-
-from .question_records import (
+from backend.domains.bi.domain.question_records import (
     BiAnswerOutcome,
     BiCompletedAnswerRecord,
     BiLatestAnswerQuery,
@@ -21,6 +16,10 @@ from .question_records import (
     BiQuestionStatus,
     JobId,
     QuestionId,
+)
+from backend.storage.connection_pool import (
+    get_pooled_async_connection,
+    get_pooled_raw_connection,
 )
 
 QUESTION_COLUMNS: Final = (

@@ -4,7 +4,7 @@ from typing import cast
 import pytest
 from pydantic import ValidationError
 
-from backend.features.bi.models import BiDashboardSnapshot
+from backend.domains.bi.domain.models import BiDashboardSnapshot
 from backend.features.bi.postgres_store import PostgresBiStore
 from backend.features.bi.snapshot_compatibility import normalize_snapshot_payload
 
