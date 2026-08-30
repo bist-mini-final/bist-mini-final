@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { X } from 'lucide-react';
-import { IconButton } from '../../shared/ui';
+import { IconButton, PromptDialog } from '../../shared/ui';
 import { useBiPlaygroundHandoff } from '../bi/integrations/playgroundHandoffAdapter';
 import { Header } from './components/Header';
 import type { WorkflowOption } from './components/Header';
@@ -18,6 +18,10 @@ import type { WorkflowDocument } from './types';
 import './playground.css';
 
 const DEFAULT_WORKFLOW_ID = 'rag_query';
+
+type WorkflowPrompt =
+  | { readonly type: 'duplicate'; readonly initialValue: string }
+  | { readonly type: 'template'; readonly templateId: string; readonly initialValue: string };
 
 function workflowOptions(documents: WorkflowDocument[]): WorkflowOption[] {
   return documents
@@ -49,6 +53,9 @@ function PlaygroundWorkspace() {
   const [activeWorkflowId, setActiveWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
   const [isTemplatePanelOpen, setIsTemplatePanelOpen] = useState(false);
   const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(true);
+  const [workflowPrompt, setWorkflowPrompt] = useState<WorkflowPrompt | null>(null);
+  const [workflowPromptError, setWorkflowPromptError] = useState<string | null>(null);
+  const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
   const activeWorkflow = useMemo(
     () => workflows.find((workflow) => workflow.id === activeWorkflowId),
     [workflows, activeWorkflowId]
@@ -160,46 +167,49 @@ function PlaygroundWorkspace() {
     name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
 
   const handleDuplicateWorkflow = () => {
-    const source = activeWorkflowName;
-    const name = window.prompt('복제할 워크플로 이름을 입력하세요.', `${source} 복사본`);
-    if (!name?.trim()) return;
-    const baseId = workflowIdFromName(name) || 'workflow-copy';
-    let id = baseId;
-    let suffix = 2;
-    while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
-
-    void pipelineApi.saveWorkflow(id, name.trim(), graph.exportGraph())
-      .then(async () => {
-        await refreshWorkflows();
-        handleSelectWorkflow(id);
-      })
-      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 복제하지 못했습니다.'));
+    setWorkflowPromptError(null);
+    setWorkflowPrompt({ type: 'duplicate', initialValue: `${activeWorkflowName} 복사본` });
   };
 
-  const handleCreateFromTemplate = async (templateId: string) => {
+  const handleCreateFromTemplate = (templateId: string) => {
     const template = workflows.find(
       (item) => item.id === templateId && item.template,
     );
     if (!template) return;
-    const name = window.prompt(
-      '새 워크플로 이름을 입력하세요.',
-      `${template.name} 복사본`,
-    );
-    if (!name?.trim()) return;
-    const baseId = workflowIdFromName(name) || 'workflow-template';
+    setWorkflowPromptError(null);
+    setWorkflowPrompt({
+      type: 'template',
+      templateId,
+      initialValue: `${template.name} 복사본`,
+    });
+  };
+
+  const createWorkflow = async (name: string) => {
+    const request = workflowPrompt;
+    if (!request || isCreatingWorkflow) return;
+    const baseId = workflowIdFromName(name)
+      || (request.type === 'template' ? 'workflow-template' : 'workflow-copy');
     let id = baseId;
     let suffix = 2;
     while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
 
+    setIsCreatingWorkflow(true);
+    setWorkflowPromptError(null);
     try {
-      const source = await pipelineApi.getWorkflow(templateId);
-      await pipelineApi.saveWorkflow(id, name.trim(), source.graph);
+      const workflowGraph = request.type === 'template'
+        ? (await pipelineApi.getWorkflow(request.templateId)).graph
+        : graph.exportGraph();
+      await pipelineApi.saveWorkflow(id, name, workflowGraph);
       await refreshWorkflows();
       handleSelectWorkflow(id);
+      setWorkflowPrompt(null);
+      if (request.type === 'template') setIsTemplatePanelOpen(false);
     } catch (error: unknown) {
-      controller.reportError(
-        error instanceof Error ? error.message : '표준 워크플로를 복사하지 못했습니다.'
+      setWorkflowPromptError(
+        error instanceof Error ? error.message : '워크플로를 생성하지 못했습니다.'
       );
+    } finally {
+      setIsCreatingWorkflow(false);
     }
   };
 
@@ -259,6 +269,7 @@ function PlaygroundWorkspace() {
       }}
     >
       <div className="app-shell">
+        <h1 className="page-visually-hidden">RAG 워크플로 플레이그라운드</h1>
         <Header
           activeStep={activeBatch}
           totalSteps={totalBatches}
@@ -298,7 +309,7 @@ function PlaygroundWorkspace() {
           </div>
         )}
 
-        <main
+        <section
           className="app-workspace"
           style={{ '--module-palette-width': `${modulePanel.width}px` } as React.CSSProperties}
         >
@@ -330,20 +341,38 @@ function PlaygroundWorkspace() {
           <PipelineCanvas
             graph={graph}
             modules={controller.modules}
-            runs={workflow.runs}
+            currentRun={currentRun}
             isPaletteOpen={isPaletteOpen}
             onOpenPalette={() => setIsPaletteOpen(true)}
             activeWorkflowId={activeWorkflowId}
             readOnly={!workflow.isEditableWorkflow}
           />
-        </main>
+        </section>
         <WorkflowTemplatePanel
           isOpen={isTemplatePanelOpen}
           isLoading={isWorkflowListLoading}
           workflows={workflows}
           modules={controller.modules}
           onClose={() => setIsTemplatePanelOpen(false)}
-          onCreateFromTemplate={(templateId) => void handleCreateFromTemplate(templateId)}
+          onCreateFromTemplate={handleCreateFromTemplate}
+        />
+        <PromptDialog
+          open={workflowPrompt !== null}
+          title={workflowPrompt?.type === 'template' ? '템플릿으로 워크플로 만들기' : '워크플로 복제'}
+          description={workflowPrompt?.type === 'template'
+            ? '표준 템플릿을 편집 가능한 새 워크플로로 복제합니다.'
+            : '현재 워크플로의 모듈과 연결 구성을 새 워크플로로 복제합니다.'}
+          label="워크플로 이름"
+          initialValue={workflowPrompt?.initialValue ?? ''}
+          confirmLabel="워크플로 생성"
+          busy={isCreatingWorkflow}
+          error={workflowPromptError}
+          onClose={() => {
+            if (isCreatingWorkflow) return;
+            setWorkflowPrompt(null);
+            setWorkflowPromptError(null);
+          }}
+          onConfirm={(name) => { void createWorkflow(name); }}
         />
       </div>
     </ModuleExecutionContext.Provider>

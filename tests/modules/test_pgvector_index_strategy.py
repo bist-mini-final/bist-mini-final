@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from unittest.mock import MagicMock
 
 from backend.storage.pgvector_store import (
     VECTOR_INDEX_STRATEGY,
@@ -53,3 +54,25 @@ def test_collection_index_uses_binary_quantization_and_exact_vector_is_retained(
     assert connection.closed is True
     assert VECTOR_INDEX_STRATEGY == "binary_quantized_hnsw_exact_rerank"
     assert VECTOR_PARTITION_STRATEGY == "collection_local_partial_indexes"
+
+
+def test_search_encodes_query_with_the_collection_model() -> None:
+    store = PgVectorStore("postgresql://unused")
+    encoder = MagicMock()
+    encoder.encode_for_model.return_value = [[0.1, 0.2, 0.3]]
+    cast(Any, store).similarity_search_by_vector_with_score = MagicMock(return_value=[])
+
+    result = store.search(
+        "idx-test",
+        query_text="Total Revenue 2024",
+        model_name="text-embedding-3-large",
+        embedding_encoder=encoder,
+        limit=5,
+    )
+
+    assert result == []
+    encoder.encode_for_model.assert_called_once_with(
+        ["Total Revenue 2024"],
+        "text-embedding-3-large",
+    )
+    encoder.encode.assert_not_called()

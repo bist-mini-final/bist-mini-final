@@ -3,9 +3,7 @@
    ========================================================================== */
 
 .ds-page {
-  width: min(100%, 96rem);
-  margin: 0 auto;
-  padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1.2rem, 3.5vw, 3rem) 4rem;
+  width: 100%;
 }
 
 /* Summary Grid */
@@ -213,6 +211,28 @@
   background: #f8fafc;
 }
 
+.ds-table .ds-index-row td {
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.ds-table .ds-index-row--updating td,
+.ds-table .ds-index-row--updating:hover td {
+  background: #f3faf6;
+}
+
+.ds-table .ds-index-row--updating td:first-child {
+  box-shadow: inset 3px 0 0 #62b98a;
+}
+
+.ds-table .ds-index-row--deleting td,
+.ds-table .ds-index-row--deleting:hover td {
+  background: #fff7f5;
+}
+
+.ds-table .ds-index-row--deleting td:first-child {
+  box-shadow: inset 3px 0 0 #d86b5e;
+}
+
 .ds-model-badge {
   display: inline-flex;
   align-items: center;
@@ -258,6 +278,8 @@
   color: #166534;
   font-size: 0.75rem;
   font-weight: 700;
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
   transition: all 120ms ease;
   max-width: 220px;
@@ -424,6 +446,48 @@
   gap: 0.45rem;
   white-space: nowrap;
   flex-wrap: nowrap;
+}
+
+.ds-company-badge:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
+.ds-company-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ds-company-edit-error {
+  color: #b42318;
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.ds-company-operation-status,
+.ds-row-operation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.ds-company-operation-status {
+  color: #17734b;
+}
+
+.ds-row-operation {
+  min-height: var(--control-h-sm);
+  justify-content: flex-end;
+  border: 1px solid #efc4be;
+  border-radius: var(--control-radius);
+  background: #fff1ef;
+  padding: 0 0.65rem;
+  color: #a33a32;
 }
 
 /* Empty & Loading */
@@ -1416,4 +1480,48 @@
   .ds-pipeline-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Shared product visual system alignment */
+.ds-page { color: var(--text); }
+.ds-summary-grid { gap: .75rem; margin-bottom: 1rem; }
+.ds-summary-card {
+  min-height: 7.5rem;
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--duration-standard) var(--ease-standard), border-color var(--duration-standard) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard);
+}
+.ds-summary-card:hover { border-color: var(--brand-200); box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+.ds-summary-card__header { color: var(--text-muted); }
+.ds-summary-card__value { color: var(--text-strong); }
+.ds-summary-card__caption { color: var(--text-subtle); }
+.ds-panel,
+.ds-pipeline-main-card,
+.ds-pipeline-hud-card {
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.ds-panel__header h3 { color: var(--text); }
+.ds-panel__header small { color: var(--text-muted); }
+.ds-table-container { border: 1px solid var(--border-subtle); background: var(--surface); }
+.ds-table th,
+.ds-table th.ds-actions-col { border-color: var(--border); background: var(--surface-muted); color: var(--text-muted); }
+.ds-table td,
+.ds-table td.ds-actions-col { border-color: var(--border-subtle); background: var(--surface); color: var(--text-secondary); }
+.ds-table tr:hover td,
+.ds-table tr:hover td.ds-actions-col { background: var(--surface-subtle); }
+.ds-modal-backdrop { background: rgb(13 28 20 / 42%); backdrop-filter: blur(4px); }
+.ds-modal { border-color: var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-dialog); }
+.ds-loading-pane { border-color: var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-card); }
+.ds-hud-metric-row { border-color: var(--border-subtle); }
+.ds-hud-metric-label { color: var(--text-muted); }
+.ds-hud-metric-value { color: var(--text-strong); }
+
+@media (max-width: 640px) {
+  .ds-summary-grid { grid-template-columns: minmax(0, 1fr); }
+  .ds-panel { padding: 1rem; }
 }

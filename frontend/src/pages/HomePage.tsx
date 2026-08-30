@@ -2,218 +2,241 @@ import {
   ArrowRight,
   BarChart3,
   Bot,
-  ChartNoAxesCombined,
+  CheckCircle2,
   Database,
+  FileSearch,
   FileSpreadsheet,
+  LayoutDashboard,
+  MessageSquareText,
   Scale,
+  ScanSearch,
   Sparkles,
-  TrendingUp,
+  Waypoints,
   Workflow,
+  type LucideIcon,
 } from 'lucide-react';
 import { AppLink } from '../app/router';
+import './HomePage.css';
 
-const secondaryCards = [
+interface JourneyStep {
+  readonly number: string;
+  readonly title: string;
+  readonly description: string;
+  readonly action: string;
+  readonly path: string;
+  readonly icon: LucideIcon;
+}
+
+interface WorkspaceLink {
+  readonly path: string;
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly description: string;
+  readonly action: string;
+  readonly tone: 'green' | 'blue' | 'violet' | 'indigo' | 'cyan';
+  readonly icon: LucideIcon;
+  readonly featured?: boolean;
+}
+
+const journeySteps: readonly JourneyStep[] = [
+  {
+    number: '01',
+    title: 'Excel 원본 적재',
+    description: '재무 Excel을 업로드하고 기업명과 인덱싱 상태를 확인합니다.',
+    action: '데이터 소스 열기',
+    path: '/data-sources',
+    icon: FileSpreadsheet,
+  },
+  {
+    number: '02',
+    title: '워크플로 검증',
+    description: '표준 RAG 파이프라인의 모듈별 입력·출력과 실행 흐름을 검증합니다.',
+    action: '플레이그라운드 열기',
+    path: '/playground',
+    icon: Workflow,
+  },
+  {
+    number: '03',
+    title: '기업 스냅샷 생성',
+    description: '적재된 기업을 선택해 BI 분석용 스냅샷을 생성하고 갱신합니다.',
+    action: 'BI 대시보드 열기',
+    path: '/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    number: '04',
+    title: '질문하고 근거 확인',
+    description: '재무 질문의 답변과 셀 근거를 원본 시트 이미지에서 확인합니다.',
+    action: 'AI 챗봇 열기',
+    path: '/chatbot',
+    icon: MessageSquareText,
+  },
+];
+
+const workspaceLinks: readonly WorkspaceLink[] = [
+  {
+    path: '/playground',
+    eyebrow: 'BUILD & OBSERVE',
+    title: '플레이그라운드',
+    description: '모듈을 조합하고 Kubernetes DAG의 실행 상태와 각 단계 결과를 관찰합니다.',
+    action: '워크플로 열기',
+    tone: 'green',
+    icon: Workflow,
+    featured: true,
+  },
+  {
+    path: '/data-sources',
+    eyebrow: 'INGEST & INDEX',
+    title: '데이터 소스',
+    description: 'Excel 파일, 기업 메타데이터, pgvector 인덱스와 적재 작업을 관리합니다.',
+    action: '데이터 관리',
+    tone: 'blue',
+    icon: Database,
+  },
+  {
+    path: '/dashboard',
+    eyebrow: 'ANALYZE',
+    title: 'BI 대시보드',
+    description: '기업별 재무 스냅샷을 카드와 시계열 차트로 분석합니다.',
+    action: '대시보드 열기',
+    tone: 'violet',
+    icon: BarChart3,
+  },
   {
     path: '/chatbot',
+    eyebrow: 'ASK & VERIFY',
     title: 'AI 금융 챗봇',
-    description: '자연어로 질의하고 실시간 재무 데이터 기반의 정확한 인사이트와 답변을 제공받습니다.',
-    icon: Bot,
+    description: '대화형 재무 답변을 받고 인용 셀을 원본 시트에서 검증합니다.',
+    action: '새 질문 시작',
     tone: 'indigo',
+    icon: Bot,
   },
   {
     path: '/company-comparison',
-    title: '기업 비교 대시보드',
-    description: 'IBM, Bistelligence, DH Innovation 등 다중 기업 간의 재무 비율과 성장성을 크로스 비교합니다.',
-    icon: Scale,
+    eyebrow: 'COMPARE',
+    title: '기업 비교',
+    description: '여러 기업의 성장성·수익성·안정성을 동일한 기준으로 비교합니다.',
+    action: '기업 비교 열기',
     tone: 'cyan',
+    icon: Scale,
   },
+];
+
+const analysisFlow = [
+  { label: 'Excel', detail: '원본 데이터', icon: FileSpreadsheet },
+  { label: 'Structure', detail: '셀 계층 인식', icon: ScanSearch },
+  { label: 'Retrieve', detail: '하이브리드 검색', icon: Waypoints },
+  { label: 'Evidence', detail: '원본 셀 검증', icon: FileSearch },
 ] as const;
 
-/**
- * Renders the workspace landing page with links to available and upcoming workspaces.
- */
+/** Product onboarding hub for first-time and returning users. */
 export function HomePage() {
   return (
-    <div className="home-page">
-      <section className="home-hero" aria-labelledby="home-hero-title">
-        <div>
-          <div className="home-eyebrow">
-            <Sparkles size={13} />
-            <span>AI FINANCIAL INTELLIGENCE PLATFORM</span>
+    <div className="home-onboarding">
+      <section className="home-onboarding__hero" aria-labelledby="home-title">
+        <div className="home-onboarding__intro">
+          <div className="home-onboarding__eyebrow">
+            <Sparkles aria-hidden="true" />
+            <span>FINANCIAL RAG WORKSPACE</span>
           </div>
-          <h1 id="home-hero-title">
-            엑셀 구조화부터 지능형 금융 RAG까지
-          </h1>
+          <h1 id="home-title">재무 Excel을 올리고,<br />근거까지 검증하세요.</h1>
           <p>
-            비정형 스프레드시트의 셀 구조를 VLM으로 분석하고, 인덱스별 차원이 보장된 pgvector와
-            Kubernetes DAG 파이프라인으로 빠른 재무 분석 및 근거 기반 답변을 제공합니다.
+            비정형 스프레드시트를 셀 단위로 구조화하고 검색·분석·비교·질의까지
+            하나의 검증 가능한 흐름으로 연결합니다.
           </p>
+          <div className="home-onboarding__actions" aria-label="빠른 시작">
+            <AppLink to="/data-sources" className="home-onboarding__primary-action">
+              <FileSpreadsheet aria-hidden="true" />
+              Excel 데이터 추가
+              <ArrowRight aria-hidden="true" />
+            </AppLink>
+            <AppLink to="/playground" className="home-onboarding__secondary-action">
+              <Workflow aria-hidden="true" />
+              플레이그라운드 열기
+            </AppLink>
+          </div>
+          <ul className="home-onboarding__capabilities" aria-label="핵심 기능">
+            <li><CheckCircle2 aria-hidden="true" /> 셀 계층 구조 보존</li>
+            <li><CheckCircle2 aria-hidden="true" /> pgvector + 키워드 검색</li>
+            <li><CheckCircle2 aria-hidden="true" /> 원본 시트 근거 검증</li>
+          </ul>
         </div>
+
+        <aside className="home-flow" aria-label="재무 데이터 분석 흐름">
+          <header className="home-flow__header">
+            <div>
+              <span>END-TO-END FLOW</span>
+              <strong>원본부터 검증 가능한 답변까지</strong>
+            </div>
+            <span className="home-flow__status"><i /> 4 stages</span>
+          </header>
+          <ol className="home-flow__steps">
+            {analysisFlow.map(({ label, detail, icon: Icon }, index) => (
+              <li key={label}>
+                <span className="home-flow__icon"><Icon aria-hidden="true" /></span>
+                <div><strong>{label}</strong><small>{detail}</small></div>
+                {index < analysisFlow.length - 1 && <ArrowRight aria-hidden="true" />}
+              </li>
+            ))}
+          </ol>
+          <div className="home-flow__result">
+            <span><FileSearch aria-hidden="true" /></span>
+            <div>
+              <small>ANSWER TRACE</small>
+              <strong>Sheet · Cell 좌표까지 추적</strong>
+              <p>근거 뱃지를 클릭해 실제 Excel 시트의 원본 셀을 확인할 수 있습니다.</p>
+            </div>
+          </div>
+        </aside>
       </section>
 
-      <section className="home-section" aria-labelledby="workspace-title">
-        <div className="home-section__heading">
+      <section className="home-onboarding__section" aria-labelledby="journey-title">
+        <header className="home-onboarding__section-heading">
+          <div>
+            <span>QUICK START</span>
+            <h2 id="journey-title">처음이라면 이렇게 시작하세요</h2>
+          </div>
+          <p>데이터 준비부터 답변 검증까지 권장 순서입니다.</p>
+        </header>
+        <ol className="home-journey">
+          {journeySteps.map(({ number, title, description, action, path, icon: Icon }) => (
+            <li key={number}>
+              <AppLink to={path} className="home-journey__card">
+                <div className="home-journey__topline">
+                  <span className="home-journey__icon"><Icon aria-hidden="true" /></span>
+                  <b>{number}</b>
+                </div>
+                <strong>{title}</strong>
+                <p>{description}</p>
+                <span className="home-journey__action">{action}<ArrowRight aria-hidden="true" /></span>
+              </AppLink>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="home-onboarding__section" aria-labelledby="workspace-title">
+        <header className="home-onboarding__section-heading">
           <div>
             <span>WORKSPACES</span>
-            <h2 id="workspace-title">작업 공간</h2>
+            <h2 id="workspace-title">목적에 맞는 작업 공간으로 이동하세요</h2>
           </div>
-          <small>5개 작업공간 사용 가능</small>
-        </div>
-
-        <div className="workspace-grid">
-          {/* 1. Pipeline Playground */}
-          <AppLink to="/playground" className="workspace-card workspace-card--featured">
-            <div className="playground-preview" aria-hidden="true">
-              <span className="preview-glow preview-glow--one" />
-              <span className="preview-glow preview-glow--two" />
-              <div className="preview-node preview-node--query">
-                <span>01</span><strong>Query</strong><small>질문 입력 & 분해</small>
+          <p>5개 작업 공간을 모두 사용할 수 있습니다.</p>
+        </header>
+        <div className="home-workspaces">
+          {workspaceLinks.map(({ path, eyebrow, title, description, action, tone, icon: Icon, featured }) => (
+            <AppLink
+              key={path}
+              to={path}
+              className={`home-workspace home-workspace--${tone}${featured ? ' home-workspace--featured' : ''}`}
+            >
+              <span className="home-workspace__icon"><Icon aria-hidden="true" /></span>
+              <div className="home-workspace__copy">
+                <span>{eyebrow}</span>
+                <strong>{title}</strong>
+                <p>{description}</p>
               </div>
-              <div className="preview-path preview-path--one" />
-              <div className="preview-node preview-node--retrieval">
-                <span>02</span><strong>Retrieve</strong><small>pgvector RRF 검색</small>
-              </div>
-              <div className="preview-path preview-path--two" />
-              <div className="preview-node preview-node--reader">
-                <span>03</span><strong>Reader</strong><small>수식 & 정제 답변</small>
-              </div>
-            </div>
-            <div className="workspace-card__footer">
-              <span className="workspace-card__icon workspace-card__icon--green">
-                <Workflow size={18} />
-              </span>
-              <div>
-                <strong>Pipeline Playground</strong>
-                <small>모듈을 조합하고 제로 I/O 인메모리로 즉시 실행</small>
-              </div>
-              <span className="workspace-card__action"><ArrowRight size={17} /></span>
-            </div>
-          </AppLink>
-
-          {/* 2. Data Sources & pgvector */}
-          <AppLink to="/data-sources" className="workspace-card">
-            <div className="datasources-preview" aria-hidden="true">
-              <span className="preview-glow preview-glow--blue-one" />
-              <span className="preview-glow preview-glow--blue-two" />
-              <div className="ds-preview-container">
-                <div className="ds-preview-card">
-                  <div className="ds-preview-card__header">
-                    <div className="ds-preview-card__header-left">
-                      <FileSpreadsheet size={13} style={{ color: '#2563eb' }} />
-                      <span>Luna VLM 구조화</span>
-                    </div>
-                    <span className="ds-preview-card__badge">Table Bounds</span>
-                  </div>
-                  <div className="ds-preview-card__items">
-                    <span>[SHEET] KeyStats / IS</span>
-                    <span>[COL] Total Revenue 2024</span>
-                    <span>[VAL] $62,472M (Audited)</span>
-                  </div>
-                </div>
-
-                <div className="ds-preview-connector">
-                  <span className="ds-preview-connector__pill">
-                    <Sparkles size={9} /> INDEX-BOUND
-                  </span>
-                  <ArrowRight size={14} />
-                </div>
-
-                <div className="ds-preview-card">
-                  <div className="ds-preview-card__header">
-                    <div className="ds-preview-card__header-left">
-                      <Database size={13} style={{ color: '#4f46e5' }} />
-                      <span>PostgreSQL pgvector</span>
-                    </div>
-                    <span className="ds-preview-card__badge">HNSW</span>
-                  </div>
-                  <div className="ds-preview-card__items">
-                    <span style={{ color: '#2563eb', fontWeight: 700 }}>Cosine sim: 0.988</span>
-                    <span>Multi-Company Collections</span>
-                    <span>Native Full-Text + Vector</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="workspace-card__footer">
-              <span className="workspace-card__icon workspace-card__icon--blue">
-                <Database size={18} />
-              </span>
-              <div>
-                <strong>데이터 소스 & pgvector</strong>
-                <small>엑셀 구조화 및 고밀도 벡터 인덱스 관리</small>
-              </div>
-              <span className="workspace-card__action"><ArrowRight size={17} /></span>
-            </div>
-          </AppLink>
-
-          {/* 3. BI Financial Dashboard */}
-          <AppLink to="/dashboard" className="workspace-card">
-            <div className="dashboard-preview" aria-hidden="true">
-              <span className="preview-glow preview-glow--violet-one" />
-              <span className="preview-glow preview-glow--violet-two" />
-              <div className="bi-preview-container">
-                <div className="bi-preview-card">
-                  <div className="bi-preview-card__header">
-                    <div className="bi-preview-card__header-left">
-                      <TrendingUp size={13} style={{ color: '#7c3aed' }} />
-                      <span>매출 & 영업이익 추이</span>
-                    </div>
-                    <span className="bi-preview-card__badge">Growth</span>
-                  </div>
-                  <div className="bi-preview-bars">
-                    <div className="bi-preview-bar" style={{ height: '40%' }} />
-                    <div className="bi-preview-bar" style={{ height: '55%' }} />
-                    <div className="bi-preview-bar" style={{ height: '70%' }} />
-                    <div className="bi-preview-bar" style={{ height: '85%' }} />
-                    <div className="bi-preview-bar" style={{ height: '100%' }} />
-                  </div>
-                </div>
-
-                <div className="bi-preview-card">
-                  <div className="bi-preview-card__header">
-                    <div className="bi-preview-card__header-left">
-                      <BarChart3 size={13} style={{ color: '#9333ea' }} />
-                      <span>재무 건전성 분석</span>
-                    </div>
-                    <span className="bi-preview-card__badge">3개사 통합</span>
-                  </div>
-                  <div className="ds-preview-card__items">
-                    <span style={{ color: '#7c3aed', fontWeight: 700 }}>영업이익률: 14.8%</span>
-                    <span>부채비율: 78.2% (안정)</span>
-                    <span>ROE / ROA 실시간 산출</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="workspace-card__footer">
-              <span className="workspace-card__icon workspace-card__icon--violet">
-                <ChartNoAxesCombined size={18} />
-              </span>
-              <div>
-                <strong>BI 재무 대시보드</strong>
-                <small>기업별 재무제표 탐색 및 인터랙티브 인터페이스</small>
-              </div>
-              <span className="workspace-card__action"><ArrowRight size={17} /></span>
-            </div>
-          </AppLink>
-
-          {/* Secondary workspace cards */}
-          {secondaryCards.map(({ path, title, description, icon: Icon, tone }) => (
-            <AppLink key={path} to={path} className="workspace-card">
-              <div className={`planned-preview planned-preview--${tone}`}>
-                <span className="planned-preview__badge">AVAILABLE</span>
-                <Icon size={34} strokeWidth={1.45} />
-              </div>
-              <div className="workspace-card__footer">
-                <span className={`workspace-card__icon workspace-card__icon--${tone}`}>
-                  <Icon size={18} />
-                </span>
-                <div>
-                  <strong>{title}</strong>
-                  <small>{description}</small>
-                </div>
-                <span className="workspace-card__action"><ArrowRight size={17} /></span>
-              </div>
+              <span className="home-workspace__action">{action}<ArrowRight aria-hidden="true" /></span>
             </AppLink>
           ))}
         </div>

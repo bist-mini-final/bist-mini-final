@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BiApiRequestError,
   createBiMaterialization,
+  deleteBiDashboard,
   fetchBiCompanies,
   fetchBiDashboard,
   fetchBiMaterializationCandidates,
@@ -117,6 +118,18 @@ describe('BI API service', () => {
     const result = await fetchBiDashboard('acme', new AbortController().signal);
 
     expect(result.kind).toBe('pending');
+  });
+
+  it('deletes only the selected company dashboard endpoint', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await deleteBiDashboard('acme/company', new AbortController().signal);
+
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    if (!(request instanceof Request)) return;
+    expect(request.method).toBe('DELETE');
+    expect(new URL(request.url).pathname).toBe('/api/v1/bi/companies/acme%2Fcompany/dashboard');
   });
 
   it('raises a typed request error for a failed response', async () => {

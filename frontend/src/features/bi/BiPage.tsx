@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BiDashboardGrid } from './components/BiDashboardGrid';
 import { BiDataState } from './components/BiDataState';
 import { BiHeader } from './components/BiHeader';
@@ -6,6 +6,7 @@ import { BiPageNotice } from './components/BiPageNotice';
 import { BiToolbar } from './components/BiToolbar';
 import { CardLibraryDialog } from './components/CardLibraryDialog';
 import { CompanySelector } from './components/CompanySelector';
+import { DeleteSnapshotDialog } from './components/DeleteSnapshotDialog';
 import { EvidenceDialog } from './components/EvidenceDialog';
 import { ResetDataDialog } from './components/ResetDataDialog';
 import { ResetLayoutDialog } from './components/ResetLayoutDialog';
@@ -16,6 +17,7 @@ import { useBiDashboard } from './hooks/useBiDashboard';
 import { useBiLayout } from './hooks/useBiLayout';
 import { useSelectedBiCompany } from './hooks/useSelectedBiCompany';
 import { buildCardViewModel } from './selectors/cardViewModel';
+import { BiApiRequestError, deleteBiDashboard } from './services/api';
 import type { BiCardId, PeriodRange } from './types';
 import 'react-grid-layout/css/styles.css';
 import './bi.css';
@@ -33,10 +35,16 @@ export function BiPage() {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [isDataResetOpen, setIsDataResetOpen] = useState(false);
+  const [isSnapshotDeleteOpen, setIsSnapshotDeleteOpen] = useState(false);
+  const [isDeletingSnapshot, setIsDeletingSnapshot] = useState(false);
+  const [snapshotDeleteError, setSnapshotDeleteError] = useState<string | null>(null);
   const [evidenceCardId, setEvidenceCardId] = useState<BiCardId | null>(null);
+  const snapshotDeleteControllerRef = useRef<AbortController | null>(null);
   const layout = useBiLayout();
   const dashboardController = useBiDashboard(companySelection.selectedCompany);
   const dashboardState = dashboardController.state;
+
+  useEffect(() => () => snapshotDeleteControllerRef.current?.abort(), []);
 
   if (companiesState.status === 'loading') {
     return <BiDataState tone="loading" title="BI 데이터를 불러오는 중입니다" message="등록된 기업 목록을 확인하고 있습니다." />;
@@ -70,6 +78,37 @@ export function BiPage() {
     range: selectedPeriod,
     size: 'L',
   }) : null;
+  const activeHeaderAction = isDeletingSnapshot ? 'delete' : dashboardController.activeAction;
+
+  const deleteSelectedSnapshot = async () => {
+    if (!dashboard || isDeletingSnapshot) return;
+    snapshotDeleteControllerRef.current?.abort();
+    const controller = new AbortController();
+    snapshotDeleteControllerRef.current = controller;
+    const deletedCompanyId = dashboard.company.companyId;
+    setIsDeletingSnapshot(true);
+    setSnapshotDeleteError(null);
+    try {
+      await deleteBiDashboard(deletedCompanyId, controller.signal);
+      if (controller.signal.aborted) return;
+      setIsSnapshotDeleteOpen(false);
+      setEvidenceCardId(null);
+      companiesController.removeCompany(deletedCompanyId);
+      await companiesController.refresh();
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setSnapshotDeleteError(
+        error instanceof BiApiRequestError && error.status === 409
+          ? '진행 중인 스냅샷 생성 또는 재생성 작업이 끝난 뒤 삭제해 주세요.'
+          : '스냅샷을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      if (snapshotDeleteControllerRef.current === controller) {
+        snapshotDeleteControllerRef.current = null;
+        setIsDeletingSnapshot(false);
+      }
+    }
+  };
 
   return (
     <section
@@ -80,9 +119,13 @@ export function BiPage() {
         <>
           <BiHeader
             dashboard={dashboard}
-            activeAction={dashboardController.activeAction}
+            activeAction={activeHeaderAction}
             onRefresh={() => void dashboardController.refresh()}
             onReset={() => setIsDataResetOpen(true)}
+            onDelete={() => {
+              setSnapshotDeleteError(null);
+              setIsSnapshotDeleteOpen(true);
+            }}
           />
           <BiPageNotice refresh={dashboard.refresh} />
         </>
@@ -183,6 +226,18 @@ export function BiPage() {
             void dashboardController.reset();
           }}
           onClose={() => setIsDataResetOpen(false)}
+        />
+      ) : null}
+      {dashboard && isSnapshotDeleteOpen ? (
+        <DeleteSnapshotDialog
+          companyName={dashboard.company.displayName}
+          isDeleting={isDeletingSnapshot}
+          errorMessage={snapshotDeleteError}
+          onConfirm={() => { void deleteSelectedSnapshot(); }}
+          onClose={() => {
+            setSnapshotDeleteError(null);
+            setIsSnapshotDeleteOpen(false);
+          }}
         />
       ) : null}
     </section>

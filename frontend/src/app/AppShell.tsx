@@ -12,6 +12,7 @@ import { Button, IconButton } from '../shared/ui';
 import type { AppRoute } from './routes';
 import { APP_ROUTES } from './routes';
 import { AppLink } from './router';
+import { SIDEBAR_CONTEXT_SLOT_ID } from './SidebarContextPortal';
 
 interface AppShellProps {
   activeRoute?: AppRoute;
@@ -20,6 +21,12 @@ interface AppShellProps {
 }
 
 const SIDEBAR_STORAGE_KEY = 'rag-flow:sidebar-collapsed';
+const SYSTEM_ROUTE_PATHS = new Set(['/jobs', '/settings']);
+
+function preloadRoute(route: AppRoute): void {
+  if (!route.preload) return;
+  void route.preload().catch(() => undefined);
+}
 
 export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -44,6 +51,10 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
     });
   };
 
+  const isFullBleedPage = activeRoute?.path === '/playground';
+  const isWorkspacePage = activeRoute?.path === '/chatbot';
+  const hasSidebarContext = activeRoute?.path === '/chatbot';
+
   useEffect(() => {
     setIsMobileNavOpen(false);
   }, [pathname]);
@@ -64,7 +75,8 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
         className={clsx(
           'product-sidebar',
           isSidebarCollapsed && 'product-sidebar--collapsed',
-          isMobileNavOpen && 'product-sidebar--open'
+          isMobileNavOpen && 'product-sidebar--open',
+          hasSidebarContext && 'product-sidebar--with-context',
         )}
         aria-label="서비스 내비게이션"
       >
@@ -84,7 +96,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
 
         <nav className="product-nav" aria-label="주요 메뉴">
           {/* <span className="product-nav__caption">WORKSPACE</span> */}
-          {APP_ROUTES.filter((r) => r.path !== '/settings').map((route) => {
+          {APP_ROUTES.filter((route) => !SYSTEM_ROUTE_PATHS.has(route.path)).map((route) => {
             const Icon = route.icon;
             const isActive = route.path === activeRoute?.path;
             return (
@@ -95,6 +107,8 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
                 aria-current={isActive ? 'page' : undefined}
                 title={route.label}
                 aria-label={route.label}
+                onMouseEnter={() => preloadRoute(route)}
+                onFocus={() => preloadRoute(route)}
               >
                 <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
                 <span className="product-nav__label">{route.label}</span>
@@ -106,29 +120,41 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           })}
         </nav>
 
+        {hasSidebarContext && (
+          <>
+            <div className="product-sidebar__divider product-sidebar__context-divider" />
+            <div
+              id={SIDEBAR_CONTEXT_SLOT_ID}
+              className="product-sidebar__context"
+              aria-label="챗봇 대화 탐색"
+            />
+          </>
+        )}
+
         <div className="product-sidebar__spacer" />
 
         <div className="product-sidebar__divider" />
 
-        <div className="product-nav product-nav--bottom" aria-label="시스템 및 설정">
-          {(() => {
-            const settingsRoute = APP_ROUTES.find((r) => r.path === '/settings');
-            if (!settingsRoute) return null;
-            const Icon = settingsRoute.icon;
-            const isActive = activeRoute?.path === '/settings';
+        <nav className="product-nav product-nav--bottom" aria-label="시스템 및 설정">
+          {APP_ROUTES.filter((route) => SYSTEM_ROUTE_PATHS.has(route.path)).map((route) => {
+            const Icon = route.icon;
+            const isActive = activeRoute?.path === route.path;
             return (
               <AppLink
-                to="/settings"
+                key={route.path}
+                to={route.path}
                 className={clsx('product-nav__item', isActive && 'is-active')}
                 aria-current={isActive ? 'page' : undefined}
-                title={settingsRoute.label}
-                aria-label={settingsRoute.label}
+                title={route.label}
+                aria-label={route.label}
+                onMouseEnter={() => preloadRoute(route)}
+                onFocus={() => preloadRoute(route)}
               >
                 <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
-                <span className="product-nav__label">{settingsRoute.label}</span>
+                <span className="product-nav__label">{route.label}</span>
               </AppLink>
             );
-          })()}
+          })}
 
           <a
             className="product-sidebar__docs"
@@ -160,7 +186,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
               </>
             )}
           </Button>
-        </div>
+        </nav>
       </aside>
 
       {isMobileNavOpen && (
@@ -175,10 +201,19 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
       <main
         className={clsx(
           'product-page',
-          activeRoute?.path === '/playground' && 'product-page--playground'
+          isFullBleedPage && 'product-page--playground'
         )}
       >
-        {children}
+        {isFullBleedPage ? children : (
+          <div
+            className={clsx(
+              'product-page__viewport',
+              isWorkspacePage && 'product-page__viewport--workspace',
+            )}
+          >
+            {children}
+          </div>
+        )}
       </main>
     </div>
   );

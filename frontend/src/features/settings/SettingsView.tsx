@@ -11,7 +11,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
-import { Button } from '../../shared/ui';
+import { Button, PageHeader, Surface } from '../../shared/ui';
 import { dataSourceApi } from '../data-sources/services/dataSourceApi';
 import type { DbStatusInfo } from '../data-sources/types';
 import './settings.css';
@@ -121,23 +121,21 @@ export function SettingsView() {
 
   return (
     <div className="settings-page">
-      <header className="settings-header">
-        <div>
-          <h1>시스템 환경 & 인프라 설정</h1>
-          <p>PostgreSQL pgvector 데이터베이스 연결, 임베딩 파이프라인, 유사도 캐시 임계값을 관리합니다.</p>
-        </div>
-        <Button
-          type="button"
-          onClick={fetchStatus}
-          disabled={isLoading}
-        >
-          <RefreshCw size={15} className={isLoading ? 'ds-spin' : ''} />
-          <span>새로고침</span>
-        </Button>
-      </header>
+      <PageHeader
+        className="settings-header"
+        eyebrow="SYSTEM CONFIGURATION"
+        title="시스템 환경 & 인프라 설정"
+        description="PostgreSQL pgvector 데이터베이스 연결, 임베딩 파이프라인, 유사도 캐시 임계값을 관리합니다."
+        actions={(
+          <Button type="button" onClick={fetchStatus} disabled={isLoading} busy={isLoading}>
+            <RefreshCw size={15} className={isLoading ? 'ds-spin' : ''} />
+            <span>새로고침</span>
+          </Button>
+        )}
+      />
 
       {/* 1. Database & pgvector Infrastructure */}
-      <section className="settings-section">
+      <Surface className="settings-section">
         <div className="settings-section__header">
           <div className="settings-section__title">
             <Server size={19} className="text-emerald-600" />
@@ -251,10 +249,10 @@ export function SettingsView() {
             </Button>
           </div>
         </div>
-      </section>
+      </Surface>
 
       {/* 2. RAG Pipeline & Similarity Cache Configuration */}
-      <section className="settings-section">
+      <Surface className="settings-section">
         <div className="settings-section__header">
           <div className="settings-section__title">
             <Sparkles size={19} className="text-amber-500" />
@@ -306,7 +304,7 @@ export function SettingsView() {
             <span className="settings-badge font-mono">gpt-4o-mini</span>
           </div>
         </div>
-      </section>
+      </Surface>
     </div>
   );
 }

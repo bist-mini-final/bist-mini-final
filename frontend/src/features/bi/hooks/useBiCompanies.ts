@@ -14,6 +14,7 @@ export interface BiCompaniesRefreshResult {
 interface BiCompaniesController {
   readonly state: BiCompaniesState;
   readonly refresh: () => Promise<BiCompaniesRefreshResult>;
+  readonly removeCompany: (companyId: string) => void;
 }
 
 type CompanyLoadMode = 'initial' | 'refresh';
@@ -63,9 +64,19 @@ export function useBiCompanies(): BiCompaniesController {
   }, [loadCompanies]);
 
   const refresh = useCallback(() => loadCompanies('refresh'), [loadCompanies]);
+  const removeCompany = useCallback((companyId: string) => {
+    setState((current) => {
+      if (current.status !== 'ready') return current;
+      return {
+        status: 'ready',
+        companies: current.companies.filter((company) => company.companyId !== companyId),
+      };
+    });
+  }, []);
 
   return {
     state,
     refresh,
+    removeCompany,
   };
 }

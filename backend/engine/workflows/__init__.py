@@ -3,6 +3,7 @@
 from .dispatcher import RunDispatcher
 from .executor import DagExecutionCancelled, DagExecutionError, WorkflowExecutor
 from .models import (
+    RunNodeState,
     WorkflowDocument,
     WorkflowExecutionRequest,
     WorkflowGraph,
@@ -23,6 +24,7 @@ __all__ = [
     "ResultCache",
     "RunDispatcher",
     "RunStore",
+    "RunNodeState",
     "WorkflowDocument",
     "WorkflowExecutionRequest",
     "WorkflowExecutionPort",

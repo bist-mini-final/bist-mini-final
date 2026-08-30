@@ -7,7 +7,7 @@ import {
 describe('cell citation markdown', () => {
   it('removes structured source details from the visible markdown and keeps them in metadata', () => {
     const normalized = normalizeCellCitations(
-      '- [Sheet: Balance_Sheet | Cell: P74] Company: DHIN | Sheet: Balance_Sheet | Row Header: Total Liabilities | Column Header: 2025-12-31 | Cell Value: 9,015',
+      '- [Sheet: Balance_Sheet | Cell: P74] Company: DHIN | Sheet: Balance_Sheet | Row Header: Total Liabilities | Column Header: 2025-12-31 | Cell Value: 9,015 | File Name: dhin.xlsx | Workbook Hash: abc123 | Index ID: idx_dhin',
     );
     const href = /\((https:\/\/citation\.local\/[^)]+)\)/.exec(normalized)?.[1];
     const citation = parseCellCitationHref(href);
@@ -21,6 +21,9 @@ describe('cell citation markdown', () => {
       rowHeader: 'Total Liabilities',
       columnHeader: '2025-12-31',
       cellValue: '9,015',
+      fileName: 'dhin.xlsx',
+      workbookHash: 'abc123',
+      indexId: 'idx_dhin',
     });
   });
 

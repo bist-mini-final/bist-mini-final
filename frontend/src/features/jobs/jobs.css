@@ -1,4 +1,4 @@
-.jobs-page { min-height: 100%; overflow-y: auto; padding: 2rem; color: #17251d; background: #f6f9f7; }
+.jobs-page { min-height: 100%; color: #17251d; background: #f6f9f7; }
 .jobs-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; max-width: 90rem; margin: 0 auto 1.35rem; }
 .jobs-header__eyebrow { color: #0b7a52; font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
 .jobs-header h1 { margin: .25rem 0; font-size: 1.65rem; letter-spacing: -.035em; }
@@ -29,5 +29,35 @@
 .jobs-table td small { display: block; margin-top: .12rem; color: #8a9890; }
 .jobs-table__message { max-width: 26rem; word-break: break-word; }
 .jobs-table__empty { padding: 1.3rem !important; color: #87958d !important; text-align: center; }
-@media (max-width: 900px) { .jobs-page { padding: 4rem 1rem 1rem; } .jobs-summary { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px) { .jobs-summary { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .jobs-header { flex-direction: column; } .jobs-summary { grid-template-columns: 1fr; } .jobs-context { flex-direction: column; gap: .25rem; } }
+
+/* Shared product visual system alignment */
+.jobs-page {
+  display: grid;
+  align-content: start;
+  gap: var(--page-section-gap);
+  background: transparent;
+  color: var(--text);
+}
+.jobs-header { width: 100%; max-width: none; margin: 0 0 .2rem; }
+.jobs-header__eyebrow { color: var(--brand-700); }
+.jobs-header h1 { color: var(--text-strong); }
+.jobs-header p { color: var(--text-muted); }
+.jobs-alert { width: 100%; max-width: none; margin: 0; border-radius: var(--radius-md); }
+.jobs-summary { width: 100%; max-width: none; margin: 0; gap: .75rem; }
+.jobs-summary article {
+  min-height: 4.5rem;
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--duration-standard) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard), transform var(--duration-standard) var(--ease-standard);
+}
+.jobs-summary article:hover { border-color: var(--brand-200); box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+.jobs-context { width: 100%; max-width: none; margin: -.15rem 0 0; }
+.jobs-panel { width: 100%; max-width: none; margin: 0; border-radius: var(--radius-lg); box-shadow: var(--shadow-card); }
+.jobs-panel__header { background: linear-gradient(180deg, var(--surface), var(--surface-subtle)); }
+.jobs-table th { background: var(--surface-muted); color: var(--text-muted); }
+.jobs-table td { border-color: var(--border-subtle); color: var(--text-secondary); }
+.jobs-table td strong { color: var(--text); }

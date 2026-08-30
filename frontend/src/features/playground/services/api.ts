@@ -87,6 +87,13 @@ export const pipelineApi = {
     return requestJson<WorkflowRun>(`/api/runs/${runId}`, signal);
   },
 
+  getRunNode(runId: string, nodeId: string, signal?: AbortSignal) {
+    return requestJson<WorkflowRun['nodes'][string]>(
+      `/api/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}`,
+      signal
+    );
+  },
+
   createRun(
     workflowId: string,
     inputs: Record<string, Record<string, unknown>>,

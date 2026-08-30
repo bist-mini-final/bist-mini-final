@@ -4,6 +4,7 @@ import { BiPage } from '../../BiPage';
 import { DASHBOARD_FIXTURES } from '../../../../test/fixtures/biDashboardFixtures';
 import {
   createBiMaterialization,
+  deleteBiDashboard,
   fetchBiCompanies,
   fetchBiDashboard,
   fetchBiMaterializationCandidates,
@@ -19,6 +20,7 @@ vi.mock('../../services/api', async (importOriginal) => ({
   fetchBiDashboard: vi.fn(),
   fetchBiMaterializationCandidates: vi.fn(),
   createBiMaterialization: vi.fn(),
+  deleteBiDashboard: vi.fn(),
   refreshBiDashboard: vi.fn(),
   resetBiDashboard: vi.fn(),
   streamBiMaterializationJob: vi.fn(),
@@ -48,6 +50,7 @@ describe('BiPage Component', () => {
       status: 'queued',
       publishedSnapshotId: null,
     });
+    vi.mocked(deleteBiDashboard).mockResolvedValue(undefined);
     vi.mocked(refreshBiDashboard).mockResolvedValue(DASHBOARD_FIXTURES[0]);
     vi.mocked(resetBiDashboard).mockResolvedValue({
       jobId: 'question-job-refresh',
@@ -330,6 +333,33 @@ describe('BiPage Component', () => {
       DASHBOARD_FIXTURES[0].company.companyId,
       expect.any(AbortSignal),
     ));
+  });
+
+  it('deletes the selected snapshot after confirmation and selects another company', async () => {
+    const remainingCompany = companyResponse.companies[1];
+    if (!remainingCompany) throw new Error('missing remaining company fixture');
+    vi.mocked(fetchBiCompanies)
+      .mockResolvedValueOnce(companyResponse)
+      .mockResolvedValueOnce({ companies: [remainingCompany] });
+
+    render(<BiPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '스냅샷 삭제' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'BIST 데모 주식회사 스냅샷을 삭제할까요?',
+    });
+    expect(within(dialog).getByText(/원본 Excel과 pgvector 인덱스는 유지/)).toBeInTheDocument();
+    expect(deleteBiDashboard).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '스냅샷 삭제' }));
+
+    await waitFor(() => expect(deleteBiDashboard).toHaveBeenCalledWith(
+      DASHBOARD_FIXTURES[0].company.companyId,
+      expect.any(AbortSignal),
+    ));
+    await waitFor(() => expect(fetchBiCompanies).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole('heading', { name: `${remainingCompany.displayName} Dashboard` }))
+      .toBeInTheDocument();
   });
 
   it('returns focus to the data reset trigger when confirmation is cancelled', async () => {

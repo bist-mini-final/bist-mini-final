@@ -3,7 +3,7 @@
    Matches media_1787810201155.png in Clean White & Excel Green Theme
    ========================================================================= */
 
-:root {
+.financial-league-page {
   --bm-primary: #107c41;
   --bm-primary-dark: #0d6336;
   --bm-primary-light: #effaf4;
@@ -14,69 +14,25 @@
   --bm-secondary-border: #bfdbfe;
   --bm-up: #2563eb;
   --bm-down: #dc2626;
-  --bm-bg: #f6f8f7;
-  --bm-card-bg: #ffffff;
-  --bm-card-bg-elevated: #fafbfa;
-  --bm-border: #dce7e1;
-  --bm-border-subtle: #edf4f0;
-  --bm-text-main: #17231d;
-  --bm-text-muted: #64746b;
-  --bm-radius: 10px;
-  --bm-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --bm-bg: transparent;
+  --bm-card-bg: var(--surface);
+  --bm-card-bg-elevated: var(--surface-subtle);
+  --bm-border: var(--border);
+  --bm-border-subtle: var(--border-subtle);
+  --bm-text-main: var(--text);
+  --bm-text-muted: var(--text-muted);
+  --bm-radius: var(--radius-lg);
+  --bm-shadow-sm: var(--shadow-card);
 }
 
 .financial-league-page {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px 22px 28px;
-  background: var(--bm-bg);
-  min-height: calc(100vh - 64px);
+  background: transparent;
+  min-height: 100%;
   color: var(--bm-text-main);
   box-sizing: border-box;
-}
-
-.league-page-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 2px;
-}
-.league-page-eyebrow {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--bm-primary);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: 0.1em;
-}
-.league-page-title-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.league-page-title-row h1 {
-  margin: 0;
-  color: var(--bm-text-main);
-  font-size: 22px;
-  line-height: 1.3;
-  letter-spacing: -0.035em;
-}
-.league-page-title-row span {
-  padding: 3px 8px;
-  border: 1px solid var(--bm-secondary-border);
-  border-radius: 999px;
-  background: var(--bm-secondary-light);
-  color: var(--bm-secondary-dark);
-  font-size: 10px;
-  font-weight: 800;
-}
-.league-page-heading p {
-  margin: 3px 0 0;
-  color: var(--bm-text-muted);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .comparison-state-card {
@@ -142,7 +98,7 @@
   column-gap: 16px;
   row-gap: 8px;
   padding: 12px 16px;
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--bm-border);
   border-radius: var(--bm-radius);
   box-shadow: var(--bm-shadow-sm);
@@ -253,7 +209,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--bm-border);
   border-radius: var(--bm-radius);
   box-shadow: var(--bm-shadow-sm);
@@ -1378,3 +1334,23 @@
 @media (max-width: 1100px) {
   .league-side-column { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Shared product visual system alignment */
+.league-top-filter-bar,
+.league-table-card,
+.company-analysis-panel,
+.spotlight-cards-panel,
+.interactive-distribution-panel,
+.position-analysis-panel {
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.dropdown-filter-pill { min-height: var(--control-h-sm); border-color: var(--border-strong); border-radius: var(--control-radius); background: var(--surface); color: var(--text-secondary); transition: border-color var(--duration-standard) var(--ease-standard), background var(--duration-standard) var(--ease-standard), color var(--duration-standard) var(--ease-standard); }
+.league-pixel-table th { border-color: var(--border); background: var(--surface-muted); color: var(--text-muted); }
+.league-pixel-table td { border-color: var(--border-subtle); }
+.league-table-row { transition: background var(--duration-fast) var(--ease-standard); }
+.league-table-row:hover { background: var(--surface-subtle); }
+.mockup-spotlight-card { border-color: var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-card); transition: transform var(--duration-standard) var(--ease-standard), border-color var(--duration-standard) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard); }
+.mockup-spotlight-card:hover { border-color: var(--brand-200); box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }

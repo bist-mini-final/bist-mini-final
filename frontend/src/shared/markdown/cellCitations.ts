@@ -8,11 +8,14 @@ export interface CellCitation {
   readonly rowHeader?: string;
   readonly columnHeader?: string;
   readonly cellValue?: string;
+  readonly fileName?: string;
+  readonly workbookHash?: string;
+  readonly indexId?: string;
   readonly sourceText?: string;
 }
 
 const CELL_REFERENCE = /\[Sheet:\s*([^\]|]+?)\s*\|\s*Cell:\s*([A-Za-z]{1,3}\d+)\](?!\()/gi;
-const STRUCTURED_FIELD = /(?:^|\|)\s*(Company|Sheet|Row Header|Column Header|Cell Value):\s*([^|]*)/gi;
+const STRUCTURED_FIELD = /(?:^|\|)\s*(Company|Sheet|Row Header|Column Header|Cell Value|File Name|Workbook Hash|Index ID):\s*([^|]*)/gi;
 
 function clean(value: string | undefined): string | undefined {
   const normalized = value?.trim();
@@ -30,6 +33,9 @@ function structuredFields(sourceText: string): Partial<CellCitation> {
     rowHeader: clean(values['row header']),
     columnHeader: clean(values['column header']),
     cellValue: clean(values['cell value']),
+    fileName: clean(values['file name']),
+    workbookHash: clean(values['workbook hash']),
+    indexId: clean(values['index id']),
   };
 }
 
@@ -66,7 +72,8 @@ function replaceCellReferences(line: string): string {
   const trailingText = line.slice(firstReference.index + firstReference[0].length).trim();
   const details = structuredFields(trailingText);
   const hasStructuredDetails = Boolean(
-    details.company || details.sheet || details.rowHeader || details.columnHeader || details.cellValue,
+    details.company || details.sheet || details.rowHeader || details.columnHeader || details.cellValue
+      || details.fileName || details.workbookHash || details.indexId,
   );
 
   if (hasStructuredDetails) {
@@ -77,6 +84,9 @@ function replaceCellReferences(line: string): string {
       rowHeader: details.rowHeader,
       columnHeader: details.columnHeader,
       cellValue: details.cellValue,
+      fileName: details.fileName,
+      workbookHash: details.workbookHash,
+      indexId: details.indexId,
       sourceText: trailingText,
     };
     return `${line.slice(0, firstReference.index)}${citationLink(citation)}`.trimEnd();

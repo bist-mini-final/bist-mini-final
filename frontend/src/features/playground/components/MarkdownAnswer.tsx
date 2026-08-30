@@ -8,6 +8,7 @@ import {
   parseCellCitationHref,
   type CellCitation,
 } from '../../../shared/markdown/cellCitations';
+import { CellEvidenceModal } from '../../../shared/evidence/CellEvidenceModal';
 import './MarkdownAnswer.css';
 
 interface MarkdownAnswerProps {
@@ -46,8 +47,14 @@ interface TooltipPosition {
   readonly placement: 'above' | 'below';
 }
 
-function CellCitationChip({ citation }: { readonly citation: CellCitation }) {
-  const anchorRef = useRef<HTMLSpanElement>(null);
+function CellCitationChip({
+  citation,
+  onOpen,
+}: {
+  readonly citation: CellCitation;
+  readonly onOpen: (citation: CellCitation) => void;
+}) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
   const tooltipId = useId();
   const [position, setPosition] = useState<TooltipPosition | null>(null);
   const label = cellCitationLabel(citation);
@@ -58,6 +65,7 @@ function CellCitationChip({ citation }: { readonly citation: CellCitation }) {
     ['행 항목', citation.rowHeader],
     ['열 항목', citation.columnHeader],
     ['셀 값', citation.cellValue],
+    ['원본 파일', citation.fileName],
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
 
   const showTooltip = () => {
@@ -68,21 +76,32 @@ function CellCitationChip({ citation }: { readonly citation: CellCitation }) {
     const placement = rect.bottom + 220 > window.innerHeight && rect.top > 220 ? 'above' : 'below';
     setPosition({ left, top: placement === 'above' ? rect.top - 8 : rect.bottom + 8, placement });
   };
+  const openEvidence = () => {
+    setPosition(null);
+    onOpen(citation);
+  };
 
   return (
     <>
-      <span
+      <button
+        type="button"
         ref={anchorRef}
-        className="reader-citation"
-        tabIndex={0}
+        className="reader-citation nodrag nopan nowheel"
+        aria-haspopup="dialog"
         aria-describedby={position ? tooltipId : undefined}
         onMouseEnter={showTooltip}
         onMouseLeave={() => setPosition(null)}
         onFocus={showTooltip}
         onBlur={() => setPosition(null)}
+        onPointerDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          openEvidence();
+        }}
       >
         {label}
-      </span>
+      </button>
       {position && createPortal(
         <aside
           id={tooltipId}
@@ -100,6 +119,7 @@ function CellCitationChip({ citation }: { readonly citation: CellCitation }) {
               </div>
             ))}
           </dl>
+          <p>클릭하여 원본 시트 이미지에서 이 셀을 검증할 수 있습니다.</p>
         </aside>,
         document.body,
       )}
@@ -108,21 +128,30 @@ function CellCitationChip({ citation }: { readonly citation: CellCitation }) {
 }
 
 export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
+  const [selectedCitation, setSelectedCitation] = useState<CellCitation | null>(null);
   return (
-    <div className="reader-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ href, children }) => {
-            const citation = parseCellCitationHref(href);
-            return citation
-              ? <CellCitationChip citation={citation} />
-              : <a href={href}>{children}</a>;
-          },
-        }}
-      >
-        {normalizeCellCitations(normalizeMarkdownTables(markdown))}
-      </ReactMarkdown>
-    </div>
+    <>
+      <div className="reader-markdown">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            a: ({ href, children }) => {
+              const citation = parseCellCitationHref(href);
+              return citation
+                ? <CellCitationChip citation={citation} onOpen={setSelectedCitation} />
+                : <a href={href}>{children}</a>;
+            },
+          }}
+        >
+          {normalizeCellCitations(normalizeMarkdownTables(markdown))}
+        </ReactMarkdown>
+      </div>
+      {selectedCitation && (
+        <CellEvidenceModal
+          citation={selectedCitation}
+          onClose={() => setSelectedCitation(null)}
+        />
+      )}
+    </>
   );
 }

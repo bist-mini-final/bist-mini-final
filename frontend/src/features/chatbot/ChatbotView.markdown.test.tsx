@@ -1,7 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MarkdownAnswer } from '../playground/components/MarkdownAnswer';
 import { normalizeChatMarkdown } from './chatMarkdown';
+
+const evidenceApiMock = vi.hoisted(() => ({
+  resolve: vi.fn(() => new Promise(() => undefined)),
+  imageUrl: vi.fn(() => '/evidence.png'),
+}));
+
+vi.mock('../../shared/evidence/cellEvidenceApi', () => ({
+  cellEvidenceApi: evidenceApiMock,
+}));
 
 describe('normalizeChatMarkdown', () => {
   it('preserves an already valid financial table header', () => {
@@ -47,5 +56,12 @@ describe('normalizeChatMarkdown', () => {
     expect(tooltip).toHaveTextContent('Total Assets');
     expect(tooltip).toHaveTextContent('2024-12-31');
     expect(tooltip).toHaveTextContent('151,880');
+
+    fireEvent.click(chip!);
+    expect(screen.getByRole('dialog', { name: '셀 원본 근거 검증' })).toBeInTheDocument();
+    expect(evidenceApiMock.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ company: 'IBM', sheet: 'Balance_Sheet', cell: 'E50' }),
+      expect.any(AbortSignal),
+    );
   });
 });

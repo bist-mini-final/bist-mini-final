@@ -51,7 +51,7 @@ from .models import (
     JobId,
     MaterializationStatus,
 )
-from .postgres_store import BiPostgresStoreError
+from .postgres_store import BiDashboardDeleteActiveError, BiPostgresStoreError
 from .question_batch import BiQuestionBatchPlan
 from .question_records import BiQuestionJobProgress
 from .question_repository import (
@@ -280,6 +280,38 @@ def create_bi_router(
             return BiDashboardPendingResponse(job=latest_job)
         response.headers["ETag"] = f'"{snapshot.snapshot.snapshot_id}"'
         return with_refresh_state(snapshot, latest_job)
+
+    @router.delete(
+        "/companies/{company_id}/dashboard",
+        tags=["BI 대시보드 스냅샷"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        summary="기업별 BI 스냅샷 삭제",
+        description=(
+            "선택 기업의 BI 스냅샷과 파생 질문·답변·작업 기록을 삭제합니다. "
+            "원본 Excel 및 pgvector 인덱스는 유지되어 이후 다시 생성할 수 있습니다."
+        ),
+        responses={
+            404: {"model": ApiErrorEnvelope},
+            409: {"model": ApiErrorEnvelope},
+            500: {"model": ApiErrorEnvelope},
+        },
+    )
+    async def delete_dashboard(company_id: IdentifierPath) -> Response:
+        """Remove a company's BI-derived snapshot data without deleting its source index."""
+        typed_company_id = CompanyId(company_id)
+        company = await services.store.get_company_async(typed_company_id)
+        if company is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, COMPANY_NOT_FOUND)
+        try:
+            deleted = await services.store.delete_dashboard_snapshot_async(typed_company_id)
+        except BiDashboardDeleteActiveError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "company BI work is active",
+            ) from error
+        if not deleted:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, DASHBOARD_NOT_AVAILABLE)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.post(
         "/materializations",

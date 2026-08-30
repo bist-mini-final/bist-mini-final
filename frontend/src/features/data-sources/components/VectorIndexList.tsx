@@ -30,7 +30,8 @@ interface VectorIndexListProps {
   onViewFailedLog?: (run: PipelineRunState) => void;
   onDeletePipeline?: (run: PipelineRunState) => void;
   deletingPipelineId?: string | null;
-  onRefresh?: () => void;
+  deletingIndexId?: string | null;
+  onRefresh?: () => void | Promise<void>;
   onDetailClick: (indexId: string) => void;
   onSearchClick: (index: VectorIndexInfo) => void;
   onDeleteClick: (indexId: string) => void;
@@ -72,6 +73,7 @@ export function VectorIndexList({
   onViewFailedLog,
   onDeletePipeline,
   deletingPipelineId,
+  deletingIndexId,
   onRefresh,
   onDetailClick,
   onSearchClick,
@@ -81,34 +83,43 @@ export function VectorIndexList({
 }: VectorIndexListProps) {
   const [editingIndexId, setEditingIndexId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingCompanyIndexId, setSavingCompanyIndexId] = useState<string | null>(null);
+  const [companyEditError, setCompanyEditError] = useState('');
 
   const startEditCompany = (idx: VectorIndexInfo) => {
+    if (savingCompanyIndexId || deletingIndexId) return;
     setEditingIndexId(idx.index_id);
     setEditingName(idx.company_name || idx.file_name?.replace(/\.[^/.]+$/, '') || '');
+    setCompanyEditError('');
   };
 
   const cancelEdit = () => {
+    if (savingCompanyIndexId) return;
     setEditingIndexId(null);
     setEditingName('');
+    setCompanyEditError('');
   };
 
   const saveCompany = async (indexId: string) => {
+    if (savingCompanyIndexId || deletingIndexId) return;
     const trimmed = editingName.trim();
     if (!trimmed) {
-      cancelEdit();
+      setCompanyEditError('기업명을 입력해 주세요.');
       return;
     }
-    setIsSaving(true);
+    setCompanyEditError('');
+    setSavingCompanyIndexId(indexId);
     try {
       await dataSourceApi.updateIndexCompany(indexId, trimmed);
+      await onRefresh?.();
       setEditingIndexId(null);
       setEditingName('');
-      onRefresh?.();
-    } catch (err: any) {
-      alert(err.message || '기업명 수정에 실패했습니다.');
+    } catch (error: unknown) {
+      setCompanyEditError(
+        error instanceof Error ? error.message : '기업명 수정에 실패했습니다.',
+      );
     } finally {
-      setIsSaving(false);
+      setSavingCompanyIndexId(null);
     }
   };
 
@@ -340,10 +351,22 @@ export function VectorIndexList({
               {/* ── Successful index rows ── */}
               {visibleIndexes.map((idx) => {
                 const isEditingThis = editingIndexId === idx.index_id;
+                const isSavingThis = savingCompanyIndexId === idx.index_id;
+                const isDeletingThis = deletingIndexId === idx.index_id;
+                const isRowBusy = isSavingThis || isDeletingThis;
                 const companyDisplay = idx.company_name || '';
+                const companyMessageId = companyEditError
+                  ? `company-error-${idx.index_id}`
+                  : isSavingThis
+                    ? `company-status-${idx.index_id}`
+                    : undefined;
 
                 return (
-                  <tr key={idx.index_id}>
+                  <tr
+                    key={idx.index_id}
+                    className={`ds-index-row${isSavingThis ? ' ds-index-row--updating' : ''}${isDeletingThis ? ' ds-index-row--deleting' : ''}`}
+                    aria-busy={isRowBusy || undefined}
+                  >
                     <td className="ds-font-mono ds-id-cell" style={{ whiteSpace: 'nowrap' }}>
                       <span title={idx.index_id}>{idx.index_id.slice(0, 10)}...</span>
                     </td>
@@ -353,55 +376,80 @@ export function VectorIndexList({
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <div className="ds-company-cell">
                         {isEditingThis ? (
-                          <div className="ds-company-inline-form">
-                            <input
-                              type="text"
-                              className="ds-company-inline-input"
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveCompany(idx.index_id);
-                                else if (e.key === 'Escape') cancelEdit();
-                              }}
-                              placeholder="기업명 입력..."
-                              autoFocus
-                              disabled={isSaving}
-                            />
-                            <IconButton
-                              variant="primary"
-                              size="sm"
-                              aria-label="기업명 저장"
-                              type="button"
-                              className="ds-company-inline-save"
-                              title="저장 (Enter)"
-                              onClick={() => saveCompany(idx.index_id)}
-                              disabled={isSaving}
-                            >
-                              <Check size={12} />
-                            </IconButton>
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              aria-label="기업명 수정 취소"
-                              type="button"
-                              className="ds-company-inline-cancel"
-                              title="취소 (Esc)"
-                              onClick={cancelEdit}
-                              disabled={isSaving}
-                            >
-                              <X size={12} />
-                            </IconButton>
+                          <div className="ds-company-editor">
+                            <div className="ds-company-inline-form">
+                              <input
+                                type="text"
+                                className="ds-company-inline-input"
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') void saveCompany(idx.index_id);
+                                  else if (e.key === 'Escape') cancelEdit();
+                                }}
+                                placeholder="기업명 입력..."
+                                aria-label="기업명"
+                                aria-invalid={Boolean(companyEditError)}
+                                aria-describedby={companyMessageId}
+                                autoFocus
+                                disabled={isSavingThis}
+                              />
+                              <IconButton
+                                variant="primary"
+                                size="sm"
+                                aria-label="기업명 저장"
+                                type="button"
+                                className="ds-company-inline-save"
+                                title="저장 (Enter)"
+                                onClick={() => void saveCompany(idx.index_id)}
+                                disabled={isSavingThis}
+                                busy={isSavingThis}
+                              >
+                                {isSavingThis ? <RefreshCw className="ds-spin" size={12} /> : <Check size={12} />}
+                              </IconButton>
+                              <IconButton
+                                variant="ghost"
+                                size="sm"
+                                aria-label="기업명 수정 취소"
+                                type="button"
+                                className="ds-company-inline-cancel"
+                                title="취소 (Esc)"
+                                onClick={cancelEdit}
+                                disabled={isSavingThis}
+                              >
+                                <X size={12} />
+                              </IconButton>
+                            </div>
+                            {companyEditError && (
+                              <small id={`company-error-${idx.index_id}`} className="ds-company-edit-error" role="alert">
+                                {companyEditError}
+                              </small>
+                            )}
+                            {isSavingThis && (
+                              <small
+                                id={`company-status-${idx.index_id}`}
+                                className="ds-company-operation-status"
+                                role="status"
+                                aria-live="polite"
+                              >
+                                <RefreshCw className="ds-spin" size={11} />
+                                기업명 변경 중...
+                              </small>
+                            )}
                           </div>
                         ) : (
                           <>
-                            <span
+                            <button
+                              type="button"
                               className={`ds-company-badge ${!companyDisplay ? 'ds-company-badge--empty' : ''}`}
                               title="클릭하여 기업명 수정"
+                              aria-label={`${companyDisplay || '미지정'} 기업명 수정`}
                               onClick={() => startEditCompany(idx)}
+                              disabled={Boolean(savingCompanyIndexId) || Boolean(deletingIndexId)}
                             >
                               <Building2 size={12} style={{ color: companyDisplay ? '#166534' : '#94a3b8' }} />
                               <span>{companyDisplay || '+ 기업명 입력'}</span>
-                            </span>
+                            </button>
                             <IconButton
                               variant="ghost"
                               size="sm"
@@ -410,6 +458,7 @@ export function VectorIndexList({
                               className="ds-company-edit-btn"
                               title="기업명 수정"
                               onClick={() => startEditCompany(idx)}
+                              disabled={Boolean(savingCompanyIndexId) || Boolean(deletingIndexId)}
                             >
                               <Edit2 size={12} />
                             </IconButton>
@@ -449,12 +498,19 @@ export function VectorIndexList({
                       </span>
                     </td>
                     <td className="ds-actions-col ds-text-right" style={{ whiteSpace: 'nowrap' }}>
-                      <div className="ds-actions-row">
+                      {isDeletingThis ? (
+                        <div className="ds-row-operation ds-row-operation--danger" role="status" aria-live="polite">
+                          <RefreshCw className="ds-spin" size={13} />
+                          <span>데이터 삭제 중...</span>
+                        </div>
+                      ) : (
+                        <div className="ds-actions-row">
                         <Button
                           size="sm"
                           type="button"
                           title="4대 모듈 파이프라인 실행 로그 및 세부 단계 확인"
                           onClick={() => onPipelineLogClick?.(idx)}
+                          disabled={isSavingThis}
                         >
                           <Cpu size={13} />
                           <span>모듈 로그</span>
@@ -465,6 +521,7 @@ export function VectorIndexList({
                           type="button"
                           title="유사도 검색 테스트"
                           onClick={() => onSearchClick(idx)}
+                          disabled={isSavingThis}
                         >
                           <Search size={13} />
                           <span>검색 테스트</span>
@@ -474,6 +531,7 @@ export function VectorIndexList({
                           type="button"
                           title="청크 및 메타데이터 상세 보기"
                           onClick={() => onDetailClick(idx.index_id)}
+                          disabled={isSavingThis}
                         >
                           <Eye size={13} />
                           <span>상세</span>
@@ -485,10 +543,12 @@ export function VectorIndexList({
                           type="button"
                           title="인덱스 삭제"
                           onClick={() => onDeleteClick(idx.index_id)}
+                          disabled={Boolean(deletingIndexId) || isSavingThis}
                         >
                           <Trash2 size={13} />
                         </IconButton>
-                      </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

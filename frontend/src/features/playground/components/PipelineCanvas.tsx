@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -38,7 +38,7 @@ interface PipelineCanvasProps {
   isPaletteOpen: boolean;
   onOpenPalette?: () => void;
   modules: ModuleDefinition[];
-  runs: WorkflowRun[];
+  currentRun: WorkflowRun | null;
   activeWorkflowId: string;
   readOnly: boolean;
 }
@@ -47,7 +47,7 @@ export function PipelineCanvas({
   graph,
   isPaletteOpen,
   modules,
-  runs,
+  currentRun,
   activeWorkflowId,
   readOnly,
 }: PipelineCanvasProps) {
@@ -76,11 +76,10 @@ export function PipelineCanvas({
   );
   const edgeTypes = useMemo<EdgeTypes>(() => ({ customEdge: CustomEdge }), []);
   const openModuleSettings = useCallback(
-    (nodeId: string) => {
-      if (!readOnly) setSettingsNodeId(nodeId);
-    },
-    [readOnly],
+    (nodeId: string) => setSettingsNodeId(nodeId),
+    [],
   );
+  useEffect(() => setSettingsNodeId(null), [activeWorkflowId]);
   const settingsNode = settingsNodeId
     ? graph.nodes.find((node) => node.id === settingsNodeId)
     : undefined;
@@ -91,8 +90,6 @@ export function PipelineCanvas({
   const settingsModule = settingsModuleType
     ? modules.find((module) => module.type === settingsModuleType)
     : undefined;
-  const settingsPreview = undefined;
-
   return (
     <ModuleSettingsContext.Provider value={openModuleSettings}>
       <section className="pipeline-canvas" data-palette-open={isPaletteOpen} aria-label="RAG 파이프라인 편집 캔버스">
@@ -144,8 +141,8 @@ export function PipelineCanvas({
           definition={settingsModule}
           config={(settingsNode.data.config as Record<string, unknown> | undefined) ?? {}}
           onConfigChange={(patch) => graph.updateNodeConfig(settingsNode.id, patch)}
-          runs={runs}
-          preview={settingsPreview}
+          readOnly={readOnly}
+          run={currentRun}
           onClose={() => setSettingsNodeId(null)}
         />
       )}

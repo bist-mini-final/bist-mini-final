@@ -17,6 +17,7 @@ from backend.engine.workflows import (
     ActiveWorkflowRunsError,
     DagExecutionError,
     RunStore,
+    RunNodeState,
     WorkflowDocument,
     WorkflowExecutionPort,
     WorkflowExecutionRequest,
@@ -214,6 +215,27 @@ def create_workflow_router(
             ) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.get(
+        "/runs/{run_id}/nodes/{node_id}",
+        response_model=RunNodeState,
+        tags=["워크플로 실행 및 실시간 스트림"],
+        summary="현재 모듈의 Input·Config·Output DTO 상세 조회",
+        description=(
+            "전체 실행 폴링 응답을 키우지 않고 설정 패널에서 선택한 한 노드의 "
+            "현재 Input DTO, Config DTO, Output DTO를 지연 조회합니다."
+        ),
+    )
+    def get_run_node(
+        run_id: str = FastPath(..., description="조회할 실행 ID"),
+        node_id: str = FastPath(..., description="조회할 노드 ID"),
+    ) -> RunNodeState:
+        try:
+            return run_store.load_node(run_id, node_id)
+        except FileNotFoundError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @router.post(
         "/runs/{run_id}/resume",

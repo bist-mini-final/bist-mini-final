@@ -36,6 +36,8 @@ class RecordingBiStore:
     def __init__(self) -> None:
         self.enqueued: list[BiMaterializationJob] = []
         self.entries: tuple[BiCompanyIndexEntry, ...] = ()
+        self.company: BiCompany | None = None
+        self.deleted_dashboard_company_ids: list[CompanyId] = []
 
     def find_latest_job(self, *_args: object) -> None:
         raise AssertionError("async API must not call sync find_latest_job")
@@ -68,6 +70,13 @@ class RecordingBiStore:
 
     async def get_latest_jobs_async(self, *_args: object) -> dict[object, object]:
         return {}
+
+    async def get_company_async(self, *_args: object) -> BiCompany | None:
+        return self.company
+
+    async def delete_dashboard_snapshot_async(self, company_id: CompanyId) -> bool:
+        self.deleted_dashboard_company_ids.append(company_id)
+        return True
 
 
 class UnusedQuestions:
@@ -184,6 +193,27 @@ class BiKubernetesContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["candidates"][0]["company_id"], "amesoft")
         self.assertEqual(response.json()["candidates"][0]["reason"], "not_created")
+
+    def test_dashboard_delete_keeps_the_source_company_available_for_recreation(self) -> None:
+        store = RecordingBiStore()
+        store.company = BiCompany(
+            company_id=CompanyId("amesoft"),
+            display_name="AmeSoft",
+        )
+        services = BiApiServices(
+            store=store,  # type: ignore[arg-type]
+            materializations=store,  # type: ignore[arg-type]
+            clock=FixedClock(),
+            questions=UnusedQuestions(),  # type: ignore[arg-type]
+        )
+        app = FastAPI()
+        app.include_router(create_bi_router(services))
+
+        response = TestClient(app).delete("/bi/companies/amesoft/dashboard")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(store.deleted_dashboard_company_ids, [CompanyId("amesoft")])
+        self.assertEqual(response.content, b"")
 
 
 if __name__ == "__main__":
