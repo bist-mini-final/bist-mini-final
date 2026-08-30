@@ -23,7 +23,9 @@ from backend.storage.data_sources.vector_shard_worker_main import VectorShardWor
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.repositories import (
+    PgVectorCatalogMixin,
     PgVectorRetrievalMixin,
+    PgVectorWriteMixin,
     SourceFileRepositoryMixin,
     WorkflowRunRepositoryMixin,
 )
@@ -140,6 +142,8 @@ def test_chat_repository_uses_shared_postgres_repository_boundary() -> None:
 def test_database_facades_compose_focused_storage_capabilities() -> None:
     assert issubclass(DatabaseManager, SourceFileRepositoryMixin)
     assert issubclass(DatabaseManager, WorkflowRunRepositoryMixin)
+    assert issubclass(PgVectorStore, PgVectorWriteMixin)
+    assert issubclass(PgVectorStore, PgVectorCatalogMixin)
     assert issubclass(PgVectorStore, PgVectorRetrievalMixin)
 
 
