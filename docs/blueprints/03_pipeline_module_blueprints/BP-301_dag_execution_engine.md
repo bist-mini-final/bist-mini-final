@@ -1,6 +1,6 @@
 # [BP-301] DAG 검증과 durable 실행
 > **Document Code:** `BP-301` | **Category:** Pipeline Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/models.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/models.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`backend/engine/workflows/service.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/service.py)
+> **Source Files:** [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/batch_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/batch_runner.py), [`backend/engine/workflows/node_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/node_runner.py), [`backend/engine/workflows/models.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/models.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`backend/engine/workflows/service.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/service.py)
 
 ---
 
@@ -51,6 +51,8 @@ Node는 pending, running, succeeded, skipped, failed 상태와 input/config/outp
 - 동기 module, RunStore I/O, CPU/file 작업은 `asyncio.to_thread()` 또는 one-shot process 경계로 격리합니다.
 - signal hard timeout이 필요한 node는 플랫폼 제약에 따라 순차 경로를 사용할 수 있습니다.
 - node 전후와 결과 publish 전에 cancel/lease ownership을 다시 확인합니다.
+
+`WorkflowExecutor`는 실행 수명주기와 공개 facade만 소유합니다. resume 계획은 `WorkflowResumePlanner`, 위상 batch 진행은 `WorkflowBatchRunner`, 단일 node 준비·실행·결과 기록은 `WorkflowNodeRunner`가 담당합니다.
 
 Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 DAG node 상태를 유지하면서 내부 work item을 `ingestion_shards`에 fan-out합니다. child KEDA Job은 별도 DAG node가 아니며, 부모 node는 durable barrier를 기다리는 동안 `running` 상태와 shard 진행률을 저장합니다. 따라서 사용자 워크플로 pin 계약은 바뀌지 않고 실행 구현만 batch-level 병렬화됩니다.
 

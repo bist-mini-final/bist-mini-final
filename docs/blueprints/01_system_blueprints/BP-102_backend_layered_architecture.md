@@ -10,7 +10,7 @@
 
 ```mermaid
 flowchart TD
-    API["Presentation\nbackend/api + feature routes"]
+    API["Presentation\nbackend/api"]
     BOOT["Composition Root\nbackend/bootstrap"]
     APP["Domain Applications\nworkflow · data sources · BI · chatbot · comparison"]
     DOMAIN["Domain Rules\nstate · errors · value contracts"]
@@ -51,11 +51,14 @@ backend/
 │   │   ├── domain/              # 상태 전이와 domain error
 │   │   └── application/         # graph/input use case와 repository/cache port
 │   ├── data_sources/application/# 파일 등록·삭제 use case와 file/catalog port
-│   ├── bi/application/          # BI API service boundary
+│   ├── bi/
+│   │   ├── domain/              # 지표·기간·수식·snapshot 계약
+│   │   └── application/         # BI API use case와 port
 │   ├── chatbot/
 │   │   ├── application/         # suggestion use case와 repository port
 │   │   └── infrastructure/      # PostgreSQL adapter
-│   └── company_comparison/application/
+│   ├── benchmark/application/   # benchmark API use case와 port
+│   └── company_comparison/      # 비교 모델·점수·builder·application
 ├── engine/                      # DAG runtime, orchestration, leased worker template
 ├── platform/pgvector/           # catalog/ingestion/retrieval narrow adapters
 ├── shared/
@@ -63,11 +66,11 @@ backend/
 │   └── infrastructure/          # DB base repository, correlation context
 ├── features/                    # 기존 모델/adapter와 non-breaking compatibility facade
 ├── providers/                   # OpenAI/Kubernetes 등 외부 시스템 adapter
-└── storage/                     # 기존 SQL gateway와 artifact 구현
+└── storage/                     # SQL facade, focused repository mixin, artifact 구현
 modules/                         # pin DTO를 가진 pipeline plugin units
 ```
 
-`backend/features`와 `backend/storage`는 공개 API·DB·저장 데이터 호환성을 보존하기 위한 기존 구현을 포함합니다. 새 유스케이스 진입점은 `backend/domains`, 새 pgvector 소비 경계는 `backend/platform/pgvector`를 기준으로 합니다. 거대 SQL gateway를 한 번에 재작성하지 않고 좁은 adapter로 감싸 소비자의 결합을 먼저 제거했습니다.
+`backend/features`와 `backend/storage`는 공개 API·DB·저장 데이터 호환성을 보존하는 infrastructure 및 계산 구현을 포함합니다. 정식 route는 `backend/api`, 유스케이스는 `backend/domains`, 새 pgvector 소비 경계는 `backend/platform/pgvector`를 기준으로 합니다. SQL facade 내부도 `backend/storage/repositories`의 source-file, workflow-run, retrieval capability로 분리되어 있습니다.
 
 ---
 
@@ -75,10 +78,10 @@ modules/                         # pin DTO를 가진 pipeline plugin units
 
 | 경계 | 책임 | 대표 구현 |
 | :--- | :--- | :--- |
-| Presentation | `/api/v1`, Pydantic 입력, status code, SSE, 표준 오류 envelope | `backend/api/*_routes.py`, feature route factory, `exception_handlers.py` |
+| Presentation | `/api/v1`, Pydantic 입력, status code, SSE, 표준 오류 envelope | `backend/api/*_routes.py`, `workflow_controller.py`, `exception_handlers.py` |
 | Domain | 프레임워크와 저장소에 독립적인 상태·오류·값 규칙 | `workflow/domain/state.py`, `workflow/domain/errors.py` |
-| Application | 유스케이스 orchestration과 요구 port | `GraphValidator`, `WorkflowInputAssembler`, `DataSourceFileService`, `BiApiServices`, `CompanyComparisonService`, `ChatSuggestionService` |
-| Engine | DAG 실행, durable queue, worker lease와 retry/timeout policy | `WorkflowExecutor`, `KubernetesQueueDispatcher`, `LeasedWorker`, `LeaseHeartbeat` |
+| Application | 유스케이스 orchestration과 요구 port | `GraphValidator`, `WorkflowInputAssembler`, `DataSourceFileService`, `BiApplicationService`, `CompanyComparisonService`, `ChatConversationService`, `BenchmarkApplicationService` |
+| Engine | DAG 실행, durable queue, worker lease와 retry/timeout policy | `WorkflowExecutor`, `WorkflowBatchRunner`, `WorkflowNodeRunner`, `KubernetesQueueDispatcher`, `LeasedWorker` |
 | Modules | 입력·출력·config pin 계약을 가진 재사용 실행 단위 | `BaseModule`, `BaseModuleRegistry`, 19개 module type |
 | Infrastructure | PostgreSQL, pgvector, OpenAI, artifact, snapshot 구현 | shared repository bases, pgvector capability repositories, provider adapters |
 | Bootstrap | 프로세스 수명주기와 concrete object graph | `ApplicationContainer`, `RuntimeContainer`, `ExecutionContainer`, `DomainServicesContainer` |
@@ -90,7 +93,7 @@ modules/                         # pin DTO를 가진 pipeline plugin units
 - `SyncPostgresRepository`와 `AsyncPostgresRepository`가 connection/transaction 수명주기를 공개 메서드로 제공합니다. feature repository가 `DatabaseManager._raw_connection()`에 접근하지 않습니다.
 - `PgVectorCatalogRepository`, `PgVectorIngestionRepository`, `PgVectorRetrievalRepository`는 서로 다른 capability를 노출합니다.
 - pipeline module은 `backend.storage.pgvector_store`를 import하지 않고 module port에만 의존합니다.
-- `DatabaseManager`와 `PgVectorStore`는 현재 하위 호환 SQL gateway입니다. schema와 데이터 migration 없이 소비자 결합을 제거하기 위해 adapter 내부 구현으로 유지합니다.
+- `DatabaseManager`는 `SourceFileRepositoryMixin`과 `WorkflowRunRepositoryMixin`을 조합하고, `PgVectorStore`는 `PgVectorRetrievalMixin`을 조합하는 하위 호환 facade입니다. 외부 호출 경로는 유지하되 저장 책임별 파일 경계를 갖습니다.
 - 동적 SQL 식별자는 driver의 SQL composition API를 사용하고 값은 parameter binding을 사용합니다.
 
 ---

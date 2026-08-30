@@ -1,6 +1,6 @@
 # [BP-503] PostgreSQL·pgvector 물리 스키마
 > **Document Code:** `BP-503` | **Category:** Interface & Physical Schema Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/features/bi/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/database_schema.py), [`backend/features/benchmark/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/database_schema.py), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
+> **Source Files:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/repositories/source_files.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/source_files.py), [`backend/storage/repositories/workflow_runs.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/workflow_runs.py), [`backend/features/bi/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/database_schema.py), [`backend/features/benchmark/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/database_schema.py), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
 
 ---
 
