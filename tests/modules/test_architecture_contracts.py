@@ -12,8 +12,14 @@ from backend.bootstrap.container import (
     DomainServicesContainer,
     ExecutionContainer,
 )
+from backend.engine.worker.base import LeasedWorker
+from backend.features.bi.materialization_worker_main import BiMaterializationWorker
 from backend.features.chatbot.repository import ChatSessionRepository
 from backend.shared.infrastructure.database import SyncPostgresRepository
+from backend.storage.data_sources.embedding_shard_worker_main import (
+    EmbeddingShardWorker,
+)
+from backend.storage.data_sources.vector_shard_worker_main import VectorShardWorker
 from jobs import ALL_JOBS, WorkerJobDefinition
 from jobs.kubernetes import kubernetes_worker_specs
 
@@ -65,7 +71,9 @@ def test_domain_packages_do_not_import_outer_layers() -> None:
                 name.startswith(forbidden_prefixes)
                 for name in imported
             ):
-                violations.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+                violations.append(
+                    f"{path.relative_to(PROJECT_ROOT)}:{getattr(node, 'lineno', 0)}"
+                )
     assert not violations, f"domain -> outer layer dependency: {violations}"
 
 
@@ -127,6 +135,12 @@ def test_feature_repositories_do_not_reach_into_private_database_connections() -
 
 def test_chat_repository_uses_shared_postgres_repository_boundary() -> None:
     assert issubclass(ChatSessionRepository, SyncPostgresRepository)
+
+
+def test_one_shot_workers_share_the_leased_worker_template() -> None:
+    assert issubclass(EmbeddingShardWorker, LeasedWorker)
+    assert issubclass(VectorShardWorker, LeasedWorker)
+    assert issubclass(BiMaterializationWorker, LeasedWorker)
 
 
 def test_kubernetes_specs_are_projected_from_worker_jobs() -> None:

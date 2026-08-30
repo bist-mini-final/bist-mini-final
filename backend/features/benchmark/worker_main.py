@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import logging
-import os
-import socket
 from datetime import UTC, datetime
 from time import sleep
-from uuid import uuid4
 
 from backend.bootstrap.container import RuntimeContainer
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
 from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
+from backend.engine.worker.base import default_worker_id
 from backend.engine.worker.lease import (
     LeaseHeartbeat,
     terminate_process_on_lease_loss,
@@ -28,10 +26,7 @@ logger = logging.getLogger(__name__)
 def _run(container: RuntimeContainer) -> int:
     services = container.services
     store = BenchmarkPostgresStore(services.db_manager.database_url)
-    worker_id = (
-        os.getenv("KUBERNETES_JOB_NAME")
-        or f"{socket.gethostname()}-{uuid4().hex[:12]}"
-    )
+    worker_id = default_worker_id()
     claimed = store.claim_next(worker_id, datetime.now(UTC))
     if claimed is None:
         print("benchmark queue empty")
