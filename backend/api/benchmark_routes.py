@@ -1,30 +1,18 @@
-"""HTTP adapter for benchmark job submission, lifecycle control, and inspection."""
+"""HTTP presentation for benchmark submission, lifecycle control, and inspection."""
 
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime
-from typing import Any, Dict
-from uuid import uuid4
+from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi import Path as FastPath
 from pydantic import BaseModel, Field
 
 from backend.core.settings import PGVECTOR_URL
+from backend.domains.benchmark.application import BenchmarkApplicationService
 from backend.engine.workflows import RunStore, WorkflowExecutionPort, WorkflowStore
-from backend.features.benchmark.postgres_store import (
-    BenchmarkPostgresStore,
-    BenchmarkStoreError,
-)
-from backend.features.benchmark.service import (
-    BENCHMARK_SET_DIR,
-    BENCHMARK_SET_NAMES,
-    BenchmarkCase,
-    BenchmarkRequest,
-    run_snapshot,
-    validate_workflows,
-)
+from backend.features.benchmark.postgres_store import BenchmarkPostgresStore
+from backend.features.benchmark.service import BenchmarkRequest
 
 
 class BenchmarkJobCreateResponse(BaseModel):
@@ -45,7 +33,7 @@ def create_benchmark_router(
     run_store: RunStore,
     workflow_execution: WorkflowExecutionPort,
 ) -> APIRouter:
-    """RAG 벤치마크 실행, 제어 및 채점을 위한 FastAPI 라우터 생성."""
+    """Create the benchmark API while keeping HTTP metadata at the edge."""
     router = APIRouter(tags=["벤치마크 실행 및 채점"])
     database = run_store.db_manager
     database_url = (
@@ -53,53 +41,21 @@ def create_benchmark_router(
         if database is not None and hasattr(database, "database_url")
         else PGVECTOR_URL
     )
-    benchmark_store = BenchmarkPostgresStore(database_url)
-
-    def load_job(job_id: str) -> Dict[str, Any]:
-        try:
-            job = benchmark_store.get(job_id)
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-        if job is None:
-            raise HTTPException(status_code=404, detail="벤치마크 작업을 찾을 수 없습니다.")
-        return job
-
-    def public_job(job: Dict[str, Any]) -> Dict[str, Any]:
-        payload = dict(job)
-        active_run_id = payload.pop("active_run_id", None)
-        if active_run_id:
-            try:
-                run = run_store.load_summary(str(active_run_id))
-                payload["active_run"] = run_snapshot(run)
-            except (FileNotFoundError, PermissionError, OSError, ValueError):
-                payload["active_run"] = None
-        else:
-            payload["active_run"] = None
-        return payload
+    service = BenchmarkApplicationService(
+        store=BenchmarkPostgresStore(database_url),
+        workflow_store=workflow_store,
+        run_store=run_store,
+        workflow_execution=workflow_execution,
+        queue_available=database is not None,
+    )
 
     @router.get(
         "/benchmark-sets",
         summary="내장 벤치마크 평가 세트 목록 조회",
         description="시스템에 사전 정의된 골든 데이터셋 및 평가 케이스(Benchmark Sets) 목록을 조회합니다.",
     )
-    def list_benchmark_sets() -> Dict[str, Any]:
-        """내장된 벤치마크 평가 세트 목록을 반환합니다."""
-        sets = []
-        for path in sorted(BENCHMARK_SET_DIR.glob("*.json")):
-            try:
-                raw_cases = json.loads(path.read_text(encoding="utf-8"))
-                cases = [BenchmarkCase.model_validate(item) for item in raw_cases]
-            except (OSError, ValueError, TypeError) as error:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"올바르지 않은 벤치마크 세트 파일 ({path.name}): {error}",
-                ) from error
-            sets.append({
-                "id": path.stem,
-                "name": BENCHMARK_SET_NAMES.get(path.stem, path.stem),
-                "cases": [case.model_dump(mode="json", exclude_none=True) for case in cases],
-            })
-        return {"benchmark_sets": sets}
+    def list_benchmark_sets() -> dict[str, Any]:
+        return service.list_benchmark_sets()
 
     @router.post(
         "/benchmarks/jobs",
@@ -111,35 +67,8 @@ def create_benchmark_router(
             "PostgreSQL `benchmark_runs` 큐에 등록하고 KEDA 워커가 처리하도록 예약합니다."
         ),
     )
-    def start_benchmark_job(request: BenchmarkRequest) -> Dict[str, Any]:
-        """벤치마크 평가 작업을 등록하고 큐 ID를 반환합니다."""
-        if database is None:
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "code": "BENCHMARK_QUEUE_UNAVAILABLE",
-                    "message": "Benchmark 제출에는 PostgreSQL 연결이 필요합니다",
-                    "retryable": True,
-                    "context": {},
-                },
-            )
-        try:
-            validate_workflows(request, workflow_store)
-        except FileNotFoundError as error:
-            raise HTTPException(status_code=404, detail=str(error)) from error
-        except ValueError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-        job_id = f"benchmark-job-{uuid4().hex}"
-        try:
-            job = benchmark_store.enqueue(
-                job_id,
-                request.model_dump(mode="json"),
-                len(request.cases) * len(request.workflow_ids),
-                datetime.now(UTC),
-            )
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-        return {"id": job["id"]}
+    def start_benchmark_job(request: BenchmarkRequest) -> dict[str, Any]:
+        return service.start_job(request)
 
     @router.get(
         "/benchmarks/jobs/{job_id}",
@@ -148,9 +77,8 @@ def create_benchmark_router(
     )
     def get_benchmark_job(
         job_id: str = FastPath(..., description="벤치마크 작업 고유 식별자"),
-    ) -> Dict[str, Any]:
-        """진행 중이거나 완료된 벤치마크 작업의 실시간 상태를 조회합니다."""
-        return public_job(load_job(job_id))
+    ) -> dict[str, Any]:
+        return service.get_job(job_id)
 
     @router.delete(
         "/benchmarks/jobs/{job_id}",
@@ -159,21 +87,8 @@ def create_benchmark_router(
     )
     def cancel_benchmark_job(
         job_id: str = FastPath(..., description="취소할 벤치마크 작업 ID"),
-    ) -> Dict[str, Any]:
-        """대기 중이거나 실행 중인 벤치마크 작업을 취소합니다."""
-        existing = load_job(job_id)
-        if existing["status"] in {"completed", "cancelled", "failed"}:
-            raise HTTPException(status_code=409, detail="이미 완료, 취소 또는 실패한 벤치마크 작업입니다.")
-        try:
-            job = benchmark_store.request_cancel(job_id)
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-        if job is None:
-            raise HTTPException(status_code=409, detail="벤치마크 작업을 취소할 수 없습니다.")
-        run_id = existing.get("active_run_id")
-        if run_id:
-            workflow_execution.cancel(str(run_id))
-        return {"id": job_id, "status": job["status"]}
+    ) -> dict[str, Any]:
+        return service.cancel_job(job_id)
 
     @router.post(
         "/benchmarks/jobs/{job_id}/pause",
@@ -183,16 +98,8 @@ def create_benchmark_router(
     )
     def pause_benchmark_job(
         job_id: str = FastPath(..., description="일시 정지할 벤치마크 작업 ID"),
-    ) -> Dict[str, Any]:
-        """진행 중인 벤치마크 작업을 일시 정지합니다."""
-        load_job(job_id)
-        try:
-            job = benchmark_store.request_pause(job_id)
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-        if job is None:
-            raise HTTPException(status_code=409, detail="벤치마크 작업을 일시 정지할 수 없습니다.")
-        return {"id": job_id, "status": job["status"]}
+    ) -> dict[str, Any]:
+        return service.pause_job(job_id)
 
     @router.post(
         "/benchmarks/jobs/{job_id}/resume",
@@ -202,28 +109,16 @@ def create_benchmark_router(
     )
     def resume_benchmark_job(
         job_id: str = FastPath(..., description="재개할 벤치마크 작업 ID"),
-    ) -> Dict[str, Any]:
-        """일시 정지된 벤치마크 작업을 다시 시작합니다."""
-        load_job(job_id)
-        try:
-            job = benchmark_store.request_resume(job_id)
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-        if job is None:
-            raise HTTPException(status_code=409, detail="일시 정지 상태가 아닌 벤치마크 작업입니다.")
-        return {"id": job_id, "status": job["status"]}
+    ) -> dict[str, Any]:
+        return service.resume_job(job_id)
 
     @router.get(
         "/benchmarks",
         summary="완료된 벤치마크 평가 결과 목록 조회",
         description="저장된 전체 벤치마크 평가 실행 결과 및 집계 스코어 목록을 반환합니다.",
     )
-    def list_benchmarks() -> Dict[str, Any]:
-        """완료된 전체 벤치마크 평가 결과 목록을 반환합니다."""
-        try:
-            return {"benchmarks": benchmark_store.list_results()}
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
+    def list_benchmarks() -> dict[str, Any]:
+        return service.list_results()
 
     @router.get(
         "/benchmarks/{benchmark_id}",
@@ -232,14 +127,10 @@ def create_benchmark_router(
     )
     def get_benchmark(
         benchmark_id: str = FastPath(..., description="조회할 벤치마크 결과 ID"),
-    ) -> Dict[str, Any]:
-        """지정된 단일 벤치마크 평가의 상세 채점 결과를 반환합니다."""
-        try:
-            result = benchmark_store.get_result(benchmark_id)
-        except BenchmarkStoreError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-        if result is None:
-            raise HTTPException(status_code=404, detail="벤치마크 결과를 찾을 수 없습니다.")
-        return result
+    ) -> dict[str, Any]:
+        return service.get_result(benchmark_id)
 
     return router
+
+
+__all__ = ["create_benchmark_router"]
