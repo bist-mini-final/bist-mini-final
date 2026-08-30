@@ -83,6 +83,15 @@ def test_modules_do_not_construct_infrastructure_clients() -> None:
     assert not violations, f"module infrastructure construction: {violations}"
 
 
+def test_pipeline_modules_depend_on_pgvector_ports_not_the_sql_gateway() -> None:
+    violations: list[str] = []
+    for path in _python_files("modules"):
+        source = path.read_text(encoding="utf-8")
+        if "backend.storage.pgvector_store" in source:
+            violations.append(str(path.relative_to(PROJECT_ROOT)))
+    assert not violations, f"module -> pgvector SQL gateway dependency: {violations}"
+
+
 def test_feature_repositories_do_not_reach_into_private_database_connections() -> None:
     violations: list[str] = []
     for path in _python_files("backend/features"):

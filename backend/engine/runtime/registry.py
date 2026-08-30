@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from backend.platform.pgvector import PgVectorRepositorySet
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.openai_responses import OpenAIResponsesClient
 from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
@@ -52,6 +53,7 @@ class ModuleRegistry(BaseModuleRegistry):
         spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
         self.pgvector_store = pgvector_store
+        self.pgvector_repositories = PgVectorRepositorySet.create(pgvector_store)
         self.db_manager = db_manager
         super().__init__(embedding_artifact_store)
         workbook_catalog = WorkbookCatalog(processed_dir)
@@ -79,15 +81,21 @@ class ModuleRegistry(BaseModuleRegistry):
             (
                 self._factory(
                     PgVectorDataScopeModule,
-                    pgvector_store=self.pgvector_store,
+                    pgvector_store=self.pgvector_repositories.retrieval,
                 ),
-                self._factory(PgVectorRetrieverModule, self.pgvector_store),
+                self._factory(
+                    PgVectorRetrieverModule,
+                    self.pgvector_repositories.retrieval,
+                ),
                 self._factory(
                     PostgresNativeKeywordRetrieverModule,
-                    self.pgvector_store,
+                    self.pgvector_repositories.retrieval,
                 ),
                 self._factory(RrfFusionModule),
-                self._factory(PgContextExpanderModule, self.pgvector_store),
+                self._factory(
+                    PgContextExpanderModule,
+                    self.pgvector_repositories.retrieval,
+                ),
             )
         )
         self._register_domain_factories(
@@ -102,7 +110,7 @@ class ModuleRegistry(BaseModuleRegistry):
                     PgVectorIndexWriterModule,
                     artifact_store=embedding_artifact_store,
                     db_manager=self.db_manager,
-                    pgvector_store=self.pgvector_store,
+                    pgvector_store=self.pgvector_repositories.ingestion,
                     embedding_encoder=embedding_encoder,
                     processed_dir=processed_dir,
                     shard_coordinator=ingestion_shard_coordinator,
@@ -122,7 +130,7 @@ class ModuleRegistry(BaseModuleRegistry):
                 self._factory(
                     CompanyEntityExtractorModule,
                     completion_client=completion_client,
-                    pgvector_store=self.pgvector_store,
+                    pgvector_store=self.pgvector_repositories.catalog,
                     catalog=workbook_catalog,
                 ),
                 self._factory(
@@ -135,7 +143,11 @@ class ModuleRegistry(BaseModuleRegistry):
         )
         self._register_domain_factories(
             (
-                self._factory(ReaderModule, completion_client, self.pgvector_store),
+                self._factory(
+                    ReaderModule,
+                    completion_client,
+                    self.pgvector_repositories.retrieval,
+                ),
             )
         )
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import re
 import threading
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from numbers import Real
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -15,6 +14,7 @@ from uuid import UUID, uuid4, uuid5
 import psycopg2.extras
 from langchain_core.documents import Document
 
+from backend.contracts.vector import PgVectorReplacePlan
 from backend.core.settings import PGVECTOR_URL
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.storage.embedding_artifacts import EmbeddingArtifactVectors
@@ -32,19 +32,6 @@ logger = logging.getLogger(__name__)
 
 class PgVectorStoreError(RuntimeError):
     """Raised when a pgvector database operation fails."""
-
-
-@dataclass(frozen=True, slots=True)
-class PgVectorReplacePlan:
-    """Stable staging identity shared by parallel COPY workers and finalizer."""
-
-    index_id: str
-    operation_id: str
-    staging_name: str
-    staging_uuid: str
-    dimension: int
-    metadata: Dict[str, Any]
-    published: bool = False
 
 
 PGVECTOR_INSERT_BATCH_SIZE = 1000
