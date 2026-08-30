@@ -16,8 +16,6 @@ COMPLEXITY_PATTERN = re.compile(r"^`([^`]+)` is too complex \((\d+) > 10\)$")
 # budget fails the suite.
 LEGACY_COMPLEXITY_BUDGETS = {
     ("backend/api/bi_routes.py", "create_bi_router"): 12,
-    ("backend/api/data_source_ingestion_routes.py", "create_ingestion_router"): 27,
-    ("backend/api/data_source_routes.py", "create_data_source_router"): 25,
     ("backend/api/exception_handlers.py", "register_global_exception_handlers"): 12,
     ("backend/api/module_routes.py", "create_module_router"): 12,
     ("backend/api/workflow_routes.py", "create_workflow_router"): 12,
