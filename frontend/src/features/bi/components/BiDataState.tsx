@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { CircleAlert, LoaderCircle } from 'lucide-react';
+import { Button } from '../../../shared/ui';
 
 interface BiDataStateProps {
   readonly title: string;
@@ -28,9 +29,9 @@ export function BiDataState({
           <h1 id="bi-page-title">{title}</h1>
           <p>{message}</p>
           {actionLabel && onAction ? (
-            <button className="bi-data-state__action" type="button" onClick={onAction}>
+            <Button className="bi-data-state__action" type="button" onClick={onAction}>
               {actionLabel}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>

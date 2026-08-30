@@ -14,7 +14,10 @@ export interface BiCompaniesRefreshResult {
 interface BiCompaniesController {
   readonly state: BiCompaniesState;
   readonly refresh: () => Promise<BiCompaniesRefreshResult>;
+  readonly removeCompany: (companyId: string) => void;
 }
+
+type CompanyLoadMode = 'initial' | 'refresh';
 
 function companyErrorMessage(error: unknown): string {
   if (error instanceof BiApiRequestError) {
@@ -28,8 +31,8 @@ export function useBiCompanies(): BiCompaniesController {
   const [state, setState] = useState<BiCompaniesState>({ status: 'loading', companies: [] });
   const activeControllerRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (
-    preserveCurrentState: boolean,
+  const loadCompanies = useCallback(async (
+    mode: CompanyLoadMode,
   ): Promise<BiCompaniesRefreshResult> => {
     activeControllerRef.current?.abort();
     const controller = new AbortController();
@@ -44,22 +47,36 @@ export function useBiCompanies(): BiCompaniesController {
     } catch (error) {
       if (controller.signal.aborted) return { errorMessage: null };
       const message = companyErrorMessage(error);
-      if (!preserveCurrentState) {
-        setState({ status: 'error', companies: [], message: companyErrorMessage(error) });
+      if (mode === 'initial') {
+        setState({ status: 'error', companies: [], message });
       }
       return { errorMessage: message };
+    } finally {
+      if (activeControllerRef.current === controller) {
+        activeControllerRef.current = null;
+      }
     }
   }, []);
 
   useEffect(() => {
-    void load(false);
+    void loadCompanies('initial');
     return () => activeControllerRef.current?.abort();
-  }, [load]);
+  }, [loadCompanies]);
 
-  const refresh = useCallback(() => load(true), [load]);
+  const refresh = useCallback(() => loadCompanies('refresh'), [loadCompanies]);
+  const removeCompany = useCallback((companyId: string) => {
+    setState((current) => {
+      if (current.status !== 'ready') return current;
+      return {
+        status: 'ready',
+        companies: current.companies.filter((company) => company.companyId !== companyId),
+      };
+    });
+  }, []);
 
   return {
     state,
     refresh,
+    removeCompany,
   };
 }

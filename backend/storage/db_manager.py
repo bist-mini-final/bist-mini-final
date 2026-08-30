@@ -45,7 +45,8 @@ import psycopg2.extras
 
 from backend.core.settings import PGVECTOR_URL
 
-from .connection_pool import get_pooled_raw_connection
+from .audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
+from .connection_pool import get_pooled_async_connection, get_pooled_raw_connection
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,9 @@ class WorkflowRunLease:
     run_id: str
     token: str
 
-DDL_INIT = """
+
+DDL_INIT = (
+    """
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS source_files (
@@ -75,8 +78,13 @@ CREATE TABLE IF NOT EXISTS source_files (
     file_type VARCHAR(32) NOT NULL,
     file_size BIGINT NOT NULL,
     storage_path VARCHAR(512) NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE source_files ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE source_files ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS sheets (
     sheet_id VARCHAR(128) PRIMARY KEY,
@@ -129,6 +137,28 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_shards (
+    operation_id VARCHAR(128) NOT NULL,
+    phase VARCHAR(32) NOT NULL CHECK (phase IN ('embedding', 'vector_copy')),
+    shard_index INT NOT NULL CHECK (shard_index >= 0),
+    status VARCHAR(32) NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+    payload JSONB NOT NULL,
+    worker_id VARCHAR(128),
+    lease_token VARCHAR(64),
+    attempt_count INT NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    claimed_at TIMESTAMPTZ,
+    heartbeat_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    total_tokens BIGINT,
+    duration_seconds DOUBLE PRECISION,
+    error_message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (operation_id, phase, shard_index)
 );
 
 CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -209,6 +239,8 @@ CREATE TABLE IF NOT EXISTS node_execution_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_source_files_hash ON source_files(file_hash);
+CREATE INDEX IF NOT EXISTS idx_source_files_active
+    ON source_files(created_at DESC) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_sheets_file_id ON sheets(file_id);
 CREATE INDEX IF NOT EXISTS idx_langchain_cmetadata_gin ON langchain_pg_embedding USING gin (cmetadata jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_id ON workflow_runs(workflow_id);
@@ -220,12 +252,18 @@ CREATE INDEX IF NOT EXISTS idx_workflow_runs_queue_claim
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_stale_lease
     ON workflow_runs(queue_name, heartbeat_at)
     WHERE status = 'running' AND cancel_requested = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ingestion_shards_claim
+    ON ingestion_shards(phase, status, available_at, created_at)
+    WHERE status IN ('queued', 'running');
 CREATE INDEX IF NOT EXISTS idx_node_logs_run_id ON node_execution_logs(run_id);
 CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
 CREATE INDEX IF NOT EXISTS idx_node_logs_pgvector_index_id
     ON node_execution_logs ((output->>'index_id'))
     WHERE module_type = 'pgvector_index_writer';
 """
+    + AUDIT_SCHEMA_SQL
+    + SOURCE_FILE_AUDIT_SQL
+)
 
 
 class DatabaseManager:
@@ -240,7 +278,9 @@ class DatabaseManager:
         self.database_url = database_url
 
     def _raw_connection(self) -> Any:
-        raw_url = getattr(self, "database_url", PGVECTOR_URL).replace("postgresql+psycopg://", "postgresql://")
+        raw_url = getattr(self, "database_url", PGVECTOR_URL).replace(
+            "postgresql+psycopg://", "postgresql://"
+        )
         return get_pooled_raw_connection(raw_url)
 
     def _advisory_lock_connection(self) -> Any:
@@ -255,9 +295,9 @@ class DatabaseManager:
 
     def is_connected(self) -> bool:
         """Check whether a connection to the database can be established and used.
-        
+
         Returns:
-        	bool: `True` if the database connection succeeds, `False` otherwise.
+                bool: `True` if the database connection succeeds, `False` otherwise.
         """
         try:
             conn = self._raw_connection()
@@ -267,6 +307,17 @@ class DatabaseManager:
                 return True
             finally:
                 conn.close()
+        except Exception:
+            return False
+
+    async def is_connected_async(self) -> bool:
+        """Check connectivity through the process-owned psycopg async pool."""
+        try:
+            async with get_pooled_async_connection(self.database_url) as connection:
+                async with connection.cursor() as cursor:
+                    await cursor.execute("SELECT 1;")
+                    await cursor.fetchone()
+            return True
         except Exception:
             return False
 
@@ -309,9 +360,7 @@ class DatabaseManager:
                 )
             if queue_name is not None:
                 if worker_id is None or lease_token is None:
-                    raise ValueError(
-                        "queue claim에는 worker_id와 lease_token이 필요합니다"
-                    )
+                    raise ValueError("queue claim에는 worker_id와 lease_token이 필요합니다")
                 if not self.finalize_workflow_run_claim(
                     run_id,
                     queue_name,
@@ -386,7 +435,7 @@ class DatabaseManager:
     ) -> None:
         """
         Insert a source file record or update the existing record with the same file ID.
-        
+
         Parameters:
             file_id (str): Unique identifier for the source file.
             file_name (str): Name of the source file.
@@ -400,14 +449,16 @@ class DatabaseManager:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, is_deleted, deleted_at, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, FALSE, NULL, NOW())
                     ON CONFLICT (file_id) DO UPDATE SET
                         file_name = EXCLUDED.file_name,
                         file_hash = EXCLUDED.file_hash,
                         file_type = EXCLUDED.file_type,
                         file_size = EXCLUDED.file_size,
-                        storage_path = EXCLUDED.storage_path;
+                        storage_path = EXCLUDED.storage_path,
+                        is_deleted = FALSE,
+                        deleted_at = NULL;
                     """,
                     (
                         file_id,
@@ -422,15 +473,60 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def delete_source_file(self, file_id_hash_or_name: str) -> bool:
-        """Delete a source file by ID, hash, or filename with cascading sheets."""
+    async def save_source_file_async(
+        self,
+        file_id: str,
+        file_name: str,
+        file_hash: str,
+        file_type: str,
+        file_size: int,
+        storage_path: str,
+        **_ignored: Any,
+    ) -> None:
+        """Persist upload metadata through native async PostgreSQL I/O."""
+        async with get_pooled_async_connection(self.database_url) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    """
+                    INSERT INTO source_files (file_id, file_name, file_hash, file_type, file_size, storage_path, is_deleted, deleted_at, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, FALSE, NULL, NOW())
+                    ON CONFLICT (file_id) DO UPDATE SET
+                        file_name = EXCLUDED.file_name,
+                        file_hash = EXCLUDED.file_hash,
+                        file_type = EXCLUDED.file_type,
+                        file_size = EXCLUDED.file_size,
+                        storage_path = EXCLUDED.storage_path,
+                        is_deleted = FALSE,
+                        deleted_at = NULL;
+                    """,
+                    (
+                        file_id,
+                        file_name,
+                        file_hash,
+                        file_type,
+                        file_size,
+                        storage_path,
+                    ),
+                )
+            await connection.commit()
+
+    def delete_source_file(
+        self,
+        file_id_hash_or_name: str,
+        *,
+        actor_id: str = "system",
+        request_id: str | None = None,
+    ) -> bool:
+        """Soft-delete source metadata by ID, hash, or unambiguous filename."""
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
+                self._set_audit_context(cur, actor_id=actor_id, request_id=request_id)
                 cur.execute(
                     """
-                    DELETE FROM source_files
-                    WHERE file_id = %s OR file_hash = %s;
+                    UPDATE source_files
+                    SET is_deleted = TRUE, deleted_at = NOW()
+                    WHERE (file_id = %s OR file_hash = %s) AND is_deleted = FALSE;
                     """,
                     (file_id_hash_or_name, file_id_hash_or_name),
                 )
@@ -441,7 +537,7 @@ class DatabaseManager:
                         """
                         SELECT file_id
                         FROM source_files
-                        WHERE file_name = %s
+                        WHERE file_name = %s AND is_deleted = FALSE
                         ORDER BY created_at DESC
                         LIMIT 2;
                         """,
@@ -455,7 +551,9 @@ class DatabaseManager:
                         )
                     if matches:
                         cur.execute(
-                            "DELETE FROM source_files WHERE file_id = %s;",
+                            "UPDATE source_files SET is_deleted = TRUE, "
+                            "deleted_at = NOW() WHERE file_id = %s "
+                            "AND is_deleted = FALSE;",
                             (matches[0][0],),
                         )
                         deleted = cur.rowcount > 0
@@ -463,6 +561,19 @@ class DatabaseManager:
             return deleted
         finally:
             conn.close()
+
+    @staticmethod
+    def _set_audit_context(
+        cursor: Any,
+        *,
+        actor_id: str,
+        request_id: str | None,
+    ) -> None:
+        cursor.execute(
+            "SELECT set_config('app.audit_actor_id', %s, TRUE), "
+            "set_config('app.audit_request_id', %s, TRUE)",
+            (actor_id[:128], (request_id or "")[:128]),
+        )
 
     def save_sheets(self, file_id: str, sheets_info: List[Dict[str, Any]]) -> None:
         """Insert or replace sheet records for a source file."""
@@ -524,9 +635,7 @@ class DatabaseManager:
                         "column_count": int(row[4]),
                         "detected_tables": row[5] or [],
                         "parsed_at": (
-                            row[6].isoformat()
-                            if hasattr(row[6], "isoformat")
-                            else str(row[6])
+                            row[6].isoformat() if hasattr(row[6], "isoformat") else str(row[6])
                         ),
                     }
                     for row in cur.fetchall()
@@ -587,9 +696,7 @@ class DatabaseManager:
                         (run_id, lease_token),
                     )
                     if cur.fetchone() is None:
-                        raise WorkflowLeaseLost(
-                            f"워크플로 lease 소유권을 잃었습니다: {run_id}"
-                        )
+                        raise WorkflowLeaseLost(f"워크플로 lease 소유권을 잃었습니다: {run_id}")
                 cur.execute(
                     """
                     INSERT INTO workflow_runs (
@@ -699,7 +806,9 @@ class DatabaseManager:
                             module_type,
                             batch_index,
                             node_status,
-                            psycopg2.extras.Json(input_payload) if input_payload is not None else None,
+                            psycopg2.extras.Json(input_payload)
+                            if input_payload is not None
+                            else None,
                             psycopg2.extras.Json(config_payload),
                             psycopg2.extras.Json(output) if output is not None else None,
                             error,
@@ -747,8 +856,12 @@ class DatabaseManager:
                     "orchestration": row[8] or {},
                     "batches": row[9] or [],
                     "nodes": row[10] or {},
-                    "created_at": row[11].isoformat() if hasattr(row[11], "isoformat") else str(row[11]),
-                    "updated_at": row[12].isoformat() if hasattr(row[12], "isoformat") else str(row[12]),
+                    "created_at": row[11].isoformat()
+                    if hasattr(row[11], "isoformat")
+                    else str(row[11]),
+                    "updated_at": row[12].isoformat()
+                    if hasattr(row[12], "isoformat")
+                    else str(row[12]),
                 }
                 cur.execute(
                     """
@@ -815,9 +928,7 @@ class DatabaseManager:
         """Build a product-facing run snapshot without loading large node payloads."""
 
         status = row[3]
-        node_statuses = {
-            str(node.get("status")) for node in nodes.values() if node.get("status")
-        }
+        node_statuses = {str(node.get("status")) for node in nodes.values() if node.get("status")}
         if status in ("queued", "running") and node_statuses:
             if node_statuses <= {"succeeded", "skipped"}:
                 status = "completed"
@@ -835,16 +946,8 @@ class DatabaseManager:
             "orchestration": row[8] or {},
             "batches": row[9] or [],
             "nodes": nodes,
-            "created_at": (
-                row[10].isoformat()
-                if hasattr(row[10], "isoformat")
-                else str(row[10])
-            ),
-            "updated_at": (
-                row[11].isoformat()
-                if hasattr(row[11], "isoformat")
-                else str(row[11])
-            ),
+            "created_at": (row[10].isoformat() if hasattr(row[10], "isoformat") else str(row[10])),
+            "updated_at": (row[11].isoformat() if hasattr(row[11], "isoformat") else str(row[11])),
         }
 
     @staticmethod
@@ -920,9 +1023,7 @@ class DatabaseManager:
                 """,
                 (run_ids,),
             )
-            summaries: Dict[str, Dict[str, Dict[str, Any]]] = {
-                run_id: {} for run_id in run_ids
-            }
+            summaries: Dict[str, Dict[str, Dict[str, Any]]] = {run_id: {} for run_id in run_ids}
             for row in cur.fetchall():
                 run_id = str(row[0])
                 node = self._node_summary_from_row(row)
@@ -1040,9 +1141,7 @@ class DatabaseManager:
             run_status = getattr(run, "status", "running")
             updated_at = getattr(run, "updated_at", None)
             batches = [
-                batch.model_dump(mode="json")
-                if hasattr(batch, "model_dump")
-                else dict(batch)
+                batch.model_dump(mode="json") if hasattr(batch, "model_dump") else dict(batch)
                 for batch in getattr(run, "batches", [])
             ]
             raw_node = getattr(run, "nodes", {}).get(node_id)
@@ -1096,9 +1195,7 @@ class DatabaseManager:
                     ),
                 )
                 if cur.rowcount != 1:
-                    raise WorkflowLeaseLost(
-                        f"워크플로 lease 소유권을 잃었습니다: {run_id}"
-                    )
+                    raise WorkflowLeaseLost(f"워크플로 lease 소유권을 잃었습니다: {run_id}")
                 cur.execute(
                     """
                     INSERT INTO node_execution_logs (
@@ -1164,20 +1261,12 @@ class DatabaseManager:
         node = getattr(run, "nodes", {}).get(node_id)
         if not run_id or node is None:
             raise ValueError(f"run에 저장할 노드가 없습니다: {node_id}")
-        node_state = (
-            node.model_dump(mode="json")
-            if hasattr(node, "model_dump")
-            else dict(node)
-        )
+        node_state = node.model_dump(mode="json") if hasattr(node, "model_dump") else dict(node)
         batches = [
-            batch.model_dump(mode="json")
-            if hasattr(batch, "model_dump")
-            else dict(batch)
+            batch.model_dump(mode="json") if hasattr(batch, "model_dump") else dict(batch)
             for batch in getattr(run, "batches", [])
         ]
-        updated_at = getattr(run, "updated_at", None) or datetime.now(
-            timezone.utc
-        ).isoformat()
+        updated_at = getattr(run, "updated_at", None) or datetime.now(timezone.utc).isoformat()
         conn = self._raw_connection()
         try:
             with conn.cursor() as cur:
@@ -1205,9 +1294,7 @@ class DatabaseManager:
                         run.status,
                         run.status,
                         psycopg2.extras.Json(batches),
-                        node_state.get("error")
-                        if node_state.get("status") == "failed"
-                        else None,
+                        node_state.get("error") if node_state.get("status") == "failed" else None,
                         updated_at,
                         run.status,
                         updated_at,
@@ -1216,9 +1303,7 @@ class DatabaseManager:
                     ),
                 )
                 if cur.rowcount != 1:
-                    raise WorkflowLeaseLost(
-                        f"워크플로 lease 소유권을 잃었습니다: {run_id}"
-                    )
+                    raise WorkflowLeaseLost(f"워크플로 lease 소유권을 잃었습니다: {run_id}")
                 cur.execute(
                     """
                     INSERT INTO node_execution_logs (
@@ -1658,6 +1743,61 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def list_active_workflow_leases(
+        self,
+        *,
+        stale_after_seconds: int = 180,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Return bounded read-only queue/lease data for the operations portal."""
+        safe_limit = max(1, min(limit, 500))
+        conn = self._raw_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        run_id,
+                        workflow_id,
+                        queue_name,
+                        status,
+                        worker_id,
+                        priority,
+                        attempt_count,
+                        available_at,
+                        claimed_at,
+                        heartbeat_at,
+                        cancel_requested,
+                        created_at,
+                        updated_at,
+                        CASE WHEN heartbeat_at IS NULL THEN NULL ELSE
+                            GREATEST(0, EXTRACT(EPOCH FROM (NOW() - heartbeat_at)))
+                        END AS heartbeat_age_seconds,
+                        CASE WHEN status <> 'running' OR heartbeat_at IS NULL THEN NULL ELSE
+                            GREATEST(
+                                0,
+                                %s - EXTRACT(EPOCH FROM (NOW() - heartbeat_at))
+                            )
+                        END AS lease_ttl_seconds,
+                        CASE WHEN status = 'running' THEN (
+                            heartbeat_at IS NULL OR
+                            heartbeat_at < NOW() - (%s * INTERVAL '1 second')
+                        ) ELSE FALSE END AS lease_stale
+                    FROM workflow_runs
+                    WHERE queue_name IS NOT NULL
+                      AND status IN ('queued', 'running', 'paused')
+                    ORDER BY
+                        CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,
+                        priority DESC,
+                        updated_at DESC
+                    LIMIT %s
+                    """,
+                    (stale_after_seconds, stale_after_seconds, safe_limit),
+                )
+                return [dict(row) for row in cur.fetchall()]
+        finally:
+            conn.close()
+
     def list_workflow_runs(self, workflow_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """List workflow runs from database, ordered by most recently updated."""
         conn = self._raw_connection()
@@ -1688,21 +1828,27 @@ class DatabaseManager:
                 rows = cur.fetchall()
                 runs = []
                 for row in rows:
-                    runs.append({
-                        "id": row[0],
-                        "workflow_id": row[1],
-                        "workflow_updated_at": row[2] or "",
-                        "status": row[3],
-                        "schema_version": row[4],
-                        "graph": row[5] or {},
-                        "runtime_inputs": row[6] or {},
-                        "use_cache": bool(row[7]),
-                        "orchestration": row[8] or {},
-                        "batches": row[9] or [],
-                        "nodes": row[10] or {},
-                        "created_at": row[11].isoformat() if hasattr(row[11], "isoformat") else str(row[11]),
-                        "updated_at": row[12].isoformat() if hasattr(row[12], "isoformat") else str(row[12]),
-                    })
+                    runs.append(
+                        {
+                            "id": row[0],
+                            "workflow_id": row[1],
+                            "workflow_updated_at": row[2] or "",
+                            "status": row[3],
+                            "schema_version": row[4],
+                            "graph": row[5] or {},
+                            "runtime_inputs": row[6] or {},
+                            "use_cache": bool(row[7]),
+                            "orchestration": row[8] or {},
+                            "batches": row[9] or [],
+                            "nodes": row[10] or {},
+                            "created_at": row[11].isoformat()
+                            if hasattr(row[11], "isoformat")
+                            else str(row[11]),
+                            "updated_at": row[12].isoformat()
+                            if hasattr(row[12], "isoformat")
+                            else str(row[12]),
+                        }
+                    )
                 return runs
         finally:
             conn.close()
@@ -1805,6 +1951,70 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    @staticmethod
+    def _node_execution_log_from_row(row: Any) -> Dict[str, Any]:
+        """Convert a full node execution row into the runtime DTO shape."""
+
+        return {
+            "log_id": row[0],
+            "run_id": row[1],
+            "node_id": row[2],
+            "module_type": row[3],
+            "batch_index": row[4],
+            "status": row[5],
+            "input_payload": row[6],
+            "config_payload": row[7] or {},
+            "output": row[8],
+            "error": row[9],
+            "cache_hit": bool(row[10]),
+            "outcome": row[11],
+            "progress": row[12] or {},
+            "elapsed_ms": row[13],
+            "cost_usd": row[14],
+            "usage": row[15],
+            "started_at": row[16].isoformat()
+            if hasattr(row[16], "isoformat")
+            else str(row[16])
+            if row[16]
+            else None,
+            "completed_at": row[17].isoformat()
+            if hasattr(row[17], "isoformat")
+            else str(row[17])
+            if row[17]
+            else None,
+            "created_at": row[18].isoformat()
+            if hasattr(row[18], "isoformat")
+            else str(row[18]),
+        }
+
+    def get_workflow_node_execution_log(
+        self,
+        run_id: str,
+        node_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Load one node's complete current DTO state for the settings monitor."""
+
+        conn = self._raw_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT log_id, run_id, node_id, module_type, batch_index,
+                           status, input_payload, config_payload, output, error,
+                           cache_hit, outcome, progress, elapsed_ms, cost_usd,
+                           usage, started_at, completed_at, created_at
+                    FROM node_execution_logs
+                    WHERE run_id = %s AND node_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1;
+                    """,
+                    (run_id, node_id),
+                )
+                row = cur.fetchone()
+            return self._node_execution_log_from_row(row) if row else None
+        finally:
+            conn.close()
+
     def get_node_execution_logs(self, run_id: str) -> List[Dict[str, Any]]:
         """Get execution logs for all nodes of a given workflow run."""
         conn = self._raw_connection()
@@ -1823,30 +2033,7 @@ class DatabaseManager:
                     (run_id,),
                 )
                 rows = cur.fetchall()
-                logs = []
-                for row in rows:
-                    logs.append({
-                        "log_id": row[0],
-                        "run_id": row[1],
-                        "node_id": row[2],
-                        "module_type": row[3],
-                        "batch_index": row[4],
-                        "status": row[5],
-                        "input_payload": row[6],
-                        "config_payload": row[7] or {},
-                        "output": row[8],
-                        "error": row[9],
-                        "cache_hit": bool(row[10]),
-                        "outcome": row[11],
-                        "progress": row[12] or {},
-                        "elapsed_ms": row[13],
-                        "cost_usd": row[14],
-                        "usage": row[15],
-                        "started_at": row[16].isoformat() if hasattr(row[16], "isoformat") else str(row[16]) if row[16] else None,
-                        "completed_at": row[17].isoformat() if hasattr(row[17], "isoformat") else str(row[17]) if row[17] else None,
-                        "created_at": row[18].isoformat() if hasattr(row[18], "isoformat") else str(row[18]),
-                    })
-                return logs
+                return [self._node_execution_log_from_row(row) for row in rows]
         finally:
             conn.close()
 

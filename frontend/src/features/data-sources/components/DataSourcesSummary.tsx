@@ -1,4 +1,5 @@
 import { Database, Layers, Server, Sparkles } from 'lucide-react';
+import { Surface } from '../../../shared/ui';
 import type { DbStatusInfo, VectorIndexInfo } from '../types';
 
 interface SummaryProps {
@@ -19,7 +20,7 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
 
   return (
     <section className="ds-summary-grid">
-      <div className="ds-summary-card">
+      <Surface as="article" className="ds-summary-card">
         <div className="ds-summary-card__header">
           <span>pgvector 컬렉션</span>
           <span className="ds-summary-card__icon ds-summary-card__icon--blue">
@@ -30,9 +31,9 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
         <small className="ds-summary-card__caption">
           langchain_pg_collection 등록
         </small>
-      </div>
+      </Surface>
 
-      <div className="ds-summary-card">
+      <Surface as="article" className="ds-summary-card">
         <div className="ds-summary-card__header">
           <span>총 벡터 임베딩 청크</span>
           <span className="ds-summary-card__icon ds-summary-card__icon--green">
@@ -43,9 +44,9 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
         <small className="ds-summary-card__caption">
           langchain_pg_embedding 저장
         </small>
-      </div>
+      </Surface>
 
-      <div className="ds-summary-card">
+      <Surface as="article" className="ds-summary-card">
         <div className="ds-summary-card__header">
           <span>데이터베이스 엔진</span>
           <span className="ds-summary-card__icon ds-summary-card__icon--purple">
@@ -60,9 +61,9 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
             ? `pgvector ${dbStatus.pgvector_version || '0.8.6'} · HNSW 인덱싱`
             : 'deploy/db/docker-compose.yml 실행 필요'}
         </small>
-      </div>
+      </Surface>
 
-      <div className="ds-summary-card">
+      <Surface as="article" className="ds-summary-card">
         <div className="ds-summary-card__header">
           <span>임베딩 표준 모델</span>
           <span className="ds-summary-card__icon ds-summary-card__icon--amber">
@@ -79,7 +80,7 @@ export function DataSourcesSummary({ indexes, dbStatus }: SummaryProps) {
               ? `${dimensions.join(' / ')}차원 · 질의 모델 자동 동기화`
               : '인덱스 모델·차원 자동 동기화'}
         </small>
-      </div>
+      </Surface>
     </section>
   );
 }

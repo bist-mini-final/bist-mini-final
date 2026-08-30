@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from backend.providers.openai_responses import OpenAIResponsesClient
 
+from .evidence import verifiable_cells
 from .extraction_models import (
     BiMetricExtractionRequest,
     BiMetricReaderResponse,
@@ -13,15 +14,7 @@ from .extraction_models import (
     ReaderContractFailure,
 )
 
-JsonValue: TypeAlias = (
-    str
-    | int
-    | float
-    | bool
-    | list["JsonValue"]
-    | dict[str, "JsonValue"]
-    | None
-)
+JsonValue: TypeAlias = str | int | float | bool | list["JsonValue"] | dict[str, "JsonValue"] | None
 
 
 def _strict_json_schema_value(value: JsonValue) -> JsonValue:
@@ -39,10 +32,7 @@ def _strict_json_schema_value(value: JsonValue) -> JsonValue:
 def _strict_json_schema(
     schema: dict[str, JsonValue],
 ) -> dict[str, JsonValue]:
-    normalized = {
-        key: _strict_json_schema_value(value)
-        for key, value in schema.items()
-    }
+    normalized = {key: _strict_json_schema_value(value) for key, value in schema.items()}
     pattern = normalized.get("pattern")
     if isinstance(pattern, str) and "(?" in pattern:
         del normalized["pattern"]
@@ -97,14 +87,18 @@ class BiMetricReader:
     ) -> MetricReaderResult:
         """
         Extract one metric for one reporting period from the retrieved context.
-        
+
         Parameters:
             request (BiMetricExtractionRequest): Identifies the metric and reporting period to extract.
             context (BiRetrievedContext): Provides the allowed evidence cells and contextual blocks.
-        
+
         Returns:
             MetricReaderResult: The validated extraction result, or a reader contract failure when the response payload is invalid.
         """
+        allowed_cells = verifiable_cells(context.cells)
+        if not allowed_cells:
+            return ReaderContractFailure(code="verifiable_evidence_missing")
+
         payload = json.dumps(
             {
                 "request": {
@@ -120,9 +114,11 @@ class BiMetricReader:
                         "cell_coord": cell.cell_coord,
                         "source_text": cell.source_text,
                     }
-                    for cell in context.cells
+                    for cell in allowed_cells
                 ],
-                "context_blocks": context.context_blocks,
+                # The retrieval layer may use placeholder-bearing search hints,
+                # but the BI Reader receives only concrete value cells.
+                "context_blocks": list(dict.fromkeys(cell.source_text for cell in allowed_cells)),
             },
             ensure_ascii=False,
         )
@@ -135,7 +131,7 @@ class BiMetricReader:
                     "근거는 allowed_evidence_cells의 cell_id만 사용한다. "
                     "금액 지표의 currency와 scale은 근거에 명시된 표기만 사용하고 추정하거나 환산하지 않는다. "
                     "근거에서 통화 또는 배율을 특정할 수 없으면 해당 필드는 null로 둔다. "
-                    "셀 값이 비어있거나 '?', 'NA'인 경우에만 missing 또는 ambiguous로 표현한다."
+                    "allowed_evidence_cells 밖의 값은 사용하지 않는다."
                 ),
             },
             {"role": "user", "content": payload},

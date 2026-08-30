@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
-from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
     BaseModule,
     DocumentContextDTO,
@@ -20,6 +20,7 @@ from modules.common.base_module import (
 )
 from modules.common.config import DEFAULT_RETRIEVAL_TOP_K
 from modules.embedding.query_embedder import EmbeddingsDTO, RoutedEmbeddingDTO
+from modules.retrieval.ports import DenseVectorSearchPort
 
 
 class RankedSearchCandidateDTO(ModuleDTO):
@@ -38,27 +39,33 @@ class RankedSearchResultDTO(ModuleDTO):
 
     query_context: QueryContextDTO = Field(..., description="원본 질문 컨텍스트")
     document_context: DocumentContextDTO = Field(..., description="문서 및 인덱스 메타데이터")
-    items: List[RankedSearchCandidateDTO] = Field(default_factory=list, description="랭킹된 셀 후보 목록")
+    items: List[RankedSearchCandidateDTO] = Field(
+        default_factory=list, description="랭킹된 셀 후보 목록"
+    )
 
 
 class PgVectorRetrieverInputDTO(ModuleInputDTO):
     """Input payload containing routed query embeddings."""
 
-    query_input: EmbeddingsDTO = Field(..., description="임베딩된 서브쿼리 및 라우팅된 컬렉션 벡터 목록")
+    query_input: EmbeddingsDTO = Field(
+        ..., description="임베딩된 서브쿼리 및 라우팅된 컬렉션 벡터 목록"
+    )
 
 
 class PgVectorRetrieverConfigDTO(ModuleConfigDTO):
     """Configuration options for dense vector retrieval."""
 
-    top_k: int = Field(default=DEFAULT_RETRIEVAL_TOP_K, gt=0, le=10000, description="각 서브쿼리당 검색할 상위 셀 수 (Top-K)")
+    top_k: int = Field(
+        default=DEFAULT_RETRIEVAL_TOP_K,
+        gt=0,
+        le=10000,
+        description="각 서브쿼리당 검색할 상위 셀 수 (Top-K)",
+    )
 
 
 def _document_context(embeddings: EmbeddingsDTO) -> DocumentContextDTO:
     collections = list(
-        {
-            item.collection.index_id: item.collection
-            for item in embeddings.items
-        }.values()
+        {item.collection.index_id: item.collection for item in embeddings.items}.values()
     )
     if not collections:
         return DocumentContextDTO(
@@ -68,9 +75,7 @@ def _document_context(embeddings: EmbeddingsDTO) -> DocumentContextDTO:
     companies = list(
         dict.fromkeys(scope.company_name for scope in collections if scope.company_name)
     )
-    sheets = list(
-        dict.fromkeys(sheet for scope in collections for sheet in scope.sheet_names)
-    )
+    sheets = list(dict.fromkeys(sheet for scope in collections for sheet in scope.sheet_names))
     return DocumentContextDTO(
         file_name=", ".join(scope.file_name for scope in collections),
         workbook_hash=",".join(scope.workbook_hash for scope in collections),
@@ -101,7 +106,7 @@ class PgVectorRetrieverModule(BaseModule):
     config_model = PgVectorRetrieverConfigDTO
     output_model = RankedSearchResultDTO
 
-    def __init__(self, pgvector_store: PgVectorStore) -> None:
+    def __init__(self, pgvector_store: DenseVectorSearchPort) -> None:
         self.pgvector_store = pgvector_store
 
     def _search_one(
@@ -126,6 +131,14 @@ class PgVectorRetrieverModule(BaseModule):
                 embedding=item.vector,
                 k=top_k,
             )
+        return self._search_hits(item, query_text, results)
+
+    @staticmethod
+    def _search_hits(
+        item: RoutedEmbeddingDTO,
+        query_text: str,
+        results: List[Tuple[Any, float]],
+    ) -> Tuple[int, str, List[Tuple[float, Dict[str, Any]]]]:
         hits: List[Tuple[float, Dict[str, Any]]] = []
         for document, distance in results:
             text = document.page_content or ""
@@ -151,34 +164,43 @@ class PgVectorRetrieverModule(BaseModule):
             )
         return item.subquery_index, query_text, hits
 
-    def execute(
+    async def _search_one_async(
         self,
-        input_data: PgVectorRetrieverInputDTO,
-        config: Optional[PgVectorRetrieverConfigDTO] = None,
-    ) -> Dict[str, Any]:
-        cfg = config or PgVectorRetrieverConfigDTO()
-        embeddings = input_data.query_input
-        if not embeddings.items:
-            return {
-                "query_context": embeddings.query_context.model_dump(mode="json"),
-                "document_context": _document_context(embeddings).model_dump(mode="json"),
-                "items": [],
-            }
-
-        best_by_subquery: Dict[
-            int, Dict[Tuple[str, str], Tuple[float, Dict[str, Any]]]
-        ] = {}
-        with ThreadPoolExecutor(max_workers=min(8, len(embeddings.items))) as executor:
-            results = executor.map(
-                lambda item: self._search_one(item, cfg.top_k),
-                embeddings.items,
+        item: RoutedEmbeddingDTO,
+        top_k: int,
+    ) -> Tuple[int, str, List[Tuple[float, Dict[str, Any]]]]:
+        subquery = item.subquery
+        query_text = subquery.text or subquery.to_serialized_query()
+        company = subquery.company if subquery.company not in ("", "?") else None
+        sheets = [subquery.sheet] if subquery.sheet not in ("", "?") else None
+        results = await self.pgvector_store.similarity_search_by_vector_with_score_async(
+            collection_name=item.collection.index_id,
+            embedding=item.vector,
+            k=top_k,
+            sheet_names=sheets,
+            company_name=company,
+        )
+        if (company or sheets) and not results:
+            results = await self.pgvector_store.similarity_search_by_vector_with_score_async(
+                collection_name=item.collection.index_id,
+                embedding=item.vector,
+                k=top_k,
             )
-            for subquery_index, _, hits in results:
-                best = best_by_subquery.setdefault(subquery_index, {})
-                for score, hit in hits:
-                    key = (hit["index_id"], hit["cell_id"])
-                    if key not in best or score > best[key][0]:
-                        best[key] = (score, hit)
+        return self._search_hits(item, query_text, results)
+
+    @staticmethod
+    def _output(
+        embeddings: EmbeddingsDTO,
+        cfg: PgVectorRetrieverConfigDTO,
+        search_results: List[Tuple[int, str, List[Tuple[float, Dict[str, Any]]]]],
+    ) -> Dict[str, Any]:
+        best_by_subquery: Dict[int, Dict[Tuple[str, str], Tuple[float, Dict[str, Any]]]] = {}
+        for subquery_index, _, hits in search_results:
+            best = best_by_subquery.setdefault(subquery_index, {})
+            for score, hit in hits:
+                key = (hit["index_id"], hit["cell_id"])
+                if key not in best or score > best[key][0]:
+                    best[key] = (score, hit)
 
         ranked_items: List[Dict[str, Any]] = []
         for subquery_index in sorted(best_by_subquery):
@@ -202,6 +224,59 @@ class PgVectorRetrieverModule(BaseModule):
             "document_context": _document_context(embeddings).model_dump(mode="json"),
             "items": ranked_items,
         }
+
+    def execute(
+        self,
+        input_data: PgVectorRetrieverInputDTO,
+        config: Optional[PgVectorRetrieverConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or PgVectorRetrieverConfigDTO()
+        embeddings = input_data.query_input
+        if not embeddings.items:
+            return {
+                "query_context": embeddings.query_context.model_dump(mode="json"),
+                "document_context": _document_context(embeddings).model_dump(mode="json"),
+                "items": [],
+            }
+
+        with ThreadPoolExecutor(max_workers=min(8, len(embeddings.items))) as executor:
+            results = list(
+                executor.map(
+                    lambda item: self._search_one(item, cfg.top_k),
+                    embeddings.items,
+                )
+            )
+        return self._output(embeddings, cfg, results)
+
+    async def execute_async(
+        self,
+        input_data: PgVectorRetrieverInputDTO,
+        config: Optional[PgVectorRetrieverConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or PgVectorRetrieverConfigDTO()
+        embeddings = input_data.query_input
+        if not embeddings.items:
+            return {
+                "query_context": embeddings.query_context.model_dump(mode="json"),
+                "document_context": _document_context(embeddings).model_dump(mode="json"),
+                "items": [],
+            }
+        tasks: List[asyncio.Task[Tuple[int, str, List[Tuple[float, Dict[str, Any]]]]]] = []
+        async with asyncio.TaskGroup() as task_group:
+            tasks.extend(
+                (
+                    task_group.create_task(
+                        self._search_one_async(item, cfg.top_k),
+                        name=(f"dense-search:{item.subquery_index}:{item.collection.index_id}"),
+                    )
+                    for item in embeddings.items
+                )
+            )
+        return self._output(
+            embeddings,
+            cfg,
+            [task.result() for task in tasks],
+        )
 
 
 __all__ = [

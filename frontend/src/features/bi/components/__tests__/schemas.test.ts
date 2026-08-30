@@ -1,7 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { parseBiCompanies, parseBiDashboard } from '../../schemas';
+import {
+  parseBiCompanies,
+  parseBiDashboard,
+  parseBiMaterializationCandidates,
+} from '../../schemas';
 
 describe('BI API schemas', () => {
+  it('maps materialization candidates and their generation reason', () => {
+    const response = parseBiMaterializationCandidates({
+      candidates: [{
+        company_id: 'acme',
+        display_name: 'ACME',
+        source: {
+          file_name: 'acme.xlsx',
+          workbook_hash: 'a'.repeat(64),
+          index_id: 'index-acme',
+        },
+        reason: 'source_changed',
+      }],
+    });
+
+    expect(response.candidates[0]).toEqual({
+      companyId: 'acme',
+      displayName: 'ACME',
+      source: {
+        fileName: 'acme.xlsx',
+        workbookHash: 'a'.repeat(64),
+        indexId: 'index-acme',
+      },
+      reason: 'source_changed',
+    });
+  });
+
   it('maps the company list contract to readonly frontend fields', () => {
     const response = parseBiCompanies({
       companies: [{

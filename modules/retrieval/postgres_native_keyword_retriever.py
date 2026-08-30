@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
-from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleInputDTO
 from modules.common.config import DEFAULT_RETRIEVAL_TOP_K
 from modules.query.llm_query_router import RetrievalPlanDTO, document_context_for_plan
 from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
+from modules.retrieval.ports import KeywordSearchPort
 
 
 class PostgresNativeKeywordRetrieverInputDTO(ModuleInputDTO):
@@ -52,9 +53,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         type="postgres_native_keyword_retriever",
         label="PostgreSQL Native Keyword Retriever",
         category="Logic",
-        description=(
-            "Router가 지정한 collection 집합 안에서만 GIN/tsvector 검색을 수행합니다."
-        ),
+        description=("Router가 지정한 collection 집합 안에서만 GIN/tsvector 검색을 수행합니다."),
         inputs=["retrieval_plan"],
         outputs=["bm25_result"],
         config_fields=["top_k"],
@@ -65,112 +64,68 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
     config_model = PostgresNativeKeywordRetrieverConfigDTO
     output_model = RankedSearchResultDTO
 
-    def __init__(self, pgvector_store: PgVectorStore) -> None:
+    def __init__(self, pgvector_store: KeywordSearchPort) -> None:
         self.pgvector_store = pgvector_store
 
-    def execute(
+    def _search_one(
         self,
-        input_data: PostgresNativeKeywordRetrieverInputDTO,
-        config: Optional[PostgresNativeKeywordRetrieverConfigDTO] = None,
-    ) -> Dict[str, Any]:
-        cfg = config or PostgresNativeKeywordRetrieverConfigDTO()
-        plan = input_data.retrieval_plan
-        document_context = document_context_for_plan(plan)
-        if not plan.routes:
-            return {
-                "query_context": plan.query_context.model_dump(mode="json"),
-                "document_context": document_context.model_dump(mode="json"),
-                "items": [],
-            }
+        route: Any,
+        top_k: int,
+    ) -> Tuple[int, str, List[Tuple[str, Dict[str, Any], float, str]]]:
+        query_text = route.subquery.text or route.subquery.to_serialized_query()
+        clean_query = _clean_tsquery_term(query_text)
+        if not clean_query:
+            return route.subquery_index, query_text, []
+        rows = self.pgvector_store.keyword_search(
+            collection_names=[scope.index_id for scope in route.collections],
+            query_text=clean_query,
+            k=top_k,
+            company_name=(
+                route.subquery.company.strip() if route.subquery.company not in ("", "?") else None
+            ),
+            sheet_name=(route.subquery.sheet if route.subquery.sheet not in ("", "?") else None),
+        )
+        return route.subquery_index, query_text, rows
 
-        connection = self.pgvector_store._read_connection()
-        hits_by_subquery: Dict[
-            int, List[Tuple[float, str, Dict[str, Any], str, str]]
-        ] = {}
-        try:
-            with connection.cursor() as cursor:
-                for route in plan.routes:
-                    query_text = route.subquery.text or route.subquery.to_serialized_query()
-                    clean_query = _clean_tsquery_term(query_text)
-                    if not clean_query:
-                        continue
-                    collection_ids = [scope.index_id for scope in route.collections]
-                    where_extra: List[str] = []
-                    where_params: List[Any] = []
-                    if route.subquery.company not in ("", "?"):
-                        company = route.subquery.company.strip()
-                        where_extra.append(
-                            "AND (embedding.cmetadata->>'company_name' ILIKE %s ESCAPE '!' "
-                            "OR embedding.cmetadata->>'company_name' = %s)"
-                        )
-                        where_params.extend([f"%{_escape_like_term(company)}%", company])
-                    if route.subquery.sheet not in ("", "?"):
-                        where_extra.append(
-                            "AND embedding.cmetadata->>'sheet_name' = %s"
-                        )
-                        where_params.append(route.subquery.sheet)
-                    extra_sql = " ".join(where_extra)
-                    sql = f"""
-                        SELECT
-                            embedding.document,
-                            embedding.cmetadata,
-                            ts_rank_cd(
-                                to_tsvector('simple', embedding.document),
-                                plainto_tsquery('simple', %s)
-                            ) AS fts_score,
-                            collection.name
-                        FROM langchain_pg_embedding AS embedding
-                        JOIN langchain_pg_collection AS collection
-                          ON collection.uuid = embedding.collection_id
-                        WHERE collection.name = ANY(%s)
-                          AND to_tsvector('simple', embedding.document)
-                              @@ plainto_tsquery('simple', %s)
-                          {extra_sql}
-                        ORDER BY fts_score DESC, embedding.id
-                        LIMIT %s;
-                    """
-                    cursor.execute(
-                        sql,
-                        [clean_query, collection_ids, clean_query, *where_params, cfg.top_k],
+    async def _search_one_async(
+        self,
+        route: Any,
+        top_k: int,
+    ) -> Tuple[int, str, List[Tuple[str, Dict[str, Any], float, str]]]:
+        query_text = route.subquery.text or route.subquery.to_serialized_query()
+        clean_query = _clean_tsquery_term(query_text)
+        if not clean_query:
+            return route.subquery_index, query_text, []
+        rows = await self.pgvector_store.keyword_search_async(
+            collection_names=[scope.index_id for scope in route.collections],
+            query_text=clean_query,
+            k=top_k,
+            company_name=(
+                route.subquery.company.strip() if route.subquery.company not in ("", "?") else None
+            ),
+            sheet_name=(route.subquery.sheet if route.subquery.sheet not in ("", "?") else None),
+        )
+        return route.subquery_index, query_text, rows
+
+    @staticmethod
+    def _output(
+        plan: RetrievalPlanDTO,
+        cfg: PostgresNativeKeywordRetrieverConfigDTO,
+        search_results: List[Tuple[int, str, List[Tuple[str, Dict[str, Any], float, str]]]],
+    ) -> Dict[str, Any]:
+        hits_by_subquery: Dict[int, List[Tuple[float, str, Dict[str, Any], str, str]]] = {}
+        for subquery_index, query_text, rows in search_results:
+            route_hits = hits_by_subquery.setdefault(subquery_index, [])
+            for document, metadata, score, index_id in rows:
+                route_hits.append(
+                    (
+                        score if score > 0 else 0.05,
+                        index_id,
+                        metadata,
+                        document,
+                        query_text,
                     )
-                    rows = cursor.fetchall()
-                    if not rows and extra_sql:
-                        cursor.execute(
-                            """
-                            SELECT
-                                embedding.document,
-                                embedding.cmetadata,
-                                ts_rank_cd(
-                                    to_tsvector('simple', embedding.document),
-                                    plainto_tsquery('simple', %s)
-                                ) AS fts_score,
-                                collection.name
-                            FROM langchain_pg_embedding AS embedding
-                            JOIN langchain_pg_collection AS collection
-                              ON collection.uuid = embedding.collection_id
-                            WHERE collection.name = ANY(%s)
-                              AND to_tsvector('simple', embedding.document)
-                                  @@ plainto_tsquery('simple', %s)
-                            ORDER BY fts_score DESC, embedding.id
-                            LIMIT %s;
-                            """,
-                            (clean_query, collection_ids, clean_query, cfg.top_k),
-                        )
-                        rows = cursor.fetchall()
-                    route_hits = hits_by_subquery.setdefault(route.subquery_index, [])
-                    for document, raw_metadata, score, index_id in rows:
-                        metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
-                        route_hits.append(
-                            (
-                                float(score) if score and float(score) > 0 else 0.05,
-                                str(index_id),
-                                metadata,
-                                str(document),
-                                query_text,
-                            )
-                        )
-        finally:
-            connection.close()
+                )
 
         ranked_items: List[Dict[str, Any]] = []
         for subquery_index in sorted(hits_by_subquery):
@@ -209,9 +164,62 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
 
         return {
             "query_context": plan.query_context.model_dump(mode="json"),
-            "document_context": document_context.model_dump(mode="json"),
+            "document_context": document_context_for_plan(plan).model_dump(mode="json"),
             "items": ranked_items,
         }
+
+    def execute(
+        self,
+        input_data: PostgresNativeKeywordRetrieverInputDTO,
+        config: Optional[PostgresNativeKeywordRetrieverConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or PostgresNativeKeywordRetrieverConfigDTO()
+        plan = input_data.retrieval_plan
+        if not plan.routes:
+            return {
+                "query_context": plan.query_context.model_dump(mode="json"),
+                "document_context": document_context_for_plan(plan).model_dump(mode="json"),
+                "items": [],
+            }
+        return self._output(
+            plan,
+            cfg,
+            [self._search_one(route, cfg.top_k) for route in plan.routes],
+        )
+
+    async def execute_async(
+        self,
+        input_data: PostgresNativeKeywordRetrieverInputDTO,
+        config: Optional[PostgresNativeKeywordRetrieverConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or PostgresNativeKeywordRetrieverConfigDTO()
+        plan = input_data.retrieval_plan
+        if not plan.routes:
+            return {
+                "query_context": plan.query_context.model_dump(mode="json"),
+                "document_context": document_context_for_plan(plan).model_dump(mode="json"),
+                "items": [],
+            }
+        tasks: List[
+            asyncio.Task[
+                Tuple[
+                    int,
+                    str,
+                    List[Tuple[str, Dict[str, Any], float, str]],
+                ]
+            ]
+        ] = []
+        async with asyncio.TaskGroup() as task_group:
+            tasks.extend(
+                (
+                    task_group.create_task(
+                        self._search_one_async(route, cfg.top_k),
+                        name=f"keyword-search:{route.subquery_index}",
+                    )
+                    for route in plan.routes
+                )
+            )
+        return self._output(plan, cfg, [task.result() for task in tasks])
 
 
 __all__ = [

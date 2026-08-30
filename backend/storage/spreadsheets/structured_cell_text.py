@@ -1,15 +1,22 @@
 import re
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Final, List, Optional, Tuple
 
 from .cell_visibility import WorksheetVisibility
 
 UNKNOWN_FIELD = "?"
-SERIALIZATION_VERSION = "structured-cell-v5-visible-only"
+UNRESOLVED_CELL_VALUES: Final = frozenset(
+    {"", "?", "-", "na", "n/a", "nm", "#pend", "none", "null"}
+)
+SERIALIZATION_VERSION = "structured-cell-v6-company-scoped"
 SHEET_NAME_ALIASES: Dict[str, str] = {}
 SHEET_CODE_MAP: Dict[str, str] = {}
 PERIOD_PATTERN = re.compile(
     r"\b(?:19|20)\d{2}(?:-\d{2}-\d{2})?\b|\bFY(?:-?\d+|\d{4})\b|\bLTM\b",
+    re.IGNORECASE,
+)
+CELL_VALUE_PATTERN = re.compile(
+    r"(?:^|\|)\s*Cell Value:\s*([^|]*)",
     re.IGNORECASE,
 )
 
@@ -34,6 +41,24 @@ def format_cell_value(value: Any) -> Optional[str]:
     return formatted or None
 
 
+def resolved_cell_value(value: Any) -> Optional[str]:
+    """Return a concrete cell value, excluding search/query placeholders."""
+
+    formatted = format_cell_value(value)
+    if formatted is None or formatted.casefold() in UNRESOLVED_CELL_VALUES:
+        return None
+    return formatted
+
+
+def extract_resolved_cell_value(source_text: Any) -> Optional[str]:
+    """Extract a concrete value from the canonical structured-cell contract."""
+
+    matched = CELL_VALUE_PATTERN.search(str(source_text or ""))
+    if matched is None:
+        return None
+    return resolved_cell_value(matched.group(1))
+
+
 def serialize_structured_cell(
     sheet_name: str,
     row_headers: List[str],
@@ -52,6 +77,51 @@ def serialize_structured_cell(
     parts.append(f"Column Header: {column_text}")
     parts.append(f"Cell Value: {value_text}")
     return " | ".join(parts)
+
+
+def normalize_row_headers(
+    row_headers: List[str],
+    *,
+    company_name: Optional[str] = None,
+) -> List[str]:
+    """Remove legacy workbook-title metadata from a semantic row-header path.
+
+    Older indexes prepended the table ``title`` region (company, data source,
+    unit and period labels) to every row header. Those values are document
+    metadata, not account-name hierarchy. New serializers no longer add the
+    title region, while this normalizer keeps existing indexes readable without
+    requiring a paid re-embedding pass.
+    """
+
+    values = [str(value).strip() for value in row_headers if str(value).strip()]
+    if not values:
+        return []
+
+    company = str(company_name or "").strip().casefold()
+    if company:
+        values = [value for value in values if value.casefold() != company]
+
+    legacy_prefix = re.compile(
+        r"^(?:source\s*:|data\s+in\b|fiscal\s+year\s+ended\b|ltm$)",
+        re.IGNORECASE,
+    )
+    legal_company_title = re.compile(
+        r"\b(?:corporation|corp\.?|inc\.?|incorporated|limited|ltd\.?|plc|company|co\.?)$",
+        re.IGNORECASE,
+    )
+    while values and legacy_prefix.search(values[0]):
+        values.pop(0)
+
+    # A legacy company title commonly precedes source/unit labels. It may be
+    # the legal name while collection metadata contains only a ticker (IBM).
+    if len(values) > 1 and (
+        legacy_prefix.search(values[1]) or legal_company_title.search(values[0])
+    ):
+        values.pop(0)
+        while values and legacy_prefix.search(values[0]):
+            values.pop(0)
+
+    return values
 
 
 def generate_header_combinations(
@@ -135,9 +205,7 @@ class WorksheetValueReader:
         )
         if not self.visibility.cell_visible(source_row, source_column):
             return None
-        return format_cell_value(
-            self.worksheet.cell(row=source_row, column=source_column).value
-        )
+        return format_cell_value(self.worksheet.cell(row=source_row, column=source_column).value)
 
     def row_hidden(self, row: int) -> bool:
         return self.visibility.row_hidden(row)

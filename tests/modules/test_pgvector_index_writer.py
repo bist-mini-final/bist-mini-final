@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.storage.pgvector_store import PgVectorReplacePlan
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 
 
@@ -66,3 +67,47 @@ def test_pgvector_writer_execution(tmp_path: Path) -> None:
     assert vectors[0] == pytest.approx([0.1, 0.2])
     assert len(vectors) == 2
     db_manager.save_source_file.assert_called_once()
+
+
+def test_pgvector_writer_delegates_to_vector_copy_jobs(tmp_path: Path) -> None:
+    artifact_store = EmbeddingArtifactStore(tmp_path / "vectors")
+    artifact_id = "c" * 64
+    db_manager = MagicMock()
+    pgvector_store = MagicMock()
+    coordinator = MagicMock()
+    coordinator.enabled = True
+    plan = PgVectorReplacePlan(
+        index_id=f"idx_{artifact_id}",
+        operation_id=artifact_id,
+        staging_name=f"idx_{artifact_id}__staging__{artifact_id[:16]}",
+        staging_uuid="11111111-1111-1111-1111-111111111111",
+        dimension=2,
+        metadata={"document_count": 2},
+    )
+    pgvector_store.prepare_collection_replace.return_value = plan
+    module = PgVectorIndexWriterModule(
+        artifact_store=artifact_store,
+        db_manager=db_manager,
+        pgvector_store=pgvector_store,
+        processed_dir=tmp_path,
+        shard_coordinator=coordinator,
+    )
+
+    result = module.run(
+        {
+            "file_name": "sample.xlsx",
+            "workbook_hash": "d" * 64,
+            "model": "custom-2d",
+            "artifact_id": artifact_id,
+            "dimension": 2,
+            "items": [
+                {**item, "embedding_index": index}
+                for index, item in enumerate(_serialized_items())
+            ],
+        }
+    )
+
+    assert result["index_id"] == f"idx_{artifact_id}"
+    pgvector_store.prepare_collection_replace.assert_called_once()
+    coordinator.copy_vectors.assert_called_once()
+    pgvector_store.put_documents.assert_not_called()

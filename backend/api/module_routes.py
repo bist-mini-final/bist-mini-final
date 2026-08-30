@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
+from backend.api.dependencies import get_module_registry
 from backend.cli.documentation.module_docs import render_module_markdown
 from backend.engine.runtime.registry import ModuleRegistry
 
@@ -87,9 +88,20 @@ class AllModuleSchemasResponse(BaseModel):
 # ==============================================================================
 # Router Factory
 # ==============================================================================
-def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
+def create_module_router(module_registry: ModuleRegistry | None = None) -> APIRouter:
     """파이프라인 모듈 탐색 및 스키마 조회를 위한 FastAPI 라우터 생성."""
     router = APIRouter(tags=["모듈 카탈로그 및 스키마"])
+
+    def resolve_module_registry() -> ModuleRegistry:
+        if module_registry is None:
+            raise RuntimeError("모듈 레지스트리 의존성이 바인딩되지 않았습니다")
+        return module_registry
+
+    registry_dependency = (
+        resolve_module_registry
+        if module_registry is not None
+        else get_module_registry
+    )
 
     @router.get(
         "/modules",
@@ -100,9 +112,11 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
             "포트 계약, Input/Config/Output DTO 스키마, UI 팔레트 메타데이터를 일괄 조회합니다."
         ),
     )
-    def get_modules() -> Dict[str, Any]:
+    def get_modules(
+        registry: ModuleRegistry = Depends(registry_dependency),
+    ) -> Dict[str, Any]:
         """등록된 모든 모듈의 팔레트 메타데이터 및 정형 DTO 스키마를 반환합니다."""
-        return {"modules": module_registry.definitions()}
+        return {"modules": registry.definitions()}
 
     @router.get(
         "/modules/categories",
@@ -113,9 +127,11 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
             "(Query, Embedding, Retrieval, Reader, Structure, Storage)로 그룹화하여 조회합니다."
         ),
     )
-    def get_module_categories() -> Dict[str, Any]:
+    def get_module_categories(
+        registry: ModuleRegistry = Depends(registry_dependency),
+    ) -> Dict[str, Any]:
         """파이프라인 모듈을 기능별 카테고리로 그룹화하여 반환합니다."""
-        all_defs = module_registry.definitions()
+        all_defs = registry.definitions()
         grouped: Dict[str, List[Dict[str, Any]]] = {}
         for definition in all_defs:
             cat = definition.get("category", "General")
@@ -141,10 +157,12 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
             "Pydantic DTO (입력, 설정, 출력) JSON Schema를 일괄 반환합니다."
         ),
     )
-    def get_all_module_schemas() -> Dict[str, Any]:
+    def get_all_module_schemas(
+        registry: ModuleRegistry = Depends(registry_dependency),
+    ) -> Dict[str, Any]:
         """모든 등록된 모듈의 JSON 스키마 사전을 일괄 반환합니다."""
         schemas_map: Dict[str, Dict[str, Any]] = {}
-        for definition in module_registry.definitions():
+        for definition in registry.definitions():
             m_type = definition["type"]
             schemas_map[m_type] = {
                 "input_schema": definition.get("input_schema", {}),
@@ -166,10 +184,11 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
     )
     def get_module(
         module_type: str = Path(..., description="모듈 식별자 (예: 'decomposer', 'reader')"),
+        registry: ModuleRegistry = Depends(registry_dependency),
     ) -> Dict[str, Any]:
         """단일 모듈의 입력, 설정, 출력 및 실행 스키마를 반환합니다."""
         try:
-            return module_registry.definition(module_type)
+            return registry.definition(module_type)
         except KeyError as error:
             raise HTTPException(
                 status_code=404,
@@ -187,10 +206,11 @@ def create_module_router(module_registry: ModuleRegistry) -> APIRouter:
     )
     def get_module_docs(
         module_type: str = Path(..., description="모듈 식별자 (예: 'decomposer', 'reader')"),
+        registry: ModuleRegistry = Depends(registry_dependency),
     ) -> str:
         """모듈의 Pydantic DTO 구조로부터 마크다운 사용 가이드를 동적 렌더링합니다."""
         try:
-            return render_module_markdown(module_registry.get(module_type))
+            return render_module_markdown(registry.get(module_type))
         except KeyError as error:
             raise HTTPException(
                 status_code=404,

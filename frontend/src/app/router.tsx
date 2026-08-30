@@ -7,36 +7,54 @@ import {
 
 const NAVIGATION_EVENT = 'rag-flow:navigation';
 
+export interface AppLocation {
+  readonly pathname: string;
+  readonly search: string;
+  readonly hash: string;
+}
+
 function normalizePathname(pathname: string): string {
   if (!pathname || pathname === '/') return '/';
   return pathname.replace(/\/+$/, '') || '/';
 }
 
 export function navigateTo(to: string, replace = false): void {
-  const [pathname, search] = to.split('?');
-  const nextPath = normalizePathname(pathname) + (search ? `?${search}` : '');
-  const currentFull = normalizePathname(window.location.pathname) + (window.location.search || '');
+  const target = new URL(to, window.location.href);
+  const nextPath = normalizePathname(target.pathname) + target.search + target.hash;
+  const currentFull = normalizePathname(window.location.pathname)
+    + window.location.search
+    + window.location.hash;
   if (currentFull === nextPath) return;
   window.history[replace ? 'replaceState' : 'pushState']({}, '', nextPath);
   window.dispatchEvent(new Event(NAVIGATION_EVENT));
 }
 
-export function usePathname(): string {
-  const [pathname, setPathname] = useState(() =>
-    normalizePathname(window.location.pathname)
-  );
+function readLocation(): AppLocation {
+  return {
+    pathname: normalizePathname(window.location.pathname),
+    search: window.location.search,
+    hash: window.location.hash,
+  };
+}
+
+export function useAppLocation(): AppLocation {
+  const [location, setLocation] = useState(readLocation);
 
   useEffect(() => {
-    const syncPathname = () => setPathname(normalizePathname(window.location.pathname));
-    window.addEventListener('popstate', syncPathname);
-    window.addEventListener(NAVIGATION_EVENT, syncPathname);
+    const syncLocation = () => setLocation(readLocation());
+    window.addEventListener('popstate', syncLocation);
+    window.addEventListener(NAVIGATION_EVENT, syncLocation);
     return () => {
-      window.removeEventListener('popstate', syncPathname);
-      window.removeEventListener(NAVIGATION_EVENT, syncPathname);
+      window.removeEventListener('popstate', syncLocation);
+      window.removeEventListener(NAVIGATION_EVENT, syncLocation);
     };
   }, []);
 
-  return pathname;
+  return location;
+}
+
+export function usePathname(): string {
+  return useAppLocation().pathname;
 }
 
 export interface AppLinkProps
@@ -44,7 +62,7 @@ export interface AppLinkProps
   to: string;
 }
 
-export function AppLink({ to, onClick, target, ...props }: AppLinkProps) {
+export function AppLink({ to, onClick, target, children, ...props }: AppLinkProps) {
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
     if (
@@ -62,5 +80,5 @@ export function AppLink({ to, onClick, target, ...props }: AppLinkProps) {
     navigateTo(to);
   };
 
-  return <a {...props} href={to} target={target} onClick={handleClick} />;
+  return <a {...props} href={to} target={target} onClick={handleClick}>{children}</a>;
 }

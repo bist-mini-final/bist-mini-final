@@ -68,6 +68,8 @@ __ARGS_BLOCK__
                 value: "1"
               - name: DB_POOL_MAX_SIZE
                 value: "4"
+              - name: INGESTION_SHARDS_ENABLED
+                value: "true"
             resources:
               requests:
                 cpu: __CPU_REQUEST__
@@ -80,8 +82,9 @@ __VOLUME_BLOCK__
   triggers:
     - type: postgresql
       metadata:
-        connectionFromEnv: PGVECTOR_URL
         targetQueryValue: "1"
         activationTargetQueryValue: "0"
         query: >-
 __QUERY_BLOCK__
+      authenticationRef:
+        name: bist-postgresql

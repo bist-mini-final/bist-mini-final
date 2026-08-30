@@ -25,6 +25,7 @@ RAG_QUERY_JOB = DagJobDefinition(
     ),
     queue_name="workflow-core",
     version="5",
+    template=True,
     nodes=(
         JobNode("query", "query_input"),
         JobNode("decompose", "decomposer"),

@@ -22,6 +22,7 @@ from backend.engine.workflows.models import (
     WorkflowSaveRequest,
     utc_now_iso,
 )
+from backend.engine.workflows.service import WorkflowExecutionService
 from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
 from tests.modules.registry_factory import create_test_registry
 
@@ -75,6 +76,18 @@ class RecordingDatabase:
 
     def get_workflow_run_summary(self, run_id: str) -> dict[str, Any] | None:
         return self.get_workflow_run(run_id)
+
+    def get_workflow_node_execution_log(
+        self,
+        run_id: str,
+        node_id: str,
+    ) -> dict[str, Any] | None:
+        if self.saved is None or self.saved.id != run_id:
+            return None
+        state = self.saved.nodes.get(node_id)
+        if state is None:
+            return None
+        return state.model_dump(mode="json")
 
     def enqueue_workflow_run(
         self,
@@ -144,6 +157,8 @@ def workflow_run_with_output(output: Any) -> WorkflowRun:
                 module_type=node.module_type,
                 batch_index=0,
                 status="succeeded",
+                input_payload={"query": "현재 질문"},
+                config_payload={"mode": "current"},
                 output=output,
             )
         },
@@ -181,6 +196,84 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
                 store.load("excel_ingestion").graph,
                 workflow.graph,
             )
+
+    def test_workflow_list_serializes_backend_owned_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow_store = WorkflowStore(root / "workflows")
+            rag_workflow = canonical_workflow("rag_query")
+            self.assertIsNotNone(rag_workflow)
+            assert rag_workflow is not None
+            workflow_store.save(
+                "user-workflow",
+                WorkflowSaveRequest(name="사용자 워크플로", graph=rag_workflow.graph),
+            )
+            app = FastAPI()
+            app.include_router(
+                create_workflow_router(
+                    workflow_store=workflow_store,
+                    run_store=RunStore(root / "runs"),
+                    workflow_execution=object(),  # type: ignore[arg-type]
+                )
+            )
+
+            response = TestClient(app).get("/workflows")
+
+        self.assertEqual(response.status_code, 200)
+        workflows = {item["id"]: item for item in response.json()["workflows"]}
+        self.assertEqual(workflows["rag_query"]["kind"], "standard")
+        self.assertFalse(workflows["rag_query"]["editable"])
+        self.assertTrue(workflows["rag_query"]["template"])
+        self.assertEqual(len(workflows["rag_query"]["graph"]["nodes"]), 10)
+        self.assertEqual(len(workflows["rag_query"]["graph"]["edges"]), 10)
+        self.assertEqual(workflows["bi_metric_extraction"]["kind"], "standard")
+        self.assertFalse(workflows["bi_metric_extraction"]["template"])
+        self.assertEqual(workflows["user-workflow"]["kind"], "user")
+        self.assertTrue(workflows["user-workflow"]["editable"])
+        self.assertFalse(workflows["user-workflow"]["template"])
+
+    def test_run_list_serializes_workflow_models(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_store = RunStore(root / "runs")
+            run_store.save(workflow_run_with_output({"answer": "ok"}))
+            app = FastAPI()
+            app.include_router(
+                create_workflow_router(
+                    workflow_store=WorkflowStore(root / "workflows"),
+                    run_store=run_store,
+                    workflow_execution=object(),  # type: ignore[arg-type]
+                )
+            )
+
+            response = TestClient(app).get("/runs?workflow_id=rag_query")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["runs"][0]["id"], "run-artifact-test")
+
+    def test_node_detail_endpoint_returns_current_dto_values(self) -> None:
+        database = RecordingDatabase()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_store = RunStore(root / "runs", db_manager=database)
+            run_store.save(workflow_run_with_output({"answer": "현재 답변"}))
+            app = FastAPI()
+            app.include_router(
+                create_workflow_router(
+                    workflow_store=WorkflowStore(root / "workflows"),
+                    run_store=run_store,
+                    workflow_execution=object(),  # type: ignore[arg-type]
+                )
+            )
+
+            response = TestClient(app).get(
+                "/runs/run-artifact-test/nodes/query"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["input_payload"], {"query": "현재 질문"})
+        self.assertEqual(response.json()["config_payload"], {"mode": "current"})
+        self.assertEqual(response.json()["output"], {"answer": "현재 답변"})
 
     def test_large_node_output_is_externalized_and_hydrated(self) -> None:
         database = RecordingDatabase()
@@ -240,13 +333,18 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
             run_store = RunStore(root / "runs", db_manager=database)
             registry = create_test_registry(db_manager=database)
             executor = WorkflowExecutor(registry, run_store, ResultCache(root / "cache"))
+            workflow_store = WorkflowStore(root / "workflows")
             app = FastAPI()
             app.include_router(
                 create_workflow_router(
-                    workflow_store=WorkflowStore(root / "workflows"),
+                    workflow_store=workflow_store,
                     run_store=run_store,
-                    workflow_executor=executor,
-                    workflow_dispatcher=dispatcher,  # type: ignore[arg-type]
+                    workflow_execution=WorkflowExecutionService(
+                        workflow_store,
+                        run_store,
+                        executor,
+                        dispatcher,  # type: ignore[arg-type]
+                    ),
                 )
             )
             response = TestClient(app).post(
@@ -268,13 +366,18 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
                 run_store,
                 ResultCache(root / "cache"),
             )
+            workflow_store = WorkflowStore(root / "workflows")
             app = FastAPI()
             app.include_router(
                 create_workflow_router(
-                    workflow_store=WorkflowStore(root / "workflows"),
+                    workflow_store=workflow_store,
                     run_store=run_store,
-                    workflow_executor=executor,
-                    workflow_dispatcher=dispatcher,  # type: ignore[arg-type]
+                    workflow_execution=WorkflowExecutionService(
+                        workflow_store,
+                        run_store,
+                        executor,
+                        dispatcher,  # type: ignore[arg-type]
+                    ),
                 )
             )
             response = TestClient(app).post(

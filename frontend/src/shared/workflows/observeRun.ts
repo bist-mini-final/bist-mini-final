@@ -3,7 +3,7 @@ import { streamJsonEvents, type JsonSseMessage } from '../api/sse';
 import { mergeRunNodeUpdate } from './runState';
 import type { WorkflowRun } from './types';
 
-export interface WorkflowRunEvent extends JsonSseMessage {}
+export type WorkflowRunEvent = JsonSseMessage;
 
 interface ObserveWorkflowRunOptions {
   readonly initialRun?: WorkflowRun;
@@ -17,15 +17,34 @@ function isTerminal(run: WorkflowRun | undefined): run is WorkflowRun {
     && (run.status === 'completed' || run.status === 'failed' || run.status === 'paused');
 }
 
-function nodeUpdate(data: unknown): { node_id: string } | null {
+type WorkflowNodeUpdate = Partial<WorkflowRun['nodes'][string]>
+  & Pick<WorkflowRun['nodes'][string], 'node_id'>;
+
+export function workflowNodeUpdateFromEventData(data: unknown): WorkflowNodeUpdate | null {
   if (!data || typeof data !== 'object' || !('node_id' in data)) return null;
-  return typeof data.node_id === 'string' ? data as { node_id: string } : null;
+  return typeof data.node_id === 'string' ? data as WorkflowNodeUpdate : null;
 }
 
-function completedRun(data: unknown): WorkflowRun | null {
+export function workflowRunFromEventData(data: unknown): WorkflowRun | null {
   if (!data || typeof data !== 'object' || !('run' in data)) return null;
   const run = data.run;
   return run && typeof run === 'object' ? run as WorkflowRun : null;
+}
+
+const NODE_EVENTS = new Set([
+  'node_progress',
+  'node_started',
+  'node_completed',
+  'node_failed',
+]);
+const TERMINAL_EVENTS = new Set(['run_completed', 'run_finished', 'run_failed']);
+
+export function isWorkflowNodeEvent(event: string): boolean {
+  return NODE_EVENTS.has(event);
+}
+
+export function isWorkflowTerminalEvent(event: string): boolean {
+  return TERMINAL_EVENTS.has(event);
 }
 
 function reconnectDelay(signal?: AbortSignal): Promise<void> {
@@ -53,14 +72,12 @@ export async function observeWorkflowRun(
         options.onEvent?.(event);
         if (
           current
-          && (event.event === 'node_progress'
-            || event.event === 'node_completed'
-            || event.event === 'node_failed')
+          && isWorkflowNodeEvent(event.event)
         ) {
-          const update = nodeUpdate(event.data);
+          const update = workflowNodeUpdateFromEventData(event.data);
           if (update) current = mergeRunNodeUpdate(current, update);
-        } else if (event.event === 'run_completed') {
-          current = completedRun(event.data) ?? current;
+        } else if (isWorkflowTerminalEvent(event.event)) {
+          current = workflowRunFromEventData(event.data) ?? current;
         }
         if (current) options.onRun?.(current, event);
       }, options.signal);

@@ -17,6 +17,7 @@ spec:
         app.kubernetes.io/name: backend-api
         app.kubernetes.io/part-of: bist-mini
     spec:
+      serviceAccountName: backend-api
       containers:
         - name: backend
           image: bist-backend:local
@@ -40,6 +41,12 @@ spec:
                 secretKeyRef:
                   name: bist-batch-env
                   key: OPENAI_BASE_URL
+            - name: REDIS_URL
+              value: redis://bist-redis:6379/0
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           resources:
             requests:
               cpu: "500m"
@@ -49,13 +56,13 @@ spec:
               memory: "4Gi"
           readinessProbe:
             httpGet:
-              path: /api/modules
+              path: /readyz
               port: 8765
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /api/modules
+              path: /livez
               port: 8765
             initialDelaySeconds: 15
             periodSeconds: 20

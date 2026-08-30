@@ -6,11 +6,54 @@ metadata:
   annotations:
     ingress.kubernetes.io/ssl-redirect: "false"
 spec:
+  ingressClassName: nginx
   rules:
     - http:
         paths:
           - path: /api
             pathType: Prefix
+            backend:
+              service:
+                name: backend-api
+                port:
+                  number: 8765
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-api
+                port:
+                  number: 8765
+          - path: /redoc
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-api
+                port:
+                  number: 8765
+          - path: /openapi.json
+            pathType: Exact
+            backend:
+              service:
+                name: backend-api
+                port:
+                  number: 8765
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: backend-api
+                port:
+                  number: 8765
+          - path: /livez
+            pathType: Exact
+            backend:
+              service:
+                name: backend-api
+                port:
+                  number: 8765
+          - path: /readyz
+            pathType: Exact
             backend:
               service:
                 name: backend-api

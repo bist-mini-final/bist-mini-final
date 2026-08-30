@@ -82,9 +82,7 @@ class DecomposerModule(BaseLLMModule):
         type="decomposer",
         label="LLM Query Decomposer",
         category="Logic",
-        description=(
-            "사용자 질문을 collection과 독립적인 원자 셀 검색 서브쿼리로 분해합니다."
-        ),
+        description=("사용자 질문을 collection과 독립적인 원자 셀 검색 서브쿼리로 분해합니다."),
         inputs=["query_context"],
         outputs=["output"],
         config_fields=["model", "system_prompt", "user_prompt_template"],
@@ -97,6 +95,20 @@ class DecomposerModule(BaseLLMModule):
 
     def __init__(self, completion_client: Any) -> None:
         super().__init__(completion_client=completion_client)
+
+    @staticmethod
+    def _output(
+        input_data: DecomposerInputDTO,
+        parsed: DecomposedSubqueriesResponse,
+    ) -> Dict[str, Any]:
+        unique: Dict[str, SubqueryItem] = {}
+        for item in parsed.items:
+            serialized = item.to_serialized_query()
+            unique.setdefault(serialized, item)
+        return {
+            "query_context": input_data.query_context.model_dump(mode="json"),
+            "items": [item.model_dump(mode="json") for item in unique.values()],
+        }
 
     def execute(
         self,
@@ -112,14 +124,23 @@ class DecomposerModule(BaseLLMModule):
             model=cfg.model,
             system_prompt=cfg.system_prompt or LUNA_SYSTEM_PROMPT,
         )
-        unique: Dict[str, SubqueryItem] = {}
-        for item in parsed.items:
-            serialized = item.to_serialized_query()
-            unique.setdefault(serialized, item)
-        return {
-            "query_context": input_data.query_context.model_dump(mode="json"),
-            "items": [item.model_dump(mode="json") for item in unique.values()],
-        }
+        return self._output(input_data, parsed)
+
+    async def execute_async(
+        self,
+        input_data: DecomposerInputDTO,
+        config: Optional[DecomposerConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or DecomposerConfigDTO()
+        parsed, _, _, _ = await self.complete_structured_async(
+            messages_or_prompt=(cfg.user_prompt_template or LUNA_USER_TEMPLATE).format(
+                question=input_data.query_context.question_text
+            ),
+            response_model=DecomposedSubqueriesResponse,
+            model=cfg.model,
+            system_prompt=cfg.system_prompt or LUNA_SYSTEM_PROMPT,
+        )
+        return self._output(input_data, parsed)
 
 
 __all__ = [

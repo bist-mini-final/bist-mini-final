@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Database, Layers, Loader2, X } from 'lucide-react';
+import { Database, Layers, Loader2 } from 'lucide-react';
+import { Button, Dialog } from '../../../shared/ui';
 import { dataSourceApi } from '../services/dataSourceApi';
 import type { VectorIndexDetail } from '../types';
 
@@ -39,29 +40,23 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
   }, [indexId]);
 
   return (
-    <div className="ds-modal-backdrop" onClick={onClose}>
-      <div
-        className="ds-modal ds-modal--large"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-labelledby="index-detail-title"
-      >
-        <header className="ds-modal__header">
-          <div className="ds-modal__title-wrap">
+    <Dialog
+      open
+      size="lg"
+      className="ds-modal ds-modal--large"
+      bodyClassName="ds-modal__body"
+      title={(
+        <span className="ds-modal__title-wrap">
             <span className="ds-modal__icon ds-modal__icon--purple">
               <Database size={19} />
             </span>
-            <div>
-              <h3 id="index-detail-title">벡터 인덱스 상세 및 청크 미리보기</h3>
-              <small className="ds-font-mono">{indexId.slice(0, 16)}...</small>
-            </div>
-          </div>
-          <button className="ds-modal__close" onClick={onClose} aria-label="닫기">
-            <X size={18} />
-          </button>
-        </header>
-
-        <div className="ds-modal__body">
+            <span>벡터 인덱스 상세 및 청크 미리보기</span>
+        </span>
+      )}
+      description={<span className="ds-font-mono">{indexId.slice(0, 16)}...</span>}
+      onClose={onClose}
+      footer={<Button type="button" onClick={onClose}>닫기</Button>}
+    >
           {isLoading && (
             <div className="ds-loading-state">
               <Loader2 className="ds-spin" size={24} />
@@ -94,7 +89,7 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
                 {detail.duration_seconds !== undefined && detail.duration_seconds !== null && (
                   <div>
                     <small>인덱싱 소요 시간</small>
-                    <strong style={{ color: '#166534' }}>{detail.duration_seconds}초</strong>
+                    <strong className="ds-index-meta-value--success">{detail.duration_seconds}초</strong>
                   </div>
                 )}
                 {detail.total_tokens !== undefined && detail.total_tokens !== null && (
@@ -106,7 +101,7 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
                 {detail.estimated_cost_usd !== undefined && detail.estimated_cost_usd !== null && (
                   <div>
                     <small>예상 API 비용</small>
-                    <strong style={{ color: '#1d4ed8' }}>
+                    <strong className="ds-index-meta-value--info">
                       ${detail.estimated_cost_usd.toFixed(4)}
                       {detail.estimated_cost_krw ? ` (약 ₩${detail.estimated_cost_krw.toLocaleString()})` : ''}
                     </strong>
@@ -156,14 +151,6 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
               </div>
             </div>
           )}
-        </div>
-
-        <footer className="ds-modal__footer">
-          <button type="button" className="secondary-button" onClick={onClose}>
-            닫기
-          </button>
-        </footer>
-      </div>
-    </div>
+    </Dialog>
   );
 }

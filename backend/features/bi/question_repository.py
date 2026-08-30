@@ -51,10 +51,7 @@ class BiQuestionTransitionError(RuntimeError):
     expected_status: BiQuestionStatus
 
     def __str__(self) -> str:
-        return (
-            f"BI question {self.question_id} is not in "
-            f"{self.expected_status.value} state"
-        )
+        return f"BI question {self.question_id} is not in {self.expected_status.value} state"
 
 
 class PostgresBiQuestionRepository:
@@ -109,8 +106,7 @@ class PostgresBiQuestionRepository:
                         (job_id,),
                     )
                     stored = tuple(
-                        BiQuestionRecord.model_validate(row)
-                        for row in cursor.fetchall()
+                        BiQuestionRecord.model_validate(row) for row in cursor.fetchall()
                     )
                     stored_by_identity = {
                         (
@@ -130,9 +126,7 @@ class PostgresBiQuestionRepository:
                         for question in questions
                     )
                     if not all_registered:
-                        raise BiQuestionRegistrationError(
-                            materialization_job_id=job_id
-                        )
+                        raise BiQuestionRegistrationError(materialization_job_id=job_id)
                     registered = tuple(
                         stored_by_identity[
                             (
@@ -181,8 +175,7 @@ class PostgresBiQuestionRepository:
             with get_pooled_raw_connection(self._database_url) as connection:
                 with connection.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute(
-                        "SELECT company_id FROM bi_companies "
-                        "WHERE company_id = %s FOR UPDATE",
+                        "SELECT company_id FROM bi_companies WHERE company_id = %s FOR UPDATE",
                         (first.company_id,),
                     )
                     cursor.execute(
@@ -222,8 +215,7 @@ class PostgresBiQuestionRepository:
                         (first.materialization_job_id,),
                     )
                     registered = tuple(
-                        BiQuestionRecord.model_validate(row)
-                        for row in cursor.fetchall()
+                        BiQuestionRecord.model_validate(row) for row in cursor.fetchall()
                     )
                     if len(registered) != len(questions):
                         raise BiQuestionRegistrationError(
@@ -248,6 +240,12 @@ class PostgresBiQuestionRepository:
         job_id: JobId,
     ) -> BiQuestionJobProgress | None:
         return self._queries.get_job_progress(job_id)
+
+    async def get_job_progress_async(
+        self,
+        job_id: JobId,
+    ) -> BiQuestionJobProgress | None:
+        return await self._queries.get_job_progress_async(job_id)
 
     def claim_next(
         self,

@@ -16,10 +16,16 @@ from .bi_materialization import (
     BI_QUESTION_JOB,
 )
 from .excel_ingestion import EXCEL_INGESTION_JOB
+from .ingestion_shards import (
+    INGESTION_EMBEDDING_SHARD_JOB,
+    INGESTION_VECTOR_SHARD_JOB,
+)
 from .rag_pipeline import RAG_QUERY_JOB
 
 ALL_JOBS = [
     EXCEL_INGESTION_JOB,
+    INGESTION_EMBEDDING_SHARD_JOB,
+    INGESTION_VECTOR_SHARD_JOB,
     BI_MATERIALIZATION_JOB,
     BI_QUESTION_JOB,
     BI_METRIC_EXTRACTION_JOB,
@@ -45,6 +51,8 @@ __all__ = [
     "BI_METRIC_EXTRACTION_JOB",
     "BI_QUESTION_JOB",
     "EXCEL_INGESTION_JOB",
+    "INGESTION_EMBEDDING_SHARD_JOB",
+    "INGESTION_VECTOR_SHARD_JOB",
     "JOB_REGISTRY",
     "DagJobDefinition",
     "JobDefinition",

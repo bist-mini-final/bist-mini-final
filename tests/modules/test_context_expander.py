@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 from modules.common.base_module import DocumentContextDTO, QueryContextDTO
 from modules.retrieval.context_expander import (
@@ -57,6 +58,57 @@ def test_context_expander_batches_rows_per_sheet():
     assert mock_store.fetch_rows_cells.called
 
 
+def test_context_expander_native_async_matches_sync_output() -> None:
+    rows = {
+        10: [
+            {
+                "col_index": 2,
+                "column_header": ["2024"],
+                "cell_value": "70000억",
+                "cell_coord": "B10",
+                "row_header": ["영업이익"],
+                "source_text": "영업이익 | 2024 | Cell Value: 70000억",
+            }
+        ]
+    }
+    store = MagicMock()
+    store.fetch_rows_cells.return_value = rows
+    store.fetch_rows_cells_async = AsyncMock(return_value=rows)
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(question_id="q-async", question_text="영업이익"),
+        document_context=DocumentContextDTO(
+            file_name="sample.xlsx",
+            workbook_hash="hash-async",
+            index_id="idx-async",
+            sheet_names=["손익계산서"],
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="idx-async",
+                cell_id="손익계산서:B10",
+                rrf_score=0.9,
+                text="영업이익",
+                matched_subquery="영업이익",
+            )
+        ],
+    )
+    input_dto = PgContextExpanderInputDTO(retrieval_json=retrieval)
+    module = PgContextExpanderModule(store)
+
+    sync_result = module.run(input_dto)
+    async_result = asyncio.run(module.run_async(input_dto))
+
+    assert async_result == sync_result
+    store.fetch_rows_cells_async.assert_awaited_once_with(
+        collection_name="idx-async",
+        workbook_hash=None,
+        sheet_name="손익계산서",
+        row_indices=[10],
+        limit_per_row=100,
+    )
+
+
 def test_context_expander_preserves_raw_document_texts():
     mock_store = MagicMock()
     mock_store.fetch_rows_cells.return_value = {
@@ -111,8 +163,14 @@ def test_context_expander_preserves_raw_document_texts():
     items = result["items"]
     # Candidate text is identical to row 5 col 2, so deduplication keeps 2 unique raw documents
     assert len(items) == 2
-    assert "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2022 | Cell Value: 433766" in items
-    assert "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670" in items
+    assert (
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2022 | Cell Value: 433766"
+        in items
+    )
+    assert (
+        "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670"
+        in items
+    )
 
 
 def test_context_expander_restores_values_hidden_by_header_only_variants() -> None:
@@ -121,7 +179,13 @@ def test_context_expander_restores_values_hidden_by_header_only_variants() -> No
         8: [
             {
                 "col_index": 3,
+                "cell_id": "Financials:C8",
+                "cell_coord": "C8",
+                "sheet_name": "Financials",
                 "cell_value": "120",
+                "row_header": ["Revenue"],
+                "column_header": ["FY2025"],
+                "company_name": "Example Corp",
                 "source_text": (
                     "Company: Example Corp | Sheet: Financials | "
                     "Row Header: Revenue | Column Header: FY2025 | Cell Value: ?"
@@ -148,13 +212,84 @@ def test_context_expander_restores_values_hidden_by_header_only_variants() -> No
         ],
     )
 
+    result = PgContextExpanderModule(store).run(PgContextExpanderInputDTO(retrieval_json=retrieval))
+
+    assert any("Cell Value: 120" in item for item in result["items"])
+    assert "cells" in result
+    assert len(result["cells"]) == 1
+    assert "Cell Value: ?" not in result["cells"][0]["source_text"]
+
+
+def test_context_expander_canonicalizes_legacy_company_and_title_headers() -> None:
+    store = MagicMock()
+    store.fetch_rows_cells.return_value = {
+        23: [
+            {
+                "col_index": 15,
+                "cell_id": "IS Cell O23",
+                "cell_coord": "O23",
+                "sheet_name": "Income_Statement",
+                "cell_value": "62753",
+                "row_header": [
+                    "International Business Machines Corporation",
+                    "Source: S&P Capital IQ Pro",
+                    "Data in ($M)",
+                    "Fiscal Year Ended,",
+                    "LTM",
+                    "Total Revenue",
+                ],
+                "column_header": ["2024-12-31"],
+                "company_name": "IBM",
+                "source_text": (
+                    "Sheet: Income_Statement | Row Header: International Business "
+                    "Machines Corporation > Source: S&P Capital IQ Pro > Data in ($M) > "
+                    "Fiscal Year Ended, > LTM > Total Revenue | Column Header: "
+                    "2024-12-31 | Cell Value: 62753"
+                ),
+            }
+        ]
+    }
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(question_id="q-ibm", question_text="IBM 2024 총매출"),
+        document_context=DocumentContextDTO(
+            file_name="ibm.xlsx",
+            workbook_hash="hash-ibm",
+            index_id="ibm-index",
+            company_name="IBM",
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="ibm-index",
+                cell_id="IS Cell O23",
+                rrf_score=0.9,
+                text=(
+                    "Sheet: Income_Statement | Row Header: Total Revenue | "
+                    "Column Header: 2024-12-31 | Cell Value: ?"
+                ),
+                matched_subquery="Total Revenue 2024",
+            )
+        ],
+    )
+
     result = PgContextExpanderModule(store).run(
         PgContextExpanderInputDTO(retrieval_json=retrieval)
     )
 
-    assert any("Cell Value: 120" in item for item in result["items"])
-    assert "cells" in result
-    assert len(result["cells"]) >= 1
+    expected = (
+        "Company: IBM | Sheet: Income_Statement | Row Header: Total Revenue | "
+        "Column Header: 2024-12-31 | Cell Value: 62753"
+    )
+    assert expected in result["items"]
+    assert result["cells"] == [
+        {
+            "cell_id": "IS Cell O23",
+            "sheet_name": "Income_Statement",
+            "cell_coord": "O23",
+            "source_text": expected,
+            "cell_value": "62753",
+        }
+    ]
 
 
 def test_context_expander_collects_expanded_cell_metadata() -> None:
@@ -198,9 +333,7 @@ def test_context_expander_collects_expanded_cell_metadata() -> None:
         ],
     )
 
-    result = PgContextExpanderModule(store).run(
-        PgContextExpanderInputDTO(retrieval_json=retrieval)
-    )
+    result = PgContextExpanderModule(store).run(PgContextExpanderInputDTO(retrieval_json=retrieval))
 
     assert "cells" in result
     coords = {c["cell_coord"] for c in result["cells"]}

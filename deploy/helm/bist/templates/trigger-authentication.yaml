@@ -1,0 +1,11 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ include "bist.fullname" . }}-postgresql
+  labels:
+    {{- include "bist.labels" . | nindent 4 }}
+spec:
+  secretTargetRef:
+    - parameter: connection
+      name: {{ .Values.keda.databaseSecret.name }}
+      key: {{ .Values.keda.databaseSecret.key }}

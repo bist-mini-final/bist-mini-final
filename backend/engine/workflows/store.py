@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from .history import compact_history_value
 from .models import (
     IDENTIFIER_PATTERN,
+    RunNodeState,
     WorkflowDocument,
     WorkflowRun,
     WorkflowSaveRequest,
@@ -176,6 +177,9 @@ class WorkflowStore:
             name=request.name,
             updated_at=utc_now_iso(),
             graph=request.graph,
+            kind="user",
+            editable=True,
+            template=False,
         )
         return self._store.write(workflow_id, document)
 
@@ -185,7 +189,9 @@ class WorkflowStore:
         canonical = canonical_workflow(workflow_id)
         if canonical is not None:
             return canonical
-        return self._store.load(workflow_id)
+        return self._store.load(workflow_id).model_copy(
+            update={"kind": "user", "editable": True, "template": False}
+        )
 
     def list(self) -> List[WorkflowDocument]:
         from backend.engine.job_catalog import canonical_workflows
@@ -199,7 +205,11 @@ class WorkflowStore:
                 doc = doc.model_copy(update={"id": path.stem})
             if doc.id in canonical_ids:
                 continue
-            documents.append(doc)
+            documents.append(
+                doc.model_copy(
+                    update={"kind": "user", "editable": True, "template": False}
+                )
+            )
         return documents
 
     def delete(self, workflow_id: str) -> None:
@@ -558,6 +568,52 @@ class RunStore:
                 return self._memory_runs[run_id]
 
         raise FileNotFoundError(f"실행 {run_id}를 찾을 수 없습니다")
+
+    def load_node(self, run_id: str, node_id: str) -> RunNodeState:
+        """Load one node's current full input/config/output DTO snapshot."""
+
+        if self.db_manager is not None:
+            try:
+                data = self.db_manager.get_workflow_node_execution_log(run_id, node_id)
+                if data is not None:
+                    state = RunNodeState.model_validate(
+                        {
+                            key: data.get(key)
+                            for key in RunNodeState.model_fields
+                            if key in data
+                        }
+                        | {
+                            "cache_key": None,
+                            "skip_reason": None,
+                        }
+                    )
+                    return state.model_copy(
+                        deep=False,
+                        update={"output": self._hydrate_output(state.output)},
+                    )
+            except Exception as error:
+                logger.warning(
+                    "DB에서 노드 실행 상세 로드 실패 (run_id=%s node_id=%s): %s",
+                    run_id,
+                    node_id,
+                    error,
+                )
+                if self.require_database:
+                    raise RuntimeError(
+                        "노드 실행 상세를 PostgreSQL에서 조회할 수 없습니다"
+                    ) from error
+            if self.require_database:
+                raise FileNotFoundError(
+                    f"실행 {run_id}에서 노드 {node_id}를 찾을 수 없습니다"
+                )
+
+        run = self.load(run_id)
+        try:
+            return run.nodes[node_id]
+        except KeyError as error:
+            raise FileNotFoundError(
+                f"실행 {run_id}에서 노드 {node_id}를 찾을 수 없습니다"
+            ) from error
 
     def load_summary(self, run_id: str) -> WorkflowRun:
         """Load a compact run snapshot."""

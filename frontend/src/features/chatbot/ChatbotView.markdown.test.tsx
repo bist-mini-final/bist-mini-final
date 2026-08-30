@@ -1,8 +1,16 @@
-import { render } from '@testing-library/react';
-import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { MarkdownAnswer } from '../playground/components/MarkdownAnswer';
 import { normalizeChatMarkdown } from './chatMarkdown';
+
+const evidenceApiMock = vi.hoisted(() => ({
+  resolve: vi.fn(() => new Promise(() => undefined)),
+  imageUrl: vi.fn(() => '/evidence.png'),
+}));
+
+vi.mock('../../shared/evidence/cellEvidenceApi', () => ({
+  cellEvidenceApi: evidenceApiMock,
+}));
 
 describe('normalizeChatMarkdown', () => {
   it('preserves an already valid financial table header', () => {
@@ -30,11 +38,30 @@ describe('normalizeChatMarkdown', () => {
     expect(screen.getByText('38.0%에서 48.0%').tagName).toBe('STRONG');
   });
 
-  it('renders verified cell evidence as a citation chip', () => {
-    const markdown = normalizeChatMarkdown('**근거**\n- [Sheet: Balance Sheet | Cell: E50] IBM 총자산: 151,880');
+  it('collapses verbose cell evidence into a citation chip with hover details', () => {
+    const markdown = normalizeChatMarkdown([
+      '**근거**',
+      '- [Sheet: Balance_Sheet | Cell: E50] Company: IBM | Sheet: Balance_Sheet | Row Header: Total Assets | Column Header: 2024-12-31 | Cell Value: 151,880',
+    ].join('\n'));
 
     const { container } = render(<MarkdownAnswer markdown={markdown} />);
+    const chip = container.querySelector('.reader-citation');
 
-    expect(container.querySelector('.chatbot-citation-chip')).toHaveTextContent('Balance Sheet · E50');
+    expect(chip).toHaveTextContent('Balance Sheet · E50');
+    expect(container).not.toHaveTextContent('Row Header: Total Assets');
+
+    fireEvent.mouseEnter(chip!);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('IBM');
+    expect(tooltip).toHaveTextContent('Total Assets');
+    expect(tooltip).toHaveTextContent('2024-12-31');
+    expect(tooltip).toHaveTextContent('151,880');
+
+    fireEvent.click(chip!);
+    expect(screen.getByRole('dialog', { name: '셀 원본 근거 검증' })).toBeInTheDocument();
+    expect(evidenceApiMock.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ company: 'IBM', sheet: 'Balance_Sheet', cell: 'E50' }),
+      expect.any(AbortSignal),
+    );
   });
 });

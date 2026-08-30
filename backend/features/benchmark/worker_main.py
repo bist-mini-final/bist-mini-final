@@ -10,7 +10,10 @@ from uuid import uuid4
 from backend.bootstrap.container import RuntimeContainer
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
 from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.worker.lease import LeaseHeartbeat
+from backend.engine.worker.lease import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
 from backend.engine.workflows import DagExecutionCancelled
 from backend.features.benchmark.service import (
     BenchmarkRequest,
@@ -45,12 +48,14 @@ def _run(container: RuntimeContainer) -> int:
         thread_name=f"benchmark-heartbeat-{claimed.job_id}",
         logger=logger,
         failure_message=f"benchmark heartbeat failed (job_id={claimed.job_id})",
+        on_lease_lost=terminate_process_on_lease_loss,
     )
     heartbeat.start()
 
     def await_permission() -> None:
         announced_pause = False
         while True:
+            heartbeat.raise_if_lost()
             cancel_requested, pause_requested = store.control(
                 claimed.job_id,
                 worker_id,
@@ -67,6 +72,7 @@ def _run(container: RuntimeContainer) -> int:
             sleep(0.25)
 
     def update(progress: dict[str, object]) -> None:
+        heartbeat.raise_if_lost()
         if not store.update_progress(claimed.job_id, worker_id, progress):
             raise RuntimeError("benchmark worker lease changed")
 

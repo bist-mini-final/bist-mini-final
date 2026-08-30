@@ -1,14 +1,18 @@
+import asyncio
 import logging
+import time
 from collections import defaultdict
+from dataclasses import dataclass
 from threading import Lock, RLock
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 from uuid import uuid4
 
 from pydantic import ValidationError
 
 from backend.core.telemetry import trace_node_execution
 from backend.engine.runtime.registry_base import BaseModuleRegistry
-from modules.common.base_module import ModuleExecutionError
+from backend.providers.openai_pricing import calculate_openai_cost
+from modules.common.base_module import BaseModule, ModuleExecutionError
 
 from .history import compact_history_value
 from .models import (
@@ -25,6 +29,18 @@ from .models import (
 from .store import ResultCache, RunStore
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _PreparedNodeExecution:
+    input_payload: Any
+    module: BaseModule
+    validated_config: Dict[str, Any]
+    cache_key: str
+    cache_enabled: bool
+    output: Any
+    started_at: float
+    progress_callback: Callable[[Dict[str, Any]], None]
 
 
 class DagExecutionError(ValueError):
@@ -74,8 +90,7 @@ class WorkflowExecutor:
                 module.validate_config(node.config)
             except ValidationError as error:
                 raise DagExecutionError(
-                    f"노드 {node.id}의 config가 유효하지 않습니다: "
-                    + self._format_error(error)
+                    f"노드 {node.id}의 config가 유효하지 않습니다: " + self._format_error(error)
                 ) from error
             allowed_value_fields = (
                 set(module.definition.inputs)
@@ -103,9 +118,7 @@ class WorkflowExecutor:
                 raise DagExecutionError(f"중복 연결 ID입니다: {edge.id}")
             edge_ids.add(edge.id)
             if edge.source not in node_by_id or edge.target not in node_by_id:
-                raise DagExecutionError(
-                    f"연결 {edge.id}이 존재하지 않는 노드를 참조합니다"
-                )
+                raise DagExecutionError(f"연결 {edge.id}이 존재하지 않는 노드를 참조합니다")
             if edge.source == edge.target:
                 raise DagExecutionError(f"자기 자신으로 연결할 수 없습니다: {edge.id}")
 
@@ -149,14 +162,14 @@ class WorkflowExecutor:
     ) -> WorkflowRun:
         """
         Create and persist a workflow run from the requested inputs and configuration.
-        
+
         Parameters:
             workflow (WorkflowDocument): Workflow definition to execute.
             request (WorkflowExecutionRequest): Runtime inputs, configuration overrides, and cache settings.
-        
+
         Returns:
             WorkflowRun: The newly created and persisted workflow run.
-        
+
         Raises:
             DagExecutionError: If the request references unknown nodes or contains invalid runtime inputs, or if the workflow graph is invalid.
         """
@@ -165,14 +178,12 @@ class WorkflowExecutor:
         unknown_inputs = sorted(set(request.inputs) - known_nodes)
         if unknown_inputs:
             raise DagExecutionError(
-                "실행 입력이 존재하지 않는 노드를 참조합니다: "
-                + ", ".join(unknown_inputs)
+                "실행 입력이 존재하지 않는 노드를 참조합니다: " + ", ".join(unknown_inputs)
             )
         unknown_config_nodes = sorted(set(request.config_overrides) - known_nodes)
         if unknown_config_nodes:
             raise DagExecutionError(
-                "실행 설정이 존재하지 않는 노드를 참조합니다: "
-                + ", ".join(unknown_config_nodes)
+                "실행 설정이 존재하지 않는 노드를 참조합니다: " + ", ".join(unknown_config_nodes)
             )
 
         for node in execution_graph.nodes:
@@ -182,9 +193,7 @@ class WorkflowExecutor:
 
         batches = self.validate_graph(execution_graph)
         for node_id, runtime_input in request.inputs.items():
-            node = next(
-                item for item in execution_graph.nodes if item.id == node_id
-            )
+            node = next(item for item in execution_graph.nodes if item.id == node_id)
             module = self.module_registry.get(node.module_type)
             if module.definition.raw_input:
                 allowed_fields = set(module.definition.inputs)
@@ -244,6 +253,207 @@ class WorkflowExecutor:
                 ),
             )
 
+    def execute_scheduled_batch(
+        self,
+        run_id: str,
+        node_ids: tuple[str, ...],
+    ) -> WorkflowRun:
+        """Execute one topological generation through an asyncio TaskGroup."""
+        return asyncio.run(self.execute_scheduled_batch_async(run_id, node_ids))
+
+    async def execute_scheduled_batch_async(
+        self,
+        run_id: str,
+        node_ids: tuple[str, ...],
+    ) -> WorkflowRun:
+        """Run isolated node snapshots concurrently and merge terminal states once."""
+        if not node_ids:
+            raise DagExecutionError("실행할 batch 노드가 없습니다")
+        if len(set(node_ids)) != len(node_ids):
+            raise DagExecutionError("batch에 중복 노드 ID가 있습니다")
+
+        with self._cancellation_lock:
+            self._cancelled_run_ids.discard(run_id)
+            self._active_run_ids.add(run_id)
+        try:
+            base_run, selected_nodes = await asyncio.to_thread(
+                self._prepare_scheduled_batch,
+                run_id,
+                node_ids,
+            )
+
+            module_locks: dict[str, asyncio.Lock] = {}
+            results: dict[str, RunNodeState] = {}
+            errors: dict[str, Exception] = {}
+
+            async def execute_isolated(node: WorkflowNode) -> None:
+                snapshot = base_run.model_copy(deep=True)
+                state = snapshot.nodes[node.id]
+                if state.status in ("succeeded", "skipped"):
+                    results[node.id] = state
+                    return
+                if state.status in ("failed", "running"):
+                    self._reset_node_state(state)
+                should_execute, skip_reason = self._should_execute_node(snapshot, node)
+                if not should_execute:
+                    state.status = "skipped"
+                    state.outcome = None
+                    state.skip_reason = skip_reason
+                    state.completed_at = utc_now_iso()
+                    results[node.id] = state
+                    return
+
+                module = self.module_registry.get(node.module_type)
+                policy = module.definition.task or module.definition.task_policy
+                module_lock = module_locks.setdefault(node.module_type, asyncio.Lock())
+                for attempt in range(policy.retries + 1):
+                    try:
+                        async with module_lock:
+                            await self._execute_node_async(
+                                snapshot,
+                                node,
+                                state,
+                                False,
+                            )
+                        results[node.id] = state
+                        return
+                    except DagExecutionCancelled as error:
+                        errors[node.id] = error
+                        return
+                    except Exception as error:
+                        if attempt >= policy.retries:
+                            state.status = "failed"
+                            state.outcome = "failed"
+                            state.error = self._format_error(
+                                error,
+                                include_type=not isinstance(
+                                    error,
+                                    (
+                                        DagExecutionError,
+                                        ValidationError,
+                                        ModuleExecutionError,
+                                    ),
+                                ),
+                            )
+                            state.completed_at = utc_now_iso()
+                            results[node.id] = state
+                            errors[node.id] = error
+                            return
+                        self._reset_node_state(state)
+                        if policy.retry_delay_seconds:
+                            await asyncio.sleep(policy.retry_delay_seconds)
+
+            async with asyncio.TaskGroup() as task_group:
+                for node in selected_nodes:
+                    task_group.create_task(
+                        execute_isolated(node),
+                        name=f"workflow:{run_id}:{node.id}",
+                    )
+
+            merged = await asyncio.to_thread(
+                self._merge_scheduled_batch_results,
+                run_id,
+                node_ids,
+                results,
+            )
+
+            cancellation = next(
+                (error for error in errors.values() if isinstance(error, DagExecutionCancelled)),
+                None,
+            )
+            if cancellation is not None:
+                await asyncio.to_thread(self._persist_cancelled_run, run_id)
+                raise DagExecutionCancelled(
+                    "실행이 사용자 요청으로 중단되었습니다"
+                ) from cancellation
+            if errors:
+                failed_nodes = ", ".join(sorted(errors))
+                first_error = errors[sorted(errors)[0]]
+                raise DagExecutionError(f"batch 노드 실행 실패: {failed_nodes}") from first_error
+            return merged
+        finally:
+            with self._cancellation_lock:
+                self._active_run_ids.discard(run_id)
+
+    def _prepare_scheduled_batch(
+        self,
+        run_id: str,
+        node_ids: tuple[str, ...],
+    ) -> tuple[WorkflowRun, tuple[WorkflowNode, ...]]:
+        """Validate a batch and persist its live node states before execution.
+
+        Scheduled TaskGroup nodes execute against isolated snapshots. Persisting
+        their ``running`` transition here keeps the API/SSE projection live while
+        a worker is waiting for a module response instead of jumping directly
+        from ``pending`` to a terminal state.
+        """
+        with self._execution_lock:
+            run = self.run_store.load(run_id)
+            graph_nodes = {node.id: node for node in run.graph.nodes}
+            try:
+                selected_nodes = tuple(graph_nodes[node_id] for node_id in node_ids)
+            except KeyError as error:
+                raise DagExecutionError(
+                    f"실행할 노드를 찾을 수 없습니다: {error.args[0]}"
+                ) from error
+            batch_indexes = {run.nodes[node.id].batch_index for node in selected_nodes}
+            if len(batch_indexes) != 1:
+                raise DagExecutionError("TaskGroup은 하나의 topological batch만 실행할 수 있습니다")
+            batch = run.batches[next(iter(batch_indexes))]
+            if set(node_ids) != set(batch.node_ids):
+                raise DagExecutionError(
+                    "TaskGroup 입력은 persisted batch의 전체 노드와 일치해야 합니다"
+                )
+            run.status = "running"
+            batch.status = "running"
+            batch.started_at = batch.started_at or utc_now_iso()
+            batch.completed_at = None
+
+            started_at = utc_now_iso()
+            for node in selected_nodes:
+                state = run.nodes[node.id]
+                if state.status in ("succeeded", "skipped"):
+                    continue
+                if state.status in ("failed", "running"):
+                    self._reset_node_state(state)
+                should_execute, skip_reason = self._should_execute_node(run, node)
+                if should_execute:
+                    state.status = "running"
+                    state.started_at = started_at
+                    state.completed_at = None
+                    state.error = None
+                    state.skip_reason = None
+                else:
+                    state.status = "skipped"
+                    state.outcome = None
+                    state.skip_reason = skip_reason
+                    state.completed_at = started_at
+
+            self._refresh_run_status(run)
+            for node in selected_nodes:
+                state = run.nodes[node.id]
+                if state.status == "running":
+                    self.run_store.save_progress(run, node.id)
+                elif state.status == "skipped":
+                    self.run_store.save_node(run, node.id)
+            return run, selected_nodes
+
+    def _merge_scheduled_batch_results(
+        self,
+        run_id: str,
+        node_ids: tuple[str, ...],
+        results: Mapping[str, RunNodeState],
+    ) -> WorkflowRun:
+        """Merge and persist one async batch while holding the execution lock."""
+        with self._execution_lock:
+            merged = self.run_store.load(run_id)
+            for node_id in node_ids:
+                merged.nodes[node_id] = results[node_id]
+            self._refresh_run_status(merged)
+            for node_id in node_ids:
+                self.run_store.save_node(merged, node_id)
+            return merged
+
     def _execute_scheduled_node(self, run_id: str, node_id: str) -> WorkflowRun:
         self._raise_if_cancelled(run_id)
         run = self.run_store.load(run_id)
@@ -302,9 +512,9 @@ class WorkflowExecutor:
     def _reset_node_state(state: RunNodeState) -> None:
         """
         Reset a node state to its initial pending state.
-        
+
         Parameters:
-        	state (RunNodeState): The node state to reset.
+                state (RunNodeState): The node state to reset.
         """
         state.status = "pending"
         state.input_payload = None
@@ -350,10 +560,7 @@ class WorkflowExecutor:
             sink_node_ids = set(run.nodes) - source_node_ids
             run.status = (
                 "completed"
-                if any(
-                    run.nodes[node_id].status == "succeeded"
-                    for node_id in sink_node_ids
-                )
+                if any(run.nodes[node_id].status == "succeeded" for node_id in sink_node_ids)
                 else "failed"
             )
         else:
@@ -399,9 +606,7 @@ class WorkflowExecutor:
     def _prepare_resume(self, run_id: str) -> WorkflowRun:
         run = self.run_store.load(run_id)
         failed_node_ids = {
-            node_id
-            for node_id, state in run.nodes.items()
-            if state.status == "failed"
+            node_id for node_id, state in run.nodes.items() if state.status == "failed"
         }
         reset_node_ids = set(failed_node_ids)
 
@@ -426,10 +631,7 @@ class WorkflowExecutor:
             node_id = pending_ancestors.pop()
             for descendant_id in outgoing.get(node_id, set()):
                 descendant = run.nodes[descendant_id]
-                if (
-                    descendant_id not in reset_node_ids
-                    and descendant.status != "succeeded"
-                ):
+                if descendant_id not in reset_node_ids and descendant.status != "succeeded":
                     reset_node_ids.add(descendant_id)
                     pending_ancestors.append(descendant_id)
 
@@ -449,15 +651,90 @@ class WorkflowExecutor:
         run: WorkflowRun,
         node: WorkflowNode,
         state: RunNodeState,
+        persist_progress_updates: bool = True,
     ) -> None:
-        """
-        Execute a workflow node, recording its input, output, status, cache state, progress, usage, and cost.
-        
-        Parameters:
-            run (WorkflowRun): The workflow run containing the node.
-            node (WorkflowNode): The node to execute.
-            state (RunNodeState): The node state to update with execution results.
-        """
+        """Execute one node through the synchronous compatibility boundary."""
+        prepared = self._prepare_node_execution(
+            run,
+            node,
+            state,
+            persist_progress_updates,
+        )
+        output = prepared.output
+        if output is None:
+            self._raise_if_cancelled(run.id)
+            with trace_node_execution(
+                run.workflow_id,
+                run.id,
+                node.id,
+                node.module_type,
+                state.batch_index,
+            ) as _span:
+                prepared.module.set_progress_callback(prepared.progress_callback)
+                try:
+                    output = self.module_registry.execute(
+                        node.module_type,
+                        prepared.input_payload,
+                        prepared.validated_config,
+                    )
+                finally:
+                    prepared.module.set_progress_callback(None)
+            self._raise_if_cancelled(run.id)
+            if prepared.cache_enabled:
+                self.result_cache.put(prepared.cache_key, output)
+        self._complete_node_execution(run, node, state, prepared, output)
+
+    async def _execute_node_async(
+        self,
+        run: WorkflowRun,
+        node: WorkflowNode,
+        state: RunNodeState,
+        persist_progress_updates: bool = True,
+    ) -> None:
+        """Execute one node through its native async hook when available."""
+        prepared = await asyncio.to_thread(
+            self._prepare_node_execution,
+            run,
+            node,
+            state,
+            persist_progress_updates,
+        )
+        output = prepared.output
+        if output is None:
+            await self._raise_if_cancelled_async(run.id)
+            with trace_node_execution(
+                run.workflow_id,
+                run.id,
+                node.id,
+                node.module_type,
+                state.batch_index,
+            ) as _span:
+                prepared.module.set_progress_callback(prepared.progress_callback)
+                try:
+                    output = await self.module_registry.execute_async(
+                        node.module_type,
+                        prepared.input_payload,
+                        prepared.validated_config,
+                    )
+                finally:
+                    prepared.module.set_progress_callback(None)
+            await self._raise_if_cancelled_async(run.id)
+            if prepared.cache_enabled:
+                await asyncio.to_thread(
+                    self.result_cache.put,
+                    prepared.cache_key,
+                    output,
+                )
+        self._complete_node_execution(run, node, state, prepared, output)
+
+    def _prepare_node_execution(
+        self,
+        run: WorkflowRun,
+        node: WorkflowNode,
+        state: RunNodeState,
+        persist_progress_updates: bool,
+    ) -> _PreparedNodeExecution:
+        """Validate input, initialize state, and resolve a possible cache hit."""
         input_payload = self._assemble_input(run, node)
         module = self.module_registry.get(node.module_type)
         validated_config = module.validate_config(node.config).model_dump(mode="json")
@@ -468,10 +745,6 @@ class WorkflowExecutor:
         cache_key = self.result_cache.key(
             f"{node.module_type}@{module.definition.version}", cache_payload
         )
-
-        import time
-
-        from backend.providers.openai_pricing import calculate_openai_cost
 
         t_start = time.perf_counter()
         state.status = "running"
@@ -484,7 +757,8 @@ class WorkflowExecutor:
         state.cache_hit = False
         state.progress = {}
         state.started_at = utc_now_iso()
-        self.run_store.save_progress(run, node.id)
+        if persist_progress_updates:
+            self.run_store.save_progress(run, node.id)
 
         last_progress_persisted_at = 0.0
         last_progress_phase: Any = None
@@ -517,40 +791,46 @@ class WorkflowExecutor:
                 or is_final
                 or now - last_progress_persisted_at >= 1.0
             )
-            if should_persist:
+            if should_persist and persist_progress_updates:
                 self.run_store.save_progress(run, node.id)
                 last_progress_persisted_at = now
                 last_progress_phase = phase
 
         output: Any = None
-        cache_enabled = run.use_cache and module.definition.cacheable and (
-            run.cache_only_module_types is None or node.module_type in run.cache_only_module_types
+        cache_enabled = (
+            run.use_cache
+            and module.definition.cacheable
+            and (
+                run.cache_only_module_types is None
+                or node.module_type in run.cache_only_module_types
+            )
         )
         if cache_enabled:
             output = self.result_cache.get(cache_key)
             state.cache_hit = output is not None
-        if output is None:
-            self._raise_if_cancelled(run.id)
-            with trace_node_execution(
-                run.workflow_id,
-                run.id,
-                node.id,
-                node.module_type,
-                state.batch_index,
-            ) as _span:
-                module.set_progress_callback(persist_progress)
-                try:
-                    output = self.module_registry.execute(
-                        node.module_type,
-                        input_payload,
-                        validated_config,
-                    )
-                finally:
-                    module.set_progress_callback(None)
-            self._raise_if_cancelled(run.id)
-            if cache_enabled:
-                self.result_cache.put(cache_key, output)
+        return _PreparedNodeExecution(
+            input_payload=input_payload,
+            module=module,
+            validated_config=validated_config,
+            cache_key=cache_key,
+            cache_enabled=cache_enabled,
+            output=output,
+            started_at=t_start,
+            progress_callback=persist_progress,
+        )
 
+    def _complete_node_execution(
+        self,
+        run: WorkflowRun,
+        node: WorkflowNode,
+        state: RunNodeState,
+        prepared: _PreparedNodeExecution,
+        output: Any,
+    ) -> None:
+        """Apply output contracts and terminal usage metrics identically for both paths."""
+        del run
+        module = prepared.module
+        validated_config = prepared.validated_config
         branch_ports = set(module.definition.branch_outputs.values())
         if module.definition.raw_output:
             missing_outputs: List[str] = []
@@ -560,19 +840,17 @@ class WorkflowExecutor:
             )
         else:
             missing_outputs = (
-                []
-                if branch_ports.intersection(output)
-                else list(branch_ports)
-            ) if branch_ports else [
-                port for port in module.definition.outputs if port not in output
-            ]
+                ([] if branch_ports.intersection(output) else list(branch_ports))
+                if branch_ports
+                else [port for port in module.definition.outputs if port not in output]
+            )
         if missing_outputs:
             raise DagExecutionError(
                 f"모듈 {node.module_type}이 출력 포트를 생성하지 않았습니다: "
                 + ", ".join(missing_outputs)
             )
 
-        t_elapsed = round((time.perf_counter() - t_start) * 1000, 2)
+        t_elapsed = round((time.perf_counter() - prepared.started_at) * 1000, 2)
         state.output = output
         state.status = "succeeded"
         state.outcome = module.execution_outcome(output, state.cache_hit)
@@ -600,9 +878,7 @@ class WorkflowExecutor:
                 raw_usage = metrics.get("api_usage") or {}
                 if isinstance(raw_usage, Mapping) and raw_usage:
                     node_usage = {
-                        key: int(value)
-                        for key, value in raw_usage.items()
-                        if value is not None
+                        key: int(value) for key, value in raw_usage.items() if value is not None
                     }
                 elif metrics.get("total_tokens") is not None:
                     total_tokens = int(metrics.get("total_tokens") or 0)
@@ -630,20 +906,10 @@ class WorkflowExecutor:
                         cached_tokens=node_usage["cached_tokens"],
                     )
 
-        module_usage = (
-            getattr(module, "last_usage", None) if not state.cache_hit else None
-        )
-        raw_u = (
-            module_usage
-            if isinstance(module_usage, Mapping)
-            else None
-        )
+        module_usage = getattr(module, "last_usage", None) if not state.cache_hit else None
+        raw_u = module_usage if isinstance(module_usage, Mapping) else None
         if node_usage is None and isinstance(raw_u, Mapping):
-            model_used = (
-                getattr(module, "last_model", "")
-                or validated_config.get("model")
-                or ""
-            )
+            model_used = getattr(module, "last_model", "") or validated_config.get("model") or ""
             node_usage = {
                 "prompt_tokens": int(raw_u.get("prompt_tokens", 0) or 0),
                 "completion_tokens": int(raw_u.get("completion_tokens", 0) or 0),
@@ -701,14 +967,18 @@ class WorkflowExecutor:
         if cancelled:
             raise DagExecutionCancelled("실행이 사용자 요청으로 중단되었습니다")
 
+    async def _raise_if_cancelled_async(self, run_id: str) -> None:
+        """Check durable cancellation state without blocking the event loop."""
+        await asyncio.to_thread(self._raise_if_cancelled, run_id)
+
     def _persist_cancelled_run(self, run_id: str) -> WorkflowRun:
         """Persist a run after cancellation, resetting running nodes and marking non-terminal runs as paused.
-        
+
         Parameters:
-        	run_id (str): Identifier of the run to persist.
-        
+                run_id (str): Identifier of the run to persist.
+
         Returns:
-        	WorkflowRun: The saved run with updated node and execution statuses.
+                WorkflowRun: The saved run with updated node and execution statuses.
         """
         run = self.run_store.load(run_id)
         was_terminal = run.status in ("completed", "failed")
@@ -725,33 +995,28 @@ class WorkflowExecutor:
     ) -> Tuple[bool, Optional[str]]:
         """
         Determine whether a node has all prerequisites required for execution.
-        
+
         Parameters:
             run (WorkflowRun): Workflow run containing the node's inputs and incoming edges.
             node (WorkflowNode): Node whose execution prerequisites are evaluated.
-        
+
         Returns:
             Tuple[bool, Optional[str]]: Whether the node can execute and, when it cannot, the reason it will be skipped.
         """
         incoming_edges = [edge for edge in run.graph.edges if edge.target == node.id]
         if not incoming_edges:
             module = self.module_registry.get(node.module_type)
-            supplied_fields = set(node.values) | set(
-                run.runtime_inputs.get(node.id, {})
-            )
+            supplied_fields = set(node.values) | set(run.runtime_inputs.get(node.id, {}))
             required_inputs = (
                 list(module.definition.inputs)
                 if module.definition.raw_input
                 else module.required_input_fields
             )
-            missing_inputs = [
-                field for field in required_inputs if field not in supplied_fields
-            ]
+            missing_inputs = [field for field in required_inputs if field not in supplied_fields]
             if missing_inputs:
                 return (
                     False,
-                    "연결되지 않은 필수 입력이 있어 건너뜁니다: "
-                    + ", ".join(missing_inputs),
+                    "연결되지 않은 필수 입력이 있어 건너뜁니다: " + ", ".join(missing_inputs),
                 )
             return True, None
 
@@ -763,9 +1028,7 @@ class WorkflowExecutor:
 
         module = self.module_registry.get(node.module_type)
         supplied_inputs = (
-            set(node.values)
-            | set(run.runtime_inputs.get(node.id, {}))
-            | set(edges_by_input)
+            set(node.values) | set(run.runtime_inputs.get(node.id, {})) | set(edges_by_input)
         )
         # A raw object connected to the conventional ``input`` port is merged
         # into a structured target DTO by ``_assemble_input``.  Account for the
@@ -777,21 +1040,16 @@ class WorkflowExecutor:
                     continue
                 for edge in alternatives:
                     source_node = node_by_id[edge.source]
-                    source_module = self.module_registry.get(
-                        source_node.module_type
-                    )
+                    source_module = self.module_registry.get(source_node.module_type)
                     if source_module.definition.raw_output:
                         supplied_inputs.update(source_module.output_model.model_fields)
         missing_inputs = [
-            field
-            for field in module.required_input_fields
-            if field not in supplied_inputs
+            field for field in module.required_input_fields if field not in supplied_inputs
         ]
         if missing_inputs:
             return (
                 False,
-                "연결되지 않은 필수 입력이 있어 건너뜁니다: "
-                + ", ".join(missing_inputs),
+                "연결되지 않은 필수 입력이 있어 건너뜁니다: " + ", ".join(missing_inputs),
             )
 
         for target_input, alternatives in edges_by_input.items():
@@ -809,9 +1067,7 @@ class WorkflowExecutor:
             return source_state.status == "succeeded"
         return source_state.outcome == edge.source_branch
 
-    def _assemble_input(
-        self, run: WorkflowRun, node: WorkflowNode
-    ) -> Any:
+    def _assemble_input(self, run: WorkflowRun, node: WorkflowNode) -> Any:
         payload = dict(node.values)
         target_module = self.module_registry.get(node.module_type)
         payload.update(run.runtime_inputs.get(node.id, {}))
@@ -838,13 +1094,14 @@ class WorkflowExecutor:
                 raise DagExecutionError(
                     f"선행 노드 {edge.source}의 출력이 아직 준비되지 않았습니다"
                 )
-            source_module = self.module_registry.get(
-                node_by_id[edge.source].module_type
-            ).definition
+            source_module = self.module_registry.get(node_by_id[edge.source].module_type).definition
             if source_module.raw_output:
                 source_value = source_state.output
             else:
-                if not isinstance(source_state.output, Mapping) or source_output not in source_state.output:
+                if (
+                    not isinstance(source_state.output, Mapping)
+                    or source_output not in source_state.output
+                ):
                     raise DagExecutionError(
                         f"선행 노드 {edge.source}에 출력 {source_output}이 없습니다"
                     )
@@ -892,12 +1149,8 @@ class WorkflowExecutor:
         edge: WorkflowEdge,
         node_by_id: Mapping[str, WorkflowNode],
     ) -> Tuple[str, str]:
-        source_module = self.module_registry.get(
-            node_by_id[edge.source].module_type
-        ).definition
-        target_module = self.module_registry.get(
-            node_by_id[edge.target].module_type
-        ).definition
+        source_module = self.module_registry.get(node_by_id[edge.source].module_type).definition
+        target_module = self.module_registry.get(node_by_id[edge.target].module_type).definition
 
         source_output = edge.source_output
         if edge.source_branch is not None:
@@ -913,9 +1166,7 @@ class WorkflowExecutor:
             source_output = branch_output
         if source_output is None:
             if len(source_module.outputs) != 1:
-                raise DagExecutionError(
-                    f"연결 {edge.id}의 source_output을 지정해야 합니다"
-                )
+                raise DagExecutionError(f"연결 {edge.id}의 source_output을 지정해야 합니다")
             source_output = source_module.outputs[0]
         if source_output not in source_module.outputs:
             raise DagExecutionError(
@@ -925,9 +1176,7 @@ class WorkflowExecutor:
         target_input = edge.target_input
         if target_input is None:
             if len(target_module.inputs) != 1:
-                raise DagExecutionError(
-                    f"연결 {edge.id}의 target_input을 지정해야 합니다"
-                )
+                raise DagExecutionError(f"연결 {edge.id}의 target_input을 지정해야 합니다")
             target_input = target_module.inputs[0]
         if target_input not in target_module.inputs:
             raise DagExecutionError(
@@ -939,11 +1188,11 @@ class WorkflowExecutor:
     def _format_error(error: Exception, *, include_type: bool = False) -> str:
         """
         Format an exception into a concise, user-facing error message.
-        
+
         Parameters:
             error (Exception): The exception to format.
             include_type (bool): Whether to prefix ordinary error messages with the exception type.
-        
+
         Returns:
             str: The formatted error message, truncated to 4,000 characters when necessary.
         """

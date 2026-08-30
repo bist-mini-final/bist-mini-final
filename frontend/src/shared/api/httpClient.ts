@@ -21,6 +21,23 @@ export class ApiError extends Error {
   }
 }
 
+export const API_V1_PREFIX = '/api/v1';
+
+/**
+ * Migrate legacy feature-local `/api/*` paths at the single transport boundary.
+ * Non-API URLs and already-versioned URLs are left untouched.
+ */
+export function versionedApiEndpoint(endpoint: string): string {
+  if (endpoint === '/api') return API_V1_PREFIX;
+  if (endpoint === API_V1_PREFIX || endpoint.startsWith(`${API_V1_PREFIX}/`)) {
+    return endpoint;
+  }
+  if (endpoint.startsWith('/api/')) {
+    return `${API_V1_PREFIX}${endpoint.slice('/api'.length)}`;
+  }
+  return endpoint;
+}
+
 export const httpClient = ky.create({
   retry: 0,
   timeout: 15_000,
@@ -56,7 +73,7 @@ export async function requestResponse(
   options: Options = {},
   fallback?: string,
 ): Promise<Response> {
-  const response = await httpClient(endpoint, options);
+  const response = await httpClient(versionedApiEndpoint(endpoint), options);
   if (!response.ok) {
     throw await apiErrorFromResponse(response, fallback);
   }

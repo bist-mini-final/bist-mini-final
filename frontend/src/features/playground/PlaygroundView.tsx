@@ -1,56 +1,77 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { X } from 'lucide-react';
+import { useAppLocation } from '../../app/router';
+import { IconButton, PromptDialog } from '../../shared/ui';
 import { useBiPlaygroundHandoff } from '../bi/integrations/playgroundHandoffAdapter';
 import { Header } from './components/Header';
 import type { WorkflowOption } from './components/Header';
-import { BenchmarkPanel } from './components/BenchmarkPanel';
 import { PipelineCanvas } from './components/PipelineCanvas';
 import { ModulePalette } from './components/Sidebar/ModulePalette';
+import { WorkflowTemplatePanel } from './components/WorkflowTemplatePanel';
 import { usePipelineController } from './hooks/usePipelineController';
 import { usePipelineGraph } from './hooks/usePipelineGraph';
 import { useWorkflowPersistence } from './hooks/useWorkflowPersistence';
 import { useResizablePanel } from './hooks/useResizablePanel';
 import { ModuleExecutionContext } from './contexts/ModuleExecutionContext';
 import { pipelineApi } from './services/api';
+import type { WorkflowDocument } from './types';
 import './playground.css';
 
 const DEFAULT_WORKFLOW_ID = 'rag_query';
-const CANONICAL_WORKFLOW_IDS = new Set(['rag_query', 'excel_ingestion']);
+
+type WorkflowPrompt =
+  | { readonly type: 'duplicate'; readonly initialValue: string }
+  | { readonly type: 'template'; readonly templateId: string; readonly initialValue: string };
+
+function workflowOptions(documents: WorkflowDocument[]): WorkflowOption[] {
+  return documents
+    .map((workflow) => ({
+      id: workflow.id,
+      name: workflow.name,
+      kind: workflow.kind,
+      editable: workflow.editable,
+      template: workflow.template,
+      nodeCount: workflow.graph.nodes.length,
+      edgeCount: workflow.graph.edges.length,
+      moduleTypes: workflow.graph.nodes.map((node) => node.module_type),
+    }))
+    .sort((left, right) => {
+      if (left.id === DEFAULT_WORKFLOW_ID) return -1;
+      if (right.id === DEFAULT_WORKFLOW_ID) return 1;
+      return left.name.localeCompare(right.name);
+    });
+}
 
 function PlaygroundWorkspace() {
+  const location = useAppLocation();
   const [isPaletteOpen, setIsPaletteOpen] = useState(
     () => window.matchMedia('(min-width: 1024px)').matches
   );
   const modulePanel = useResizablePanel();
   const controller = usePipelineController();
 
-  // Keep the canonical RAG job selectable while the API is starting.
-  const [workflows, setWorkflows] = useState<WorkflowOption[]>([
-    { id: DEFAULT_WORKFLOW_ID, name: DEFAULT_WORKFLOW_ID },
-  ]);
+  const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [activeWorkflowId, setActiveWorkflowId] = useState(DEFAULT_WORKFLOW_ID);
-  const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
-  const activeWorkflowName = useMemo(
-    () => workflows.find((w) => w.id === activeWorkflowId)?.name ?? activeWorkflowId,
+  const [isTemplatePanelOpen, setIsTemplatePanelOpen] = useState(false);
+  const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(true);
+  const [workflowPrompt, setWorkflowPrompt] = useState<WorkflowPrompt | null>(null);
+  const [workflowPromptError, setWorkflowPromptError] = useState<string | null>(null);
+  const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
+  const activeWorkflow = useMemo(
+    () => workflows.find((workflow) => workflow.id === activeWorkflowId),
     [workflows, activeWorkflowId]
   );
+  const activeWorkflowName = activeWorkflow?.name ?? activeWorkflowId;
+  const activeWorkflowEditable = activeWorkflow?.editable ?? false;
 
   // Load workflow list on mount
   useEffect(() => {
     const controller = new AbortController();
-    pipelineApi.listWorkflows(controller.signal).then(({ workflows: list }) => {
-      const options: WorkflowOption[] = list.map((wf) => ({ id: wf.id, name: wf.name }));
-      // Keep the primary RAG job first.
-      options.sort((a, b) => {
-        if (a.id === DEFAULT_WORKFLOW_ID) return -1;
-        if (b.id === DEFAULT_WORKFLOW_ID) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      setWorkflows(options);
-    }).catch(() => {
-      // The canonical RAG option remains available until the next refresh.
-    });
+    pipelineApi.listWorkflows(controller.signal)
+      .then(({ workflows: list }) => setWorkflows(workflowOptions(list)))
+      .catch(() => undefined)
+      .finally(() => setIsWorkflowListLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -65,12 +86,13 @@ function PlaygroundWorkspace() {
     controller.modules.length > 0,
     activeWorkflowId,
     activeWorkflowName,
+    activeWorkflowEditable,
   );
   useBiPlaygroundHandoff({
     modules: controller.modules,
     nodes: graph.nodes,
     ready: workflow.ready,
-    search: window.location.search,
+    search: location.search,
     setQueryText: controller.setQueryText,
   });
   const currentRun = workflow.latestRunMatchesGraph ? workflow.latestRun : null;
@@ -102,7 +124,7 @@ function PlaygroundWorkspace() {
     }
   };
 
-  const handleNodeExecute = async (_nodeId: string) => {
+  const handleNodeExecute = async () => {
     controller.dismissError();
     try {
       await workflow.executeAll(
@@ -140,68 +162,57 @@ function PlaygroundWorkspace() {
 
   const refreshWorkflows = async () => {
     const { workflows: list } = await pipelineApi.listWorkflows();
-    const options = list.map((item) => ({ id: item.id, name: item.name }));
-    options.sort((a, b) => {
-      if (a.id === DEFAULT_WORKFLOW_ID) return -1;
-      if (b.id === DEFAULT_WORKFLOW_ID) return 1;
-      return a.name.localeCompare(b.name);
-    });
-    setWorkflows(options);
+    setWorkflows(workflowOptions(list));
   };
 
   const workflowIdFromName = (name: string) =>
     name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
 
-  const handleCreateWorkflow = () => {
-    const name = window.prompt('새 워크플로 이름을 입력하세요.', '새 워크플로');
-    if (!name?.trim()) return;
-    const baseId = workflowIdFromName(name) || 'workflow';
-    let id = baseId;
-    let suffix = 2;
-    while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
-
-    void pipelineApi.saveWorkflow(id, name.trim(), graph.exportGraph())
-      .then(async () => {
-        await refreshWorkflows();
-        handleSelectWorkflow(id);
-      })
-      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 만들지 못했습니다.'));
-  };
-
   const handleDuplicateWorkflow = () => {
-    const source = activeWorkflowName;
-    const name = window.prompt('복제할 워크플로 이름을 입력하세요.', `${source} 복사본`);
-    if (!name?.trim()) return;
-    const baseId = workflowIdFromName(name) || 'workflow-copy';
+    setWorkflowPromptError(null);
+    setWorkflowPrompt({ type: 'duplicate', initialValue: `${activeWorkflowName} 복사본` });
+  };
+
+  const handleCreateFromTemplate = (templateId: string) => {
+    const template = workflows.find(
+      (item) => item.id === templateId && item.template,
+    );
+    if (!template) return;
+    setWorkflowPromptError(null);
+    setWorkflowPrompt({
+      type: 'template',
+      templateId,
+      initialValue: `${template.name} 복사본`,
+    });
+  };
+
+  const createWorkflow = async (name: string) => {
+    const request = workflowPrompt;
+    if (!request || isCreatingWorkflow) return;
+    const baseId = workflowIdFromName(name)
+      || (request.type === 'template' ? 'workflow-template' : 'workflow-copy');
     let id = baseId;
     let suffix = 2;
     while (workflows.some((item) => item.id === id)) id = `${baseId}-${suffix++}`;
 
-    void pipelineApi.saveWorkflow(id, name.trim(), graph.exportGraph())
-      .then(async () => {
-        await refreshWorkflows();
-        handleSelectWorkflow(id);
-      })
-      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 복제하지 못했습니다.'));
-  };
-
-  const handleRenameWorkflow = () => {
-    if (CANONICAL_WORKFLOW_IDS.has(activeWorkflowId)) return;
-    const name = window.prompt('워크플로 이름을 입력하세요.', activeWorkflowName);
-    if (!name?.trim() || name.trim() === activeWorkflowName) return;
-    void pipelineApi.saveWorkflow(activeWorkflowId, name.trim(), graph.exportGraph())
-      .then(() => refreshWorkflows())
-      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로 이름을 바꾸지 못했습니다.'));
-  };
-
-  const handleDeleteWorkflow = () => {
-    if (CANONICAL_WORKFLOW_IDS.has(activeWorkflowId) || !window.confirm(`'${activeWorkflowName}' 워크플로를 삭제할까요?`)) return;
-    void pipelineApi.deleteWorkflow(activeWorkflowId)
-      .then(async () => {
-        await refreshWorkflows();
-        handleSelectWorkflow(DEFAULT_WORKFLOW_ID);
-      })
-      .catch((error: unknown) => controller.reportError(error instanceof Error ? error.message : '워크플로를 삭제하지 못했습니다.'));
+    setIsCreatingWorkflow(true);
+    setWorkflowPromptError(null);
+    try {
+      const workflowGraph = request.type === 'template'
+        ? (await pipelineApi.getWorkflow(request.templateId)).graph
+        : graph.exportGraph();
+      await pipelineApi.saveWorkflow(id, name, workflowGraph);
+      await refreshWorkflows();
+      handleSelectWorkflow(id);
+      setWorkflowPrompt(null);
+      if (request.type === 'template') setIsTemplatePanelOpen(false);
+    } catch (error: unknown) {
+      setWorkflowPromptError(
+        error instanceof Error ? error.message : '워크플로를 생성하지 못했습니다.'
+      );
+    } finally {
+      setIsCreatingWorkflow(false);
+    }
   };
 
   const runMetrics = useMemo(() => {
@@ -253,13 +264,14 @@ function PlaygroundWorkspace() {
   return (
     <ModuleExecutionContext.Provider
       value={{
-        onExecuteNode: (nodeId) => void handleNodeExecute(nodeId),
+        onExecuteNode: () => void handleNodeExecute(),
         onStopExecution: workflow.cancelExecution,
         onClearNodeResult: graph.clearNodeExecutionState,
         isExecuting: workflow.isExecuting,
       }}
     >
       <div className="app-shell">
+        <h1 className="page-visually-hidden">RAG 워크플로 플레이그라운드</h1>
         <Header
           activeStep={activeBatch}
           totalSteps={totalBatches}
@@ -275,7 +287,7 @@ function PlaygroundWorkspace() {
           onToggleRun={() => void handleAutoRun()}
           saveStatus={workflow.saveStatus}
           onSave={() => {
-            if (workflow.isCanonicalWorkflow) {
+            if (!workflow.isEditableWorkflow) {
               handleDuplicateWorkflow();
               return;
             }
@@ -287,19 +299,19 @@ function PlaygroundWorkspace() {
           workflows={workflows}
           activeWorkflowId={activeWorkflowId}
           onSelectWorkflow={handleSelectWorkflow}
-          onOpenBenchmark={() => setIsBenchmarkOpen(true)}
+          onOpenWorkflowCreator={() => setIsTemplatePanelOpen(true)}
         />
 
         {controller.errorMessage && (
           <div className="error-banner" role="alert">
             <span>{controller.errorMessage}</span>
-            <button onClick={controller.dismissError} aria-label="오류 메시지 닫기">
+            <IconButton size="sm" variant="ghost" className="error-banner__close" onClick={controller.dismissError} aria-label="오류 메시지 닫기">
               <X className="h-4 w-4" />
-            </button>
+            </IconButton>
           </div>
         )}
 
-        <main
+        <section
           className="app-workspace"
           style={{ '--module-palette-width': `${modulePanel.width}px` } as React.CSSProperties}
         >
@@ -309,9 +321,9 @@ function PlaygroundWorkspace() {
             onClose={() => setIsPaletteOpen(false)}
             width={modulePanel.width}
             onResizeStart={modulePanel.startResize}
-            onResizeBy={modulePanel.resizeBy}
+          onResizeBy={modulePanel.resizeBy}
           onAddNode={(type) => {
-              if (workflow.isCanonicalWorkflow) {
+              if (!workflow.isEditableWorkflow) {
                 controller.reportError('표준 Job은 읽기 전용입니다. 워크플로를 복제한 뒤 편집하세요.');
                 return;
               }
@@ -331,20 +343,39 @@ function PlaygroundWorkspace() {
           <PipelineCanvas
             graph={graph}
             modules={controller.modules}
-            runs={workflow.runs}
+            currentRun={currentRun}
             isPaletteOpen={isPaletteOpen}
             onOpenPalette={() => setIsPaletteOpen(true)}
-            workflows={workflows}
             activeWorkflowId={activeWorkflowId}
-            readOnly={workflow.isCanonicalWorkflow}
-            onSelectWorkflow={handleSelectWorkflow}
-            onCreateWorkflow={handleCreateWorkflow}
-            onDuplicateWorkflow={handleDuplicateWorkflow}
-            onRenameWorkflow={handleRenameWorkflow}
-            onDeleteWorkflow={handleDeleteWorkflow}
+            readOnly={!workflow.isEditableWorkflow}
           />
-        </main>
-        <BenchmarkPanel isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
+        </section>
+        <WorkflowTemplatePanel
+          isOpen={isTemplatePanelOpen}
+          isLoading={isWorkflowListLoading}
+          workflows={workflows}
+          modules={controller.modules}
+          onClose={() => setIsTemplatePanelOpen(false)}
+          onCreateFromTemplate={handleCreateFromTemplate}
+        />
+        <PromptDialog
+          open={workflowPrompt !== null}
+          title={workflowPrompt?.type === 'template' ? '템플릿으로 워크플로 만들기' : '워크플로 복제'}
+          description={workflowPrompt?.type === 'template'
+            ? '표준 템플릿을 편집 가능한 새 워크플로로 복제합니다.'
+            : '현재 워크플로의 모듈과 연결 구성을 새 워크플로로 복제합니다.'}
+          label="워크플로 이름"
+          initialValue={workflowPrompt?.initialValue ?? ''}
+          confirmLabel="워크플로 생성"
+          busy={isCreatingWorkflow}
+          error={workflowPromptError}
+          onClose={() => {
+            if (isCreatingWorkflow) return;
+            setWorkflowPrompt(null);
+            setWorkflowPromptError(null);
+          }}
+          onConfirm={(name) => { void createWorkflow(name); }}
+        />
       </div>
     </ModuleExecutionContext.Provider>
   );

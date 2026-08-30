@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import Field
@@ -100,6 +101,46 @@ def test_base_llm_module_complete_structured():
     assert schema["required"] == ["result"]
 
 
+def test_base_module_native_async_execution_keeps_validation_contract() -> None:
+    class NativeAsyncModule(DummyModule):
+        def execute(self, input_data, config=None):
+            raise AssertionError("sync execute must not be called")
+
+        async def execute_async(self, input_data, config=None):
+            cfg = config or DummyConfigDTO()
+            await asyncio.sleep(0)
+            return {"result": f"{input_data.text}:{cfg.temperature}"}
+
+    result = asyncio.run(NativeAsyncModule().run_async({"text": "async", "temperature": 0.3}))
+    assert result == {"result": "async:0.3"}
+
+
+def test_base_llm_module_complete_structured_async() -> None:
+    mock_client = MagicMock()
+    mock_client.create_response_async = AsyncMock(
+        return_value=OpenAIResponseResult(
+            response_id="resp_async",
+            content='{"result": "async_answer"}',
+            usage={"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6},
+            latency_seconds=0.05,
+        )
+    )
+    llm_module = DummyLLMModule(completion_client=mock_client)
+
+    parsed, usage, _, latency = asyncio.run(
+        llm_module.complete_structured_async(
+            "query",
+            DummyOutputDTO,
+            "gpt-5.6-luna",
+        )
+    )
+
+    assert parsed.result == "async_answer"
+    assert usage.total_tokens == 6
+    assert latency == 0.05
+    mock_client.create_response_async.assert_awaited_once()
+
+
 def test_base_module_rejects_unknown_fields_and_reports_progress():
     from modules.common.exceptions import ModuleExecutionError
 
@@ -131,7 +172,9 @@ def test_pipeline_exception_hierarchy():
         StorageError,
     )
 
-    val_err = ModuleValidationError("Input is missing", module_type="dummy", details={"field": "text"})
+    val_err = ModuleValidationError(
+        "Input is missing", module_type="dummy", details={"field": "text"}
+    )
     assert isinstance(val_err, ModuleExecutionError)
     assert isinstance(val_err, PipelineBaseError)
     assert val_err.status_code == 422

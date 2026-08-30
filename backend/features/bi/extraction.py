@@ -1,6 +1,7 @@
 from typing import Final, Literal, Protocol, assert_never, cast
 
 from .catalog import METRIC_CATALOG, DerivedMetricDefinition, SourceMetricDefinition
+from .evidence import is_verifiable_cell
 from .extraction_models import (
     BiMetricExtractionRequest,
     BiMetricExtractionResult,
@@ -22,9 +23,7 @@ from .models import (
     ValueKind,
 )
 
-MISSING_TOKENS: Final = frozenset(
-    {"", "-", "NA", "N/A", "NM", "#PEND", "NULL"}
-)
+MISSING_TOKENS: Final = frozenset({"", "-", "NA", "N/A", "NM", "#PEND", "NULL"})
 
 
 class ExistingRagRetrievalPort(Protocol):
@@ -63,7 +62,9 @@ class BiMetricExtractionService:
     ) -> BiMetricExtractionResult:
         definition = METRIC_CATALOG[request.metric_id]
         if isinstance(definition, DerivedMetricDefinition):
-            return self._invalid(request, definition.value_kind, "derived_metric_requires_calculation")
+            return self._invalid(
+                request, definition.value_kind, "derived_metric_requires_calculation"
+            )
         if not isinstance(definition, SourceMetricDefinition):
             return self._invalid(request, definition.value_kind, "unsupported_metric_definition")
         question = definition.question_template.format(
@@ -79,7 +80,9 @@ class BiMetricExtractionService:
     ) -> BiMetricExtractionResult:
         definition = METRIC_CATALOG[request.metric_id]
         if isinstance(definition, DerivedMetricDefinition):
-            return self._invalid(request, definition.value_kind, "derived_metric_requires_calculation")
+            return self._invalid(
+                request, definition.value_kind, "derived_metric_requires_calculation"
+            )
 
         if not isinstance(definition, SourceMetricDefinition):
             return self._invalid(request, definition.value_kind, "unsupported_metric_definition")
@@ -141,18 +144,16 @@ class BiMetricExtractionService:
                 )
             if response.normalized_value is None:
                 return self._invalid(request, value_kind, "available_value_missing")
+            if not evidence:
+                return self._invalid(request, value_kind, "available_evidence_missing")
             currency = response.currency
             scale = response.scale
-            if value_kind is ValueKind.AMOUNT and (
-                currency is None or scale is None
-            ):
+            if value_kind is ValueKind.AMOUNT and (currency is None or scale is None):
                 profile = self._profiles.get_for_source(request.source)
                 if profile is not None:
                     currency = currency or profile.currency
                     scale = scale or profile.scale
-            if value_kind is ValueKind.AMOUNT and (
-                currency is None or scale is None
-            ):
+            if value_kind is ValueKind.AMOUNT and (currency is None or scale is None):
                 return self._unavailable(
                     request,
                     value_kind,
@@ -197,11 +198,9 @@ class BiMetricExtractionService:
         context: BiRetrievedContext,
         evidence_cell_ids: tuple[str, ...],
     ) -> tuple[BiEvidence, ...]:
-        cells_by_id = {cell.cell_id: cell for cell in context.cells}
+        cells_by_id = {cell.cell_id: cell for cell in context.cells if is_verifiable_cell(cell)}
         unique_ids = tuple(
-            cell_id
-            for cell_id in dict.fromkeys(evidence_cell_ids)
-            if cell_id in cells_by_id
+            cell_id for cell_id in dict.fromkeys(evidence_cell_ids) if cell_id in cells_by_id
         )
         return tuple(
             BiEvidence(

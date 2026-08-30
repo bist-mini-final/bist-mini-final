@@ -97,20 +97,21 @@ export function parseBiPlaygroundHandoff(search: string): BiPlaygroundHandoff | 
 }
 
 export function useBiPlaygroundHandoff(options: UsePlaygroundHandoffOptions): void {
+  const { modules, nodes, ready, search, setQueryText } = options;
   const handoff = useMemo(
-    () => parseBiPlaygroundHandoff(options.search),
-    [options.search],
+    () => parseBiPlaygroundHandoff(search),
+    [search],
   );
-  const nodesRef = useRef(options.nodes);
-  const modulesRef = useRef(options.modules);
+  const nodesRef = useRef(nodes);
+  const modulesRef = useRef(modules);
   const appliedSearchRef = useRef<string | null>(null);
-  nodesRef.current = options.nodes;
-  modulesRef.current = options.modules;
+  nodesRef.current = nodes;
+  modulesRef.current = modules;
 
   useEffect(() => {
-    if (!options.ready || !handoff || appliedSearchRef.current === options.search) return;
-    appliedSearchRef.current = options.search;
-    options.setQueryText(handoff.question);
+    if (!ready || !handoff || appliedSearchRef.current === search) return;
+    appliedSearchRef.current = search;
+    setQueryText(handoff.question);
 
     const nodes = nodesRef.current;
     const fileUpdater = findNodeValuesUpdater(nodes, PROCESSED_FILE_SELECTOR);
@@ -121,5 +122,5 @@ export function useBiPlaygroundHandoff(options: UsePlaygroundHandoffOptions): vo
       fileUpdater({ file_name: handoff.fileName });
     }
 
-  }, [handoff, options.ready, options.search, options.setQueryText]);
+  }, [handoff, ready, search, setQueryText]);
 }

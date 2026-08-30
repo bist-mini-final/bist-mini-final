@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from backend.storage.data_sources.shard_coordinator import DistributedEmbeddingResult
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_embedder import calculate_embedding_cost
 from modules.embedding.cell_text_embedder import (
@@ -70,3 +71,35 @@ def test_embedding_cost_uses_model_specific_rate() -> None:
     assert calculate_embedding_cost("text-embedding-3-large", 1_000_000)[
         "cost_usd"
     ] == 0.13
+
+
+def test_cell_embedder_delegates_to_kubernetes_shards(tmp_path: Path) -> None:
+    encoder = MagicMock()
+    coordinator = MagicMock()
+    coordinator.enabled = True
+    coordinator.embed.return_value = DistributedEmbeddingResult(
+        duration_seconds=1.25,
+        worker_seconds=3.5,
+        total_tokens=42,
+        shard_count=2,
+    )
+    artifact_store = EmbeddingArtifactStore(tmp_path)
+    module = CellTextEmbedderModule(
+        encoder=encoder,
+        artifact_store=artifact_store,
+        shard_coordinator=coordinator,
+    )
+
+    result = module.run(
+        {
+            "file_name": "sample.xlsx",
+            "workbook_hash": "w" * 64,
+            "items": _serialized_items(),
+        },
+        {"model": "custom-2d", "dimension": 2, "batch_size": 1},
+    )
+
+    assert result["total_tokens"] == 42
+    assert result["duration_seconds"] == 1.25
+    coordinator.embed.assert_called_once()
+    encoder.encode.assert_not_called()

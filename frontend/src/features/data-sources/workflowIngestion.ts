@@ -85,7 +85,10 @@ const PHASE_LABELS: Record<string, string> = {
   serialization_tables: '셀 문서 직렬화',
   document_generation: '전수 셀 문서 생성',
   embedding_batches: '임베딩 생성',
+  embedding_assembly: '임베딩 아티팩트 결합',
   storage_batches: 'pgvector 적재',
+  vector_index_build: 'HNSW 인덱스 생성',
+  collection_publish: '검색 컬렉션 전환',
 };
 
 function numericProgress(progress: Record<string, unknown> | undefined): ModuleStepState['liveProgress'] {
@@ -179,6 +182,13 @@ function moduleState(run: WorkflowRun, nodeId: string): ModuleStepState | null {
     if (batchProgress.totalItems !== undefined) {
       metaInfo['문서 진행'] = `${batchProgress.completedItems ?? 0}/${batchProgress.totalItems}`;
     }
+  }
+  if (state.progress?.execution_mode === 'kubernetes_shards') {
+    metaInfo['실행 방식'] = 'Kubernetes 샤드 Job';
+    const runningJobs = Number(state.progress.running_jobs);
+    const queuedJobs = Number(state.progress.queued_jobs);
+    if (Number.isFinite(runningJobs)) metaInfo['실행 중 Job'] = runningJobs;
+    if (Number.isFinite(queuedJobs)) metaInfo['대기 Job'] = queuedJobs;
   }
   if (liveProgress) {
     metaInfo['현재 단계'] = liveProgress.label;

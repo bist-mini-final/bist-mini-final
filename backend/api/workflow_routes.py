@@ -12,12 +12,16 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from backend.core.state_stream import SharedStateStream
+from backend.core.state_stream_broker import StateStreamBroker
 from backend.engine.workflows import (
+    ActiveWorkflowRunsError,
     DagExecutionError,
-    RunDispatcher,
     RunStore,
+    RunNodeState,
+    WorkflowDocument,
+    WorkflowExecutionPort,
     WorkflowExecutionRequest,
-    WorkflowExecutor,
+    WorkflowRun,
     WorkflowSaveRequest,
     WorkflowStore,
 )
@@ -26,7 +30,9 @@ from backend.engine.workflows import (
 class WorkflowListResponse(BaseModel):
     """저장된 전체 DAG 워크플로 정의 목록 응답 DTO."""
 
-    workflows: List[Dict[str, Any]] = Field(..., description="저장된 전체 DAG 워크플로 목록")
+    workflows: List[WorkflowDocument] = Field(
+        ..., description="표준/사용자 메타데이터를 포함한 전체 DAG 워크플로 목록"
+    )
 
 
 class WorkflowDeleteResponse(BaseModel):
@@ -38,15 +44,15 @@ class WorkflowDeleteResponse(BaseModel):
 class RunListResponse(BaseModel):
     """워크플로 실행 요약 기록 목록 응답 DTO."""
 
-    runs: List[Dict[str, Any]] = Field(..., description="워크플로 실행 기록 목록")
+    runs: List[WorkflowRun] = Field(..., description="워크플로 실행 기록 목록")
 
 
 def create_workflow_router(
     *,
     workflow_store: WorkflowStore,
     run_store: RunStore,
-    workflow_executor: WorkflowExecutor,
-    workflow_dispatcher: RunDispatcher,
+    workflow_execution: WorkflowExecutionPort,
+    state_stream_broker: StateStreamBroker | None = None,
 ) -> APIRouter:
     """DAG 워크플로 저장소, 노드 실행 및 실시간 SSE 텔레메트리 스트리밍을 위한 FastAPI 라우터 생성."""
     router = APIRouter()
@@ -54,6 +60,8 @@ def create_workflow_router(
         run_store.load_summary,
         fingerprint=lambda run: run.updated_at,
         terminal=lambda run: run.status in ("completed", "failed", "paused"),
+        broker=state_stream_broker,
+        topic_prefix="workflow-run",
     )
 
     @router.delete(
@@ -64,16 +72,13 @@ def create_workflow_router(
     )
     def clear_runtime_cache() -> Dict[str, Any]:
         """실행 중인 워크플로가 없을 때 메모리 및 디스크의 런타임 캐시를 초기화합니다."""
-        workflow_dispatcher.cancel_all()
-        if any(
-            workflow_dispatcher.is_active(run.id)
-            for run in run_store.list()
-        ):
+        try:
+            return workflow_execution.clear_runtime_cache()
+        except ActiveWorkflowRunsError as error:
             raise HTTPException(
                 status_code=409,
-                detail="실행 중인 워크플로가 완전히 중지될 때까지 캐시를 삭제할 수 없습니다.",
-            )
-        return workflow_executor.clear_runtime_cache()
+                detail=str(error),
+            ) from error
 
     @router.get(
         "/workflows",
@@ -160,14 +165,7 @@ def create_workflow_router(
         if request is None:
             raise HTTPException(status_code=422, detail="요청 본문이 필요합니다.")
         try:
-            if run_store.db_manager is None:
-                raise RuntimeError(
-                    "Kubernetes workflow 제출에는 PostgreSQL 연결이 필요합니다."
-                )
-            workflow = workflow_store.load(workflow_id)
-            run = workflow_executor.create_run(workflow, request)
-            workflow_dispatcher.submit(run.id)
-            return run_store.load_summary(run.id)
+            return workflow_execution.submit(workflow_id, request)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"워크플로 {workflow_id}를 찾을 수 없습니다."
@@ -218,6 +216,27 @@ def create_workflow_router(
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
+    @router.get(
+        "/runs/{run_id}/nodes/{node_id}",
+        response_model=RunNodeState,
+        tags=["워크플로 실행 및 실시간 스트림"],
+        summary="현재 모듈의 Input·Config·Output DTO 상세 조회",
+        description=(
+            "전체 실행 폴링 응답을 키우지 않고 설정 패널에서 선택한 한 노드의 "
+            "현재 Input DTO, Config DTO, Output DTO를 지연 조회합니다."
+        ),
+    )
+    def get_run_node(
+        run_id: str = FastPath(..., description="조회할 실행 ID"),
+        node_id: str = FastPath(..., description="조회할 노드 ID"),
+    ) -> RunNodeState:
+        try:
+            return run_store.load_node(run_id, node_id)
+        except FileNotFoundError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
     @router.post(
         "/runs/{run_id}/resume",
         tags=["워크플로 실행 및 실시간 스트림"],
@@ -229,8 +248,7 @@ def create_workflow_router(
     ) -> Any:
         """실패하거나 일시 중지된 워크플로 실행을 재개합니다."""
         try:
-            workflow_dispatcher.submit(run_id, resume_failed=True)
-            return run_store.load_summary(run_id)
+            return workflow_execution.resume(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다."
@@ -259,7 +277,7 @@ def create_workflow_router(
     ) -> Any:
         """진행 중인 워크플로 실행을 즉시 취소합니다."""
         try:
-            return workflow_dispatcher.cancel(run_id)
+            return workflow_execution.cancel(run_id)
         except FileNotFoundError as error:
             raise HTTPException(
                 status_code=404, detail=f"실행 {run_id}를 찾을 수 없습니다."
@@ -344,6 +362,8 @@ def create_workflow_router(
                                 if node.status in ("succeeded", "skipped")
                                 else "node_failed"
                                 if node.status == "failed"
+                                else "node_started"
+                                if node.status == "running"
                                 else "node_progress"
                             ),
                             "data": json.dumps(
@@ -353,7 +373,11 @@ def create_workflow_router(
                         }
                     if run.status in ("completed", "failed", "paused"):
                         yield {
-                            "event": "run_completed",
+                            "event": (
+                                "run_finished"
+                                if run.status == "completed"
+                                else "run_failed"
+                            ),
                             "data": json.dumps(
                                 {
                                     "run_id": run.id,
@@ -370,6 +394,6 @@ def create_workflow_router(
                     "data": json.dumps({"error": str(error), "run_id": run_id}, ensure_ascii=False),
                 }
 
-        return EventSourceResponse(event_generator())
+        return EventSourceResponse(event_generator(), ping=15)
 
     return router

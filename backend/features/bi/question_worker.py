@@ -7,7 +7,10 @@ from typing import Final, Protocol, assert_never
 
 from pydantic import ValidationError
 
-from backend.engine.worker.lease import LeaseHeartbeat
+from backend.engine.worker.lease import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
 from backend.providers.openai_responses import OpenAIResponsesError
 from modules.common.exceptions import ModuleExecutionError
 
@@ -118,6 +121,7 @@ class BiQuestionWorker:
             failure_message=(
                 f"BI question heartbeat failed (question_id={question.question_id})"
             ),
+            on_lease_lost=terminate_process_on_lease_loss,
         )
         heartbeat.start()
 
@@ -137,6 +141,7 @@ class BiQuestionWorker:
             else:
                 timing = self._timing(claimed_at, started)
                 answer = self._completed_answer(question, result, timing)
+            heartbeat.raise_if_lost()
             return self._service.save_answer(answer)
         finally:
             heartbeat.stop()
