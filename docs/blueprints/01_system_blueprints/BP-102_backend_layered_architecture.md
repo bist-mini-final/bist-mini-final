@@ -1,80 +1,136 @@
-# [BP-102] 백엔드 계층 구조와 의존성 규칙
+# [BP-102] 백엔드 modular monolith와 의존성 규칙
 > **Document Code:** `BP-102` | **Category:** System Architecture Blueprint | **Status:** Implemented & Operational
-> **Source Roots:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/features/`](file:///c:/Repos/bist-mini-final/backend/features/), [`backend/engine/`](file:///c:/Repos/bist-mini-final/backend/engine/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/providers/`](file:///c:/Repos/bist-mini-final/backend/providers/), [`backend/storage/`](file:///c:/Repos/bist-mini-final/backend/storage/)
+> **Source Roots:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/engine/`](file:///c:/Repos/bist-mini-final/backend/engine/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
 
 ---
 
-## 1. 계층 맵
+## 1. 구조 원칙
+
+백엔드는 기술별 7계층을 수평으로 늘리는 구조가 아니라, 제품 도메인을 먼저 분리하고 각 도메인 안에서 `domain → application port → infrastructure adapter` 방향을 지키는 modular monolith입니다. HTTP, worker, DB, 외부 provider는 도메인 유스케이스의 바깥에 위치합니다.
 
 ```mermaid
 flowchart TD
-    API["1. API\nFastAPI routes, DTO, error mapping"]
-    BOOT["2. Bootstrap\nApplication/Runtime/Execution/Domain containers"]
-    FEATURE["3. Features\nBI, chatbot, comparison, benchmark"]
-    ENGINE["4. Engine\nworkflow execution, queue, lease, runtime"]
-    MODULE["5. Modules\n19 registered atomic modules"]
-    PROVIDER["6. Providers\nOpenAI ports/adapters, Kubernetes observation"]
-    STORAGE["7. Storage\nPostgreSQL, pgvector, snapshots, artifacts"]
-    API --> BOOT
-    BOOT --> FEATURE
+    API["Presentation\nbackend/api + feature routes"]
+    BOOT["Composition Root\nbackend/bootstrap"]
+    APP["Domain Applications\nworkflow · data sources · BI · chatbot · comparison"]
+    DOMAIN["Domain Rules\nstate · errors · value contracts"]
+    ENGINE["Execution Engine\nDAG · queue · leased worker"]
+    MODULE["Pipeline Modules\n19 typed atomic modules"]
+    PORT["Application / Module Ports"]
+    ADAPTER["Infrastructure Adapters\nplatform · providers · storage"]
+    SHARED["Shared Kernel\nerrors · DB repository base · observability"]
+
+    API --> APP
+    BOOT --> API
+    BOOT --> APP
     BOOT --> ENGINE
-    FEATURE --> ENGINE
-    FEATURE --> STORAGE
+    BOOT --> ADAPTER
+    APP --> DOMAIN
+    APP --> PORT
+    ENGINE --> APP
     ENGINE --> MODULE
-    ENGINE --> STORAGE
-    MODULE --> PROVIDER
-    MODULE --> STORAGE
+    MODULE --> PORT
+    ADAPTER --> PORT
+    APP --> SHARED
+    ENGINE --> SHARED
+    ADAPTER --> SHARED
 ```
 
-이 그림은 책임을 설명하는 논리 계층입니다. 모든 import가 정확히 한 단계씩만 내려가야 한다는 뜻은 아니며, 핵심 규칙은 도메인과 모듈이 상위 HTTP 조립 세부사항에 의존하지 않는 것입니다.
+화살표는 compile-time 의존 방향입니다. Bootstrap은 유일한 예외로 구체 구현 전체를 알고 객체 그래프를 조립합니다.
 
 ---
 
-## 2. 책임과 현재 심볼
+## 2. 표준 디렉터리 구조
 
-| 계층 | 책임 | 대표 구현 |
+```text
+backend/
+├── api/                         # FastAPI presentation, DTO, SSE, error mapping
+├── bootstrap/                   # process lifecycle와 concrete dependency 조립
+├── domains/
+│   ├── workflow/
+│   │   ├── domain/              # 상태 전이와 domain error
+│   │   └── application/         # graph/input use case와 repository/cache port
+│   ├── data_sources/application/# 파일 등록·삭제 use case와 file/catalog port
+│   ├── bi/application/          # BI API service boundary
+│   ├── chatbot/
+│   │   ├── application/         # suggestion use case와 repository port
+│   │   └── infrastructure/      # PostgreSQL adapter
+│   └── company_comparison/application/
+├── engine/                      # DAG runtime, orchestration, leased worker template
+├── platform/pgvector/           # catalog/ingestion/retrieval narrow adapters
+├── shared/
+│   ├── domain/                  # ApplicationError 공통 계층
+│   └── infrastructure/          # DB base repository, correlation context
+├── features/                    # 기존 모델/adapter와 non-breaking compatibility facade
+├── providers/                   # OpenAI/Kubernetes 등 외부 시스템 adapter
+└── storage/                     # 기존 SQL gateway와 artifact 구현
+modules/                         # pin DTO를 가진 pipeline plugin units
+```
+
+`backend/features`와 `backend/storage`는 공개 API·DB·저장 데이터 호환성을 보존하기 위한 기존 구현을 포함합니다. 새 유스케이스 진입점은 `backend/domains`, 새 pgvector 소비 경계는 `backend/platform/pgvector`를 기준으로 합니다. 거대 SQL gateway를 한 번에 재작성하지 않고 좁은 adapter로 감싸 소비자의 결합을 먼저 제거했습니다.
+
+---
+
+## 3. 책임과 현재 구현
+
+| 경계 | 책임 | 대표 구현 |
 | :--- | :--- | :--- |
-| API | `/api/v1` route, Pydantic 검증, status code, SSE, 표준 오류 | `backend/api/*_routes.py`, feature별 `api_routes.py`, `backend/api/exception_handlers.py` |
-| Bootstrap | 프로세스 수명주기와 객체 그래프 조립 | `ApplicationContainer`, `RuntimeContainer`, `ExecutionContainer`, `DomainServicesContainer` |
-| Features | 제품 규칙과 유스케이스 | `BiApiServices`, chatbot services, `CompanyComparisonService`, `BenchmarkService` |
-| Engine | DAG 실행, durable queue 제출, worker lease, registry | `WorkflowExecutionService`, `WorkflowExecutor`, `KubernetesQueueDispatcher`, `WorkflowRuntimeServices` |
-| Modules | Pydantic pin 계약을 가진 재사용 실행 단위 | `BaseModule`, `BaseModuleRegistry`, 19개 등록 module type |
-| Providers | 외부 서비스의 포트와 어댑터 | `OpenAIProvider`, `OpenAIResponsesClient`, `EmbeddingEncoder` |
-| Storage | DB pool, pgvector, Binary COPY, artifacts, 버전형 스냅샷 | `DatabaseManager`, `PgVectorStore`, `PgVectorBinaryCopyStream`, `VersionedSnapshotRepository` |
-
-Kubernetes dispatcher의 현재 구현은 [`backend/engine/orchestration/kubernetes/dispatcher.py`](file:///c:/Repos/bist-mini-final/backend/engine/orchestration/kubernetes/dispatcher.py)에 있습니다.
+| Presentation | `/api/v1`, Pydantic 입력, status code, SSE, 표준 오류 envelope | `backend/api/*_routes.py`, feature route factory, `exception_handlers.py` |
+| Domain | 프레임워크와 저장소에 독립적인 상태·오류·값 규칙 | `workflow/domain/state.py`, `workflow/domain/errors.py` |
+| Application | 유스케이스 orchestration과 요구 port | `GraphValidator`, `WorkflowInputAssembler`, `DataSourceFileService`, `BiApiServices`, `CompanyComparisonService`, `ChatSuggestionService` |
+| Engine | DAG 실행, durable queue, worker lease와 retry/timeout policy | `WorkflowExecutor`, `KubernetesQueueDispatcher`, `LeasedWorker`, `LeaseHeartbeat` |
+| Modules | 입력·출력·config pin 계약을 가진 재사용 실행 단위 | `BaseModule`, `BaseModuleRegistry`, 19개 module type |
+| Infrastructure | PostgreSQL, pgvector, OpenAI, artifact, snapshot 구현 | shared repository bases, pgvector capability repositories, provider adapters |
+| Bootstrap | 프로세스 수명주기와 concrete object graph | `ApplicationContainer`, `RuntimeContainer`, `ExecutionContainer`, `DomainServicesContainer` |
 
 ---
 
-## 3. DI와 실행 경계
+## 4. 저장소와 pgvector 경계
+
+- `SyncPostgresRepository`와 `AsyncPostgresRepository`가 connection/transaction 수명주기를 공개 메서드로 제공합니다. feature repository가 `DatabaseManager._raw_connection()`에 접근하지 않습니다.
+- `PgVectorCatalogRepository`, `PgVectorIngestionRepository`, `PgVectorRetrievalRepository`는 서로 다른 capability를 노출합니다.
+- pipeline module은 `backend.storage.pgvector_store`를 import하지 않고 module port에만 의존합니다.
+- `DatabaseManager`와 `PgVectorStore`는 현재 하위 호환 SQL gateway입니다. schema와 데이터 migration 없이 소비자 결합을 제거하기 위해 adapter 내부 구현으로 유지합니다.
+- 동적 SQL 식별자는 driver의 SQL composition API를 사용하고 값은 parameter binding을 사용합니다.
+
+---
+
+## 5. Worker 상속과 관측성
+
+동일한 one-shot 수명주기를 가진 ingestion embedding, ingestion vector COPY, BI materialization worker는 `LeasedWorker[Claim, Output]`를 상속합니다.
+
+1. `claim()`으로 한 작업을 확보합니다.
+2. `WorkerLeaseSpec`으로 job/worker ID와 heartbeat 갱신 함수를 제공합니다.
+3. base template이 heartbeat 시작·소유권 확인·실행 시간·terminal update·종료를 소유합니다.
+4. subclass는 `execute`, `complete`, `fail`의 도메인별 동작만 구현합니다.
+
+Benchmark처럼 pause/cancel FSM이 추가된 worker를 이 상속에 강제로 넣지 않습니다. 해당 worker는 공통 `LeaseHeartbeat`와 `default_worker_id` primitive를 재사용합니다.
+
+HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_id`, `worker_id`를 전달합니다. OpenTelemetry node span은 현재 correlation identifier를 attribute로 기록합니다.
+
+---
+
+## 6. DI와 비동기 규칙
 
 - `RuntimeContainer.create()`가 OpenAI clients, embedding adapter, `WorkflowRuntimeServices`, paths, pgvector probe를 구성합니다.
 - `ExecutionContainer.create(runtime)`가 durable workflow dispatcher와 execution service를 구성합니다.
-- `DomainServicesContainer.create(runtime)`가 BI, company comparison, chat suggestions, jobs monitor를 구성합니다.
-- `ApplicationContainer.create()`는 위 세 컨테이너를 결합하며 FastAPI lifespan이 close/aclose를 소유합니다.
-- worker entrypoint도 동일한 runtime service factory를 사용하여 API/worker 설정 드리프트를 줄입니다.
-
-`WorkflowRuntimeServices`에는 DB manager, stores, module registry, workflow executor가 들어 있습니다. 예전 문서의 `PipelineExecutionEngine`과 `InfrastructureContainer`는 현재 클래스가 아닙니다.
-
----
-
-## 4. 비동기·동기 규칙
-
-1. FastAPI hot path는 native async DB/provider method를 우선합니다.
-2. 동기 계약을 유지해야 하는 `RunStore` 호출, 파일 해시·이동, openpyxl 파싱 등은 worker thread로 격리합니다.
-3. Binary COPY와 대량 spreadsheet 처리는 one-shot worker 프로세스에서 동기 스트리밍으로 수행합니다.
-4. DAG의 동일 위상 batch는 `TaskGroup`으로 병렬 실행하되, timeout/상태 병합 계약을 지킵니다.
-5. 저장 상태를 먼저 확정하고 Redis는 변경 알림에만 사용합니다.
+- `DomainServicesContainer.create(runtime)`가 BI, company comparison, chat suggestion, jobs monitor application service를 구성합니다.
+- FastAPI hot path는 native async DB/provider method를 우선합니다.
+- 동기 `RunStore`, 파일 해시·이동, openpyxl 파싱은 worker thread 또는 one-shot worker로 격리합니다.
+- DAG의 동일 위상 batch는 `TaskGroup`으로 병렬 실행하되 timeout/상태 병합 계약을 지킵니다.
+- PostgreSQL 상태를 먼저 확정하고 Redis는 변경 알림으로만 사용합니다.
 
 ---
 
-## 5. 의존성 불변식과 확장 규칙
+## 7. 실행 가능한 의존성 불변식
 
+- `backend/domains`에서 `backend.api`, `backend.platform`, `backend.providers`, `backend.storage` import 금지.
 - `backend/features`에서 `backend.api` import 금지.
-- `modules`에서 `DatabaseManager`, `PgVectorStore`, `OpenAIProvider` 직접 생성 금지.
-- 새 module type은 도메인 factory에 recipe를 등록하고 입력·출력·config schema와 테스트를 함께 추가.
-- 새 제품 도메인은 전용 route/DTO/service를 유지하고 공유 인프라는 port 수준에서만 재사용.
-- BI와 Company Comparison의 계산 로직을 공통 base service로 합치지 않음. 공유 대상은 versioned snapshot 저장 수명주기뿐임.
-- 공개 경로·테이블·모듈 수는 코드/OpenAPI/Alembic을 기준으로 갱신.
+- `modules`에서 DB/provider concrete client 생성 금지.
+- `modules`에서 `backend.storage.pgvector_store` import 금지.
+- feature repository에서 private DB connection 접근 금지.
+- 동일 수명주기의 one-shot worker는 `LeasedWorker` 상속.
+- BI와 Company Comparison 계산을 공통 base service로 합치지 않음. 공유 대상은 versioned snapshot 저장 수명주기와 infrastructure primitive뿐임.
+- 공개 API·DB schema·저장 데이터는 구조 리팩토링만으로 변경하지 않음.
 
-이 규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py)와 관련 회귀 테스트로 검증합니다.
+이 규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py)와 Ruff/Pyright로 검증합니다.

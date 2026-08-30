@@ -20,7 +20,11 @@ flowchart TB
 ## 2. 핵심 불변식
 
 - feature는 `backend.api`를 import하지 않습니다.
+- `backend/domains`는 API/platform/provider/legacy storage를 import하지 않습니다.
 - module은 DB/provider 객체를 직접 생성하지 않습니다.
+- module은 pgvector SQL gateway 대신 capability port를 사용합니다.
+- feature repository는 private DB connection에 접근하지 않습니다.
+- 동일한 one-shot lease 수명주기의 worker는 공통 template을 상속합니다.
 - rendered KEDA worker spec은 queue/command/environment 계약과 일치합니다.
 - Alembic revision chain의 head는 하나이며 현재 `20260829_0005`입니다.
 - `/api/v1` OpenAPI에 정식 route가 노출되고 제거된 comparison legacy route는 나타나지 않습니다.
@@ -75,7 +79,7 @@ npm test -- --run
 npm run build
 ```
 
-2026-08-31 기준 최근 전체 결과는 backend **196 passed, 2 skipped**, frontend **168 passed**, Ruff/Pyright/typecheck/build 통과입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
+2026-08-31 기준 최근 전체 결과는 backend **208 passed, 2 skipped**, frontend **48 files / 168 passed**, Ruff/Pyright/ESLint/TypeScript typecheck/production build 통과, Kubernetes renderer **6 ScaledJobs**입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
 
 ---
 
