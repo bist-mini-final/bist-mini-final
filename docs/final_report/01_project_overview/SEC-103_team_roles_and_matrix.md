@@ -1,27 +1,27 @@
-# [SEC-103] 팀 구성 및 4인 역할 분담 (Team Roles & R&R)
-> **Chapter:** 1. 프로젝트 개요 | **Section:** 1.3 | **Status:** Approved Baseline  
-> **Classification:** Team Structure & 4-Lead Role Distribution Matrix
+# [SEC-103] 팀 구성 및 역할 분담
+
+> **Chapter:** 1. 프로젝트 개요 | **Section:** 1.3 | **Status:** Historical ownership with current mappings
 
 ---
 
-## 1. 4인 전담 엔지니어링 역할 분배 매트릭스 (R&R Matrix)
+## 1. 프로젝트 역할
 
-`bist-mini-final` 프로젝트는 4인의 전문 엔지니어링 Lead로 구성되어 각자의 전담 영역과 3단계 MVP 전 과정에서 주도적인 책임을 수행했습니다:
+| 담당 | 프로젝트 기여 영역 | 현재 코드·문서 연결 |
+| :--- | :--- | :--- |
+| 김지환 | 시스템 총괄, DAG 실행·배포·리팩토링·품질 거버넌스 | `backend/engine/`, `backend/bootstrap/`, `deploy/`, `tests/modules/` |
+| 전명준 | 평가 데이터, 초기 기업 비교 UX·분석 정책 | `backend/features/benchmark/`, `backend/features/company_comparison/`, `frontend/src/features/company-comparison/` |
+| 권혁준 | Financial BI와 재무 지표·시각화 | `backend/features/bi/`, `frontend/src/features/bi/` |
+| 김정원 | 질의 라우팅과 AI 금융 챗봇 | `modules/query/`, `backend/features/chatbot/`, `frontend/src/features/chatbot/` |
 
-| 엔지니어 (Role) | 주관 영역 및 핵심 책임 (Core Responsibilities) | 담당 구현 모듈 & 주요 산출물 | 연계 설계도 |
-| :--- | :--- | :--- | :---: |
-| **김지환**<br>*(Team Lead)* | • **전체 시스템 총괄 및 2-Tier DAG 오케스트레이션 엔진 구축**<br>• **PR 코드 리뷰, 브랜치 머지 및 병합 충돌 관리**<br>• **전사 코드베이스 리팩토링 및 아키텍처 불변식 유지보수**<br>• **대용량 데이터 적재 파이프라인(좌표 파서, VLM 직렬화, Binary COPY) 구축**<br>• 분산 락(Lease) 동시성 제어 및 React Flow 2D Playground 공통 설계 | • `backend/engine/workflows/` (DAG 실행기)<br>• `backend/storage/spreadsheets/` (좌표 파서)<br>• `backend/storage/pgvector_binary_copy.py`<br>• `modules/structure/cell_text_serializer.py`<br>• `backend/engine/worker/lease.py` | [`SEC-301`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-301_system_topology_and_runtime.md)<br>[`SEC-303`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-303_sequence_diagrams.md)<br>[`SEC-401`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-401_mvp1_data_and_vision_pipeline.md) |
-| **전명준**<br>*(Data & Evaluation Lead)* | • **IBM 원천 재무제표 기반 Ground-Truth 벤치마크 평가셋 생성**<br>• **가상 기업(비스텔리젼스, 콜드플레이) 모델링 및 다중 시트 재무제표(`.xlsx`) 제작**<br>• **다중 기업 크로스 비교(Company Comparison) 인사이트 분석 및 듀퐁 3단계 분해 기능 담당**<br>• 기업 간 통화/단위 정규화 및 5각 재무 건전성 랭킹 모델 구현 | • `modules/storage/company_entity_extractor.py`<br>• `modules/storage/qa_example_loader.py`<br>• `backend/features/benchmark/`<br>• `frontend/src/pages/CompanyComparisonPage.tsx`<br>• 가상 기업 재무제표 데이터셋 (`assets/`) | [`SEC-202`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-202_stakeholders_and_personas.md)<br>[`SEC-403`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-403_mvp3_chatbot_and_comparison.md)<br>[`SEC-501`](file:///c:/Repos/bist-mini-final/docs/final_report/05_validation_and_conclusion/SEC-501_benchmark_evaluation_plan.md) |
-| **권혁준**<br>*(RAG Framework & BI Lead)*| • **FRTR(Financial RAG/Table Retrieval) 재무 RAG 방법론 프레임워크 조사 및 틀 정립**<br>• **40+ 전사 재무 지표 및 Financial BI 대시보드(수익성/안정성/성장성/활동성) 구축**<br>• 무손실 `Decimal` 연산 기반 재무 계산기 및 5개년 건전성 히트맵 뷰모델 구현<br>• 음수 마진 적응형 Y축 스케일링(`chartViewModel.ts`) 및 원본 감사 셀 모달 결선 | • `backend/features/bi/` (BI 서비스 & 프로파일러)<br>• `modules/reader/financial_calculator.py`<br>• `frontend/src/features/bi/` (BI 대시보드)<br>• `frontend/src/features/bi/selectors/chartViewModel.ts`<br>• `frontend/src/features/bi/components/useModalDialog.ts` | [`SEC-204`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-204_use_case_modeling_and_traceability.md)<br>[`SEC-402`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-402_mvp2_orchestration_and_bi.md)<br>[`SEC-403`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-403_mvp3_chatbot_and_comparison.md) |
-| **김정원**<br>*(Query Optimization & Chatbot Lead)* | • **시맨틱 쿼리 라우팅 및 LLM 쿼리 라우터를 통한 데이터 스코프(Data Scope) 제한 연구·구현**<br>• **불필요한 검색 범위 축소를 통한 토큰/비용 절감 및 RAG 정밀도 최적화**<br>• **AI 금융 대화형 챗봇(AI Financial Chatbot) 기능 담당**<br>• Fast RAG 인메모리 어댑터 결선, 실시간 대화 FSM 및 스트리밍 답변 파이프라인 구현 | • `modules/query/semantic_query_router.py`<br>• `modules/query/llm_query_router.py`<br>• `modules/query/decomposer.py`<br>• `backend/features/bi/fast_rag_adapter.py`<br>• `frontend/src/pages/ChatbotPage.tsx` | [`SEC-201`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-201_prior_research_and_hypotheses.md)<br>[`SEC-305`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-305_interface_specification.md)<br>[`SEC-403`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-403_mvp3_chatbot_and_comparison.md) |
+이 표는 팀의 기능 소유 이력을 설명합니다. 현재 코드는 공통 composition root와 계약 테스트를 통해 담당자와 무관하게 동일한 아키텍처 규칙을 따릅니다.
 
----
+## 2. 현재화 과정에서의 공동 결정
 
-## 2. 4인 팀원별 3단계 MVP 완결 매트릭스 (1차 ➡️ 2차 ➡️ 3차 MVP)
+- 과거 21개 모듈 기획은 `ModuleRegistry`에 실제 등록된 19개 모듈 계약으로 정리했습니다.
+- BI의 21개 지표와 Company Comparison 점수 정책을 서로 다른 도메인으로 분리했습니다.
+- 기존 Company Comparison과 V2의 이중 화면을 `/company-comparison` 하나로 통합했습니다.
+- 가상 기업과 임의 보간은 운영 비교 경로에서 제거했습니다.
+- 로컬 VLM과 Cross-Encoder reranker는 구현 범위에서 제외했습니다.
+- 배포는 PostgreSQL durable queue, Redis 변경 신호, KEDA worker, Helm과 Alembic을 기준으로 통일했습니다.
 
-| 팀원 (Role) | 1차 MVP (기반 데이터 & 코어 RAG) | 2차 MVP (오케스트레이션, 라우팅 & BI) | 3차 MVP (챗봇, 비교 & 인터랙션 고도화/거버넌스) |
-| :--- | :--- | :--- | :--- |
-| **김지환**<br>*(Team Lead)* | • OpenPyXL 2D 셀 좌표 파서<br>• Luna VLM 표 바운딩박스 검출<br>• PostgreSQL Native Binary COPY 파이프라인 구축 | • 2-Tier DAG 오케스트레이션 엔진 구축<br>• 런타임 FSM 및 노드 상태 전이기 구현<br>• PR 코드 리뷰, 브랜치 머지 및 충돌 관리 | • 전사 코드베이스 리팩토링 및 클린 계층화<br>• AST 아키텍처 계약 테스트 체계 수립<br>• 5대 챕터 22개 마스터 청사진 거버넌스 확립 |
-| **전명준**<br>*(Data & Evaluation Lead)* | • IBM 원천 재무제표 엑셀 분석<br>• 1차 Ground-Truth 재무 Q&A 평가 데이터셋 구축<br>• 재무 데이터 무결성 검증 | • 가상 기업(비스텔리젼스, 콜드플레이) 모델링<br>• 다중 시트 합성 재무제표(`.xlsx`) 데이터셋 제작<br>• 다년도 계정과목 매핑 정규화 | • 다중 기업 듀퐁 3단계 크로스 비교 엔진 구현<br>• 동종업계 5각 재무 건전성 레이더 차트 및 벤치마크 랭킹 인사이트 뷰 구축<br>• 다중 기업 통화/단위 정규화 모델 |
-| **권혁준**<br>*(RAG Framework & BI Lead)*| • FRTR(Financial RAG/Table Retrieval) 재무 RAG 방법론 프레임워크 조사<br>• Dense+Sparse 기초 검색 방법론 틀 정립 | • 40+ 전사 재무비율 무손실 `Decimal` 계산 엔진(`FinancialCalculatorModule`) 구현<br>• 5개년 건전성 히트맵 및 기본 Financial BI 대시보드 구축 | • **Financial BI 대시보드 고도화 (적응형 음수 마진 Y축 동적 스케일링 엔진 `chartViewModel.ts`)**<br>• **원천 엑셀 셀 감사 추적 `EvidenceDialog` & Web a11y 표준 모달 시스템(`useModalDialog.ts`) 연동**<br>• **BI 스냅샷 렌더링 및 캐시 최적화** |
-| **김정원**<br>*(Query Optimization & Chatbot Lead)* | • 재무 자연어 질의 분석 및 서브쿼리 분해 방법론 조사<br>• 쿼리 라우팅 기초 구조 탐색 | • `SemanticQueryRouter` & `LlmQueryRouter` 개발을 통한 대상 기업/시트 데이터 스코프(Data Scope) 제한기 구현<br>• 불필요 검색 범위 축소를 통한 토큰/비용 최적화 | • AI 금융 대화형 챗봇(/chatbot) 풀스택 구축<br>• `FastRagPipelineAdapter` 인메모리 연동 (<300ms 초고속 응답)<br>• 대화 세션 컨텍스트 및 마크다운/LaTeX 수식 실시간 SSE 스트리밍 구현 |
+세부 책임보다 현재 실행 계약이 우선하며, 최신 기준은 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 따릅니다.

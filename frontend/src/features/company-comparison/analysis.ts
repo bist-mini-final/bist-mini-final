@@ -1,4 +1,4 @@
-import type { LeagueCompany } from './leagueTypes';
+import type { ComparisonCompany, ComparisonPeriod } from './types';
 
 export const SCORE_DIMENSIONS = [
   { key: 'growthScore', label: '성장성', weight: 0.35 },
@@ -8,7 +8,7 @@ export const SCORE_DIMENSIONS = [
 
 export type ScoreDimension = (typeof SCORE_DIMENSIONS)[number];
 
-export function formatAmount(value: number, company: LeagueCompany): string {
+export function formatAmount(value: number, company: ComparisonCompany): string {
   const currency = company.currency === 'USD'
     ? '$'
     : company.currency === 'KRW'
@@ -25,23 +25,29 @@ export function formatAmount(value: number, company: LeagueCompany): string {
   return `${sign}${currency}${Math.round(Math.abs(value)).toLocaleString()}${suffix}`;
 }
 
-export function historicalCandles(company: LeagueCompany) {
-  return [...company.candles]
-    .filter((candle) => candle.periodType === 'historical')
+export function historicalPeriods(company: ComparisonCompany) {
+  return [...company.periods]
+    .filter((period) => period.periodType === 'historical')
+    .sort((left, right) => left.year - right.year);
+}
+
+export function forecastPeriods(company: ComparisonCompany) {
+  return [...company.periods]
+    .filter((period) => period.periodType === 'forecast')
     .sort((left, right) => left.year - right.year);
 }
 
 export function scoreRank(
-  companies: readonly LeagueCompany[],
-  company: LeagueCompany,
+  companies: readonly ComparisonCompany[],
+  company: ComparisonCompany,
   dimension: ScoreDimension,
 ): number {
   return companies.filter((candidate) => candidate[dimension.key] > company[dimension.key]).length + 1;
 }
 
 export function rankReason(
-  company: LeagueCompany,
-  companies: readonly LeagueCompany[],
+  company: ComparisonCompany,
+  companies: readonly ComparisonCompany[],
 ): readonly string[] {
   const dimensions = SCORE_DIMENSIONS.map((dimension) => ({
     ...dimension,
@@ -69,7 +75,16 @@ export function percentChange(values: readonly number[]): number | null {
   return ((values[values.length - 1] - values[0]) / Math.abs(values[0])) * 100;
 }
 
-export function indexedSeries(values: readonly number[]): readonly number[] {
-  if (!values.length || values[0] === 0) return values.map(() => 100);
-  return values.map((value) => (value / values[0]) * 100);
+export interface TrendPoint {
+  readonly year: number;
+  readonly value: number;
+}
+
+export function indexedSeries(periods: readonly ComparisonPeriod[]): readonly TrendPoint[] {
+  if (!periods.length) return [];
+  const first = periods[0].revenue;
+  return periods.map((period) => ({
+    year: period.year,
+    value: first === 0 ? 100 : (period.revenue / first) * 100,
+  }));
 }

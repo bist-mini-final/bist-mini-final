@@ -24,8 +24,6 @@ interface WorkflowGraphBridge {
   clearExecutionState: () => void;
 }
 
-const CANONICAL_WORKFLOW_IDS = new Set(['rag_query', 'excel_ingestion']);
-
 async function pollRun(runId: string, signal: AbortSignal): Promise<WorkflowRun> {
   while (true) {
     const run = await pipelineApi.getRun(runId, signal);
@@ -60,6 +58,7 @@ export function useWorkflowPersistence(
   moduleCatalogReady: boolean,
   activeWorkflowId: string,
   activeWorkflowName: string,
+  activeWorkflowEditable: boolean,
 ) {
   const graphRef = useRef(graph);
   graphRef.current = graph;
@@ -80,7 +79,7 @@ export function useWorkflowPersistence(
       && executionDefinitionFingerprint(latestRun.graph)
         === executionDefinitionFingerprint(currentGraph)
   );
-  const isCanonicalWorkflow = CANONICAL_WORKFLOW_IDS.has(activeWorkflowId);
+  const isEditableWorkflow = activeWorkflowEditable;
 
   const applyRun = useCallback((run: WorkflowRun) => {
     latestRunRef.current = run;
@@ -141,14 +140,14 @@ export function useWorkflowPersistence(
   const saveNow = useCallback(async (signal?: AbortSignal) => {
     setSaveStatus('saving');
     try {
-      const workflow = isCanonicalWorkflow
-        ? await pipelineApi.getWorkflow(activeWorkflowId, signal)
-        : await pipelineApi.saveWorkflow(
+      const workflow = isEditableWorkflow
+        ? await pipelineApi.saveWorkflow(
             activeWorkflowId,
             activeWorkflowName,
             graphRef.current.exportGraph(),
             signal
-          );
+          )
+        : await pipelineApi.getWorkflow(activeWorkflowId, signal);
       setLastSavedAt(workflow.updated_at);
       setSaveStatus('saved');
       return workflow;
@@ -158,10 +157,10 @@ export function useWorkflowPersistence(
       }
       throw error;
     }
-  }, [activeWorkflowId, activeWorkflowName, isCanonicalWorkflow]);
+  }, [activeWorkflowId, activeWorkflowName, isEditableWorkflow]);
 
   useEffect(() => {
-    if (!ready || isCanonicalWorkflow) return;
+    if (!ready || !isEditableWorkflow) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void saveNow(controller.signal).catch(() => undefined);
@@ -170,13 +169,13 @@ export function useWorkflowPersistence(
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [graphFingerprint, isCanonicalWorkflow, ready, saveNow]);
+  }, [graphFingerprint, isEditableWorkflow, ready, saveNow]);
 
   const createRun = useCallback(
     async (query: string, signal: AbortSignal) => {
-      const workflow = isCanonicalWorkflow
-        ? await pipelineApi.getWorkflow(activeWorkflowId, signal)
-        : await saveNow(signal);
+      const workflow = isEditableWorkflow
+        ? await saveNow(signal)
+        : await pipelineApi.getWorkflow(activeWorkflowId, signal);
       const run = await pipelineApi.createRun(
         activeWorkflowId,
         workflowRuntimeInputs(workflow.graph, query),
@@ -185,7 +184,7 @@ export function useWorkflowPersistence(
       applyRun(run);
       return run;
     },
-    [activeWorkflowId, applyRun, isCanonicalWorkflow, saveNow]
+    [activeWorkflowId, applyRun, isEditableWorkflow, saveNow]
   );
 
   const executeAll = useCallback(
@@ -309,7 +308,7 @@ export function useWorkflowPersistence(
     latestRun,
     runs,
     latestRunMatchesGraph,
-    isCanonicalWorkflow,
+    isEditableWorkflow,
     isExecuting,
     isClearingCache,
     saveNow,

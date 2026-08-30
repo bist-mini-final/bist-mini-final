@@ -1,10 +1,10 @@
-# [BP-203] 대용량 바이너리 COPY & pgvector 인덱싱 파이프라인
-> **Document Code:** `BP-203` | **Category:** Data Engine & Vector Pipeline Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py)
+# [BP-203] 대용량 Binary COPY와 pgvector 인덱싱
+> **Document Code:** `BP-203` | **Category:** Data Engine Blueprint | **Status:** Implemented & Operational
+> **Source Files:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py), [`backend/storage/data_sources/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/shard_coordinator.py)
 
 ---
 
-## 1. 초고속 벡터 인제스천 아키텍처 (High-Throughput Vector Ingestion)
+## 1. 벡터 인제스천 아키텍처
 
 수십만 개의 스프레드시트 셀 임베딩을 PostgreSQL `INSERT` 문이나 ORM 객체 매핑으로 주입하면 Python 인터프리터의 float 객체 생성 오버헤드와 네트워크 직렬화 병목으로 인해 막대한 지연이 발생합니다.
 
@@ -12,12 +12,20 @@
 
 ```mermaid
 flowchart LR
-    EMB["Embedding Artifact (.bin float32 little-endian)"] --> STREAM["PgVectorBinaryCopyStream (io.RawIOBase)"]
-    STREAM --> SWAP["C-level array byte-swap (Little-Endian -> Network Byte Order)"]
-    SWAP --> FRAME["PostgreSQL PGCOPY Header & Tuple Framing (memoryview segments)"]
-    FRAME --> PSYCOPG["psycopg copy_expert / copy_from (Direct TCP Socket)"]
-    PSYCOPG --> PG["PostgreSQL langchain_pg_embedding (Zero-Allocation DB Flush)"]
+    SERIALIZED["직렬화 문서"] --> EQ["ingestion_shards: embedding"]
+    EQ --> EJ["KEDA embedding Jobs\n최대 4"]
+    EJ --> PARTS["ordered .f32 part artifacts"]
+    PARTS --> EMB["canonical float32 artifact"]
+    EMB --> VQ["ingestion_shards: vector_copy"]
+    VQ --> VJ["KEDA COPY Jobs\n최대 2"]
+    VJ --> STREAM["PgVectorBinaryCopyStream"]
+    STREAM --> STAGE["private staging collection"]
+    STAGE --> BARRIER["count barrier"]
+    BARRIER --> HNSW["collection-local HNSW 1회 생성"]
+    HNSW --> PUBLISH["atomic collection publish"]
 ```
+
+기본 임베딩 배치 크기 2,048은 각각 독립적인 `ingestion-embedding` Job으로 claim됩니다. COPY는 기본 4,096문서 shard를 `ingestion-vector` Job으로 보내며, 전체 shard가 성공하기 전에는 staging collection을 검색에 공개하지 않습니다. KEDA 동시성은 임베딩 4, COPY 2로 제한해 API rate limit과 PostgreSQL WAL·인덱스 write amplification을 제어합니다.
 
 ---
 
@@ -68,7 +76,8 @@ WHERE collection_id = '{collection_uuid}'::uuid
 
 ## 4. 메모리 격리 및 SSE 실시간 진행률 스트리밍 (Memory Isolation & SSE Telemetry)
 
-- **`memoryview` 세그먼트 스트리밍**: 수만 행의 대형 워크북이라도 DB 전송 프레임 전체를 한 번에 만들지 않고 `batch_size=1000` 단위로 생성합니다. 실제 최대 메모리는 문서 크기와 임베딩 공급 방식에 따라 측정합니다.
+- **`memoryview` 세그먼트 스트리밍**: 수만 행의 대형 워크북이라도 DB 전송 프레임 전체를 한 번에 만들지 않습니다. 분산 COPY Job은 artifact range view를 사용해 Python float 목록을 만들지 않고 little-endian raw bytes를 직접 읽으며, 로컬 fallback은 기존 `batch_size=1000` 스트림을 유지합니다.
+- **재시도 멱등성**: `(staging collection UUID, global embedding index)`의 UUIDv5를 row ID로 사용합니다. 같은 shard를 재실행하면 해당 결정적 ID 범위를 한 트랜잭션에서 삭제한 뒤 COPY하므로 중복 row가 생기지 않습니다.
 - **실시간 SSE 프로그레스 이벤트 (`Server-Sent Events`)**:
   - `progress_callback({"completed_batches", "total_batches", "completed_items", "total_items"})`가 실행 상태에 저장되고 SSE 상태 갱신에 반영됩니다.
   - **React 프론트엔드 UI ([BP-402], [BP-601])**: 워크플로 실행은 `EventSource` (`GET /api/v1/runs/{id}/stream`)로 상태를 수신합니다. 인제스천 화면은 ingestion job 조회를 기준으로 상태를 표시하며, 지연 시간은 네트워크·저장소 상태에 따라 달라집니다.
@@ -88,3 +97,8 @@ WHERE collection_id = '{collection_uuid}'::uuid
    - 모든 벡터는 immutable `collection_id`로 범위를 제한하고, 컬렉션 UUID별 partial HNSW를 생성합니다. PostgreSQL 실행계획에서 해당 인덱스가 직접 선택됩니다.
    - `company_name`은 수정 가능한 JSON 메타데이터이고 현재 인덱싱 계약에는 `fiscal_year`가 필수가 아닙니다. 이를 물리 파티션 키로 쓰면 기업명 변경 시 대량 row 이동이 발생하고 연도 없는 행을 안정적으로 분배할 수 없습니다.
    - 따라서 기존 대형 테이블을 자동 재작성하는 마이그레이션은 넣지 않습니다. 향후 회계연도 메타데이터 계약이 필수화되고 컬렉션 수·쿼리 계획 벤치마크가 물리 분할의 이득을 입증할 때 온라인 마이그레이션으로 별도 도입합니다.
+4. **구현됨 — Kubernetes shard fan-out/fan-in**:
+   - `ingestion_shards`가 embedding과 vector COPY work item의 queue, lease, heartbeat, retry 상태를 저장합니다.
+   - 부모 workflow Job은 child shard barrier를 기다리면서 진행률과 실행/대기 Job 수를 SSE 상태에 기록합니다.
+   - embedding part는 순서대로 하나의 content-addressed artifact로 결합하고, COPY 완료 후 document count를 검증한 뒤 HNSW와 collection publish를 한 번만 수행합니다.
+   - publish 후 operation advisory lock 안에서 part vector와 shard manifest를 제거해 canonical artifact와 PostgreSQL collection만 남깁니다.

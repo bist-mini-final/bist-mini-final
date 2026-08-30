@@ -43,6 +43,9 @@ def workflow_from_job(
         id=workflow_id or job.job_id,
         name=job.name,
         updated_at=CANONICAL_UPDATED_AT,
+        kind="standard",
+        editable=False,
+        template=job.template,
         graph=WorkflowGraph(
             nodes=nodes,
             edges=[

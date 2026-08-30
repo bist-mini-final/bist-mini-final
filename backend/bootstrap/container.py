@@ -24,6 +24,10 @@ from backend.engine.workflows import WorkflowExecutionService
 from backend.features.bi.api_services import BiApiServices
 from backend.features.bi.composition import create_bi_services
 from backend.features.chatbot.suggestions import ChatSuggestionService
+from backend.features.company_comparison.composition import (
+    create_company_comparison_service,
+)
+from backend.features.company_comparison.service import CompanyComparisonService
 from backend.providers.embeddings.openai import OpenAIEmbeddingEncoder
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.kubernetes_monitor import KubernetesMonitor
@@ -143,6 +147,7 @@ class DomainServicesContainer:
     """Own product-facing services without HTTP or process lifecycle concerns."""
 
     bi_services: BiApiServices
+    company_comparison: CompanyComparisonService
     chat_suggestions: ChatSuggestionService
     job_monitor: KubernetesMonitor
 
@@ -154,6 +159,10 @@ class DomainServicesContainer:
         bi_services = create_bi_services(runtime.services.module_registry)
         return cls(
             bi_services=bi_services,
+            company_comparison=create_company_comparison_service(
+                bi_services.store,
+                database_url=runtime.services.db_manager.database_url,
+            ),
             chat_suggestions=ChatSuggestionService(
                 runtime.services.db_manager,
                 bi_services,

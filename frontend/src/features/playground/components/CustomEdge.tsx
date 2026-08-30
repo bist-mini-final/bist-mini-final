@@ -129,6 +129,8 @@ export const CustomEdge: React.FC<EdgeProps> = ({
 
   return (
     <g
+      className="workflow-edge"
+      data-execution-state={isActive ? 'active' : isDone ? 'done' : 'idle'}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -179,6 +181,19 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
       />
+
+      {/* A moving dash overlay keeps in-flight work visible at low zoom. */}
+      {isActive && (
+        <path
+          d={edgePath}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeLinecap="round"
+          className="workflow-edge__activity-path"
+          aria-hidden="true"
+        />
+      )}
       <path
         d={edgePath}
         fill="none"
@@ -220,8 +235,15 @@ export const CustomEdge: React.FC<EdgeProps> = ({
 
       {/* Animated packet when active */}
       {isActive && (
-        <circle r="4" fill={color}>
-          <animateMotion dur="1.2s" repeatCount="indefinite" path={edgePath} />
+        <circle
+          r="5"
+          fill={color}
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          className="workflow-edge__packet"
+          aria-hidden="true"
+        >
+          <animateMotion dur="0.9s" repeatCount="indefinite" path={edgePath} />
         </circle>
       )}
     </g>

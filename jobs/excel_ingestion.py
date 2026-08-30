@@ -13,6 +13,7 @@ EXCEL_INGESTION_JOB = DagJobDefinition(
     ),
     queue_name="workflow-core",
     version="2",
+    template=True,
     nodes=(
         JobNode("source", "processed_file_selector"),
         JobNode("structure", "luna_vlm_structure_detector"),

@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum, unique
 from typing import assert_never
 
 from pydantic import Field, field_validator
@@ -49,6 +50,33 @@ class BiCompanyListResponse(BiContractModel):
             tuple[BiCompanySummary, ...]: Company summaries that should appear in the dashboard list.
         """
         return tuple(company for company in companies if _should_list_company(company))
+
+
+@unique
+class BiMaterializationCandidateReason(StrEnum):
+    """Why an indexed company needs a BI snapshot materialization."""
+
+    NOT_CREATED = "not_created"
+    SOURCE_CHANGED = "source_changed"
+    FAILED = "failed"
+
+
+class BiMaterializationCandidate(BiContractModel):
+    """Indexed company that can be explicitly added to the BI dashboard."""
+
+    company_id: CompanyId = Field(..., description="기업 고유 식별자")
+    display_name: str = Field(..., description="기업 표시명")
+    source: BiMaterializationSource = Field(..., description="스냅샷 생성에 사용할 최신 인덱스")
+    reason: BiMaterializationCandidateReason = Field(..., description="스냅샷 생성 필요 사유")
+
+
+class BiMaterializationCandidateListResponse(BiContractModel):
+    """Companies excluded from the dashboard list but eligible for materialization."""
+
+    candidates: tuple[BiMaterializationCandidate, ...] = Field(
+        ...,
+        description="사용자가 명시적으로 BI 스냅샷을 생성할 수 있는 기업 목록",
+    )
 
 
 class BiDashboardPendingResponse(BiContractModel):

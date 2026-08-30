@@ -1,4 +1,4 @@
-import type { LeagueCompany } from './leagueTypes';
+import type { ComparisonCompany } from './types';
 
 export type RankingMetric =
   | 'composite'
@@ -10,7 +10,7 @@ export type RankingMetric =
 export type DisplayDirection = 'best-first' | 'worst-first';
 
 export interface RankedCompany {
-  readonly company: LeagueCompany;
+  readonly company: ComparisonCompany;
   readonly rank: number;
   readonly metricValue: number;
 }
@@ -19,18 +19,18 @@ export const RANKING_METRICS: Readonly<Record<RankingMetric, { readonly label: s
   composite: { label: '종합점수', shortLabel: '종합' },
   revenue: { label: '매출액', shortLabel: '매출' },
   operatingIncome: { label: '영업이익', shortLabel: '영업이익' },
-  revenueCagr: { label: '5개년 매출 성장률', shortLabel: '성장률' },
+  revenueCagr: { label: '관측 구간 매출 성장률', shortLabel: '성장률' },
   operatingMargin: { label: '영업이익률', shortLabel: '이익률' },
 };
 
-export function latestHistoricalCandle(company: LeagueCompany) {
-  return [...company.candles]
-    .filter((candle) => candle.periodType === 'historical')
+export function latestHistoricalPeriod(company: ComparisonCompany) {
+  return [...company.periods]
+    .filter((period) => period.periodType === 'historical')
     .sort((left, right) => right.year - left.year)[0];
 }
 
-export function metricValue(company: LeagueCompany, metric: RankingMetric): number {
-  const latest = latestHistoricalCandle(company);
+export function metricValue(company: ComparisonCompany, metric: RankingMetric): number {
+  const latest = latestHistoricalPeriod(company);
   switch (metric) {
     case 'composite':
       return company.compositeScore;
@@ -45,13 +45,13 @@ export function metricValue(company: LeagueCompany, metric: RankingMetric): numb
   }
 }
 
-function compareMetric(left: LeagueCompany, right: LeagueCompany, metric: RankingMetric): number {
+function compareMetric(left: ComparisonCompany, right: ComparisonCompany, metric: RankingMetric): number {
   return metricValue(right, metric) - metricValue(left, metric);
 }
 
 /** Competition ranking for the selected metric: equal values share a rank (1, 2, 2, 4). */
 export function rankCompaniesByMetric(
-  companies: readonly LeagueCompany[],
+  companies: readonly ComparisonCompany[],
   metric: RankingMetric,
 ): readonly RankedCompany[] {
   const meritOrder = [...companies].sort((left, right) => compareMetric(left, right, metric));
@@ -66,13 +66,19 @@ export function rankCompaniesByMetric(
 
 /** Official composite-score ranking used by the fixed TOP 3 summary. */
 export function rankCompaniesByComposite(
-  companies: readonly LeagueCompany[],
+  companies: readonly ComparisonCompany[],
 ): readonly RankedCompany[] {
-  return rankCompaniesByMetric(companies, 'composite');
+  return [...companies]
+    .sort((left, right) => left.rank - right.rank || right.compositeScore - left.compositeScore)
+    .map((company) => ({
+      company,
+      rank: company.rank,
+      metricValue: company.compositeScore,
+    }));
 }
 
 function metricRankAt(
-  companies: readonly LeagueCompany[],
+  companies: readonly ComparisonCompany[],
   index: number,
   metric: RankingMetric,
 ): number {

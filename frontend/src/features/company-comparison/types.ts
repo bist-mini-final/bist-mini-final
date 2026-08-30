@@ -1,23 +1,23 @@
 export type FinancialTier = 'S' | 'A' | 'B' | 'C';
 
-export interface FinancialCandle {
+export interface ComparisonPeriod {
   readonly year: number;
   readonly periodType: 'historical' | 'forecast';
-  readonly open: number;
-  readonly high: number;
-  readonly low: number;
-  readonly close: number;
   readonly revenue: number;
   readonly operatingIncome: number;
   readonly operatingMargin: number;
-  readonly evidenceId: string;
+  readonly evidenceIds: readonly string[];
+  readonly assumptionId: string | null;
 }
 
-export interface LeagueCompany {
+export interface ComparisonCompany {
   readonly companyId: string;
   readonly displayName: string;
   readonly currency: string;
   readonly scale: 'ones' | 'thousands' | 'millions' | 'billions';
+  readonly sourceSnapshotId: string;
+  readonly historicalStartYear: number;
+  readonly historicalEndYear: number;
   readonly rank: number;
   readonly previousRank: number;
   readonly rankChange: number;
@@ -31,36 +31,58 @@ export interface LeagueCompany {
   readonly netDebt: number;
   readonly netDebtToRevenue: number;
   readonly tier: FinancialTier;
-  readonly candles: readonly FinancialCandle[];
+  readonly periods: readonly ComparisonPeriod[];
 }
 
-export interface LeagueEvidence {
+export interface ComparisonEvidence {
   readonly evidenceId: string;
   readonly companyId: string;
+  readonly metricId: string;
+  readonly year: number | null;
   readonly fileName: string;
   readonly sheetName: string;
   readonly cellCoord: string;
   readonly sourceText: string;
-  readonly origin: 'snapshot' | 'rag';
+  readonly origin: 'bi_snapshot';
 }
 
-export interface LeagueDistributionBucket {
+export interface ComparisonDistributionBucket {
   readonly label: string;
   readonly count: number;
 }
 
-export interface FinancialLeagueResponse {
+export interface CompanyComparisonSnapshot {
   readonly schemaVersion: 1;
-  readonly generatedAt: string;
-  readonly historicalEndYear: 2025;
-  readonly companies: readonly LeagueCompany[];
+  readonly snapshot: {
+    readonly snapshotId: string;
+    readonly status: 'ready' | 'partial';
+    readonly generatedAt: string;
+    readonly sourceFingerprint: string;
+    readonly sourceSnapshotIds: readonly string[];
+    readonly scoringVersion: string;
+    readonly forecastVersion: string;
+  };
+  readonly historicalStartYear: number;
+  readonly historicalEndYear: number;
+  readonly forecastEndYear: number;
+  readonly companies: readonly ComparisonCompany[];
   readonly spotlight: {
     readonly leaderCompanyId: string;
     readonly riserCompanyId: string;
     readonly averageCagr: number;
     readonly averageMargin: number;
-    readonly cagrDistribution: readonly LeagueDistributionBucket[];
-    readonly marginDistribution: readonly LeagueDistributionBucket[];
+    readonly averageLiabilitiesToAssets: number;
+    readonly cagrDistribution: readonly ComparisonDistributionBucket[];
+    readonly marginDistribution: readonly ComparisonDistributionBucket[];
   };
-  readonly evidence: readonly LeagueEvidence[];
+  readonly evidence: readonly ComparisonEvidence[];
+  readonly exclusions: readonly {
+    readonly companyId: string;
+    readonly displayName: string;
+    readonly reasons: readonly string[];
+  }[];
+  readonly assumptions: readonly {
+    readonly assumptionId: string;
+    readonly description: string;
+  }[];
 }

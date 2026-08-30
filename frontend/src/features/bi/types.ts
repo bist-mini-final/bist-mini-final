@@ -69,6 +69,17 @@ export interface BiCompanyListResponse {
   readonly companies: readonly BiCompanySummary[];
 }
 
+export type BiMaterializationCandidateReason = 'not_created' | 'source_changed' | 'failed';
+
+export interface BiMaterializationCandidate extends BiCompany {
+  readonly source: BiMaterializationSource;
+  readonly reason: BiMaterializationCandidateReason;
+}
+
+export interface BiMaterializationCandidateListResponse {
+  readonly candidates: readonly BiMaterializationCandidate[];
+}
+
 export interface BiMaterializationJob {
   readonly jobId: string;
   readonly companyId: string;

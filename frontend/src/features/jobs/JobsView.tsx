@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Boxes, CheckCircle2, CircleAlert, Clock3, RefreshCw } from 'lucide-react';
+import { Button, StatusBadge } from '../../shared/ui';
 import { jobsApi } from './api';
 import type {
   KubernetesResourceSummary,
@@ -58,9 +59,9 @@ function ResourceTable({
                   <small>{resource.kind}</small>
                 </td>
                 <td>
-                  <span className="jobs-status" data-status={resource.status.toLowerCase()}>
+                  <StatusBadge tone={resource.ready ? 'success' : resource.failed ? 'danger' : 'neutral'}>
                     {resource.status}
-                  </span>
+                  </StatusBadge>
                 </td>
                 <td>{resource.ready == null ? '-' : resource.ready ? '예' : '아니요'}</td>
                 <td>{resource.succeeded ?? 0} / {resource.failed ?? 0}</td>
@@ -95,7 +96,7 @@ function LeaseTable({ runs }: { runs: WorkflowLeaseSummary[] }) {
               <tr key={run.run_id}>
                 <td><strong>{run.run_id}</strong><small>{run.workflow_id}</small></td>
                 <td>{run.queue_name}<small>priority {run.priority}</small></td>
-                <td><span className="jobs-status" data-status={run.lease_stale ? 'failed' : run.status.toLowerCase()}>{run.lease_stale ? 'Lease stale' : run.status}</span>{run.cancel_requested ? <small>취소 요청됨</small> : null}</td>
+                <td><StatusBadge tone={run.lease_stale ? 'danger' : run.status === 'running' ? 'success' : 'neutral'}>{run.lease_stale ? 'Lease stale' : run.status}</StatusBadge>{run.cancel_requested ? <small>취소 요청됨</small> : null}</td>
                 <td>{run.worker_id ?? '-'}<small>{run.kubernetes_resource ?? 'K8s 미연결'}</small></td>
                 <td>{duration(run.heartbeat_age_seconds)} 경과<small>TTL {duration(run.lease_ttl_seconds)} · {formattedTime(run.heartbeat_at)}</small></td>
                 <td>{run.attempt_count}</td>
@@ -155,10 +156,10 @@ export function JobsView() {
           <h1>Kubernetes 작업 관제</h1>
           <p>KEDA ScaledJob과 배치 Job, Pod의 현재 상태를 5초마다 갱신합니다.</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={isLoading}>
+        <Button type="button" busy={isLoading} onClick={() => void load()} disabled={isLoading}>
           <RefreshCw size={15} className={isLoading ? 'jobs-spin' : ''} />
           새로고침
-        </button>
+        </Button>
       </header>
 
       {error && (

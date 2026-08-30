@@ -17,8 +17,10 @@ from backend.engine.workflows import (
     ActiveWorkflowRunsError,
     DagExecutionError,
     RunStore,
+    WorkflowDocument,
     WorkflowExecutionPort,
     WorkflowExecutionRequest,
+    WorkflowRun,
     WorkflowSaveRequest,
     WorkflowStore,
 )
@@ -27,7 +29,9 @@ from backend.engine.workflows import (
 class WorkflowListResponse(BaseModel):
     """저장된 전체 DAG 워크플로 정의 목록 응답 DTO."""
 
-    workflows: List[Dict[str, Any]] = Field(..., description="저장된 전체 DAG 워크플로 목록")
+    workflows: List[WorkflowDocument] = Field(
+        ..., description="표준/사용자 메타데이터를 포함한 전체 DAG 워크플로 목록"
+    )
 
 
 class WorkflowDeleteResponse(BaseModel):
@@ -39,7 +43,7 @@ class WorkflowDeleteResponse(BaseModel):
 class RunListResponse(BaseModel):
     """워크플로 실행 요약 기록 목록 응답 DTO."""
 
-    runs: List[Dict[str, Any]] = Field(..., description="워크플로 실행 기록 목록")
+    runs: List[WorkflowRun] = Field(..., description="워크플로 실행 기록 목록")
 
 
 def create_workflow_router(

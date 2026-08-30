@@ -179,7 +179,13 @@ def test_context_expander_restores_values_hidden_by_header_only_variants() -> No
         8: [
             {
                 "col_index": 3,
+                "cell_id": "Financials:C8",
+                "cell_coord": "C8",
+                "sheet_name": "Financials",
                 "cell_value": "120",
+                "row_header": ["Revenue"],
+                "column_header": ["FY2025"],
+                "company_name": "Example Corp",
                 "source_text": (
                     "Company: Example Corp | Sheet: Financials | "
                     "Row Header: Revenue | Column Header: FY2025 | Cell Value: ?"
@@ -210,7 +216,80 @@ def test_context_expander_restores_values_hidden_by_header_only_variants() -> No
 
     assert any("Cell Value: 120" in item for item in result["items"])
     assert "cells" in result
-    assert len(result["cells"]) >= 1
+    assert len(result["cells"]) == 1
+    assert "Cell Value: ?" not in result["cells"][0]["source_text"]
+
+
+def test_context_expander_canonicalizes_legacy_company_and_title_headers() -> None:
+    store = MagicMock()
+    store.fetch_rows_cells.return_value = {
+        23: [
+            {
+                "col_index": 15,
+                "cell_id": "IS Cell O23",
+                "cell_coord": "O23",
+                "sheet_name": "Income_Statement",
+                "cell_value": "62753",
+                "row_header": [
+                    "International Business Machines Corporation",
+                    "Source: S&P Capital IQ Pro",
+                    "Data in ($M)",
+                    "Fiscal Year Ended,",
+                    "LTM",
+                    "Total Revenue",
+                ],
+                "column_header": ["2024-12-31"],
+                "company_name": "IBM",
+                "source_text": (
+                    "Sheet: Income_Statement | Row Header: International Business "
+                    "Machines Corporation > Source: S&P Capital IQ Pro > Data in ($M) > "
+                    "Fiscal Year Ended, > LTM > Total Revenue | Column Header: "
+                    "2024-12-31 | Cell Value: 62753"
+                ),
+            }
+        ]
+    }
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(question_id="q-ibm", question_text="IBM 2024 총매출"),
+        document_context=DocumentContextDTO(
+            file_name="ibm.xlsx",
+            workbook_hash="hash-ibm",
+            index_id="ibm-index",
+            company_name="IBM",
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="ibm-index",
+                cell_id="IS Cell O23",
+                rrf_score=0.9,
+                text=(
+                    "Sheet: Income_Statement | Row Header: Total Revenue | "
+                    "Column Header: 2024-12-31 | Cell Value: ?"
+                ),
+                matched_subquery="Total Revenue 2024",
+            )
+        ],
+    )
+
+    result = PgContextExpanderModule(store).run(
+        PgContextExpanderInputDTO(retrieval_json=retrieval)
+    )
+
+    expected = (
+        "Company: IBM | Sheet: Income_Statement | Row Header: Total Revenue | "
+        "Column Header: 2024-12-31 | Cell Value: 62753"
+    )
+    assert expected in result["items"]
+    assert result["cells"] == [
+        {
+            "cell_id": "IS Cell O23",
+            "sheet_name": "Income_Statement",
+            "cell_coord": "O23",
+            "source_text": expected,
+            "cell_value": "62753",
+        }
+    ]
 
 
 def test_context_expander_collects_expanded_cell_metadata() -> None:

@@ -66,6 +66,11 @@ from langchain_core.tools import ArgsSchema, BaseTool
 from pydantic import BaseModel, Field
 
 from backend.storage.pgvector_store import PgVectorStore
+from backend.storage.spreadsheets.structured_cell_text import (
+    extract_resolved_cell_value,
+    resolved_cell_value,
+    serialize_structured_cell,
+)
 from modules.common.base_llm import (
     ApiUsageDTO,
     BaseLLMModule,
@@ -95,7 +100,11 @@ def _citation_ready_cells(cells: list[dict[str, Any]]) -> list[dict[str, str]]:
         sheet = str(cell.get("sheet_name") or "").strip()
         coord = str(cell.get("cell_coord") or "").strip().upper()
         source = str(cell.get("source_text") or "").strip()
-        if not sheet or not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", coord):
+        if (
+            not sheet
+            or not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", coord)
+            or extract_resolved_cell_value(source) is None
+        ):
             continue
         key = (sheet, coord)
         if key in seen:
@@ -103,6 +112,13 @@ def _citation_ready_cells(cells: list[dict[str, Any]]) -> list[dict[str, str]]:
         seen.add(key)
         evidence.append({"sheet": sheet, "coord": coord, "source": source})
     return evidence
+
+
+def _header_values(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple)):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value or "").strip()
+    return [text] if text else []
 
 
 def _render_evidence_cells(cells: list[dict[str, str]]) -> str:
@@ -337,20 +353,31 @@ class LookupCellMetadataTool(BaseTool):
 
         lines = []
         for cell in fetched:
-            row_header = " > ".join(cell.get("row_header", [])) if cell.get("row_header") else "N/A"
-            column_header = (
-                " > ".join(cell.get("column_header", [])) if cell.get("column_header") else "N/A"
+            value = resolved_cell_value(cell.get("cell_value")) or extract_resolved_cell_value(
+                cell.get("source_text")
             )
-            value = cell.get("cell_value", "(empty)")
+            if value is None:
+                continue
+            row_headers = _header_values(cell.get("row_header"))
+            column_headers = _header_values(cell.get("column_header"))
+            row_header = " > ".join(row_headers) if row_headers else "N/A"
+            column_header = " > ".join(column_headers) if column_headers else "N/A"
             company = cell.get("company_name") or target_company or "Company"
             sheet = cell.get("sheet_name") or target_sheet or "Sheet"
             coordinate = cell.get("cell_coord", "")
+            source_text = serialize_structured_cell(
+                str(sheet),
+                row_headers,
+                column_headers,
+                value,
+                company_name=str(company),
+            )
             lines.append(
                 f"- [{company}!{sheet}!{coordinate}] Row: {row_header} | "
                 f"Col: {column_header} | Value: {value} | "
-                f"Full: {cell.get('source_text', '')}"
+                f"Full: {source_text}"
             )
-        return "\n".join(lines)
+        return "\n".join(lines) or "No value-bearing cells found in PostgreSQL metadata."
 
     def _run(
         self,
@@ -500,7 +527,7 @@ class ReaderModule(BaseLLMModule):
             "enable_tools",
             "max_tool_iterations",
         ],
-        version="5",
+        version="6",
     )
     input_model = ReaderInputDTO
     config_model = ReaderConfigDTO
@@ -536,10 +563,14 @@ class ReaderModule(BaseLLMModule):
         query_ctx = input_data.context_json.query_context
         doc_ctx = input_data.context_json.document_context
         evidence_cells = _citation_ready_cells(input_data.context_json.cells)
+        # Search queries may intentionally contain ``Cell Value: ?``.  The
+        # Reader boundary is stricter: build both prompt sections exclusively
+        # from concrete, citable source cells and never from raw search hints.
+        reader_context = "\n\n".join(cell["source"] for cell in evidence_cells)
         user_prompt = (
             user_template.replace(
                 "{context_text}",
-                "\n\n".join(input_data.context_json.items),
+                reader_context,
             )
             .replace("{evidence_cells}", _render_evidence_cells(evidence_cells))
             .replace("{question}", query_ctx.question_text)

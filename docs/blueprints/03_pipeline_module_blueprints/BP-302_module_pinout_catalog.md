@@ -1,255 +1,80 @@
-# [BP-302] 19개 파이프라인 모듈 + 2개 BI 도메인 서비스 카탈로그
-> **Document Code:** `BP-302` | **Category:** Pipeline & Modular Contracts Blueprint | **Status:** Approved Baseline  
-> **Source Directories:** [`modules/`](file:///c:/Repos/bist-mini-final/modules/), [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)
+# [BP-302] 19개 파이프라인 모듈 핀아웃 카탈로그
+
+> **Document Code:** `BP-302` | **Category:** Pipeline Module Contracts | **Status:** Implemented & Operational
+> **Canonical Source:** [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
 
 ---
 
-## 1. 3단계 클래스 상속 계층 및 종합 핀아웃 규격 (3-Tier Inheritance & Pinout Architecture)
+## 1. 카탈로그 경계
 
-런타임에 등록되는 19개 파이프라인 모듈은 최상위 추상 클래스 [`BaseModule`](file:///c:/Repos/bist-mini-final/modules/common/base_module.py)을 정점으로 하며, 표준화된 Input Pin, Output Pin, Config Pin 인터페이스를 준수합니다. 현재 모듈 템플릿 메서드는 동기 `run/execute` 계약이며, FastAPI의 블로킹 경계는 스레드 격리하고 장시간 작업은 Kubernetes one-shot 워커에서 실행합니다.
-
-> **Canonical count:** [`ModuleRegistry`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py)가 등록하는 파이프라인 모듈은 19개입니다. `DocumentProfiler`와 `FinancialCalculator`는 각각 `backend/features/bi/document_profiler.py`, `backend/features/bi/calculator.py`에 위치한 BI 도메인 서비스이며 DAG 모듈 수에 포함하지 않습니다.
-
----
-
-### 1.1 표준 모듈 입출력 핀아웃 계약 (Pinout Interface Protocol)
-
-각 모듈은 엄격한 Pydantic 스키마를 통해 입출력 계약(Contract)을 체결하며, 파이프라인 런타임은 이 핀아웃을 기반으로 DAG 결선 유효성을 100% 사전 검증합니다:
-
-```mermaid
-graph LR
-    subgraph ModuleContract ["표준 모듈 인터페이스 (Pinout Interface)"]
-        IN["Input Pins (Pydantic InputDTO)"] --> MOD["BaseModule.run() / execute()"]
-        CFG["Config Pins (ModuleConfigDTO)"] --> MOD
-        MOD --> OUT["Output Pins (Pydantic OutputDTO)"]
-        MOD --> ERR["Error Envelope (ModuleExecutionError)"]
-    end
-```
-
-* **Input Pins (`input_model`)**: 이전 노드의 출력을 주입받는 Pydantic 입력 DTO (타입 검증 자동 수행)
-* **Config Pins (`config_model`)**: 모델명(`model`), 임계값(`top_k`), 타임아웃 등 모듈별 런타임 제어 설정값
-* **Output Pins (`output_model`)**: 후속 노드로 전달되는 결정론적 Pydantic 출력 DTO
-* **Error Envelope (`exceptions.py`)**: Pydantic 검증 실패 또는 Provider API 에러 시 표준 에러 엔벨로프로 즉시 래핑
-
----
-
-### 1.2 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
-
-LLM 호출과 임베딩 처리의 보일러플레이트는 **`BaseLLMModule`과 `BaseEmbedderModule` 중간 추상 계층**에서 공유합니다. 아래 분류도는 장기 확장 후보를 함께 표시한 참조 구조이며, 현재 런타임의 canonical 등록 목록은 `ModuleRegistry`의 19개입니다. Cross-Encoder re-ranker는 프로젝트 범위에서 제외하며 후보·등록 목록에 포함하지 않습니다.
+`ModuleRegistry`가 등록하는 실행 가능한 DAG 노드는 19개입니다. 이 수는 코드의 factory 등록 목록을 기준으로 하며 문서상 후보 모듈을 포함하지 않습니다. BI, 챗봇, 벤치마크, Company Comparison은 사용자 유스케이스를 조율하는 제품 도메인 서비스이므로 모듈 수에 포함하지 않습니다.
 
 ```mermaid
 classDiagram
     class BaseModule {
-        <<Abstract Root>>
-        +input_model: Type[ModuleInputDTO]
-        +config_model: Type[ModuleConfigDTO]
-        +output_model: Type[ModuleDTO]
         +definition: ModuleDefinition
-        +execute_async(input_data, config)*
-        +run(input_data, config) Template Method
+        +input_model
+        +config_model
+        +output_model
+        +run()
+        +run_async()
     }
-
     class BaseLLMModule {
-        <<Abstract Intermediate>>
-        +complete_structured(response_model, prompt)
-        +complete_text(prompt, system_prompt)
-        +complete_agentic(tools, max_turns)
-        +calculate_token_cost_usd(usage)
+        +complete_structured()
+        +complete_structured_async()
+        +complete_text()
     }
-
-    class BaseEmbedderModule {
-        <<Abstract Intermediate>>
-        +encode_texts(texts, dimension=3072)
-        +encode_batches_streaming(texts, batch_size)
+    class BaseEmbeddingModule {
+        +encode_texts()
+        +encode_texts_async()
     }
-
-    class PureAlgorithmModules {
-        <<8 Modules>>
-        QueryInput, QueryRouter, CellTextSerializer,
-        PgVectorRetriever, SparseBm25Retriever,
-        RrfFuser, ContextExpander, FinancialCalculator
-    }
-
-    class LLMInferenceModules {
-        <<11 Modules>>
-        Decomposer, MultiQueryExpander, HydeGenerator,
-        LunaVlmStructureDetector, DocumentProfiler,
-        CompanyEntityExtractor, Reader, AgenticReasoner,
-        ContextCompressor, FactChecker, ConfidenceScorer
-    }
-
-    class EmbeddingModules {
-        <<1 Module>>
-        TextEmbedder
-    }
-
-    BaseModule <|-- BaseLLMModule : Inherits
-    BaseModule <|-- BaseEmbedderModule : Inherits
-    BaseModule <|-- PureAlgorithmModules : Directly Inherits
-    BaseLLMModule <|-- LLMInferenceModules : Inherits
-    BaseEmbedderModule <|-- EmbeddingModules : Inherits
+    BaseModule <|-- BaseLLMModule
+    BaseModule <|-- BaseEmbeddingModule
 ```
 
----
+- `BaseModule`은 Pydantic 입출력·설정 검증, 공통 오류 분류와 실행 telemetry를 담당합니다.
+- `BaseLLMModule`은 OpenAI Responses 구조화·텍스트 호출을 공유합니다.
+- `BaseEmbeddingModule`은 임베딩 차원 검증과 동기·비동기 인코딩을 공유합니다.
+- 네이티브 async 구현이 없는 동기 모듈은 실행기가 worker thread에 격리합니다.
 
-### 1.3 장기 확장 목표 모듈 분류 매트릭스
+## 2. 현재 등록 목록
 
-이 절의 분류는 Agentic Reasoner 등 향후 후보를 포함한 To-Be 카탈로그입니다. 현재 실행 가능한 모듈 수나 API 응답 수를 의미하지 않습니다. `retrieval.cross_encoder_reranker`는 범위 제외 결정에 따라 후보와 구현 계획에서 제거합니다.
+| 번호 | module type | 구현 클래스·파일 | 상속 | 역할 |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | `query_input` | `QueryInputModule` · `modules/query/query_input.py` | `BaseModule` | 사용자 질의를 표준 입력 DTO로 변환 |
+| 2 | `decomposer` | `DecomposerModule` · `modules/query/decomposer.py` | `BaseLLMModule` | 복합 질의를 하위 질의로 분해 |
+| 3 | `llm_query_router` | `LlmQueryRouterModule` · `modules/query/llm_query_router.py` | `BaseLLMModule` | 질의 의도와 실행 분기 결정 |
+| 4 | `semantic_query_matcher` | `SemanticQueryMatcherModule` · `modules/query/semantic_query_matcher.py` | `BaseModule` | 평가 예제 임베딩 기반 fast path 판정 |
+| 5 | `embedder` | `EmbedderModule` · `modules/embedding/query_embedder.py` | `BaseEmbeddingModule` | 검색 질의 임베딩 생성 |
+| 6 | `pgvector_data_scope` | `PgVectorDataScopeModule` · `modules/storage/pgvector_data_scope.py` | `BaseModule` | 컬렉션·기업·시트 검색 범위 결정 |
+| 7 | `pgvector_retriever` | `PgVectorRetrieverModule` · `modules/retrieval/pgvector_retriever.py` | `BaseModule` | pgvector Dense 검색 |
+| 8 | `postgres_native_keyword_retriever` | `PostgresNativeKeywordRetrieverModule` · `modules/retrieval/postgres_native_keyword_retriever.py` | `BaseModule` | PostgreSQL Full-Text keyword 검색 |
+| 9 | `rrf_fusion` | `RrfFusionModule` · `modules/retrieval/rrf_fusion.py` | `BaseModule` | Dense·keyword 결과 RRF 융합 |
+| 10 | `pg_context_expander` | `PgContextExpanderModule` · `modules/retrieval/context_expander.py` | `BaseModule` | 원본 셀 주변 2D 문맥 확장 |
+| 11 | `cell_text_embedder` | `CellTextEmbedderModule` · `modules/embedding/cell_text_embedder.py` | `BaseEmbeddingModule` | 직렬화된 셀 배치 임베딩 |
+| 12 | `pgvector_index_writer` | `PgVectorIndexWriterModule` · `modules/storage/pgvector_index_writer.py` | `BaseModule` | 임베딩 아티팩트 Binary COPY 색인 |
+| 13 | `processed_file_selector` | `ProcessedFileSelectorModule` · `modules/storage/processed_file_selector.py` | `BaseModule` | 처리할 워크북 선택·해시 확인 |
+| 14 | `luna_vlm_structure_detector` | `LunaVlmStructureDetectorModule` · `modules/structure/luna_vlm_structure_detector.py` | `BaseModule` | 외부 vision client로 시트 구조 감지 |
+| 15 | `cell_text_serializer` | `CellTextSerializerModule` · `modules/structure/cell_text_serializer.py` | `BaseModule` | 셀 좌표와 헤더를 검색 텍스트로 직렬화 |
+| 16 | `company_entity_extractor` | `CompanyEntityExtractorModule` · `modules/storage/company_entity_extractor.py` | `BaseLLMModule` | 워크북 기업 식별 정보 추출 |
+| 17 | `sheet_metadata_persistence` | `SheetMetadataPersistenceModule` · `modules/storage/sheet_metadata_persistence.py` | `BaseModule` | 시트·구조 메타데이터 저장 |
+| 18 | `qa_example_loader` | `QaExampleLoaderModule` · `modules/storage/qa_example_loader.py` | `BaseModule` | Ground-Truth Q&A 평가셋 로드 |
+| 19 | `reader` | `ReaderModule` · `modules/reader/reader.py` | `BaseLLMModule` | 검색 문맥으로 근거 기반 답변 생성 |
 
-| 상속 부모 클래스 | 모듈 개수 | 소속 모듈 목록 | 부모 클래스 제공 핵심 메서드 및 역할 |
-| :--- | :---: | :--- | :--- |
-| **`BaseLLMModule`** | **11개** | • `query.decomposer`<br>• `query.multi_query_expander`<br>• `query.hyde_generator`<br>• `structure.luna_vlm_structure_detector`<br>• `structure.document_profiler`<br>• `storage.company_entity_extractor`<br>• `generation.reader`<br>• `generation.agentic_reasoner`<br>• `generation.context_compressor`<br>• `generation.fact_checker`<br>• `generation.confidence_scorer` | • `complete_structured(...)` (1-Shot Pydantic 파싱)<br>• `complete_agentic(...)` (LangChain BaseTool 루프)<br>• 토큰 사용량/비용(USD)/지연시간 자동 집계 |
-| **`BaseEmbedderModule`** | **1개** | • `retrieval.text_embedder` | • `encode_texts(...)` (배치 임베딩 & 3072d 검증)<br>• `encode_batches_streaming(...)` (스트리밍 인코딩) |
-| **`BaseModule` (직접)** | **7개** | • `query.query_input`<br>• `query.llm_query_router`<br>• `structure.cell_text_serializer`<br>• `retrieval.pgvector_retriever`<br>• `retrieval.sparse_bm25_retriever`<br>• `retrieval.rrf_fuser`<br>• `retrieval.context_expander` | • 결정론적 알고리즘·검색·I/O 실행 (`run/execute`)<br>• Pydantic DTO 검증 및 중앙화 예외 가드 |
+정확한 Input·Config·Output JSON Schema는 실행 중인 API의 `GET /api/v1/modules`, `GET /api/v1/modules/{module_type}`, `GET /api/v1/modules/schemas`를 단일 계약으로 사용합니다. 문서에 DTO 필드를 중복 복사하지 않아 코드 변경과의 드리프트를 방지합니다.
 
----
+## 3. 제품 도메인 서비스와의 관계
 
-## 2. 모듈별 상세 핀아웃 명세 (Detailed Module Specifications)
+| 도메인 | 주요 서비스 | 모듈과의 관계 |
+| :--- | :--- | :--- |
+| BI | `DocumentProfiler`, `QuestionPipeline`, `FinancialCalculator`, `PostgresBiStore` | 필요 시 등록 모듈을 포트로 조합하지만 BI DTO·스냅샷 수명주기는 독립 |
+| Chat | 세션 repository, suggestion service, durable RAG run | 워크플로 run을 등록하고 완료 결과를 메시지로 동기화 |
+| Benchmark | benchmark job service·worker | 평가셋을 대상으로 워크플로를 반복 실행 |
+| Company Comparison | `CompanyComparisonSnapshotBuilder`, `CompanyComparisonService` | BI current snapshot을 읽고 별도 비교 버전을 발행; DAG 모듈 아님 |
 
-### [Group A: 질의 처리 및 라우팅 모듈 (Query & Routing)]
+## 4. 변경 규칙
 
-#### 1. `QueryInputModule` (`query.query_input`)
-- **역할**: 사용자 자연어 질의 접수 및 기본 파라미터(대상 기업, 기간) 패키징.
-- **Input Pins**: `query: str` (필수), `company_name: Optional[str]`, `target_year: Optional[str]`
-- **Output Pins**: `query: str`, `company_name: str`, `target_year: str`, `timestamp: str`
-- **Config Pins**: `normalize_whitespace: bool = True`
-
-#### 2. `DecomposerModule` (`query.decomposer`)
-- **역할**: 복합 재무 질의를 원자적 하위 질의(Sub-queries)로 분해 (예: "삼성전자 2023년 영업이익률은?" -> "2023년 매출액", "2023년 영업이익").
-- **Input Pins**: `query: str`
-- **Output Pins**: `sub_queries: List[str]`, `reasoning: str`
-- **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_sub_queries: int = 4`
-
-#### 3. `LlmQueryRouterModule` (`query.llm_query_router`)
-- **역할**: 질의 유형에 따라 직접 검색(Search), BI 수식 계산(Calculation), 메타데이터 조회(Metadata) 경로로 라우팅.
-- **Input Pins**: `query: str`, `sub_queries: Optional[List[str]]`
-- **Output Pins**: `route_type: Literal["vector_search", "bi_formula", "direct_sql"]`, `confidence: float`
-- **Config Pins**: `temperature: float = 0.0`
-
-#### 4. `SemanticQueryMatcherModule` (`query.semantic_query_matcher`)
-- **역할**: 기존 질의 캐시 및 사전 계산된 정답지 임베딩과 유사도를 비교하여 Fast-Path 제공.
-- **Input Pins**: `query: str`, `query_embedding: List[float]`
-- **Output Pins**: `is_matched: bool`, `matched_answer: Optional[str]`, `similarity_score: float`
-- **Config Pins**: `threshold: float = 0.95`
-
----
-
-### [Group B: 임베딩 및 색인 모듈 (Embedding & Indexing)]
-
-#### 5. `EmbedderModule` (`embedding.query_embedder`)
-- **역할**: 텍스트 질의를 3072차원 부동소수점 벡터로 변환.
-- **Input Pins**: `query: str`
-- **Output Pins**: `query_embedding: List[float]`, `dimension: int`
-- **Config Pins**: `model: str = "text-embedding-3-large"`
-
-#### 6. `CellTextEmbedderModule` (`embedding.cell_text_embedder`)
-- **역할**: 직렬화된 엑셀 셀 청크 리스트를 일괄 배치 임베딩하여 아티팩트 버퍼 생성.
-- **Input Pins**: `items: List[StructuredCellItem]`
-- **Output Pins**: `embedding_artifact_path: str`, `total_embeddings: int`
-- **Config Pins**: `batch_size: int = 512`
-
-#### 7. `PgVectorIndexWriterModule` (`storage.pgvector_index_writer`)
-- **역할**: 바이너리 COPY 프로토콜을 통해 임베딩 아티팩트를 pgvector 테이블에 고속 인덱싱.
-- **Input Pins**: `embedding_artifact_path: str`, `collection_name: str`
-- **Output Pins**: `indexed_count: int`, `collection_uuid: str`, `elapsed_ms: float`
-- **Config Pins**: `batch_size: int = 1000`
-
----
-
-### [Group C: 검색 및 융합 모듈 (Retrieval & Fusion)]
-
-#### 8. `PgVectorDataScopeModule` (`storage.pgvector_data_scope`)
-- **역할**: 검색 질의 대상 기업, 시트 코드, 회계연도에 맞추어 pgvector 메타데이터 필터 조건을 생성.
-- **Input Pins**: `company_name: Optional[str]`, `sheet_code: Optional[str]`, `year: Optional[str]`
-- **Output Pins**: `filter_criteria: Dict[str, Any]`
-
-#### 9. `PgVectorRetrieverModule` (`retrieval.pgvector_retriever`)
-- **역할**: 3072차원 HNSW 코사인 유사도 기반 Dense 벡터 검색.
-- **Input Pins**: `query_embedding: List[float]`, `filter_criteria: Optional[Dict]`, `top_k: int = 10`
-- **Output Pins**: `dense_results: List[RetrievedChunk]`
-- **Config Pins**: `top_k: int = 10`, `similarity_threshold: float = 0.5`
-
-#### 10. `PostgresNativeKeywordRetrieverModule` (`retrieval.postgres_native_keyword_retriever`)
-- **역할**: PostgreSQL 네이티브 `to_tsquery` 및 GIN 인덱스를 활용한 Sparse BM25 키워드 검색.
-- **Input Pins**: `query: str`, `filter_criteria: Optional[Dict]`, `top_k: int = 10`
-- **Output Pins**: `sparse_results: List[RetrievedChunk]`
-- **Config Pins**: `top_k: int = 10`, `language: str = "simple"`
-
-#### 11. `RrfFusionModule` (`retrieval.rrf_fusion`)
-- **역할**: Dense 검색 결과와 Sparse 검색 결과를 Reciprocal Rank Fusion ($k=60$) 공식으로 결합 랭킹.
-- **Input Pins**: `dense_results: List[RetrievedChunk]`, `sparse_results: List[RetrievedChunk]`
-- **Output Pins**: `fused_results: List[RetrievedChunk]`
-- **Config Pins**: `rrf_k: int = 60`, `top_n: int = 10`
-
-#### 12. `PgContextExpanderModule` (`retrieval.context_expander`)
-- **역할**: 검색된 단일 셀을 2D 엑셀 그리드 상에서 인접 행/열 및 테이블 전체 마크다운 블록으로 확장.
-- **Input Pins**: `fused_results: List[RetrievedChunk]`, `expansion_mode: str = "row_block"`
-- **Output Pins**: `expanded_contexts: List[ExpandedContextBlock]`
-- **Config Pins**: `window_size: int = 3`, `include_table_headers: bool = True`
-
----
-
-### [Group D: 추론 및 생성 모듈 (Generation & Reader)]
-
-#### 13. `ReaderModule` (`reader.reader`)
-- **역할**: 확장된 재무 표 컨텍스트와 자연어 질의를 결합하여 수식 검증 및 근거 기반 최종 답변 생성.
-- **Input Pins**: `query: str`, `contexts: List[ExpandedContextBlock]`
-- **Output Pins**: `answer: str`, `reasoning_steps: List[str]`, `cited_cells: List[str]`, `formula_used: Optional[str]`
-- **Config Pins**: `model: str = "gpt-5.6-luna"`, `temperature: float = 0.1`
-
----
-
-### [Group E: 엑셀 전처리 및 비전 모듈 (Spreadsheet & Vision)]
-
-#### 14. `ProcessedFileSelectorModule` (`storage.processed_file_selector`)
-- **역할**: 처리 대상 디렉터리 내 유효 엑셀 워크북 목록 발견 및 해시 무결성 검사.
-- **Input Pins**: `directory_path: Optional[str]`, `file_pattern: str = "*.xlsx"`
-- **Output Pins**: `workbook_list: List[WorkbookMetadata]`
-
-#### 15. `LunaVlmStructureDetectorModule` (`structure.luna_vlm_structure_detector`)
-- **역할**: 시트 이미지 렌더링 및 GPT-5.6 Luna 기반 표 바운딩 박스 검출.
-- **Input Pins**: `file_name: str`, `workbook_hash: str`, `sheet_names: List[str]`
-- **Output Pins**: `tables: List[TableBoundary]`, `sheet_layouts: Dict[str, Any]`
-- **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_rows: int = 100`, `max_cols: int = 30`
-
-#### 16. `CellTextSerializerModule` (`structure.cell_text_serializer`)
-- **역할**: 감지된 표 기하학과 2D 그리드 셀 값을 결합하여 대칭적 검색 청크 텍스트 생성.
-- **Input Pins**: `file_name: str`, `workbook_hash: str`, `tables: List[TableBoundary]`
-- **Output Pins**: `items: List[StructuredCellItem]`, `total_cells: int`
-- **Config Pins**: `mode: str = "header_with_value"`
-
-#### 17. `CompanyEntityExtractorModule` (`storage.company_entity_extractor`)
-- **역할**: 파일명, 시트 제목, 첫 페이지 텍스트로부터 기업명(종목명), 티커, 회계연도 엔티티 추출.
-- **Input Pins**: `file_name: str`, `workbook_hash: str`
-- **Output Pins**: `company_name: str`, `ticker: Optional[str]`, `fiscal_year: str`
-
-#### 18. `SheetMetadataPersistenceModule` (`storage.sheet_metadata_persistence`)
-- **역할**: 파싱된 시트 레이아웃, 셀 수, 테이블 경계 메타데이터를 PostgreSQL `sheets` 테이블에 영속화.
-- **Input Pins**: `file_id: str`, `sheet_layouts: Dict[str, Any]`
-- **Output Pins**: `persisted_sheet_ids: List[str]`
-
-#### 19. `QaExampleLoaderModule` (`storage.qa_example_loader`)
-- **역할**: 벤치마크 평가용 Ground-Truth Q&A 데이터셋 로드.
-- **Input Pins**: `dataset_path: str`
-- **Output Pins**: `qa_examples: List[QaExample]`
-
-#### Domain Service A. `DocumentProfiler` (`backend.features.bi.document_profiler`)
-- **역할**: 엑셀 워크북의 회계기간(FY/LTM), 표시 통화(KRW/USD) 및 배율 단위(백만원/천원/원), 재무제표 시트를 1-Shot LLM 구조화 추론으로 자동 발견.
-- **Input Pins**: `workbook_hash: str` (필수), `file_name: str` (필수), `index_id: Optional[str]`, `available_sheets: Optional[List[str]]`
-- **Output Pins**: `periods: List[str]`, `currency: str`, `scale: int`, `relevant_sheets: List[str]`, `evidence_cells: List[Dict[str, Any]]`
-- **Config Pins**: `model: str = "gpt-5.6-luna"`, `max_periods: int = 5`, `temperature: float = 0.0`
-
-#### Domain Service B. `FinancialCalculator` (`backend.features.bi.calculator`)
-- **역할**: 관측된 원천 재무 수치로 현재 카탈로그의 파생 지표를 무손실 고정소수점(`Decimal`)으로 산출하고 감사 근거를 합성·바인딩.
-- **Input Pins**: `raw_metrics: Dict[str, Any]` (기간별 원천 관측 수치 맵), `evidence_cells: Optional[List[Dict[str, Any]]]` (원천 감사 셀 목록)
-- **Output Pins**: `derived_ratios: Dict[str, Any]` (현재 카탈로그에서 구현된 파생 지표와 상태 플래그), `bound_evidence: Dict[str, List[Dict[str, Any]]]` (파생 지표별 합성 감사 근거)
-- **Config Pins**: `precision: int = 4`, `categories: List[str] = ["all"]` (또는 `["profitability", "stability", "activity", "growth"]`)
-
----
-
-## 3. 리팩토링 타깃 (Refactoring Targets)
-
-1. **구현됨 — Pydantic v2 제네릭 포트 규격화**:
-   - `BaseModule[InputModelT, OutputModelT, ConfigModelT]`가 입력·출력·설정 DTO 타입 파라미터를 제공하고 `validate_config()`와 추상 `execute()` 계약을 정적으로 연결합니다. 기존 모듈은 점진적으로 구체 타입을 선언할 수 있으며 Pyright 검사를 통과합니다.
-2. **동적 플러그인 로더(Dynamic Plugin Loader)**:
-   - 신규 모듈을 `modules/` 디렉터리에 추가할 때 `registry.py`를 수동 수정하지 않고 데코레이터(`@register_module`) 기반으로 자동 스캔 및 로드되도록 개편.
+1. 모듈 추가·삭제 시 `ModuleRegistry`, Playground 목록, API contract test와 이 문서를 같은 변경에서 갱신합니다.
+2. 신규 제품 도메인 서비스를 모듈 개수에 포함하지 않습니다.
+3. 로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다. 원격 vision 모듈과 Dense + keyword + RRF 경로가 현재 기준선입니다.
+4. 자동 스캔보다 명시적 factory 등록을 유지하여 provider·storage 의존성 주입과 등록 순서를 코드 리뷰 가능하게 보존합니다.

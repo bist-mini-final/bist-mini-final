@@ -3,7 +3,6 @@ import {
   Boxes,
   ChartNoAxesCombined,
   Database,
-  GitCompareArrows,
   House,
   Scale,
   Settings,
@@ -17,9 +16,6 @@ import { SettingsPage } from '../pages/SettingsPage';
 
 const CompanyComparisonPage = lazy(() =>
   import('../pages/CompanyComparisonPage').then((module) => ({ default: module.CompanyComparisonPage }))
-);
-const CompanyComparisonV2Page = lazy(() =>
-  import('../pages/CompanyComparisonV2Page').then((module) => ({ default: module.CompanyComparisonV2Page }))
 );
 const BiPage = lazy(() =>
   import('../pages/BiPage').then((module) => ({ default: module.BiPage }))
@@ -101,18 +97,9 @@ export const APP_ROUTES: readonly AppRoute[] = [
     path: '/company-comparison',
     label: '기업 비교',
     shortLabel: 'Comparison',
-    description: '다중 기업 재무 지표 비교 분석 대시보드',
+    description: '검증된 BI 스냅샷 기반 기업 재무 순위 및 비교 분석',
     icon: Scale,
     component: CompanyComparisonPage,
-    status: 'ready',
-  },
-  {
-    path: '/company-comparison-v2',
-    label: 'AI 기업 비교',
-    shortLabel: 'AI Comparison',
-    description: '선택 기업의 RAG 근거 기반 동적 비교 분석',
-    icon: GitCompareArrows,
-    component: CompanyComparisonV2Page,
     status: 'ready',
   },
   {

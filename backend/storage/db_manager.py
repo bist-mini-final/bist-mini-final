@@ -139,6 +139,28 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     completed_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS ingestion_shards (
+    operation_id VARCHAR(128) NOT NULL,
+    phase VARCHAR(32) NOT NULL CHECK (phase IN ('embedding', 'vector_copy')),
+    shard_index INT NOT NULL CHECK (shard_index >= 0),
+    status VARCHAR(32) NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+    payload JSONB NOT NULL,
+    worker_id VARCHAR(128),
+    lease_token VARCHAR(64),
+    attempt_count INT NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    claimed_at TIMESTAMPTZ,
+    heartbeat_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    total_tokens BIGINT,
+    duration_seconds DOUBLE PRECISION,
+    error_message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (operation_id, phase, shard_index)
+);
+
 CREATE TABLE IF NOT EXISTS chat_sessions (
     session_id VARCHAR(64) PRIMARY KEY,
     client_id VARCHAR(128) NOT NULL,
@@ -230,6 +252,9 @@ CREATE INDEX IF NOT EXISTS idx_workflow_runs_queue_claim
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_stale_lease
     ON workflow_runs(queue_name, heartbeat_at)
     WHERE status = 'running' AND cancel_requested = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ingestion_shards_claim
+    ON ingestion_shards(phase, status, available_at, created_at)
+    WHERE status IN ('queued', 'running');
 CREATE INDEX IF NOT EXISTS idx_node_logs_run_id ON node_execution_logs(run_id);
 CREATE INDEX IF NOT EXISTS idx_node_logs_status ON node_execution_logs(status);
 CREATE INDEX IF NOT EXISTS idx_node_logs_pgvector_index_id

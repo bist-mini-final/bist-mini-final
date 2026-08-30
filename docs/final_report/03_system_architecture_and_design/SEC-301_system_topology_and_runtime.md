@@ -12,11 +12,10 @@
 flowchart TD
     subgraph ClientTier ["1. Client Tier (Vite + React 18 SPA)"]
         UI_PLAY["/playground (React Flow 2D DAG Sandbox)"]
-        UI_DS["/data-sources (Spreadsheet Viewer & VLM Overlay)"]
+        UI_DS["/data-sources (Files, Preview, Index and Ingestion)"]
         UI_BI["/dashboard (/bi alias, Financial BI)"]
         UI_CHAT["/chatbot (AI Financial Chatbot)"]
-        UI_COMP["/company-comparison (Peer DuPont Comparison)"]
-        UI_COMP_V2["/company-comparison-v2 (RAG Comparison)"]
+        UI_COMP["/company-comparison (Versioned Snapshot Comparison)"]
     end
 
     subgraph ApiGatewayTier ["2. API Gateway & Presentation Tier (FastAPI)"]
@@ -28,6 +27,7 @@ flowchart TD
     subgraph ExecutionTier ["3. Non-blocking Read API & Durable Job Runtime"]
         subgraph ReadApi ["Async read/calculation API"]
             BI_CALC["Async BI Snapshot Query & FinancialCalculator"]
+            COMP_CALC["CompanyComparisonSnapshotBuilder & Snapshot Head"]
         end
         subgraph DurableJobs ["Durable PostgreSQL Queue (KEDA Workers)"]
             DAG_EXEC["DAG Topology Executor (Kahn Topological Sort)"]
@@ -38,7 +38,7 @@ flowchart TD
 
     subgraph DataVisionEngine ["4. Data & Vision Processing Tier"]
         PARSER["OpenPyXL 2D Coordinate Normalizer"]
-        LUNA_VLM["GPT-5.6 Luna VLM Vision Detector"]
+        LUNA_VLM["External OpenAI Vision Structure Detector"]
         SERIALIZER["Cell Text Serializer (header_with_value)"]
         BINARY_COPY["PostgreSQL Native Binary COPY 3072d Ingestion Engine"]
     end
@@ -47,7 +47,7 @@ flowchart TD
         PG_DB[("PostgreSQL 16 Database Engine")]
         PG_VEC["pgvector 3072d HNSW Index (Cosine)"]
         PG_FTS["TSVector BM25 Full-Text Search Index"]
-        PG_TABLES["10 Relational Business Tables (workflow_runs, bi_snapshots, sheets...)"]
+        PG_TABLES["Relational Business Tables (workflow, BI, comparison snapshots, chat...)"]
         REDIS["Redis Pub/Sub: optional SSE state-change hint"]
     end
 
@@ -64,5 +64,5 @@ flowchart TD
 
 | 실행 경로 | 구동 메커니즘 | 처리 작업 성격 | 상태 전달 |
 | :--- | :--- | :--- | :--- |
-| **비차단 read/calculation** | FastAPI async route → domain service → async PostgreSQL 또는 명시적 thread boundary | • BI 대시보드 스냅샷<br>• 기업 비교·리그<br>• 파일/인덱스 조회 | HTTP 응답. BI 핫패스는 native async pool, 동기 라이브러리는 이벤트 루프 밖에서 실행 |
+| **비차단 read/calculation** | FastAPI async route → domain service → async PostgreSQL 또는 명시적 thread boundary | • BI 대시보드 스냅샷<br>• Company Comparison current/refresh<br>• 파일/인덱스 조회 | HTTP 응답. BI·비교 저장소는 native async pool, 동기 라이브러리는 이벤트 루프 밖에서 실행 |
 | **Durable job** | PostgreSQL queue + KEDA ScaledJob + lease | • 워크플로 DAG<br>• 인제스천·BI materialization/question·benchmark<br>• 채팅 RAG run | 상태 저장 후 SSE 또는 polling. Redis는 API Pod 간 SSE 갱신 신호만 전달 |

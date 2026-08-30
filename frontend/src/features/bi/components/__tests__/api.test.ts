@@ -4,6 +4,7 @@ import {
   createBiMaterialization,
   fetchBiCompanies,
   fetchBiDashboard,
+  fetchBiMaterializationCandidates,
   fetchBiMaterializationJob,
   fetchBiQuestionJob,
   refreshBiDashboard,
@@ -64,6 +65,33 @@ describe('BI API service', () => {
     const response = await fetchBiCompanies(new AbortController().signal);
 
     expect(response).toEqual({ companies: [] });
+  });
+
+  it('loads snapshot generation candidates from the dedicated endpoint', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{
+        company_id: 'acme',
+        display_name: 'ACME',
+        source: {
+          file_name: 'acme.xlsx',
+          workbook_hash: 'a'.repeat(64),
+          index_id: 'index-acme',
+        },
+        reason: 'not_created',
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    const response = await fetchBiMaterializationCandidates(new AbortController().signal);
+
+    expect(response.candidates[0]?.reason).toBe('not_created');
+    const input = fetchMock.mock.calls[0]?.[0];
+    expect(input).toBeInstanceOf(Request);
+    if (input instanceof Request) {
+      expect(new URL(input.url).pathname).toBe('/api/v1/bi/materialization-candidates');
+    }
   });
 
   it('returns a typed pending dashboard result for HTTP 202', async () => {

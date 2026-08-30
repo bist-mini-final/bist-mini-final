@@ -14,6 +14,7 @@ from typing import Optional
 from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
+    INGESTION_SHARDS_ENABLED,
     PROCESSED_DATA_DIR,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
@@ -24,6 +25,11 @@ from backend.engine.workflows.executor import WorkflowExecutor
 from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.storage.data_sources.ingestion_shards import (
+    PostgresIngestionShardRepository,
+)
+from backend.storage.data_sources.shard_artifacts import IngestionShardArtifactStore
+from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
@@ -69,10 +75,18 @@ def create_workflow_runtime_services(
         raise RuntimeError("PostgreSQL 워크플로 스키마를 초기화할 수 없습니다")
 
     pg_store = pgvector_store or PgVectorStore(database.database_url)
+    embedding_store = EmbeddingArtifactStore(embedding_artifact_dir)
+    shard_coordinator = IngestionShardCoordinator(
+        PostgresIngestionShardRepository(database.database_url),
+        IngestionShardArtifactStore(embedding_store),
+        enabled=INGESTION_SHARDS_ENABLED and database_connected,
+        pgvector_store=pg_store,
+    )
     registry = ModuleRegistry(
         completion_client=completion_client,
         embedding_encoder=embedding_encoder,
-        embedding_artifact_store=EmbeddingArtifactStore(embedding_artifact_dir),
+        embedding_artifact_store=embedding_store,
+        ingestion_shard_coordinator=shard_coordinator,
         pgvector_store=pg_store,
         db_manager=database,
         processed_dir=processed_dir,

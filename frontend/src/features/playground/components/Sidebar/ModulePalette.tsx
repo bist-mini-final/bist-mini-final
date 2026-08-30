@@ -31,6 +31,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { IconButton } from '../../../../shared/ui';
 import { MODULE_PRESENTATION, orderedModuleCategories } from '../../config/modules';
 import type { ModuleDefinition, ModuleType } from '../../types';
 import { MODULE_PANEL_MAX_WIDTH, MODULE_PANEL_MIN_WIDTH } from '../../hooks/useResizablePanel';
@@ -114,14 +115,16 @@ export function ModulePalette({
           <p>클릭하거나 캔버스로 드래그하세요</p>
         </div>
         <span className="module-count">{modules.length}</span>
-        <button
+        <IconButton
+          size="sm"
+          variant="ghost"
           className="module-palette__close"
           onClick={onClose}
           aria-label="모듈 패널 닫기"
           title="패널 닫기"
         >
           <X className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="module-palette__list">

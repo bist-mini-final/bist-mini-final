@@ -79,6 +79,39 @@
   line-height: 1.5;
 }
 
+.comparison-state-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid #f3d08a;
+  border-radius: 8px;
+  background: #fff9e9;
+  color: #714f00;
+}
+
+.comparison-state-card strong,
+.comparison-state-card p {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+}
+
+.comparison-state-card p {
+  margin-top: 2px;
+  color: #8a6a1f;
+}
+
+.comparison-forecast-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid #7c3aed;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
 .league-loading {
   display: flex;
   flex-direction: column;

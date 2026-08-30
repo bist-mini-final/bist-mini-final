@@ -49,12 +49,20 @@ def test_query_embedder_batches_by_collection_model_contract() -> None:
             return [[0.1] * dimension for _ in queries]
 
     encoder = Encoder()
+    search_subquery = SubqueryItem(
+        company="Example Corp",
+        sheet="Financials",
+        row_header="Revenue",
+        column_header="2025",
+        cell_value="?",
+    )
+    serialized_search_query = search_subquery.to_serialized_query()
     plan = RetrievalPlanDTO(
         query_context=QueryContextDTO(question_id="q1", question_text="Revenue"),
         routes=[
             RoutedSubqueryDTO(
                 subquery_index=0,
-                subquery=SubqueryItem(row_header="Revenue", text="Revenue"),
+                subquery=search_subquery,
                 collections=[
                     _scope("idx-small", "text-embedding-3-small", 1536),
                     _scope("idx-large", "text-embedding-3-large", 3072),
@@ -72,9 +80,10 @@ def test_query_embedder_batches_by_collection_model_contract() -> None:
     assert len(result["items"][0]["vector"]) == 3072
     assert len(result["items"][1]["vector"]) == 1536
     assert encoder.calls == [
-        (["Revenue"], "text-embedding-3-small"),
-        (["Revenue"], "text-embedding-3-large"),
+        ([serialized_search_query], "text-embedding-3-small"),
+        ([serialized_search_query], "text-embedding-3-large"),
     ]
+    assert "Cell Value: ?" in serialized_search_query
 
     async_result = asyncio.run(
         EmbedderModule(encoder).run_async(EmbedderInputDTO(retrieval_plan=plan))

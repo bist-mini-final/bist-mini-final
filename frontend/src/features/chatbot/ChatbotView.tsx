@@ -8,6 +8,7 @@ import { BiCardChart } from '../bi/components/charts/BiCardChart';
 import { fetchBiDashboard } from '../bi/services/api';
 import type { BiCardId, BiDashboardSnapshot } from '../bi/types';
 import { normalizeChatMarkdown } from './chatMarkdown';
+import { Button, IconButton } from '../../shared/ui';
 import '../bi/bi.css';
 import '../bi/bi-reference.css';
 import './chatbot.css';
@@ -145,5 +146,213 @@ export function ChatbotView() {
     });
   };
   const messages = active?.messages ?? [];
-  return <div className="chatbot-page"><header className="chatbot-header"><span className="chatbot-header__icon"><Bot size={22} /></span><div><span className="chatbot-header__eyebrow">FINANCIAL RAG ASSISTANT</span><h1>AI 금융 챗봇</h1><p>내 대화에서 재무 문서 기반 답변을 확인하세요.</p></div></header><div className="chatbot-layout chatbot-layout--sessions"><aside className="chatbot-sessions"><button type="button" onClick={newSession}><MessageSquarePlus size={16} /> 새 대화</button><span>내 대화</span>{sessions.map((session) => <div key={session.id} className={`chatbot-session${active?.id === session.id ? ' is-active' : ''}`} title={`최근 대화: ${formatDate(session.updated_at)}`}><button type="button" className="chatbot-session__select" onClick={() => void select(session.id)}><strong>{session.title}</strong></button><span className="chatbot-session__actions"><button type="button" aria-label={`${session.title} 제목 편집`} onClick={() => { setTitleDraft(session.title); setDialog({ type: 'rename', session }); }}><Pencil size={13} /></button><button type="button" aria-label={`${session.title} 삭제`} onClick={() => setDialog({ type: 'delete', session })}><Trash2 size={13} /></button></span></div>)}</aside><section className="chatbot-panel"><div className="chatbot-messages" aria-live="polite">{messages.length === 0 && <div className="chatbot-empty"><Bot size={28} /><h2>새 재무 질문을 시작하세요</h2><p>첫 질문을 보내면 내 대화 목록에 저장됩니다.</p><div className="chatbot-examples__heading"><span>추천 질문</span><button type="button" className="chatbot-refresh-suggestions" aria-label="추천 질문 새로고침" title="추천 질문 새로고침" onClick={() => void refreshSuggestions()} disabled={isRefreshingSuggestions}><RefreshCw size={15} className={isRefreshingSuggestions ? 'chatbot-spin' : ''} /></button></div><div className="chatbot-examples">{examples.map((example) => <button key={example} type="button" onClick={() => void ask(undefined, example)}>{example}</button>)}</div>{requestError && <small className="chatbot-request-error">{requestError}</small>}</div>}{messages.map((message) => <article key={message.id} className={`chatbot-message chatbot-message--${message.role}`}><span className="chatbot-message__avatar">{message.role === 'assistant' ? <Bot size={16} /> : '나'}</span><div className="chatbot-message__body">{message.status === 'processing' ? <div className="chatbot-progress">{progress.length ? progress.map((step) => <span key={step.id} className={step.state === 'active' ? 'is-active' : ''}>{step.state === 'active' && <RefreshCw size={14} className="chatbot-spin" />}{step.label}</span>) : <span className="is-active"><RefreshCw size={14} className="chatbot-spin" />답변을 준비하고 있습니다</span>}</div> : message.role === 'assistant' ? <ChatAnswer markdown={message.content} /> : <><p>{message.content}</p>{message.attachments.map((item) => <span key={item.id} className="chatbot-message__attachment"><FileText size={13} />{item.name}</span>)}</>}{message.visualization && message.status === 'completed' && <ChatVisualization visualization={message.visualization} />}{message.status === 'failed' && <small>답변 생성에 실패했습니다.</small>}</div></article>)}</div><form className="chatbot-composer" onSubmit={(event) => void ask(event)}>{attachment && <div className="chatbot-attachment"><FileText size={14} /><span>{attachment.name}</span><button type="button" aria-label="첨부 파일 제거" onClick={() => setAttachment(null)}><X size={13} /></button></div>}<textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(); } }} placeholder="예: IBM의 2025년 총자산은 얼마인가요?" rows={2} disabled={isRunning} /><div><input ref={attachmentInput} type="file" accept=".txt,.md,.csv,.json,.xlsx,.xlsm" hidden onChange={(event) => { setAttachment(event.target.files?.[0] ?? null); event.target.value = ''; }} /><button type="button" className="chatbot-attach" aria-label="파일 첨부" title="파일 첨부" onClick={() => attachmentInput.current?.click()} disabled={isRunning}><Paperclip size={17} /></button>{isRunning ? <button type="button" className="chatbot-stop" onClick={stop}><CircleStop size={16} /> 중지</button> : <button type="submit" disabled={!draft.trim()}><Send size={16} /> 질문하기</button>}</div></form></section></div>{dialog && <div className="chatbot-dialog-backdrop" role="presentation" onMouseDown={() => setDialog(null)}><section className="chatbot-dialog" role="dialog" aria-modal="true" aria-labelledby="chatbot-dialog-title" onMouseDown={(event) => event.stopPropagation()}><header><h2 id="chatbot-dialog-title">{dialog.type === 'delete' ? '대화를 삭제하시겠습니까?' : '채팅 이름 변경'}</h2><button type="button" aria-label="닫기" onClick={() => setDialog(null)}><X size={18} /></button></header>{dialog.type === 'delete' ? <p><strong>{dialog.session.title}</strong> 대화와 모든 메시지가 삭제됩니다.</p> : <form onSubmit={(event) => { event.preventDefault(); void renameSession(); }}><label htmlFor="chatbot-title">채팅 이름</label><input id="chatbot-title" value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} maxLength={80} autoFocus /></form>}<footer><button type="button" className="chatbot-dialog__cancel" onClick={() => setDialog(null)}>취소</button><button type="button" className={dialog.type === 'delete' ? 'chatbot-dialog__danger' : ''} onClick={() => void (dialog.type === 'delete' ? deleteSession() : renameSession())}>{dialog.type === 'delete' ? '삭제' : '변경'}</button></footer></section></div>}</div>;
+  return (
+    <div className="chatbot-page">
+      <header className="chatbot-header">
+        <span className="chatbot-header__icon"><Bot size={22} /></span>
+        <div>
+          <span className="chatbot-header__eyebrow">FINANCIAL RAG ASSISTANT</span>
+          <h1>AI 금융 챗봇</h1>
+          <p>내 대화에서 재무 문서 기반 답변을 확인하세요.</p>
+        </div>
+      </header>
+
+      <div className="chatbot-layout chatbot-layout--sessions">
+        <aside className="chatbot-sessions">
+          <Button variant="primary" onClick={newSession} className="chatbot-new-session">
+            <MessageSquarePlus size={16} /> 새 대화
+          </Button>
+          <span>내 대화</span>
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              className={`chatbot-session${active?.id === session.id ? ' is-active' : ''}`}
+              title={`최근 대화: ${formatDate(session.updated_at)}`}
+            >
+              <button type="button" className="chatbot-session__select" onClick={() => void select(session.id)}>
+                <strong>{session.title}</strong>
+              </button>
+              <span className="chatbot-session__actions">
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`${session.title} 제목 편집`}
+                  onClick={() => {
+                    setTitleDraft(session.title);
+                    setDialog({ type: 'rename', session });
+                  }}
+                >
+                  <Pencil size={13} />
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`${session.title} 삭제`}
+                  onClick={() => setDialog({ type: 'delete', session })}
+                >
+                  <Trash2 size={13} />
+                </IconButton>
+              </span>
+            </div>
+          ))}
+        </aside>
+
+        <section className="chatbot-panel">
+          <div className="chatbot-messages" aria-live="polite">
+            {messages.length === 0 && (
+              <div className="chatbot-empty">
+                <Bot size={28} />
+                <h2>새 재무 질문을 시작하세요</h2>
+                <p>첫 질문을 보내면 내 대화 목록에 저장됩니다.</p>
+                <div className="chatbot-examples__heading">
+                  <span>추천 질문</span>
+                  <IconButton
+                    size="sm"
+                    variant="ghost"
+                    aria-label="추천 질문 새로고침"
+                    title="추천 질문 새로고침"
+                    onClick={() => void refreshSuggestions()}
+                    disabled={isRefreshingSuggestions}
+                  >
+                    <RefreshCw size={15} className={isRefreshingSuggestions ? 'chatbot-spin' : ''} />
+                  </IconButton>
+                </div>
+                <div className="chatbot-examples">
+                  {examples.map((example) => (
+                    <button key={example} type="button" onClick={() => void ask(undefined, example)}>{example}</button>
+                  ))}
+                </div>
+                {requestError && <small className="chatbot-request-error">{requestError}</small>}
+              </div>
+            )}
+
+            {messages.map((message) => (
+              <article key={message.id} className={`chatbot-message chatbot-message--${message.role}`}>
+                <span className="chatbot-message__avatar">{message.role === 'assistant' ? <Bot size={16} /> : '나'}</span>
+                <div className="chatbot-message__body">
+                  {message.status === 'processing' ? (
+                    <div className="chatbot-progress">
+                      {progress.length ? progress.map((step) => (
+                        <span key={step.id} className={step.state === 'active' ? 'is-active' : ''}>
+                          {step.state === 'active' && <RefreshCw size={14} className="chatbot-spin" />}
+                          {step.label}
+                        </span>
+                      )) : (
+                        <span className="is-active"><RefreshCw size={14} className="chatbot-spin" />답변을 준비하고 있습니다</span>
+                      )}
+                    </div>
+                  ) : message.role === 'assistant' ? (
+                    <ChatAnswer markdown={message.content} />
+                  ) : (
+                    <>
+                      <p>{message.content}</p>
+                      {message.attachments.map((item) => (
+                        <span key={item.id} className="chatbot-message__attachment"><FileText size={13} />{item.name}</span>
+                      ))}
+                    </>
+                  )}
+                  {message.visualization && message.status === 'completed' && <ChatVisualization visualization={message.visualization} />}
+                  {message.status === 'failed' && <small>답변 생성에 실패했습니다.</small>}
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <form className="chatbot-composer" onSubmit={(event) => void ask(event)}>
+            {attachment && (
+              <div className="chatbot-attachment">
+                <FileText size={14} />
+                <span>{attachment.name}</span>
+                <IconButton size="sm" variant="ghost" aria-label="첨부 파일 제거" onClick={() => setAttachment(null)}>
+                  <X size={13} />
+                </IconButton>
+              </div>
+            )}
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void ask();
+                }
+              }}
+              placeholder="예: IBM의 2025년 총자산은 얼마인가요?"
+              rows={2}
+              disabled={isRunning}
+            />
+            <div>
+              <input
+                ref={attachmentInput}
+                type="file"
+                accept=".txt,.md,.csv,.json,.xlsx,.xlsm"
+                hidden
+                onChange={(event) => {
+                  setAttachment(event.target.files?.[0] ?? null);
+                  event.target.value = '';
+                }}
+              />
+              <IconButton
+                size="sm"
+                variant="secondary"
+                className="chatbot-attach"
+                aria-label="파일 첨부"
+                title="파일 첨부"
+                onClick={() => attachmentInput.current?.click()}
+                disabled={isRunning}
+              >
+                <Paperclip size={17} />
+              </IconButton>
+              {isRunning ? (
+                <Button size="sm" variant="danger-solid" className="chatbot-stop" onClick={stop}>
+                  <CircleStop size={16} /> 중지
+                </Button>
+              ) : (
+                <Button size="sm" variant="primary" type="submit" disabled={!draft.trim()}>
+                  <Send size={16} /> 질문하기
+                </Button>
+              )}
+            </div>
+          </form>
+        </section>
+      </div>
+
+      {dialog && (
+        <div className="chatbot-dialog-backdrop" role="presentation" onMouseDown={() => setDialog(null)}>
+          <section
+            className="chatbot-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chatbot-dialog-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <h2 id="chatbot-dialog-title">{dialog.type === 'delete' ? '대화를 삭제하시겠습니까?' : '채팅 이름 변경'}</h2>
+              <IconButton size="sm" variant="ghost" aria-label="닫기" onClick={() => setDialog(null)}>
+                <X size={18} />
+              </IconButton>
+            </header>
+            {dialog.type === 'delete' ? (
+              <p><strong>{dialog.session.title}</strong> 대화와 모든 메시지가 삭제됩니다.</p>
+            ) : (
+              <form onSubmit={(event) => { event.preventDefault(); void renameSession(); }}>
+                <label htmlFor="chatbot-title">채팅 이름</label>
+                <input id="chatbot-title" value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} maxLength={80} autoFocus />
+              </form>
+            )}
+            <footer>
+              <Button size="sm" variant="secondary" onClick={() => setDialog(null)}>취소</Button>
+              <Button
+                size="sm"
+                variant={dialog.type === 'delete' ? 'danger-solid' : 'primary'}
+                onClick={() => void (dialog.type === 'delete' ? deleteSession() : renameSession())}
+              >
+                {dialog.type === 'delete' ? '삭제' : '변경'}
+              </Button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </div>
+  );
 }

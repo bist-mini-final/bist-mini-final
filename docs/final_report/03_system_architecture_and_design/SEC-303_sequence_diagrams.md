@@ -1,76 +1,69 @@
-# [SEC-303] 동적 시퀀스 다이어그램 & 분산 동시성 런북
-> **Chapter:** 3. 시스템 아키텍처 및 상세 설계 | **Section:** 3.3 | **Status:** Implementation-aligned reference
-> **Classification:** Dynamic Sequence Diagrams, 3-Level Distributed Locking & Ops Runbook
+# [SEC-303] 주요 실행 시퀀스와 동시성 경계
+
+> **Chapter:** 3. 시스템 아키텍처 및 상세 설계 | **Section:** 3.3 | **Status:** Implementation-aligned
 
 ---
 
-## 1. AI 챗봇 Durable RAG 질의 시퀀스
-
-RAG가 필요한 챗봇 메시지는 WebSocket으로 토큰을 전송하지 않습니다. 세션 메시지 API가 workflow run을 durable queue에 등록하고, 클라이언트는 run 조회로 결과를 동기화합니다.
+## 1. Durable workflow 실행
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor User as Client UI (ChatbotView)
-    participant API as FastAPI Chat Router (/api/v1/chat)
-    participant Queue as PostgreSQL Workflow Queue
-    participant Worker as KEDA Worker
-    participant PG as PostgreSQL (pgvector + FTS)
-    participant LLM as GPT-5.6 Luna Financial Reader
+    actor Client
+    participant API as FastAPI
+    participant PG as PostgreSQL queue
+    participant KEDA
+    participant Worker
 
-    User->>API: POST /sessions/{id}/messages
-    API->>Queue: create workflow run + submit
-    API-->>User: 202 Accepted (run_id)
-    Worker->>Queue: claim run and persist progress
-    Worker->>PG: hybrid retrieval + answer generation
-    Worker->>Queue: persist completed/failed result
-    loop client polling
-        User->>API: GET /runs/{run_id}?client_id=...
-        API-->>User: run state + completed message when terminal
-    end
+    Client->>API: POST /api/v1/workflows/{id}/runs
+    API->>PG: insert queued workflow_run
+    API-->>Client: 202 + run_id
+    KEDA->>PG: read claimable queue depth
+    KEDA->>Worker: create one-shot Job
+    Worker->>PG: claim with SKIP LOCKED + lease token
+    Worker->>PG: persist node and run progress
+    Client->>API: GET /api/v1/runs/{id}/stream
+    API->>PG: reload authoritative state
+    API-->>Client: SSE until terminal state
 ```
 
----
+Redis는 상태 변경 wake-up을 전달할 수 있지만 최종 상태는 항상 PostgreSQL에서 다시 읽습니다.
 
-## 2. 3-Level 동시성 안전 분산 락킹 시퀀스 (3-Level Distributed Locking)
-
-Kubernetes 다중 워커 환경에서 작업 경합, 좀비 덮어쓰기 및 고아 작업을 방지하기 위한 3중 락 프로토콜입니다:
+## 2. Company Comparison refresh
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant W as Worker Engine (Main Flow)
-    participant HB as LeaseHeartbeat Thread
-    participant DB as PostgreSQL (workflow_runs)
+    actor User
+    participant UI as /company-comparison
+    participant API as Comparison Router
+    participant BI as PostgresBiStore
+    participant Builder
+    participant Repo as VersionedSnapshotRepository
 
-    Note over W,DB: 1. Level 1: 후보 작업 비차단 락 획득 (SKIP LOCKED)
-    W->>DB: claim_workflow_run_candidate(queue_name, worker_id)
-    DB->>DB: SELECT run_id FROM workflow_runs ... FOR UPDATE SKIP LOCKED
-    DB-->>W: WorkflowRunLease(run_id="run-123", token="uuid-gen1")
-
-    Note over W,DB: 2. Level 2: PostgreSQL Advisory Lock 획득 (세션 분산 락)
-    W->>DB: pg_try_advisory_lock(hashtext('workflow_run:' || run_id))
-    DB-->>W: true (Lock Acquired)
-
-    Note over W,DB: 3. Level 3: 기본 15초 주기 Lease 하트비트 스레드 가동
-    W->>HB: LeaseHeartbeat(..., interval_seconds=15).start()
-    loop 기본 15초마다 생존 갱신
-        HB->>DB: UPDATE workflow_runs SET heartbeat_at=NOW() WHERE run_id=:id AND lease_token=:token
+    User->>UI: snapshot refresh
+    UI->>API: POST /api/v1/company-comparisons/snapshot/refresh
+    API->>BI: list companies and load current BI snapshots
+    API->>Builder: validate same FY/unit/evidence and calculate
+    alt fewer than two complete companies
+        Builder-->>API: ComparisonDataError
+        API-->>UI: 409
+    else same source and policy fingerprint
+        Repo-->>API: current snapshot
+        API-->>UI: 200 existing version
+    else new materialization
+        Builder-->>API: CompanyComparisonSnapshot
+        API->>Repo: insert immutable version and move scoped head
+        API-->>UI: 200 new version
     end
-
-    Note over W,DB: 4. 파이프라인 안전 완료 및 락 정상 해제
-    W->>DB: mark_workflow_completed(run_id, token)
-    W->>HB: stop()
-    W->>DB: pg_advisory_unlock(hashtext('workflow_run:' || run_id))
 ```
 
----
+이 경로는 외부 LLM이 없는 짧은 결정론적 계산이므로 KEDA job으로 보내지 않습니다.
 
-## 3. 분산 인프라 운영 런북 및 장애 복구 절차 (Ops & Disaster Recovery Runbook)
+## 3. Lease 안전성
 
-| 장애 시나리오 (Scenario) | 감지 메커니즘 (Detection) | 자동 복구 절차 (Automated Recovery Sequence) | 운영자 수동 개입 지침 (Runbook Action) |
-| :--- | :--- | :--- | :--- |
-| **워커 Pod OOM / 노드 장애** | 기본 15초 주기 하트비트 중단 ➡️ `heartbeat_at`이 기본 180초 stale 임계값 초과 | 1. PostgreSQL이 종료된 워커 세션의 `pg_advisory_lock`을 자동 해제.<br>2. 180초 경과 시 타 워커가 stale lease를 감지.<br>3. `reap_stalled_leases()`가 기존 토큰을 무효화하고 `status='queued'`로 전환. | k8s 워커 Pod의 메모리 리밋 증설 (`deploy/kubernetes/`) 및 `/jobs` 포털에서 큐 재유입 확인. |
-| **PostgreSQL 일시적 연결 단절** | `psycopg2.OperationalError` 발생 | 1. 워커는 DB 업데이트 실패 시 `lease_token`을 상실한 것으로 간주하여 즉시 실행 중단.<br>2. 커넥션 풀이 지수 백오프(1s, 2s, 4s)로 재연결 시도. | DB 서버 리소스(CPU/메모리) 점유율 확인 및 `pg_stat_activity`에서 잔여 락 세션 점검. |
-| **OpenAI Responses API 429 (Rate-Limit)** | ProviderApiError (HTTP 429) 반환 | 1. `BaseLLMModule`이 `Retry-After` 헤더를 파싱하여 최대 5회 지수 백오프 자동 재시도.<br>2. 재시도 초과 시 에러 엔벨로프 포장 후 큐에 재등록. | OpenAI 티어 할당량(TPM/RPM) 모니터링 및 KEDA 동시 워커 수 상한(`maxReplicaCount`) 조정. |
-| **장기 실행 좀비 워커 발생** | 실행 시간이 `timeout_seconds` 초과 | 1. 워커 내부 비동기 타임아웃 트리거.<br>2. `cancel_requested=true` 플래그 감지 시 프로세스 안전 종료 및 롤백. | 워크플로 실행은 `POST /api/v1/runs/{run_id}/cancel`로 취소 요청합니다. `/jobs`는 현재 읽기 전용 관제입니다. |
+- 후보 claim은 `FOR UPDATE SKIP LOCKED`로 워커 간 경합을 피합니다.
+- advisory lock은 동일 run의 동시 실행을 차단합니다.
+- lease token과 heartbeat는 이전 세대 worker가 새 실행 결과를 덮어쓰지 못하게 합니다.
+- stale lease는 설정된 임계값 이후 회수되고 queue로 복귀합니다.
+- 소유권을 잃은 worker는 결과 저장 전 fail-closed 합니다.
+
+정확한 간격·상태 전이·장애 런북은 [`BP-103`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-103_concurrency_and_locking_model.md)를 기준으로 합니다.

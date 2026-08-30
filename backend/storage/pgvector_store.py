@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 import re
 import threading
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from numbers import Real
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import psycopg2.extras
 from langchain_core.documents import Document
@@ -31,6 +32,19 @@ logger = logging.getLogger(__name__)
 
 class PgVectorStoreError(RuntimeError):
     """Raised when a pgvector database operation fails."""
+
+
+@dataclass(frozen=True, slots=True)
+class PgVectorReplacePlan:
+    """Stable staging identity shared by parallel COPY workers and finalizer."""
+
+    index_id: str
+    operation_id: str
+    staging_name: str
+    staging_uuid: str
+    dimension: int
+    metadata: Dict[str, Any]
+    published: bool = False
 
 
 PGVECTOR_INSERT_BATCH_SIZE = 1000
@@ -202,6 +216,225 @@ class PgVectorStore:
             connection.close()
         with self._collection_uuid_lock:
             self._collection_uuid_cache.pop(collection_name, None)
+
+    @staticmethod
+    def _collection_metadata(
+        metadata: Optional[Dict[str, Any]],
+        *,
+        model_name: str,
+        document_count: int,
+    ) -> Dict[str, Any]:
+        meta_dict = metadata or {}
+        return {
+            "file_name": meta_dict.get("file_name", ""),
+            "workbook_hash": meta_dict.get("workbook_hash", ""),
+            "model": meta_dict.get("model", model_name),
+            "dimension": meta_dict.get("dimension", DEFAULT_EMBEDDING_DIMENSION),
+            "document_count": document_count,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "pipeline": meta_dict.get("pipeline", "luna_vlm_structured"),
+            "duration_seconds": meta_dict.get("duration_seconds"),
+            "total_tokens": meta_dict.get("total_tokens"),
+            "estimated_cost_usd": meta_dict.get("estimated_cost_usd"),
+            "estimated_cost_krw": meta_dict.get("estimated_cost_krw"),
+            "batch_size": meta_dict.get("batch_size"),
+            "company_name": meta_dict.get("company_name", ""),
+            "ticker": meta_dict.get("ticker", ""),
+            "operation_id": meta_dict.get("operation_id"),
+        }
+
+    def prepare_collection_replace(
+        self,
+        *,
+        index_id: str,
+        operation_id: str,
+        model_name: str,
+        document_count: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> PgVectorReplacePlan:
+        """Return a retry-stable private collection for distributed shard COPY."""
+
+        clean_meta = self._collection_metadata(
+            {**(metadata or {}), "operation_id": operation_id},
+            model_name=model_name,
+            document_count=document_count,
+        )
+        dimension = int(clean_meta["dimension"])
+        published_uuid = self._collection_uuid(index_id)
+        if (
+            published_uuid is not None
+            and self.collection_document_count(published_uuid) == document_count
+        ):
+            return PgVectorReplacePlan(
+                index_id=index_id,
+                operation_id=operation_id,
+                staging_name=index_id,
+                staging_uuid=published_uuid,
+                dimension=dimension,
+                metadata=clean_meta,
+                published=True,
+            )
+
+        staging_name = f"{index_id}__staging__{operation_id[:16]}"
+        staging_uuid = self._collection_uuid(staging_name)
+        if staging_uuid is None:
+            try:
+                staging_uuid = self._create_collection(staging_name, clean_meta)
+            except Exception:
+                # A concurrent coordinator for the same content may have won
+                # the unique-name race. Reuse that deterministic staging row.
+                staging_uuid = self._collection_uuid(staging_name)
+                if staging_uuid is None:
+                    raise
+        return PgVectorReplacePlan(
+            index_id=index_id,
+            operation_id=operation_id,
+            staging_name=staging_name,
+            staging_uuid=staging_uuid,
+            dimension=dimension,
+            metadata=clean_meta,
+        )
+
+    def copy_prepared_collection_shard(
+        self,
+        plan: PgVectorReplacePlan,
+        *,
+        documents: Sequence[Document],
+        vectors: Sequence[Sequence[float]],
+        start_index: int,
+    ) -> None:
+        """Idempotently replace one disjoint row range in a private collection."""
+
+        if plan.published:
+            return
+        if len(documents) != len(vectors):
+            raise PgVectorStoreError("pgvector shard 문서와 벡터 개수가 다릅니다")
+        document_ids = [
+            str(uuid5(UUID(plan.staging_uuid), str(start_index + offset)))
+            for offset in range(len(documents))
+        ]
+        connection = self._raw_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM langchain_pg_embedding WHERE id = ANY(%s::varchar[]);",
+                    (document_ids,),
+                )
+            copy_documents(
+                connection,
+                collection_uuid=plan.staging_uuid,
+                documents=documents,
+                vectors=vectors,
+                batch_size=max(1, len(documents)),
+                document_ids=document_ids,
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def collection_document_count(self, collection_uuid: str) -> int:
+        connection = self._read_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM langchain_pg_embedding WHERE collection_id = %s;",
+                    (collection_uuid,),
+                )
+                row = cursor.fetchone()
+        finally:
+            connection.close()
+        return int(row[0]) if row else 0
+
+    def publish_prepared_collection(self, plan: PgVectorReplacePlan) -> None:
+        """Build one HNSW index and atomically expose a fully copied collection."""
+
+        if plan.published:
+            return
+        actual_count = self.collection_document_count(plan.staging_uuid)
+        expected_count = int(plan.metadata["document_count"])
+        if actual_count != expected_count:
+            raise PgVectorStoreError(
+                "pgvector staging collection 문서 수가 일치하지 않습니다 "
+                f"({actual_count}/{expected_count})"
+            )
+        self.ensure_collection_vector_index(plan.staging_name, plan.dimension)
+
+        retired_name = f"{plan.index_id}__retired__{uuid4().hex}"
+        retired_uuid: Optional[str] = None
+        retired_dimension = plan.dimension
+        connection = self._raw_connection()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s));",
+                    (plan.index_id,),
+                )
+                cursor.execute(
+                    """
+                    UPDATE langchain_pg_collection
+                    SET name = %s
+                    WHERE name = %s
+                    RETURNING uuid, cmetadata;
+                    """,
+                    (retired_name, plan.index_id),
+                )
+                retired = cursor.fetchone()
+                if retired is not None:
+                    retired_uuid = str(retired[0])
+                    if isinstance(retired[1], dict):
+                        retired_dimension = int(
+                            retired[1].get("dimension") or retired_dimension
+                        )
+                cursor.execute(
+                    """
+                    UPDATE langchain_pg_collection
+                    SET name = %s, cmetadata = %s
+                    WHERE name = %s
+                    RETURNING uuid;
+                    """,
+                    (
+                        plan.index_id,
+                        psycopg2.extras.Json(plan.metadata),
+                        plan.staging_name,
+                    ),
+                )
+                published = cursor.fetchone()
+                if published is None:
+                    # Another retry may have published the same deterministic
+                    # staging collection while this coordinator was waiting.
+                    cursor.execute(
+                        "SELECT uuid FROM langchain_pg_collection WHERE name = %s;",
+                        (plan.index_id,),
+                    )
+                    published = cursor.fetchone()
+                if published is None:
+                    raise PgVectorStoreError("완료된 pgvector staging collection이 없습니다")
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+        published_uuid = str(UUID(str(published[0])))
+        with self._collection_uuid_lock:
+            self._collection_uuid_cache.pop(plan.staging_name, None)
+            self._collection_uuid_cache[plan.index_id] = published_uuid
+
+        if retired_uuid is not None and retired_uuid != published_uuid:
+            try:
+                self._delete_collection(retired_name)
+                self._drop_collection_vector_index(retired_uuid, retired_dimension)
+            except Exception:
+                logger.warning(
+                    "교체된 pgvector collection 정리 실패: %s",
+                    retired_name,
+                    exc_info=True,
+                )
+        self.ensure_optimized_indexes()
 
     @staticmethod
     def _collection_vector_index_name(collection_uuid: str, dimension: int) -> str:
@@ -1134,7 +1367,11 @@ class PgVectorStore:
                             to_jsonb(%s::text)
                         ),
                         document = regexp_replace(
-                            document,
+                            CASE
+                                WHEN document ~ '^Company:\\s*[^|]*\\|\\s*'
+                                    THEN document
+                                ELSE 'Company: ? | ' || document
+                            END,
                             '^Company:\\s*[^|]*\\|\\s*',
                             'Company: ' || %s || ' | '
                         )
@@ -1698,8 +1935,10 @@ class PgVectorStore:
                             WHEN cmetadata->>'variant' = 'header_only' THEN 3
                             ELSE 4
                         END,
-                        COALESCE(cmetadata->'row_header', '[]'::jsonb)::text,
-                        COALESCE(cmetadata->'column_header', '[]'::jsonb)::text,
+                        CASE WHEN jsonb_typeof(cmetadata->'row_header') = 'array'
+                            THEN jsonb_array_length(cmetadata->'row_header') ELSE 0 END DESC,
+                        CASE WHEN jsonb_typeof(cmetadata->'column_header') = 'array'
+                            THEN jsonb_array_length(cmetadata->'column_header') ELSE 0 END DESC,
                         id
                 ) AS cell_rank
             FROM langchain_pg_embedding
@@ -1977,6 +2216,10 @@ class PgVectorStore:
                         cmetadata->>'cell_coord'
                         ORDER BY
                             CASE WHEN cmetadata->>'variant' = 'header_with_value' THEN 0 ELSE 1 END,
+                            CASE WHEN jsonb_typeof(cmetadata->'row_header') = 'array'
+                                THEN jsonb_array_length(cmetadata->'row_header') ELSE 0 END DESC,
+                            CASE WHEN jsonb_typeof(cmetadata->'column_header') = 'array'
+                                THEN jsonb_array_length(cmetadata->'column_header') ELSE 0 END DESC,
                             CASE WHEN cmetadata->>'col_index' ~ '^\d+$' THEN (cmetadata->>'col_index')::int ELSE 99999 END,
                             id
                     ) AS coord_rank
@@ -2025,6 +2268,7 @@ class PgVectorStore:
                     "sheet_name": cmetadata.get("sheet_name", ""),
                     "row_header": cmetadata.get("row_header", []),
                     "column_header": cmetadata.get("column_header", []),
+                    "company_name": cmetadata.get("company_name", ""),
                     "row_index": resolved_row,
                     "col_index": col_idx,
                     "source_text": document or "",
@@ -2144,6 +2388,10 @@ class PgVectorStore:
                                 cmetadata->>'cell_coord'
                                 ORDER BY
                                     CASE WHEN cmetadata->>'variant' = 'header_with_value' THEN 0 ELSE 1 END,
+                                    CASE WHEN jsonb_typeof(cmetadata->'row_header') = 'array'
+                                        THEN jsonb_array_length(cmetadata->'row_header') ELSE 0 END DESC,
+                                    CASE WHEN jsonb_typeof(cmetadata->'column_header') = 'array'
+                                        THEN jsonb_array_length(cmetadata->'column_header') ELSE 0 END DESC,
                                     CASE WHEN cmetadata->>'col_index' ~ '^\\d+$' THEN (cmetadata->>'col_index')::int ELSE 99999 END,
                                     id
                             ) AS coord_rank
@@ -2192,6 +2440,7 @@ class PgVectorStore:
                             "sheet_name": cmetadata.get("sheet_name", ""),
                             "row_header": cmetadata.get("row_header", []),
                             "column_header": cmetadata.get("column_header", []),
+                            "company_name": cmetadata.get("company_name", ""),
                             "row_index": resolved_row,
                             "col_index": col_idx,
                             "source_text": doc or "",

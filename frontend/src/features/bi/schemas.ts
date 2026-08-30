@@ -6,6 +6,7 @@ import {
   type BiEvidence,
   type BiMaterializationJob,
   type BiMaterializationAccepted,
+  type BiMaterializationCandidateListResponse,
   type BiQuestionJobProgress,
   type MetricObservation,
   type MetricSeries,
@@ -120,6 +121,26 @@ const CompanyListApiSchema = z.object({
     snapshotStatus: company.snapshot_status,
     refreshStatus: company.refresh_status,
     updatedAt: company.updated_at,
+  })),
+}));
+
+const MaterializationCandidateListApiSchema = z.object({
+  candidates: z.array(z.object({
+    company_id: z.string().min(1),
+    display_name: z.string().min(1),
+    source: MaterializationSourceApiSchema,
+    reason: z.enum(['not_created', 'source_changed', 'failed']),
+  }).strict()),
+}).strict().transform((value): BiMaterializationCandidateListResponse => ({
+  candidates: value.candidates.map((candidate) => ({
+    companyId: candidate.company_id,
+    displayName: candidate.display_name,
+    source: {
+      fileName: candidate.source.file_name,
+      workbookHash: candidate.source.workbook_hash,
+      indexId: candidate.source.index_id,
+    },
+    reason: candidate.reason,
   })),
 }));
 
@@ -255,6 +276,12 @@ const QuestionJobProgressApiSchema = z.object({
 
 export function parseBiCompanies(value: unknown): BiCompanyListResponse {
   return CompanyListApiSchema.parse(value);
+}
+
+export function parseBiMaterializationCandidates(
+  value: unknown,
+): BiMaterializationCandidateListResponse {
+  return MaterializationCandidateListApiSchema.parse(value);
 }
 
 export function parseBiDashboard(value: unknown): BiDashboardSnapshot {

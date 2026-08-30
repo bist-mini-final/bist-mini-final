@@ -75,6 +75,9 @@ class WorkflowDocument(StrictModel):
     name: str
     updated_at: str
     graph: WorkflowGraph
+    kind: Literal["standard", "user"] = "user"
+    editable: bool = True
+    template: bool = False
 
 
 class WorkflowExecutionRequest(StrictModel):

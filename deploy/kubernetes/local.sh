@@ -449,6 +449,7 @@ PY
     kubectl rollout status deployment/keda-operator -n keda --timeout=180s
   fi
   echo "Docker 자원 기준 최대 병렬 Job: ${max_jobs}"
+  echo "Excel ingestion phase 상한: embedding=$(( max_jobs < 4 ? max_jobs : 4 )), vector COPY=$(( max_jobs < 2 ? max_jobs : 2 ))"
 }
 
 run_schema_migration() {
@@ -575,6 +576,17 @@ case "${ACTION}" in
     kubectl logs -n "${NAMESPACE}" deployment/backend-api \
       --all-containers --tail=200 --prefix=true
     ;;
+  logs-ingestion)
+    if [[ -z "$(kubectl get pods -n "${NAMESPACE}" \
+      -l 'bist.ai/queue in (ingestion-embedding,ingestion-vector)' \
+      -o name 2>/dev/null)" ]]; then
+      echo "실행 중이거나 보존된 ingestion shard worker Pod가 없습니다."
+    else
+      kubectl logs -n "${NAMESPACE}" \
+        -l 'bist.ai/queue in (ingestion-embedding,ingestion-vector)' \
+        --all-containers --tail=200 --prefix=true
+    fi
+    ;;
   down)
     k3d cluster stop "${CLUSTER_NAME}" || true
     ;;
@@ -582,7 +594,7 @@ case "${ACTION}" in
     k3d cluster delete "${CLUSTER_NAME}" || true
     ;;
   *)
-    echo "사용법: $0 {setup-tools|check|cluster|build|deploy|all|recreate|restart|status|logs|logs-api|down|destroy}" >&2
+    echo "사용법: $0 {setup-tools|check|cluster|build|deploy|all|recreate|restart|status|logs|logs-api|logs-ingestion|down|destroy}" >&2
     exit 2
     ;;
 esac

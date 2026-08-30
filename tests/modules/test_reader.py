@@ -65,7 +65,16 @@ def test_reader_tool_calling_execution():
             "row_header": ["영업이익"],
             "column_header": ["2023"],
             "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65,670억원",
-        }
+        },
+        {
+            "cell_coord": "C10",
+            "sheet_name": "손익계산서",
+            "company_name": "삼성전자",
+            "cell_value": "?",
+            "row_header": ["영업이익"],
+            "column_header": ["2024"],
+            "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2024 | Cell Value: ?",
+        },
     ]
 
     reader = ReaderModule(completion_client=mock_llm, pgvector_store=mock_store)
@@ -85,7 +94,7 @@ def test_reader_tool_calling_execution():
                 {
                     "cell_coord": "B10",
                     "sheet_name": "손익계산서",
-                    "source_text": "영업이익 65,670억원",
+                    "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65,670억원",
                 }
             ],
         )
@@ -104,6 +113,7 @@ def test_reader_tool_calling_execution():
     assert continuation.kwargs["previous_response_id"] == "resp_lookup_call"
     assert continuation.kwargs["input_items"][0]["type"] == "function_call_output"
     assert continuation.kwargs["input_items"][0]["call_id"] == "call_123"
+    assert "Cell Value: ?" not in continuation.kwargs["input_items"][0]["output"]
 
 
 def test_reader_math_tool_calling_execution():
@@ -148,7 +158,7 @@ def test_reader_math_tool_calling_execution():
                 {
                     "cell_coord": "E60",
                     "sheet_name": "손익계산서",
-                    "source_text": "2023년 영업이익: 65670억",
+                    "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670억",
                 }
             ],
         )
@@ -182,7 +192,7 @@ def test_reader_native_async_response_path() -> None:
                 {
                     "cell_coord": "B10",
                     "sheet_name": "손익계산서",
-                    "source_text": "비동기 답변 근거",
+                    "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
                 }
             ],
         )
@@ -280,6 +290,87 @@ def test_reader_rejects_numeric_answer_when_no_verifiable_cells_exist():
     assert not mock_llm.create_response.called
 
 
+def test_reader_rejects_header_only_cells_as_evidence() -> None:
+    mock_llm = MagicMock()
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    input_dto = ReaderInputDTO(
+        context_json=ContextDTO(
+            query_context=QueryContextDTO(
+                question_id="q-header-only", question_text="IBM 2024 총매출은?"
+            ),
+            document_context=DocumentContextDTO(file_name="ibm.xlsx", workbook_hash="hash123"),
+            items=["[No context blocks available]"],
+            cells=[
+                {
+                    "cell_coord": "O201",
+                    "sheet_name": "Balance_Sheet",
+                    "source_text": (
+                        "Company: IBM | Sheet: Balance_Sheet | Row Header: Period Date | "
+                        "Column Header: 2024-12-31 | Cell Value: ?"
+                    ),
+                }
+            ],
+        )
+    )
+
+    result = reader.execute(input_dto)
+
+    assert result["answer_json"]["answer"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert not mock_llm.create_response.called
+
+
+def test_reader_prompt_contains_only_value_bearing_cells() -> None:
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-value-boundary",
+        content="IBM의 2024년 매출은 62,753입니다. [Sheet: Income_Statement | Cell: O23]",
+        usage={"prompt_tokens": 50, "completion_tokens": 15},
+        latency_seconds=0.1,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    valid = (
+        "Company: IBM | Sheet: Income_Statement | Row Header: Total Revenue | "
+        "Column Header: 2024-12-31 | Cell Value: 62753"
+    )
+    placeholder = (
+        "Company: IBM | Sheet: Balance_Sheet | Row Header: Period Date | "
+        "Column Header: 2024-12-31 | Cell Value: ?"
+    )
+    result = reader.execute(
+        ReaderInputDTO(
+            context_json=ContextDTO(
+                query_context=QueryContextDTO(
+                    question_id="q-reader-boundary",
+                    question_text="IBM 2024 총매출은?",
+                ),
+                document_context=DocumentContextDTO(
+                    file_name="ibm.xlsx",
+                    workbook_hash="hash123",
+                ),
+                items=[placeholder, "raw retrieval hint must not reach Reader", valid],
+                cells=[
+                    {
+                        "cell_coord": "O201",
+                        "sheet_name": "Balance_Sheet",
+                        "source_text": placeholder,
+                    },
+                    {
+                        "cell_coord": "O23",
+                        "sheet_name": "Income_Statement",
+                        "source_text": valid,
+                    },
+                ],
+            )
+        )
+    )
+
+    prompt = mock_llm.create_response.call_args.kwargs["input_items"][0]["content"]
+    assert valid in prompt
+    assert placeholder not in prompt
+    assert "raw retrieval hint must not reach Reader" not in prompt
+    assert "62,753" in result["answer_json"]["answer"]
+
+
 def test_reader_rejects_answer_with_an_unsupported_cell_citation():
     mock_llm = MagicMock()
     mock_llm.create_response.return_value = OpenAIResponseResult(
@@ -300,7 +391,7 @@ def test_reader_rejects_answer_with_an_unsupported_cell_citation():
                 {
                     "cell_coord": "E50",
                     "sheet_name": "Balance Sheet",
-                    "source_text": "IBM 총자산: 151,880",
+                    "source_text": "Company: IBM | Sheet: Balance Sheet | Row Header: Total Assets | Column Header: 2025 | Cell Value: 151880",
                 }
             ],
         )
@@ -331,7 +422,7 @@ def test_reader_appends_verified_evidence_when_model_omits_citations():
                 {
                     "cell_coord": "E50",
                     "sheet_name": "Balance Sheet",
-                    "source_text": "IBM 총자산: 151,880",
+                    "source_text": "Company: IBM | Sheet: Balance Sheet | Row Header: Total Assets | Column Header: 2025 | Cell Value: 151880",
                 }
             ],
         )

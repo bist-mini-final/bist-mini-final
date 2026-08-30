@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Loader2, Search, Sparkles, X } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 import { dataSourceApi } from '../services/dataSourceApi';
 import type { SearchResultItem } from '../types';
 
@@ -53,9 +54,9 @@ export function IndexSearchTester({ indexId, fileName, model, onClose }: SearchT
               </small>
             </div>
           </div>
-          <button className="ds-modal__close" onClick={onClose} aria-label="닫기">
+          <IconButton variant="ghost" onClick={onClose} aria-label="닫기">
             <X size={18} />
-          </button>
+          </IconButton>
         </header>
 
         <div className="ds-modal__body">
@@ -80,13 +81,14 @@ export function IndexSearchTester({ indexId, fileName, model, onClose }: SearchT
               <option value={5}>Top 5</option>
               <option value={10}>Top 10</option>
             </select>
-            <button
+            <Button
+              variant="primary"
               type="submit"
-              className="primary-button ds-search-btn"
+              className="ds-search-btn"
               disabled={isSearching || !query.trim()}
             >
               {isSearching ? <Loader2 size={16} className="ds-spin" /> : '검색'}
-            </button>
+            </Button>
           </form>
 
           {error && <div className="ds-error-alert">{error}</div>}
@@ -146,9 +148,9 @@ export function IndexSearchTester({ indexId, fileName, model, onClose }: SearchT
 
         <footer className="ds-modal__footer">
           <small>질의 벡터와 인덱스 벡터의 Inner Product(정규화 Cosine) 점수입니다.</small>
-          <button type="button" className="secondary-button" onClick={onClose}>
+          <Button type="button" onClick={onClose}>
             닫기
-          </button>
+          </Button>
         </footer>
       </div>
     </div>

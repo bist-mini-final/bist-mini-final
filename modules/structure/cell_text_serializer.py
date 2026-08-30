@@ -145,24 +145,10 @@ class CellTextSerializerModule(BaseModule):
         reader: WorksheetValueReader,
         row: int,
         column: int,
-        title_region: Optional[ClassifiedRegionDTO],
         row_region: Optional[ClassifiedRegionDTO],
         column_region: Optional[ClassifiedRegionDTO],
     ) -> tuple[List[str], List[str]]:
         row_headers: List[str] = []
-        if title_region is not None:
-            for title_row in range(title_region.rows[0], title_region.rows[1] + 1):
-                if reader.row_hidden(title_row):
-                    continue
-                for title_column in range(
-                    title_region.columns[0],
-                    title_region.columns[1] + 1,
-                ):
-                    if reader.column_hidden(title_column):
-                        continue
-                    value = reader.value(title_row, title_column)
-                    if value is not None and value not in row_headers:
-                        row_headers.append(value)
         if row_region is not None:
             for header_column in range(
                 row_region.columns[0],
@@ -216,7 +202,6 @@ class CellTextSerializerModule(BaseModule):
             return []
         row_region = self._region(table, "row_header")
         column_region = self._region(table, "column_header")
-        title_region = self._region(table, "title")
         canonical_name = canonical_sheet_name(table.sheet_name)
         code = sheet_code(table.sheet_name)
         documents: List[Dict[str, Any]] = []
@@ -237,7 +222,6 @@ class CellTextSerializerModule(BaseModule):
                     reader,
                     row,
                     column,
-                    title_region,
                     row_region,
                     column_region,
                 )

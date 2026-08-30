@@ -11,6 +11,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
+import { Button } from '../../shared/ui';
 import { dataSourceApi } from '../data-sources/services/dataSourceApi';
 import type { DbStatusInfo } from '../data-sources/types';
 import './settings.css';
@@ -125,15 +126,14 @@ export function SettingsView() {
           <h1>시스템 환경 & 인프라 설정</h1>
           <p>PostgreSQL pgvector 데이터베이스 연결, 임베딩 파이프라인, 유사도 캐시 임계값을 관리합니다.</p>
         </div>
-        <button
+        <Button
           type="button"
-          className="secondary-button"
           onClick={fetchStatus}
           disabled={isLoading}
         >
           <RefreshCw size={15} className={isLoading ? 'ds-spin' : ''} />
           <span>새로고침</span>
-        </button>
+        </Button>
       </header>
 
       {/* 1. Database & pgvector Infrastructure */}
@@ -146,9 +146,9 @@ export function SettingsView() {
               <span>PostgreSQL/pgvector native 저장 계층</span>
             </div>
           </div>
-          <button
+          <Button
+            variant="primary"
             type="button"
-            className="primary-button"
             onClick={handleTestConnection}
             disabled={isTesting}
           >
@@ -158,7 +158,7 @@ export function SettingsView() {
               <RefreshCw size={15} />
             )}
             <span>{isTesting ? '연결 테스트 중...' : '연결 다시 테스트'}</span>
-          </button>
+          </Button>
         </div>
 
         {/* Status Banner */}
@@ -228,14 +228,13 @@ export function SettingsView() {
           <label>PostgreSQL 연결 접속 URL (psycopg)</label>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <code style={{ flex: 1 }}>{dbUrl}</code>
-            <button
+            <Button
               type="button"
-              className="secondary-button"
               onClick={() => copyToClipboard(dbUrl, 'url')}
             >
               <Copy size={14} />
               <span>{copiedUrl === 'success' ? '복사됨!' : copiedUrl === 'error' ? '복사 실패' : 'URL 복사'}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -243,14 +242,13 @@ export function SettingsView() {
           <label>Docker 컨테이너 가동 명령어</label>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <code style={{ flex: 1 }}>{dockerCmd}</code>
-            <button
+            <Button
               type="button"
-              className="secondary-button"
               onClick={() => copyToClipboard(dockerCmd, 'cmd')}
             >
               <Copy size={14} />
               <span>{copiedCmd === 'success' ? '복사됨!' : copiedCmd === 'error' ? '복사 실패' : '명령어 복사'}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </section>

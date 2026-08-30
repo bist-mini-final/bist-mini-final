@@ -84,8 +84,10 @@ def test_modules_do_not_construct_infrastructure_clients() -> None:
 def test_kubernetes_specs_are_projected_from_worker_jobs() -> None:
     specs = kubernetes_worker_specs(ALL_JOBS)
     by_name = {spec.deployment_name: spec for spec in specs}
-    assert len(by_name) == 4
+    assert len(by_name) == 6
     assert "workflow-worker" in by_name
+    assert by_name["ingestion-embedding"].max_replica_count == 4
+    assert by_name["ingestion-vector"].max_replica_count == 2
     for job in ALL_JOBS:
         if not isinstance(job, WorkerJobDefinition):
             continue

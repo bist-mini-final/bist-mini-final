@@ -6,7 +6,6 @@ from backend.features.bi.api_routes import create_bi_router
 from backend.features.chatbot.api_routes import create_chat_router
 from backend.features.company_comparison import (
     create_company_comparison_router,
-    create_company_comparison_service,
 )
 
 from .benchmark_routes import create_benchmark_router
@@ -30,26 +29,13 @@ def create_api_router(
     runtime = container.runtime
     services = runtime.services
     paths = runtime.paths
-    module_registry = services.module_registry
     domain = container.domain
     execution = container.execution
     router.include_router(
         create_bi_router(domain.bi_services, state_stream_broker=state_stream_broker)
     )
-    company_comparison_service = create_company_comparison_service(
-        store=domain.bi_services.store,
-        registry=module_registry,
-        cell_store=services.pgvector_store,
-        completion_client=runtime.completion_client,
-    )
-    router.include_router(create_company_comparison_router(company_comparison_service))
     router.include_router(
-        create_company_comparison_router(
-            company_comparison_service,
-            prefix="/bi/comparisons",
-            include_in_schema=False,
-            legacy_alias=True,
-        )
+        create_company_comparison_router(domain.company_comparison)
     )
     workflow_dispatcher = execution.workflow_dispatcher
     workflow_execution = execution.workflow_execution
