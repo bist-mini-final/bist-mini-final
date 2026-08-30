@@ -1,0 +1,2 @@
+"""Financial BI domain boundary."""
+

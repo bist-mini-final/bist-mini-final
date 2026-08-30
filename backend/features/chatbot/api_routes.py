@@ -7,6 +7,8 @@ from anyio import to_thread
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
+from backend.domains.bi.application import BiApiServices
+from backend.domains.chatbot.application import ChatSuggestionService
 from backend.engine.workflows import (
     RunDispatcher,
     RunStore,
@@ -14,7 +16,6 @@ from backend.engine.workflows import (
     WorkflowExecutor,
     WorkflowStore,
 )
-from backend.features.bi.api_services import BiApiServices
 from backend.providers.openai_responses import OpenAIResponsesClient, OpenAIResponsesError
 from backend.storage.db_manager import DatabaseManager
 from modules.common.config import DEFAULT_READER_MODEL
@@ -32,7 +33,6 @@ from .grounding import (
     finalize_grounded_answer,
 )
 from .repository import ChatSessionRepository
-from .suggestions import ChatSuggestionService
 
 
 class CreateSessionRequest(BaseModel):

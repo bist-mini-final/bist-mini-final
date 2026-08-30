@@ -30,7 +30,7 @@ from .api_models import (
     BiMaterializationAccepted,
     BiMaterializationCandidateListResponse,
 )
-from .api_services import BiApiServices
+from backend.domains.bi.application import BiApiServices
 from .api_state import (
     accepted,
     build_company_summary,

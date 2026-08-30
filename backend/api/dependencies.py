@@ -14,7 +14,7 @@ from fastapi import Depends, Request
 from backend.bootstrap.container import ApplicationContainer
 from backend.engine.runtime.registry import ModuleRegistry
 from backend.engine.runtime.services import WorkflowRuntimeServices
-from backend.features.bi.api_services import BiApiServices
+from backend.domains.bi.application import BiApiServices
 
 
 def get_container(request: Request) -> ApplicationContainer:
