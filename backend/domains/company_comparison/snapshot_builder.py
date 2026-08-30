@@ -18,6 +18,7 @@ from backend.domains.bi.domain.models import (
     BiEvidence,
     CompanyId,
     MetricId,
+    MetricSeries,
     SnapshotStatus,
 )
 from backend.features.bi.evidence import verifiable_cells
@@ -133,33 +134,35 @@ def _observed(
     )
 
 
-def _extract_base(
+def _validate_amount_contract(
     snapshot: BiDashboardSnapshot,
-) -> tuple[BaseFinancials | None, tuple[str, ...]]:
-    reasons: list[str] = []
-    revenue_series = snapshot.metrics.get(MetricId.REVENUE)
-    revenue_raw = _series(snapshot, MetricId.REVENUE)
-    income_raw = _series(snapshot, MetricId.OPERATING_INCOME)
-    common_years = sorted(set(revenue_raw) & set(income_raw))[-MAX_HISTORICAL_PERIODS:]
-    if len(common_years) < 2:
-        reasons.append("매출과 영업이익이 함께 존재하는 회계연도가 2개 미만입니다.")
+    revenue_series: MetricSeries | None,
+    reasons: list[str],
+) -> None:
     if revenue_series is None or revenue_series.currency is None or revenue_series.scale is None:
         reasons.append("매출 통화 또는 배율 정보가 없습니다.")
-    else:
-        amount_metrics = (
-            MetricId.OPERATING_INCOME,
-            MetricId.TOTAL_LIABILITIES,
-            MetricId.TOTAL_ASSETS,
-            MetricId.NET_DEBT,
-        )
-        for metric_id in amount_metrics:
-            series = snapshot.metrics.get(metric_id)
-            if series is not None and (
-                series.currency != revenue_series.currency or series.scale != revenue_series.scale
-            ):
-                reasons.append("비교에 사용하는 금액 지표의 통화 또는 배율이 일치하지 않습니다.")
-                break
+        return
+    amount_metrics = (
+        MetricId.OPERATING_INCOME,
+        MetricId.TOTAL_LIABILITIES,
+        MetricId.TOTAL_ASSETS,
+        MetricId.NET_DEBT,
+    )
+    for metric_id in amount_metrics:
+        series = snapshot.metrics.get(metric_id)
+        if series is not None and (
+            series.currency != revenue_series.currency or series.scale != revenue_series.scale
+        ):
+            reasons.append("비교에 사용하는 금액 지표의 통화 또는 배율이 일치하지 않습니다.")
+            return
 
+
+def _historical_values(
+    revenue_raw: dict[int, AvailableObservation],
+    income_raw: dict[int, AvailableObservation],
+    common_years: list[int],
+    reasons: list[str],
+) -> tuple[dict[int, ObservedValue], dict[int, ObservedValue]]:
     revenues: dict[int, ObservedValue] = {}
     operating_income: dict[int, ObservedValue] = {}
     for year in common_years:
@@ -173,27 +176,50 @@ def _extract_base(
             continue
         revenues[year] = revenue
         operating_income[year] = income
+    return revenues, operating_income
 
-    latest_year = max(revenues) if revenues else None
-    liabilities = _observed(
-        _series(snapshot, MetricId.TOTAL_LIABILITIES).get(latest_year)
-        if latest_year is not None
-        else None
-    )
-    assets = _observed(
-        _series(snapshot, MetricId.TOTAL_ASSETS).get(latest_year)
-        if latest_year is not None
-        else None
-    )
-    net_debt = _observed(
-        _series(snapshot, MetricId.NET_DEBT).get(latest_year) if latest_year is not None else None
-    )
+
+def _financial_position(
+    snapshot: BiDashboardSnapshot,
+    latest_year: int | None,
+    reasons: list[str],
+) -> tuple[ObservedValue | None, ObservedValue | None, ObservedValue | None]:
+    def observed(metric_id: MetricId) -> ObservedValue | None:
+        observation = _series(snapshot, metric_id).get(latest_year) if latest_year else None
+        return _observed(observation)
+
+    liabilities = observed(MetricId.TOTAL_LIABILITIES)
+    assets = observed(MetricId.TOTAL_ASSETS)
+    net_debt = observed(MetricId.NET_DEBT)
     if liabilities is None:
         reasons.append("비교 기준 회계연도의 총부채 값 또는 원본 셀 근거가 없습니다.")
     if assets is None or assets.value <= 0:
         reasons.append("비교 기준 회계연도의 유효한 총자산 값과 원본 셀 근거가 없습니다.")
     if net_debt is None:
         reasons.append("비교 기준 회계연도의 순부채 값 또는 원본 셀 근거가 없습니다.")
+    return liabilities, assets, net_debt
+
+
+def _extract_base(
+    snapshot: BiDashboardSnapshot,
+) -> tuple[BaseFinancials | None, tuple[str, ...]]:
+    reasons: list[str] = []
+    revenue_series = snapshot.metrics.get(MetricId.REVENUE)
+    revenue_raw = _series(snapshot, MetricId.REVENUE)
+    income_raw = _series(snapshot, MetricId.OPERATING_INCOME)
+    common_years = sorted(set(revenue_raw) & set(income_raw))[-MAX_HISTORICAL_PERIODS:]
+    if len(common_years) < 2:
+        reasons.append("매출과 영업이익이 함께 존재하는 회계연도가 2개 미만입니다.")
+    _validate_amount_contract(snapshot, revenue_series, reasons)
+    revenues, operating_income = _historical_values(
+        revenue_raw,
+        income_raw,
+        common_years,
+        reasons,
+    )
+
+    latest_year = max(revenues) if revenues else None
+    liabilities, assets, net_debt = _financial_position(snapshot, latest_year, reasons)
     if len(revenues) < 2:
         reasons.append("검증 가능한 비교 회계연도가 2개 미만입니다.")
 

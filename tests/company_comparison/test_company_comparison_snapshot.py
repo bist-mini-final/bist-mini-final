@@ -34,6 +34,7 @@ from backend.domains.bi.domain.models import (
 )
 from backend.domains.company_comparison.application import CompanyComparisonService
 from backend.domains.company_comparison.errors import ComparisonDataError
+from backend.domains.company_comparison.models import CompanyComparisonSnapshot
 from backend.domains.company_comparison.snapshot_builder import (
     CompanyComparisonSnapshotBuilder,
 )
@@ -277,6 +278,20 @@ def test_builder_drops_placeholder_source_cells_from_comparison_evidence() -> No
 
     assert all("Cell Value: ?" not in item.source_text for item in result.evidence)
     assert not any(item.cell_coord == "D22" for item in result.evidence)
+
+
+def test_snapshot_contract_rejects_unresolved_period_evidence() -> None:
+    snapshot = CompanyComparisonSnapshotBuilder().build(
+        (
+            _snapshot("company-a", "Alpha", growth=Decimal("0.10"), margin=Decimal("0.20")),
+            _snapshot("company-b", "Beta", growth=Decimal("0.04"), margin=Decimal("0.12")),
+        )
+    )
+    payload = snapshot.model_dump(mode="json")
+    payload["companies"][0]["periods"][0]["evidence_ids"] = ["E99999"]
+
+    with pytest.raises(ValueError, match="period evidence ids must resolve"):
+        CompanyComparisonSnapshot.model_validate(payload)
 
 
 def test_builder_rejects_fewer_than_two_complete_companies() -> None:

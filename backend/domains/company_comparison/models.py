@@ -115,6 +115,102 @@ class ComparisonSpotlight(BiContractModel):
     margin_distribution: tuple[ComparisonDistributionBucket, ...]
 
 
+def _validate_company_identity(snapshot: "CompanyComparisonSnapshot") -> list[str]:
+    company_ids = [str(company.company_id) for company in snapshot.companies]
+    if len(company_ids) != len(set(company_ids)):
+        raise ValueError("company ids must be unique")
+    if min(company.rank for company in snapshot.companies) != 1:
+        raise ValueError("company ranks must start at one")
+    source_ids = {company.source_snapshot_id for company in snapshot.companies}
+    if source_ids != set(snapshot.snapshot.source_snapshot_ids):
+        raise ValueError("source snapshot ids must match included companies")
+    return company_ids
+
+
+def _snapshot_link_ids(
+    snapshot: "CompanyComparisonSnapshot",
+) -> tuple[set[str], set[str]]:
+    evidence_ids = [item.evidence_id for item in snapshot.evidence]
+    if len(evidence_ids) != len(set(evidence_ids)):
+        raise ValueError("evidence ids must be unique")
+    return set(evidence_ids), {item.assumption_id for item in snapshot.assumptions}
+
+
+def _validate_period_links(
+    periods: tuple[ComparisonPeriod, ...],
+    evidence_ids: set[str],
+    assumption_ids: set[str],
+) -> None:
+    for period in periods:
+        if not set(period.evidence_ids) <= evidence_ids:
+            raise ValueError("period evidence ids must resolve inside the snapshot")
+        if period.assumption_id is not None and period.assumption_id not in assumption_ids:
+            raise ValueError("forecast assumption ids must resolve inside the snapshot")
+
+
+def _validate_company_periods(
+    company: ComparisonCompany,
+    evidence_ids: set[str],
+    assumption_ids: set[str],
+) -> None:
+    historical = [period for period in company.periods if period.period_type == "historical"]
+    forecasts = [period for period in company.periods if period.period_type == "forecast"]
+    if len(historical) < 2 or len(forecasts) != 3:
+        raise ValueError("each company requires at least two actuals and three forecasts")
+    if [period.year for period in company.periods] != sorted(
+        period.year for period in company.periods
+    ):
+        raise ValueError("company periods must be ordered by year")
+    if (
+        historical[0].year != company.historical_start_year
+        or historical[-1].year != company.historical_end_year
+    ):
+        raise ValueError("company historical range must match its periods")
+    if forecasts[0].year != company.historical_end_year + 1:
+        raise ValueError("forecast periods must follow the latest historical year")
+    _validate_period_links(company.periods, evidence_ids, assumption_ids)
+
+
+def _validate_snapshot_ranges(snapshot: "CompanyComparisonSnapshot") -> None:
+    expected_start = min(company.historical_start_year for company in snapshot.companies)
+    expected_end = max(company.historical_end_year for company in snapshot.companies)
+    if (
+        snapshot.historical_start_year != expected_start
+        or snapshot.historical_end_year != expected_end
+    ):
+        raise ValueError("snapshot historical range must match included companies")
+    expected_forecast_end = max(
+        period.year
+        for company in snapshot.companies
+        for period in company.periods
+        if period.period_type == "forecast"
+    )
+    if snapshot.forecast_end_year != expected_forecast_end:
+        raise ValueError("snapshot forecast range must match included companies")
+
+
+def _validate_snapshot_status(snapshot: "CompanyComparisonSnapshot") -> None:
+    if (snapshot.snapshot.status is SnapshotStatus.PARTIAL) != bool(snapshot.exclusions):
+        raise ValueError("partial status must match the exclusion list")
+
+
+def _validate_spotlight(snapshot: "CompanyComparisonSnapshot", company_ids: list[str]) -> None:
+    if str(snapshot.spotlight.leader_company_id) not in company_ids:
+        raise ValueError("spotlight leader must be an included company")
+    if str(snapshot.spotlight.riser_company_id) not in company_ids:
+        raise ValueError("spotlight riser must be an included company")
+    expected_count = len(snapshot.companies)
+    distributions = (
+        snapshot.spotlight.cagr_distribution,
+        snapshot.spotlight.margin_distribution,
+    )
+    if any(
+        sum(bucket.count for bucket in distribution) != expected_count
+        for distribution in distributions
+    ):
+        raise ValueError("distribution buckets must cover every included company")
+
+
 class CompanyComparisonSnapshot(BiContractModel):
     schema_version: Literal[1] = 1
     snapshot: ComparisonSnapshotMeta
@@ -129,72 +225,13 @@ class CompanyComparisonSnapshot(BiContractModel):
 
     @model_validator(mode="after")
     def validate_snapshot_links(self) -> "CompanyComparisonSnapshot":
-        company_ids = [str(company.company_id) for company in self.companies]
-        if len(company_ids) != len(set(company_ids)):
-            raise ValueError("company ids must be unique")
-        if min(company.rank for company in self.companies) != 1:
-            raise ValueError("company ranks must start at one")
-
-        source_snapshot_ids = [company.source_snapshot_id for company in self.companies]
-        if set(source_snapshot_ids) != set(self.snapshot.source_snapshot_ids):
-            raise ValueError("source snapshot ids must match included companies")
-
-        evidence_ids = [item.evidence_id for item in self.evidence]
-        if len(evidence_ids) != len(set(evidence_ids)):
-            raise ValueError("evidence ids must be unique")
-        evidence_id_set = set(evidence_ids)
-        assumption_ids = {item.assumption_id for item in self.assumptions}
-
+        company_ids = _validate_company_identity(self)
+        evidence_ids, assumption_ids = _snapshot_link_ids(self)
         for company in self.companies:
-            historical = [
-                period for period in company.periods if period.period_type == "historical"
-            ]
-            forecasts = [period for period in company.periods if period.period_type == "forecast"]
-            if len(historical) < 2 or len(forecasts) != 3:
-                raise ValueError("each company requires at least two actuals and three forecasts")
-            if [period.year for period in company.periods] != sorted(
-                period.year for period in company.periods
-            ):
-                raise ValueError("company periods must be ordered by year")
-            if (
-                historical[0].year != company.historical_start_year
-                or historical[-1].year != company.historical_end_year
-            ):
-                raise ValueError("company historical range must match its periods")
-            if forecasts[0].year != company.historical_end_year + 1:
-                raise ValueError("forecast periods must follow the latest historical year")
-            for period in company.periods:
-                if not set(period.evidence_ids) <= evidence_id_set:
-                    raise ValueError("period evidence ids must resolve inside the snapshot")
-                if period.assumption_id is not None and period.assumption_id not in assumption_ids:
-                    raise ValueError("forecast assumption ids must resolve inside the snapshot")
-
-        if self.historical_start_year != min(
-            company.historical_start_year for company in self.companies
-        ) or self.historical_end_year != max(
-            company.historical_end_year for company in self.companies
-        ):
-            raise ValueError("snapshot historical range must match included companies")
-        if self.forecast_end_year != max(
-            period.year
-            for company in self.companies
-            for period in company.periods
-            if period.period_type == "forecast"
-        ):
-            raise ValueError("snapshot forecast range must match included companies")
-        if (self.snapshot.status is SnapshotStatus.PARTIAL) != bool(self.exclusions):
-            raise ValueError("partial status must match the exclusion list")
-        if str(self.spotlight.leader_company_id) not in company_ids:
-            raise ValueError("spotlight leader must be an included company")
-        if str(self.spotlight.riser_company_id) not in company_ids:
-            raise ValueError("spotlight riser must be an included company")
-        expected_count = len(self.companies)
-        for distribution in (
-            self.spotlight.cagr_distribution,
-            self.spotlight.margin_distribution,
-        ):
-            if sum(bucket.count for bucket in distribution) != expected_count:
-                raise ValueError("distribution buckets must cover every included company")
+            _validate_company_periods(company, evidence_ids, assumption_ids)
+        _validate_snapshot_ranges(self)
+        _validate_snapshot_status(self)
+        _validate_spotlight(self, company_ids)
         return self
 
 
