@@ -1,0 +1,2 @@
+"""Company-comparison domain boundary."""
+

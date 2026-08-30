@@ -15,20 +15,20 @@ from backend.core.settings import (
     VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
+from backend.domains.bi.application import BiApiServices
+from backend.domains.chatbot.application import ChatSuggestionService
+from backend.domains.chatbot.infrastructure.postgres import ChatSuggestionRepository
+from backend.domains.company_comparison.application import CompanyComparisonService
 from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
 from backend.engine.runtime.services import (
     WorkflowRuntimeServices,
     create_workflow_runtime_services,
 )
 from backend.engine.workflows import WorkflowExecutionService
-from backend.features.bi.api_services import BiApiServices
 from backend.features.bi.composition import create_bi_services
-from backend.features.chatbot.suggestion_repository import ChatSuggestionRepository
-from backend.features.chatbot.suggestions import ChatSuggestionService
 from backend.features.company_comparison.composition import (
     create_company_comparison_service,
 )
-from backend.features.company_comparison.service import CompanyComparisonService
 from backend.providers.embeddings.openai import OpenAIEmbeddingEncoder
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.kubernetes_monitor import KubernetesMonitor

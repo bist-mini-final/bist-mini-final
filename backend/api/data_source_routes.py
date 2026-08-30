@@ -2,34 +2,37 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
-from uuid import uuid4
 
-from anyio import open_file, to_thread
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi import Path as FastPath
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from backend.core.settings import PROCESSED_DATA_DIR
+from backend.domains.data_sources.application import (
+    DataSourceFileService,
+    UploadSourceFileCommand,
+)
 from backend.engine.workflows import (
     RunDispatcher,
     RunStore,
     WorkflowExecutor,
     WorkflowStore,
 )
+from backend.platform.data_sources import (
+    IngestionSubmissionAdapter,
+    SourceFileInspectorAdapter,
+)
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.storage.data_sources import IngestionJobService
-from backend.storage.data_sources import IngestionRequest as IngestRequestDTO
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_probe import PgVectorConnectionProbe
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.spreadsheets.ingestion import (
     delete_vector_index,
-    get_processed_file_info,
     get_vector_index_detail,
     list_processed_files,
     list_vector_indexes,
@@ -41,18 +44,7 @@ from modules.common.config import DEFAULT_EMBEDDING_MODEL
 from .data_source_database_routes import create_database_router
 from .data_source_ingestion_routes import create_ingestion_router
 
-MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
-_WORKBOOK_SUFFIXES = frozenset({".xlsx", ".xlsm"})
-_HASHED_FILE_SUFFIXES = frozenset({".xlsx", ".xlsm", ".json"})
 logger = logging.getLogger(__name__)
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 class SearchRequestDTO(BaseModel):
@@ -91,6 +83,13 @@ def create_data_source_router(
         run_store,
         workflow_executor,
         workflow_dispatcher,
+    )
+    file_service = DataSourceFileService(
+        processed_dir=processed_dir,
+        metadata=db_manager,
+        vector_indexes=pgvector_store,
+        ingestion=IngestionSubmissionAdapter(ingestion_jobs),
+        inspector=SourceFileInspectorAdapter(),
     )
     router.include_router(create_database_router(pgvector_store, connection_probe))
     router.include_router(
@@ -151,83 +150,22 @@ def create_data_source_router(
         if not file.filename:
             raise HTTPException(status_code=400, detail="유효한 파일명이 필요합니다.")
 
-        safe_filename = Path(file.filename).name
-        destination = processed_dir / safe_filename
-        temporary = processed_dir / f".{safe_filename}.{uuid4().hex}.uploading"
+        async def chunks():
+            while chunk := await file.read(1024 * 1024):
+                yield chunk
+
         try:
-            processed_dir.mkdir(parents=True, exist_ok=True)
-            digest = hashlib.sha256()
-            size_bytes = 0
-            async with await open_file(temporary, "wb") as buffer:
-                while chunk := await file.read(1024 * 1024):
-                    size_bytes += len(chunk)
-                    if size_bytes > MAX_UPLOAD_SIZE_BYTES:
-                        raise HTTPException(
-                            status_code=413,
-                            detail="파일 크기는 500MB를 초과할 수 없습니다.",
-                        )
-                    digest.update(chunk)
-                    await buffer.write(chunk)
-            await to_thread.run_sync(temporary.replace, destination)
-            file_hash = digest.hexdigest()
-        except HTTPException:
-            if temporary.exists():
-                temporary.unlink()
-            raise
-        except Exception as error:
-            if temporary.exists():
-                temporary.unlink()
-            raise HTTPException(
-                status_code=500,
-                detail=f"파일 저장 실패: {error}",
-            ) from error
-        finally:
-            await file.close()
-
-        if await db_manager.is_connected_async():
-            try:
-                await db_manager.save_source_file_async(
-                    file_id=file_hash,
-                    file_name=safe_filename,
-                    file_hash=file_hash,
-                    file_type=destination.suffix.lstrip(".").lower() or "bin",
-                    file_size=size_bytes,
-                    storage_path=str(destination.resolve()),
-                )
-            except Exception as error:
-                logger.warning("업로드 파일 DB 메타데이터 저장 실패: %s", error)
-
-        suffix = destination.suffix.casefold()
-        ingestion_job: Optional[Dict[str, Any]] = None
-        ingestion_error: Optional[str] = None
-        if auto_ingest and suffix in _WORKBOOK_SUFFIXES:
-            try:
-                request = IngestRequestDTO(
-                    file_name=safe_filename,
+            return await file_service.upload(
+                UploadSourceFileCommand(
+                    file_name=file.filename,
+                    auto_ingest=auto_ingest,
                     model=model,
                     batch_size=batch_size,
-                )
-                run = await to_thread.run_sync(
-                    ingestion_jobs.create_and_submit,
-                    request,
-                )
-                ingestion_job = ingestion_jobs.payload(run)
-            except Exception as error:
-                logger.exception("업로드 후 자동 인덱싱 제출 실패: %s", safe_filename)
-                ingestion_error = str(error)
-
-        uploaded = await to_thread.run_sync(
-            lambda: get_processed_file_info(
-                destination,
-                workbook_hash=(file_hash if suffix in _HASHED_FILE_SUFFIXES else None),
+                ),
+                chunks(),
             )
-        )
-        return {
-            "status": "success",
-            "file": uploaded,
-            "ingestion_job": ingestion_job,
-            "error": ingestion_error,
-        }
+        finally:
+            await file.close()
 
     @router.get(
         "/files/{filename}/download",
@@ -258,56 +196,11 @@ def create_data_source_router(
         filename: str = FastPath(..., description="삭제할 파일명"),
     ) -> Dict[str, Any]:
         """업로드된 원본 파일을 삭제하고 연결된 pgvector 벡터 인덱스를 제거합니다."""
-        safe_filename = Path(filename).name
-        target = processed_dir / safe_filename
-        if not target.is_file():
-            raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
-
-        # Compute workbook hash to identify associated indexes
-        workbook_hash: Optional[str] = None
-        suffix = target.suffix.lower()
-        if suffix in _HASHED_FILE_SUFFIXES:
-            try:
-                workbook_hash = _sha256_file(target)
-            except Exception as error:
-                logger.warning("파일 해시 계산 실패 (인덱스 정리 건너뜀): %s", error)
-
-        try:
-            target.unlink()
-        except Exception as error:
-            raise HTTPException(status_code=500, detail=f"파일 삭제 실패: {error}") from error
-
-        # Clean up associated vector indexes
-        deleted_indexes = 0
-        if workbook_hash and pgvector_store.is_connected():
-            try:
-                deleted_indexes = pgvector_store.delete_by_workbook_hash(workbook_hash)
-            except Exception as error:
-                logger.warning(
-                    "연관된 벡터 인덱스 정리 중 오류 발생 (파일은 삭제됨): %s",
-                    error,
-                    exc_info=True,
-                )
-
-        if db_manager.is_connected():
-            try:
-                db_manager.delete_source_file(
-                    workbook_hash or safe_filename,
-                    actor_id="api-user",
-                    request_id=getattr(request.state, "request_id", None),
-                )
-            except Exception as error:
-                logger.warning(
-                    "삭제된 파일의 DB 메타데이터 soft-delete 실패: %s",
-                    error,
-                    exc_info=True,
-                )
-
-        return {
-            "status": "success",
-            "message": f"{safe_filename} 파일이 삭제되었습니다.",
-            "deleted_indexes": deleted_indexes,
-        }
+        return file_service.delete(
+            filename,
+            actor_id="api-user",
+            request_id=getattr(request.state, "request_id", None),
+        )
 
     @router.get(
         "/indexes",

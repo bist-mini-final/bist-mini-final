@@ -1,6 +1,4 @@
-"""Compatibility exports for the BI application boundary."""
-
-from backend.domains.bi.application import (
+from .services import (
     BiApiServices,
     BiApiStorePort,
     BiMaterializationQueuePort,
@@ -13,3 +11,4 @@ __all__ = [
     "BiMaterializationQueuePort",
     "BiQuestionApiPort",
 ]
+

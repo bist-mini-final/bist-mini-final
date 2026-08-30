@@ -6,10 +6,10 @@ from fastapi import APIRouter, HTTPException
 from starlette import status
 
 from backend.contracts import ApiErrorEnvelope
+from backend.domains.company_comparison.application import CompanyComparisonService
 
 from .errors import ComparisonDataError
 from .models import CompanyComparisonSnapshot
-from .service import CompanyComparisonService
 
 
 def create_company_comparison_router(

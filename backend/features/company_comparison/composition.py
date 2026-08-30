@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from backend.features.bi.api_services import BiApiStorePort
+from backend.domains.bi.application import BiApiStorePort
+from backend.domains.company_comparison.application import CompanyComparisonService
 from backend.storage.versioned_snapshot_store import PostgresVersionedSnapshotRepository
-
-from .service import CompanyComparisonService
 
 
 def create_company_comparison_service(

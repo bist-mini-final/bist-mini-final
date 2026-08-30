@@ -1,6 +1,4 @@
-"""Compatibility exports for the company-comparison application service."""
-
-from backend.domains.company_comparison.application import (
+from .service import (
     SNAPSHOT_DOMAIN,
     SNAPSHOT_SCOPE,
     CompanyComparisonService,
@@ -13,3 +11,4 @@ __all__ = [
     "CompanyComparisonService",
     "CompanyComparisonSourcePort",
 ]
+

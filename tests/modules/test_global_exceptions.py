@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from backend.main import register_global_exception_handlers
+from backend.shared.domain import ResourceNotFoundError
 from modules.common.exceptions import (
     DocumentParsingError,
     ModuleValidationError,
@@ -53,6 +54,12 @@ class GlobalExceptionHandlerTests(unittest.TestCase):
                     "retryable": True,
                 },
             )
+
+        @self.app.get("/test/error/application")
+        def raise_application():
+            error = ResourceNotFoundError("대상을 찾을 수 없습니다")
+            error.code = "TEST_RESOURCE_NOT_FOUND"
+            raise error
 
         self.client = TestClient(self.app, raise_server_exceptions=False)
 
@@ -105,6 +112,13 @@ class GlobalExceptionHandlerTests(unittest.TestCase):
         detail = res.json()["detail"]
         self.assertEqual(detail["code"], "WORKFLOW_QUEUE_UNAVAILABLE")
         self.assertTrue(detail["retryable"])
+
+    def test_application_error_uses_shared_error_contract(self) -> None:
+        res = self.client.get("/test/error/application")
+        self.assertEqual(res.status_code, 404)
+        detail = res.json()["detail"]
+        self.assertEqual(detail["code"], "TEST_RESOURCE_NOT_FOUND")
+        self.assertEqual(detail["message"], "대상을 찾을 수 없습니다")
 
     def test_healthz_and_probes(self) -> None:
         from backend.main import create_app
