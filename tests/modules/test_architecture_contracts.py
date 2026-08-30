@@ -45,6 +45,30 @@ def test_features_never_import_http_api_layer() -> None:
     assert not violations, f"feature -> API layer inversion: {sorted(set(violations))}"
 
 
+def test_domain_packages_do_not_import_outer_layers() -> None:
+    forbidden_prefixes = (
+        "backend.api",
+        "backend.platform",
+        "backend.providers",
+        "backend.storage",
+    )
+    violations: list[str] = []
+    for path in _python_files("backend/domains"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            imported: list[str] = []
+            if isinstance(node, ast.ImportFrom):
+                imported = [node.module or ""]
+            elif isinstance(node, ast.Import):
+                imported = [alias.name for alias in node.names]
+            if any(
+                name.startswith(forbidden_prefixes)
+                for name in imported
+            ):
+                violations.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+    assert not violations, f"domain -> outer layer dependency: {violations}"
+
+
 def test_framework_state_access_is_confined_to_the_composition_boundary() -> None:
     allowed = {
         Path("backend/api/dependencies.py"),
