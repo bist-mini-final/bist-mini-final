@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api.bi_routes import register_bi_exception_handlers
 from backend.api.exception_handlers import register_global_exception_handlers
 from backend.api.middleware import RequestObservabilityMiddleware
 from backend.api.openapi import OPENAPI_TAGS, custom_openapi_schema
@@ -16,7 +17,6 @@ from backend.bootstrap.container import ApplicationContainer
 from backend.bootstrap.lifecycle import create_lifespan
 from backend.core.settings import DEV_CORS_ORIGINS, REDIS_URL
 from backend.core.state_stream_broker import create_state_stream_broker
-from backend.features.bi.api_routes import register_bi_exception_handlers
 
 
 def create_app(container: ApplicationContainer | None = None) -> FastAPI:

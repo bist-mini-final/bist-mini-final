@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
+from backend.api.bi_routes import create_bi_router
 from backend.bootstrap.container import ApplicationContainer
 from backend.core.state_stream_broker import StateStreamBroker
-from backend.features.bi.api_routes import create_bi_router
 from backend.features.chatbot.api_routes import create_chat_router
 from backend.features.company_comparison.api_routes import (
     create_company_comparison_router,
