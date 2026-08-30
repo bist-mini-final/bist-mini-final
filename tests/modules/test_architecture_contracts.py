@@ -20,6 +20,13 @@ from backend.storage.data_sources.embedding_shard_worker_main import (
     EmbeddingShardWorker,
 )
 from backend.storage.data_sources.vector_shard_worker_main import VectorShardWorker
+from backend.storage.db_manager import DatabaseManager
+from backend.storage.pgvector_store import PgVectorStore
+from backend.storage.repositories import (
+    PgVectorRetrievalMixin,
+    SourceFileRepositoryMixin,
+    WorkflowRunRepositoryMixin,
+)
 from jobs import ALL_JOBS, WorkerJobDefinition
 from jobs.kubernetes import kubernetes_worker_specs
 
@@ -41,9 +48,7 @@ def test_features_never_import_http_api_layer() -> None:
     for path in _python_files("backend/features"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
-                "backend.api"
-            ):
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("backend.api"):
                 violations.append(str(path.relative_to(PROJECT_ROOT)))
             if isinstance(node, ast.Import):
                 if any(alias.name.startswith("backend.api") for alias in node.names):
@@ -67,13 +72,8 @@ def test_domain_packages_do_not_import_outer_layers() -> None:
                 imported = [node.module or ""]
             elif isinstance(node, ast.Import):
                 imported = [alias.name for alias in node.names]
-            if any(
-                name.startswith(forbidden_prefixes)
-                for name in imported
-            ):
-                violations.append(
-                    f"{path.relative_to(PROJECT_ROOT)}:{getattr(node, 'lineno', 0)}"
-                )
+            if any(name.startswith(forbidden_prefixes) for name in imported):
+                violations.append(f"{path.relative_to(PROJECT_ROOT)}:{getattr(node, 'lineno', 0)}")
     assert not violations, f"domain -> outer layer dependency: {violations}"
 
 
@@ -137,6 +137,12 @@ def test_chat_repository_uses_shared_postgres_repository_boundary() -> None:
     assert issubclass(ChatSessionRepository, SyncPostgresRepository)
 
 
+def test_database_facades_compose_focused_storage_capabilities() -> None:
+    assert issubclass(DatabaseManager, SourceFileRepositoryMixin)
+    assert issubclass(DatabaseManager, WorkflowRunRepositoryMixin)
+    assert issubclass(PgVectorStore, PgVectorRetrievalMixin)
+
+
 def test_one_shot_workers_share_the_leased_worker_template() -> None:
     assert issubclass(EmbeddingShardWorker, LeasedWorker)
     assert issubclass(VectorShardWorker, LeasedWorker)
@@ -164,24 +170,22 @@ def test_feature_packages_do_not_own_kubernetes_yaml() -> None:
 
 
 def test_kubernetes_tooling_uses_the_locked_project_python() -> None:
-    script = (PROJECT_ROOT / "deploy" / "kubernetes" / "local.sh").read_text(
-        encoding="utf-8"
-    )
+    script = (PROJECT_ROOT / "deploy" / "kubernetes" / "local.sh").read_text(encoding="utf-8")
     assert 'PROJECT_PYTHON="${PROJECT_ROOT}/.venv/bin/python"' in script
     assert "python3" not in script
 
 
 def test_execution_views_share_the_streaming_core() -> None:
     frontend = PROJECT_ROOT / "frontend" / "src"
-    playground_api = (
-        frontend / "features" / "playground" / "services" / "api.ts"
-    ).read_text(encoding="utf-8")
+    playground_api = (frontend / "features" / "playground" / "services" / "api.ts").read_text(
+        encoding="utf-8"
+    )
     ingestion_api = (
         frontend / "features" / "data-sources" / "services" / "dataSourceApi.ts"
     ).read_text(encoding="utf-8")
-    ingestion_view = (
-        frontend / "features" / "data-sources" / "DataSourcesView.tsx"
-    ).read_text(encoding="utf-8")
+    ingestion_view = (frontend / "features" / "data-sources" / "DataSourcesView.tsx").read_text(
+        encoding="utf-8"
+    )
 
     assert "observeWorkflowRun" in playground_api
     assert "observeWorkflowRun" in ingestion_api
@@ -200,6 +204,5 @@ def test_bi_product_route_never_uses_dashboard_fixtures() -> None:
     assert "features/bi/BiPage" in route
     assert not (frontend / "features" / "bi" / "BiView.tsx").exists()
     assert all(
-        "dashboardFixtures" not in path.read_text(encoding="utf-8")
-        for path in production_bi_files
+        "dashboardFixtures" not in path.read_text(encoding="utf-8") for path in production_bi_files
     )
