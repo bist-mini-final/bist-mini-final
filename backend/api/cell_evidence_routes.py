@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -15,21 +16,74 @@ def _matching_indexes(
     indexes: list[dict[str, Any]],
     company_name: str,
     workbook_hash: str,
+    index_id: str,
+    file_name: str,
 ) -> list[dict[str, Any]]:
-    company_key = company_name.strip().casefold()
     workbook_key = workbook_hash.strip().casefold()
-    return [
+    index_key = index_id.strip().casefold()
+    file_key = file_name.strip().casefold()
+    candidates = [
         item
         for item in indexes
         if (
-            not company_key
-            or str(item.get("company_name") or "").strip().casefold() == company_key
-        )
-        and (
             not workbook_key
             or str(item.get("workbook_hash") or "").strip().casefold() == workbook_key
         )
+        and (
+            not index_key
+            or str(item.get("index_id") or "").strip().casefold() == index_key
+        )
+        and (
+            not file_key
+            or str(item.get("file_name") or "").strip().casefold() == file_key
+        )
     ]
+    if not company_name.strip():
+        return candidates
+    company_matches = [
+        item
+        for item in candidates
+        if _company_alias_matches(item.get("company_name"), company_name)
+    ]
+    # Company names can be renamed after a run was persisted. Treat the name as a
+    # preference, while workbook/index/file identifiers remain strict filters.
+    return company_matches or candidates
+
+
+_LEGAL_SUFFIXES = {
+    "co",
+    "company",
+    "corp",
+    "corporation",
+    "inc",
+    "incorporated",
+    "limited",
+    "llc",
+    "ltd",
+    "plc",
+}
+
+
+def _company_tokens(value: Any) -> list[str]:
+    return [
+        token
+        for token in re.findall(r"[0-9a-z가-힣]+", str(value or "").casefold())
+        if token not in _LEGAL_SUFFIXES
+    ]
+
+
+def _company_alias_matches(left: Any, right: Any) -> bool:
+    left_tokens = _company_tokens(left)
+    right_tokens = _company_tokens(right)
+    if not left_tokens or not right_tokens:
+        return False
+    left_key = "".join(left_tokens)
+    right_key = "".join(right_tokens)
+    if left_key == right_key or left_key.startswith(right_key) or right_key.startswith(left_key):
+        return True
+    left_acronym = "".join(token[0] for token in left_tokens if token)
+    right_acronym = "".join(token[0] for token in right_tokens if token)
+    return left_key == right_acronym or right_key == left_acronym
 
 
 def _comparable_cell_value(value: Any) -> str:
@@ -54,6 +108,8 @@ def create_cell_evidence_router(
         cell_coord: str = Query(min_length=2, max_length=20),
         company_name: str = Query(default="", max_length=200),
         workbook_hash: str = Query(default="", max_length=64),
+        index_id: str = Query(default="", max_length=200),
+        file_name: str = Query(default="", max_length=500),
         cell_value: str = Query(default="", max_length=500),
     ) -> dict[str, Any]:
         normalized_sheet = sheet_name.strip()
@@ -62,15 +118,17 @@ def create_cell_evidence_router(
             pgvector_store.list_indexes(),
             company_name,
             workbook_hash,
+            index_id,
+            file_name,
         )
         matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
         for index in indexes:
-            index_id = str(index.get("index_id") or "").strip()
-            if not index_id:
+            collection_id = str(index.get("index_id") or "").strip()
+            if not collection_id:
                 continue
             cells = pgvector_store.fetch_cells_by_metadata(
                 [normalized_coord],
-                collection_name=index_id,
+                collection_name=collection_id,
                 limit=2,
                 cell_references=[
                     {
@@ -109,6 +167,17 @@ def create_cell_evidence_router(
             ]
             if value_matches:
                 matches = value_matches
+        if company_name.strip():
+            company_matches = [
+                match
+                for match in matches
+                if _company_alias_matches(
+                    match[1].get("company_name") or match[0].get("company_name"),
+                    company_name,
+                )
+            ]
+            if company_matches:
+                matches = company_matches
         distinct_indexes = {str(index.get("index_id") or "") for index, _ in matches}
         if len(distinct_indexes) > 1:
             raise HTTPException(
@@ -121,15 +190,17 @@ def create_cell_evidence_router(
             )
 
         index, cell = matches[0]
-        workbook_hash = str(
+        resolved_workbook_hash = str(
             cell.get("workbook_hash") or index.get("workbook_hash") or ""
         ).strip()
-        file_name = str(cell.get("file_name") or index.get("file_name") or "").strip()
+        resolved_file_name = str(
+            cell.get("file_name") or index.get("file_name") or ""
+        ).strip()
         image = locate_cell_artifact(
             processed_dir=processed_dir,
             artifact_dir=artifact_dir,
-            file_name=file_name,
-            workbook_hash=workbook_hash,
+            file_name=resolved_file_name,
+            workbook_hash=resolved_workbook_hash,
             sheet_name=normalized_sheet,
             cell_coord=normalized_coord,
         )
@@ -138,8 +209,8 @@ def create_cell_evidence_router(
                 cell.get("company_name") or index.get("company_name") or company_name
             ).strip(),
             "index_id": str(index.get("index_id") or ""),
-            "file_name": file_name,
-            "workbook_hash": workbook_hash,
+            "file_name": resolved_file_name,
+            "workbook_hash": resolved_workbook_hash,
             "sheet_name": str(cell.get("sheet_name") or normalized_sheet),
             "cell_coord": str(cell.get("cell_coord") or normalized_coord),
             "cell_value": cell.get("cell_value"),

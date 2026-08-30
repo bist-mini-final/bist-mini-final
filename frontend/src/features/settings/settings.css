@@ -90,7 +90,7 @@
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--color-text-primary, #0f172a);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-code);
 }
 
 .settings-status-banner {
@@ -120,7 +120,7 @@
   gap: 0.4rem;
 }
 
-.settings-url-box label {
+.settings-url-box__label {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--color-text-secondary, #64748b);
@@ -133,7 +133,7 @@
   padding: 0.8rem 1rem;
   border-radius: 6px;
   font-size: 0.85rem;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-code);
   word-break: break-all;
   user-select: all;
 }
@@ -196,6 +196,19 @@
   color: #92e2b5;
 }
 
+.settings-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-copy-row code {
+  flex: 1;
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .settings-section { padding: 1rem; }
+  .settings-copy-row { align-items: stretch; flex-direction: column; }
+  .settings-copy-row .ui-button { align-self: flex-end; }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Loader2, Search, Sparkles, X } from 'lucide-react';
-import { Button, IconButton } from '../../../shared/ui';
+import { Loader2, Search, Sparkles } from 'lucide-react';
+import { Button, Dialog } from '../../../shared/ui';
 import { dataSourceApi } from '../services/dataSourceApi';
 import type { SearchResultItem } from '../types';
 
@@ -27,39 +27,38 @@ export function IndexSearchTester({ indexId, fileName, model, onClose }: SearchT
     try {
       const res = await dataSourceApi.searchIndex(indexId, query.trim(), limit);
       setResults(res.results);
-    } catch (err: any) {
-      setError(err.message || '유사도 검색 실행에 실패했습니다.');
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message
+        ? err.message
+        : '유사도 검색 실행에 실패했습니다.');
     } finally {
       setIsSearching(false);
     }
   };
 
   return (
-    <div className="ds-modal-backdrop" onClick={onClose}>
-      <div
-        className="ds-modal ds-modal--large"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-labelledby="search-tester-title"
-      >
-        <header className="ds-modal__header">
-          <div className="ds-modal__title-wrap">
+    <Dialog
+      open
+      size="lg"
+      className="ds-modal ds-modal--large"
+      bodyClassName="ds-modal__body"
+      title={(
+        <span className="ds-modal__title-wrap">
             <span className="ds-modal__icon ds-modal__icon--green">
               <Search size={19} />
             </span>
-            <div>
-              <h3 id="search-tester-title">인덱스 유사도 검색 테스트</h3>
-              <small>
-                {fileName} · {model}
-              </small>
-            </div>
-          </div>
-          <IconButton variant="ghost" onClick={onClose} aria-label="닫기">
-            <X size={18} />
-          </IconButton>
-        </header>
-
-        <div className="ds-modal__body">
+            <span>인덱스 유사도 검색 테스트</span>
+        </span>
+      )}
+      description={`${fileName} · ${model}`}
+      onClose={onClose}
+      footer={(
+        <>
+          <small>질의 벡터와 인덱스 벡터의 Inner Product(정규화 Cosine) 점수입니다.</small>
+          <Button type="button" onClick={onClose}>닫기</Button>
+        </>
+      )}
+    >
           {/* Search Bar Form */}
           <form className="ds-search-form" onSubmit={handleSearch}>
             <div className="ds-search-input-wrap">
@@ -144,15 +143,6 @@ export function IndexSearchTester({ indexId, fileName, model, onClose }: SearchT
               </>
             )}
           </div>
-        </div>
-
-        <footer className="ds-modal__footer">
-          <small>질의 벡터와 인덱스 벡터의 Inner Product(정규화 Cosine) 점수입니다.</small>
-          <Button type="button" onClick={onClose}>
-            닫기
-          </Button>
-        </footer>
-      </div>
-    </div>
+    </Dialog>
   );
 }

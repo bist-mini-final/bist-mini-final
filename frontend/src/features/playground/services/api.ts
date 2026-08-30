@@ -1,8 +1,5 @@
 import type {
   ModuleDefinition,
-  BenchmarkCase,
-  BenchmarkSet,
-  BenchmarkJob,
   WorkflowDocument,
   WorkflowGraph,
   WorkflowRun,
@@ -10,7 +7,10 @@ import type {
 import {
   requestJson as httpJson,
 } from '../../../shared/api/httpClient';
-import { observeWorkflowRun } from '../../../shared/workflows/observeRun';
+import {
+  observeWorkflowRun,
+  type WorkflowRunEvent,
+} from '../../../shared/workflows/observeRun';
 
 export { ApiError } from '../../../shared/api/httpClient';
 
@@ -116,7 +116,7 @@ export const pipelineApi = {
 
   async streamRun(
     runId: string,
-    onEvent: (event: { event: string; data: any }) => void,
+    onEvent: (event: WorkflowRunEvent) => void,
     signal?: AbortSignal
   ): Promise<WorkflowRun> {
     return observeWorkflowRun(runId, { onEvent, signal });
@@ -145,27 +145,4 @@ export const pipelineApi = {
     return requestJson<{ workflows: WorkflowDocument[] }>('/api/workflows', signal);
   },
 
-  getBenchmarkSets(signal?: AbortSignal) {
-    return requestJson<{ benchmark_sets: BenchmarkSet[] }>('/api/benchmark-sets', signal);
-  },
-
-  startBenchmarkJob(workflowIds: string[], cases: BenchmarkCase[], cacheMode: 'off' | 'all' | 'index_only' = 'index_only', executionScope: 'full' | 'pre_retrieval' = 'full') {
-    return postJson<{ id: string }>('/api/benchmarks/jobs', { workflow_ids: workflowIds, cases, use_cache: cacheMode === 'all', cache_mode: cacheMode, execution_scope: executionScope });
-  },
-
-  getBenchmarkJob(jobId: string, signal?: AbortSignal) {
-    return requestJson<BenchmarkJob>(`/api/benchmarks/jobs/${encodeURIComponent(jobId)}`, signal);
-  },
-
-  cancelBenchmarkJob(jobId: string) {
-    return writeJson<{ id: string; status: string }>('DELETE', `/api/benchmarks/jobs/${encodeURIComponent(jobId)}`);
-  },
-
-  pauseBenchmarkJob(jobId: string) {
-    return postJson<{ id: string; status: string }>(`/api/benchmarks/jobs/${encodeURIComponent(jobId)}/pause`);
-  },
-
-  resumeBenchmarkJob(jobId: string) {
-    return postJson<{ id: string; status: string }>(`/api/benchmarks/jobs/${encodeURIComponent(jobId)}/resume`);
-  },
 };

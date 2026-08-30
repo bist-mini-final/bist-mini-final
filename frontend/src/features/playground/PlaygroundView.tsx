@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { X } from 'lucide-react';
+import { useAppLocation } from '../../app/router';
 import { IconButton, PromptDialog } from '../../shared/ui';
 import { useBiPlaygroundHandoff } from '../bi/integrations/playgroundHandoffAdapter';
 import { Header } from './components/Header';
@@ -43,6 +44,7 @@ function workflowOptions(documents: WorkflowDocument[]): WorkflowOption[] {
 }
 
 function PlaygroundWorkspace() {
+  const location = useAppLocation();
   const [isPaletteOpen, setIsPaletteOpen] = useState(
     () => window.matchMedia('(min-width: 1024px)').matches
   );
@@ -90,7 +92,7 @@ function PlaygroundWorkspace() {
     modules: controller.modules,
     nodes: graph.nodes,
     ready: workflow.ready,
-    search: window.location.search,
+    search: location.search,
     setQueryText: controller.setQueryText,
   });
   const currentRun = workflow.latestRunMatchesGraph ? workflow.latestRun : null;
@@ -122,7 +124,7 @@ function PlaygroundWorkspace() {
     }
   };
 
-  const handleNodeExecute = async (_nodeId: string) => {
+  const handleNodeExecute = async () => {
     controller.dismissError();
     try {
       await workflow.executeAll(
@@ -262,7 +264,7 @@ function PlaygroundWorkspace() {
   return (
     <ModuleExecutionContext.Provider
       value={{
-        onExecuteNode: (nodeId) => void handleNodeExecute(nodeId),
+        onExecuteNode: () => void handleNodeExecute(),
         onStopExecution: workflow.cancelExecution,
         onClearNodeResult: graph.clearNodeExecutionState,
         isExecuting: workflow.isExecuting,

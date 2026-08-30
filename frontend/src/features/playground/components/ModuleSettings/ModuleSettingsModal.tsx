@@ -390,13 +390,18 @@ export function ModuleSettingsModal({
   }, [nodeId, run, summaryState]);
 
   return createPortal(
-    <div className="module-settings-overlay" role="presentation" onMouseDown={onClose}>
+    <div
+      className="module-settings-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section
         className="module-settings-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="module-settings-title"
-        onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="module-settings-modal__header">
           <div className="module-settings-modal__mark"><Settings2 className="h-5 w-5" /></div>

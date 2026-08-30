@@ -15,7 +15,7 @@
 .jobs-summary strong { overflow: hidden; color: #25372d; font-size: .87rem; text-overflow: ellipsis; white-space: nowrap; }
 .jobs-source-dot { width: .7rem; height: .7rem; border-radius: 999px; background: #23a56f; box-shadow: 0 0 0 4px #dcf7ea; }
 .jobs-context { display: flex; gap: 1.25rem; max-width: 90rem; margin: 0 auto .8rem; color: #738078; font-size: .66rem; }
-.jobs-context strong { margin-left: .3rem; color: #374a3f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.jobs-context strong { margin-left: .3rem; color: #374a3f; font-family: var(--font-code); }
 .jobs-panel { max-width: 90rem; margin: 0 auto .85rem; border: 1px solid #dde7e1; border-radius: .75rem; overflow: hidden; background: #fff; }
 .jobs-panel__header { display: flex; align-items: center; justify-content: space-between; padding: .85rem 1rem; border-bottom: 1px solid #e7ece9; }
 .jobs-panel__header h2 { margin: 0; font-size: .92rem; }

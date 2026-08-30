@@ -9,8 +9,9 @@ import {
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button, IconButton } from './Button';
+import { useFocusTrap } from './useFocusTrap';
 
-type DialogSize = 'sm' | 'md' | 'lg';
+type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
 export interface DialogProps {
   readonly open: boolean;
@@ -20,20 +21,13 @@ export interface DialogProps {
   readonly children?: ReactNode;
   readonly footer?: ReactNode;
   readonly size?: DialogSize;
+  readonly className?: string;
+  readonly backdropClassName?: string;
+  readonly bodyClassName?: string;
   readonly closeLabel?: string;
   readonly closeDisabled?: boolean;
   readonly onClose: () => void;
 }
-
-const FOCUSABLE_SELECTOR = [
-  '[data-dialog-initial-focus]',
-  'button:not(:disabled)',
-  'input:not(:disabled)',
-  'select:not(:disabled)',
-  'textarea:not(:disabled)',
-  'a[href]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
 
 /** Accessible modal foundation with focus trapping, Escape handling, and focus restoration. */
 export function Dialog({
@@ -44,6 +38,9 @@ export function Dialog({
   children,
   footer,
   size = 'md',
+  className = '',
+  backdropClassName = '',
+  bodyClassName = '',
   closeLabel = '닫기',
   closeDisabled = false,
   onClose,
@@ -59,58 +56,19 @@ export function Dialog({
     closeDisabledRef.current = closeDisabled;
   }, [closeDisabled, onClose]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const panel = panelRef.current;
-    const focusTimer = window.setTimeout(() => {
-      const initialFocus = panel?.querySelector<HTMLElement>('[data-dialog-initial-focus]')
-        ?? panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-      initialFocus?.focus();
-    });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (!closeDisabledRef.current) {
-          event.preventDefault();
-          onCloseRef.current();
-        }
-        return;
-      }
-      if (event.key !== 'Tab' || !panel) return;
-      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-        .filter((element) => element.getAttribute('aria-hidden') !== 'true');
-      if (focusable.length === 0) {
-        event.preventDefault();
-        panel.focus();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      document.removeEventListener('keydown', handleKeyDown);
-      previousFocus?.focus();
-    };
-  }, [open]);
+  useFocusTrap({
+    active: open,
+    containerRef: panelRef,
+    onEscape: () => {
+      if (!closeDisabledRef.current) onCloseRef.current();
+    },
+  });
 
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
-      className="ui-dialog-backdrop"
+      className={`ui-dialog-backdrop ${backdropClassName}`.trim()}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !closeDisabled) onClose();
@@ -118,7 +76,7 @@ export function Dialog({
     >
       <section
         ref={panelRef}
-        className={`ui-dialog ui-dialog--${size}`}
+        className={`ui-dialog ui-dialog--${size} ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -141,7 +99,9 @@ export function Dialog({
             <X size={18} />
           </IconButton>
         </header>
-        {children ? <div className="ui-dialog__body">{children}</div> : null}
+        {children ? (
+          <div className={`ui-dialog__body ${bodyClassName}`.trim()}>{children}</div>
+        ) : null}
         {footer ? <footer className="ui-dialog__footer">{footer}</footer> : null}
       </section>
     </div>,

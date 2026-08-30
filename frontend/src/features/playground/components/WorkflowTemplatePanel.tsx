@@ -46,14 +46,15 @@ export function WorkflowTemplatePanel({
     <div
       className="workflow-template-overlay"
       role="presentation"
-      onMouseDown={onClose}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <aside
         className="workflow-template-panel"
         role="dialog"
         aria-modal="true"
         aria-label="새 워크플로 만들기"
-        onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="workflow-template-panel__header">
           <span><Plus size={18} /> 새 워크플로 만들기</span>

@@ -61,7 +61,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     (event: React.PointerEvent) => {
       event.stopPropagation();
       const el = event.currentTarget as HTMLElement;
-      try { el.setPointerCapture(event.pointerId); } catch {}
+      try { el.setPointerCapture(event.pointerId); } catch { /* pointer capture is optional */ }
 
       const onMove = (e: PointerEvent) => {
         const fp = screenToFlowPosition({ x: e.clientX, y: e.clientY });
@@ -77,7 +77,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
       };
 
       const onUp = (e: PointerEvent) => {
-        try { el.releasePointerCapture(e.pointerId); } catch {}
+        try { el.releasePointerCapture(e.pointerId); } catch { /* capture may already be released */ }
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
@@ -144,7 +144,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
         fill="none"
         stroke="transparent"
         strokeWidth={1}
-        style={{ pointerEvents: 'none', visibility: 'hidden' }}
+        className="workflow-edge__measurement-path"
       />
 
       {/* Wide invisible hit area */}
@@ -153,7 +153,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
         fill="none"
         stroke="transparent"
         strokeWidth={24}
-        style={{ cursor: 'pointer' }}
+        className="workflow-edge__hit-path"
       />
 
       {/* Selection halo */}
@@ -207,7 +207,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
       {/* Curve drag handle — always on the path via getPointAtLength */}
       {isSelectedOrHovered && handlePos && (
         <g
-          style={{ pointerEvents: 'all', cursor: 'grab' }}
+          className="workflow-edge__control"
           onPointerDown={onControlPointerDown}
           onDoubleClick={onControlDoubleClick}
         >
@@ -228,7 +228,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
             cy={handlePos.y}
             r={2.5}
             fill="#2563eb"
-            style={{ pointerEvents: 'none' }}
+            className="workflow-edge__control-center"
           />
         </g>
       )}

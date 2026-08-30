@@ -5,11 +5,12 @@ import {
   LoaderCircle,
   Minus,
   Plus,
-  X,
+  RotateCw,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { CellCitation } from '../markdown/cellCitations';
+import { Button, Dialog, IconButton } from '../ui';
+import { useDragPan } from '../ui/useDragPan';
 import { cellEvidenceApi, type CellEvidence } from './cellEvidenceApi';
 import './CellEvidenceModal.css';
 
@@ -28,17 +29,9 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState(0.8);
   const [imageReady, setImageReady] = useState(false);
+  const [requestVersion, setRequestVersion] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  const { isDragging, dragPanProps } = useDragPan(viewportRef);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -52,7 +45,7 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
         setError(reason instanceof Error ? reason.message : '셀 근거를 불러오지 못했습니다.');
       });
     return () => controller.abort();
-  }, [citation]);
+  }, [citation, requestVersion]);
 
   const bbox = evidence?.image.cell_bbox_px ?? null;
   const imageUrl = evidence?.image.rendered_available
@@ -93,40 +86,24 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
   // Focus follows both the loaded evidence and explicit zoom changes.
   }, [imageReady, bbox, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return createPortal(
-    <div
-      className="cell-evidence-overlay"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
-        className="cell-evidence-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cell-evidence-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header className="cell-evidence-modal__header">
+  return (
+    <Dialog
+      open
+      size="xl"
+      className="cell-evidence-modal"
+      backdropClassName="cell-evidence-overlay"
+      bodyClassName="cell-evidence-modal__body"
+      eyebrow="Source cell verification"
+      title={(
+        <span className="cell-evidence-dialog-title">
           <span className="cell-evidence-modal__mark"><FileSpreadsheet aria-hidden="true" /></span>
-          <div>
-            <span>Source cell verification</span>
-            <h2 id="cell-evidence-title">셀 원본 근거 검증</h2>
-            <p>답변에 사용된 셀을 원본 Excel 시트 이미지에서 직접 확인합니다.</p>
-          </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="cell-evidence-modal__close"
-            onClick={onClose}
-            aria-label="근거 검증 닫기"
-          >
-            <X aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className="cell-evidence-modal__body">
+          <span>셀 원본 근거 검증</span>
+        </span>
+      )}
+      description="답변에 사용된 셀을 원본 Excel 시트 이미지에서 직접 확인합니다."
+      closeLabel="근거 검증 닫기"
+      onClose={onClose}
+    >
           <aside className="cell-evidence-details" aria-label="셀 근거 메타데이터">
             <div className="cell-evidence-details__target">
               <span>{evidence?.sheet_name || citation.sheet}</span>
@@ -166,24 +143,30 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
                 <span>{evidence?.file_name || '근거를 확인하는 중입니다.'}</span>
               </div>
               <div className="cell-evidence-toolbar__actions">
-                <button type="button" onClick={() => setZoom((value) => Math.max(0.15, value - 0.1))} aria-label="축소">
+                <IconButton size="sm" variant="secondary" onClick={() => setZoom((value) => Math.max(0.15, value - 0.1))} aria-label="축소" disabled={!evidence}>
                   <Minus aria-hidden="true" />
-                </button>
+                </IconButton>
                 <output>{Math.round(zoom * 100)}%</output>
-                <button type="button" onClick={() => setZoom((value) => Math.min(2, value + 0.1))} aria-label="확대">
+                <IconButton size="sm" variant="secondary" onClick={() => setZoom((value) => Math.min(2, value + 0.1))} aria-label="확대" disabled={!evidence}>
                   <Plus aria-hidden="true" />
-                </button>
-                <button type="button" onClick={fitImage} aria-label="시트 화면 맞춤">
+                </IconButton>
+                <Button size="sm" variant="secondary" onClick={fitImage} aria-label="시트 화면 맞춤" disabled={!imageReady}>
                   <Focus aria-hidden="true" />
                   <span>맞춤</span>
-                </button>
-                <button type="button" onClick={focusCell} disabled={!bbox} aria-label="근거 셀로 이동">
+                </Button>
+                <Button size="sm" variant="secondary" onClick={focusCell} disabled={!bbox || !imageReady} aria-label="근거 셀로 이동">
                   <Focus aria-hidden="true" />
                   <span>근거 셀</span>
-                </button>
+                </Button>
               </div>
             </div>
-            <div ref={viewportRef} className="cell-evidence-viewport">
+            <div
+              ref={viewportRef}
+              className={`cell-evidence-viewport${isDragging ? ' is-dragging' : ''}`}
+              role="region"
+              aria-label="원본 시트 캔버스 · 드래그하여 이동"
+              {...dragPanProps}
+            >
               {evidence?.image.rendered_available && imageUrl ? (
                 <div
                   className="cell-evidence-canvas"
@@ -192,6 +175,7 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
                   <img
                     src={imageUrl}
                     alt={`${evidence.sheet_name} 원본 시트`}
+                    draggable={false}
                     style={{ width: imageSize.width * zoom, height: imageSize.height * zoom }}
                     onLoad={() => {
                       setImageReady(true);
@@ -218,6 +202,20 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
                   <strong>원본 시트 이미지 없음</strong>
                   <p>{evidence.image.unavailable_reason || '이 파일의 시트 이미지를 찾을 수 없습니다.'}</p>
                 </div>
+              ) : error ? (
+                <div className="cell-evidence-viewer__empty cell-evidence-viewer__empty--error" role="alert">
+                  <AlertTriangle aria-hidden="true" />
+                  <strong>셀 근거를 연결하지 못했습니다.</strong>
+                  <p>{error}</p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setRequestVersion((version) => version + 1)}
+                  >
+                    <RotateCw aria-hidden="true" />
+                    다시 시도
+                  </Button>
+                </div>
               ) : (
                 <div className="cell-evidence-viewer__empty">
                   <LoaderCircle className="cell-evidence-state__spinner" aria-hidden="true" />
@@ -226,9 +224,6 @@ export function CellEvidenceModal({ citation, onClose }: CellEvidenceModalProps)
               )}
             </div>
           </div>
-        </div>
-      </section>
-    </div>,
-    document.body,
+    </Dialog>
   );
 }

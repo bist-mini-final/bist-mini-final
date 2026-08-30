@@ -3,7 +3,7 @@ import { streamJsonEvents, type JsonSseMessage } from '../api/sse';
 import { mergeRunNodeUpdate } from './runState';
 import type { WorkflowRun } from './types';
 
-export interface WorkflowRunEvent extends JsonSseMessage {}
+export type WorkflowRunEvent = JsonSseMessage;
 
 interface ObserveWorkflowRunOptions {
   readonly initialRun?: WorkflowRun;
@@ -17,12 +17,15 @@ function isTerminal(run: WorkflowRun | undefined): run is WorkflowRun {
     && (run.status === 'completed' || run.status === 'failed' || run.status === 'paused');
 }
 
-function nodeUpdate(data: unknown): { node_id: string } | null {
+type WorkflowNodeUpdate = Partial<WorkflowRun['nodes'][string]>
+  & Pick<WorkflowRun['nodes'][string], 'node_id'>;
+
+export function workflowNodeUpdateFromEventData(data: unknown): WorkflowNodeUpdate | null {
   if (!data || typeof data !== 'object' || !('node_id' in data)) return null;
-  return typeof data.node_id === 'string' ? data as { node_id: string } : null;
+  return typeof data.node_id === 'string' ? data as WorkflowNodeUpdate : null;
 }
 
-function completedRun(data: unknown): WorkflowRun | null {
+export function workflowRunFromEventData(data: unknown): WorkflowRun | null {
   if (!data || typeof data !== 'object' || !('run' in data)) return null;
   const run = data.run;
   return run && typeof run === 'object' ? run as WorkflowRun : null;
@@ -71,10 +74,10 @@ export async function observeWorkflowRun(
           current
           && isWorkflowNodeEvent(event.event)
         ) {
-          const update = nodeUpdate(event.data);
+          const update = workflowNodeUpdateFromEventData(event.data);
           if (update) current = mergeRunNodeUpdate(current, update);
         } else if (isWorkflowTerminalEvent(event.event)) {
-          current = completedRun(event.data) ?? current;
+          current = workflowRunFromEventData(event.data) ?? current;
         }
         if (current) options.onRun?.(current, event);
       }, options.signal);

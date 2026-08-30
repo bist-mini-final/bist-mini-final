@@ -31,12 +31,14 @@ export const ProcessedFileSelectorNode = ({ data, selected }: ProcessedFileSelec
   const schemaDefault = typeof fileSchema?.default === 'string' ? fileSchema.default : '';
   const selectedFile = data.values?.file_name || schemaDefault || fileOptions[0] || '';
   const sheetCount = selectedSheetCount(data.executionOutput);
+  const configuredFile = data.values?.file_name;
+  const onValuesChange = data.onValuesChange;
 
   useEffect(() => {
-    if (!data.values?.file_name && selectedFile) {
-      data.onValuesChange?.({ file_name: selectedFile });
+    if (!configuredFile && selectedFile) {
+      onValuesChange?.({ file_name: selectedFile });
     }
-  }, [data.onValuesChange, data.values?.file_name, selectedFile]);
+  }, [configuredFile, onValuesChange, selectedFile]);
 
   return (
     <NodeShell

@@ -47,12 +47,13 @@ export function SettingsView() {
 
   useEffect(() => {
     fetchStatus();
+    const timers = copyResetTimers.current;
     return () => {
-      if (copyResetTimers.current.url) {
-        clearTimeout(copyResetTimers.current.url);
+      if (timers.url) {
+        clearTimeout(timers.url);
       }
-      if (copyResetTimers.current.cmd) {
-        clearTimeout(copyResetTimers.current.cmd);
+      if (timers.cmd) {
+        clearTimeout(timers.cmd);
       }
     };
   }, []);
@@ -223,9 +224,9 @@ export function SettingsView() {
 
         {/* PostgreSQL URL & Docker Command Box */}
         <div className="settings-url-box">
-          <label>PostgreSQL 연결 접속 URL (psycopg)</label>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <code style={{ flex: 1 }}>{dbUrl}</code>
+          <span className="settings-url-box__label">PostgreSQL 연결 접속 URL (psycopg)</span>
+          <div className="settings-copy-row">
+            <code>{dbUrl}</code>
             <Button
               type="button"
               onClick={() => copyToClipboard(dbUrl, 'url')}
@@ -237,9 +238,9 @@ export function SettingsView() {
         </div>
 
         <div className="settings-url-box">
-          <label>Docker 컨테이너 가동 명령어</label>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <code style={{ flex: 1 }}>{dockerCmd}</code>
+          <span className="settings-url-box__label">Docker 컨테이너 가동 명령어</span>
+          <div className="settings-copy-row">
+            <code>{dockerCmd}</code>
             <Button
               type="button"
               onClick={() => copyToClipboard(dockerCmd, 'cmd')}

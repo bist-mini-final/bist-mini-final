@@ -9,6 +9,7 @@ import {
   type CellCitation,
 } from '../../../shared/markdown/cellCitations';
 import { CellEvidenceModal } from '../../../shared/evidence/CellEvidenceModal';
+import { useCellEvidenceLauncher } from '../../../shared/evidence/CellEvidenceProvider';
 import './MarkdownAnswer.css';
 
 interface MarkdownAnswerProps {
@@ -113,7 +114,7 @@ function CellCitationChip({
           <strong>{label} 셀 출처</strong>
           <dl>
             {details.map(([term, value]) => (
-              <div key={term} style={{ display: 'contents' }}>
+              <div key={term} className="reader-citation-tooltip__row">
                 <dt>{term}</dt>
                 <dd>{value}</dd>
               </div>
@@ -129,6 +130,8 @@ function CellCitationChip({
 
 export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
   const [selectedCitation, setSelectedCitation] = useState<CellCitation | null>(null);
+  const launchGlobalEvidence = useCellEvidenceLauncher();
+  const openEvidence = launchGlobalEvidence ?? setSelectedCitation;
   return (
     <>
       <div className="reader-markdown">
@@ -138,7 +141,7 @@ export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
             a: ({ href, children }) => {
               const citation = parseCellCitationHref(href);
               return citation
-                ? <CellCitationChip citation={citation} onOpen={setSelectedCitation} />
+                ? <CellCitationChip citation={citation} onOpen={openEvidence} />
                 : <a href={href}>{children}</a>;
             },
           }}
@@ -146,7 +149,7 @@ export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
           {normalizeCellCitations(normalizeMarkdownTables(markdown))}
         </ReactMarkdown>
       </div>
-      {selectedCitation && (
+      {!launchGlobalEvidence && selectedCitation && (
         <CellEvidenceModal
           citation={selectedCitation}
           onClose={() => setSelectedCitation(null)}

@@ -1,0 +1,301 @@
+/* Full-Page Pipeline Tracker View */
+.ds-pipeline-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: ds-fade-in 200ms ease;
+}
+
+@keyframes ds-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ds-pipeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 1.1rem 1.4rem;
+  border-radius: 0.85rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.03);
+}
+
+.ds-pipeline-header__left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ds-pipeline-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.ds-pipeline-breadcrumbs button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #0f766e;
+  font-weight: 650;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.ds-pipeline-breadcrumbs button:hover {
+  text-decoration: underline;
+}
+
+.ds-pipeline-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ds-pipeline-title-row h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.ds-pipeline-header__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ds-batch-progress {
+  margin-bottom: 0.7rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.ds-batch-progress__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+}
+
+.ds-batch-progress__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbeafe;
+}
+
+.ds-batch-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 180ms ease;
+}
+
+/* 2-Column Grid Layout */
+.ds-pipeline-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.ds-pipeline-main-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  padding: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.04);
+}
+
+.ds-pipeline-hud-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  position: sticky;
+  top: 1rem;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.04);
+}
+
+.ds-hud-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ds-hud-metric-row:last-child {
+  border-bottom: none;
+}
+
+.ds-hud-metric-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ds-hud-metric-value {
+  font-size: 0.88rem;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+/* Auto-return banner */
+.ds-auto-return-banner {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  animation: ds-fade-in 300ms ease;
+}
+
+.ds-auto-return-banner__text {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  color: #065f46;
+  font-weight: 650;
+}
+
+/* Pipeline tracker composition */
+.ds-nowrap-action { white-space: nowrap; }
+
+.ds-company-badge--static,
+.ds-company-badge--static:hover {
+  cursor: default;
+  transform: none;
+}
+
+.ds-module-status-badge .ds-live-pulse-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.ds-pipeline-notice {
+  margin: 0 0 0.8rem;
+}
+
+.ds-auto-return-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.ds-progress-header__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ds-progress-header__value {
+  color: var(--brand-600);
+  font-weight: 750;
+}
+
+.ds-module-pipeline-list--expanded { max-height: none; }
+.ds-luna-inspect-action { margin-right: 0.3rem; }
+.ds-module-category-badge { font-size: 0.66rem; }
+
+.ds-module-meta-item {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.ds-module-meta-item strong { color: var(--text-secondary); }
+.ds-module-meta-item .ds-font-mono { color: var(--brand-600); }
+.ds-module-sublogs--tracker { max-height: 9rem; }
+
+.ds-module-sublogs__empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ds-pipeline-hud-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ds-pipeline-hud-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.ds-pipeline-hud-card__title svg { color: var(--brand-600); }
+
+.ds-pipeline-hud-card__model {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.ds-hud-metric-value--accent { color: var(--brand-600); }
+.ds-hud-metric-value--info { color: var(--color-info); }
+
+.ds-hud-metric-value--storage {
+  color: var(--color-success);
+  font-size: 0.78rem;
+}
+
+.ds-hud-metric-value--compact { font-size: 0.8rem; }
+
+
+.ds-pipeline-hud-card__note {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+/* Component-local product system alignment */
+.ds-pipeline-main-card,
+.ds-pipeline-hud-card {
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.ds-hud-metric-row { border-color: var(--border-subtle); }
+.ds-hud-metric-label { color: var(--text-muted); }
+.ds-hud-metric-value { color: var(--text-strong); }
+
+@media (max-width: 900px) {
+  .ds-pipeline-grid { grid-template-columns: minmax(0, 1fr); }
+}

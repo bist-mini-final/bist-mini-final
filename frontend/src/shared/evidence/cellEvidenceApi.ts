@@ -32,6 +32,8 @@ export const cellEvidenceApi = {
     });
     if (citation.company) query.set('company_name', citation.company);
     if (citation.workbookHash) query.set('workbook_hash', citation.workbookHash);
+    if (citation.indexId) query.set('index_id', citation.indexId);
+    if (citation.fileName) query.set('file_name', citation.fileName);
     if (citation.cellValue) query.set('cell_value', citation.cellValue);
     return requestJson<CellEvidence>(`/api/evidence/cells/resolve?${query}`, { signal });
   },

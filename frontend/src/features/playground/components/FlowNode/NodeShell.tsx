@@ -96,7 +96,7 @@ export function NodeShell({
 
   useEffect(() => stopResize, [stopResize]);
 
-  const startResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+  const startResize = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!onWidthChange) return;
     event.preventDefault();
     event.stopPropagation();
@@ -117,14 +117,14 @@ export function NodeShell({
     };
   }, [clampWidth, onWidthChange, stopResize, width]);
 
-  const resizeWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const resizeWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (!onWidthChange || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
     event.stopPropagation();
     onWidthChange(clampWidth(width + (event.key === 'ArrowRight' ? 24 : -24)));
   }, [clampWidth, onWidthChange, width]);
 
-  const startHeightResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+  const startHeightResize = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!onHeightChange || height === undefined) return;
     event.preventDefault();
     event.stopPropagation();
@@ -145,7 +145,7 @@ export function NodeShell({
     };
   }, [clampHeight, height, onHeightChange, stopResize]);
 
-  const resizeHeightWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const resizeHeightWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (
       !onHeightChange
       || height === undefined
@@ -378,9 +378,10 @@ export function NodeShell({
       ))}
 
       {onWidthChange && (
-        <div
+        <button
+          type="button"
           className="nodrag nopan flow-node__resize-handle"
-          role="separator"
+          role="slider"
           aria-label={`${title} 가로 크기 조절`}
           aria-orientation="vertical"
           aria-valuemin={minWidth}
@@ -394,9 +395,10 @@ export function NodeShell({
       )}
 
       {onHeightChange && height !== undefined && (
-        <div
+        <button
+          type="button"
           className="nodrag nopan flow-node__height-resize-handle"
-          role="separator"
+          role="slider"
           aria-label={`${title} 세로 크기 조절`}
           aria-orientation="horizontal"
           aria-valuemin={minHeight}

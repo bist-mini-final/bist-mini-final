@@ -498,6 +498,10 @@
 }
 
 @media (max-width: 1023px) {
+  .module-settings-overlay {
+    padding: 1rem;
+  }
+
   .module-settings-modal__body {
     overflow: auto;
     grid-template-columns: 1fr;
@@ -505,5 +509,37 @@
 
   .module-state-panel {
     min-height: 24rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .module-settings-overlay {
+    padding: 0;
+  }
+
+  .module-settings-modal {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .module-settings-modal__header {
+    align-items: flex-start;
+    padding: 0.8rem;
+  }
+
+  .module-settings-modal__mark,
+  .module-settings-modal__meta {
+    display: none;
+  }
+
+  .module-settings-modal__heading p {
+    white-space: normal;
+  }
+
+  .module-settings-modal__body {
+    grid-template-columns: 1fr;
   }
 }

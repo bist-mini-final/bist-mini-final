@@ -232,7 +232,6 @@
   background: linear-gradient(90deg, var(--brand-100), var(--brand-50));
   color: var(--brand-700);
   font-weight: 720;
-  box-shadow: inset 2px 0 0 var(--brand-500);
 }
 
 .product-nav__item svg {
