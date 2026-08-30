@@ -1,265 +1,676 @@
 import {
   AlertCircle,
-  BarChart3,
-  CheckCircle2,
+  ArrowUpDown,
+  ChevronDown,
+  Clock,
+  Database,
   RefreshCw,
-  ShieldAlert,
-  Sparkles,
-  TrendingUp,
-  WalletCards,
+  X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
+  ReferenceLine,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { AppLink } from '../app/router';
+import { CompanyLogoBadge } from '../features/company-comparison-v2/CompanyLogoBadge';
 import {
-  buildComparisonViewModel,
-  COMPARISON_COMPANIES,
-  getCommonFiscalYears,
-  presentNetDebt,
-  type ComparisonCompanyKey,
-  type CompanyComparisonResult,
-  type ComparisonInsight,
-} from '../features/company-comparison/comparison';
-import { useCompanyComparison } from '../features/company-comparison/useCompanyComparison';
-import '../features/company-comparison/company-comparison.css';
+  BenchmarkScatterTooltip,
+  ComparisonTrendChart,
+  FinancialTrendChart,
+  renderBenchmarkScatterMarker,
+  type BenchmarkScatterPoint,
+} from '../features/company-comparison-v2/LeagueCharts';
+import {
+  formatAmount,
+  historicalCandles,
+  indexedSeries,
+  percentChange,
+  rankReason,
+  SCORE_DIMENSIONS,
+  scoreRank,
+  signedPoint,
+} from '../features/company-comparison-v2/leagueAnalysis';
+import {
+  RANKING_METRICS,
+  latestHistoricalCandle,
+  orderForDisplay,
+  rankCompaniesByComposite,
+  rankCompaniesByMetric,
+  toggleCompanySelection,
+  type DisplayDirection,
+  type RankingMetric,
+} from '../features/company-comparison-v2/metricRanking';
+import { useFinancialLeague } from '../features/company-comparison-v2/useFinancialLeague';
+import type { LeagueCompany } from '../features/company-comparison-v2/leagueTypes';
+import '../features/company-comparison-v2/financial-league.css';
 
-type ChartMetric = 'revenue' | 'operatingIncome';
+const FACTOR_LABELS: Record<'Overall' | 'Revenue' | 'Profit' | 'Growth', string> = {
+  Overall: '종합순위',
+  Revenue: '매출액',
+  Profit: '영업이익',
+  Growth: '성장률',
+};
 
-function formatPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
-}
+export function CompanyComparisonV2Page() {
+  const [reloadKey, setReloadKey] = useState(0);
+  const state = useFinancialLeague(reloadKey);
 
-function formatAmount(value: number): string {
-  return value.toLocaleString('ko-KR', { maximumFractionDigits: 1 });
-}
+  const [rankingMetric, setRankingMetric] = useState<RankingMetric>('composite');
+  const [displayDirection, setDisplayDirection] = useState<DisplayDirection>('best-first');
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<ReadonlySet<string>>(new Set());
+  const [focusedCompanyId, setFocusedCompanyId] = useState<string>('');
 
-function insightIcon(type: ComparisonInsight['type']) {
-  if (type === 'growth') return TrendingUp;
-  if (type === 'profitability') return WalletCards;
-  return ShieldAlert;
-}
+  const companiesList = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    return state.data.companies;
+  }, [state]);
 
-function MetricComparisonList({
-  title,
-  description,
-  companies,
-  valueOf,
-  formatValue,
-  lowerIsBetter = false,
-}: {
-  readonly title: string;
-  readonly description: string;
-  readonly companies: readonly CompanyComparisonResult[];
-  readonly valueOf: (company: CompanyComparisonResult) => number;
-  readonly formatValue: (value: number) => string;
-  readonly lowerIsBetter?: boolean;
-}) {
-  const values = companies.map(valueOf);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const strength = (value: number) => {
-    if (min === max) return 1;
-    return lowerIsBetter ? (max - value) / (max - min) : (value - min) / (max - min);
+  const filteredCompanies = companiesList;
+
+  const officialRankedCompanies = useMemo(
+    () => rankCompaniesByComposite(filteredCompanies),
+    [filteredCompanies],
+  );
+
+  const activeMetricRankedCompanies = useMemo(
+    () => rankCompaniesByMetric(filteredCompanies, rankingMetric),
+    [filteredCompanies, rankingMetric],
+  );
+
+  const displayedCompanies = useMemo(
+    () => orderForDisplay(activeMetricRankedCompanies, rankingMetric, displayDirection),
+    [activeMetricRankedCompanies, displayDirection, rankingMetric],
+  );
+
+  const handleRankingMetric = (metric: RankingMetric) => {
+    if (rankingMetric === metric) {
+      setDisplayDirection((current) => current === 'best-first' ? 'worst-first' : 'best-first');
+    } else {
+      setRankingMetric(metric);
+      setDisplayDirection('best-first');
+    }
   };
 
+  const metricDirectionLabel = displayDirection === 'best-first' ? '높은 순' : '낮은 순';
+  const activeRankingLabel = `${RANKING_METRICS[rankingMetric].label} 순위`;
+  const averageCagr = filteredCompanies.length
+    ? filteredCompanies.reduce((sum, company) => sum + company.revenueCagr, 0) / filteredCompanies.length
+    : 0;
+  const averageMargin = filteredCompanies.length
+    ? filteredCompanies.reduce((sum, company) => sum + company.operatingMargin, 0) / filteredCompanies.length
+    : 0;
+  const averageDebtRatio = filteredCompanies.length
+    ? filteredCompanies.reduce((sum, company) => sum + company.liabilitiesToAssets, 0) / filteredCompanies.length
+    : 0;
+  const officialRankByCompanyId = new Map(
+    officialRankedCompanies.map(({ company, rank }) => [company.companyId, rank]),
+  );
+  const selectedCompanies = Array.from(selectedCompanyIds)
+    .map((companyId) => filteredCompanies.find((company) => company.companyId === companyId))
+    .filter((company): company is LeagueCompany => Boolean(company));
+  const focusedCompany = filteredCompanies.find((company) => company.companyId === focusedCompanyId);
+  const analysisCompany = selectedCompanies.length === 1
+    ? selectedCompanies[0]
+    : focusedCompany ?? officialRankedCompanies[0]?.company;
+  const comparisonCompanies = selectedCompanies.length === 2 ? selectedCompanies : [];
+  const analysisCandles = analysisCompany ? historicalCandles(analysisCompany) : [];
+  const comparisonCandles = comparisonCompanies.map(historicalCandles);
+  const analysisReasons = analysisCompany ? rankReason(analysisCompany, filteredCompanies) : [];
+  const benchmarkScatterData: readonly BenchmarkScatterPoint[] = filteredCompanies.map((company) => ({
+    companyId: company.companyId,
+    companyName: company.displayName,
+    growth: company.revenueCagr,
+    margin: company.operatingMargin,
+    tone: comparisonCompanies[0]?.companyId === company.companyId
+      ? 'compare-a'
+      : comparisonCompanies[1]?.companyId === company.companyId
+        ? 'compare-b'
+        : analysisCompany?.companyId === company.companyId
+          ? 'selected'
+          : 'default',
+  }));
+
+  if (state.status === 'loading') {
+    return (
+      <main className="financial-league-page league-loading" aria-live="polite">
+        <RefreshCw size={24} className="spin" />
+        <strong>2021~2025 기업 실적 벤치마크 데이터를 분석하고 있습니다...</strong>
+      </main>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <main className="financial-league-page league-loading" role="alert">
+        <AlertCircle size={28} color="#dc2626" />
+        <strong>데이터 로드 실패</strong>
+        <p>{state.message}</p>
+        <button type="button" onClick={() => setReloadKey((k) => k + 1)}>
+          다시 시도
+        </button>
+      </main>
+    );
+  }
+
   return (
-    <div className="comparison-breakdown">
-      <div className="comparison-breakdown__title">
-        <div><strong>{title}</strong><span>{description}</span></div>
-        <small>{lowerIsBetter ? '낮을수록 양호' : '높을수록 양호'}</small>
-      </div>
-      <div className="comparison-breakdown__rows">
-        {companies.map((company) => (
-          <div className="comparison-breakdown__row" key={company.key}>
-            <span className="comparison-breakdown__company"><i style={{ backgroundColor: company.color }} />{company.label}</span>
-            <span className="comparison-breakdown__bar"><i style={{ '--bar-color': company.color, '--bar-width': `${24 + strength(valueOf(company)) * 76}%` } as CSSProperties} /></span>
-            <strong>{formatValue(valueOf(company))}</strong>
+    <main className="financial-league-page" aria-label="기업 랭킹 리그 화면">
+      <header className="league-page-heading">
+        <div>
+          <span className="league-page-eyebrow">FINANCIAL LEAGUE</span>
+          <div className="league-page-title-row">
+            <h1>AI 기업 비교</h1>
+            <span>{filteredCompanies.length}개 기업</span>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function stabilityStatus(liabilitiesToAssets: number): { readonly label: string; readonly tone: 'stable' | 'caution' | 'risk' } {
-  if (liabilitiesToAssets < 50) return { label: '안정', tone: 'stable' };
-  if (liabilitiesToAssets < 70) return { label: '주의', tone: 'caution' };
-  return { label: '위험', tone: 'risk' };
-}
-
-function StabilityOverview({
-  companies,
-  endYear,
-  currency,
-}: {
-  readonly companies: readonly CompanyComparisonResult[];
-  readonly endYear: number;
-  readonly currency: string;
-}) {
-  return (
-    <div className="comparison-stability-overview">
-      <div className="comparison-stability-legend">
-        <span><i className="is-stable" />50% 미만 안정</span>
-        <span><i className="is-caution" />50–70% 주의</span>
-        <span><i className="is-risk" />70% 이상 위험</span>
-      </div>
-      {companies.map((company) => {
-        const status = stabilityStatus(company.liabilitiesToAssets);
-        const netDebt = presentNetDebt(company.netDebt);
-        return (
-          <article className={`comparison-stability-company comparison-stability-company--${status.tone}`} key={company.key}>
-            <header>
-              <span><i style={{ backgroundColor: company.color }} />{company.label}</span>
-              <strong>{status.label}</strong>
-            </header>
-            <div className="comparison-stability-values">
-              <div><span>총부채 / 총자산</span><b>{formatPercent(company.liabilitiesToAssets)}</b><small>{endYear}년</small></div>
-              <div><span>{netDebt.label}</span><b>{formatAmount(netDebt.value)}</b><small>{currency} 백만</small></div>
-            </div>
-            <p>{netDebt.description}</p>
-          </article>
-        );
-      })}
-      <p className="comparison-stability-note">상태는 총부채/총자산 비율 기준이며, 순부채를 함께 확인해 현금 여력을 보완적으로 해석합니다.</p>
-    </div>
-  );
-}
-
-export function CompanyComparisonPage() {
-  const [reloadKey, setReloadKey] = useState(0);
-  const [chartMetric, setChartMetric] = useState<ChartMetric>('revenue');
-  const [selectedCompanyKeys, setSelectedCompanyKeys] = useState<readonly ComparisonCompanyKey[]>(
-    () => COMPARISON_COMPANIES.map((company) => company.key),
-  );
-  const loadState = useCompanyComparison(reloadKey);
-  const companies = loadState.status === 'ready' ? loadState.companies : [];
-  const selectedCompanies = useMemo(
-    () => companies.filter((company) => selectedCompanyKeys.includes(company.key)),
-    [companies, selectedCompanyKeys],
-  );
-  const commonYears = useMemo(() => getCommonFiscalYears(selectedCompanies), [selectedCompanies]);
-  const [startYear, setStartYear] = useState<number | null>(null);
-  const [endYear, setEndYear] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (commonYears.length < 2) return;
-    setStartYear((current) => current !== null && commonYears.includes(current) && current < commonYears[commonYears.length - 1]
-      ? current : commonYears[0]);
-    setEndYear((current) => current !== null && commonYears.includes(current) && current > commonYears[0]
-      ? current : commonYears[commonYears.length - 1]);
-  }, [commonYears]);
-
-  const modelResult = useMemo(() => {
-    if (loadState.status !== 'ready' || startYear === null || endYear === null) return null;
-    try {
-      return { model: buildComparisonViewModel(selectedCompanies, startYear, endYear), error: null };
-    } catch (error) {
-      return { model: null, error: error instanceof Error ? error.message : '비교 지표 계산에 실패했습니다.' };
-    }
-  }, [endYear, loadState.status, selectedCompanies, startYear]);
-  const model = modelResult?.model ?? null;
-  const chartData = model ? model.companies[0].points.map((point) => {
-    const row: Record<string, number> = { year: point.year };
-    for (const company of model.companies) {
-      const companyPoint = company.points.find((candidate) => candidate.year === point.year);
-      if (companyPoint) row[company.key] = companyPoint[chartMetric];
-    }
-    return row;
-  }) : [];
-
-  return (
-    <main className="company-comparison-page">
-      <header className="company-comparison-header">
-        <div><p className="company-comparison-eyebrow">FINANCIAL INTELLIGENCE</p><h1>기업 비교 인사이트</h1><p>검증된 3개 기업 중 원하는 2~3개를 같은 기간 기준으로 비교합니다.</p></div>
-        <button className="comparison-refresh-button" type="button" onClick={() => setReloadKey((value) => value + 1)} disabled={loadState.status === 'loading'}><RefreshCw size={16} />분석 새로고침</button>
+          <p>2021~2025 재무 성과를 동일 기준으로 비교하고 성장성·수익성·안정성을 함께 확인합니다.</p>
+        </div>
       </header>
 
-      {loadState.status === 'loading' && <section className="comparison-state-card" aria-live="polite"><RefreshCw className="comparison-spin" size={24} /><strong>3개 기업의 검증된 스냅샷을 불러오고 있습니다.</strong></section>}
-      {loadState.status === 'error' && <section className="comparison-state-card comparison-state-card--error" role="alert"><AlertCircle size={24} /><div><strong>기업 비교 데이터를 준비하지 못했습니다.</strong><p>{loadState.message}</p></div></section>}
-      {loadState.status === 'ready' && commonYears.length < 2 && <section className="comparison-state-card comparison-state-card--error" role="alert"><AlertCircle size={24} /><strong>세 기업에 공통으로 존재하는 회계연도가 2개 미만입니다.</strong></section>}
-      {modelResult?.error && <section className="comparison-state-card comparison-state-card--error" role="alert"><AlertCircle size={24} /><strong>{modelResult.error}</strong></section>}
-
-      {model && <>
-        <section className="comparison-toolbar" aria-label="비교 조건">
-          <div className="comparison-company-chips">
-            <span className="comparison-toolbar-label">비교 기업 <b>{selectedCompanyKeys.length}/3</b></span>
-            {companies.map((company) => {
-              const selected = selectedCompanyKeys.includes(company.key);
-              const minimumSelected = selected && selectedCompanyKeys.length === 2;
+      {/* =========================================================================
+          1. Top Control Bar: Ranking Controls | Live Sorting
+         ========================================================================= */}
+      <section className="league-top-filter-bar" aria-label="순위 정렬 제어">
+        {/* Left: Quick ranking metric controls */}
+        <div className="filter-section-block">
+          <span className="filter-section-label">빠른 표시 정렬</span>
+          <div className="filter-pills-row">
+            {(['Overall', 'Revenue', 'Profit', 'Growth'] as const).map((factor) => {
+              const factorMetric: Record<typeof factor, RankingMetric> = {
+                Overall: 'composite', Revenue: 'revenue', Profit: 'operatingIncome', Growth: 'revenueCagr',
+              };
+              const isActive = rankingMetric === factorMetric[factor];
               return (
                 <button
-                  className={`comparison-company-chip ${selected ? 'is-selected' : ''}`}
                   type="button"
-                  key={company.key}
-                  aria-pressed={selected}
-                  disabled={minimumSelected}
-                  title={minimumSelected ? '비교 기업은 최소 2개가 필요합니다.' : undefined}
-                  onClick={() => setSelectedCompanyKeys((current) => selected
-                    ? current.filter((key) => key !== company.key)
-                    : [...current, company.key])}
+                  key={factor}
+                  className={`dropdown-filter-pill ${isActive ? 'is-active' : ''}`}
+                  onClick={() => handleRankingMetric(factorMetric[factor])}
+                  aria-pressed={isActive}
                 >
-                  <i style={{ backgroundColor: company.color }} />{company.label}
+                  <span>{FACTOR_LABELS[factor]}</span>
+                  <ChevronDown size={11} />
                 </button>
               );
             })}
           </div>
-          <div className="comparison-period-controls"><span className="comparison-toolbar-label">기간</span>
-            <select aria-label="비교 시작 연도" value={model.startYear} onChange={(event) => {
-              const value = Number(event.target.value); setStartYear(value);
-              if (endYear !== null && value >= endYear) setEndYear(commonYears.find((year) => year > value) ?? commonYears[commonYears.length - 1]);
-            }}>{commonYears.slice(0, -1).map((year) => <option key={year} value={year}>{year}</option>)}</select><span>–</span>
-            <select aria-label="비교 종료 연도" value={model.endYear} onChange={(event) => setEndYear(Number(event.target.value))}>{commonYears.filter((year) => year > model.startYear).map((year) => <option key={year} value={year}>{year}</option>)}</select>
+        </div>
+
+        {/* Right: Live sorting pills */}
+        <div className="filter-section-block">
+          <span className="filter-section-label">실시간 정렬 기준</span>
+          <div className="filter-pills-row">
+            <div className="sort-status-pill">
+              <ArrowUpDown size={11} />
+              <span>
+                {activeRankingLabel} · {metricDirectionLabel}
+              </span>
+              <button
+                type="button"
+                className="sort-clear-btn"
+                onClick={() => {
+                  setRankingMetric('composite');
+                  setDisplayDirection('best-first');
+                }}
+                aria-label="정렬 초기화"
+                title="정렬 초기화"
+              >
+                <X size={10} />
+              </button>
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <div className="comparison-dashboard-grid">
-          <div className="comparison-main-column">
-            <section className="comparison-card comparison-chart-card">
-              <div className="comparison-chart-header">
-                <div><h2>실적 추이 비교</h2><p>{model.startYear}–{model.endYear} · {model.companies[0].currency} {model.companies[0].scale === 'millions' ? '백만' : model.companies[0].scale}</p></div>
-                <div className="comparison-chart-tabs" role="group" aria-label="차트 지표 선택">
-                  <button className={chartMetric === 'revenue' ? 'is-active' : ''} type="button" onClick={() => setChartMetric('revenue')}>매출</button>
-                  <button className={chartMetric === 'operatingIncome' ? 'is-active' : ''} type="button" onClick={() => setChartMetric('operatingIncome')}>영업이익</button>
-                </div>
+      {/* =========================================================================
+          2. Main Layout: Left Table (70%) vs Right Spotlight Cards & Metrics (30%)
+         ========================================================================= */}
+      <div className="league-main-grid">
+        {/* Left Column: League Ranking Table */}
+        <div className="league-table-card">
+          <div className="league-table-scroll-wrap">
+            <table className="league-pixel-table">
+              <thead>
+                <tr>
+                  <th className="col-th-rank">{activeRankingLabel}</th>
+                  <th className="col-th-select">비교</th>
+                  <th className="col-th-company">기업명</th>
+                  {([
+                    ['revenue', '매출액'],
+                    ['operatingIncome', '영업이익'],
+                    ['revenueCagr', '5개년 매출 성장률'],
+                    ['operatingMargin', '영업이익률'],
+                  ] as const).map(([metric, label]) => (
+                    <th
+                      key={metric}
+                      className={`metric-rank-header col-th-${metric} ${rankingMetric === metric ? 'is-active' : ''}`}
+                      aria-sort={rankingMetric === metric
+                        ? (displayDirection === 'best-first' ? 'descending' : 'ascending')
+                        : 'none'}
+                    >
+                      <button type="button" onClick={() => handleRankingMetric(metric)}>
+                        {label}<span aria-hidden="true">{rankingMetric === metric
+                          ? (displayDirection === 'best-first' ? '▼' : '▲')
+                          : '↕'}</span>
+                      </button>
+                    </th>
+                  ))}
+                  <th className="col-th-debtRatio">부채비율</th>
+                  <th
+                    className={`metric-rank-header col-th-composite ${rankingMetric === 'composite' ? 'is-active' : ''}`}
+                    aria-sort={rankingMetric === 'composite'
+                      ? (displayDirection === 'best-first' ? 'descending' : 'ascending')
+                      : 'none'}
+                  >
+                    <button type="button" onClick={() => handleRankingMetric('composite')}>
+                      종합점수<span aria-hidden="true">{rankingMetric === 'composite'
+                        ? (displayDirection === 'best-first' ? '▼' : '▲')
+                        : '↕'}</span>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedCompanies.map(({ company, rank }) => {
+                  const isFocused = company.companyId === focusedCompanyId;
+                  const isSelected = selectedCompanyIds.has(company.companyId);
+                  const latest = latestHistoricalCandle(company);
+
+                  return (
+                    <tr
+                      key={company.companyId}
+                      className={`league-table-row ${isFocused ? 'is-selected' : ''}`}
+                      onClick={() => setFocusedCompanyId(company.companyId)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setFocusedCompanyId(company.companyId);
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-selected={isFocused}
+                    >
+                      {/* 1. Rank */}
+                      <td className="col-th-rank">
+                        <div className="rank-cell-display">
+                          <span>{rank}</span>
+                        </div>
+                      </td>
+
+                      <td className="col-th-select">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          aria-label={`${company.displayName} 비교 선택`}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => {
+                            if (!isSelected) setFocusedCompanyId(company.companyId);
+                            setSelectedCompanyIds((current) =>
+                              toggleCompanySelection(current, company.companyId));
+                          }}
+                        />
+                      </td>
+
+                      {/* 2. Company Logo + Name */}
+                      <td className="col-th-company">
+                        <div className="company-cell-flex">
+                          <CompanyLogoBadge
+                            companyId={company.companyId}
+                            companyName={company.displayName}
+                            size={22}
+                          />
+                          <AppLink
+                            to={`/dashboard?companyId=${encodeURIComponent(company.companyId)}`}
+                            className="company-name-text"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            title={`${company.displayName} BI 대시보드 바로가기`}
+                          >
+                            {company.displayName}
+                          </AppLink>
+                        </div>
+                      </td>
+
+                      <td className={`col-th-revenue ${rankingMetric === 'revenue' ? 'is-ranked' : ''}`}>
+                        <strong>{latest ? formatAmount(latest.revenue, company) : '—'}</strong>
+                      </td>
+                      <td className={`col-th-operatingIncome ${rankingMetric === 'operatingIncome' ? 'is-ranked' : ''}`}>
+                        <strong>{latest ? formatAmount(latest.operatingIncome, company) : '—'}</strong>
+                      </td>
+                      <td className={`col-th-revenueCagr ${rankingMetric === 'revenueCagr' ? 'is-ranked' : ''}`}>
+                        <strong
+                          className={`growth-rate ${company.revenueCagr > 0
+                            ? 'is-positive'
+                            : company.revenueCagr < 0
+                              ? 'is-negative'
+                              : 'is-neutral'}`}
+                          aria-label={`5개년 매출 성장률 ${company.revenueCagr.toFixed(1)}%, ${company.revenueCagr > 0
+                            ? '상승'
+                            : company.revenueCagr < 0
+                              ? '하락'
+                              : '변동 없음'}`}
+                        >
+                          <span className="growth-rate-arrow" aria-hidden="true">
+                            {company.revenueCagr > 0 ? '▲' : company.revenueCagr < 0 ? '▼' : '—'}
+                          </span>
+                          <span>{company.revenueCagr.toFixed(1)}%</span>
+                        </strong>
+                      </td>
+                      <td className={`col-th-operatingMargin ${rankingMetric === 'operatingMargin' ? 'is-ranked' : ''}`}>
+                        <strong className={company.operatingMargin < 0 ? 'metric-negative' : ''}>
+                          {company.operatingMargin.toFixed(1)}%
+                        </strong>
+                      </td>
+                      <td className="col-th-debtRatio">
+                        <strong title={`순부채/매출 ${company.netDebtToRevenue.toFixed(1)}%`}>
+                          {company.liabilitiesToAssets.toFixed(1)}%
+                        </strong>
+                      </td>
+                      <td className={`col-th-composite ${rankingMetric === 'composite' ? 'is-ranked' : ''}`}>
+                        <div className="debt-grade-cell" title="성장성 35% + 수익성 35% + 안정성 30%">
+                          <span className={`tier-round-pill pill-${company.tier.toLowerCase()}`}>
+                            {company.tier}
+                          </span>
+                          <strong>{company.compositeScore.toFixed(1)}</strong>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Right Column: selection-driven company analysis */}
+        <div className="league-side-column">
+          <section className="company-analysis-panel" aria-label="선택 기업 분석">
+            <div className="analysis-panel-heading">
+              <div>
+                <span>{comparisonCompanies.length === 2 ? 'COMPARE MODE' : 'COMPANY INSIGHT'}</span>
+                <strong>{comparisonCompanies.length === 2 ? '선택 기업 비교' : '선택 기업 분석'}</strong>
               </div>
-              <p className="comparison-chart-guide">{chartMetric === 'revenue' ? '기업별 매출 규모와 성장 흐름을 비교합니다.' : '기업별 본업의 이익 규모와 적자 여부를 비교합니다.'}</p>
-              <div className="comparison-chart-wrap"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 12, right: 18, left: 4, bottom: 0 }}>
-                <CartesianGrid stroke="#e7eee9" strokeDasharray="3 4" vertical={false} /><XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: '#64746b', fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} width={58} tick={{ fill: '#64746b', fontSize: 11 }} tickFormatter={formatAmount} /><Tooltip formatter={(value) => [`${formatAmount(Number(value))} ${model.companies[0].currency} 백만`, chartMetric === 'revenue' ? '매출' : '영업이익']} labelFormatter={(year) => `${year}년`} /><Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                {model.companies.map((company) => <Line key={company.key} name={company.label} type="monotone" dataKey={company.key} stroke={company.color} strokeWidth={2.6} dot={{ r: 3.5, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 5 }} />)}
-              </LineChart></ResponsiveContainer></div>
-            </section>
-
-            <div className="comparison-summary-grid">
-              <section className="comparison-card comparison-metrics-card">
-                <div className="comparison-card-heading"><div><h2>성장률과 수익성</h2><p>성장 속도와 종료연도 수익 효율을 구분해 비교합니다.</p></div><BarChart3 size={18} /></div>
-                <div className="comparison-breakdown-stack">
-                  <MetricComparisonList title="매출 성장률" description={`${model.startYear}–${model.endYear} CAGR`} companies={model.companies} valueOf={(company) => company.revenueCagr} formatValue={formatPercent} />
-                  <MetricComparisonList title="영업이익률" description={`${model.endYear}년 영업이익 ÷ 매출`} companies={model.companies} valueOf={(company) => company.operatingMargin} formatValue={formatPercent} />
-                </div>
-              </section>
-              <section className="comparison-card comparison-metrics-card">
-                <div className="comparison-card-heading"><div><h2>재무 안정성 진단</h2><p>기업별 차입 부담과 현금 여력을 하나의 상태로 확인합니다.</p></div><ShieldAlert size={18} /></div>
-                <StabilityOverview companies={model.companies} endYear={model.endYear} currency={model.companies[0].currency} />
-              </section>
+              <small>{comparisonCompanies.length === 2 ? '체크한 2개 기업' : '행을 클릭하거나 비교 체크'}</small>
             </div>
 
-            <section className="comparison-card comparison-evidence-card"><div className="comparison-card-heading"><div><h2>근거 및 출처</h2><p>브리프 번호와 연결된 원본 셀 기준</p></div><CheckCircle2 size={18} /></div><div className="comparison-table-wrap"><table><thead><tr><th>근거</th><th>지표</th><th>기준일</th><th>출처</th><th>검증</th></tr></thead><tbody>{model.evidenceRows.map((row) => <tr key={row.id}><td>[{row.id}]</td><td>{row.metric}</td><td>{row.basis}</td><td title={row.sources.join(', ')}>{row.sources.length}개 기업 파일 · 원본 셀 {row.evidence.length}개</td><td><span className="comparison-verified"><CheckCircle2 size={13} />검증 완료</span></td></tr>)}</tbody></table></div></section>
-          </div>
+            {comparisonCompanies.length === 2 ? (
+              <>
+                <div className="analysis-company-pair">
+                  {comparisonCompanies.map((company, index) => (
+                    <div key={company.companyId} className={`analysis-company-identity is-${index === 0 ? 'a' : 'b'}`}>
+                      <span className="analysis-compare-key">{index === 0 ? 'A' : 'B'}</span>
+                      <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={25} />
+                      <div>
+                        <strong title={company.displayName}>{company.displayName}</strong>
+                        <span>종합 {officialRankByCompanyId.get(company.companyId)}위 · {company.tier}등급 · {company.compositeScore.toFixed(1)}점</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-          <aside className="comparison-side-column">
-            <section className="comparison-card comparison-brief-card"><div className="comparison-card-heading"><div><h2><Sparkles size={19} /> AI 비교 브리프</h2><p>검증된 원본 지표와 계산식에 기반한 상세 해석</p></div></div><div className="comparison-insights">{model.insights.map((insight) => { const Icon = insightIcon(insight.type); return <article className={`comparison-insight comparison-insight--${insight.type}`} key={insight.type}><div><Icon size={17} /><strong>{insight.title}</strong></div><p>{insight.body}</p><span>연결 근거 {insight.evidenceIds.map((id) => `[${id}]`).join(' ')}</span></article>; })}</div></section>
-          </aside>
+                <div className="analysis-section-block">
+                  <div className="analysis-section-title">
+                    <strong>핵심 지표 우위</strong>
+                    <span>부채비율은 낮을수록 양호</span>
+                  </div>
+                  <div className="comparison-metric-grid">
+                    {[
+                      { label: '종합점수', a: comparisonCompanies[0].compositeScore, b: comparisonCompanies[1].compositeScore, suffix: '점', lower: false },
+                      { label: '매출 성장률', a: comparisonCompanies[0].revenueCagr, b: comparisonCompanies[1].revenueCagr, suffix: '%', lower: false },
+                      { label: '영업이익률', a: comparisonCompanies[0].operatingMargin, b: comparisonCompanies[1].operatingMargin, suffix: '%', lower: false },
+                      { label: '부채비율', a: comparisonCompanies[0].liabilitiesToAssets, b: comparisonCompanies[1].liabilitiesToAssets, suffix: '%', lower: true },
+                    ].map((metric) => {
+                      const aWins = metric.lower ? metric.a < metric.b : metric.a > metric.b;
+                      const bWins = metric.lower ? metric.b < metric.a : metric.b > metric.a;
+                      return (
+                        <div className="comparison-metric-row" key={metric.label}>
+                          <strong className={aWins ? 'is-winner-a' : ''}>{metric.a.toFixed(1)}{metric.suffix}</strong>
+                          <span>{metric.label}</span>
+                          <strong className={bWins ? 'is-winner-b' : ''}>{metric.b.toFixed(1)}{metric.suffix}</strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="analysis-section-block">
+                  <div className="analysis-section-title">
+                    <strong>평가축별 우위</strong>
+                    <span>종합점수 계산 기준</span>
+                  </div>
+                  <div className="comparison-score-list">
+                    {SCORE_DIMENSIONS.map((dimension) => {
+                      const aScore = comparisonCompanies[0][dimension.key];
+                      const bScore = comparisonCompanies[1][dimension.key];
+                      return (
+                        <div className="comparison-score-row" key={dimension.key}>
+                          <span>{dimension.label} <small>{Math.round(dimension.weight * 100)}%</small></span>
+                          <div className="comparison-score-values">
+                            <strong className={aScore > bScore ? 'is-winner-a' : ''}>A {aScore.toFixed(1)}</strong>
+                            <i aria-hidden="true"><b style={{ width: `${aScore}%` }} /><b style={{ width: `${bScore}%` }} /></i>
+                            <strong className={bScore > aScore ? 'is-winner-b' : ''}>B {bScore.toFixed(1)}</strong>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="analysis-section-block trend-section">
+                  <div className="analysis-section-title">
+                    <strong>2021~2025 매출 추이</strong>
+                    <span>2021년=100 지수</span>
+                  </div>
+                  <div className="comparison-trend-legend">
+                    <span><i className="is-a" />A {comparisonCompanies[0].displayName}</span>
+                    <span><i className="is-b" />B {comparisonCompanies[1].displayName}</span>
+                  </div>
+                  <ComparisonTrendChart
+                    first={indexedSeries(comparisonCandles[0].map((candle) => candle.revenue))}
+                    second={indexedSeries(comparisonCandles[1].map((candle) => candle.revenue))}
+                  />
+                </div>
+              </>
+            ) : analysisCompany ? (
+              <>
+                <div className="analysis-company-summary">
+                  <div className="analysis-company-identity">
+                    <CompanyLogoBadge companyId={analysisCompany.companyId} companyName={analysisCompany.displayName} size={30} />
+                    <div>
+                      <strong title={analysisCompany.displayName}>{analysisCompany.displayName}</strong>
+                      <span>19개 기업 중 종합 {officialRankByCompanyId.get(analysisCompany.companyId)}위</span>
+                    </div>
+                  </div>
+                  <div className="analysis-total-score">
+                    <span className={`tier-round-pill pill-${analysisCompany.tier.toLowerCase()}`}>{analysisCompany.tier}</span>
+                    <strong>{analysisCompany.compositeScore.toFixed(1)}</strong>
+                    <small>종합점수</small>
+                  </div>
+                </div>
+
+                <div className="analysis-section-block rank-reason-section">
+                  <div className="analysis-section-title">
+                    <strong>왜 이 순위인가?</strong>
+                    <span>성장 35 · 수익 35 · 안정 30</span>
+                  </div>
+                  <div className="score-contribution-list">
+                    {SCORE_DIMENSIONS.map((dimension) => {
+                      const score = analysisCompany[dimension.key];
+                      return (
+                        <div className="score-contribution-row" key={dimension.key}>
+                          <span>{dimension.label}<small>{scoreRank(filteredCompanies, analysisCompany, dimension)}위</small></span>
+                          <i><b style={{ width: `${score}%` }} /></i>
+                          <strong>{score.toFixed(1)}</strong>
+                          <small>+{(score * dimension.weight).toFixed(1)}</small>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="rank-reason-copy">
+                    {analysisReasons.map((reason) => <p key={reason}>{reason}</p>)}
+                  </div>
+                </div>
+
+                <div className="analysis-section-block">
+                  <div className="analysis-section-title">
+                    <strong>19개 기업 평균 대비</strong>
+                    <span>현재 기업 / 전체 평균 / 차이</span>
+                  </div>
+                  <div className="benchmark-compare-list">
+                    {[
+                      { label: '매출 성장률', value: analysisCompany.revenueCagr, average: averageCagr, lower: false },
+                      { label: '영업이익률', value: analysisCompany.operatingMargin, average: averageMargin, lower: false },
+                      { label: '부채비율', value: analysisCompany.liabilitiesToAssets, average: averageDebtRatio, lower: true },
+                    ].map((metric) => {
+                      const delta = metric.value - metric.average;
+                      const favorable = metric.lower ? delta < 0 : delta > 0;
+                      return (
+                        <div className="benchmark-compare-row" key={metric.label}>
+                          <span>{metric.label}</span>
+                          <strong>{metric.value.toFixed(1)}%</strong>
+                          <small>평균 {metric.average.toFixed(1)}%</small>
+                          <b className={delta === 0 ? 'is-neutral' : favorable ? 'is-favorable' : 'is-unfavorable'}>
+                            {metric.lower && delta < 0 ? `${Math.abs(delta).toFixed(1)}%p 낮음` : signedPoint(delta)}
+                          </b>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="analysis-section-block trend-section">
+                  <div className="analysis-section-title">
+                    <strong>2021~2025 핵심 추이</strong>
+                    <span>실적 방향성</span>
+                  </div>
+                  {[
+                    { label: '매출', values: analysisCandles.map((candle) => candle.revenue), color: '#107c41', gradientId: 'revenue-trend-fill' },
+                    { label: '영업이익', values: analysisCandles.map((candle) => candle.operatingIncome), color: '#2563eb', gradientId: 'profit-trend-fill' },
+                  ].map((metric) => {
+                    const change = percentChange(metric.values);
+                    return (
+                      <div className="single-trend-row" key={metric.label}>
+                        <div>
+                          <span>{metric.label}</span>
+                          <strong>{formatAmount(metric.values[metric.values.length - 1] ?? 0, analysisCompany)}</strong>
+                          <small className={change !== null && change < 0 ? 'is-down' : ''}>{change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</small>
+                        </div>
+                        <FinancialTrendChart
+                          values={metric.values}
+                          color={metric.color}
+                          gradientId={metric.gradientId}
+                          label={metric.label}
+                          valueFormatter={(value) => formatAmount(value, analysisCompany)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+          </section>
+
+          <section className="interactive-distribution-panel position-analysis-panel" aria-label="기업군 내 성장성과 수익성 위치">
+            <div className="distribution-title-row">
+              <div>
+                <span className="distribution-main-title">성장성 × 수익성 포지션</span>
+                <p className="distribution-description">선택 기업이 전체 19개 기업에서 어디에 위치하는지 확인하세요.</p>
+              </div>
+              <span className="distribution-scope">{filteredCompanies.length}개 기업</span>
+            </div>
+            <div className="distribution-sub-widget benchmark-scatter-widget is-standalone">
+              <div className="benchmark-scatter-title-row">
+                <span className="dist-widget-heading">평균 기준선: 성장률 {averageCagr.toFixed(1)}% · 이익률 {averageMargin.toFixed(1)}%</span>
+                <div className="benchmark-scatter-legend" aria-label="산점도 범례">
+                  {comparisonCompanies.length === 2 ? (
+                    <><span><i className="is-compare-a" />기업 A</span><span><i className="is-compare-b" />기업 B</span></>
+                  ) : <span><i className="is-selected" />선택 기업</span>}
+                  <span><i />기타</span>
+                </div>
+              </div>
+              <div
+                className="benchmark-scatter-chart"
+                role="img"
+                aria-label="기업별 매출 성장률과 영업이익률 산점도. 점을 선택하면 표에서 기업이 강조됩니다."
+              >
+                <span className="quadrant-label is-top-left">안정 수익형</span>
+                <span className="quadrant-label is-top-right">고성장·고수익</span>
+                <span className="quadrant-label is-bottom-left">관찰 필요</span>
+                <span className="quadrant-label is-bottom-right">성장 투자형</span>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 22, right: 16, bottom: 6, left: -4 }}>
+                    <CartesianGrid stroke="#e5ece8" strokeDasharray="3 3" />
+                    <XAxis
+                      type="number"
+                      dataKey="growth"
+                      name="매출 성장률"
+                      unit="%"
+                      tick={{ fill: '#64746b', fontSize: 9 }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#cbd8d1' }}
+                      tickCount={5}
+                      domain={['auto', 'auto']}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="margin"
+                      name="영업이익률"
+                      unit="%"
+                      width={42}
+                      tick={{ fill: '#64746b', fontSize: 9 }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#cbd8d1' }}
+                      tickCount={5}
+                      domain={['auto', 'auto']}
+                    />
+                    <ReferenceLine x={averageCagr} stroke="#2563eb" strokeDasharray="4 3" />
+                    <ReferenceLine y={averageMargin} stroke="#107c41" strokeDasharray="4 3" />
+                    <Tooltip cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }} content={<BenchmarkScatterTooltip />} />
+                    <Scatter
+                      data={benchmarkScatterData}
+                      shape={renderBenchmarkScatterMarker}
+                      onClick={(point) => {
+                        const companyId = (point as { payload?: BenchmarkScatterPoint }).payload?.companyId;
+                        if (companyId) setFocusedCompanyId(companyId);
+                      }}
+                    />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="benchmark-scatter-axis-labels" aria-hidden="true">
+                <span>낮은 성장</span>
+                <strong>매출 성장률</strong>
+                <span>높은 성장</span>
+              </div>
+            </div>
+          </section>
         </div>
-      </>}
+      </div>
+
+      {/* =========================================================================
+          3. Bottom Status Footer Bar
+         ========================================================================= */}
+      <footer className="league-bottom-status-bar" aria-label="데이터 상태">
+        <div className="footer-left-links">
+          <span className="footer-link-item">
+            <Database size={11} /> 데이터 출처: 파싱 기준기업 4개 + 재무 시나리오 기업 15개
+          </span>
+          <span className="footer-link-item">
+            <RefreshCw size={11} /> 현재 순위: {RANKING_METRICS[rankingMetric].label} 기준 · {metricDirectionLabel}
+          </span>
+        </div>
+        <div className="footer-right-time">
+          <span className="footer-link-item">
+            <Clock size={11} /> 최종 업데이트: {new Date(state.data.generatedAt).toLocaleString('ko-KR')}
+          </span>
+        </div>
+      </footer>
     </main>
   );
 }
