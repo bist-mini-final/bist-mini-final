@@ -1,7 +1,7 @@
 # [BP-403] Financial BI Analytics 워크스페이스
 
 > **Document Code:** `BP-403` | **Category:** Workspace & Financial Analytics | **Status:** Implemented & Operational
-> **Canonical Source:** [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
+> **Canonical Source:** [`backend/domains/bi/application/`](file:///c:/Repos/bist-mini-final/backend/domains/bi/application/), [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
 
 ---
 

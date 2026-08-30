@@ -35,18 +35,27 @@
 - BI와 Company Comparison snapshot은 불변 발행본과 current pointer를 분리한다.
 - workflow와 child shard queue는 lease token, heartbeat, stale recovery를 사용한다.
 
+## 백엔드 구조 기준선
+
+- `backend/api`는 HTTP presentation과 오류 매핑만 소유한다.
+- `backend/domains/<domain>/application`은 유스케이스와 port를, `domain`은 순수 상태·오류 규칙을 소유한다. 현재 명시 도메인은 workflow, data sources, BI, chatbot, company comparison이다.
+- `backend/platform/pgvector`와 `backend/shared/infrastructure/database`가 좁은 저장소 adapter 경계를 제공한다. 기존 `DatabaseManager`와 `PgVectorStore`는 호환 가능한 SQL gateway로 유지되며 application/module 소비자는 private connection이나 거대 gateway 대신 port를 사용한다.
+- `backend/bootstrap`만 concrete adapter를 조립한다. feature 패키지의 기존 구현은 호환 facade 뒤에 유지하며 새 application 진입점은 `backend/domains`를 기준으로 한다.
+- one-shot queue worker는 `LeasedWorker` template method를 상속해 claim, heartbeat, terminal transition을 공유한다. pause/cancel 같은 별도 상태 기계를 가진 worker는 공통 lease primitive만 재사용한다.
+- HTTP와 worker는 request/run/job/worker correlation context를 공유한다.
+
 ## 검증 기준선
 
 2026-08-31 로컬 전체 검증 결과:
 
-- Backend: 196 passed, 2 skipped
+- Backend: 208 passed, 2 skipped
 - Frontend: 168 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Kubernetes renderer: 6개 `ScaledJob`
 
 테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다.
 
-## 다음 구조 리팩토링 원칙
+## 구조 변경 원칙
 
 - Presentation → Application → Domain 의존 방향을 유지한다.
 - Infrastructure는 Application에 정의된 port를 구현한다.

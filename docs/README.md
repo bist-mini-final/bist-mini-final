@@ -15,7 +15,7 @@ flowchart TD
     ROOT["docs/README.md (마스터 청사진 포털)"]
 
     subgraph BlueprintTrack ["📐 blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
-        B1["01_system_blueprints/ (BP-101~104: durable job, 7계층, 3-Level 락, K8s)"]
+        B1["01_system_blueprints/ (BP-101~104: modular backend, durable job, 3-Level 락, K8s)"]
         B2["02_data_engine_blueprints/ (BP-201~203: 2D 파서, Luna VLM, Binary COPY)"]
         B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 19개 모듈·BI 서비스, RRF 융합)"]
         B4["04_workspace_blueprints/ (BP-401~405: 5대 워크스페이스 세부 명세)"]
@@ -34,7 +34,7 @@ flowchart TD
 | 도메인 | 청사진 번호 & 문서명 | 핵심 기술 스펙 및 내용 |
 | :--- | :--- | :--- |
 | **01. System** | [`BP-101`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-101_system_architecture_blueprint.md) | durable job 토폴로지, PostgreSQL 영속 상태, Redis 신호 및 KEDA 런타임 |
-| | [`BP-102`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-102_backend_layered_architecture.md) | 7계층 클린 아키텍처 & 의존성 역전 원칙(DIP) |
+| | [`BP-102`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-102_backend_layered_architecture.md) | 도메인별 modular monolith, application port 및 의존성 역전 원칙(DIP) |
 | | [`BP-103`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | 3-Level 분산 락, 하트비트 Lease & 장애 복구 런북 |
 | | [`BP-104`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | Helm·Kubernetes KEDA ScaledJob, TriggerAuthentication 및 `/api/v1/jobs` |
 | **02. Data Engine** | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md) | OpenPyXL 병합 해제 및 2D 직교 좌표계 정규화 |

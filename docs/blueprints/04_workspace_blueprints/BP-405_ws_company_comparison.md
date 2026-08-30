@@ -1,6 +1,6 @@
 # [BP-405] Company Comparison 스냅샷 워크스페이스 청사진
 > **Document Code:** `BP-405` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/features/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/features/company_comparison/), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`frontend/src/pages/CompanyComparisonPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx), [`frontend/src/features/company-comparison/`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/)
+> **Source Files:** [`backend/domains/company_comparison/application/`](file:///c:/Repos/bist-mini-final/backend/domains/company_comparison/application/), [`backend/features/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/features/company_comparison/), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`frontend/src/pages/CompanyComparisonPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx), [`frontend/src/features/company-comparison/`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/)
 
 ---
 
