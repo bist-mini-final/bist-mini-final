@@ -12,6 +12,8 @@ from backend.bootstrap.container import (
     DomainServicesContainer,
     ExecutionContainer,
 )
+from backend.features.chatbot.repository import ChatSessionRepository
+from backend.shared.infrastructure.database import SyncPostgresRepository
 from jobs import ALL_JOBS, WorkerJobDefinition
 from jobs.kubernetes import kubernetes_worker_specs
 
@@ -79,6 +81,19 @@ def test_modules_do_not_construct_infrastructure_clients() -> None:
             if name in forbidden:
                 violations.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
     assert not violations, f"module infrastructure construction: {violations}"
+
+
+def test_feature_repositories_do_not_reach_into_private_database_connections() -> None:
+    violations: list[str] = []
+    for path in _python_files("backend/features"):
+        source = path.read_text(encoding="utf-8")
+        if "._raw_connection(" in source:
+            violations.append(str(path.relative_to(PROJECT_ROOT)))
+    assert not violations, f"private database connection access: {violations}"
+
+
+def test_chat_repository_uses_shared_postgres_repository_boundary() -> None:
+    assert issubclass(ChatSessionRepository, SyncPostgresRepository)
 
 
 def test_kubernetes_specs_are_projected_from_worker_jobs() -> None:

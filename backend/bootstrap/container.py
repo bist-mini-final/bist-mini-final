@@ -23,6 +23,7 @@ from backend.engine.runtime.services import (
 from backend.engine.workflows import WorkflowExecutionService
 from backend.features.bi.api_services import BiApiServices
 from backend.features.bi.composition import create_bi_services
+from backend.features.chatbot.suggestion_repository import ChatSuggestionRepository
 from backend.features.chatbot.suggestions import ChatSuggestionService
 from backend.features.company_comparison.composition import (
     create_company_comparison_service,
@@ -164,7 +165,7 @@ class DomainServicesContainer:
                 database_url=runtime.services.db_manager.database_url,
             ),
             chat_suggestions=ChatSuggestionService(
-                runtime.services.db_manager,
+                ChatSuggestionRepository(runtime.services.db_manager),
                 bi_services,
             ),
             job_monitor=KubernetesMonitor(queue_reader=runtime.services.db_manager),
