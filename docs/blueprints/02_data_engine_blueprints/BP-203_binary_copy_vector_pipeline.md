@@ -1,6 +1,6 @@
 # [BP-203] 대용량 Binary COPY와 pgvector 인덱싱
 > **Document Code:** `BP-203` | **Category:** Data Engine Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py), [`backend/storage/data_sources/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/shard_coordinator.py)
+> **Source Files:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/repositories/pgvector_retrieval.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/pgvector_retrieval.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py), [`backend/storage/data_sources/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/shard_coordinator.py)
 
 ---
 

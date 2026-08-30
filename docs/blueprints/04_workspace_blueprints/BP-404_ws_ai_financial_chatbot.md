@@ -1,6 +1,6 @@
 # [BP-404] AI Financial Chatbot 워크스페이스 명세서
 > **Document Code:** `BP-404` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx), [`backend/features/chatbot/api_routes.py`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/api_routes.py), [`backend/features/chatbot/conversation.py`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/conversation.py), [`backend/features/chatbot/grounding.py`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/grounding.py)
+> **Source Files:** [`backend/api/chat_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/chat_routes.py), [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`backend/features/chatbot/`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx)
 
 ---
 
@@ -51,7 +51,7 @@ flowchart TD
 
 ## 3. 대화 라우팅과 근거 안전성
 
-* 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 `conversation.py`의 결정적 정책으로 처리하고 기업 수치·실적 조회만 `rag_query` 워크플로로 보냅니다.
+* 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 `ChatConversationService`가 조율하고 `features/chatbot/conversation.py`의 결정적 정책을 사용합니다. 기업 수치·실적 조회만 `rag_query` 워크플로로 보냅니다.
 * 검색 서브쿼리의 `Cell Value: ?`는 Dense 유사도 검색용 와일드카드이므로 검색 단계까지 보존합니다. Reader에는 실제 `Cell Value`가 확인된 셀만 전달하며, 원시 검색 힌트나 자리표시자 셀은 Context Blocks·근거·추가 DB 조회 결과에서 모두 제외합니다.
 * RAG 응답은 실행 결과의 `expand-context` 셀 또는 실행 로그에서 복구한 pgvector 셀과 대조합니다. 검증 가능한 셀이 없거나 응답의 셀 인용이 실행 근거와 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
 * 모델이 근거 셀을 사용했지만 인용 표기를 생략한 경우 `grounding.py`가 최대 6개의 `[Sheet: ... | Cell: ...]` 근거를 보강합니다.

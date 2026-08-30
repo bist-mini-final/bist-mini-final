@@ -32,6 +32,7 @@ flowchart TB
 - BI는 21개 metric ID와 evidence 계약을 지킵니다.
 - Company Comparison은 source snapshot, evidence, rank, forecast assumption, exclusion, current head 무결성을 지킵니다.
 - frontend에는 `/company-comparison-v2`가 없고 정식 `/company-comparison`만 존재합니다.
+- C901 복잡도는 함수별 명시적 migration budget을 넘거나 새 hotspot이 생기면 실패합니다. 기존 hotspot 제거와 budget 감소만 허용합니다.
 
 ---
 
@@ -79,7 +80,7 @@ npm test -- --run
 npm run build
 ```
 
-2026-08-31 기준 최근 전체 결과는 backend **208 passed, 2 skipped**, frontend **48 files / 168 passed**, Ruff/Pyright/ESLint/TypeScript typecheck/production build 통과, Kubernetes renderer **6 ScaledJobs**입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
+2026-08-31 기준 최근 전체 결과는 backend **224 passed, 2 skipped**, frontend **48 files / 168 passed**, Ruff/Pyright/ESLint/TypeScript typecheck/production build 통과, Kubernetes renderer **6 ScaledJobs**입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
 
 ---
 

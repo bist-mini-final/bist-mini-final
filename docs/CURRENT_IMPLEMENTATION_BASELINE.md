@@ -38,9 +38,9 @@
 ## 백엔드 구조 기준선
 
 - `backend/api`는 HTTP presentation과 오류 매핑만 소유한다.
-- `backend/domains/<domain>/application`은 유스케이스와 port를, `domain`은 순수 상태·오류 규칙을 소유한다. 현재 명시 도메인은 workflow, data sources, BI, chatbot, company comparison이다.
-- `backend/platform/pgvector`와 `backend/shared/infrastructure/database`가 좁은 저장소 adapter 경계를 제공한다. 기존 `DatabaseManager`와 `PgVectorStore`는 호환 가능한 SQL gateway로 유지되며 application/module 소비자는 private connection이나 거대 gateway 대신 port를 사용한다.
-- `backend/bootstrap`만 concrete adapter를 조립한다. feature 패키지의 기존 구현은 호환 facade 뒤에 유지하며 새 application 진입점은 `backend/domains`를 기준으로 한다.
+- `backend/domains/<domain>/application`은 유스케이스와 port를, `domain`은 순수 상태·오류 규칙을 소유한다. 현재 명시 도메인은 workflow, data sources, BI, chatbot, benchmark, company comparison이다.
+- `backend/platform/pgvector`와 `backend/shared/infrastructure/database`가 좁은 저장소 adapter 경계를 제공한다. `DatabaseManager`는 source-file/workflow-run repository capability를, `PgVectorStore`는 retrieval capability를 조합하는 하위 호환 facade다.
+- `backend/bootstrap`만 concrete adapter를 조립한다. 정식 HTTP 진입점은 `backend/api`, application 진입점은 `backend/domains`이며 `backend/features`는 남은 infrastructure·계산 구현만 보유한다.
 - one-shot queue worker는 `LeasedWorker` template method를 상속해 claim, heartbeat, terminal transition을 공유한다. pause/cancel 같은 별도 상태 기계를 가진 worker는 공통 lease primitive만 재사용한다.
 - HTTP와 worker는 request/run/job/worker correlation context를 공유한다.
 
@@ -48,7 +48,7 @@
 
 2026-08-31 로컬 전체 검증 결과:
 
-- Backend: 208 passed, 2 skipped
+- Backend: 224 passed, 2 skipped
 - Frontend: 168 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Kubernetes renderer: 6개 `ScaledJob`
