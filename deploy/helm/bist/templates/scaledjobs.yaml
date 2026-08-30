@@ -1,0 +1,100 @@
+{{- range $job := .Values.workerJobs }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: {{ $job.name }}
+  labels:
+    {{- include "bist.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: {{ $job.appName }}
+spec:
+  pollingInterval: {{ $.Values.keda.pollingInterval }}
+  minReplicaCount: 0
+  maxReplicaCount: {{ default $.Values.keda.maxReplicaCount $job.maxReplicaCount }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  rollout:
+    strategy: gradual
+  scalingStrategy:
+    strategy: accurate
+    pendingPodConditions: [Ready, PodScheduled]
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    backoffLimit: 0
+    activeDeadlineSeconds: {{ $job.activeDeadlineSeconds }}
+    ttlSecondsAfterFinished: 600
+    template:
+      metadata:
+        labels:
+          {{- include "bist.selectorLabels" $ | nindent 10 }}
+          app.kubernetes.io/name: {{ $job.appName }}
+          bist.ai/queue: {{ $job.queue }}
+      spec:
+        restartPolicy: Never
+        terminationGracePeriodSeconds: 30
+        containers:
+          - name: worker
+            image: {{ include "bist.image" $.Values.images.worker | quote }}
+            imagePullPolicy: {{ $.Values.images.worker.pullPolicy }}
+            command: ["python", "-m", {{ $job.module | quote }}]
+            {{- with $job.args }}
+            args:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            env:
+              - name: WORKFLOW_QUEUE
+                value: {{ $job.queue | quote }}
+              - name: KUBERNETES_JOB_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.labels['batch.kubernetes.io/job-name']
+              - name: PGVECTOR_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $.Values.application.existingSecret }}
+                    key: {{ $.Values.application.databaseKey }}
+              - name: OPENAI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $.Values.application.existingSecret }}
+                    key: {{ $.Values.application.openaiApiKey }}
+              - name: OPENAI_BASE_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $.Values.application.existingSecret }}
+                    key: {{ $.Values.application.openaiBaseUrlKey }}
+              - name: DB_POOL_MIN_SIZE
+                value: "1"
+              - name: DB_POOL_MAX_SIZE
+                value: "4"
+              - name: INGESTION_SHARDS_ENABLED
+                value: "true"
+            resources:
+              {{- toYaml $.Values.keda.workerResources | nindent 14 }}
+            {{- if and $job.mountData (or $.Values.storage.existingClaim $.Values.storage.hostPath) }}
+            volumeMounts:
+              - name: bist-data
+                mountPath: /app/data
+            {{- end }}
+        {{- if and $job.mountData (or $.Values.storage.existingClaim $.Values.storage.hostPath) }}
+        volumes:
+          - name: bist-data
+            {{- if $.Values.storage.hostPath }}
+            hostPath:
+              path: {{ $.Values.storage.hostPath }}
+              type: Directory
+            {{- else }}
+            persistentVolumeClaim:
+              claimName: {{ $.Values.storage.existingClaim }}
+            {{- end }}
+        {{- end }}
+  triggers:
+    - type: postgresql
+      metadata:
+        targetQueryValue: "1"
+        activationTargetQueryValue: "0"
+        query: {{ $job.query | quote }}
+      authenticationRef:
+        name: {{ include "bist.fullname" $ }}-postgresql
+{{- end }}

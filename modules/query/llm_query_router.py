@@ -63,22 +63,14 @@ class RetrievalPlanDTO(ModuleDTO):
     @property
     def selected_index_ids(self) -> List[str]:
         return list(
-            dict.fromkeys(
-                scope.index_id
-                for route in self.routes
-                for scope in route.collections
-            )
+            dict.fromkeys(scope.index_id for route in self.routes for scope in route.collections)
         )
 
 
 def document_context_for_plan(plan: RetrievalPlanDTO) -> DocumentContextDTO:
     """Build one deterministic multi-collection lineage projection."""
     collections = list(
-        {
-            scope.index_id: scope
-            for route in plan.routes
-            for scope in route.collections
-        }.values()
+        {scope.index_id: scope for route in plan.routes for scope in route.collections}.values()
     )
     if not collections:
         return DocumentContextDTO(
@@ -89,11 +81,7 @@ def document_context_for_plan(plan: RetrievalPlanDTO) -> DocumentContextDTO:
     company_names = list(
         dict.fromkeys(scope.company_name for scope in collections if scope.company_name)
     )
-    sheet_names = list(
-        dict.fromkeys(
-            sheet for scope in collections for sheet in scope.sheet_names
-        )
-    )
+    sheet_names = list(dict.fromkeys(sheet for scope in collections for sheet in scope.sheet_names))
     return DocumentContextDTO(
         file_name=", ".join(scope.file_name for scope in collections),
         workbook_hash=",".join(scope.workbook_hash for scope in collections),
@@ -123,9 +111,7 @@ class LlmQueryRouterModule(BaseLLMModule):
         type="llm_query_router",
         label="LLM Query Router",
         category="Logic",
-        description=(
-            "분해된 각 서브쿼리를 DB catalog의 concrete collection에 자동 대응시킵니다."
-        ),
+        description=("분해된 각 서브쿼리를 DB catalog의 concrete collection에 자동 대응시킵니다."),
         inputs=["query_input", "scope_catalog"],
         outputs=["retrieval_plan"],
         config_fields=["model", "max_collections_per_subquery"],
@@ -139,25 +125,8 @@ class LlmQueryRouterModule(BaseLLMModule):
     def __init__(self, completion_client: Any) -> None:
         super().__init__(completion_client=completion_client)
 
-    def execute(
-        self,
-        input_data: LlmQueryRouterInputDTO,
-        config: Optional[LlmQueryRouterConfigDTO] = None,
-    ) -> Dict[str, Any]:
-        cfg = config or LlmQueryRouterConfigDTO()
-        subqueries = input_data.query_input.items
-        catalog = input_data.scope_catalog.collections
-        if not subqueries:
-            return {
-                "query_context": input_data.query_input.query_context.model_dump(
-                    mode="json"
-                ),
-                "routes": [],
-                "metrics": {"kind": "llm_collection_router", "model": cfg.model},
-            }
-        if not catalog:
-            raise ModuleExecutionError("라우팅할 PostgreSQL data scope가 없습니다")
-
+    @staticmethod
+    def _prompt(input_data: LlmQueryRouterInputDTO) -> str:
         catalog_payload = [
             {
                 "index_id": scope.index_id,
@@ -167,16 +136,16 @@ class LlmQueryRouterModule(BaseLLMModule):
                 "model": scope.model,
                 "dimension": scope.dimension,
             }
-            for scope in catalog
+            for scope in input_data.scope_catalog.collections
         ]
         subquery_payload = [
             {
                 "subquery_index": index,
                 **item.model_dump(mode="json"),
             }
-            for index, item in enumerate(subqueries)
+            for index, item in enumerate(input_data.query_input.items)
         ]
-        prompt = json.dumps(
+        return json.dumps(
             {
                 "question": input_data.query_input.query_context.question_text,
                 "subqueries": subquery_payload,
@@ -185,13 +154,29 @@ class LlmQueryRouterModule(BaseLLMModule):
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        parsed, usage, cost_usd, latency_seconds = self.complete_structured(
-            messages_or_prompt=prompt,
-            response_model=LlmRouterResponse,
-            model=cfg.model,
-            system_prompt=ROUTER_SYSTEM_PROMPT,
-        )
 
+    @staticmethod
+    def _empty_output(
+        input_data: LlmQueryRouterInputDTO,
+        cfg: LlmQueryRouterConfigDTO,
+    ) -> Dict[str, Any]:
+        return {
+            "query_context": input_data.query_input.query_context.model_dump(mode="json"),
+            "routes": [],
+            "metrics": {"kind": "llm_collection_router", "model": cfg.model},
+        }
+
+    @staticmethod
+    def _route_output(
+        input_data: LlmQueryRouterInputDTO,
+        cfg: LlmQueryRouterConfigDTO,
+        parsed: LlmRouterResponse,
+        usage: Any,
+        cost_usd: float,
+        latency_seconds: float,
+    ) -> Dict[str, Any]:
+        subqueries = input_data.query_input.items
+        catalog = input_data.scope_catalog.collections
         catalog_by_id = {scope.index_id: scope for scope in catalog}
         selections: Dict[int, RouteSelectionDTO] = {}
         for selection in parsed.routes:
@@ -209,12 +194,12 @@ class LlmQueryRouterModule(BaseLLMModule):
                 else:
                     matched = next(
                         (
-                            c.index_id
-                            for c in catalog
+                            scope.index_id
+                            for scope in catalog
                             if len(index_id) >= 8
                             and (
-                                c.index_id.startswith(index_id[:8])
-                                or index_id.startswith(c.index_id[:8])
+                                scope.index_id.startswith(index_id[:8])
+                                or index_id.startswith(scope.index_id[:8])
                             )
                         ),
                         None,
@@ -262,6 +247,60 @@ class LlmQueryRouterModule(BaseLLMModule):
                 "route_count": len(routes),
             },
         }
+
+    def execute(
+        self,
+        input_data: LlmQueryRouterInputDTO,
+        config: Optional[LlmQueryRouterConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or LlmQueryRouterConfigDTO()
+        subqueries = input_data.query_input.items
+        catalog = input_data.scope_catalog.collections
+        if not subqueries:
+            return self._empty_output(input_data, cfg)
+        if not catalog:
+            raise ModuleExecutionError("라우팅할 PostgreSQL data scope가 없습니다")
+
+        parsed, usage, cost_usd, latency_seconds = self.complete_structured(
+            messages_or_prompt=self._prompt(input_data),
+            response_model=LlmRouterResponse,
+            model=cfg.model,
+            system_prompt=ROUTER_SYSTEM_PROMPT,
+        )
+        return self._route_output(
+            input_data,
+            cfg,
+            parsed,
+            usage,
+            cost_usd,
+            latency_seconds,
+        )
+
+    async def execute_async(
+        self,
+        input_data: LlmQueryRouterInputDTO,
+        config: Optional[LlmQueryRouterConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or LlmQueryRouterConfigDTO()
+        if not input_data.query_input.items:
+            return self._empty_output(input_data, cfg)
+        if not input_data.scope_catalog.collections:
+            raise ModuleExecutionError("라우팅할 PostgreSQL data scope가 없습니다")
+
+        parsed, usage, cost_usd, latency_seconds = await self.complete_structured_async(
+            messages_or_prompt=self._prompt(input_data),
+            response_model=LlmRouterResponse,
+            model=cfg.model,
+            system_prompt=ROUTER_SYSTEM_PROMPT,
+        )
+        return self._route_output(
+            input_data,
+            cfg,
+            parsed,
+            usage,
+            cost_usd,
+            latency_seconds,
+        )
 
 
 __all__ = [

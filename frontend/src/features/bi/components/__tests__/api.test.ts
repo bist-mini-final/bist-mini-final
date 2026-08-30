@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BiApiRequestError,
   createBiMaterialization,
+  deleteBiDashboard,
   fetchBiCompanies,
   fetchBiDashboard,
+  fetchBiMaterializationCandidates,
   fetchBiMaterializationJob,
   fetchBiQuestionJob,
   refreshBiDashboard,
@@ -66,6 +68,33 @@ describe('BI API service', () => {
     expect(response).toEqual({ companies: [] });
   });
 
+  it('loads snapshot generation candidates from the dedicated endpoint', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{
+        company_id: 'acme',
+        display_name: 'ACME',
+        source: {
+          file_name: 'acme.xlsx',
+          workbook_hash: 'a'.repeat(64),
+          index_id: 'index-acme',
+        },
+        reason: 'not_created',
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    const response = await fetchBiMaterializationCandidates(new AbortController().signal);
+
+    expect(response.candidates[0]?.reason).toBe('not_created');
+    const input = fetchMock.mock.calls[0]?.[0];
+    expect(input).toBeInstanceOf(Request);
+    if (input instanceof Request) {
+      expect(new URL(input.url).pathname).toBe('/api/v1/bi/materialization-candidates');
+    }
+  });
+
   it('returns a typed pending dashboard result for HTTP 202', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({
       job: {
@@ -89,6 +118,18 @@ describe('BI API service', () => {
     const result = await fetchBiDashboard('acme', new AbortController().signal);
 
     expect(result.kind).toBe('pending');
+  });
+
+  it('deletes only the selected company dashboard endpoint', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await deleteBiDashboard('acme/company', new AbortController().signal);
+
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    if (!(request instanceof Request)) return;
+    expect(request.method).toBe('DELETE');
+    expect(new URL(request.url).pathname).toBe('/api/v1/bi/companies/acme%2Fcompany/dashboard');
   });
 
   it('raises a typed request error for a failed response', async () => {
@@ -133,7 +174,7 @@ describe('BI API service', () => {
     expect(input).toBeInstanceOf(Request);
     if (!(input instanceof Request)) return;
     expect(input.method).toBe('POST');
-    expect(new URL(input.url).pathname).toBe('/api/bi/materializations');
+    expect(new URL(input.url).pathname).toBe('/api/v1/bi/materializations');
     expect(await input.clone().json()).toEqual({
       company_id: 'acme',
       display_name: 'ACME',
@@ -235,7 +276,7 @@ describe('BI API service', () => {
     expect(request).toBeInstanceOf(Request);
     if (!(request instanceof Request)) return;
     expect(request.method).toBe('POST');
-    expect(new URL(request.url).pathname).toBe('/api/bi/companies/acme/refresh');
+    expect(new URL(request.url).pathname).toBe('/api/v1/bi/companies/acme/refresh');
   });
 
   it('resets and reads a question regeneration job', async () => {
@@ -269,9 +310,9 @@ describe('BI API service', () => {
     expect(second).toBeInstanceOf(Request);
     if (!(first instanceof Request) || !(second instanceof Request)) return;
     expect(first.method).toBe('POST');
-    expect(new URL(first.url).pathname).toBe('/api/bi/companies/acme/reset');
+    expect(new URL(first.url).pathname).toBe('/api/v1/bi/companies/acme/reset');
     expect(new URL(second.url).pathname).toBe(
-      '/api/bi/question-jobs/question-job-refresh',
+      '/api/v1/bi/question-jobs/question-job-refresh',
     );
   });
 });

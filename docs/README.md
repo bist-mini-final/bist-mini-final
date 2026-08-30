@@ -1,32 +1,55 @@
-# Architecture & Design Documentation
-
-이 디렉토리는 시스템 아키텍처 결정 기록(ADR) 및 파이프라인 설계 문서를 관리합니다.
-
----
-
-## Architecture Decision Records (ADRs)
-
-| ADR ID | 제목 | 상태 | 날짜 |
-| :--- | :--- | :--- | :--- |
-| [ADR-001](adr/0001-hybrid-indexing-and-streaming-ingestion-strategy.md) | **Hybrid Indexing (Dense HNSW + Sparse GIN FTS) and Streaming Ingestion Strategy** | `Accepted` | 2026-08-21 |
-| [ADR-002](adr/0002-semantic-query-data-scope-routing-and-prefiltering.md) | **Semantic Query Data Scope Routing & SQL Metadata Pre-filtering (Company & Sheet Scoping)** | `Accepted` | 2026-08-21 |
-| [ADR-003](adr/0003-entity-to-intent-mapping-and-symmetric-serialization.md) | **Entity-to-Intent Mapping & Symmetric `Company: ...` Serialization Architecture** | `Accepted` | 2026-08-21 |
-| [ADR-004](adr/0004-module-architecture-and-pydantic-structured-output-standard.md) | **Module Architecture Simplification & Pydantic Structured Output Standard** | `Accepted` | 2026-08-22 |
+# 🏛️ bist-mini-final 엔지니어링 청사진 포털 (Engineering Blueprints Gateway)
+> **Project Version:** `0.1.0` | **Public API Version:** `2.4.0` | **Build Target:** Financial RAG, BI & Comparison Platform
+> **Master Portals:** [📐 엔지니어링 청사진 규격서 (Blueprints)](file:///c:/Repos/bist-mini-final/docs/blueprints/) | [📋 현재 구현 기준선 (Current Implementation Baseline)](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)
 
 ---
 
-## 개발 표준 & 가이드 (Standards & Guidelines)
-- [**제품 및 기능 명세**](specs/README.md): Kubernetes 실행 경계, 기능 요구사항, API 계약, SLO와 검증 기준의 단일 진입점.
-- [**클린 아키텍처 계약**](specs/ARCHITECTURE_CONTRACT.md): frontend/backend/worker/Kubernetes의 의존 방향과 객체 수명, KEDA 실행 계약.
-- [**현재 모듈 런타임 아키텍처**](MODULE_HIERARCHY_ARCHITECTURE.md): `BaseModule`, `BaseLLMModule`, `BaseEmbeddingModule` 계층과 Responses·I/O 계약.
-- [**RAG Pipeline Coding Standards & Module Patterns**](CODING_STANDARDS.md): 모듈 표준 레이아웃, Pydantic Structured Output 규칙, 대칭 직렬화 및 단일 소스 원칙 명세.
+## 🧭 엔지니어링 문서 체계 및 청사진 구조
+
+`bist-mini-final`의 기술 문서는 시스템의 실제 아키텍처, 19개 파이프라인 모듈 핀아웃, 5대 워크스페이스, 데이터베이스 DDL 및 프론트엔드 배선도를 개발 및 운영 시 실시간으로 참조할 수 있도록 **[엔지니어링 청사진 규격서 (Blueprints)]** 체계로 관리됩니다:
+
+> **문서 해석 기준:** [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)가 현재 구현의 요약 기준입니다. `blueprints/`는 실행 계약과 설계 결정을 명세합니다. 현재 기준은 19개 등록 파이프라인 모듈, 21개 BI 지표, 독립 Company Comparison 스냅샷 도메인, PostgreSQL 영속 상태, Redis 상태 변경 신호, KEDA 작업 런타임과 Excel embedding/COPY child shard 실행입니다. 로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다.
+
+```mermaid
+flowchart TD
+    ROOT["docs/README.md (마스터 청사진 포털)"]
+
+    subgraph BlueprintTrack ["📐 blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
+        B1["01_system_blueprints/ (BP-101~104: durable job, 7계층, 3-Level 락, K8s)"]
+        B2["02_data_engine_blueprints/ (BP-201~203: 2D 파서, Luna VLM, Binary COPY)"]
+        B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 19개 모듈·BI 서비스, RRF 융합)"]
+        B4["04_workspace_blueprints/ (BP-401~405: 5대 워크스페이스 세부 명세)"]
+        B5["05_interface_blueprints/ (BP-501~503: REST API, SSE, PostgreSQL DDL)"]
+        B6["06_frontend_blueprints/ (BP-601: React 18 결선도)"]
+        B7["07_validation_blueprints/ (BP-701: AST 계약 테스트 규격)"]
+    end
+
+    ROOT ==> BlueprintTrack
+```
 
 ---
 
-## 핵심 요약
-- **하이브리드 인덱싱 (ADR-001)**: 단일 PostgreSQL 16 + `pgvector` 저장소 내에서 **HNSW 벡터 인덱스**와 **GIN FTS 전문검색 인덱스**를 동시 구축하고 **RRF Fusion**으로 결합.
-- **스트리밍 수집 (ADR-001)**: `BaseEmbeddingModule` 및 `CellTextEmbedder`의 `storage_sink` 콜백을 통해 $O(\text{batch\_size})$ 수준으로 피크 메모리를 엄격히 제한.
-- **데이터 스코프 라우팅 & 사전 필터링 (ADR-002)**: `(company_name, sheet_name)` 복합 스코프를 추론하여 DB 레벨에서 SQL 사전 필터링 푸시다운을 수행하고, 결과 0건 시 전역 검색으로 자동 릴랙스 폴백하여 재현율 100% 보장.
-- **개체-인텐트 매핑 & 대칭 직렬화 (ADR-003)**: 복합 질의에서 기업별 요구 지표(`company_scopes`)를 격리 분해하고, 수집기와 질의기 모두 `Company: {company} | Sheet: {sheet} | ...` 포맷을 적용하여 교차 오염을 100% 차단.
-- **모듈 단일화 및 Pydantic 구조화 (ADR-004)**: 중복 디렉토리/모듈을 단일화하고, 비정형 문자열 파싱 대신 Pydantic `model_validate_json()`을 통해 안전하고 견고한 데이터 파이프라인 구축.
-- **Kubernetes 실행 단일화**: API는 계약 검증, PostgreSQL 큐 제출, 상태 조회와 SSE 전달만 수행한다. 실제 모듈 실행은 KEDA가 확장하는 일회성 Kubernetes Job에서만 수행한다.
+# 📐 엔지니어링 청사진 규격서 색인 (Blueprints Catalog)
+
+| 도메인 | 청사진 번호 & 문서명 | 핵심 기술 스펙 및 내용 |
+| :--- | :--- | :--- |
+| **01. System** | [`BP-101`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-101_system_architecture_blueprint.md) | durable job 토폴로지, PostgreSQL 영속 상태, Redis 신호 및 KEDA 런타임 |
+| | [`BP-102`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-102_backend_layered_architecture.md) | 7계층 클린 아키텍처 & 의존성 역전 원칙(DIP) |
+| | [`BP-103`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-103_concurrency_and_locking_model.md) | 3-Level 분산 락, 하트비트 Lease & 장애 복구 런북 |
+| | [`BP-104`](file:///c:/Repos/bist-mini-final/docs/blueprints/01_system_blueprints/BP-104_deployment_and_infra_topology.md) | Helm·Kubernetes KEDA ScaledJob, TriggerAuthentication 및 `/api/v1/jobs` |
+| **02. Data Engine** | [`BP-201`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md) | OpenPyXL 병합 해제 및 2D 직교 좌표계 정규화 |
+| | [`BP-202`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) | 외부 OpenAI vision 기반 시트 구조 감지; 로컬 VLM 제외 |
+| | [`BP-203`](file:///c:/Repos/bist-mini-final/docs/blueprints/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | PostgreSQL Native `Binary COPY` 3072d 고속 벌크 주입 |
+| **03. Pipeline** | [`BP-301`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | Kahn 위상정렬 DAG, durable queue 실행 및 FSM |
+| | [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md) | `ModuleRegistry` 기준 19개 원자적 파이프라인 모듈 계약 |
+| | [`BP-303`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | Dense(3072d) + Sparse(BM25) + RRF($k=60$) 융합 검색 |
+| **04. Workspaces** | [`BP-401`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md) | 모듈 카탈로그, DAG 실행 및 SSE 상태 스트림 |
+| | [`BP-402`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-402_ws_data_sources_management.md) | 스프레드시트 미리보기 및 영속 ingestion job 관리 |
+| | [`BP-403`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md) | 21개 근거 기반 BI 지표와 재무 분석 화면 |
+| | [`BP-404`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-404_ws_ai_financial_chatbot.md) | RAG 실행 작업, 상태 조회 및 대화형 챗봇 |
+| | [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md) | 검증된 BI 원천 기반 버전형 기업 비교 스냅샷과 재무 순위·선택 비교 |
+| **05. Interface** | [`BP-501`](file:///c:/Repos/bist-mini-final/docs/blueprints/05_interface_blueprints/BP-501_rest_api_specification.md) | FastAPI REST API 엔드포인트 & 표준 에러 엔벨로프 |
+| | [`BP-502`](file:///c:/Repos/bist-mini-final/docs/blueprints/05_interface_blueprints/BP-502_sse_streaming_protocol.md) | Server-Sent Events(SSE) 실시간 스트리밍 프로토콜 |
+| | [`BP-503`](file:///c:/Repos/bist-mini-final/docs/blueprints/05_interface_blueprints/BP-503_database_erd_and_ddl.md) | Alembic 관리 PostgreSQL·pgvector·버전형 도메인 스냅샷 ERD & DDL |
+| **06. Frontend** | [`BP-601`](file:///c:/Repos/bist-mini-final/docs/blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | React 18 SPA 컴포넌트 배선도 & a11y 표준 모달 |
+| **07. Validation** | [`BP-701`](file:///c:/Repos/bist-mini-final/docs/blueprints/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md) | AST 아키텍처 계약 검증 & 정량 벤치마크 하네스 |

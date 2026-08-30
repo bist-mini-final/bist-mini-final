@@ -50,6 +50,7 @@ class DagJobDefinition(BaseJobDefinition):
 
     nodes: Tuple[JobNode, ...]
     edges: Tuple[JobEdge, ...] = ()
+    template: bool = False
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -77,12 +78,15 @@ class KubernetesWorkerPolicy:
     pending_query: str
     active_deadline_seconds: int = 21_600
     mount_data_volume: bool = False
+    max_replica_count: int | None = None
 
     def __post_init__(self) -> None:
         if not self.deployment_name or not self.pending_query.strip():
             raise ValueError("Kubernetes worker policy가 완전하지 않습니다")
         if self.active_deadline_seconds < 1:
             raise ValueError("active_deadline_seconds는 1 이상이어야 합니다")
+        if self.max_replica_count is not None and self.max_replica_count < 1:
+            raise ValueError("max_replica_count는 1 이상이어야 합니다")
 
 
 @dataclass(frozen=True, kw_only=True)

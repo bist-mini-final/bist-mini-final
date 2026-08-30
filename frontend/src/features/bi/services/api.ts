@@ -2,6 +2,7 @@ import {
   parseBiCompanies,
   parseBiDashboard,
   parseBiMaterializationAccepted,
+  parseBiMaterializationCandidates,
   parseBiMaterializationJob,
   parseBiPendingDashboard,
   parseBiQuestionJobProgress,
@@ -11,6 +12,7 @@ import type {
   BiDashboardSnapshot,
   BiDashboardFetchResult,
   BiMaterializationAccepted,
+  BiMaterializationCandidateListResponse,
   BiMaterializationJob,
   BiMaterializationRequest,
   BiQuestionJobProgress,
@@ -23,16 +25,27 @@ import { streamJsonEvents } from '../../../shared/api/sse';
 
 export { ApiError as BiApiRequestError } from '../../../shared/api/httpClient';
 
+const BI_API_PREFIX = '/api/v1/bi';
+
 export async function fetchBiCompanies(signal: AbortSignal): Promise<BiCompanyListResponse> {
-  const endpoint = '/api/bi/companies';
+  const endpoint = `${BI_API_PREFIX}/companies`;
   return parseBiCompanies(await requestJson<unknown>(endpoint, { signal }));
+}
+
+export async function fetchBiMaterializationCandidates(
+  signal: AbortSignal,
+): Promise<BiMaterializationCandidateListResponse> {
+  const endpoint = `${BI_API_PREFIX}/materialization-candidates`;
+  return parseBiMaterializationCandidates(
+    await requestJson<unknown>(endpoint, { signal }),
+  );
 }
 
 export async function fetchBiDashboard(
   companyId: string,
   signal: AbortSignal,
 ): Promise<BiDashboardFetchResult> {
-  const endpoint = `/api/bi/companies/${encodeURIComponent(companyId)}/dashboard`;
+  const endpoint = `${BI_API_PREFIX}/companies/${encodeURIComponent(companyId)}/dashboard`;
   const response = await requestResponse(endpoint, { signal });
   const payload = await response.json() as unknown;
   if (response.status === 202) {
@@ -41,11 +54,19 @@ export async function fetchBiDashboard(
   return { kind: 'snapshot', dashboard: parseBiDashboard(payload) };
 }
 
+export async function deleteBiDashboard(
+  companyId: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const endpoint = `${BI_API_PREFIX}/companies/${encodeURIComponent(companyId)}/dashboard`;
+  await requestResponse(endpoint, { method: 'DELETE', signal });
+}
+
 export async function createBiMaterialization(
   request: BiMaterializationRequest,
   signal: AbortSignal,
 ): Promise<BiMaterializationAccepted> {
-  const endpoint = '/api/bi/materializations';
+  const endpoint = `${BI_API_PREFIX}/materializations`;
   const payload = await requestJson<unknown>(endpoint, {
     method: 'POST',
     signal,
@@ -66,7 +87,7 @@ export async function fetchBiMaterializationJob(
   jobId: string,
   signal: AbortSignal,
 ): Promise<BiMaterializationJob> {
-  const endpoint = `/api/bi/materializations/${encodeURIComponent(jobId)}`;
+  const endpoint = `${BI_API_PREFIX}/materializations/${encodeURIComponent(jobId)}`;
   return parseBiMaterializationJob(
     await requestJson<unknown>(endpoint, { signal }),
   );
@@ -89,7 +110,7 @@ export async function streamBiMaterializationJob(
   signal: AbortSignal,
 ): Promise<BiMaterializationJob> {
   let latest: BiMaterializationJob | null = null;
-  const endpoint = `/api/bi/materializations/${encodeURIComponent(jobId)}/stream`;
+  const endpoint = `${BI_API_PREFIX}/materializations/${encodeURIComponent(jobId)}/stream`;
   while (!signal.aborted) {
     try {
       await streamJsonEvents(endpoint, (event) => {
@@ -113,7 +134,7 @@ export async function refreshBiDashboard(
   companyId: string,
   signal: AbortSignal,
 ): Promise<BiDashboardSnapshot> {
-  const endpoint = `/api/bi/companies/${encodeURIComponent(companyId)}/refresh`;
+  const endpoint = `${BI_API_PREFIX}/companies/${encodeURIComponent(companyId)}/refresh`;
   return parseBiDashboard(
     await requestJson<unknown>(endpoint, { method: 'POST', signal }),
   );
@@ -123,7 +144,7 @@ export async function resetBiDashboard(
   companyId: string,
   signal: AbortSignal,
 ): Promise<BiQuestionJobProgress> {
-  const endpoint = `/api/bi/companies/${encodeURIComponent(companyId)}/reset`;
+  const endpoint = `${BI_API_PREFIX}/companies/${encodeURIComponent(companyId)}/reset`;
   return parseBiQuestionJobProgress(
     await requestJson<unknown>(endpoint, { method: 'POST', signal }),
   );
@@ -133,7 +154,7 @@ export async function fetchBiQuestionJob(
   jobId: string,
   signal: AbortSignal,
 ): Promise<BiQuestionJobProgress> {
-  const endpoint = `/api/bi/question-jobs/${encodeURIComponent(jobId)}`;
+  const endpoint = `${BI_API_PREFIX}/question-jobs/${encodeURIComponent(jobId)}`;
   return parseBiQuestionJobProgress(
     await requestJson<unknown>(endpoint, { signal }),
   );
@@ -145,7 +166,7 @@ export async function streamBiQuestionJob(
   signal: AbortSignal,
 ): Promise<BiQuestionJobProgress> {
   let latest: BiQuestionJobProgress | null = null;
-  const endpoint = `/api/bi/question-jobs/${encodeURIComponent(jobId)}/stream`;
+  const endpoint = `${BI_API_PREFIX}/question-jobs/${encodeURIComponent(jobId)}/stream`;
   while (!signal.aborted) {
     try {
       await streamJsonEvents(endpoint, (event) => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createBiMaterialization,
   fetchBiDashboard,
@@ -87,20 +87,16 @@ export function useBiDashboard(
   company: BiCompanySummary | null,
 ): UseBiDashboardResult {
   const companyId = company?.companyId ?? '';
-  const companyDisplayName = company?.displayName ?? '';
-  const sourceFileName = company?.source?.fileName ?? '';
-  const sourceWorkbookHash = company?.source?.workbookHash ?? '';
-  const sourceIndexId = company?.source?.indexId ?? '';
   const [state, setState] = useState<BiDashboardState>({ status: 'idle' });
   const [activeAction, setActiveAction] = useState<'refresh' | 'reset' | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const dashboardRef = useRef<BiDashboardSnapshot | null>(null);
 
-  const isCurrent = (controller: AbortController): boolean => (
+  const isCurrent = useCallback((controller: AbortController): boolean => (
     controllerRef.current === controller && !controller.signal.aborted
-  );
+  ), []);
 
-  const showRefreshFailure = (message: string): void => {
+  const showRefreshFailure = useCallback((message: string): void => {
     const dashboard = dashboardRef.current;
     if (!dashboard) {
       setState({ status: 'error', companyId, message });
@@ -112,9 +108,9 @@ export function useBiDashboard(
     } satisfies BiDashboardSnapshot;
     dashboardRef.current = failedDashboard;
     setState({ status: 'ready', companyId, dashboard: failedDashboard });
-  };
+  }, [companyId]);
 
-  const showJobProgress = (job: BiMaterializationJob): void => {
+  const showJobProgress = useCallback((job: BiMaterializationJob): void => {
     const dashboard = dashboardRef.current;
     if (!dashboard) {
       setState({ status: 'pending', companyId, job });
@@ -131,9 +127,9 @@ export function useBiDashboard(
     } satisfies BiDashboardSnapshot;
     dashboardRef.current = progressingDashboard;
     setState({ status: 'ready', companyId, dashboard: progressingDashboard });
-  };
+  }, [companyId]);
 
-  const showQuestionProgress = (progress: BiQuestionJobProgress): void => {
+  const showQuestionProgress = useCallback((progress: BiQuestionJobProgress): void => {
     const dashboard = dashboardRef.current;
     if (!dashboard) return;
     const finished = progress.completedQuestions + progress.failedQuestions;
@@ -151,9 +147,9 @@ export function useBiDashboard(
     } satisfies BiDashboardSnapshot;
     dashboardRef.current = progressingDashboard;
     setState({ status: 'ready', companyId, dashboard: progressingDashboard });
-  };
+  }, [companyId]);
 
-  const publishResult = (
+  const publishResult = useCallback((
     result: BiDashboardFetchResult,
   ): string | null => {
     switch (result.kind) {
@@ -171,17 +167,17 @@ export function useBiDashboard(
       default:
         return assertNever(result);
     }
-  };
+  }, [companyId, showJobProgress]);
 
-  const loadPublishedSnapshot = async (
+  const loadPublishedSnapshot = useCallback(async (
     controller: AbortController,
   ): Promise<string | null> => {
     const result = await fetchBiDashboard(companyId, controller.signal);
     if (!isCurrent(controller)) return null;
     return publishResult(result);
-  };
+  }, [companyId, isCurrent, publishResult]);
 
-  const loadReplacementSnapshot = async (
+  const loadReplacementSnapshot = useCallback(async (
     previousSnapshotId: string,
     controller: AbortController,
   ): Promise<void> => {
@@ -207,9 +203,9 @@ export function useBiDashboard(
       }
       await waitForSnapshotPublication(controller.signal);
     }
-  };
+  }, [companyId, isCurrent, publishResult, showJobProgress]);
 
-  const observeMaterialization = async (
+  const observeMaterialization = useCallback(async (
     jobId: string,
     controller: AbortController,
   ): Promise<void> => {
@@ -226,7 +222,7 @@ export function useBiDashboard(
       return;
     }
     await loadPublishedSnapshot(controller);
-  };
+  }, [isCurrent, loadPublishedSnapshot, showJobProgress, showRefreshFailure]);
 
   useEffect(() => {
     if (!company) {
@@ -281,13 +277,12 @@ export function useBiDashboard(
     void load();
     return () => controller.abort();
   }, [
+    company,
     companyId,
-    companyDisplayName,
-    company?.currentSnapshotId,
-    company?.refreshStatus,
-    sourceFileName,
-    sourceWorkbookHash,
-    sourceIndexId,
+    isCurrent,
+    loadPublishedSnapshot,
+    observeMaterialization,
+    showRefreshFailure,
   ]);
 
   const refresh = async (): Promise<void> => {

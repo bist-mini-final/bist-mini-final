@@ -64,6 +64,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import ConfigDict, Field
 
 from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_embedder import (
     BaseEmbeddingModule,
@@ -150,7 +151,7 @@ class CellTextEmbedderModule(BaseEmbeddingModule):
         task=ModuleTaskPolicy(
             retries=2,
             retry_delay_seconds=5,
-            timeout_seconds=3600,
+            timeout_seconds=21600,
             tags=["embedding"],
             resource_profile="high-memory",
         ),
@@ -164,10 +165,12 @@ class CellTextEmbedderModule(BaseEmbeddingModule):
         encoder: EmbeddingEncoder,
         artifact_store: EmbeddingArtifactStore,
         storage_sink: Optional[Any] = None,
+        shard_coordinator: IngestionShardCoordinator | None = None,
     ) -> None:
         super().__init__(encoder=encoder)
         self.artifact_store = artifact_store
         self.storage_sink = storage_sink
+        self.shard_coordinator = shard_coordinator
 
     def execute(
         self,
@@ -227,6 +230,25 @@ class CellTextEmbedderModule(BaseEmbeddingModule):
                     end = start + len(batch_vectors)
                     _handle_batch_complete(batch_vectors, start, end)
                     start = end
+        elif self.shard_coordinator is not None and self.shard_coordinator.enabled:
+            distributed = self.shard_coordinator.embed(
+                artifact_id=artifact_id,
+                items=[document.model_dump(mode="json") for document in input_data.items],
+                model_name=model_name,
+                dimension=expected_dimension,
+                batch_size=batch_size,
+                progress_callback=self.report_progress,
+            )
+            self.last_model = model_name
+            self.last_dimension = expected_dimension
+            self.last_duration_seconds = distributed.duration_seconds
+            self.last_total_tokens = distributed.total_tokens
+            self.last_usage = {
+                "total_tokens": distributed.total_tokens,
+                "prompt_tokens": distributed.total_tokens,
+                "worker_seconds": distributed.worker_seconds,
+                "shard_count": distributed.shard_count,
+            }
         else:
             vector_batches = (
                 batch_vectors

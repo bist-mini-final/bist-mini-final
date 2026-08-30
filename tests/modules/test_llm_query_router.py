@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -69,6 +70,14 @@ def test_router_maps_each_subquery_to_concrete_collection() -> None:
     assert plan.routes[0].subquery.company == "삼성전자"
     assert plan.routes[1].collections[0].index_id == "idx-hyundai"
     assert plan.metrics["kind"] == "llm_collection_router"
+
+    client.create_response_async = AsyncMock(return_value=client.create_response.return_value)
+    async_result = asyncio.run(LlmQueryRouterModule(client).run_async(_input()))
+    assert RetrievalPlanDTO.model_validate(async_result).selected_index_ids == [
+        "idx-samsung",
+        "idx-hyundai",
+    ]
+    client.create_response_async.assert_awaited_once()
 
 
 def test_router_rejects_collection_not_present_in_db_catalog() -> None:

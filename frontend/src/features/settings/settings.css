@@ -1,7 +1,5 @@
 .settings-page {
-  padding: 2rem;
-  max-width: 1100px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
@@ -92,7 +90,7 @@
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--color-text-primary, #0f172a);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-code);
 }
 
 .settings-status-banner {
@@ -122,7 +120,7 @@
   gap: 0.4rem;
 }
 
-.settings-url-box label {
+.settings-url-box__label {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--color-text-secondary, #64748b);
@@ -135,7 +133,7 @@
   padding: 0.8rem 1rem;
   border-radius: 6px;
   font-size: 0.85rem;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-code);
   word-break: break-all;
   user-select: all;
 }
@@ -163,4 +161,54 @@
 .settings-badge--amber {
   background: #fef3c7;
   color: #92400e;
+}
+
+/* Shared product visual system alignment */
+.settings-page { gap: var(--page-section-gap); }
+.settings-header { margin-bottom: .2rem; }
+.settings-header h1 { color: var(--text-strong); font-size: clamp(1.45rem, 2.2vw, 1.85rem); font-weight: 760; }
+.settings-header p { color: var(--text-muted); font-size: .78rem; }
+.settings-section {
+  gap: 1rem;
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+.settings-section__header { border-color: var(--border-subtle); }
+.settings-section__title h3 { color: var(--text); font-weight: 720; }
+.settings-section__title span { color: var(--text-muted); }
+.settings-card {
+  min-height: 5.5rem;
+  justify-content: center;
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+.settings-card__label { color: var(--text-muted); }
+.settings-card__val { color: var(--text-strong); }
+.settings-status-banner { border-radius: var(--radius-md); }
+.settings-url-box code {
+  border: 1px solid #294037;
+  border-radius: var(--radius-md);
+  background: #14231c;
+  color: #92e2b5;
+}
+
+.settings-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-copy-row code {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .settings-section { padding: 1rem; }
+  .settings-copy-row { align-items: stretch; flex-direction: column; }
+  .settings-copy-row .ui-button { align-self: flex-end; }
 }

@@ -24,12 +24,18 @@ async function postJson<T>(url: string, payload: unknown, signal?: AbortSignal):
   });
 }
 
-async function patchJson<T>(url: string, payload: unknown, signal?: AbortSignal): Promise<T> {
+async function putJson<T>(url: string, payload: unknown, signal?: AbortSignal): Promise<T> {
   return httpJson<T>(url, {
-    method: 'PATCH',
+    method: 'PUT',
     json: payload,
     signal,
   });
+}
+
+interface UpdateIndexCompanyResponse {
+  status: 'success';
+  index_id: string;
+  company_name: string;
 }
 
 /**
@@ -94,9 +100,9 @@ export const dataSourceApi = {
     indexId: string,
     companyName: string,
     signal?: AbortSignal
-  ): Promise<VectorIndexDetail> {
-    return patchJson<VectorIndexDetail>(
-      `/api/data-sources/indexes/${encodeURIComponent(indexId)}`,
+  ): Promise<UpdateIndexCompanyResponse> {
+    return putJson<UpdateIndexCompanyResponse>(
+      `/api/data-sources/indexes/${encodeURIComponent(indexId)}/company`,
       { company_name: companyName },
       signal
     );

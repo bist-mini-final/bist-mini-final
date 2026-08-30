@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 from pathlib import Path
 
 import httpx
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 
 def project_env_value(name: str) -> str | None:
@@ -46,6 +47,7 @@ class OpenAIProvider:
         timeout_seconds: float = 60.0,
         max_retries: int = 6,
         http_client: httpx.Client | None = None,
+        async_http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = api_key or project_env_value("OPENAI_API_KEY")
         self.base_url = (
@@ -56,6 +58,7 @@ class OpenAIProvider:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max(0, max_retries)
         self._owns_http_client = http_client is None
+        self._owns_async_http_client = async_http_client is None
         self._http_client = http_client or httpx.Client(
             timeout=httpx.Timeout(timeout_seconds),
             limits=httpx.Limits(
@@ -64,7 +67,10 @@ class OpenAIProvider:
             ),
         )
         self._client: OpenAI | None = None
+        self._async_http_client = async_http_client
+        self._async_client: AsyncOpenAI | None = None
         self._client_lock = threading.Lock()
+        self._async_client_lock = asyncio.Lock()
 
     @property
     def client(self) -> OpenAI:
@@ -90,10 +96,51 @@ class OpenAIProvider:
             return client
         return client.with_options(timeout=timeout_seconds)
 
+    @property
+    async def async_client(self) -> AsyncOpenAI:
+        """Return the lazily initialized official async SDK client."""
+        if not self.api_key:
+            raise OpenAIProviderError("OPENAI_API_KEY가 설정되지 않았습니다")
+        if self._async_client is not None:
+            return self._async_client
+        async with self._async_client_lock:
+            if self._async_client is None:
+                if self._async_http_client is None:
+                    self._async_http_client = httpx.AsyncClient(
+                        timeout=httpx.Timeout(self.timeout_seconds),
+                        limits=httpx.Limits(
+                            max_connections=50,
+                            max_keepalive_connections=20,
+                        ),
+                    )
+                self._async_client = AsyncOpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    timeout=self.timeout_seconds,
+                    max_retries=self.max_retries,
+                    http_client=self._async_http_client,
+                )
+            return self._async_client
+
+    async def with_timeout_async(
+        self,
+        timeout_seconds: float | None = None,
+    ) -> AsyncOpenAI:
+        client = await self.async_client
+        if timeout_seconds is None or timeout_seconds == self.timeout_seconds:
+            return client
+        return client.with_options(timeout=timeout_seconds)
+
     def close(self) -> None:
-        """Close only the HTTP pool created by this provider."""
+        """Close the synchronous pool; async applications call ``aclose``."""
         if self._owns_http_client:
             self._http_client.close()
+
+    async def aclose(self) -> None:
+        """Close both process-owned HTTP pools from an async lifespan."""
+        self.close()
+        if self._owns_async_http_client and self._async_http_client is not None:
+            await self._async_http_client.aclose()
 
 
 __all__ = [

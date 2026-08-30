@@ -1,0 +1,11 @@
+backend:
+  replicas: 1
+frontend:
+  replicas: 1
+
+storage:
+  existingClaim: ""
+  hostPath: /mnt/bist-data
+
+ingress:
+  host: ""

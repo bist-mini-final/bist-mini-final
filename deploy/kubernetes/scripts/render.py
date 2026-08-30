@@ -65,7 +65,9 @@ def render_scaled_job(
         "__VOLUME_MOUNT_BLOCK__": volume_mounts,
         "__VOLUME_BLOCK__": volumes,
         "__QUERY_BLOCK__": _indented_query(spec.pending_query),
-        "__MAX_REPLICAS__": str(max_replicas),
+        "__MAX_REPLICAS__": str(
+            min(max_replicas, spec.max_replica_count or max_replicas)
+        ),
         "__IMAGE__": image,
         "__CONNECTION_HASH__": connection_hash,
         "__CPU_REQUEST__": cpu_request,

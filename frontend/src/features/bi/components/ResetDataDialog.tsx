@@ -1,4 +1,5 @@
 import { DatabaseZap, X } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 import { useModalDialog } from './useModalDialog';
 
 interface ResetDataDialogProps {
@@ -27,19 +28,19 @@ export function ResetDataDialog({
           <span className="bi-dialog__eyebrow">RESET DASHBOARD DATA</span>
           <h2 id="bi-data-reset-title">{companyName} 데이터를 다시 만들까요?</h2>
         </div>
-        <button type="button" aria-label="데이터 초기화 확인 닫기" onClick={onClose}>
+        <IconButton variant="ghost" aria-label="데이터 초기화 확인 닫기" onClick={onClose}>
           <X size={18} aria-hidden="true" />
-        </button>
+        </IconButton>
       </div>
       <p className="bi-dialog__empty">
         이 기업의 현재 원본에 연결된 지표 질문과 답변을 모두 제거한 뒤,
         새 질문을 LLM으로 병렬 처리합니다. 현재 대시보드는 새 스냅샷이 완성될 때까지 유지됩니다.
       </p>
       <div className="bi-dialog__actions">
-        <button type="button" onClick={onClose}>취소</button>
-        <button className="bi-dialog__danger" type="button" onClick={onConfirm}>
+        <Button type="button" onClick={onClose}>취소</Button>
+        <Button variant="danger-solid" type="button" onClick={onConfirm}>
           <DatabaseZap size={16} aria-hidden="true" />삭제 후 재생성
-        </button>
+        </Button>
       </div>
     </dialog>
   );

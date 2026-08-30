@@ -1,3 +1,5 @@
+import { normalizeCellCitations } from '../../shared/markdown/cellCitations';
+
 function repairInlineTable(markdown: string) {
   const normalized = markdown.replace(/\\+\|/g, '|');
   return normalized.split('\n').map((line) => repairInlineTableLine(line)).join('\n');
@@ -49,15 +51,12 @@ function repairCollapsedDateTableHeaders(markdown: string) {
 }
 
 export function normalizeChatMarkdown(markdown: string) {
-  return repairCollapsedDateTableHeaders(repairInlineTable(markdown)).replace(/(?<![A-Za-z])NA(?![A-Za-z])\s*로?\s*근거가 부족(?:합니다|해요)?/gi, '확인 가능한 근거가 부족해 요약에서 제외했습니다').replace(/(?<![A-Za-z])NA(?![A-Za-z])\s*로 표시되어 있어/gi, '확인 가능한 값이 없어').replace(/\s*[;；]\s*(?=(?:\*\*)?[^\n]*확인 가능한 근거가 부족)/g, '\n\n').replace(/(\d{4})~~(\d{4})/g, '$1–$2').replace(/\\([*_`\[\].~])/g, '$1').replace(/(\*\*[^*\n]+?\*\*)(?=[가-힣])/g, '$1 ').replace(/\[([^\]]+:[^\]]+)\]/g, (_match, source: string) => {
-    const cellCitation = /^Sheet:\s*(.+?)\s*\|\s*Cell:\s*([A-Za-z]{1,3}\d+)$/i.exec(source.trim());
-    if (cellCitation) {
-      const label = `${cellCitation[1].replace(/_/g, ' ')} · ${cellCitation[2].toUpperCase()}`;
-      return `[${label}](https://citation.local/${encodeURIComponent(label)})`;
-    }
-    const [sheet, detail = ''] = source.split(':', 2);
-    const [field, period] = detail.split('|').map((item) => item.trim());
-    const label = `${sheet.replace(/_/g, ' ')}${field ? ` · ${field}` : ''}${period ? ` · ${period}` : ''}`;
-    return `[${label}](https://citation.local/${encodeURIComponent(label)})`;
-  });
+  const normalized = repairCollapsedDateTableHeaders(repairInlineTable(markdown))
+    .replace(/(?<![A-Za-z])NA(?![A-Za-z])\s*로?\s*근거가 부족(?:합니다|해요)?/gi, '확인 가능한 근거가 부족해 요약에서 제외했습니다')
+    .replace(/(?<![A-Za-z])NA(?![A-Za-z])\s*로 표시되어 있어/gi, '확인 가능한 값이 없어')
+    .replace(/\s*[;；]\s*(?=(?:\*\*)?[^\n]*확인 가능한 근거가 부족)/g, '\n\n')
+    .replace(/(\d{4})~~(\d{4})/g, '$1–$2')
+    .replace(/\\([*_`[\].~])/g, '$1')
+    .replace(/(\*\*[^*\n]+?\*\*)(?=[가-힣])/g, '$1 ');
+  return normalizeCellCitations(normalized);
 }

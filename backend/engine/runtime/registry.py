@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import List
+from typing import Callable, Iterable
 
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
@@ -44,6 +45,7 @@ class ModuleRegistry(BaseModuleRegistry):
         completion_client: OpenAIResponsesClient,
         embedding_encoder: EmbeddingEncoder,
         embedding_artifact_store: EmbeddingArtifactStore,
+        ingestion_shard_coordinator: IngestionShardCoordinator | None = None,
         pgvector_store: PgVectorStore,
         db_manager: DatabaseManager,
         processed_dir: Path = PROCESSED_DATA_DIR,
@@ -54,49 +56,105 @@ class ModuleRegistry(BaseModuleRegistry):
         super().__init__(embedding_artifact_store)
         workbook_catalog = WorkbookCatalog(processed_dir)
         sheet_renderer = ExcelSheetRenderer()
-        modules: List[BaseModule] = [
-            QueryInputModule(),
-            DecomposerModule(completion_client=completion_client),
-            LlmQueryRouterModule(completion_client=completion_client),
-            SemanticQueryMatcherModule(
-                encoder=embedding_encoder,
-                artifact_store=embedding_artifact_store,
-            ),
-            EmbedderModule(encoder=embedding_encoder),
-            CellTextEmbedderModule(
-                encoder=embedding_encoder,
-                artifact_store=embedding_artifact_store,
-            ),
-            PgVectorIndexWriterModule(
-                artifact_store=embedding_artifact_store,
-                db_manager=self.db_manager,
-                pgvector_store=self.pgvector_store,
-                embedding_encoder=embedding_encoder,
-                processed_dir=processed_dir,
-            ),
-            PgVectorDataScopeModule(pgvector_store=self.pgvector_store),
-            PgVectorRetrieverModule(self.pgvector_store),
-            PostgresNativeKeywordRetrieverModule(self.pgvector_store),
-            RrfFusionModule(),
-            PgContextExpanderModule(self.pgvector_store),
-            ReaderModule(completion_client, self.pgvector_store),
-            ProcessedFileSelectorModule(catalog=workbook_catalog),
-            LunaVlmStructureDetectorModule(
-                vision_client=completion_client,
-                catalog=workbook_catalog,
-                renderer=sheet_renderer,
-                artifact_dir=spreadsheet_artifact_dir,
-            ),
-            CellTextSerializerModule(catalog=workbook_catalog),
-            CompanyEntityExtractorModule(
-                completion_client=completion_client,
-                pgvector_store=self.pgvector_store,
-                catalog=workbook_catalog,
-            ),
-            SheetMetadataPersistenceModule(
-                db_manager=self.db_manager,
-                catalog=workbook_catalog,
-            ),
-            QaExampleLoaderModule(),
-        ]
-        self.register(modules)
+        self._register_domain_factories(
+            (
+                self._factory(QueryInputModule),
+                self._factory(
+                    DecomposerModule,
+                    completion_client=completion_client,
+                ),
+                self._factory(
+                    LlmQueryRouterModule,
+                    completion_client=completion_client,
+                ),
+                self._factory(
+                    SemanticQueryMatcherModule,
+                    encoder=embedding_encoder,
+                    artifact_store=embedding_artifact_store,
+                ),
+                self._factory(EmbedderModule, encoder=embedding_encoder),
+            )
+        )
+        self._register_domain_factories(
+            (
+                self._factory(
+                    PgVectorDataScopeModule,
+                    pgvector_store=self.pgvector_store,
+                ),
+                self._factory(PgVectorRetrieverModule, self.pgvector_store),
+                self._factory(
+                    PostgresNativeKeywordRetrieverModule,
+                    self.pgvector_store,
+                ),
+                self._factory(RrfFusionModule),
+                self._factory(PgContextExpanderModule, self.pgvector_store),
+            )
+        )
+        self._register_domain_factories(
+            (
+                self._factory(
+                    CellTextEmbedderModule,
+                    encoder=embedding_encoder,
+                    artifact_store=embedding_artifact_store,
+                    shard_coordinator=ingestion_shard_coordinator,
+                ),
+                self._factory(
+                    PgVectorIndexWriterModule,
+                    artifact_store=embedding_artifact_store,
+                    db_manager=self.db_manager,
+                    pgvector_store=self.pgvector_store,
+                    embedding_encoder=embedding_encoder,
+                    processed_dir=processed_dir,
+                    shard_coordinator=ingestion_shard_coordinator,
+                ),
+                self._factory(
+                    ProcessedFileSelectorModule,
+                    catalog=workbook_catalog,
+                ),
+                self._factory(
+                    LunaVlmStructureDetectorModule,
+                    vision_client=completion_client,
+                    catalog=workbook_catalog,
+                    renderer=sheet_renderer,
+                    artifact_dir=spreadsheet_artifact_dir,
+                ),
+                self._factory(CellTextSerializerModule, catalog=workbook_catalog),
+                self._factory(
+                    CompanyEntityExtractorModule,
+                    completion_client=completion_client,
+                    pgvector_store=self.pgvector_store,
+                    catalog=workbook_catalog,
+                ),
+                self._factory(
+                    SheetMetadataPersistenceModule,
+                    db_manager=self.db_manager,
+                    catalog=workbook_catalog,
+                ),
+                self._factory(QaExampleLoaderModule),
+            )
+        )
+        self._register_domain_factories(
+            (
+                self._factory(ReaderModule, completion_client, self.pgvector_store),
+            )
+        )
+
+    @staticmethod
+    def _factory(
+        module_class: type[BaseModule],
+        *args: object,
+        **kwargs: object,
+    ) -> tuple[str, Callable[[], BaseModule]]:
+        module_type = module_class.definition.type
+
+        def create() -> BaseModule:
+            return module_class(*args, **kwargs)
+
+        return module_type, create
+
+    def _register_domain_factories(
+        self,
+        factories: Iterable[tuple[str, Callable[[], BaseModule]]],
+    ) -> None:
+        for module_type, factory in factories:
+            self.register_factory(module_type, factory)

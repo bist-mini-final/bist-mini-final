@@ -69,6 +69,43 @@ class EmbedderModule(BaseEmbeddingModule):
     config_model = EmbedderConfigDTO
     output_model = EmbeddingsDTO
 
+    @staticmethod
+    def _contracts(
+        plan: RetrievalPlanDTO,
+    ) -> Dict[Tuple[str, int], List[Tuple[int, SubqueryItem, DataScopeDTO]]]:
+        contracts: Dict[
+            Tuple[str, int],
+            List[Tuple[int, SubqueryItem, DataScopeDTO]],
+        ] = defaultdict(list)
+        for route in plan.routes:
+            for collection in route.collections:
+                contracts[(collection.model, collection.dimension)].append(
+                    (route.subquery_index, route.subquery, collection)
+                )
+        return contracts
+
+    @staticmethod
+    def _output(
+        plan: RetrievalPlanDTO,
+        routed_embeddings: List[Dict[str, Any]],
+        used_models: List[str],
+        total_tokens: int,
+        total_cost_usd: float,
+    ) -> Dict[str, Any]:
+        routed_embeddings.sort(
+            key=lambda item: (item["subquery_index"], item["collection"]["index_id"])
+        )
+        return {
+            "query_context": plan.query_context.model_dump(mode="json"),
+            "items": routed_embeddings,
+            "metrics": {
+                "kind": "routed_embeddings",
+                "models": list(dict.fromkeys(used_models)),
+                "total_tokens": total_tokens,
+                "estimated_cost_usd": round(total_cost_usd, 8),
+            },
+        }
+
     def execute(
         self,
         input_data: EmbedderInputDTO,
@@ -76,24 +113,14 @@ class EmbedderModule(BaseEmbeddingModule):
     ) -> Dict[str, Any]:
         cfg = config or EmbedderConfigDTO()
         plan = input_data.retrieval_plan
-        contracts: Dict[Tuple[str, int], List[Tuple[int, SubqueryItem, DataScopeDTO]]] = (
-            defaultdict(list)
-        )
-        for route in plan.routes:
-            for collection in route.collections:
-                contracts[(collection.model, collection.dimension)].append(
-                    (route.subquery_index, route.subquery, collection)
-                )
+        contracts = self._contracts(plan)
 
         routed_embeddings: List[Dict[str, Any]] = []
         total_tokens = 0
         total_cost_usd = 0.0
         used_models: List[str] = []
         for (model_name, dimension), routed_items in contracts.items():
-            texts = [
-                item.text or item.to_serialized_query()
-                for _, item, _ in routed_items
-            ]
+            texts = [item.text or item.to_serialized_query() for _, item, _ in routed_items]
             unique_texts = list(dict.fromkeys(texts))
             vectors = self.encode_texts(
                 unique_texts,
@@ -119,19 +146,62 @@ class EmbedderModule(BaseEmbeddingModule):
                     ).model_dump(mode="json")
                 )
 
-        routed_embeddings.sort(
-            key=lambda item: (item["subquery_index"], item["collection"]["index_id"])
+        return self._output(
+            plan,
+            routed_embeddings,
+            used_models,
+            total_tokens,
+            total_cost_usd,
         )
-        return {
-            "query_context": plan.query_context.model_dump(mode="json"),
-            "items": routed_embeddings,
-            "metrics": {
-                "kind": "routed_embeddings",
-                "models": list(dict.fromkeys(used_models)),
-                "total_tokens": total_tokens,
-                "estimated_cost_usd": round(total_cost_usd, 8),
-            },
-        }
+
+    async def execute_async(
+        self,
+        input_data: EmbedderInputDTO,
+        config: Optional[EmbedderConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or EmbedderConfigDTO()
+        plan = input_data.retrieval_plan
+        contracts = self._contracts(plan)
+        routed_embeddings: List[Dict[str, Any]] = []
+        total_tokens = 0
+        total_cost_usd = 0.0
+        used_models: List[str] = []
+        for (model_name, dimension), routed_items in contracts.items():
+            texts = [item.text or item.to_serialized_query() for _, item, _ in routed_items]
+            unique_texts = list(dict.fromkeys(texts))
+            vectors = await self.encode_texts_async(
+                unique_texts,
+                model_name=model_name,
+                expected_dimension=dimension,
+                batch_size=cfg.batch_size,
+                report_progress=False,
+            )
+            vectors_by_text = dict(zip(unique_texts, vectors, strict=True))
+            group_tokens = self.last_total_tokens
+            total_tokens += group_tokens
+            total_cost_usd += calculate_openai_cost(model_name, group_tokens)
+            used_models.append(model_name)
+            for (subquery_index, subquery, collection), text in zip(
+                routed_items,
+                texts,
+                strict=True,
+            ):
+                routed_embeddings.append(
+                    RoutedEmbeddingDTO(
+                        subquery_index=subquery_index,
+                        subquery=subquery,
+                        collection=collection,
+                        vector=vectors_by_text[text],
+                    ).model_dump(mode="json")
+                )
+
+        return self._output(
+            plan,
+            routed_embeddings,
+            used_models,
+            total_tokens,
+            total_cost_usd,
+        )
 
 
 __all__ = [

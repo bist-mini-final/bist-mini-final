@@ -20,11 +20,17 @@ from backend.engine.runtime.services import (
     WorkflowRuntimeServices,
     create_workflow_runtime_services,
 )
+from backend.engine.workflows import WorkflowExecutionService
 from backend.features.bi.api_services import BiApiServices
 from backend.features.bi.composition import create_bi_services
 from backend.features.chatbot.suggestions import ChatSuggestionService
+from backend.features.company_comparison.composition import (
+    create_company_comparison_service,
+)
+from backend.features.company_comparison.service import CompanyComparisonService
 from backend.providers.embeddings.openai import OpenAIEmbeddingEncoder
 from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.providers.kubernetes_monitor import KubernetesMonitor
 from backend.providers.openai_provider import OpenAIProvider
 from backend.providers.openai_responses import OpenAIResponsesClient
 from backend.storage.pgvector_probe import PgVectorConnectionProbe
@@ -102,15 +108,76 @@ class RuntimeContainer:
         if self._owns_openai_provider:
             self.openai_provider.close()
 
+    async def aclose(self) -> None:
+        if self._owns_openai_provider:
+            await self.openai_provider.aclose()
+
+
+@dataclass
+class ExecutionContainer:
+    """Own control-plane adapters that schedule durable workflow work."""
+
+    workflow_dispatcher: KubernetesQueueDispatcher
+    workflow_execution: WorkflowExecutionService
+
+    @classmethod
+    def create(cls, runtime: RuntimeContainer) -> "ExecutionContainer":
+        services = runtime.services
+        dispatcher = KubernetesQueueDispatcher(
+            services.workflow_executor,
+            services.run_store,
+            KUBERNETES_WORKFLOW_QUEUE,
+        )
+        return cls(
+            workflow_dispatcher=dispatcher,
+            workflow_execution=WorkflowExecutionService(
+                services.workflow_store,
+                services.run_store,
+                services.workflow_executor,
+                dispatcher,
+            ),
+        )
+
+    def recover_pending_runs(self) -> int:
+        return self.workflow_dispatcher.recover_pending()
+
+
+@dataclass
+class DomainServicesContainer:
+    """Own product-facing services without HTTP or process lifecycle concerns."""
+
+    bi_services: BiApiServices
+    company_comparison: CompanyComparisonService
+    chat_suggestions: ChatSuggestionService
+    job_monitor: KubernetesMonitor
+
+    @classmethod
+    def create(
+        cls,
+        runtime: RuntimeContainer,
+    ) -> "DomainServicesContainer":
+        bi_services = create_bi_services(runtime.services.module_registry)
+        return cls(
+            bi_services=bi_services,
+            company_comparison=create_company_comparison_service(
+                bi_services.store,
+                database_url=runtime.services.db_manager.database_url,
+            ),
+            chat_suggestions=ChatSuggestionService(
+                runtime.services.db_manager,
+                bi_services,
+            ),
+            job_monitor=KubernetesMonitor(queue_reader=runtime.services.db_manager),
+        )
+
 
 @dataclass
 class ApplicationContainer:
-    """The only composition root used by the FastAPI process."""
+    """Small composition root delegating ownership to focused subcontainers."""
 
     runtime: RuntimeContainer
-    workflow_dispatcher: KubernetesQueueDispatcher
-    bi_services: BiApiServices
-    chat_suggestions: ChatSuggestionService
+    execution: ExecutionContainer
+    domain: DomainServicesContainer
 
     @classmethod
     def create(
@@ -119,23 +186,32 @@ class ApplicationContainer:
         runtime: RuntimeContainer | None = None,
     ) -> "ApplicationContainer":
         shared_runtime = runtime or RuntimeContainer.create(require_database=True)
-        services = shared_runtime.services
-        dispatcher = KubernetesQueueDispatcher(
-            services.workflow_executor,
-            services.run_store,
-            KUBERNETES_WORKFLOW_QUEUE,
-        )
-        registry = services.module_registry
-        bi_services = create_bi_services(registry)
         return cls(
             runtime=shared_runtime,
-            workflow_dispatcher=dispatcher,
-            bi_services=bi_services,
-            chat_suggestions=ChatSuggestionService(services.db_manager, bi_services),
+            execution=ExecutionContainer.create(shared_runtime),
+            domain=DomainServicesContainer.create(shared_runtime),
         )
 
+    @property
+    def workflow_dispatcher(self) -> KubernetesQueueDispatcher:
+        """Compatibility view; new composition code uses ``execution``."""
+
+        return self.execution.workflow_dispatcher
+
+    @property
+    def bi_services(self) -> BiApiServices:
+        """Compatibility view; new composition code uses ``domain``."""
+
+        return self.domain.bi_services
+
+    @property
+    def chat_suggestions(self) -> ChatSuggestionService:
+        """Compatibility view; new composition code uses ``domain``."""
+
+        return self.domain.chat_suggestions
+
     def recover_pending_runs(self) -> int:
-        return self.workflow_dispatcher.recover_pending()
+        return self.execution.recover_pending_runs()
 
     def close(self) -> None:
         # Kubernetes runs are durable and may outlive this API process.  In
@@ -144,5 +220,15 @@ class ApplicationContainer:
         # user-visible "질문 처리가 중지되었습니다" failure.
         self.runtime.close()
 
+    async def aclose(self) -> None:
+        # FastAPI owns an event loop and can close AsyncOpenAI/httpx pools cleanly.
+        await self.runtime.aclose()
 
-__all__ = ["ApplicationContainer", "RuntimeContainer", "RuntimePaths"]
+
+__all__ = [
+    "ApplicationContainer",
+    "DomainServicesContainer",
+    "ExecutionContainer",
+    "RuntimeContainer",
+    "RuntimePaths",
+]

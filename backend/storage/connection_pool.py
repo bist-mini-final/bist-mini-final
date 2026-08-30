@@ -1,18 +1,34 @@
-"""Process-owned psycopg2 connection pools keyed by PostgreSQL URL."""
+"""Process-owned sync and async connection pools keyed by PostgreSQL URL."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import threading
 import time
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 import psycopg2
 import psycopg2.extensions
 import psycopg2.pool
+from psycopg import AsyncConnection
+from psycopg_pool import AsyncConnectionPool
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_windows_asyncio_policy() -> None:
+    """Use the Windows loop implementation supported by psycopg async I/O."""
+    if os.name != "nt":
+        return
+    policy_factory = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+    if policy_factory is not None:
+        asyncio.set_event_loop_policy(policy_factory())
+
+
+_configure_windows_asyncio_policy()
 
 
 def _pool_size(name: str, default: int) -> int:
@@ -25,6 +41,7 @@ def _pool_size(name: str, default: int) -> int:
 
 _MIN_CONN = _pool_size("DB_POOL_MIN_SIZE", 2)
 _MAX_CONN = max(_MIN_CONN, _pool_size("DB_POOL_MAX_SIZE", 50))
+
 
 def _normalize_url(database_url: str) -> str:
     """Strip SQLAlchemy dialect prefix so psycopg2 can parse the URL."""
@@ -91,9 +108,86 @@ class ConnectionPoolRegistry:
 _POOL_REGISTRY = ConnectionPoolRegistry()
 
 
+class AsyncConnectionPoolRegistry:
+    """Own event-loop-native psycopg3 pools for async repositories."""
+
+    def __init__(self) -> None:
+        self._pools: dict[str, AsyncConnectionPool[AsyncConnection[Any]]] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    async def get(
+        self,
+        database_url: str,
+    ) -> AsyncConnectionPool[AsyncConnection[Any]]:
+        normalized = _normalize_url(database_url)
+        existing = self._pools.get(normalized)
+        if existing is not None:
+            return existing
+        lock = self._locks.setdefault(normalized, asyncio.Lock())
+        async with lock:
+            existing = self._pools.get(normalized)
+            if existing is not None:
+                return existing
+            pool: AsyncConnectionPool[AsyncConnection[Any]] = AsyncConnectionPool(
+                conninfo=normalized,
+                min_size=_MIN_CONN,
+                max_size=_MAX_CONN,
+                open=False,
+                kwargs={
+                    "connect_timeout": 10,
+                    "options": (
+                        "-c hnsw.iterative_scan=strict_order "
+                        "-c hnsw.max_scan_tuples=20000 "
+                        "-c hnsw.ef_search=40"
+                    ),
+                },
+            )
+            await pool.open(wait=True, timeout=15)
+            self._pools[normalized] = pool
+            logger.info(
+                "psycopg async connection pool initialised (min=%d, max=%d)",
+                _MIN_CONN,
+                _MAX_CONN,
+            )
+            return pool
+
+    async def close(self, database_url: str | None = None) -> None:
+        if database_url is None:
+            pools = list(self._pools.values())
+            self._pools.clear()
+            self._locks.clear()
+        else:
+            normalized = _normalize_url(database_url)
+            pool = self._pools.pop(normalized, None)
+            self._locks.pop(normalized, None)
+            pools = [pool] if pool is not None else []
+        for pool in pools:
+            await pool.close()
+
+
+_ASYNC_POOL_REGISTRY = AsyncConnectionPoolRegistry()
+
+
 def get_pool(database_url: str) -> psycopg2.pool.ThreadedConnectionPool:
     """Return the stable process pool associated with ``database_url``."""
     return _POOL_REGISTRY.get(database_url)
+
+
+async def get_async_pool(
+    database_url: str,
+) -> AsyncConnectionPool[AsyncConnection[Any]]:
+    return await _ASYNC_POOL_REGISTRY.get(database_url)
+
+
+@asynccontextmanager
+async def get_pooled_async_connection(
+    database_url: str,
+    timeout_seconds: float = 15.0,
+) -> AsyncIterator[AsyncConnection[Any]]:
+    """Borrow a psycopg3 async connection with automatic transaction cleanup."""
+    pool = await get_async_pool(database_url)
+    async with pool.connection(timeout=timeout_seconds) as connection:
+        yield connection
 
 
 class PooledConnectionWrapper:
@@ -208,3 +302,7 @@ def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) 
 def close_pool(database_url: str | None = None) -> None:
     """Close one registered pool, or all process-owned pools."""
     _POOL_REGISTRY.close(database_url)
+
+
+async def close_async_pool(database_url: str | None = None) -> None:
+    await _ASYNC_POOL_REGISTRY.close(database_url)

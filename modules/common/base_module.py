@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import inspect
 import logging
@@ -14,6 +15,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    Generic,
     List,
     Literal,
     Mapping,
@@ -34,7 +36,9 @@ from modules.common.exceptions import (
     StorageError,
 )
 
-T = TypeVar("T", bound=BaseModel)
+InputModelT = TypeVar("InputModelT", bound=BaseModel)
+OutputModelT = TypeVar("OutputModelT", bound=BaseModel)
+ConfigModelT = TypeVar("ConfigModelT", bound=BaseModel)
 logger = logging.getLogger(__name__)
 
 
@@ -158,7 +162,10 @@ class ModuleDefinition(BaseModel):
     version: Optional[str] = None
 
 
-class BaseModule(ABC):
+class BaseModule(
+    ABC,
+    Generic[InputModelT, OutputModelT, ConfigModelT],
+):
     """Pure abstract foundation for all runnable pipeline modules."""
 
     definition: ClassVar[ModuleDefinition]
@@ -210,25 +217,24 @@ class BaseModule(ABC):
     @property
     def required_input_fields(self) -> List[str]:
         return [
-            name
-            for name, field in self.input_model.model_fields.items()
-            if field.is_required()
+            name for name, field in self.input_model.model_fields.items() if field.is_required()
         ]
 
-    def validate_config(self, config: Any = None) -> BaseModel:
+    def validate_config(self, config: Any = None) -> ConfigModelT:
         """Validate configuration parameters against the module config model."""
-        return self.config_model.model_validate({} if config is None else config)
+        return cast(
+            ConfigModelT,
+            self.config_model.model_validate({} if config is None else config),
+        )
 
     def _validated_execution(
         self,
         input_payload: Any,
         config: Any,
-    ) -> tuple[BaseModel, BaseModel, BaseModel]:
+    ) -> tuple[InputModelT, ConfigModelT, BaseModel]:
         """Validate input and config, automatically bridging them."""
         actual_input = (
-            input_payload.model_dump()
-            if isinstance(input_payload, BaseModel)
-            else input_payload
+            input_payload.model_dump() if isinstance(input_payload, BaseModel) else input_payload
         )
         actual_config = config.model_dump() if isinstance(config, BaseModel) else config
 
@@ -252,7 +258,10 @@ class BaseModule(ABC):
                     actual_config = cfg_data
             actual_input = input_data
 
-        validated_input = self.input_model.model_validate(actual_input)
+        validated_input = cast(
+            InputModelT,
+            self.input_model.model_validate(actual_input),
+        )
         validated_config = self.validate_config(actual_config)
         if (
             self.definition.raw_input
@@ -269,13 +278,12 @@ class BaseModule(ABC):
     def run(self, input_payload: Any, config: Any = None) -> Dict[str, Any]:
         """Execute the module with given input and config, returning validated output with standardized error wrapping."""
         mod_type = (
-            getattr(self, "definition", None)
-            and getattr(self.definition, "type", None)
+            getattr(self, "definition", None) and getattr(self.definition, "type", None)
         ) or self.__class__.__name__
 
         try:
-            validated_input, validated_config, execution_payload = (
-                self._validated_execution(input_payload, config)
+            validated_input, validated_config, execution_payload = self._validated_execution(
+                input_payload, config
             )
         except ValidationError as error:
             raise ModuleValidationError(
@@ -294,13 +302,14 @@ class BaseModule(ABC):
             params = [
                 p
                 for p in sig.parameters.values()
-                if p.name != "self"
-                and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+                if p.name != "self" and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
             ]
             if len(params) >= 2:
                 raw_output = self.execute(validated_input, validated_config)
             else:
-                raw_output = self.execute(execution_payload)
+                # execution_model may intentionally combine input and config
+                # into a different DTO for legacy single-argument modules.
+                raw_output = self.execute(cast(Any, execution_payload))
         except PipelineBaseError as error:
             classified = self._classify_execution_error(error, mod_type)
             if classified is not error:
@@ -320,6 +329,84 @@ class BaseModule(ABC):
                 module_type=mod_type,
                 details={"errors": error.errors(include_url=False)},
             ) from error
+
+    async def run_async(
+        self,
+        input_payload: Any,
+        config: Any = None,
+    ) -> Dict[str, Any]:
+        """Execute a native async implementation or adapt the sync module safely.
+
+        Existing modules keep their original behavior in a worker thread. Modules
+        that override :meth:`execute_async` are validated and error-classified with
+        the same contract as :meth:`run`, while their provider/storage awaits stay
+        on the workflow event loop.
+        """
+        if type(self).execute_async is BaseModule.execute_async:
+            return await asyncio.to_thread(self.run, input_payload, config)
+
+        mod_type = (
+            getattr(self, "definition", None) and getattr(self.definition, "type", None)
+        ) or self.__class__.__name__
+
+        try:
+            validated_input, validated_config, execution_payload = self._validated_execution(
+                input_payload, config
+            )
+        except ValidationError as error:
+            raise ModuleValidationError(
+                f"모듈 [{mod_type}] 입력/설정 검증 실패: {error}",
+                module_type=mod_type,
+                details={"errors": error.errors(include_url=False)},
+            ) from error
+        except Exception as error:
+            raise ModuleValidationError(
+                f"모듈 [{mod_type}] 입력 데이터 처리 중 오류: {error}",
+                module_type=mod_type,
+            ) from error
+
+        try:
+            sig = inspect.signature(self.execute_async)
+            params = [
+                parameter
+                for parameter in sig.parameters.values()
+                if parameter.name != "self"
+                and parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+            ]
+            if len(params) >= 2:
+                raw_output = await self.execute_async(
+                    validated_input,
+                    validated_config,
+                )
+            else:
+                raw_output = await self.execute_async(cast(Any, execution_payload))
+        except PipelineBaseError as error:
+            classified = self._classify_execution_error(error, mod_type)
+            if classified is not error:
+                raise classified from error
+            if error.module_type is None:
+                error.module_type = mod_type
+            raise
+        except Exception as error:
+            raise self._classify_execution_error(error, mod_type) from error
+
+        try:
+            validated_output = self.output_model.model_validate(raw_output)
+            return validated_output.model_dump(mode="json")
+        except ValidationError as error:
+            raise ModuleExecutionError(
+                f"모듈 [{mod_type}] 출력 스키마 불일치: {error}",
+                module_type=mod_type,
+                details={"errors": error.errors(include_url=False)},
+            ) from error
+
+    async def execute_async(
+        self,
+        input_data: InputModelT,
+        config: Optional[ConfigModelT] = None,
+    ) -> OutputModelT | Mapping[str, Any]:
+        """Compatibility hook for modules that only implement synchronous I/O."""
+        return await asyncio.to_thread(self.execute, input_data, config)
 
     def contract(self) -> Dict[str, Any]:
         """Return the module definition and canonical JSON schemas for UI."""
@@ -342,7 +429,9 @@ class BaseModule(ABC):
         module_type: str,
     ) -> PipelineBaseError:
         """Map provider, storage and workbook failures to stable API error contracts."""
-        if isinstance(error, (ProviderApiError, StorageError, DocumentParsingError, ModuleValidationError)):
+        if isinstance(
+            error, (ProviderApiError, StorageError, DocumentParsingError, ModuleValidationError)
+        ):
             return error
 
         error_name = type(error).__name__.lower()
@@ -370,9 +459,8 @@ class BaseModule(ABC):
             )
 
         storage_markers = ("psycopg", "sqlalchemy", "pgvector", "database", "storage")
-        if (
-            any(marker in error_name for marker in storage_markers)
-            or any(marker in error_module for marker in storage_markers)
+        if any(marker in error_name for marker in storage_markers) or any(
+            marker in error_module for marker in storage_markers
         ):
             return StorageError(
                 f"모듈 [{module_type}] 저장소 처리 실패: {message}",
@@ -413,12 +501,17 @@ class BaseModule(ABC):
         return "cached" if cache_hit else "generated"
 
     @abstractmethod
-    def execute(self, input_data: Any, config: Optional[Any] = None) -> Any:
+    def execute(
+        self,
+        input_data: InputModelT,
+        config: Optional[ConfigModelT] = None,
+    ) -> OutputModelT | Mapping[str, Any]:
         """Execute the module with validated input_data and optional config."""
 
 
 __all__ = [
     "BaseModule",
+    "ConfigModelT",
     "DocumentContextDTO",
     "DocumentParsingError",
     "EmptyModuleConfigDTO",
@@ -431,8 +524,10 @@ __all__ = [
     "ModuleInputDTO",
     "ModuleTaskPolicy",
     "ModuleValidationError",
+    "InputModelT",
     "PipelineBaseError",
     "ProviderApiError",
+    "OutputModelT",
     "QueryContextDTO",
     "StorageError",
     "question_id_for",

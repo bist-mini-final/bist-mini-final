@@ -6,6 +6,12 @@ import {
   mergeRunNodeUpdate,
   workflowRuntimeInputs,
 } from '../domain/execution';
+import {
+  isWorkflowNodeEvent,
+  isWorkflowTerminalEvent,
+  workflowNodeUpdateFromEventData,
+  workflowRunFromEventData,
+} from '../../../shared/workflows/observeRun';
 import type {
   SaveStatus,
   WorkflowGraph,
@@ -19,8 +25,6 @@ interface WorkflowGraphBridge {
   restoreRuntimeInputs: (run: WorkflowRun) => void;
   clearExecutionState: () => void;
 }
-
-const CANONICAL_WORKFLOW_IDS = new Set(['rag_query', 'excel_ingestion']);
 
 async function pollRun(runId: string, signal: AbortSignal): Promise<WorkflowRun> {
   while (true) {
@@ -56,6 +60,7 @@ export function useWorkflowPersistence(
   moduleCatalogReady: boolean,
   activeWorkflowId: string,
   activeWorkflowName: string,
+  activeWorkflowEditable: boolean,
 ) {
   const graphRef = useRef(graph);
   graphRef.current = graph;
@@ -76,7 +81,7 @@ export function useWorkflowPersistence(
       && executionDefinitionFingerprint(latestRun.graph)
         === executionDefinitionFingerprint(currentGraph)
   );
-  const isCanonicalWorkflow = CANONICAL_WORKFLOW_IDS.has(activeWorkflowId);
+  const isEditableWorkflow = activeWorkflowEditable;
 
   const applyRun = useCallback((run: WorkflowRun) => {
     latestRunRef.current = run;
@@ -137,14 +142,14 @@ export function useWorkflowPersistence(
   const saveNow = useCallback(async (signal?: AbortSignal) => {
     setSaveStatus('saving');
     try {
-      const workflow = isCanonicalWorkflow
-        ? await pipelineApi.getWorkflow(activeWorkflowId, signal)
-        : await pipelineApi.saveWorkflow(
+      const workflow = isEditableWorkflow
+        ? await pipelineApi.saveWorkflow(
             activeWorkflowId,
             activeWorkflowName,
             graphRef.current.exportGraph(),
             signal
-          );
+          )
+        : await pipelineApi.getWorkflow(activeWorkflowId, signal);
       setLastSavedAt(workflow.updated_at);
       setSaveStatus('saved');
       return workflow;
@@ -154,10 +159,10 @@ export function useWorkflowPersistence(
       }
       throw error;
     }
-  }, [activeWorkflowId, activeWorkflowName, isCanonicalWorkflow]);
+  }, [activeWorkflowId, activeWorkflowName, isEditableWorkflow]);
 
   useEffect(() => {
-    if (!ready || isCanonicalWorkflow) return;
+    if (!ready || !isEditableWorkflow) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void saveNow(controller.signal).catch(() => undefined);
@@ -166,13 +171,13 @@ export function useWorkflowPersistence(
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [graphFingerprint, isCanonicalWorkflow, ready, saveNow]);
+  }, [graphFingerprint, isEditableWorkflow, ready, saveNow]);
 
   const createRun = useCallback(
     async (query: string, signal: AbortSignal) => {
-      const workflow = isCanonicalWorkflow
-        ? await pipelineApi.getWorkflow(activeWorkflowId, signal)
-        : await saveNow(signal);
+      const workflow = isEditableWorkflow
+        ? await saveNow(signal)
+        : await pipelineApi.getWorkflow(activeWorkflowId, signal);
       const run = await pipelineApi.createRun(
         activeWorkflowId,
         workflowRuntimeInputs(workflow.graph, query),
@@ -181,7 +186,7 @@ export function useWorkflowPersistence(
       applyRun(run);
       return run;
     },
-    [activeWorkflowId, applyRun, isCanonicalWorkflow, saveNow]
+    [activeWorkflowId, applyRun, isEditableWorkflow, saveNow]
   );
 
   const executeAll = useCallback(
@@ -214,22 +219,22 @@ export function useWorkflowPersistence(
           run = await pipelineApi.streamRun(
             run.id,
             (event) => {
-              if (
-                event.event === 'node_progress'
-                || event.event === 'node_completed'
-                || event.event === 'node_failed'
-              ) {
-                const nodeUpdate = event.data;
-                if (nodeUpdate?.node_id) {
+              if (isWorkflowNodeEvent(event.event)) {
+                const nodeUpdate = workflowNodeUpdateFromEventData(event.data);
+                if (nodeUpdate) {
                   const current = latestRunRef.current;
                   if (!current) return;
                   const updated = mergeRunNodeUpdate(current, nodeUpdate);
                   applyRun(updated);
                   onBatch?.(updated);
                 }
-              } else if (event.event === 'run_completed' && event.data?.run) {
-                applyRun(event.data.run);
-                onBatch?.(event.data.run);
+              } else if (
+                isWorkflowTerminalEvent(event.event)
+              ) {
+                const completedRun = workflowRunFromEventData(event.data);
+                if (!completedRun) return;
+                applyRun(completedRun);
+                onBatch?.(completedRun);
               }
             },
             controller.signal
@@ -306,7 +311,7 @@ export function useWorkflowPersistence(
     latestRun,
     runs,
     latestRunMatchesGraph,
-    isCanonicalWorkflow,
+    isEditableWorkflow,
     isExecuting,
     isClearingCache,
     saveNow,

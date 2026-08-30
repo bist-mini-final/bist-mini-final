@@ -28,6 +28,10 @@ export interface DbStatusInfo {
   pgvector_version?: string;
   total_indexes: number;
   total_chunks: number;
+  vector_index_strategy?: 'binary_quantized_hnsw_exact_rerank';
+  vector_index_count?: number;
+  partition_strategy?: 'collection_local_partial_indexes';
+  embedding_table_partitioned?: boolean;
   error?: string;
 }
 
@@ -57,8 +61,8 @@ export interface VectorIndexDetail {
   estimated_cost_krw?: number;
   batch_size?: number;
   sheet_names?: string[];
-  tables?: any[];
-  luna_output?: any;
+  tables?: unknown[];
+  luna_output?: LunaInspectionOutput;
 }
 
 export interface LunaInspectionOutput {
@@ -76,7 +80,7 @@ export interface IngestionJobResponse {
   run: WorkflowRun;
   index: VectorIndexInfo & {
     sheet_names?: string[];
-    tables?: any[];
+    tables?: unknown[];
     luna_output?: LunaInspectionOutput;
   } | null;
   luna_output?: LunaInspectionOutput | null;

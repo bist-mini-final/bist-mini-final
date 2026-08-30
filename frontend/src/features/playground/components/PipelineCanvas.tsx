@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -28,8 +28,6 @@ import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
 import { SemanticQueryMatcherNode } from './CustomNodes/SemanticQueryMatcherNode';
 import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
-import { WorkflowLayersPanel } from './WorkflowLayersPanel';
-import type { WorkflowOption } from './Header';
 import type { usePipelineGraph } from '../hooks/usePipelineGraph';
 import type { ModuleDefinition, WorkflowRun } from '../types';
 
@@ -40,30 +38,18 @@ interface PipelineCanvasProps {
   isPaletteOpen: boolean;
   onOpenPalette?: () => void;
   modules: ModuleDefinition[];
-  runs: WorkflowRun[];
-  workflows: WorkflowOption[];
+  currentRun: WorkflowRun | null;
   activeWorkflowId: string;
   readOnly: boolean;
-  onSelectWorkflow: (id: string) => void;
-  onCreateWorkflow: () => void;
-  onDuplicateWorkflow: () => void;
-  onRenameWorkflow: () => void;
-  onDeleteWorkflow: () => void;
 }
 
 export function PipelineCanvas({
   graph,
   isPaletteOpen,
   modules,
-  runs,
-  workflows,
+  currentRun,
   activeWorkflowId,
   readOnly,
-  onSelectWorkflow,
-  onCreateWorkflow,
-  onDuplicateWorkflow,
-  onRenameWorkflow,
-  onDeleteWorkflow,
 }: PipelineCanvasProps) {
   const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null);
   const nodeTypes = useMemo<NodeTypes>(
@@ -90,11 +76,10 @@ export function PipelineCanvas({
   );
   const edgeTypes = useMemo<EdgeTypes>(() => ({ customEdge: CustomEdge }), []);
   const openModuleSettings = useCallback(
-    (nodeId: string) => {
-      if (!readOnly) setSettingsNodeId(nodeId);
-    },
-    [readOnly],
+    (nodeId: string) => setSettingsNodeId(nodeId),
+    [],
   );
+  useEffect(() => setSettingsNodeId(null), [activeWorkflowId]);
   const settingsNode = settingsNodeId
     ? graph.nodes.find((node) => node.id === settingsNodeId)
     : undefined;
@@ -105,8 +90,6 @@ export function PipelineCanvas({
   const settingsModule = settingsModuleType
     ? modules.find((module) => module.type === settingsModuleType)
     : undefined;
-  const settingsPreview = undefined;
-
   return (
     <ModuleSettingsContext.Provider value={openModuleSettings}>
       <section className="pipeline-canvas" data-palette-open={isPaletteOpen} aria-label="RAG 파이프라인 편집 캔버스">
@@ -151,21 +134,6 @@ export function PipelineCanvas({
             pannable
           />
         </ReactFlow>
-        <WorkflowLayersPanel
-          nodes={graph.nodes}
-          edges={graph.edges}
-          modules={modules}
-          workflows={workflows}
-          activeWorkflowId={activeWorkflowId}
-          onSelectWorkflow={onSelectWorkflow}
-          onCreateWorkflow={onCreateWorkflow}
-          onDuplicateWorkflow={onDuplicateWorkflow}
-          onRenameWorkflow={onRenameWorkflow}
-          onDeleteWorkflow={onDeleteWorkflow}
-          onSelectNode={graph.selectNode}
-          onDuplicateNode={graph.duplicateNode}
-          readOnly={readOnly}
-        />
       </section>
       {settingsNode && settingsModule && (
         <ModuleSettingsModal
@@ -173,8 +141,8 @@ export function PipelineCanvas({
           definition={settingsModule}
           config={(settingsNode.data.config as Record<string, unknown> | undefined) ?? {}}
           onConfigChange={(patch) => graph.updateNodeConfig(settingsNode.id, patch)}
-          runs={runs}
-          preview={settingsPreview}
+          readOnly={readOnly}
+          run={currentRun}
           onClose={() => setSettingsNodeId(null)}
         />
       )}

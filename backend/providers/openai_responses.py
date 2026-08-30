@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import mimetypes
 import time
@@ -198,6 +199,89 @@ class OpenAIResponsesClient:
             function_calls=function_calls,
         )
 
+    async def create_response_async(
+        self,
+        *,
+        model: str,
+        input_items: list[dict[str, Any]],
+        instructions: str | None = None,
+        text_format: dict[str, Any] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        previous_response_id: str | None = None,
+        reasoning_effort: ReasoningEffort = "none",
+        max_output_tokens: int | None = None,
+        timeout_seconds: float | None = None,
+        store: bool = False,
+        max_retries: int = 5,
+    ) -> OpenAIResponseResult:
+        """Call Responses through AsyncOpenAI without occupying a worker thread."""
+        request: dict[str, Any] = {
+            "model": model,
+            "input": input_items,
+            "store": store,
+        }
+        if reasoning_effort is not None:
+            request["reasoning"] = {"effort": reasoning_effort}
+        if instructions:
+            request["instructions"] = instructions
+        if text_format is not None:
+            request["text"] = {"format": text_format}
+        if tools:
+            request["tools"] = tools
+        if previous_response_id:
+            request["previous_response_id"] = previous_response_id
+        if max_output_tokens is not None:
+            request["max_output_tokens"] = max_output_tokens
+
+        started_at = time.perf_counter()
+        retries = max(0, max_retries)
+        document = None
+        for attempt in range(retries + 1):
+            try:
+                client = await self.provider.with_timeout_async(
+                    timeout_seconds or self.timeout_seconds
+                )
+                response = await client.responses.create(**request)
+                document = response.model_dump(mode="json")
+                break
+            except (OpenAIError, OpenAIProviderError, ValueError) as error:
+                is_rate_limit = (
+                    "429" in str(error)
+                    or "Rate limit" in str(error)
+                    or "rate_limit_exceeded" in str(error)
+                )
+                if is_rate_limit and attempt < retries:
+                    await asyncio.sleep(2.0 * (1.5**attempt))
+                    continue
+                raise OpenAIResponsesError(
+                    f"OpenAI Responses API 호출에 실패했습니다: {error}"
+                ) from error
+
+        if document is None:
+            raise OpenAIResponsesError("OpenAI Responses API 응답을 받지 못했습니다.")
+        status = document.get("status")
+        if status == "incomplete":
+            reason = (document.get("incomplete_details") or {}).get("reason")
+            raise OpenAIResponsesError(
+                f"OpenAI Responses API 출력이 완료되지 않았습니다: {reason or 'unknown'}"
+            )
+        if status == "failed":
+            error = document.get("error") or {}
+            raise OpenAIResponsesError(
+                f"OpenAI Responses API 처리에 실패했습니다: {error.get('message') or 'unknown'}"
+            )
+        content = _output_text(document)
+        function_calls = _function_calls(document)
+        if not content and not function_calls:
+            raise OpenAIResponsesError("OpenAI Responses API가 빈 출력을 반환했습니다")
+        return OpenAIResponseResult(
+            response_id=str(document.get("id") or ""),
+            content=content,
+            usage=_usage(document),
+            latency_seconds=time.perf_counter() - started_at,
+            function_calls=function_calls,
+        )
+
     @staticmethod
     def _prompt_parts(
         messages: list[dict[str, Any]],
@@ -233,6 +317,27 @@ class OpenAIResponsesClient:
                 "schema": json_schema,
             },
         ).content
+
+    async def complete_structured_async(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        schema_name: str,
+        json_schema: dict[str, Any],
+    ) -> str:
+        instructions, input_items = self._prompt_parts(messages)
+        result = await self.create_response_async(
+            model=model,
+            instructions=instructions,
+            input_items=input_items,
+            text_format={
+                "type": "json_schema",
+                "name": schema_name,
+                "strict": True,
+                "schema": json_schema,
+            },
+        )
+        return result.content
 
     def complete_vision_structured(
         self,
@@ -277,6 +382,10 @@ class OpenAIResponsesClient:
     def close(self) -> None:
         if self._owns_provider:
             self.provider.close()
+
+    async def aclose(self) -> None:
+        if self._owns_provider:
+            await self.provider.aclose()
 
 
 __all__ = [

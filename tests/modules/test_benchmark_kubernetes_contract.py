@@ -58,9 +58,7 @@ class BenchmarkKubernetesContractTests(unittest.TestCase):
 
         store = RecordingStore()
         database = SimpleNamespace(database_url="postgresql://contract")
-        executor = SimpleNamespace(
-            run_store=SimpleNamespace(db_manager=database),
-        )
+        run_store = SimpleNamespace(db_manager=database)
         with tempfile.TemporaryDirectory() as directory:
             workflow_store = WorkflowStore(Path(directory))
             rag_workflow = canonical_workflow("rag_query")
@@ -80,7 +78,7 @@ class BenchmarkKubernetesContractTests(unittest.TestCase):
                 app.include_router(
                     create_benchmark_router(
                         workflow_store,
-                        executor,  # type: ignore[arg-type]
+                        run_store,  # type: ignore[arg-type]
                         SimpleNamespace(),  # type: ignore[arg-type]
                     )
                 )

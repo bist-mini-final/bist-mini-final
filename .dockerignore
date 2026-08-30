@@ -5,7 +5,13 @@ __pycache__
 *.pyc
 *.log
 .env
-frontend
+# Keep the frontend source in the build context. The frontend Dockerfile builds
+# from it, while generated files and local environment overrides stay excluded.
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/.env
+frontend/.env.*
 dist
 outputs
 tmp

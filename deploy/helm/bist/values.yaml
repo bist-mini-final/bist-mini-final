@@ -1,0 +1,170 @@
+nameOverride: ""
+fullnameOverride: ""
+
+images:
+  backend:
+    repository: bist-backend
+    tag: local
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: bist-frontend
+    tag: local
+    pullPolicy: IfNotPresent
+  worker:
+    repository: bist-workflow-worker
+    tag: local
+    pullPolicy: IfNotPresent
+  redis:
+    repository: redis
+    tag: 7.4-alpine
+    pullPolicy: IfNotPresent
+
+application:
+  # This secret deliberately contains application credentials only. KEDA reads
+  # its connection string through keda.databaseSecret instead.
+  existingSecret: bist-batch-env
+  databaseKey: PGVECTOR_URL
+  openaiApiKey: OPENAI_API_KEY
+  openaiBaseUrlKey: OPENAI_BASE_URL
+
+backend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+frontend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+redis:
+  enabled: true
+  # Supply this only when using a managed Redis instead of the in-cluster relay.
+  url: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+keda:
+  databaseSecret:
+    # Must be a dedicated secret containing only the KEDA PostgreSQL DSN.
+    name: bist-keda-postgresql
+    key: PGVECTOR_URL
+  pollingInterval: 2
+  maxReplicaCount: 4
+  workerResources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+
+# Production must supply an RWX claim or another shared artifact store. A
+# hostPath is supported solely by values-k3d.yaml for local k3d validation.
+storage:
+  existingClaim: bist-data
+  hostPath: ""
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  host: ""
+  tls: []
+
+workerJobs:
+  - name: workflow-worker
+    appName: workflow-worker
+    queue: workflow-core
+    module: backend.engine.worker.main
+    args: ["--queue", "workflow-core"]
+    activeDeadlineSeconds: 21600
+    mountData: true
+    query: |-
+      SELECT COUNT(*) FROM workflow_runs
+      WHERE queue_name = 'workflow-core'
+        AND cancel_requested = FALSE
+        AND ((status = 'queued' AND available_at <= NOW())
+          OR (status = 'running' AND (heartbeat_at IS NULL
+            OR heartbeat_at < NOW() - (180 * INTERVAL '1 second'))))
+  - name: bi-materialization
+    appName: bi-materialization-worker
+    queue: bi-materialization
+    module: backend.features.bi.materialization_worker_main
+    args: []
+    activeDeadlineSeconds: 21600
+    mountData: false
+    query: |-
+      SELECT COUNT(*) FROM bi_materialization_jobs
+      WHERE (status = 'queued' AND available_at <= NOW())
+         OR (status IN ('profiling', 'extracting')
+             AND (heartbeat_at IS NULL
+                  OR heartbeat_at < NOW() - (180 * INTERVAL '1 second')))
+  - name: ingestion-embedding
+    appName: ingestion-embedding-worker
+    queue: ingestion-embedding
+    module: backend.storage.data_sources.embedding_shard_worker_main
+    args: []
+    activeDeadlineSeconds: 900
+    mountData: true
+    maxReplicaCount: 4
+    query: |-
+      SELECT COUNT(*) FROM ingestion_shards
+      WHERE phase = 'embedding'
+        AND ((status = 'queued' AND available_at <= NOW())
+          OR (status = 'running' AND (heartbeat_at IS NULL
+            OR heartbeat_at < NOW() - (180 * INTERVAL '1 second'))))
+  - name: ingestion-vector
+    appName: ingestion-vector-worker
+    queue: ingestion-vector
+    module: backend.storage.data_sources.vector_shard_worker_main
+    args: []
+    activeDeadlineSeconds: 1800
+    mountData: true
+    maxReplicaCount: 2
+    query: |-
+      SELECT COUNT(*) FROM ingestion_shards
+      WHERE phase = 'vector_copy'
+        AND ((status = 'queued' AND available_at <= NOW())
+          OR (status = 'running' AND (heartbeat_at IS NULL
+            OR heartbeat_at < NOW() - (180 * INTERVAL '1 second'))))
+  - name: bi-question
+    appName: bi-question-worker
+    queue: bi-question
+    module: backend.features.bi.question_worker_main
+    args: []
+    activeDeadlineSeconds: 2700
+    mountData: false
+    query: |-
+      SELECT COUNT(*) FROM bi_questions
+      WHERE status = 'queued'
+         OR (status = 'running'
+             AND updated_at < NOW() - (180 * INTERVAL '1 second'))
+  - name: benchmark
+    appName: benchmark-worker
+    queue: benchmark
+    module: backend.features.benchmark.worker_main
+    args: []
+    activeDeadlineSeconds: 21600
+    mountData: true
+    query: |-
+      SELECT COUNT(*) FROM benchmark_jobs
+      WHERE (status = 'queued' AND available_at <= NOW())
+         OR (status IN ('running', 'pausing', 'cancelling')
+             AND (heartbeat_at IS NULL
+                  OR heartbeat_at < NOW() - (180 * INTERVAL '1 second')))

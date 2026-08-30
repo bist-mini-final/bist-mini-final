@@ -1,6 +1,5 @@
 import {
   ChevronDown,
-  BarChart3,
   Clock,
   Coins,
   DatabaseZap,
@@ -8,11 +7,13 @@ import {
   PanelLeft,
   PanelLeftClose,
   Play,
+  Plus,
   RotateCcw,
   Save,
   Sparkles,
   Square,
 } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 import type { SaveStatus } from '../types';
 
 interface ExecutionMetrics {
@@ -25,6 +26,12 @@ interface ExecutionMetrics {
 export interface WorkflowOption {
   id: string;
   name: string;
+  kind: 'standard' | 'user';
+  editable: boolean;
+  template: boolean;
+  nodeCount: number;
+  edgeCount: number;
+  moduleTypes: string[];
 }
 
 interface HeaderProps {
@@ -46,7 +53,7 @@ interface HeaderProps {
   workflows: WorkflowOption[];
   activeWorkflowId: string;
   onSelectWorkflow: (id: string) => void;
-  onOpenBenchmark: () => void;
+  onOpenWorkflowCreator: () => void;
 }
 
 export function Header({
@@ -67,21 +74,23 @@ export function Header({
   workflows,
   activeWorkflowId,
   onSelectWorkflow,
-  onOpenBenchmark,
+  onOpenWorkflowCreator,
 }: HeaderProps) {
 
   return (
     <header className="app-header" data-palette-open={isPaletteOpen}>
       <div className="app-header__brand-card">
-        <button
+        <IconButton
           className="app-header__palette-button"
+          variant="ghost"
+          size="sm"
           onClick={onTogglePalette}
           aria-label={isPaletteOpen ? '모듈 패널 닫기' : '모듈 패널 열기'}
           aria-expanded={isPaletteOpen}
           title={isPaletteOpen ? '모듈 패널 접기' : '모듈 패널 펼치기'}
         >
           {isPaletteOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-        </button>
+        </IconButton>
 
         <div className="app-header__brand-divider" aria-hidden="true" />
 
@@ -102,21 +111,25 @@ export function Header({
               >
                 {workflows.map((wf) => (
                   <option key={wf.id} value={wf.id}>
-                    {wf.name}
+                    {wf.name} · {wf.editable ? '사용자' : '읽기 전용'}
                   </option>
                 ))}
               </select>
               <ChevronDown className="workflow-selector__chevron h-3 w-3" aria-hidden="true" />
             </div>
+            <Button
+              size="sm"
+              onClick={onOpenWorkflowCreator}
+              title="편집 가능한 새 워크플로 만들기"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>새 워크플로</span>
+            </Button>
           </>
         )}
       </div>
 
       <div className="app-header__actions">
-        <button className="control-button" onClick={onOpenBenchmark} title="워크플로우 성능 비교">
-          <BarChart3 className="h-3.5 w-3.5" />
-          <span>성능 비교</span>
-        </button>
         {metrics && (metrics.hasExecution || isRunning) && (
           <div className="execution-stats-panel" title="전체 파이프라인 총 실행 통계 (소요 시간 · 비용 · 토큰 수)">
             <div className="execution-stat-item" title="총 소요 시간">
@@ -160,22 +173,21 @@ export function Header({
           </div>
         )}
 
-        <button
-          className="control-button control-button--danger"
+        <Button
+          variant="danger"
           onClick={onClearCache}
           disabled={isClearingCache}
           title={isRunning ? '현재 실행을 중단하고 캐시와 실행 이력 초기화' : '모듈 결과 캐시와 실행 이력 초기화'}
         >
           <DatabaseZap className={`h-3.5 w-3.5 ${isClearingCache ? 'animate-pulse' : ''}`} />
           <span>{isClearingCache ? '초기화 중' : '캐시 초기화'}</span>
-        </button>
+        </Button>
 
-        <button className="control-button" onClick={onReset} title="파이프라인 초기화">
+        <Button onClick={onReset} title="파이프라인 초기화">
           <RotateCcw className="h-3.5 w-3.5" />
           <span>초기화</span>
-        </button>
-        <button
-          className="control-button"
+        </Button>
+        <Button
           onClick={onSave}
           disabled={saveStatus === 'loading' || saveStatus === 'saving'}
           title="현재 캔버스를 JSON 파일로 저장"
@@ -190,16 +202,16 @@ export function Header({
                 ? '저장 재시도'
                 : '저장됨'}
           </span>
-        </button>
-        <button
-          className={`control-button control-button--primary ${isRunning ? 'is-running' : ''}`}
+        </Button>
+        <Button
+          variant={isRunning ? 'danger-solid' : 'primary'}
           onClick={onToggleRun}
           disabled={!hasPipeline || hasGraphCycle}
           title={isRunning ? '배치 실행 중단' : 'DAG 배치 자동 실행'}
         >
           {isRunning ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
           <span>{isRunning ? '중단' : '자동 실행'}</span>
-        </button>
+        </Button>
       </div>
     </header>
   );

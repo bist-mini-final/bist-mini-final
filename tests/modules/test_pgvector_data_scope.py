@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -27,15 +28,24 @@ def test_data_scope_reads_compact_routing_catalog_without_user_selection() -> No
         }
     ]
     result = PgVectorDataScopeModule(store).run(PgVectorDataScopeInputDTO())
+    store.list_data_scopes_async = AsyncMock(return_value=store.list_data_scopes.return_value)
+    async_result = asyncio.run(
+        PgVectorDataScopeModule(store).run_async(PgVectorDataScopeInputDTO())
+    )
     catalog = DataScopeCatalogDTO.model_validate(result["scope_catalog"])
 
     assert catalog.collections[0].index_id == "idx-financials"
     assert catalog.collections[0].sheet_names == ["Income Statement"]
+    assert async_result == result
     store.list_data_scopes.assert_called_once_with()
+    store.list_data_scopes_async.assert_awaited_once_with()
 
 
 def test_data_scope_rejects_empty_database_catalog() -> None:
     store = MagicMock()
     store.list_data_scopes.return_value = []
+    store.list_data_scopes_async = AsyncMock(return_value=[])
     with pytest.raises(ModuleExecutionError, match="data scope가 없습니다"):
         PgVectorDataScopeModule(store).run(PgVectorDataScopeInputDTO())
+    with pytest.raises(ModuleExecutionError, match="data scope가 없습니다"):
+        asyncio.run(PgVectorDataScopeModule(store).run_async(PgVectorDataScopeInputDTO()))

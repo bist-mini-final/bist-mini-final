@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,
@@ -15,6 +14,7 @@ from modules.common.base_module import (
     ModuleExecutionError,
     ModuleInputDTO,
 )
+from modules.retrieval.ports import DataScopeStorePort
 
 
 class DataScopeDTO(ModuleDTO):
@@ -65,8 +65,22 @@ class PgVectorDataScopeModule(BaseModule):
     config_model = EmptyModuleConfigDTO
     output_model = PgVectorDataScopeOutputDTO
 
-    def __init__(self, pgvector_store: PgVectorStore) -> None:
+    def __init__(self, pgvector_store: DataScopeStorePort) -> None:
         self.pgvector_store = pgvector_store
+
+    @staticmethod
+    def _output(scopes: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if not scopes:
+            raise ModuleExecutionError(
+                "검색 가능한 PostgreSQL data scope가 없습니다. 먼저 Excel 인덱스를 생성하세요"
+            )
+        return {
+            "scope_catalog": {
+                "collections": [
+                    DataScopeDTO.model_validate(scope).model_dump(mode="json") for scope in scopes
+                ]
+            }
+        }
 
     def execute(
         self,
@@ -75,18 +89,16 @@ class PgVectorDataScopeModule(BaseModule):
     ) -> Dict[str, Any]:
         del input_data, config
         scopes = self.pgvector_store.list_data_scopes()
-        if not scopes:
-            raise ModuleExecutionError(
-                "검색 가능한 PostgreSQL data scope가 없습니다. 먼저 Excel 인덱스를 생성하세요"
-            )
-        return {
-            "scope_catalog": {
-                "collections": [
-                    DataScopeDTO.model_validate(scope).model_dump(mode="json")
-                    for scope in scopes
-                ]
-            }
-        }
+        return self._output(scopes)
+
+    async def execute_async(
+        self,
+        input_data: PgVectorDataScopeInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        del input_data, config
+        scopes = await self.pgvector_store.list_data_scopes_async()
+        return self._output(scopes)
 
 
 __all__ = [

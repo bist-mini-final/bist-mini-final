@@ -1,6 +1,15 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { cellEvidenceApi } from '../../../shared/evidence/cellEvidenceApi';
+import { CellEvidenceProvider } from '../../../shared/evidence/CellEvidenceProvider';
 import { MarkdownAnswer, normalizeMarkdownTables } from './MarkdownAnswer';
+
+vi.mock('../../../shared/evidence/cellEvidenceApi', () => ({
+  cellEvidenceApi: {
+    resolve: vi.fn(() => new Promise(() => undefined)),
+    imageUrl: vi.fn(() => '/evidence/sheet.png'),
+  },
+}));
 
 describe('MarkdownAnswer', () => {
   it('renders emphasis, lists, and GFM tables as semantic HTML', () => {
@@ -11,6 +20,31 @@ describe('MarkdownAnswer', () => {
     expect(screen.getByText('Revenue').tagName).toBe('STRONG');
     expect(screen.getByText('62,753', { selector: 'li' })).toBeInTheDocument();
     expect(container.querySelector('table')).toBeInTheDocument();
+  });
+
+  it('opens the shared evidence dialog from a parsed cell citation chip', () => {
+    render(
+      <MarkdownAnswer
+        markdown="근거: [Sheet: Income_Statement | Cell: E16]"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Income Statement · E16' }));
+
+    expect(screen.getByRole('dialog', { name: /셀 원본 근거 검증/ })).toBeInTheDocument();
+    expect(cellEvidenceApi.resolve).toHaveBeenCalledOnce();
+  });
+
+  it('uses the app-level evidence host when rendered inside the provider', async () => {
+    render(
+      <CellEvidenceProvider>
+        <MarkdownAnswer markdown="근거: [Sheet: Income_Statement | Cell: E16]" />
+      </CellEvidenceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Income Statement · E16' }));
+
+    expect(await screen.findByRole('dialog', { name: /셀 원본 근거 검증/ })).toBeInTheDocument();
   });
 });
 

@@ -1,7 +1,12 @@
 from hashlib import sha256
 from typing import assert_never
 
-from .api_models import BiCompanySummary, BiMaterializationAccepted
+from .api_models import (
+    BiCompanySummary,
+    BiMaterializationAccepted,
+    BiMaterializationCandidate,
+    BiMaterializationCandidateReason,
+)
 from .catalog import CATALOG_VERSION, FORMULA_VERSION
 from .materialization_models import BiCompanyIndexEntry
 from .models import (
@@ -55,6 +60,44 @@ def build_company_summary(
         snapshot_status=(snapshot.snapshot.status if snapshot is not None else None),
         refresh_status=refresh_status(latest_job),
         updated_at=updated_at,
+    )
+
+
+def build_materialization_candidate(
+    entry: BiCompanyIndexEntry,
+    snapshot: BiDashboardSnapshot | None,
+    latest_job: BiMaterializationJob | None,
+) -> BiMaterializationCandidate | None:
+    """Return a user-selectable materialization candidate when a snapshot is absent or stale."""
+    source = entry.source
+    if source is None:
+        return None
+    if snapshot is not None and snapshot.source.workbook_hash == source.workbook_hash:
+        return None
+
+    matching_job = (
+        latest_job
+        if latest_job is not None and latest_job.workbook_hash == source.workbook_hash
+        else None
+    )
+    if matching_job is not None:
+        if is_active(matching_job.status):
+            return None
+        if matching_job.status is MaterializationStatus.FAILED:
+            reason = BiMaterializationCandidateReason.FAILED
+        else:
+            # A terminal successful job may briefly precede current-snapshot visibility.
+            return None
+    elif snapshot is not None:
+        reason = BiMaterializationCandidateReason.SOURCE_CHANGED
+    else:
+        reason = BiMaterializationCandidateReason.NOT_CREATED
+
+    return BiMaterializationCandidate(
+        company_id=entry.company.company_id,
+        display_name=entry.company.display_name,
+        source=source,
+        reason=reason,
     )
 
 
