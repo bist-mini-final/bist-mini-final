@@ -1,29 +1,20 @@
-# 🏛️ bist-mini-final 시스템 마스터 아키텍처 포털 (System Master Gateway)
+# 🏛️ bist-mini-final 엔지니어링 청사진 포털 (Engineering Blueprints Gateway)
 > **Project Version:** `0.1.0` | **Public API Version:** `2.4.0` | **Build Target:** Financial RAG, BI & Comparison Platform
-> **Master Portals:** [📘 최종 프로젝트 보고서 (Final Report)](file:///c:/Repos/bist-mini-final/docs/final_report/) | [📐 엔지니어링 청사진 규격서 (Blueprints)](file:///c:/Repos/bist-mini-final/docs/blueprints/)
+> **Master Portals:** [📐 엔지니어링 청사진 규격서 (Blueprints)](file:///c:/Repos/bist-mini-final/docs/blueprints/) | [📋 현재 구현 기준선 (Current Implementation Baseline)](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)
 
 ---
 
-## 🧭 프로젝트 문서 체계 2대 트랙 구조 (Dual-Track Architecture)
+## 🧭 엔지니어링 문서 체계 및 청사진 구조
 
-`bist-mini-final`의 기술 문서는 **"비즈니스 서사 및 소프트웨어 공학 설계를 완결성 있게 설명하는 [최종 프로젝트 보고서]"**와 **"개발 및 리팩토링 시 실시간으로 참조하는 [엔지니어링 청사진 규격서]"**의 2대 트랙으로 체계적으로 분리되어 있습니다:
+`bist-mini-final`의 기술 문서는 시스템의 실제 아키텍처, 19개 파이프라인 모듈 핀아웃, 5대 워크스페이스, 데이터베이스 DDL 및 프론트엔드 배선도를 개발 및 운영 시 실시간으로 참조할 수 있도록 **[엔지니어링 청사진 규격서 (Blueprints)]** 체계로 관리됩니다:
 
-> **문서 해석 기준:** [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)가 현재 구현의 요약 기준입니다. `blueprints/`는 실행 계약과 설계 결정, `final_report/`는 요구사항·설계·MVP 진화 이력을 설명합니다. 현재 기준은 19개 등록 파이프라인 모듈, 21개 BI 지표, 독립 Company Comparison 스냅샷 도메인, PostgreSQL 영속 상태, Redis 상태 변경 신호, KEDA 작업 런타임과 Excel embedding/COPY child shard 실행입니다. 로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다.
+> **문서 해석 기준:** [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)가 현재 구현의 요약 기준입니다. `blueprints/`는 실행 계약과 설계 결정을 명세합니다. 현재 기준은 19개 등록 파이프라인 모듈, 21개 BI 지표, 독립 Company Comparison 스냅샷 도메인, PostgreSQL 영속 상태, Redis 상태 변경 신호, KEDA 작업 런타임과 Excel embedding/COPY child shard 실행입니다. 로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다.
 
 ```mermaid
 flowchart TD
-    ROOT["docs/README.md (마스터 게이트웨이 포털)"]
+    ROOT["docs/README.md (마스터 청사진 포털)"]
 
-    subgraph ReportTrack ["📘 Track 1: final_report/ (최종 프로젝트 보고서 5대 챕터)"]
-        R1["01_project_overview/ (개요, 배경, 목표, 4인 R&R, MVP 일정)"]
-        R2["02_requirements_analysis/ (선행연구/가설, 페르소나, FR/NFR, 유스케이스)"]
-        R3["03_system_architecture_and_design/ (토폴로지, 클래스, 시퀀스, ERD, 인터페이스, K8s)"]
-        R4["04_implementation_and_mvp_evolution/ (1차/2차/3차 MVP 진화 과정 & 리팩토링)"]
-        R5["05_validation_and_conclusion/ (벤치마크 평가 계획, AST 계약 테스트, 결론)"]
-        R1 --> R2 --> R3 --> R4 --> R5
-    end
-
-    subgraph BlueprintTrack ["📐 Track 2: blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
+    subgraph BlueprintTrack ["📐 blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
         B1["01_system_blueprints/ (BP-101~104: durable job, 7계층, 3-Level 락, K8s)"]
         B2["02_data_engine_blueprints/ (BP-201~203: 2D 파서, Luna VLM, Binary COPY)"]
         B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 19개 모듈·BI 서비스, RRF 융합)"]
@@ -33,49 +24,12 @@ flowchart TD
         B7["07_validation_blueprints/ (BP-701: AST 계약 테스트 규격)"]
     end
 
-    ROOT ==> ReportTrack
     ROOT ==> BlueprintTrack
 ```
 
 ---
 
-# 📘 [Track 1] 최종 프로젝트 보고서 5대 챕터 색인 (Final Report Catalog)
-
-### 제1장. 프로젝트 개요 (Chapter 1. Project Overview)
-* [`SEC-101`](file:///c:/Repos/bist-mini-final/docs/final_report/01_project_overview/SEC-101_background_and_necessity.md): 주제 배경 및 필요성 (기업 재무 데이터 분석의 4대 한계 & 솔루션 필요성)
-* [`SEC-102`](file:///c:/Repos/bist-mini-final/docs/final_report/01_project_overview/SEC-102_project_goals_and_vision.md): 프로젝트 목표 및 핵심 가치 (5대 핵심 가치 & 정량적 벤치마크 목표 KPI)
-* [`SEC-103`](file:///c:/Repos/bist-mini-final/docs/final_report/01_project_overview/SEC-103_team_roles_and_matrix.md): 팀 구성 및 4인 역할 분담 (김지환, 전명준, 권혁준, 김정원 3단계 MVP 완결 R&R)
-* [`SEC-104`](file:///c:/Repos/bist-mini-final/docs/final_report/01_project_overview/SEC-104_mvp_schedule_and_wbs.md): 3단계 MVP 개발 절차 및 총괄 수행 일정 (Gantt 마일스톤 & 상세 WBS)
-
-### 제2장. 프로젝트 요구 분석 (Chapter 2. Requirements Analysis)
-* [`SEC-201`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-201_prior_research_and_hypotheses.md): 선행 연구 조사 및 7대 아키텍처 가설 분석 (표 감지 대조군, Pixel RAG vs 셀 RAG 등)
-* [`SEC-202`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-202_stakeholders_and_personas.md): 이해관계자 및 5대 페르소나 정의 (M&A, 펀드매니저, 전략기획실, 데이터/RAG 엔지니어)
-* [`SEC-203`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-203_functional_and_nonfunctional_requirements.md): 기능적(FR) 및 비기능적(NFR) 요구사항 명세서 (IEEE 830 표준)
-* [`SEC-204`](file:///c:/Repos/bist-mini-final/docs/final_report/02_requirements_analysis/SEC-204_use_case_modeling_and_traceability.md): 유스케이스 모델링 (UC-1~UC-6) 및 구현 추적성 매트릭스
-
-### 제3장. 시스템 아키텍처 및 상세 설계 (Chapter 3. System Architecture & Design)
-* [`SEC-301`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-301_system_topology_and_runtime.md): 시스템 전체 토폴로지 및 durable job 런타임 조감도 (PostgreSQL·Redis·KEDA)
-* [`SEC-302`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-302_class_diagrams_and_contracts.md): 클래스 다이어그램 & 19개 파이프라인 모듈 입출력 계약
-* [`SEC-303`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-303_sequence_diagrams.md): 동적 시퀀스 다이어그램 & 분산 동시성 런북 (REST/SSE 작업 상태와 3-Level 분산 락)
-* [`SEC-304`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-304_database_erd_and_vector_schema.md): 데이터베이스 물리 설계 이력 및 PostgreSQL + pgvector ERD
-* [`SEC-305`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-305_interface_specification.md): 인터페이스 설계 (FastAPI REST API 엔드포인트 & SSE 스트리밍 규격)
-* [`SEC-306`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-306_infrastructure_and_deployment.md): 인프라 토폴로지 및 배포 환경 (Kubernetes KEDA ScaledJob & Docker)
-* [`SEC-307`](file:///c:/Repos/bist-mini-final/docs/final_report/03_system_architecture_and_design/SEC-307_engineering_standards_and_tokens.md): 엔지니어링 표준 헌법 및 프론트엔드 디자인 토큰 (무손실 Decimal & Lucide SVG)
-
-### 제4장. 시스템 구현 및 3단계 MVP 진화 과정 (Chapter 4. Implementation & MVP Evolution)
-* [`SEC-401`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-401_mvp1_data_and_vision_pipeline.md): [1차 MVP 및 현재화] 엑셀 2D 파싱, 외부 vision 구조 감지 & Binary COPY 적재
-* [`SEC-402`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-402_mvp2_orchestration_and_bi.md): [2차 MVP 이력] 초기 DAG 오케스트레이션, 쿼리 라우팅 & Financial BI 대시보드 구축
-* [`SEC-403`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-403_mvp3_chatbot_and_comparison.md): [3차 MVP 및 현재화] AI 금융 챗봇, 버전형 기업 비교 스냅샷 & UI/a11y 고도화
-* [`SEC-404`](file:///c:/Repos/bist-mini-final/docs/final_report/04_implementation_and_mvp_evolution/SEC-404_refactoring_and_code_governance.md): 전사 코드베이스 리팩토링 및 아키텍처 거버넌스
-
-### 제5장. 품질 검증 및 결론 (Chapter 5. Validation & Conclusion)
-* [`SEC-501`](file:///c:/Repos/bist-mini-final/docs/final_report/05_validation_and_conclusion/SEC-501_benchmark_evaluation_plan.md): 정량적 벤치마크 평가 하네스 및 목표 KPI 검증 계획
-* [`SEC-502`](file:///c:/Repos/bist-mini-final/docs/final_report/05_validation_and_conclusion/SEC-502_contract_testing_results.md): AST 아키텍처 불변식 정적 계약 테스트 결과 (`test_architecture_contracts.py`)
-* [`SEC-503`](file:///c:/Repos/bist-mini-final/docs/final_report/05_validation_and_conclusion/SEC-503_conclusion_and_roadmap.md): 결론, 기대효과 및 향후 발전 로드맵
-
----
-
-# 📐 [Track 2] 엔지니어링 청사진 규격서 색인 (Blueprints Catalog)
+# 📐 엔지니어링 청사진 규격서 색인 (Blueprints Catalog)
 
 | 도메인 | 청사진 번호 & 문서명 | 핵심 기술 스펙 및 내용 |
 | :--- | :--- | :--- |
