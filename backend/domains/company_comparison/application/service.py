@@ -8,19 +8,19 @@ from backend.contracts.snapshots import (
     VersionedSnapshotRecord,
     VersionedSnapshotRepository,
 )
-from backend.features.bi.evidence import source_cell_value
-from backend.features.bi.materialization_models import BiCompanyIndexEntry
-from backend.features.bi.models import BiDashboardSnapshot, CompanyId
-from backend.features.company_comparison.errors import (
+from backend.domains.company_comparison.errors import (
     ComparisonDataError,
     ComparisonSnapshotIntegrityError,
 )
-from backend.features.company_comparison.models import CompanyComparisonSnapshot
-from backend.features.company_comparison.snapshot_builder import (
+from backend.domains.company_comparison.models import CompanyComparisonSnapshot
+from backend.domains.company_comparison.snapshot_builder import (
     FORECAST_VERSION,
     SCORING_VERSION,
     CompanyComparisonSnapshotBuilder,
 )
+from backend.features.bi.evidence import source_cell_value
+from backend.features.bi.materialization_models import BiCompanyIndexEntry
+from backend.features.bi.models import BiDashboardSnapshot, CompanyId
 
 SNAPSHOT_DOMAIN = "company-comparison"
 SNAPSHOT_SCOPE = "global"

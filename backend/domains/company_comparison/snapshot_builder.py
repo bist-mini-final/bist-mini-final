@@ -619,3 +619,4 @@ __all__ = [
     "BaseFinancials",
     "CompanyComparisonSnapshotBuilder",
 ]
+

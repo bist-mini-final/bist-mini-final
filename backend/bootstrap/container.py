@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from backend.bootstrap.company_comparison import create_company_comparison_service
 from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
@@ -26,9 +27,6 @@ from backend.engine.runtime.services import (
 )
 from backend.engine.workflows import WorkflowExecutionService
 from backend.features.bi.composition import create_bi_services
-from backend.features.company_comparison.composition import (
-    create_company_comparison_service,
-)
 from backend.providers.embeddings.openai import OpenAIEmbeddingEncoder
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.kubernetes_monitor import KubernetesMonitor
