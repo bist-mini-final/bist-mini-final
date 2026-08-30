@@ -12,9 +12,9 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from backend.bootstrap.container import ApplicationContainer
+from backend.domains.bi.application import BiApiServices
 from backend.engine.runtime.registry import ModuleRegistry
 from backend.engine.runtime.services import WorkflowRuntimeServices
-from backend.domains.bi.application import BiApiServices
 
 
 def get_container(request: Request) -> ApplicationContainer:

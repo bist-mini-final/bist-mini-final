@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
+from backend.domains.bi.application import BiApiServices
 from backend.providers.openai_responses import OpenAIResponsesClient
 
-from backend.domains.bi.application import BiApiServices
 from .document_profiler import BiDocumentProfiler
 from .extraction import BiMetricExtractionService
 from .fast_rag_adapter import FastRagPipelineAdapter

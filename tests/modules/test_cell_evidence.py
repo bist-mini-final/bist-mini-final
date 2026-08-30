@@ -47,6 +47,7 @@ def _write_workbook(processed_dir: Path) -> tuple[str, str]:
     workbook_path = processed_dir / file_name
     workbook = Workbook()
     worksheet = workbook.active
+    assert worksheet is not None
     worksheet.title = "Income_Statement"
     worksheet["E16"] = 4836
     workbook.save(workbook_path)

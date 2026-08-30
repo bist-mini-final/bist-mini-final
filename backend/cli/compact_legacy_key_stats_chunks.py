@@ -19,9 +19,9 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 
 from backend.core.settings import PGVECTOR_URL
-
 
 COMPACTION_VERSION = "semantic-title-prune-v1"
 
@@ -240,7 +240,11 @@ def compact(*, apply: bool, rebuild_indexes: bool = True) -> int:
                 for _index_id, collection_uuid, file_name, _before, _remove in rows:
                     index_name = _hnsw_index_name(collection_uuid)
                     print(f"reindexing={file_name} index={index_name}")
-                    cursor.execute(f'REINDEX INDEX CONCURRENTLY "{index_name}";')
+                    cursor.execute(
+                        sql.SQL("REINDEX INDEX CONCURRENTLY {};").format(
+                            sql.Identifier(index_name)
+                        )
+                    )
                 cursor.execute("ANALYZE langchain_pg_embedding;")
 
     with psycopg.connect(_database_url()) as connection:
