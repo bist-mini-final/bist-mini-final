@@ -9,6 +9,7 @@ import { CompanySelector } from './components/CompanySelector';
 import { EvidenceDialog } from './components/EvidenceDialog';
 import { ResetDataDialog } from './components/ResetDataDialog';
 import { ResetLayoutDialog } from './components/ResetLayoutDialog';
+import { SnapshotManager } from './components/SnapshotManager';
 import { getCardDefinition } from './config/cardRegistry';
 import { useBiCompanies } from './hooks/useBiCompanies';
 import { useBiDashboard } from './hooks/useBiDashboard';
@@ -43,9 +44,6 @@ export function BiPage() {
   if (companiesState.status === 'error') {
     return <BiDataState tone="error" title="기업 목록을 불러오지 못했습니다" message={companiesState.message} />;
   }
-  if (companiesState.companies.length === 0) {
-    return <BiDataState tone="empty" title="등록된 기업이 없습니다" message="인덱싱 완료 후 BI materialization을 시작하면 대시보드가 표시됩니다." />;
-  }
   const companySelector = (
     <CompanySelector
       companies={companiesState.companies}
@@ -53,6 +51,14 @@ export function BiPage() {
       selectedName={companySelection.selectedCompany?.displayName ?? ''}
       onRefresh={companiesController.refresh}
       onSelect={companySelection.selectCompany}
+      managementAction={(
+        <SnapshotManager
+          onMaterialized={async (companyId) => {
+            companySelection.selectCompany(companyId);
+            await companiesController.refresh();
+          }}
+        />
+      )}
     />
   );
   const isDashboardReady = dashboardState.status === 'ready';
@@ -85,7 +91,15 @@ export function BiPage() {
       <div className="bi-page__workspace">
         {companySelector}
 
-        {dashboardState.status === 'idle' || dashboardState.status === 'loading' ? (
+        {companiesState.companies.length === 0 ? (
+          <BiDataState
+            tone="empty"
+            title="준비된 기업 스냅샷이 없습니다"
+            message="기업 스냅샷 추가에서 인덱싱이 완료된 기업을 선택해 생성할 수 있습니다."
+          />
+        ) : null}
+        {companiesState.companies.length > 0
+          && (dashboardState.status === 'idle' || dashboardState.status === 'loading') ? (
           <BiDataState
             tone="loading"
             title="대시보드를 불러오는 중입니다"

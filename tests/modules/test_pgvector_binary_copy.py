@@ -14,7 +14,7 @@ from backend.storage.embedding_artifacts import (
     EmbeddingArtifactVectors,
 )
 from backend.storage.pgvector_binary_copy import PgVectorBinaryCopyStream
-from backend.storage.pgvector_store import PgVectorStore, PgVectorStoreError
+from backend.storage.pgvector_store import PgVectorReplacePlan, PgVectorStore, PgVectorStoreError
 
 
 def test_binary_copy_stream_avoids_python_vector_materialization(
@@ -115,6 +115,78 @@ def test_binary_copy_stream_supports_ordinary_vector_sequences() -> None:
         decoded_vectors.append(struct.unpack_from("!2f", fields[2], 4))
 
     assert decoded_vectors == pytest.approx([(0.25, -0.5), (1.0, 0.125)])
+
+
+def test_binary_copy_stream_accepts_retry_stable_document_ids() -> None:
+    stable_ids = [
+        "11111111-1111-5111-8111-111111111111",
+        "22222222-2222-5222-8222-222222222222",
+    ]
+    stream = PgVectorBinaryCopyStream(
+        [
+            Document(page_content="first", metadata={}),
+            Document(page_content="second", metadata={}),
+        ],
+        [[0.25, -0.5], [1.0, 0.125]],
+        "11111111-1111-1111-1111-111111111111",
+        batch_size=2,
+        document_ids=stable_ids,
+    )
+    payload = b"".join(iter(lambda: stream.read(23), b""))
+    stream.close()
+
+    offset = len(b"PGCOPY\n\xff\r\n\x00") + 8
+    emitted: list[str] = []
+    for _ in range(2):
+        field_count = struct.unpack_from("!h", payload, offset)[0]
+        offset += 2
+        for field_index in range(field_count):
+            field_length = struct.unpack_from("!i", payload, offset)[0]
+            offset += 4
+            field = payload[offset : offset + field_length]
+            offset += field_length
+            if field_index == 0:
+                emitted.append(field.decode("utf-8"))
+
+    assert emitted == stable_ids
+
+
+def test_prepared_copy_reuses_deterministic_ids_on_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import backend.storage.pgvector_store as store_module
+
+    copied = MagicMock()
+    monkeypatch.setattr(store_module, "copy_documents", copied)
+    connection = MagicMock()
+    store = PgVectorStore("postgresql://unused")
+    cast(Any, store)._raw_connection = MagicMock(return_value=connection)
+    plan = PgVectorReplacePlan(
+        index_id="idx_target",
+        operation_id="a" * 64,
+        staging_name="idx_target__staging__aaaaaaaaaaaaaaaa",
+        staging_uuid="11111111-1111-1111-1111-111111111111",
+        dimension=2,
+        metadata={"document_count": 2},
+    )
+    documents = [
+        Document(page_content="first", metadata={}),
+        Document(page_content="second", metadata={}),
+    ]
+
+    for _ in range(2):
+        store.copy_prepared_collection_shard(
+            plan,
+            documents=documents,
+            vectors=[[0.1, 0.2], [0.3, 0.4]],
+            start_index=10,
+        )
+
+    first_ids = copied.call_args_list[0].kwargs["document_ids"]
+    second_ids = copied.call_args_list[1].kwargs["document_ids"]
+    assert first_ids == second_ids
+    assert len(set(first_ids)) == 2
+    assert connection.commit.call_count == 2
 
 
 def test_pgvector_store_routes_artifact_vectors_to_binary_copy(

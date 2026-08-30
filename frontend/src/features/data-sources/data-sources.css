@@ -417,7 +417,6 @@
 .ds-badge--green { background: #e7f7ed; color: #117e4e; }
 .ds-badge--gray { background: #f0f3f1; color: #5f6b64; }
 
-/* Action Buttons */
 .ds-actions-row {
   display: inline-flex;
   align-items: center;
@@ -425,52 +424,6 @@
   gap: 0.45rem;
   white-space: nowrap;
   flex-wrap: nowrap;
-}
-
-.ds-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.45rem;
-  background: #ffffff;
-  padding: 0.32rem 0.65rem;
-  color: #334155;
-  font-size: 0.72rem;
-  font-weight: 650;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 140ms ease;
-}
-
-.ds-action-btn:hover {
-  border-color: #94a3b8;
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.ds-action-btn--primary {
-  border-color: #a7f3d0;
-  background: #ecfdf5;
-  color: #065f46;
-}
-
-.ds-action-btn--primary:hover {
-  border-color: #6ee7b7;
-  background: #d1fae5;
-  color: #047857;
-}
-
-.ds-action-btn--danger {
-  border-color: #fecaca;
-  color: #b91c1c;
-}
-
-.ds-action-btn--danger:hover {
-  border-color: #f87171;
-  background: #fef2f2;
-  color: #991b1b;
 }
 
 /* Empty & Loading */
@@ -590,24 +543,6 @@
 .ds-modal__title-wrap small {
   color: #85928a;
   font-size: 0.7rem;
-}
-
-.ds-modal__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.85rem;
-  height: 1.85rem;
-  border: 0;
-  border-radius: 0.45rem;
-  background: transparent;
-  color: #6f7d75;
-  cursor: pointer;
-  transition: background 140ms ease;
-}
-
-.ds-modal__close:hover {
-  background: #f0f4f2;
 }
 
 .ds-modal__body {
@@ -1357,56 +1292,6 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-
-.ds-stop-ingestion-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid #fca5a5;
-  border-radius: 0.45rem;
-  background: #fff;
-  color: #b91c1c;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ds-stop-ingestion-button:hover:not(:disabled) {
-  background: #fef2f2;
-  border-color: #ef4444;
-}
-
-.ds-stop-ingestion-button:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-
-.ds-delete-ingestion-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.7rem;
-  border: 1px solid #fecaca;
-  border-radius: 7px;
-  background: #fff;
-  color: #b91c1c;
-  font-size: 0.76rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ds-delete-ingestion-button:hover:not(:disabled) {
-  background: #fef2f2;
-  border-color: #f87171;
-}
-
-.ds-delete-ingestion-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .ds-batch-progress {

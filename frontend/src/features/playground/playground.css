@@ -81,16 +81,8 @@
 }
 
 .app-header button.app-header__palette-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 1.85rem;
-  width: 1.85rem;
   border-radius: 0.6rem;
-  border: none;
-  background: transparent;
   color: #475569;
-  cursor: pointer;
   transition: all 160ms ease;
 }
 
@@ -197,8 +189,7 @@
   white-space: nowrap;
 }
 
-.icon-button,
-.control-button {
+.icon-button {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -214,69 +205,6 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 0.7rem;
-}
-
-.control-button {
-  display: inline-flex;
-  height: 2.5rem;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  border-radius: 0.85rem;
-  padding: 0 0.85rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  white-space: nowrap;
-  border: 1px solid rgb(226 232 240 / 90%);
-  background: rgb(255 255 255 / 94%);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(14px);
-}
-
-.control-button:hover:not(:disabled) {
-  border-color: var(--brand-200);
-  background: var(--brand-50);
-  color: var(--brand-700);
-}
-
-.control-button--accent {
-  border-color: var(--brand-200);
-  color: var(--brand-700);
-}
-
-.control-button--danger {
-  border-color: #fecdd3;
-  color: #be123c;
-}
-
-.control-button--danger:hover:not(:disabled) {
-  border-color: #fda4af;
-  background: #fff1f2;
-  color: #9f1239;
-}
-
-.control-button--primary {
-  border-color: var(--brand-600);
-  background: var(--brand-600);
-  color: white;
-  box-shadow: 0 8px 18px -12px rgb(16 124 65 / 75%);
-}
-
-.control-button--primary:hover:not(:disabled) {
-  border-color: var(--brand-700);
-  background: var(--brand-700);
-  color: white;
-}
-
-.control-button--primary.is-running {
-  border-color: #be123c;
-  background: #be123c;
-}
-
-.control-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
 }
 
 .execution-stats-panel {
@@ -384,11 +312,8 @@
   box-shadow: 0 4px 16px -4px rgb(146 64 14 / 15%);
 }
 
-.error-banner button {
-  border: 0;
-  background: transparent;
+.error-banner__close {
   color: currentColor;
-  cursor: pointer;
 }
 
 .app-workspace {
@@ -487,17 +412,7 @@
 
 .module-palette__close {
   display: none;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  flex: none;
-  border: 1px solid rgb(226 232 240 / 80%);
-  border-radius: 0.55rem;
-  background: transparent;
   color: #64748b;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
 }
 
 .module-palette__close:hover {
@@ -823,6 +738,24 @@
 .react-flow__handle:hover {
   background: var(--brand-600);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-600) 18%, transparent);
+}
+
+.workflow-edge__activity-path {
+  pointer-events: none;
+  stroke-dasharray: 7 11;
+  filter: drop-shadow(0 0 3px rgb(16 185 129 / 55%));
+  animation: workflow-edge-flow 0.7s linear infinite;
+}
+
+.workflow-edge__packet {
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgb(16 185 129 / 80%));
+}
+
+@keyframes workflow-edge-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
 }
 
 .flow-node {
@@ -1437,14 +1370,14 @@
     padding-inline: 0.5rem;
   }
 
-  .control-button {
+  .app-header__actions .ui-button {
     width: 2rem;
     height: 2rem;
     min-height: 2rem;
     padding: 0;
   }
 
-  .control-button span {
+  .app-header__actions .ui-button span {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1481,6 +1414,15 @@
   .app-header__actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .app-header__brand-card > .ui-button:not(.ui-button--icon) span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .step-progress {

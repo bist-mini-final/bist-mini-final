@@ -8,6 +8,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { Button, IconButton } from '../shared/ui';
 import type { AppRoute } from './routes';
 import { APP_ROUTES } from './routes';
 import { AppLink } from './router';
@@ -49,14 +50,15 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
 
   return (
     <div className={clsx('product-shell', isSidebarCollapsed && 'product-shell--collapsed')}>
-      <button
+      <IconButton
         className="product-mobile-trigger"
+        variant="secondary"
         type="button"
         onClick={() => setIsMobileNavOpen(true)}
         aria-label="메뉴 열기"
       >
         <Menu size={19} />
-      </button>
+      </IconButton>
 
       <aside
         className={clsx(
@@ -141,8 +143,9 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
             <ArrowUpRight className="product-sidebar__docs-arrow" size={14} aria-hidden="true" />
           </a>
 
-          <button
+          <Button
             className="product-sidebar__toggle-footer"
+            variant="ghost"
             type="button"
             onClick={toggleSidebar}
             aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
@@ -156,7 +159,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
                 <span>사이드바 접기</span>
               </>
             )}
-          </button>
+          </Button>
         </div>
       </aside>
 

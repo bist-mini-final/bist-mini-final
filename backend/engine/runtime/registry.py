@@ -4,6 +4,7 @@ from typing import Callable, Iterable
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
 from backend.providers.embeddings.ports import EmbeddingEncoder
 from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
@@ -44,6 +45,7 @@ class ModuleRegistry(BaseModuleRegistry):
         completion_client: OpenAIResponsesClient,
         embedding_encoder: EmbeddingEncoder,
         embedding_artifact_store: EmbeddingArtifactStore,
+        ingestion_shard_coordinator: IngestionShardCoordinator | None = None,
         pgvector_store: PgVectorStore,
         db_manager: DatabaseManager,
         processed_dir: Path = PROCESSED_DATA_DIR,
@@ -94,6 +96,7 @@ class ModuleRegistry(BaseModuleRegistry):
                     CellTextEmbedderModule,
                     encoder=embedding_encoder,
                     artifact_store=embedding_artifact_store,
+                    shard_coordinator=ingestion_shard_coordinator,
                 ),
                 self._factory(
                     PgVectorIndexWriterModule,
@@ -102,6 +105,7 @@ class ModuleRegistry(BaseModuleRegistry):
                     pgvector_store=self.pgvector_store,
                     embedding_encoder=embedding_encoder,
                     processed_dir=processed_dir,
+                    shard_coordinator=ingestion_shard_coordinator,
                 ),
                 self._factory(
                     ProcessedFileSelectorModule,

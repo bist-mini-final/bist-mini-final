@@ -46,6 +46,7 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         *,
         batch_size: int,
         progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
+        document_ids: Optional[Sequence[str]] = None,
     ) -> None:
         super().__init__()
         if len(documents) != len(vectors):
@@ -66,6 +67,9 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         self._collection_uuid = UUID(collection_uuid).bytes
         self._batch_size = max(1, batch_size)
         self._progress_callback = progress_callback
+        if document_ids is not None and len(document_ids) != len(documents):
+            raise ModuleExecutionError("COPY document ID 개수가 문서 개수와 일치하지 않습니다")
+        self._document_ids = document_ids
         self._raw_batches: Iterator[bytes] | None = (
             vectors.iter_raw_batches(self._batch_size)
             if isinstance(vectors, EmbeddingArtifactVectors)
@@ -173,9 +177,14 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         document = self._documents[self._document_index]
         vector_bytes = self._next_vector()
         # The embedding table primary key is global, not scoped by collection.
-        # A staging rebuild therefore needs fresh row IDs even when the logical
-        # Document IDs match rows in the currently published collection.
-        document_id = str(uuid4()).encode("utf-8")
+        # Monolithic rebuilds use fresh IDs. Distributed staging passes UUIDv5
+        # IDs namespaced by collection UUID so retries replace the same range
+        # while remaining disjoint from the published collection.
+        document_id = (
+            self._document_ids[self._document_index]
+            if self._document_ids is not None
+            else str(uuid4())
+        ).encode("utf-8")
         document_text = document.page_content.encode("utf-8")
         metadata_json = json.dumps(
             document.metadata or {},
@@ -276,6 +285,7 @@ def copy_documents(
     vectors: EmbeddingArtifactVectors | Sequence[Sequence[float]],
     batch_size: int,
     progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
+    document_ids: Optional[Sequence[str]] = None,
 ) -> None:
     """Stream documents and vectors into an empty collection using Binary COPY."""
     stream = PgVectorBinaryCopyStream(
@@ -284,6 +294,7 @@ def copy_documents(
         collection_uuid,
         batch_size=batch_size,
         progress_callback=progress_callback,
+        document_ids=document_ids,
     )
     try:
         with connection.cursor() as cursor:

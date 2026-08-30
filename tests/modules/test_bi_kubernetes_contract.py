@@ -4,14 +4,26 @@ import importlib
 import unittest
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import MagicMock, call, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.features.bi.api_routes import create_bi_router
 from backend.features.bi.api_services import BiApiServices
-from backend.features.bi.database_schema import BI_SCHEMA_SQL
-from backend.features.bi.models import BiMaterializationJob
+from backend.features.bi.database_schema import (
+    BI_SCHEMA_LOCK_KEY,
+    BI_SCHEMA_SQL,
+    ensure_bi_schema,
+)
+from backend.features.bi.materialization_models import BiCompanyIndexEntry
+from backend.features.bi.models import (
+    BiCompany,
+    BiMaterializationJob,
+    BiMaterializationSource,
+    CompanyId,
+    IndexId,
+)
 from jobs import BI_MATERIALIZATION_JOB, BI_QUESTION_JOB
 
 
@@ -23,6 +35,7 @@ class FixedClock:
 class RecordingBiStore:
     def __init__(self) -> None:
         self.enqueued: list[BiMaterializationJob] = []
+        self.entries: tuple[BiCompanyIndexEntry, ...] = ()
 
     def find_latest_job(self, *_args: object) -> None:
         raise AssertionError("async API must not call sync find_latest_job")
@@ -46,6 +59,15 @@ class RecordingBiStore:
 
     def list_companies(self) -> tuple[()]:
         return ()
+
+    async def list_companies_async(self) -> tuple[BiCompanyIndexEntry, ...]:
+        return self.entries
+
+    async def get_current_many_async(self, *_args: object) -> dict[object, object]:
+        return {}
+
+    async def get_latest_jobs_async(self, *_args: object) -> dict[object, object]:
+        return {}
 
 
 class UnusedQuestions:
@@ -78,6 +100,31 @@ class BiKubernetesContractTests(unittest.TestCase):
         ):
             self.assertIn(f"CREATE TABLE IF NOT EXISTS {table}", BI_SCHEMA_SQL)
 
+    def test_bi_schema_bootstrap_has_a_stable_cross_process_lock_key(self) -> None:
+        self.assertEqual(BI_SCHEMA_LOCK_KEY, "bist:bi-schema:v1")
+
+    def test_bi_schema_bootstrap_takes_lock_before_running_ddl(self) -> None:
+        pooled = MagicMock()
+        connection = pooled.__enter__.return_value
+        cursor = connection.cursor.return_value.__enter__.return_value
+
+        with patch(
+            "backend.features.bi.database_schema.get_pooled_raw_connection",
+            return_value=pooled,
+        ):
+            ensure_bi_schema("postgresql://example")
+
+        cursor.execute.assert_has_calls(
+            [
+                call(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s));",
+                    (BI_SCHEMA_LOCK_KEY,),
+                ),
+                call(BI_SCHEMA_SQL),
+            ]
+        )
+        connection.commit.assert_called_once_with()
+
     def test_materialization_api_only_enqueues_and_returns_accepted(self) -> None:
         store = RecordingBiStore()
         services = BiApiServices(
@@ -105,6 +152,38 @@ class BiKubernetesContractTests(unittest.TestCase):
         self.assertEqual(len(store.enqueued), 1)
         self.assertEqual(store.enqueued[0].status.value, "queued")
         self.assertEqual(response.json()["job_id"], str(store.enqueued[0].job_id))
+
+    def test_candidate_api_exposes_snapshotless_index_without_changing_dashboard_filter(
+        self,
+    ) -> None:
+        store = RecordingBiStore()
+        store.entries = (
+            BiCompanyIndexEntry(
+                company=BiCompany(
+                    company_id=CompanyId("amesoft"),
+                    display_name="AmeSoft",
+                ),
+                source=BiMaterializationSource(
+                    file_name="amesoft.xlsx",
+                    workbook_hash="b" * 64,
+                    index_id=IndexId("index-amesoft"),
+                ),
+            ),
+        )
+        services = BiApiServices(
+            store=store,  # type: ignore[arg-type]
+            materializations=store,  # type: ignore[arg-type]
+            clock=FixedClock(),
+            questions=UnusedQuestions(),  # type: ignore[arg-type]
+        )
+        app = FastAPI()
+        app.include_router(create_bi_router(services))
+
+        response = TestClient(app).get("/bi/materialization-candidates")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["candidates"][0]["company_id"], "amesoft")
+        self.assertEqual(response.json()["candidates"][0]["reason"], "not_created")
 
 
 if __name__ == "__main__":

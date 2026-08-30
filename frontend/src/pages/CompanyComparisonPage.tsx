@@ -19,37 +19,39 @@ import {
   YAxis,
 } from 'recharts';
 import { AppLink } from '../app/router';
-import { CompanyLogoBadge } from '../features/company-comparison-v2/CompanyLogoBadge';
+import { Button } from '../shared/ui';
+import { CompanyLogoBadge } from '../features/company-comparison/CompanyLogoBadge';
 import {
   BenchmarkScatterTooltip,
   ComparisonTrendChart,
   FinancialTrendChart,
   renderBenchmarkScatterMarker,
   type BenchmarkScatterPoint,
-} from '../features/company-comparison-v2/LeagueCharts';
+} from '../features/company-comparison/CompanyComparisonCharts';
 import {
   formatAmount,
-  historicalCandles,
+  forecastPeriods,
+  historicalPeriods,
   indexedSeries,
   percentChange,
   rankReason,
   SCORE_DIMENSIONS,
   scoreRank,
   signedPoint,
-} from '../features/company-comparison-v2/leagueAnalysis';
+} from '../features/company-comparison/analysis';
 import {
   RANKING_METRICS,
-  latestHistoricalCandle,
+  latestHistoricalPeriod,
   orderForDisplay,
   rankCompaniesByComposite,
   rankCompaniesByMetric,
   toggleCompanySelection,
   type DisplayDirection,
   type RankingMetric,
-} from '../features/company-comparison-v2/metricRanking';
-import { useFinancialLeague } from '../features/company-comparison-v2/useFinancialLeague';
-import type { LeagueCompany } from '../features/company-comparison-v2/leagueTypes';
-import '../features/company-comparison-v2/financial-league.css';
+} from '../features/company-comparison/metricRanking';
+import { useCompanyComparisonSnapshot } from '../features/company-comparison/useCompanyComparisonSnapshot';
+import type { ComparisonCompany } from '../features/company-comparison/types';
+import '../features/company-comparison/company-comparison.css';
 
 const FACTOR_LABELS: Record<'Overall' | 'Revenue' | 'Profit' | 'Growth', string> = {
   Overall: '종합순위',
@@ -58,9 +60,9 @@ const FACTOR_LABELS: Record<'Overall' | 'Revenue' | 'Profit' | 'Growth', string>
   Growth: '성장률',
 };
 
-export function CompanyComparisonV2Page() {
+export function CompanyComparisonPage() {
   const [reloadKey, setReloadKey] = useState(0);
-  const state = useFinancialLeague(reloadKey);
+  const state = useCompanyComparisonSnapshot(reloadKey);
 
   const [rankingMetric, setRankingMetric] = useState<RankingMetric>('composite');
   const [displayDirection, setDisplayDirection] = useState<DisplayDirection>('best-first');
@@ -100,28 +102,25 @@ export function CompanyComparisonV2Page() {
 
   const metricDirectionLabel = displayDirection === 'best-first' ? '높은 순' : '낮은 순';
   const activeRankingLabel = `${RANKING_METRICS[rankingMetric].label} 순위`;
-  const averageCagr = filteredCompanies.length
-    ? filteredCompanies.reduce((sum, company) => sum + company.revenueCagr, 0) / filteredCompanies.length
-    : 0;
-  const averageMargin = filteredCompanies.length
-    ? filteredCompanies.reduce((sum, company) => sum + company.operatingMargin, 0) / filteredCompanies.length
-    : 0;
-  const averageDebtRatio = filteredCompanies.length
-    ? filteredCompanies.reduce((sum, company) => sum + company.liabilitiesToAssets, 0) / filteredCompanies.length
+  const averageCagr = state.status === 'ready' ? state.data.spotlight.averageCagr : 0;
+  const averageMargin = state.status === 'ready' ? state.data.spotlight.averageMargin : 0;
+  const averageDebtRatio = state.status === 'ready'
+    ? state.data.spotlight.averageLiabilitiesToAssets
     : 0;
   const officialRankByCompanyId = new Map(
     officialRankedCompanies.map(({ company, rank }) => [company.companyId, rank]),
   );
   const selectedCompanies = Array.from(selectedCompanyIds)
     .map((companyId) => filteredCompanies.find((company) => company.companyId === companyId))
-    .filter((company): company is LeagueCompany => Boolean(company));
+    .filter((company): company is ComparisonCompany => Boolean(company));
   const focusedCompany = filteredCompanies.find((company) => company.companyId === focusedCompanyId);
   const analysisCompany = selectedCompanies.length === 1
     ? selectedCompanies[0]
     : focusedCompany ?? officialRankedCompanies[0]?.company;
   const comparisonCompanies = selectedCompanies.length === 2 ? selectedCompanies : [];
-  const analysisCandles = analysisCompany ? historicalCandles(analysisCompany) : [];
-  const comparisonCandles = comparisonCompanies.map(historicalCandles);
+  const analysisPeriods = analysisCompany ? historicalPeriods(analysisCompany) : [];
+  const analysisForecastPeriods = analysisCompany ? forecastPeriods(analysisCompany) : [];
+  const comparisonPeriods = comparisonCompanies.map(historicalPeriods);
   const analysisReasons = analysisCompany ? rankReason(analysisCompany, filteredCompanies) : [];
   const benchmarkScatterData: readonly BenchmarkScatterPoint[] = filteredCompanies.map((company) => ({
     companyId: company.companyId,
@@ -141,7 +140,7 @@ export function CompanyComparisonV2Page() {
     return (
       <main className="financial-league-page league-loading" aria-live="polite">
         <RefreshCw size={24} className="spin" />
-        <strong>2021~2025 기업 실적 벤치마크 데이터를 분석하고 있습니다...</strong>
+        <strong>기업 비교 스냅샷을 불러오고 있습니다...</strong>
       </main>
     );
   }
@@ -152,9 +151,9 @@ export function CompanyComparisonV2Page() {
         <AlertCircle size={28} color="#dc2626" />
         <strong>데이터 로드 실패</strong>
         <p>{state.message}</p>
-        <button type="button" onClick={() => setReloadKey((k) => k + 1)}>
-          다시 시도
-        </button>
+        <Button variant="primary" type="button" onClick={() => setReloadKey((k) => k + 1)}>
+          스냅샷 생성
+        </Button>
       </main>
     );
   }
@@ -163,14 +162,24 @@ export function CompanyComparisonV2Page() {
     <main className="financial-league-page" aria-label="기업 랭킹 리그 화면">
       <header className="league-page-heading">
         <div>
-          <span className="league-page-eyebrow">FINANCIAL LEAGUE</span>
+          <span className="league-page-eyebrow">COMPANY COMPARISON</span>
           <div className="league-page-title-row">
-            <h1>AI 기업 비교</h1>
+            <h1>기업 비교</h1>
             <span>{filteredCompanies.length}개 기업</span>
           </div>
-          <p>2021~2025 재무 성과를 동일 기준으로 비교하고 성장성·수익성·안정성을 함께 확인합니다.</p>
+          <p>{state.data.historicalStartYear}~{state.data.historicalEndYear} 관측 재무 성과와 명시된 예측 가정을 기준으로 성장성·수익성·안정성을 비교합니다.</p>
         </div>
+        <Button type="button" onClick={() => setReloadKey((key) => key + 1)}>
+          <RefreshCw size={14} /> 스냅샷 새로고침
+        </Button>
       </header>
+
+      {state.data.snapshot.status === 'partial' && (
+        <section className="comparison-state-card comparison-state-card--error" role="status">
+          <AlertCircle size={20} />
+          <div><strong>일부 기업이 비교에서 제외되었습니다.</strong><p>{state.data.exclusions.map((item) => item.displayName).join(', ')}</p></div>
+        </section>
+      )}
 
       {/* =========================================================================
           1. Top Control Bar: Ranking Controls | Live Sorting
@@ -243,7 +252,7 @@ export function CompanyComparisonV2Page() {
                   {([
                     ['revenue', '매출액'],
                     ['operatingIncome', '영업이익'],
-                    ['revenueCagr', '5개년 매출 성장률'],
+                    ['revenueCagr', '관측 구간 매출 성장률'],
                     ['operatingMargin', '영업이익률'],
                   ] as const).map(([metric, label]) => (
                     <th
@@ -279,7 +288,7 @@ export function CompanyComparisonV2Page() {
                 {displayedCompanies.map(({ company, rank }) => {
                   const isFocused = company.companyId === focusedCompanyId;
                   const isSelected = selectedCompanyIds.has(company.companyId);
-                  const latest = latestHistoricalCandle(company);
+                  const latest = latestHistoricalPeriod(company);
 
                   return (
                     <tr
@@ -350,7 +359,7 @@ export function CompanyComparisonV2Page() {
                             : company.revenueCagr < 0
                               ? 'is-negative'
                               : 'is-neutral'}`}
-                          aria-label={`5개년 매출 성장률 ${company.revenueCagr.toFixed(1)}%, ${company.revenueCagr > 0
+                          aria-label={`관측 구간 매출 성장률 ${company.revenueCagr.toFixed(1)}%, ${company.revenueCagr > 0
                             ? '상승'
                             : company.revenueCagr < 0
                               ? '하락'
@@ -464,16 +473,16 @@ export function CompanyComparisonV2Page() {
 
                 <div className="analysis-section-block trend-section">
                   <div className="analysis-section-title">
-                    <strong>2021~2025 매출 추이</strong>
-                    <span>2021년=100 지수</span>
+                    <strong>공통 관측 기간 매출 추이</strong>
+                    <span>{comparisonPeriods[0]?.[0]?.year ?? '기준연도'}년=100 지수</span>
                   </div>
                   <div className="comparison-trend-legend">
                     <span><i className="is-a" />A {comparisonCompanies[0].displayName}</span>
                     <span><i className="is-b" />B {comparisonCompanies[1].displayName}</span>
                   </div>
                   <ComparisonTrendChart
-                    first={indexedSeries(comparisonCandles[0].map((candle) => candle.revenue))}
-                    second={indexedSeries(comparisonCandles[1].map((candle) => candle.revenue))}
+                    first={indexedSeries(comparisonPeriods[0])}
+                    second={indexedSeries(comparisonPeriods[1])}
                   />
                 </div>
               </>
@@ -484,7 +493,7 @@ export function CompanyComparisonV2Page() {
                     <CompanyLogoBadge companyId={analysisCompany.companyId} companyName={analysisCompany.displayName} size={30} />
                     <div>
                       <strong title={analysisCompany.displayName}>{analysisCompany.displayName}</strong>
-                      <span>19개 기업 중 종합 {officialRankByCompanyId.get(analysisCompany.companyId)}위</span>
+                      <span>{filteredCompanies.length}개 기업 중 종합 {officialRankByCompanyId.get(analysisCompany.companyId)}위</span>
                     </div>
                   </div>
                   <div className="analysis-total-score">
@@ -519,7 +528,7 @@ export function CompanyComparisonV2Page() {
 
                 <div className="analysis-section-block">
                   <div className="analysis-section-title">
-                    <strong>19개 기업 평균 대비</strong>
+                    <strong>{filteredCompanies.length}개 기업 평균 대비</strong>
                     <span>현재 기업 / 전체 평균 / 차이</span>
                   </div>
                   <div className="benchmark-compare-list">
@@ -546,23 +555,23 @@ export function CompanyComparisonV2Page() {
 
                 <div className="analysis-section-block trend-section">
                   <div className="analysis-section-title">
-                    <strong>2021~2025 핵심 추이</strong>
+                    <strong>{analysisCompany.historicalStartYear}~{analysisCompany.historicalEndYear} 핵심 추이</strong>
                     <span>실적 방향성</span>
                   </div>
                   {[
-                    { label: '매출', values: analysisCandles.map((candle) => candle.revenue), color: '#107c41', gradientId: 'revenue-trend-fill' },
-                    { label: '영업이익', values: analysisCandles.map((candle) => candle.operatingIncome), color: '#2563eb', gradientId: 'profit-trend-fill' },
+                    { label: '매출', points: analysisPeriods.map((period) => ({ year: period.year, value: period.revenue })), color: '#107c41', gradientId: 'revenue-trend-fill' },
+                    { label: '영업이익', points: analysisPeriods.map((period) => ({ year: period.year, value: period.operatingIncome })), color: '#2563eb', gradientId: 'profit-trend-fill' },
                   ].map((metric) => {
-                    const change = percentChange(metric.values);
+                    const change = percentChange(metric.points.map((point) => point.value));
                     return (
                       <div className="single-trend-row" key={metric.label}>
                         <div>
                           <span>{metric.label}</span>
-                          <strong>{formatAmount(metric.values[metric.values.length - 1] ?? 0, analysisCompany)}</strong>
+                          <strong>{formatAmount(metric.points[metric.points.length - 1]?.value ?? 0, analysisCompany)}</strong>
                           <small className={change !== null && change < 0 ? 'is-down' : ''}>{change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</small>
                         </div>
                         <FinancialTrendChart
-                          values={metric.values}
+                          points={metric.points}
                           color={metric.color}
                           gradientId={metric.gradientId}
                           label={metric.label}
@@ -572,6 +581,45 @@ export function CompanyComparisonV2Page() {
                     );
                   })}
                 </div>
+
+                {analysisForecastPeriods.length > 0 && (
+                  <div className="analysis-section-block trend-section">
+                    <div className="analysis-section-title">
+                      <strong>{analysisForecastPeriods[0].year}~{analysisForecastPeriods[analysisForecastPeriods.length - 1].year} 가정 기반 전망</strong>
+                      <span>순위 점수에는 미반영</span>
+                    </div>
+                    <div className="single-trend-row">
+                      <div>
+                        <span>예상 매출</span>
+                        <strong>{formatAmount(analysisForecastPeriods[analysisForecastPeriods.length - 1].revenue, analysisCompany)}</strong>
+                        <small>FORECAST</small>
+                      </div>
+                      <FinancialTrendChart
+                        points={[
+                          ...(analysisPeriods.length > 0
+                            ? [{
+                                year: analysisPeriods[analysisPeriods.length - 1].year,
+                                value: analysisPeriods[analysisPeriods.length - 1].revenue,
+                              }]
+                            : []),
+                          ...analysisForecastPeriods.map((period) => ({
+                            year: period.year,
+                            value: period.revenue,
+                          })),
+                        ]}
+                        color="#7c3aed"
+                        gradientId="forecast-revenue-fill"
+                        label="가정 기반 예상 매출"
+                        valueFormatter={(value) => formatAmount(value, analysisCompany)}
+                      />
+                    </div>
+                    <p className="comparison-forecast-note">
+                      {state.data.assumptions.find(
+                        (item) => item.assumptionId === analysisForecastPeriods[0].assumptionId,
+                      )?.description}
+                    </p>
+                  </div>
+                )}
               </>
             ) : null}
           </section>
@@ -580,7 +628,7 @@ export function CompanyComparisonV2Page() {
             <div className="distribution-title-row">
               <div>
                 <span className="distribution-main-title">성장성 × 수익성 포지션</span>
-                <p className="distribution-description">선택 기업이 전체 19개 기업에서 어디에 위치하는지 확인하세요.</p>
+                <p className="distribution-description">선택 기업이 전체 {filteredCompanies.length}개 기업에서 어디에 위치하는지 확인하세요.</p>
               </div>
               <span className="distribution-scope">{filteredCompanies.length}개 기업</span>
             </div>
@@ -659,7 +707,7 @@ export function CompanyComparisonV2Page() {
       <footer className="league-bottom-status-bar" aria-label="데이터 상태">
         <div className="footer-left-links">
           <span className="footer-link-item">
-            <Database size={11} /> 데이터 출처: 파싱 기준기업 4개 + 재무 시나리오 기업 15개
+            <Database size={11} /> 데이터 출처: 검증된 BI 스냅샷 {state.data.snapshot.sourceSnapshotIds.length}개 · 원본 셀 근거 {state.data.evidence.length}건
           </span>
           <span className="footer-link-item">
             <RefreshCw size={11} /> 현재 순위: {RANKING_METRICS[rankingMetric].label} 기준 · {metricDirectionLabel}
@@ -667,7 +715,7 @@ export function CompanyComparisonV2Page() {
         </div>
         <div className="footer-right-time">
           <span className="footer-link-item">
-            <Clock size={11} /> 최종 업데이트: {new Date(state.data.generatedAt).toLocaleString('ko-KR')}
+            <Clock size={11} /> 최종 업데이트: {new Date(state.data.snapshot.generatedAt).toLocaleString('ko-KR')}
           </span>
         </div>
       </footer>

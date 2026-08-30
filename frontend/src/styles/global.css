@@ -61,6 +61,18 @@
   --shadow-card: 0 4px 16px -4px rgba(16, 124, 65, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-float: 0 12px 32px -6px rgba(16, 124, 65, 0.16), 0 4px 12px rgba(0, 0, 0, 0.06);
   --header-h: 4.75rem;
+
+  /* Shared interaction geometry */
+  --control-h-sm: 2.25rem;
+  --control-h-md: 2.5rem;
+  --control-h-lg: 2.75rem;
+  --control-radius: 0.625rem;
+  --control-pad-sm: 0.65rem;
+  --control-pad-md: 0.85rem;
+  --control-pad-lg: 1rem;
+  --control-font-sm: 0.68rem;
+  --control-font-md: 0.75rem;
+  --control-font-lg: 0.8rem;
 }
 
 * {

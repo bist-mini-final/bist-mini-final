@@ -115,6 +115,34 @@ workerJobs:
          OR (status IN ('profiling', 'extracting')
              AND (heartbeat_at IS NULL
                   OR heartbeat_at < NOW() - (180 * INTERVAL '1 second')))
+  - name: ingestion-embedding
+    appName: ingestion-embedding-worker
+    queue: ingestion-embedding
+    module: backend.storage.data_sources.embedding_shard_worker_main
+    args: []
+    activeDeadlineSeconds: 900
+    mountData: true
+    maxReplicaCount: 4
+    query: |-
+      SELECT COUNT(*) FROM ingestion_shards
+      WHERE phase = 'embedding'
+        AND ((status = 'queued' AND available_at <= NOW())
+          OR (status = 'running' AND (heartbeat_at IS NULL
+            OR heartbeat_at < NOW() - (180 * INTERVAL '1 second'))))
+  - name: ingestion-vector
+    appName: ingestion-vector-worker
+    queue: ingestion-vector
+    module: backend.storage.data_sources.vector_shard_worker_main
+    args: []
+    activeDeadlineSeconds: 1800
+    mountData: true
+    maxReplicaCount: 2
+    query: |-
+      SELECT COUNT(*) FROM ingestion_shards
+      WHERE phase = 'vector_copy'
+        AND ((status = 'queued' AND available_at <= NOW())
+          OR (status = 'running' AND (heartbeat_at IS NULL
+            OR heartbeat_at < NOW() - (180 * INTERVAL '1 second'))))
   - name: bi-question
     appName: bi-question-worker
     queue: bi-question

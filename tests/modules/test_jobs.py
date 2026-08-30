@@ -17,6 +17,8 @@ from jobs import (
     BI_METRIC_EXTRACTION_JOB,
     BI_QUESTION_JOB,
     EXCEL_INGESTION_JOB,
+    INGESTION_EMBEDDING_SHARD_JOB,
+    INGESTION_VECTOR_SHARD_JOB,
     RAG_QUERY_JOB,
     DagJobDefinition,
     WorkerJobDefinition,
@@ -27,13 +29,21 @@ from tests.modules.registry_factory import create_test_registry
 
 class JobsDefinitionTests(unittest.TestCase):
     def test_all_jobs_registered(self) -> None:
-        self.assertEqual(len(ALL_JOBS), 6)
+        self.assertEqual(len(ALL_JOBS), 8)
         self.assertEqual(get_job_definition("excel_ingestion"), EXCEL_INGESTION_JOB)
         self.assertEqual(get_job_definition("bi_materialization"), BI_MATERIALIZATION_JOB)
         self.assertEqual(get_job_definition("bi_question"), BI_QUESTION_JOB)
         self.assertEqual(get_job_definition("bi_metric_extraction"), BI_METRIC_EXTRACTION_JOB)
         self.assertEqual(get_job_definition("benchmark"), BENCHMARK_JOB)
         self.assertEqual(get_job_definition("rag_query"), RAG_QUERY_JOB)
+        self.assertEqual(
+            get_job_definition("ingestion_embedding_shard"),
+            INGESTION_EMBEDDING_SHARD_JOB,
+        )
+        self.assertEqual(
+            get_job_definition("ingestion_vector_shard"),
+            INGESTION_VECTOR_SHARD_JOB,
+        )
 
     def test_jobs_define_a_dag_or_worker_entrypoint(self) -> None:
         for job in ALL_JOBS:

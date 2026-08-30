@@ -77,6 +77,9 @@ describe('pipelineFromIngestionJob', () => {
       total_batches: 10,
       completed_items: 6144,
       total_items: 20000,
+      execution_mode: 'kubernetes_shards',
+      running_jobs: 4,
+      queued_jobs: 3,
     };
     const pipeline = pipelineFromIngestionJob(job);
 
@@ -104,6 +107,11 @@ describe('pipelineFromIngestionJob', () => {
       workerActive: true,
     });
     expect(pipeline.modules[2].sublogs[0].msg).toContain('3/10 배치 완료');
+    expect(pipeline.modules[2].metaInfo).toMatchObject({
+      '실행 방식': 'Kubernetes 샤드 Job',
+      '실행 중 Job': 4,
+      '대기 Job': 3,
+    });
   });
 
   it('safely skips missing batch node IDs or missing nodes entries', () => {

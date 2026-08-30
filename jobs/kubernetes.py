@@ -19,6 +19,7 @@ class KubernetesWorkerSpec:
     active_deadline_seconds: int
     arguments: tuple[str, ...] = ()
     mount_data_volume: bool = False
+    max_replica_count: int | None = None
 
 
 def _workflow_pending_query(queue_name: str) -> str:
@@ -54,6 +55,7 @@ def kubernetes_worker_specs(
             pending_query=dedent(_workflow_pending_query(queue_name)).strip(),
             active_deadline_seconds=21_600,
             mount_data_volume=True,
+            max_replica_count=None,
         )
         for queue_name in dag_queues
     ]
@@ -66,6 +68,7 @@ def kubernetes_worker_specs(
             pending_query=dedent(job.kubernetes.pending_query).strip(),
             active_deadline_seconds=job.kubernetes.active_deadline_seconds,
             mount_data_volume=job.kubernetes.mount_data_volume,
+            max_replica_count=job.kubernetes.max_replica_count,
         )
         for job in definitions
         if isinstance(job, WorkerJobDefinition)

@@ -10,7 +10,7 @@ metadata:
 spec:
   pollingInterval: {{ $.Values.keda.pollingInterval }}
   minReplicaCount: 0
-  maxReplicaCount: {{ $.Values.keda.maxReplicaCount }}
+  maxReplicaCount: {{ default $.Values.keda.maxReplicaCount $job.maxReplicaCount }}
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
   rollout:
@@ -68,6 +68,8 @@ spec:
                 value: "1"
               - name: DB_POOL_MAX_SIZE
                 value: "4"
+              - name: INGESTION_SHARDS_ENABLED
+                value: "true"
             resources:
               {{- toYaml $.Values.keda.workerResources | nindent 14 }}
             {{- if and $job.mountData (or $.Values.storage.existingClaim $.Values.storage.hostPath) }}

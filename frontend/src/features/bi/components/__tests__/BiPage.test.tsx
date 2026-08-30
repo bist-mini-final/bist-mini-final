@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BiPage } from '../../BiPage';
 import { DASHBOARD_FIXTURES } from '../../../../test/fixtures/biDashboardFixtures';
 import {
+  createBiMaterialization,
   fetchBiCompanies,
   fetchBiDashboard,
+  fetchBiMaterializationCandidates,
   refreshBiDashboard,
   resetBiDashboard,
   streamBiMaterializationJob,
@@ -15,6 +17,8 @@ vi.mock('../../services/api', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../services/api')>(),
   fetchBiCompanies: vi.fn(),
   fetchBiDashboard: vi.fn(),
+  fetchBiMaterializationCandidates: vi.fn(),
+  createBiMaterialization: vi.fn(),
   refreshBiDashboard: vi.fn(),
   resetBiDashboard: vi.fn(),
   streamBiMaterializationJob: vi.fn(),
@@ -38,6 +42,12 @@ describe('BiPage Component', () => {
     vi.clearAllMocks();
     localStorage.clear();
     vi.mocked(fetchBiCompanies).mockResolvedValue(companyResponse);
+    vi.mocked(fetchBiMaterializationCandidates).mockResolvedValue({ candidates: [] });
+    vi.mocked(createBiMaterialization).mockResolvedValue({
+      jobId: 'job-new-company',
+      status: 'queued',
+      publishedSnapshotId: null,
+    });
     vi.mocked(refreshBiDashboard).mockResolvedValue(DASHBOARD_FIXTURES[0]);
     vi.mocked(resetBiDashboard).mockResolvedValue({
       jobId: 'question-job-refresh',
@@ -107,6 +117,53 @@ describe('BiPage Component', () => {
     expect(screen.getByText('재무 안정성')).toBeInTheDocument();
     expect(screen.getByText('재무 규모')).toBeInTheDocument();
     expect(fetchBiCompanies).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a selected snapshot candidate and refreshes the filtered company list', async () => {
+    vi.mocked(fetchBiMaterializationCandidates).mockResolvedValue({
+      candidates: [{
+        companyId: 'amesoft',
+        displayName: 'AmeSoft',
+        source: {
+          fileName: 'amesoft.xlsx',
+          workbookHash: 'b'.repeat(64),
+          indexId: 'index-amesoft',
+        },
+        reason: 'not_created',
+      }],
+    });
+    vi.mocked(streamBiMaterializationJob).mockResolvedValue({
+      jobId: 'job-new-company',
+      companyId: 'amesoft',
+      workbookHash: 'b'.repeat(64),
+      status: 'ready',
+      completedRequests: 10,
+      totalRequests: 10,
+      publishedSnapshotId: 'snapshot-amesoft',
+      errorCode: null,
+      message: '완료',
+      startedAt: '2026-08-29T00:00:00Z',
+      updatedAt: '2026-08-29T00:01:00Z',
+    });
+
+    render(<BiPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '기업 스냅샷 추가' }));
+    const dialog = await screen.findByRole('dialog', { name: '기업 스냅샷 추가' });
+    fireEvent.click(await within(dialog).findByRole('option', { name: /AmeSoft/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '선택 기업 생성' }));
+
+    await waitFor(() => expect(createBiMaterialization).toHaveBeenCalledWith({
+      companyId: 'amesoft',
+      displayName: 'AmeSoft',
+      source: {
+        fileName: 'amesoft.xlsx',
+        workbookHash: 'b'.repeat(64),
+        indexId: 'index-amesoft',
+      },
+    }, expect.any(AbortSignal)));
+    await waitFor(() => expect(fetchBiCompanies).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '기업 스냅샷 추가' })).not.toBeInTheDocument());
   });
 
   it('refreshes and alphabetically sorts the company list whenever the selector opens', async () => {

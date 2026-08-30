@@ -65,8 +65,10 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
 
         self.assertTrue(product_paths)
         self.assertTrue(all(path.startswith("/api/v1/") for path in product_paths))
-        self.assertIn("/api/v1/company-comparisons/league", paths)
-        self.assertNotIn("/api/v1/bi/comparisons/league", paths)
+        self.assertIn("/api/v1/company-comparisons/snapshot", paths)
+        self.assertIn("/api/v1/company-comparisons/snapshot/refresh", paths)
+        self.assertNotIn("/api/v1/company-comparisons/analyze", paths)
+        self.assertNotIn("/api/v1/company-comparisons/league", paths)
 
     def test_legacy_api_namespace_remains_a_hidden_compatibility_alias(self) -> None:
         canonical = self.client.get("/api/v1/modules/categories")

@@ -28,8 +28,6 @@ import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
 import { SemanticQueryMatcherNode } from './CustomNodes/SemanticQueryMatcherNode';
 import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
-import { WorkflowLayersPanel } from './WorkflowLayersPanel';
-import type { WorkflowOption } from './Header';
 import type { usePipelineGraph } from '../hooks/usePipelineGraph';
 import type { ModuleDefinition, WorkflowRun } from '../types';
 
@@ -41,15 +39,8 @@ interface PipelineCanvasProps {
   onOpenPalette?: () => void;
   modules: ModuleDefinition[];
   runs: WorkflowRun[];
-  workflows: WorkflowOption[];
   activeWorkflowId: string;
   readOnly: boolean;
-  onSelectWorkflow: (id: string) => void;
-  onCreateWorkflow: () => void;
-  onDuplicateWorkflow: () => void;
-  onCreateFromTemplate: (templateId: string) => void;
-  onRenameWorkflow: () => void;
-  onDeleteWorkflow: () => void;
 }
 
 export function PipelineCanvas({
@@ -57,15 +48,8 @@ export function PipelineCanvas({
   isPaletteOpen,
   modules,
   runs,
-  workflows,
   activeWorkflowId,
   readOnly,
-  onSelectWorkflow,
-  onCreateWorkflow,
-  onDuplicateWorkflow,
-  onCreateFromTemplate,
-  onRenameWorkflow,
-  onDeleteWorkflow,
 }: PipelineCanvasProps) {
   const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null);
   const nodeTypes = useMemo<NodeTypes>(
@@ -153,22 +137,6 @@ export function PipelineCanvas({
             pannable
           />
         </ReactFlow>
-        <WorkflowLayersPanel
-          nodes={graph.nodes}
-          edges={graph.edges}
-          modules={modules}
-          workflows={workflows}
-          activeWorkflowId={activeWorkflowId}
-          onSelectWorkflow={onSelectWorkflow}
-          onCreateWorkflow={onCreateWorkflow}
-          onDuplicateWorkflow={onDuplicateWorkflow}
-          onCreateFromTemplate={onCreateFromTemplate}
-          onRenameWorkflow={onRenameWorkflow}
-          onDeleteWorkflow={onDeleteWorkflow}
-          onSelectNode={graph.selectNode}
-          onDuplicateNode={graph.duplicateNode}
-          readOnly={readOnly}
-        />
       </section>
       {settingsNode && settingsModule && (
         <ModuleSettingsModal

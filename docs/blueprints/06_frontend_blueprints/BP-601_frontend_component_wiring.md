@@ -18,8 +18,7 @@ graph TD
     ROUTER --> P_DS["DataSourcesPage (/data-sources) -> DataSourcesView"]
     ROUTER --> P_BI["BiPage (/dashboard, alias /bi) -> BiPage / BiDashboard"]
     ROUTER --> P_CHAT["ChatbotPage (/chatbot) -> ChatbotView [운영중]"]
-    ROUTER --> P_COMP["CompanyComparisonPage (/company-comparison) -> ComparisonView"]
-    ROUTER --> P_COMP_V2["CompanyComparisonV2Page (/company-comparison-v2) -> Financial League"]
+    ROUTER --> P_COMP["CompanyComparisonPage (/company-comparison) -> Snapshot Comparison"]
     ROUTER --> P_JOBS["JobsPage (/jobs) -> KEDA/Job/Pod monitor"]
     ROUTER --> P_SET["SettingsPage (/settings) -> SettingsView"]
     ROUTER --> P_404["NotFoundPage (404 Fallback)"]
@@ -29,7 +28,7 @@ graph TD
     P_BI --> RECHARTS["Recharts (Area, Bar, Line, ResponsiveContainer)"]
     P_BI --> HEATMAP["FinancialHealthHeatmap (종합 재무 건전성 히트맵)"]
     P_CHAT --> CHAT_VIEW["ChatbotView (Session Sidebar, Message Bubble, MathJax, Inline Chart)"]
-    P_COMP_V2 --> LEAGUE_VIEW["Metric ranking + company insight + two-company comparison + BI deep link"]
+    P_COMP --> LEAGUE_VIEW["Metric ranking + actual/forecast trends + evidence status + two-company comparison + BI deep link"]
     P_JOBS --> JOB_MONITOR["5-second read-only Kubernetes workload polling"]
 ```
 
@@ -44,7 +43,20 @@ graph TD
 | `/data-sources` | `Data Sources` | [`DataSourcesPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx) | **[운영중]** 스프레드시트 뷰어 & pgvector 관리 |
 | `/dashboard` (`/bi` 호환 별칭) | `Financial BI` | [`BiPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 21개 근거 기반 지표 차트 |
 | `/chatbot` | `AI Financial Chatbot` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 세션 기반 대화형 챗봇 & 인라인 시각화 |
-| `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 다중 기업 듀퐁 3단계 분해 비교 |
-| `/company-comparison-v2` | `AI Company Comparison` | [`CompanyComparisonV2Page`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonV2Page.tsx) | **[운영중]** 지표별 재무 리그, 선택 기업 분석·2개 기업 비교 및 BI 딥링크 |
+| `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 버전형 비교 스냅샷 기반 순위, 실제/예측 추이, evidence 상태, 선택 기업·2개 기업 비교 및 BI 딥링크 |
 | `/jobs` | `Jobs` | [`JobsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/JobsPage.tsx) | **[운영중]** KEDA/Job/Pod와 PostgreSQL 큐·Lease 읽기 전용 상관 관제 |
 | `/settings` | `Settings` | [`SettingsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/SettingsPage.tsx) | **[운영중]** 시스템·연결 설정 화면 |
+
+---
+
+## 3. 공용 UI 계층과 제어 크기 계약
+
+페이지의 일반 액션은 [`frontend/src/shared/ui/`](file:///c:/Repos/bist-mini-final/frontend/src/shared/ui/)의 공용 컴포넌트를 사용합니다.
+
+| 컴포넌트 | 책임 | 허용 변형 |
+| :--- | :--- | :--- |
+| `Button` | 텍스트 또는 아이콘+텍스트 액션 | `primary`, `secondary`, `ghost`, `danger`, `danger-solid` |
+| `IconButton` | 아이콘 전용 액션과 필수 접근성 이름 | `Button`과 동일하며 `aria-label` 필수 |
+| `StatusBadge` | 읽기 전용 상태 표현 | `neutral`, `success`, `warning`, `danger`, `info` |
+
+제어 높이는 `global.css`의 `--control-h-sm`, `--control-h-md`, `--control-h-lg` 세 단계만 사용하고, 실제 렌더링은 각각 36px, 40px, 44px입니다. 페이지 CSS는 배치와 너비만 소유하며 일반 버튼의 높이·padding·색상·disabled 상태를 다시 정의하지 않습니다. 표 정렬 헤더, React Flow 노드 핸들, 기간 segmented control, 차트 확대/축소처럼 선택 상태나 공간 모델이 별도인 도메인 전용 컨트롤은 native `button`을 유지할 수 있지만 접근성 이름과 키보드 동작을 제공해야 합니다.

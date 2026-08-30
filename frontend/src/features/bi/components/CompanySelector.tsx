@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { Check, Landmark, X } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 import type { BiCompaniesRefreshResult } from '../hooks/useBiCompanies';
 import type { BiCompanySummary } from '../types';
 import { useModalDialog } from './useModalDialog';
@@ -17,6 +18,7 @@ interface CompanySelectorProps {
   readonly selectedName: string;
   readonly onSelect: (companyId: string) => void;
   readonly onRefresh: () => Promise<BiCompaniesRefreshResult>;
+  readonly managementAction?: ReactNode;
 }
 
 interface CompanySelectorDialogProps extends CompanySelectorProps {
@@ -86,7 +88,7 @@ function CompanySelectorDialog({
           <span className="bi-dialog__eyebrow">COMPANY</span>
           <h2 id="bi-company-dialog-title">기업 선택</h2>
         </div>
-        <button type="button" onClick={onClose} aria-label="기업 선택 닫기"><X size={18} aria-hidden="true" /></button>
+        <IconButton variant="ghost" onClick={onClose} aria-label="기업 선택 닫기"><X size={18} aria-hidden="true" /></IconButton>
       </div>
       <p className="bi-company-dialog__status" aria-live="polite">
         {isRefreshing
@@ -99,7 +101,7 @@ function CompanySelectorDialog({
         {sortedCompanies.map((company) => {
           const isSelected = company.companyId === selectedId;
           return (
-            <button
+            <Button
               key={company.companyId}
               ref={isSelected ? selectedOptionRef : undefined}
               className="bi-company-option"
@@ -112,7 +114,7 @@ function CompanySelectorDialog({
             >
               <span>{company.displayName}</span>
               {isSelected ? <Check size={17} aria-hidden="true" /> : null}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -150,19 +152,23 @@ export function CompanySelector(props: CompanySelectorProps) {
       <div className="bi-company-selector">
         <div className="bi-company-selector__current">
           <span>현재 기업</span>
-          <strong title={props.selectedName}>{props.selectedName}</strong>
+          <strong title={props.selectedName}>{props.selectedName || '준비된 스냅샷 없음'}</strong>
         </div>
-        <button
-          ref={triggerRef}
-          className="bi-company-selector__trigger"
-          type="button"
-          aria-controls={COMPANY_SELECTOR_DIALOG_ID}
-          aria-expanded={isOpen}
-          aria-haspopup="dialog"
-          onClick={() => setIsOpen(true)}
-        >
-          기업 선택
-        </button>
+        <div className="bi-company-selector__actions">
+          <Button
+            ref={triggerRef}
+            size="sm"
+            type="button"
+            aria-controls={COMPANY_SELECTOR_DIALOG_ID}
+            aria-expanded={isOpen}
+            aria-haspopup="dialog"
+            disabled={props.companies.length === 0}
+            onClick={() => setIsOpen(true)}
+          >
+            기업 선택
+          </Button>
+          {props.managementAction}
+        </div>
       </div>
       {isOpen ? <CompanySelectorDialog {...props} onClose={closeDialog} /> : null}
     </div>

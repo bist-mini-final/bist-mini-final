@@ -21,6 +21,7 @@ import {
   Trash2,
   Zap,
 } from 'lucide-react';
+import { Button } from '../../../shared/ui';
 import type { PipelineRunState } from '../pipelineTypes';
 import { SpreadsheetResultModal } from '../../playground/components/SpreadsheetResults/SpreadsheetResultModal';
 
@@ -178,38 +179,37 @@ export function PipelineTrackerView({
 
         <div className="ds-pipeline-header__right">
           {(isRunning || isQueued) && onCancel && (
-            <button
+            <Button
+              variant="danger"
               type="button"
-              className="ds-stop-ingestion-button"
               onClick={onCancel}
               disabled={isCancelling}
               title="현재 모듈 실행을 중단하고 나중에 같은 지점부터 재개"
             >
               {isCancelling ? <Loader2 size={14} className="ds-spin" /> : <Square size={13} />}
               <span>{isCancelling ? '중단 중...' : '작업 중단'}</span>
-            </button>
+            </Button>
           )}
           {!isCompleted && onDelete && (
-            <button
+            <Button
+              variant="danger"
               type="button"
-              className="ds-delete-ingestion-button"
               onClick={onDelete}
               disabled={isDeleting || isCancelling}
               title="실행 기록과 생성 중인 부분 컬렉션 삭제 (원본 Excel은 보존)"
             >
               {isDeleting ? <Loader2 size={14} className="ds-spin" /> : <Trash2 size={14} />}
               <span>{isDeleting ? '삭제 중...' : '작업 삭제'}</span>
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className="secondary-button"
             onClick={onBack}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
           >
             <ArrowLeft size={15} />
             <span>목록으로 나가기</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -218,9 +218,9 @@ export function PipelineTrackerView({
           <AlertCircle size={16} />
           <span>{pipeline.error || '워크플로 모듈 실행 중 오류가 발생했습니다.'}</span>
           {onResume && (
-            <button type="button" className="secondary-button" onClick={onResume}>
+            <Button type="button" onClick={onResume}>
               <RotateCcw size={13} /> 실패 모듈부터 다시 실행
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -230,9 +230,9 @@ export function PipelineTrackerView({
           <Pause size={16} />
           <span>사용자 요청으로 작업이 중단됐습니다. 완료된 모듈 결과는 보존됩니다.</span>
           {onResume && (
-            <button type="button" className="secondary-button" onClick={onResume}>
+            <Button type="button" onClick={onResume}>
               <RotateCcw size={13} /> 중단 지점부터 다시 실행
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -247,23 +247,23 @@ export function PipelineTrackerView({
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
-            <button
+            <Button
+              size="sm"
               type="button"
-              className="ds-action-btn ds-action-btn--secondary"
               onClick={() => setIsAutoReturnPaused(!isAutoReturnPaused)}
               title={isAutoReturnPaused ? '카운트다운 재개' : '로그 열람을 위해 자동 이동 일시정지'}
             >
               {isAutoReturnPaused ? <Play size={13} /> : <Pause size={13} />}
               <span>{isAutoReturnPaused ? '자동 이동 재개' : '로그 계속 보기'}</span>
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               type="button"
-              className="primary-button"
-              style={{ padding: '0.35rem 0.85rem', fontSize: '0.76rem', whiteSpace: 'nowrap' }}
               onClick={onBack}
             >
               <span>즉시 목록으로 이동</span>
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -333,8 +333,8 @@ export function PipelineTrackerView({
                     aria-expanded={isOpen}
                     onClick={() => toggleModule(mod.id)}
                     onKeyDown={(e) => {
-                      // Ignore keyboard events originating from the Luna button
-                      if ((e.target as HTMLElement).closest('.ds-action-btn')) {
+                      // Nested actions own their keyboard interaction.
+                      if ((e.target as HTMLElement).closest('.ui-button')) {
                         return;
                       }
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -367,10 +367,11 @@ export function PipelineTrackerView({
                     <div className="ds-module-card__right">
                       {/* Luna VLM Magnifying Glass Inspection Action */}
                       {isLunaModule && (isModDone || isCompleted) && pipeline.lunaOutput && (
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
                           type="button"
-                          className="ds-action-btn ds-action-btn--primary"
-                          style={{ padding: '0.22rem 0.55rem', fontSize: '0.68rem', marginRight: '0.3rem' }}
+                          style={{ marginRight: '0.3rem' }}
                           title="Luna VLM 감지 표 바운딩 박스 및 계층 헤더 돋보기 검사"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -379,7 +380,7 @@ export function PipelineTrackerView({
                         >
                           <Search size={13} />
                           <span>Luna 구조 돋보기 검사</span>
-                        </button>
+                        </Button>
                       )}
 
                       <span className="ds-badge ds-badge--gray" style={{ fontSize: '0.66rem' }}>

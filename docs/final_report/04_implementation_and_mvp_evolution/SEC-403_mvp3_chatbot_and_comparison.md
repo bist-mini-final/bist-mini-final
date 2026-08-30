@@ -1,37 +1,51 @@
-# [SEC-403] [3차 MVP] AI 금융 챗봇, 기업 듀퐁 비교 & UI/a11y 고도화
-> **Chapter:** 4. 시스템 구현 및 3단계 MVP 진화 과정 | **Section:** 4.3 | **Status:** Approved Baseline  
-> **Classification:** MVP 3 Implementation Results: Full-Stack AI Chatbot, DuPont Comparison & a11y UI
+# [SEC-403] [3차 MVP 및 현재화] Chatbot과 Company Comparison
+> **Chapter:** 4. 시스템 구현 및 MVP 진화 | **Section:** 4.3 | **Status:** Current Historical Record
 
 ---
 
-## 1. 3차 MVP 핵심 과제 및 구현 목표
+## 1. Chatbot
 
-* **목표**: 실시간 대화형 AI 금융 챗봇 풀스택 구축, 다중 기업 듀퐁 3단계 크로스 비교 인사이트 엔진 및 파이낸셜 리그 테이블 개발, 프론트엔드 a11y 표준 모달 및 인터랙션 고도화.
-* **주관 엔지니어**: **김정원 (AI Chatbot & Router)**, **전명준 (DuPont Comparison & League)**, **권혁준 (BI Interaction & a11y)**, **김지환 (Team Lead & Refactoring Governance)**.
+Chatbot은 PostgreSQL 세션·메시지·첨부파일 저장소와 durable RAG run을 결합합니다.
+
+- 세션 생성·조회·이름 변경·삭제
+- 메시지 등록 후 workflow run 상태 동기화
+- Excel/CSV 첨부의 제한된 text evidence 추출
+- 일별 suggested question 저장과 refresh
+- Markdown/LaTeX/inline chart 렌더링
+- 답변에 사용된 source cell evidence 연결
+
+현재 정식 namespace는 `/api/v1/chat`이며 이전 `/api/v1/chatbot`은 호환 경로로만 취급합니다.
 
 ---
 
-## 2. 세부 구현 산출물 및 고도화 내역
+## 2. Company Comparison의 교체 과정
 
-### 1. AI 금융 대화형 챗봇 ([`backend/features/chatbot/`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx))
-* **백엔드 아키텍처**:
-  - `ChatSessionRepository`: PostgreSQL 기반 세션/메시지/첨부파일 영구 저장소.
-  - `ChatSuggestionService`: DB에 색인된 기업 목록(`bi_companies`)을 기반으로 일별/컨텍스트별 스마트 추천 질문 자동 생성.
-  - `compact_evidence` & `save_upload`: 대화 중 사용자가 첨부한 엑셀/CSV 스프레드시트의 텍스트 추출 및 압축 바인딩.
-  - `_repair_inline_markdown_tables`: LLM이 한 줄로 출력한 마크다운 GFM 테이블 자동 복원 엔진.
-* **프론트엔드 UI/UX (`ChatbotView.tsx`)**:
-  - 세션 사이드바(생성/조회/삭제/이름수정) + 실시간 메시지 버블 + 추천 질문 칩(Chips).
-  - 마크다운 및 LaTeX 수식 실시간 렌더링, 인라인 차트 시각화(`visualization`), 원천 감사 셀 태그 바인딩.
+초기 직접 DuPont 비교 화면과 별도 V2 frontend는 현재 계약에서 제거했습니다. V2의 유효한 UX를 `/company-comparison` 정식 화면으로 승격하고 백엔드에 독립 comparison API를 구현했습니다.
 
-### 2. 다중 기업 듀퐁 크로스 비교 & 파이낸셜 리그 엔진 ([`backend/features/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/features/company_comparison/), [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md))
-* **백엔드 아키텍처**:
-  - `CompanyComparisonService` & `FinancialLeagueService`: 5대 영역 종합 재무 건전성 리그 산출 및 듀퐁 크로스 분석.
-  - `DuPontCalculator`: 이종 통화/단위 자동 정규화 및 $\text{ROE} = \text{PM} \times \text{AT} \times \text{FL}$ 3단계 분해 수식 무손실 `Decimal` 연산.
-  - `ComparisonCache`: 실시간 비교 질의 지연시간 단축을 위한 인메모리 캐싱 계층.
-* **프론트엔드 UI/UX (`/company-comparison`, `/company-comparison-v2`)**:
-  - `FinancialLeagueTable`: 동종업계 5각 건전성(수익성/성장성/안정성/활동성/현금창출) 종합 순위표.
-  - `FinancialCandlestickTerminal`: 재무 지표 시계열 변동성 캔들스틱 터미널 시각화.
-  - `RankingCriteriaPanel`: 가중치 기반 사용자 정의 랭킹 기준 패널.
+```mermaid
+flowchart LR
+    BI["BI dashboard snapshots"] --> VALIDATE["same FY/currency/scale + evidence"]
+    VALIDATE --> SCORE["financial-league-v3"]
+    SCORE --> FORECAST["historical-cagr-hold-v1\n3 years, not scored"]
+    FORECAST --> PUBLISH["VersionedSnapshotRepository"]
+    PUBLISH --> API["/api/v1/company-comparisons/snapshot"]
+    API --> UI["/company-comparison"]
+```
 
-### 3. Financial BI 대시보드 인터랙션 고도화 ([`BP-601`](file:///c:/Repos/bist-mini-final/docs/blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md))
-* 영업적자 음수 마진 적응형 Y축 동적 스케일링 엔진(`getProfitabilityMarginDomain`) 및 `useModalDialog` a11y 표준 모달 시스템 연동.
+핵심 결과는 다음과 같습니다.
+
+- BI와 comparison route·DTO·service를 분리했습니다.
+- 성장성 35%, 수익성 35%, 안정성 30%의 고정 benchmark 점수와 competition rank를 사용합니다.
+- 실제 관측값과 source cell evidence가 불완전한 기업은 `exclusions`에 기록합니다.
+- 최소 2개 기업이 검증되지 않으면 publish하지 않고 409를 반환합니다.
+- 예측은 versioned assumption으로 명시하고 순위 계산에 사용하지 않습니다.
+- `domain_snapshots`와 `domain_snapshot_heads`가 불변 이력과 current pointer를 관리합니다.
+- `/company-comparison-v2`와 synthetic fallback은 제거했습니다.
+
+상세 계약은 [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md)와 [`COMPANY_COMPARISON_SNAPSHOT_DESIGN.md`](file:///c:/Repos/bist-mini-final/docs/COMPANY_COMPARISON_SNAPSHOT_DESIGN.md)를 따릅니다.
+
+---
+
+## 3. Frontend/a11y
+
+정식 페이지는 metric 순위, leader/riser와 분포, 선택 기업 actual/forecast trend, 두 기업 공통 관측 기간 비교, BI deep link를 제공합니다. Zod가 서버 snapshot을 검증하며 modal focus trap, Escape close, focus restore 등 공통 접근성 hook을 재사용합니다.

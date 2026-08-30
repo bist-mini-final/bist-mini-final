@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { CloudUpload, FileCheck2, UploadCloud, X, Zap } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 
 interface UploadProps {
   onClose: () => void;
@@ -93,9 +94,9 @@ export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
               <small>업로드 후 서버 워크플로 큐에서 모듈 조합을 실행합니다.</small>
             </div>
           </div>
-          <button className="ds-modal__close" onClick={onClose} aria-label="닫기">
+          <IconButton variant="ghost" onClick={onClose} aria-label="닫기">
             <X size={18} />
-          </button>
+          </IconButton>
         </header>
 
         <div className="ds-modal__body">
@@ -171,17 +172,17 @@ export function FileUploadModal({ onClose, onStartPipeline }: UploadProps) {
         </div>
 
         <footer className="ds-modal__footer">
-          <button type="button" className="secondary-button" onClick={onClose}>
+          <Button type="button" onClick={onClose}>
             취소
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             type="button"
-            className="primary-button"
             onClick={handleStart}
             disabled={!selectedFile}
           >
             <Zap size={15} /> 인덱싱 시작
-          </button>
+          </Button>
         </footer>
       </div>
     </div>

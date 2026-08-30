@@ -28,11 +28,13 @@ from .api_models import (
     BiCompanySummary,
     BiDashboardPendingResponse,
     BiMaterializationAccepted,
+    BiMaterializationCandidateListResponse,
 )
 from .api_services import BiApiServices
 from .api_state import (
     accepted,
     build_company_summary,
+    build_materialization_candidate,
     is_active,
     job_id_for,
     with_refresh_state,
@@ -202,6 +204,40 @@ def create_bi_router(
                 )
             )
         return BiCompanyListResponse(companies=tuple(companies))
+
+    @router.get(
+        "/materialization-candidates",
+        tags=["BI 머티리얼라이제이션 작업"],
+        response_model=BiMaterializationCandidateListResponse,
+        summary="BI 스냅샷 생성 후보 기업 조회",
+        description=(
+            "인덱싱은 완료됐지만 최신 원본에 대응하는 BI 스냅샷이 없고, "
+            "현재 생성 작업도 실행 중이지 않은 기업을 반환합니다."
+        ),
+        responses={500: {"model": ApiErrorEnvelope}},
+    )
+    async def list_materialization_candidates() -> BiMaterializationCandidateListResponse:
+        """Return indexed companies that a user may explicitly add to BI."""
+        entries = await services.store.list_companies_async()
+        if not entries:
+            return BiMaterializationCandidateListResponse(candidates=())
+        company_ids = tuple(entry.company.company_id for entry in entries)
+        snapshots, latest_jobs = await asyncio.gather(
+            services.store.get_current_many_async(company_ids),
+            services.store.get_latest_jobs_async(company_ids),
+        )
+        candidates = tuple(
+            candidate
+            for entry in entries
+            if (
+                candidate := build_materialization_candidate(
+                    entry,
+                    snapshots.get(entry.company.company_id),
+                    latest_jobs.get(entry.company.company_id),
+                )
+            ) is not None
+        )
+        return BiMaterializationCandidateListResponse(candidates=candidates)
 
     @router.get(
         "/companies/{company_id}/dashboard",

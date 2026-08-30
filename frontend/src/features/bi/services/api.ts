@@ -2,6 +2,7 @@ import {
   parseBiCompanies,
   parseBiDashboard,
   parseBiMaterializationAccepted,
+  parseBiMaterializationCandidates,
   parseBiMaterializationJob,
   parseBiPendingDashboard,
   parseBiQuestionJobProgress,
@@ -11,6 +12,7 @@ import type {
   BiDashboardSnapshot,
   BiDashboardFetchResult,
   BiMaterializationAccepted,
+  BiMaterializationCandidateListResponse,
   BiMaterializationJob,
   BiMaterializationRequest,
   BiQuestionJobProgress,
@@ -28,6 +30,15 @@ const BI_API_PREFIX = '/api/v1/bi';
 export async function fetchBiCompanies(signal: AbortSignal): Promise<BiCompanyListResponse> {
   const endpoint = `${BI_API_PREFIX}/companies`;
   return parseBiCompanies(await requestJson<unknown>(endpoint, { signal }));
+}
+
+export async function fetchBiMaterializationCandidates(
+  signal: AbortSignal,
+): Promise<BiMaterializationCandidateListResponse> {
+  const endpoint = `${BI_API_PREFIX}/materialization-candidates`;
+  return parseBiMaterializationCandidates(
+    await requestJson<unknown>(endpoint, { signal }),
+  );
 }
 
 export async function fetchBiDashboard(

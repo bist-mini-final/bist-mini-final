@@ -152,6 +152,74 @@ def test_task_group_uses_native_async_module_hook(tmp_path) -> None:
     assert completed.nodes["native"].output == {"result": "async:ok"}
 
 
+def test_task_group_persists_running_state_while_module_response_is_pending(
+    tmp_path,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    class WaitingAsyncModule(BaseModule):
+        definition = ModuleDefinition(
+            type="waiting_async",
+            label="waiting_async",
+            category="test",
+            description="Live running-state persistence probe",
+            inputs=["value"],
+            outputs=["result"],
+            config_fields=[],
+        )
+        input_model = ParallelInput
+        config_model = EmptyModuleConfigDTO
+        output_model = ParallelOutput
+
+        def execute(self, input_data, config=None):
+            raise AssertionError("workflow called sync execute")
+
+        async def execute_async(self, input_data, config=None):
+            started.set()
+            await release.wait()
+            return ParallelOutput(result=input_data.value)
+
+    registry = BaseModuleRegistry(EmbeddingArtifactStore(tmp_path / "artifacts"))
+    registry.register((WaitingAsyncModule(),))
+    run_store = RunStore()
+    executor = WorkflowExecutor(registry, run_store, ResultCache())
+    workflow = WorkflowDocument(
+        id="waiting-async-workflow",
+        name="Waiting async workflow",
+        updated_at="2026-08-28T00:00:00+00:00",
+        graph=WorkflowGraph(
+            nodes=[
+                WorkflowNode(
+                    id="waiting",
+                    module_type="waiting_async",
+                    position=CanvasPosition(x=0, y=0),
+                    values={"value": "ok"},
+                )
+            ]
+        ),
+    )
+    run = executor.create_run(workflow, WorkflowExecutionRequest(use_cache=False))
+
+    async def observe_running_state():
+        task = asyncio.create_task(
+            executor.execute_scheduled_batch_async(run.id, ("waiting",))
+        )
+        await asyncio.wait_for(started.wait(), timeout=1)
+        persisted = run_store.load(run.id)
+        assert persisted.status == "running"
+        assert persisted.batches[0].status == "running"
+        assert persisted.nodes["waiting"].status == "running"
+        assert persisted.nodes["waiting"].started_at is not None
+        release.set()
+        return await task
+
+    completed = asyncio.run(observe_running_state())
+
+    assert completed.status == "completed"
+    assert completed.nodes["waiting"].status == "succeeded"
+
+
 def test_async_batch_moves_run_store_io_off_event_loop(tmp_path) -> None:
     class NativeAsyncModule(BaseModule):
         definition = ModuleDefinition(

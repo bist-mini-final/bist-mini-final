@@ -1,10 +1,12 @@
+"""Typed contracts for the durable company-comparison snapshot."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from backend.features.bi.models import (
     IDENTIFIER_PATTERN,
@@ -12,131 +14,8 @@ from backend.features.bi.models import (
     BiContractModel,
     CompanyId,
     MetricId,
+    SnapshotStatus,
 )
-
-
-class CompanyComparisonRequest(BiContractModel):
-    company_ids: tuple[CompanyId, ...] = Field(min_length=2, max_length=3)
-    start_year: int = Field(ge=1900, le=2200)
-    end_year: int = Field(ge=1900, le=2200)
-    question: str | None = Field(default=None, min_length=5, max_length=500)
-
-    @field_validator("company_ids")
-    @classmethod
-    def require_unique_companies(
-        cls,
-        value: tuple[CompanyId, ...],
-    ) -> tuple[CompanyId, ...]:
-        if len(set(value)) != len(value):
-            raise ValueError("company_ids must be unique")
-        return value
-
-    @model_validator(mode="after")
-    def require_year_range(self) -> "CompanyComparisonRequest":
-        if self.start_year >= self.end_year:
-            raise ValueError("start_year must be earlier than end_year")
-        return self
-
-
-class ComparisonPoint(BiContractModel):
-    year: int
-    revenue: float
-    operating_income: float
-
-
-class ComparisonCompanyResult(BiContractModel):
-    company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
-    display_name: str = Field(min_length=1, max_length=200)
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
-    scale: AmountScale
-    points: tuple[ComparisonPoint, ...] = Field(min_length=2)
-    revenue_cagr: float
-    operating_margin: float
-    liabilities_to_assets: float
-    net_debt: float
-    stability_basis_year: int = Field(ge=1900, le=2200)
-
-
-class ComparisonEvidence(BiContractModel):
-    evidence_id: str = Field(pattern=r"^E[1-9][0-9]*$")
-    company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
-    file_name: str = Field(min_length=1, max_length=255)
-    sheet_name: str = Field(min_length=1, max_length=128)
-    cell_coord: str = Field(pattern=r"^[A-Z]+[1-9][0-9]*$")
-    source_text: str = Field(min_length=1, max_length=2_000)
-    origin: Literal["snapshot", "rag"]
-
-
-class ComparisonBriefSection(BiContractModel):
-    title: str = Field(min_length=1, max_length=80)
-    body: str = Field(min_length=40, max_length=1_200)
-    evidence_ids: tuple[str, ...] = Field(min_length=1, max_length=12)
-
-
-class CompanyComparisonBrief(BiContractModel):
-    compared_company_ids: tuple[CompanyId, ...] = Field(min_length=2, max_length=3)
-    growth: ComparisonBriefSection
-    profitability: ComparisonBriefSection
-    risk: ComparisonBriefSection
-    caveats: tuple[str, ...] = Field(default=(), max_length=8)
-
-
-class BriefStatus(StrEnum):
-    READY = "ready"
-    FAILED = "failed"
-
-
-class EvaluationType(StrEnum):
-    GROWTH = "growth"
-    PROFITABILITY = "profitability"
-    STABILITY = "stability"
-    COMPREHENSIVE = "comprehensive"
-
-
-class ComparisonChartId(StrEnum):
-    REVENUE_TREND = "revenue_trend"
-    OPERATING_INCOME_TREND = "operating_income_trend"
-    GROWTH_PROFITABILITY = "growth_profitability"
-    STABILITY = "stability"
-
-
-class ComparisonQuestionPlan(BiContractModel):
-    evaluation_type: EvaluationType
-    rationale: str = Field(min_length=10, max_length=400)
-
-
-class ComparisonQueryAnalysis(BiContractModel):
-    question: str = Field(min_length=5, max_length=500)
-    evaluation_type: EvaluationType
-    evaluation_label: str = Field(min_length=1, max_length=40)
-    rationale: str = Field(min_length=10, max_length=400)
-    required_metrics: tuple[MetricId, ...] = Field(min_length=1)
-    chart_ids: tuple[ComparisonChartId, ...] = Field(min_length=1)
-
-
-class ComparisonMeta(BiContractModel):
-    generated_at: datetime
-    snapshot_ids: tuple[str, ...]
-    evidence_count: int = Field(ge=0)
-    prompt_version: str = Field(min_length=1, max_length=40)
-    model: str = Field(min_length=1, max_length=80)
-    latency_ms: int = Field(ge=0)
-    cache_hit: bool = False
-
-
-class CompanyComparisonResponse(BiContractModel):
-    schema_version: Literal[2] = 2
-    analysis_id: str = Field(pattern=IDENTIFIER_PATTERN)
-    analysis_mode: Literal["rag"] = "rag"
-    brief_status: BriefStatus
-    start_year: int
-    end_year: int
-    query_analysis: ComparisonQueryAnalysis | None = None
-    companies: tuple[ComparisonCompanyResult, ...] = Field(min_length=2, max_length=3)
-    brief: CompanyComparisonBrief | None
-    evidence: tuple[ComparisonEvidence, ...]
-    warnings: tuple[str, ...] = ()
-    meta: ComparisonMeta
 
 
 class FinancialTier(StrEnum):
@@ -146,30 +25,42 @@ class FinancialTier(StrEnum):
     C = "C"
 
 
-class FinancialCandle(BiContractModel):
+class ComparisonSnapshotMeta(BiContractModel):
+    snapshot_id: str = Field(pattern=IDENTIFIER_PATTERN)
+    status: SnapshotStatus
+    generated_at: datetime
+    source_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+    source_snapshot_ids: tuple[str, ...] = Field(min_length=2, max_length=30)
+    scoring_version: str = Field(min_length=1, max_length=40)
+    forecast_version: str = Field(min_length=1, max_length=40)
+
+
+class ComparisonPeriod(BiContractModel):
     year: int = Field(ge=1900, le=2200)
     period_type: Literal["historical", "forecast"]
-    open: float = Field(ge=0)
-    high: float = Field(ge=0)
-    low: float = Field(ge=0)
-    close: float = Field(ge=0)
     revenue: float = Field(ge=0)
     operating_income: float
     operating_margin: float
-    evidence_id: str = Field(pattern=r"^E[1-9][0-9]*$")
+    evidence_ids: tuple[str, ...] = Field(min_length=1, max_length=32)
+    assumption_id: str | None = Field(default=None, max_length=80)
 
     @model_validator(mode="after")
-    def require_valid_range(self) -> "FinancialCandle":
-        if self.low > min(self.open, self.close) or self.high < max(self.open, self.close):
-            raise ValueError("candle low/high must contain open and close")
+    def require_forecast_assumption(self) -> "ComparisonPeriod":
+        if self.period_type == "forecast" and self.assumption_id is None:
+            raise ValueError("forecast periods require assumption_id")
+        if self.period_type == "historical" and self.assumption_id is not None:
+            raise ValueError("historical periods cannot declare assumption_id")
         return self
 
 
-class LeagueCompany(BiContractModel):
-    company_id: str = Field(pattern=IDENTIFIER_PATTERN)
+class ComparisonCompany(BiContractModel):
+    company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
     display_name: str = Field(min_length=1, max_length=200)
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     scale: AmountScale
+    source_snapshot_id: str = Field(pattern=IDENTIFIER_PATTERN)
+    historical_start_year: int = Field(ge=1900, le=2200)
+    historical_end_year: int = Field(ge=1900, le=2200)
     rank: int = Field(ge=1)
     previous_rank: int = Field(ge=1)
     rank_change: int
@@ -183,50 +74,139 @@ class LeagueCompany(BiContractModel):
     net_debt: float
     net_debt_to_revenue: float
     tier: FinancialTier
-    candles: tuple[FinancialCandle, ...] = Field(min_length=8, max_length=8)
+    periods: tuple[ComparisonPeriod, ...] = Field(min_length=5, max_length=8)
 
 
-class LeagueDistributionBucket(BiContractModel):
+class ComparisonEvidence(BiContractModel):
+    evidence_id: str = Field(pattern=r"^E[1-9][0-9]*$")
+    company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
+    metric_id: MetricId
+    year: int | None = Field(default=None, ge=1900, le=2200)
+    file_name: str = Field(min_length=1, max_length=255)
+    sheet_name: str = Field(min_length=1, max_length=128)
+    cell_coord: str = Field(pattern=r"^[A-Z]+[1-9][0-9]*$")
+    source_text: str = Field(min_length=1, max_length=2_000)
+    origin: Literal["bi_snapshot"] = "bi_snapshot"
+
+
+class ComparisonExclusion(BiContractModel):
+    company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
+    display_name: str = Field(min_length=1, max_length=200)
+    reasons: tuple[str, ...] = Field(min_length=1, max_length=8)
+
+
+class ComparisonAssumption(BiContractModel):
+    assumption_id: str = Field(pattern=IDENTIFIER_PATTERN)
+    description: str = Field(min_length=10, max_length=500)
+
+
+class ComparisonDistributionBucket(BiContractModel):
     label: str = Field(min_length=1, max_length=30)
     count: int = Field(ge=0)
 
 
-class LeagueSpotlight(BiContractModel):
-    leader_company_id: str = Field(pattern=IDENTIFIER_PATTERN)
-    riser_company_id: str = Field(pattern=IDENTIFIER_PATTERN)
+class ComparisonSpotlight(BiContractModel):
+    leader_company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
+    riser_company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
     average_cagr: float
     average_margin: float
-    cagr_distribution: tuple[LeagueDistributionBucket, ...]
-    margin_distribution: tuple[LeagueDistributionBucket, ...]
+    average_liabilities_to_assets: float
+    cagr_distribution: tuple[ComparisonDistributionBucket, ...]
+    margin_distribution: tuple[ComparisonDistributionBucket, ...]
 
 
-class FinancialLeagueResponse(BiContractModel):
+class CompanyComparisonSnapshot(BiContractModel):
     schema_version: Literal[1] = 1
-    generated_at: datetime
-    historical_end_year: Literal[2025] = 2025
-    companies: tuple[LeagueCompany, ...] = Field(min_length=15, max_length=30)
-    spotlight: LeagueSpotlight
+    snapshot: ComparisonSnapshotMeta
+    historical_start_year: int = Field(ge=1900, le=2200)
+    historical_end_year: int = Field(ge=1900, le=2200)
+    forecast_end_year: int = Field(ge=1900, le=2200)
+    companies: tuple[ComparisonCompany, ...] = Field(min_length=2, max_length=30)
+    spotlight: ComparisonSpotlight
     evidence: tuple[ComparisonEvidence, ...]
+    exclusions: tuple[ComparisonExclusion, ...] = ()
+    assumptions: tuple[ComparisonAssumption, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_snapshot_links(self) -> "CompanyComparisonSnapshot":
+        company_ids = [str(company.company_id) for company in self.companies]
+        if len(company_ids) != len(set(company_ids)):
+            raise ValueError("company ids must be unique")
+        if min(company.rank for company in self.companies) != 1:
+            raise ValueError("company ranks must start at one")
+
+        source_snapshot_ids = [company.source_snapshot_id for company in self.companies]
+        if set(source_snapshot_ids) != set(self.snapshot.source_snapshot_ids):
+            raise ValueError("source snapshot ids must match included companies")
+
+        evidence_ids = [item.evidence_id for item in self.evidence]
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("evidence ids must be unique")
+        evidence_id_set = set(evidence_ids)
+        assumption_ids = {item.assumption_id for item in self.assumptions}
+
+        for company in self.companies:
+            historical = [
+                period for period in company.periods if period.period_type == "historical"
+            ]
+            forecasts = [period for period in company.periods if period.period_type == "forecast"]
+            if len(historical) < 2 or len(forecasts) != 3:
+                raise ValueError("each company requires at least two actuals and three forecasts")
+            if [period.year for period in company.periods] != sorted(
+                period.year for period in company.periods
+            ):
+                raise ValueError("company periods must be ordered by year")
+            if (
+                historical[0].year != company.historical_start_year
+                or historical[-1].year != company.historical_end_year
+            ):
+                raise ValueError("company historical range must match its periods")
+            if forecasts[0].year != company.historical_end_year + 1:
+                raise ValueError("forecast periods must follow the latest historical year")
+            for period in company.periods:
+                if not set(period.evidence_ids) <= evidence_id_set:
+                    raise ValueError("period evidence ids must resolve inside the snapshot")
+                if period.assumption_id is not None and period.assumption_id not in assumption_ids:
+                    raise ValueError("forecast assumption ids must resolve inside the snapshot")
+
+        if self.historical_start_year != min(
+            company.historical_start_year for company in self.companies
+        ) or self.historical_end_year != max(
+            company.historical_end_year for company in self.companies
+        ):
+            raise ValueError("snapshot historical range must match included companies")
+        if self.forecast_end_year != max(
+            period.year
+            for company in self.companies
+            for period in company.periods
+            if period.period_type == "forecast"
+        ):
+            raise ValueError("snapshot forecast range must match included companies")
+        if (self.snapshot.status is SnapshotStatus.PARTIAL) != bool(self.exclusions):
+            raise ValueError("partial status must match the exclusion list")
+        if str(self.spotlight.leader_company_id) not in company_ids:
+            raise ValueError("spotlight leader must be an included company")
+        if str(self.spotlight.riser_company_id) not in company_ids:
+            raise ValueError("spotlight riser must be an included company")
+        expected_count = len(self.companies)
+        for distribution in (
+            self.spotlight.cagr_distribution,
+            self.spotlight.margin_distribution,
+        ):
+            if sum(bucket.count for bucket in distribution) != expected_count:
+                raise ValueError("distribution buckets must cover every included company")
+        return self
 
 
 __all__ = [
-    "BriefStatus",
-    "CompanyComparisonBrief",
-    "CompanyComparisonRequest",
-    "CompanyComparisonResponse",
-    "ComparisonBriefSection",
-    "ComparisonChartId",
-    "ComparisonCompanyResult",
+    "CompanyComparisonSnapshot",
+    "ComparisonAssumption",
+    "ComparisonCompany",
+    "ComparisonDistributionBucket",
     "ComparisonEvidence",
-    "ComparisonMeta",
-    "ComparisonPoint",
-    "ComparisonQueryAnalysis",
-    "ComparisonQuestionPlan",
-    "EvaluationType",
-    "FinancialCandle",
-    "FinancialLeagueResponse",
+    "ComparisonExclusion",
+    "ComparisonPeriod",
+    "ComparisonSnapshotMeta",
+    "ComparisonSpotlight",
     "FinancialTier",
-    "LeagueCompany",
-    "LeagueDistributionBucket",
-    "LeagueSpotlight",
 ]

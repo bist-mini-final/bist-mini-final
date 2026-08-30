@@ -1,4 +1,5 @@
 import { FileSpreadsheet, X } from 'lucide-react';
+import { IconButton } from '../../../shared/ui';
 import type { BiEvidence, BiMaterializationSource } from '../types';
 import { useModalDialog } from './useModalDialog';
 
@@ -26,7 +27,7 @@ export function EvidenceDialog({ cardTitle, evidence, source, snapshotId, onClos
           <span className="bi-dialog__eyebrow">EVIDENCE</span>
           <h2 id="bi-evidence-title">{cardTitle} 근거</h2>
         </div>
-        <button type="button" aria-label="근거 닫기" onClick={onClose}><X size={18} aria-hidden="true" /></button>
+        <IconButton variant="ghost" aria-label="근거 닫기" onClick={onClose}><X size={18} aria-hidden="true" /></IconButton>
       </div>
       <ul className="bi-evidence-list">
         {evidence.map((item) => (

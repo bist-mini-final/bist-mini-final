@@ -380,7 +380,13 @@ class WorkflowExecutor:
         run_id: str,
         node_ids: tuple[str, ...],
     ) -> tuple[WorkflowRun, tuple[WorkflowNode, ...]]:
-        """Load and validate a persisted batch outside the asyncio event loop."""
+        """Validate a batch and persist its live node states before execution.
+
+        Scheduled TaskGroup nodes execute against isolated snapshots. Persisting
+        their ``running`` transition here keeps the API/SSE projection live while
+        a worker is waiting for a module response instead of jumping directly
+        from ``pending`` to a terminal state.
+        """
         with self._execution_lock:
             run = self.run_store.load(run_id)
             graph_nodes = {node.id: node for node in run.graph.nodes}
@@ -402,6 +408,34 @@ class WorkflowExecutor:
             batch.status = "running"
             batch.started_at = batch.started_at or utc_now_iso()
             batch.completed_at = None
+
+            started_at = utc_now_iso()
+            for node in selected_nodes:
+                state = run.nodes[node.id]
+                if state.status in ("succeeded", "skipped"):
+                    continue
+                if state.status in ("failed", "running"):
+                    self._reset_node_state(state)
+                should_execute, skip_reason = self._should_execute_node(run, node)
+                if should_execute:
+                    state.status = "running"
+                    state.started_at = started_at
+                    state.completed_at = None
+                    state.error = None
+                    state.skip_reason = None
+                else:
+                    state.status = "skipped"
+                    state.outcome = None
+                    state.skip_reason = skip_reason
+                    state.completed_at = started_at
+
+            self._refresh_run_status(run)
+            for node in selected_nodes:
+                state = run.nodes[node.id]
+                if state.status == "running":
+                    self.run_store.save_progress(run, node.id)
+                elif state.status == "skipped":
+                    self.run_store.save_node(run, node.id)
             return run, selected_nodes
 
     def _merge_scheduled_batch_results(

@@ -47,10 +47,12 @@ flowchart TD
 * `GET /api/v1/chat/runs/{run_id}`: durable RAG 실행 상태를 세션 메시지로 동기화
 * `POST /api/v1/chat/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
 * `GET /api/v1/chat/suggestions`: 동적 스마트 질문 추천
+* `POST /api/v1/chat/suggestions/refresh`: 추천 질문 재생성
 
 ## 3. 대화 라우팅과 근거 안전성
 
 * 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 `conversation.py`의 결정적 정책으로 처리하고 기업 수치·실적 조회만 `rag_query` 워크플로로 보냅니다.
+* 검색 서브쿼리의 `Cell Value: ?`는 Dense 유사도 검색용 와일드카드이므로 검색 단계까지 보존합니다. Reader에는 실제 `Cell Value`가 확인된 셀만 전달하며, 원시 검색 힌트나 자리표시자 셀은 Context Blocks·근거·추가 DB 조회 결과에서 모두 제외합니다.
 * RAG 응답은 실행 결과의 `expand-context` 셀 또는 실행 로그에서 복구한 pgvector 셀과 대조합니다. 검증 가능한 셀이 없거나 응답의 셀 인용이 실행 근거와 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
 * 모델이 근거 셀을 사용했지만 인용 표기를 생략한 경우 `grounding.py`가 최대 6개의 `[Sheet: ... | Cell: ...]` 근거를 보강합니다.
-* 프런트엔드는 `chatMarkdown.ts`에서 접힌 GFM 표, 이스케이프 문자와 셀 인용 링크를 정규화한 뒤 공용 Markdown 렌더러에 전달합니다.
+* 프런트엔드는 `chatMarkdown.ts`에서 접힌 GFM 표와 이스케이프 문자를 정규화하고, `shared/markdown/cellCitations.ts`에서 셀 인용과 상세 메타데이터를 분리합니다. 본문에는 `시트 · 셀` 배지만 노출하며 hover 또는 keyboard focus 시 기업, 행 항목, 열 항목, 셀 값 상세를 포털 툴팁으로 표시합니다. 같은 공용 Markdown 렌더러를 챗봇과 Playground Reader 노드가 사용합니다.

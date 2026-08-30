@@ -1,96 +1,66 @@
-# [SEC-302] 클래스 다이어그램 & 21개 모듈 입출력 계약
-> **Chapter:** 3. 시스템 아키텍처 및 상세 설계 | **Section:** 3.2 | **Status:** Approved Baseline  
-> **Classification:** Class Diagrams, 3-Tier Module Inheritance & 21-Module Pinout Catalog
+# [SEC-302] 클래스 다이어그램과 모듈·도메인 계약
+
+> **Chapter:** 3. 시스템 아키텍처 및 상세 설계 | **Section:** 3.2 | **Status:** Implementation-aligned
 
 ---
 
-## 1. 3단계 클래스 상속 계층도 (3-Tier Inheritance Architecture)
+## 1. Composition과 실행 경계
 
-모든 파이프라인 모듈은 최상위 `BaseModule`을 상속하며, `BaseLLMModule`과 `BaseEmbedderModule` 2대 중간 추상 계층을 통해 1-Line 구조화와 토큰/비용 집계를 수행합니다:
+```mermaid
+classDiagram
+    class ApplicationContainer
+    class RuntimeContainer
+    class ExecutionContainer
+    class DomainServicesContainer
+    class ModuleRegistry
+    class WorkflowExecutor
+    class BiApiServices
+    class CompanyComparisonService
+    class VersionedSnapshotRepository
+
+    ApplicationContainer *-- RuntimeContainer
+    ApplicationContainer *-- ExecutionContainer
+    ApplicationContainer *-- DomainServicesContainer
+    RuntimeContainer *-- ModuleRegistry
+    RuntimeContainer *-- WorkflowExecutor
+    DomainServicesContainer *-- BiApiServices
+    DomainServicesContainer *-- CompanyComparisonService
+    CompanyComparisonService --> BiApiServices : reads current BI heads
+    CompanyComparisonService --> VersionedSnapshotRepository : publishes versions
+```
+
+- `RuntimeContainer`는 provider·storage·19개 module registry와 workflow runtime을 소유합니다.
+- `ExecutionContainer`는 durable workflow dispatcher와 실행 application service를 소유합니다.
+- `DomainServicesContainer`는 BI, Company Comparison, chat suggestion, jobs monitor를 조립합니다.
+- FastAPI router는 container에서 완성된 서비스를 주입받고 도메인 객체를 직접 생성하지 않습니다.
+
+## 2. 모듈 계약
 
 ```mermaid
 classDiagram
     class BaseModule {
-        <<Abstract Root>>
-        +input_model: Type[ModuleInputDTO]
-        +config_model: Type[ModuleConfigDTO]
-        +output_model: Type[ModuleDTO]
-        +definition: ModuleDefinition
-        +execute(input_data, config)*
-        +execute_async(input_data, config) Compatibility Hook
-        +run(input_data, config) Template Method
-        +run_async(input_data, config) Async Template Method
+        +definition
+        +input_model
+        +config_model
+        +output_model
+        +run()
+        +run_async()
     }
-
-    class BaseLLMModule {
-        <<Abstract Intermediate>>
-        +complete_structured(response_model, prompt)
-        +complete_structured_async(response_model, prompt)
-        +complete_text(prompt, system_prompt)
-        +complete_text_async(prompt, system_prompt)
-        +complete_agentic(tools, max_turns)
-        +complete_agentic_async(tools, max_turns)
-        +calculate_token_cost_usd(usage)
-    }
-
-    class BaseEmbedderModule {
-        <<Abstract Intermediate>>
-        +encode_texts(texts, dimension=3072)
-        +encode_texts_async(texts, dimension=3072)
-        +encode_batches_streaming(batches)
-    }
-
-    class DecomposerModule {
-        +input_model: DecomposerInputDTO
-        +config_model: DecomposerConfigDTO
-        +output_model: SubqueriesDTO
-        +execute_async()
-    }
-
-    class ReaderModule {
-        +input_model: ReaderInputDTO
-        +config_model: ReaderConfigDTO
-        +output_model: AnswerDTO
-        +execute_async()
-    }
-
-    class TextEmbedderModule {
-        +input_model: EmbedderInputDTO
-        +output_model: EmbeddedVectorsDTO
-        +execute_async()
-    }
-
+    class BaseLLMModule
+    class BaseEmbeddingModule
     BaseModule <|-- BaseLLMModule
-    BaseModule <|-- BaseEmbedderModule
-    BaseLLMModule <|-- DecomposerModule
-    BaseLLMModule <|-- ReaderModule
-    BaseEmbedderModule <|-- TextEmbedderModule
+    BaseModule <|-- BaseEmbeddingModule
 ```
 
----
+실행 가능한 module type은 `ModuleRegistry` 기준 19개입니다. Input·Config·Output schema는 `GET /api/v1/modules*`가 제공하며, 전체 목록은 [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 따릅니다.
 
-## 2. 21개 원자적 파이프라인 모듈 핀아웃(Pinout) 카탈로그
+## 3. 버전형 스냅샷 계약
 
-| 카테고리 | 모듈 키 / 식별자 | 부모 상속 클래스 | 주요 Input Pins (`input_model`) | 주요 Config Pins (`config_model`) | 주요 Output Pins (`output_model`) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Query (5)** | `query.user_query` (M1) | `BaseModule` | `question_text: str` | - | `query_context: QueryContext` |
-| | `query.decomposer` (M2) | `BaseLLMModule` | `query_context: QueryContext` | `model: str = "gpt-5.6-luna"` | `subqueries: List[Subquery]` |
-| | `query.hypothetical_answer` (M3) | `BaseLLMModule` | `query_context: QueryContext` | `model: str = "gpt-5.6-luna"` | `hyde_document: str` |
-| | `query.semantic_query_router` (M4) | `BaseModule` | `subqueries: List[Subquery]` | `routes: Dict[str, Any]` | `routed_queries: List[RoutedQuery]` |
-| | `query.llm_query_router` (M5) | `BaseLLMModule` | `subqueries: List[Subquery]` | `model: str = "gpt-5.6-luna"` | `retrieval_plan: RetrievalPlan` |
-| **Retrieval (6)** | `retrieval.text_embedder` (M6) | `BaseEmbedderModule`| `texts: List[str]` | `model="text-embedding-3-large"` | `embeddings: List[List[float]]` |
-| | `retrieval.dense_searcher` (M7) | `BaseModule` | `query_vector: List[float]` | `top_k: int = 10` | `dense_hits: List[Hit]` |
-| | `retrieval.pgvector_retriever` (M8) | `BaseModule` | `query_vector: List[float]` | `top_k: int = 10` | `candidates: List[Document]` |
-| | `retrieval.sparse_bm25_retriever` (M9)| `BaseModule` | `query_text: str` | `top_k: int = 10` | `sparse_hits: List[Hit]` |
-| | `retrieval.rrf_fuser` (M10) | `BaseModule` | `dense_hits, sparse_hits` | `rrf_k: int = 60` | `fused_results: List[FusedHit]` |
-| | `retrieval.context_expander` (M11) | `BaseModule` | `fused_results: List[FusedHit]` | `expand_radius: int = 2` | `expanded_context: str` |
-| **Generation (5)**| `generation.reader` (M12) | `BaseLLMModule` | `query_context, context` | `model: str = "gpt-5.6-luna"` | `answer_text, cited_cells` |
-| | `generation.agentic_cot` (M13) | `BaseLLMModule` | `query_context, context` | `max_turns: int = 5` | `cot_trace, final_answer` |
-| | `generation.financial_ratio` (M14) | `BaseLLMModule` | `financial_metrics: Dict` | `ratios: List[str]` | `calculated_ratios: Dict` |
-| | `generation.auditor` (M15) | `BaseLLMModule` | `answer_text, context` | `strict_mode: bool = True` | `is_valid, audit_report` |
-| | `generation.confidence_scorer` (M16)| `BaseLLMModule` | `answer_text, context` | `threshold: float = 0.8` | `confidence_score: float` |
-| **Storage (5)** | `storage.pgvector_index_writer` (M17)| `BaseModule` | `items: List[CellItem]` | `table_name: str` | `inserted_count: int` |
-| | `storage.company_entity_extractor` (M18)| `BaseLLMModule` | `file_name, workbook_hash` | `model: str = "gpt-5.6-luna"` | `company_name, ticker, fiscal_year` |
-| | `storage.qa_example_loader` (M19) | `BaseModule` | `dataset_path: str` | - | `qa_examples: List[QaExample]` |
-| | `structure.document_profiler` (M20) | `BaseLLMModule` | `workbook_hash, file_name` | `max_periods: int = 5` | `periods, currency, scale, sheets` |
-| | `reader.financial_calculator` (M21) | `BaseModule` | `raw_metrics, evidence_cells`| `precision: int = 4` | `derived_ratios, bound_evidence` |
+`VersionedSnapshotRepository`는 도메인 payload를 이해하지 않고 다음 수명주기만 공통화합니다.
+
+- `get_current(domain, scope_key)`
+- `publish(VersionedSnapshotRecord)`
+- 불변 payload 저장
+- 같은 도메인·스코프의 current head 원자적 전환
+
+BI는 기존 전용 snapshot schema를 유지하고 Company Comparison만 현재 이 공용 저장 port를 사용합니다. 향후 다른 도메인이 이 저장 port를 재사용해도 계산·검증 서비스를 공통 BaseService로 합치지 않습니다.

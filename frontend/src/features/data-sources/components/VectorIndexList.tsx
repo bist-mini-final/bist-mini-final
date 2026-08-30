@@ -16,6 +16,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 import type { VectorIndexInfo } from '../types';
 import type { PipelineRunState } from '../pipelineTypes';
 import { dataSourceApi } from '../services/dataSourceApi';
@@ -137,20 +138,20 @@ export function VectorIndexList({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {onRefresh && (
-            <button
+            <Button
+              size="md"
               type="button"
-              className="secondary-button"
               onClick={onRefresh}
               title="새로고침"
               disabled={isLoading}
             >
               <RefreshCw size={14} className={isLoading ? 'ds-spin' : ''} />
               <span>새로고침</span>
-            </button>
+            </Button>
           )}
-          <button type="button" className="primary-button" onClick={onCreateClick}>
+          <Button variant="primary" type="button" onClick={onCreateClick}>
             <Sparkles size={15} /> 새 엑셀 인덱싱
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -159,9 +160,9 @@ export function VectorIndexList({
           <Database size={44} />
           <h4>pgvector 데이터베이스에 등록된 컬렉션이 없습니다</h4>
           <p>엑셀 파일을 업로드하면 Luna VLM 표 구조 분석과 4필드 직렬화를 거쳐 pgvector로 벡터 인덱스가 즉시 생성됩니다.</p>
-          <button type="button" className="primary-button" onClick={onCreateClick}>
+          <Button variant="primary" type="button" onClick={onCreateClick}>
             <Sparkles size={15} /> 새 엑셀 인덱싱 시작
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="ds-table-container">
@@ -242,20 +243,20 @@ export function VectorIndexList({
                   </td>
                   <td className="ds-actions-col ds-text-right">
                     <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                      <button
+                      <Button
+                        variant="primary"
+                        size="sm"
                         type="button"
-                        className="primary-button"
-                        style={{ padding: '0.35rem 0.65rem', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onClick={onResumePipeline}
                         title={isPipelinePaused ? '중단된 파이프라인 확인 및 재개' : '실시간 파이프라인 HUD 및 모듈 로그로 재진입'}
                       >
                         <Layers size={13} /> 진행상황 / 모듈 로그
-                      </button>
+                      </Button>
                       {onDeletePipeline && (
-                        <button
+                        <Button
+                          variant="danger"
+                          size="sm"
                           type="button"
-                          className="ds-delete-ingestion-button"
-                          style={{ padding: '0.35rem 0.5rem', fontSize: '11px' }}
                           onClick={() => onDeletePipeline(activeRunningPipeline)}
                           disabled={deletingPipelineId === activeRunningPipeline.pipelineId}
                           title="작업과 생성 중인 부분 컬렉션 삭제"
@@ -264,7 +265,7 @@ export function VectorIndexList({
                             ? <RefreshCw size={12} className="ds-spin" />
                             : <Trash2 size={12} />}
                           작업 삭제
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
@@ -306,20 +307,20 @@ export function VectorIndexList({
                     </td>
                     <td className="ds-actions-col ds-text-right">
                       <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                        <button
+                        <Button
+                          variant="danger"
+                          size="sm"
                           type="button"
-                          className="secondary-button"
-                          style={{ padding: '0.3rem 0.55rem', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#dc2626', borderColor: '#fca5a5' }}
                           onClick={() => onViewFailedLog?.(run)}
                           title="실패 단계 및 모듈 로그 확인"
                         >
                           <Layers size={12} /> 실패 로그
-                        </button>
+                        </Button>
                         {onDeletePipeline && (
-                          <button
+                          <Button
+                            variant="danger"
+                            size="sm"
                             type="button"
-                            className="ds-delete-ingestion-button"
-                            style={{ padding: '0.3rem 0.5rem', fontSize: '11px' }}
                             onClick={() => onDeletePipeline(run)}
                             disabled={deletingPipelineId === run.pipelineId}
                             title="실패 작업 기록과 부분 컬렉션 삭제"
@@ -328,7 +329,7 @@ export function VectorIndexList({
                               ? <RefreshCw size={12} className="ds-spin" />
                               : <Trash2 size={12} />}
                             삭제
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -366,7 +367,10 @@ export function VectorIndexList({
                               autoFocus
                               disabled={isSaving}
                             />
-                            <button
+                            <IconButton
+                              variant="primary"
+                              size="sm"
+                              aria-label="기업명 저장"
                               type="button"
                               className="ds-company-inline-save"
                               title="저장 (Enter)"
@@ -374,8 +378,11 @@ export function VectorIndexList({
                               disabled={isSaving}
                             >
                               <Check size={12} />
-                            </button>
-                            <button
+                            </IconButton>
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              aria-label="기업명 수정 취소"
                               type="button"
                               className="ds-company-inline-cancel"
                               title="취소 (Esc)"
@@ -383,7 +390,7 @@ export function VectorIndexList({
                               disabled={isSaving}
                             >
                               <X size={12} />
-                            </button>
+                            </IconButton>
                           </div>
                         ) : (
                           <>
@@ -395,14 +402,17 @@ export function VectorIndexList({
                               <Building2 size={12} style={{ color: companyDisplay ? '#166534' : '#94a3b8' }} />
                               <span>{companyDisplay || '+ 기업명 입력'}</span>
                             </span>
-                            <button
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              aria-label="기업명 수정"
                               type="button"
                               className="ds-company-edit-btn"
                               title="기업명 수정"
                               onClick={() => startEditCompany(idx)}
                             >
                               <Edit2 size={12} />
-                            </button>
+                            </IconButton>
                           </>
                         )}
                       </div>
@@ -440,41 +450,44 @@ export function VectorIndexList({
                     </td>
                     <td className="ds-actions-col ds-text-right" style={{ whiteSpace: 'nowrap' }}>
                       <div className="ds-actions-row">
-                        <button
+                        <Button
+                          size="sm"
                           type="button"
-                          className="ds-action-btn"
                           title="4대 모듈 파이프라인 실행 로그 및 세부 단계 확인"
                           onClick={() => onPipelineLogClick?.(idx)}
                         >
                           <Cpu size={13} />
                           <span>모듈 로그</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
                           type="button"
-                          className="ds-action-btn ds-action-btn--primary"
                           title="유사도 검색 테스트"
                           onClick={() => onSearchClick(idx)}
                         >
                           <Search size={13} />
                           <span>검색 테스트</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          size="sm"
                           type="button"
-                          className="ds-action-btn"
                           title="청크 및 메타데이터 상세 보기"
                           onClick={() => onDetailClick(idx.index_id)}
                         >
                           <Eye size={13} />
                           <span>상세</span>
-                        </button>
-                        <button
+                        </Button>
+                        <IconButton
+                          variant="danger"
+                          size="sm"
+                          aria-label="인덱스 삭제"
                           type="button"
-                          className="ds-action-btn ds-action-btn--danger"
                           title="인덱스 삭제"
                           onClick={() => onDeleteClick(idx.index_id)}
                         >
                           <Trash2 size={13} />
-                        </button>
+                        </IconButton>
                       </div>
                     </td>
                   </tr>

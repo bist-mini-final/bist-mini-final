@@ -176,6 +176,9 @@ class WorkflowStore:
             name=request.name,
             updated_at=utc_now_iso(),
             graph=request.graph,
+            kind="user",
+            editable=True,
+            template=False,
         )
         return self._store.write(workflow_id, document)
 
@@ -185,7 +188,9 @@ class WorkflowStore:
         canonical = canonical_workflow(workflow_id)
         if canonical is not None:
             return canonical
-        return self._store.load(workflow_id)
+        return self._store.load(workflow_id).model_copy(
+            update={"kind": "user", "editable": True, "template": False}
+        )
 
     def list(self) -> List[WorkflowDocument]:
         from backend.engine.job_catalog import canonical_workflows
@@ -199,7 +204,11 @@ class WorkflowStore:
                 doc = doc.model_copy(update={"id": path.stem})
             if doc.id in canonical_ids:
                 continue
-            documents.append(doc)
+            documents.append(
+                doc.model_copy(
+                    update={"kind": "user", "editable": True, "template": False}
+                )
+            )
         return documents
 
     def delete(self, workflow_id: str) -> None:

@@ -25,7 +25,7 @@ OPENAPI_TAGS = [
     {"name": "BI 대시보드 스냅샷", "description": "재무 지표와 근거"},
     {"name": "BI 머티리얼라이제이션 작업", "description": "BI 백그라운드 작업"},
     {"name": "BI 지표 질문 및 배치 계산", "description": "지표 질문과 진행률"},
-    {"name": "기업 비교 분석", "description": "리그 순위와 다중 기업 비교"},
+    {"name": "기업 비교", "description": "BI 원천 기반 버전형 기업 비교 스냅샷"},
     {"name": "벤치마크 실행 및 채점", "description": "정확도, 비용, 지연 평가"},
 ]
 
@@ -72,7 +72,7 @@ def custom_openapi_schema(
                 "BI 지표 질문 및 배치 계산",
             ],
         },
-        {"name": "5. 기업 비교 분석", "tags": ["기업 비교 분석"]},
+        {"name": "5. 기업 비교 분석", "tags": ["기업 비교"]},
         {"name": "6. RAG 벤치마크 평가", "tags": ["벤치마크 실행 및 채점"]},
     ]
 

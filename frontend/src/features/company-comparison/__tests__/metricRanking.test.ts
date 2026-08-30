@@ -5,7 +5,7 @@ import {
   rankCompaniesByMetric,
   toggleCompanySelection,
 } from '../metricRanking';
-import type { LeagueCompany } from '../leagueTypes';
+import type { ComparisonCompany } from '../types';
 
 function company(
   id: string,
@@ -14,25 +14,35 @@ function company(
   cagr: number,
   margin: number,
   compositeScore: number,
-): LeagueCompany {
+): ComparisonCompany {
   return {
     companyId: id, displayName: id, currency: 'KRW', scale: 'millions',
+    sourceSnapshotId: `snapshot-${id}`,
+    historicalStartYear: 2025, historicalEndYear: 2025,
     rank: 1, previousRank: 1, rankChange: 0, compositeScore,
     growthScore: 50, profitabilityScore: 50, stabilityScore: 50,
     revenueCagr: cagr, operatingMargin: margin, liabilitiesToAssets: 40,
     netDebt: 0, netDebtToRevenue: 0, tier: 'B',
-    candles: [{
-      year: 2025, periodType: 'historical', open: revenue, high: revenue,
-      low: revenue, close: revenue, revenue, operatingIncome,
-      operatingMargin: margin, evidenceId: 'E1',
+    periods: [{
+      year: 2025, periodType: 'historical', revenue, operatingIncome,
+      operatingMargin: margin, evidenceIds: ['E1'], assumptionId: null,
+    }, {
+      year: 2026, periodType: 'forecast', revenue, operatingIncome,
+      operatingMargin: margin, evidenceIds: ['E1'], assumptionId: 'forecast-v1',
+    }, {
+      year: 2027, periodType: 'forecast', revenue, operatingIncome,
+      operatingMargin: margin, evidenceIds: ['E1'], assumptionId: 'forecast-v1',
+    }, {
+      year: 2028, periodType: 'forecast', revenue, operatingIncome,
+      operatingMargin: margin, evidenceIds: ['E1'], assumptionId: 'forecast-v1',
     }],
   };
 }
 
 const companies = [
-  company('alpha', 100, 15, 8, 15, 70),
-  company('beta', 200, 10, 12, 5, 90),
-  company('gamma', 150, 30, 8, 20, 80),
+  { ...company('alpha', 100, 15, 8, 15, 70), rank: 3 },
+  { ...company('beta', 200, 10, 12, 5, 90), rank: 1 },
+  { ...company('gamma', 150, 30, 8, 20, 80), rank: 2 },
 ];
 
 describe('composite ranking and display sorting', () => {
@@ -42,7 +52,11 @@ describe('composite ranking and display sorting', () => {
   });
 
   it('uses competition ranking for equal composite scores', () => {
-    const tied = [companies[0], { ...companies[1], compositeScore: 70 }, companies[2]];
+    const tied = [
+      { ...companies[0], rank: 2 },
+      { ...companies[1], rank: 2, compositeScore: 70 },
+      { ...companies[2], rank: 1 },
+    ];
     expect(rankCompaniesByComposite(tied).map((item) => item.rank)).toEqual([1, 2, 2]);
   });
 

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { AppLink } from '../app/router';
 
-const plannedCards = [
+const secondaryCards = [
   {
     path: '/chatbot',
     title: 'AI 금융 챗봇',
@@ -57,7 +57,7 @@ export function HomePage() {
             <span>WORKSPACES</span>
             <h2 id="workspace-title">작업 공간</h2>
           </div>
-          <small>3개 사용 가능 · 2개 준비 중</small>
+          <small>5개 작업공간 사용 가능</small>
         </div>
 
         <div className="workspace-grid">
@@ -197,11 +197,11 @@ export function HomePage() {
             </div>
           </AppLink>
 
-          {/* Planned Cards (3) */}
-          {plannedCards.map(({ path, title, description, icon: Icon, tone }) => (
-            <AppLink key={path} to={path} className="workspace-card workspace-card--planned">
+          {/* Secondary workspace cards */}
+          {secondaryCards.map(({ path, title, description, icon: Icon, tone }) => (
+            <AppLink key={path} to={path} className="workspace-card">
               <div className={`planned-preview planned-preview--${tone}`}>
-                <span className="planned-preview__badge">COMING SOON</span>
+                <span className="planned-preview__badge">AVAILABLE</span>
                 <Icon size={34} strokeWidth={1.45} />
               </div>
               <div className="workspace-card__footer">

@@ -23,6 +23,9 @@ class EmbeddingArtifactVectors(Sequence[List[float]]):
         artifact_id: str,
         count: int,
         dimension: int,
+        *,
+        start: int = 0,
+        stop: int | None = None,
     ) -> None:
         if not store.is_valid(artifact_id, count, dimension):
             raise ModuleExecutionError(
@@ -30,7 +33,12 @@ class EmbeddingArtifactVectors(Sequence[List[float]]):
             )
         self._store = store
         self._artifact_id = artifact_id
-        self._count = count
+        resolved_stop = count if stop is None else stop
+        if start < 0 or resolved_stop < start or resolved_stop > count:
+            raise ModuleExecutionError("임베딩 아티팩트 view 범위가 올바르지 않습니다")
+        self._total_count = count
+        self._start = start
+        self._count = resolved_stop - start
         self._dimension = dimension
 
     def __len__(self) -> int:
@@ -43,9 +51,11 @@ class EmbeddingArtifactVectors(Sequence[List[float]]):
 
     def iter_raw_batches(self, batch_size: int) -> Iterator[bytes]:
         """Yield contiguous little-endian float32 bytes without Python floats."""
-        return self._store.iter_raw_batches(
+        return self._store.iter_raw_range_batches(
             self._artifact_id,
-            self._count,
+            self._start,
+            self._start + self._count,
+            self._total_count,
             self._dimension,
             batch_size,
         )
@@ -63,9 +73,9 @@ class EmbeddingArtifactVectors(Sequence[List[float]]):
                 return [self[position] for position in range(start, stop, step)]
             return self._store.read_range(
                 self._artifact_id,
-                start,
-                stop,
-                self._count,
+                self._start + start,
+                self._start + stop,
+                self._total_count,
                 self._dimension,
             )
         position = index if index >= 0 else self._count + index
@@ -73,9 +83,9 @@ class EmbeddingArtifactVectors(Sequence[List[float]]):
             raise IndexError(index)
         return self._store.read_range(
             self._artifact_id,
-            position,
-            position + 1,
-            self._count,
+            self._start + position,
+            self._start + position + 1,
+            self._total_count,
             self._dimension,
         )[0]
 
@@ -234,6 +244,25 @@ class EmbeddingArtifactStore:
         """Expose a validated artifact as a lazy sequence for batched DB writers."""
         return EmbeddingArtifactVectors(self, artifact_id, count, dimension)
 
+    def vector_range_sequence(
+        self,
+        artifact_id: str,
+        start: int,
+        stop: int,
+        count: int,
+        dimension: int,
+    ) -> EmbeddingArtifactVectors:
+        """Expose one range while retaining raw-byte streaming for Binary COPY."""
+
+        return EmbeddingArtifactVectors(
+            self,
+            artifact_id,
+            count,
+            dimension,
+            start=start,
+            stop=stop,
+        )
+
     def get(
         self,
         artifact_id: str,
@@ -263,6 +292,37 @@ class EmbeddingArtifactStore:
         with self._path(artifact_id).open("rb") as file:
             for start in range(0, count, effective_batch_size):
                 current_count = min(effective_batch_size, count - start)
+                expected_bytes = current_count * bytes_per_vector
+                raw = file.read(expected_bytes)
+                if len(raw) != expected_bytes:
+                    raise ModuleExecutionError(
+                        "문서 임베딩 아티팩트가 예상보다 짧습니다"
+                    )
+                yield raw
+
+    def iter_raw_range_batches(
+        self,
+        artifact_id: str,
+        start: int,
+        stop: int,
+        count: int,
+        dimension: int,
+        batch_size: int,
+    ) -> Iterator[bytes]:
+        """Stream a validated contiguous vector range without Python float objects."""
+
+        if not self.is_valid(artifact_id, count, dimension):
+            raise ModuleExecutionError(
+                "문서 임베딩 아티팩트가 없거나 크기가 DTO와 일치하지 않습니다"
+            )
+        if start < 0 or stop < start or stop > count:
+            raise ModuleExecutionError("임베딩 아티팩트 raw 범위가 올바르지 않습니다")
+        effective_batch_size = max(1, batch_size)
+        bytes_per_vector = dimension * 4
+        with self._path(artifact_id).open("rb") as file:
+            file.seek(start * bytes_per_vector)
+            for batch_start in range(start, stop, effective_batch_size):
+                current_count = min(effective_batch_size, stop - batch_start)
                 expected_bytes = current_count * bytes_per_vector
                 raw = file.read(expected_bytes)
                 if len(raw) != expected_bytes:

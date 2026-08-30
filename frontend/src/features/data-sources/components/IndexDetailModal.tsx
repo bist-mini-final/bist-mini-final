@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Database, Layers, Loader2, X } from 'lucide-react';
+import { Button, IconButton } from '../../../shared/ui';
 import { dataSourceApi } from '../services/dataSourceApi';
 import type { VectorIndexDetail } from '../types';
 
@@ -56,9 +57,9 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
               <small className="ds-font-mono">{indexId.slice(0, 16)}...</small>
             </div>
           </div>
-          <button className="ds-modal__close" onClick={onClose} aria-label="닫기">
+          <IconButton variant="ghost" onClick={onClose} aria-label="닫기">
             <X size={18} />
-          </button>
+          </IconButton>
         </header>
 
         <div className="ds-modal__body">
@@ -159,9 +160,9 @@ export function IndexDetailModal({ indexId, onClose }: DetailProps) {
         </div>
 
         <footer className="ds-modal__footer">
-          <button type="button" className="secondary-button" onClick={onClose}>
+          <Button type="button" onClick={onClose}>
             닫기
-          </button>
+          </Button>
         </footer>
       </div>
     </div>

@@ -160,8 +160,12 @@ curl http://localhost:8765/readyz
 | `KUBERNETES_JOB_MEMORY_REQUEST` | `2Gi` | 워커 메모리 request |
 | `KUBERNETES_JOB_CPU_LIMIT` | `2` | 워커 CPU limit |
 | `KUBERNETES_JOB_MEMORY_LIMIT` | `3Gi` | 워커 메모리 limit |
+| `INGESTION_SHARDS_ENABLED` | `false` | 직접 실행 시 분산 Excel ingestion 사용 여부. Kubernetes ScaledJob 템플릿은 `true`를 주입 |
+| `INGESTION_SHARD_POLL_SECONDS` | `1` | 부모 ingestion 모듈의 child shard 상태 조회 간격 |
+| `INGESTION_SHARD_WAIT_TIMEOUT_SECONDS` | `21000` | embedding/COPY shard barrier 최대 대기 시간 |
+| `INGESTION_VECTOR_SHARD_SIZE` | `4096` | 한 vector COPY Job이 담당하는 문서 수 |
 | `BI_QUESTION_BATCH_SIZE` | `16` | BI 질문 워커가 한 번에 가져올 질문 수 |
-| `BI_QUESTION_MAX_WORKERS` | `8` | BI 질문 워커 내부 최대 병렬 스레드 수 |
+| `BI_QUESTION_MAX_WORKERS` | `4` | BI 질문 워커 내부 최대 병렬 스레드 수 |
 | `LOG_LEVEL` | `INFO` | 워커 로그 레벨 |
 
 `KUBERNETES_JOB_NAME`은 Kubernetes가 워커 식별용으로 주입하는 값이고, `WORKFLOW_QUEUE`는 워크플로 워커 프로세스에서 기본 큐를 일시적으로 재정의할 때 사용합니다.
@@ -210,7 +214,7 @@ Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
 ./deploy/kubernetes/local.sh status
 ```
 
-`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·4개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
+`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
 
 개발용 `.env`의 `DATABASE_URL`이 원격 DB를 가리킬 때 로컬 DB로 실행하려면 다음처럼 한 번만 재정의합니다.
 
@@ -232,6 +236,7 @@ KUBERNETES_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rag_flow \
 ./deploy/kubernetes/local.sh status       # 용량, Pod, Job, ScaledJob 확인
 ./deploy/kubernetes/local.sh logs         # 워크플로 워커 로그 확인
 ./deploy/kubernetes/local.sh logs-api     # API 로그 확인
+./deploy/kubernetes/local.sh logs-ingestion # embedding/vector shard 워커 로그 확인
 ./deploy/kubernetes/local.sh down         # 클러스터 정지(데이터 유지)
 ./deploy/kubernetes/local.sh destroy      # k3d 클러스터 삭제
 ```
@@ -268,7 +273,7 @@ helm upgrade --install bist ./deploy/helm/bist \
   --values ./deploy/helm/bist/values.yaml
 ```
 
-로컬 k3d 검증용 값은 `values-k3d.yaml`이며, 호스트 경로와 단일 replica를 사용하므로 운영에 사용하지 않습니다. Chart는 Redis, schema migration hook, API/UI deployment, 4개 KEDA ScaledJob 및 `TriggerAuthentication`을 함께 렌더링합니다.
+로컬 k3d 검증용 값은 `values-k3d.yaml`이며, 호스트 경로와 단일 replica를 사용하므로 운영에 사용하지 않습니다. Chart는 Redis, schema migration hook, API/UI deployment, 6개 KEDA ScaledJob 및 `TriggerAuthentication`을 함께 렌더링합니다. Excel ingestion은 부모 workflow 외에 `ingestion-embedding`(최대 4개)과 `ingestion-vector`(최대 2개) child Job을 사용합니다.
 
 ### 5.3 워커를 로컬에서 한 번 실행하기
 

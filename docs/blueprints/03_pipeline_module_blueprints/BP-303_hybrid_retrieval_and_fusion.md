@@ -69,13 +69,14 @@ graph TD
 
 ```text
 [Context Block: Top-K 융합 및 2D 이웃 확장 셀 목록]
-Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출액] | Col: [2022.12 (제 54기)] | Value: 302,231,360 | Unit: 백만원
-Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출액] | Col: [2023.12 (제 55기)] | Value: 258,935,494 | Unit: 백만원
-Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2022.12 (제 54기)] | Value: 43,370,290 | Unit: 백만원
-Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2023.12 (제 55기)] | Value: 6,567,200 | Unit: 백만원
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영업수익 > 매출액 | Column Header: 2022.12 (제 54기) | Cell Value: 302,231,360
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영업수익 > 매출액 | Column Header: 2023.12 (제 55기) | Cell Value: 258,935,494
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영업수익 > 매출총이익 > 영업이익 | Column Header: 2022.12 (제 54기) | Cell Value: 43,370,290
+Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영업수익 > 매출총이익 > 영업이익 | Column Header: 2023.12 (제 55기) | Cell Value: 6,567,200
 ```
 
-* **토큰 절감 및 파편화 방지**: 마크다운 테이블 구문 대신 [BP-201] 단일 표준(`header_with_value`)을 그대로 유지함으로써, 토큰을 40~50% 절감하고 `ReaderModule` LLM이 환각 없이 명확한 Key-Value 및 시계열 관계를 인식합니다.
+* **표현 일관성과 파편화 방지**: 마크다운 표를 다시 조립하기보다 [BP-201]의 `header_with_value`와 원본 좌표 metadata를 유지해 dense/keyword/reader가 같은 cell 의미를 공유합니다. 토큰·정확도 효과는 benchmark에서 별도로 측정합니다.
+* **검색/Reader 경계 규칙**: `Cell Value: ?`는 값 미지정을 뜻하는 검색 와일드카드입니다. Query Decomposer가 만든 이 표기는 Query Embedder와 Dense 유사도 검색까지 그대로 유지하며, 검색 후보 좌표와 2D 확장에도 사용할 수 있습니다. 단, Reader 입력 경계에서는 `Cell Value`가 실제 값인 셀만 통과시킵니다. Reader의 `[Context Blocks]`, 검증 가능한 근거 목록, `lookup_cell_metadata` 도구 결과는 모두 이 공통 필터를 거쳐 재구성되며 `?`, `NA`, `N/A`, `NM`, `#PEND`는 모델에 전달하지 않습니다.
 
 ---
 

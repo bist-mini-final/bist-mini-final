@@ -35,7 +35,11 @@ class FixedRetriever:
                     cell_id="KS Cell I33",
                     sheet_name="Key_Stats",
                     cell_coord="I33",
-                    source_text="Total Revenue | FY2025 | 18000",
+                    source_text=(
+                        "Company: Bistelligence | Sheet: Key_Stats | "
+                        "Row Header: Total Revenue | Column Header: FY2025 | "
+                        "Cell Value: 18000"
+                    ),
                 ),
             ),
         )

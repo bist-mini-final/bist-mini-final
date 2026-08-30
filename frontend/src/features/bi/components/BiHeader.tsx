@@ -1,4 +1,5 @@
 import { CheckCircle2, CircleAlert, Clock3, DatabaseZap, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { Button, StatusBadge } from '../../../shared/ui';
 import type { BiDashboardSnapshot } from '../types';
 
 interface BiHeaderProps {
@@ -39,12 +40,12 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHead
       </div>
 
       <div className="bi-header__summary" aria-label="현재 대시보드 상태">
-        <span className="bi-status-pill" data-status={dashboard.snapshot.status}>
+        <StatusBadge className="bi-status-pill" tone={isPartial ? 'warning' : 'success'} data-status={dashboard.snapshot.status}>
           {isPartial
             ? <CircleAlert size={15} aria-hidden="true" />
             : <CheckCircle2 size={15} aria-hidden="true" />}
           {isPartial ? '부분 완료 스냅샷' : '사용 가능한 스냅샷'}
-        </span>
+        </StatusBadge>
         <dl className="bi-header__metadata">
           <div>
             <dt><FileSpreadsheet size={15} aria-hidden="true" />선택 파일</dt>
@@ -58,8 +59,10 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHead
               <dd title={generatedAt}>{generatedAt}</dd>
             </div>
           </dl>
-          <button
-            className="bi-refresh-button"
+          <Button
+            variant="secondary"
+            size="lg"
+            busy={activeAction === 'refresh'}
             type="button"
             aria-disabled={!canStartAction}
             onClick={() => {
@@ -68,9 +71,11 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHead
           >
             <RefreshCw className={activeAction === 'refresh' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
             {activeAction === 'refresh' ? '대시보드 갱신 중' : '대시보드 갱신'}
-          </button>
-          <button
-            className="bi-data-reset-button"
+          </Button>
+          <Button
+            variant="danger"
+            size="lg"
+            busy={activeAction === 'reset'}
             type="button"
             aria-disabled={!canStartAction}
             onClick={() => {
@@ -79,7 +84,7 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset }: BiHead
           >
             <DatabaseZap className={activeAction === 'reset' ? 'bi-refresh-button__spinner' : undefined} size={15} aria-hidden="true" />
             {activeAction === 'reset' ? '데이터 재생성 중' : '데이터 초기화 및 재생성'}
-          </button>
+          </Button>
         </div>
       </div>
     </header>

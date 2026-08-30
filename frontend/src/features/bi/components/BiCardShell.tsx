@@ -1,4 +1,5 @@
 import { EyeOff, GripVertical, Search } from 'lucide-react';
+import { Button, IconButton, StatusBadge } from '../../../shared/ui';
 import type { BiCardDefinition } from '../config/cardRegistry';
 import type { BiCardViewModel } from '../selectors/cardViewModel';
 import type { BiDashboardSnapshot, CardMoveDirection, CardSize, PeriodRange } from '../types';
@@ -62,17 +63,24 @@ export function BiCardShell(props: BiCardShellProps) {
         <div className="bi-card__heading">
           <div className="bi-card__title-row">
             <h3>{props.definition.title}</h3>
-            <span className="bi-card__state">{props.viewModel.stateLabel}</span>
+            <StatusBadge
+              className="bi-card__state"
+              tone={props.viewModel.state === 'ready' ? 'success' : 'warning'}
+            >
+              {props.viewModel.stateLabel}
+            </StatusBadge>
             {props.isEditing ? (
-              <button
+              <IconButton
                 className="bi-card__hide-button"
+                variant="danger"
+                size="sm"
                 type="button"
                 aria-label={`${props.definition.title} 카드 숨기기`}
                 title="카드 숨기기"
                 onClick={props.onHide}
               >
                 <EyeOff size={15} aria-hidden="true" />
-              </button>
+              </IconButton>
             ) : null}
           </div>
           <p>{props.definition.description}</p>
@@ -112,9 +120,9 @@ export function BiCardShell(props: BiCardShellProps) {
           <span>{props.periodLabel}</span><span>{props.viewModel.unitLabel}</span><span>{props.layoutLabel}</span>
         </div>
         <div className="bi-card__actions">
-          <button type="button" disabled={props.viewModel.evidence.length === 0} onClick={props.onShowEvidence}>
+          <Button size="sm" type="button" disabled={props.viewModel.evidence.length === 0} onClick={props.onShowEvidence}>
             <Search size={14} aria-hidden="true" />근거 보기
-          </button>
+          </Button>
         </div>
       </footer>
     </article>

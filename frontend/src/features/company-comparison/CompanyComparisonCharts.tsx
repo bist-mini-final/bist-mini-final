@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { CompanyLogoBadge } from './CompanyLogoBadge';
+import type { TrendPoint } from './analysis';
 
 export interface BenchmarkScatterPoint {
   readonly companyId: string;
@@ -38,22 +39,25 @@ export function BenchmarkScatterTooltip({
 }
 
 export function FinancialTrendChart({
-  values,
+  points,
   color,
   gradientId,
   label,
   valueFormatter,
 }: {
-  readonly values: readonly number[];
+  readonly points: readonly TrendPoint[];
   readonly color: string;
   readonly gradientId: string;
   readonly label: string;
   readonly valueFormatter: (value: number) => string;
 }) {
-  const data = values.map((value, index) => ({ year: 2021 + index, value }));
+  const data = points;
+  const periodLabel = data.length
+    ? `${data[0].year}년부터 ${data[data.length - 1].year}년까지`
+    : '관측 기간';
 
   return (
-    <div className="analysis-trend-chart" role="img" aria-label={`2021년부터 2025년까지 ${label} 추이`}>
+    <div className="analysis-trend-chart" role="img" aria-label={`${periodLabel} ${label} 추이`}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 7, right: 5, bottom: 0, left: 5 }}>
           <defs>
@@ -89,12 +93,17 @@ export function ComparisonTrendChart({
   first,
   second,
 }: {
-  readonly first: readonly number[];
-  readonly second: readonly number[];
+  readonly first: readonly TrendPoint[];
+  readonly second: readonly TrendPoint[];
 }) {
-  const data = first.map((value, index) => ({ year: 2021 + index, a: value, b: second[index] }));
+  const secondByYear = new Map(second.map((point) => [point.year, point.value]));
+  const data = first.flatMap((point) => {
+    const secondValue = secondByYear.get(point.year);
+    return secondValue === undefined ? [] : [{ year: point.year, a: point.value, b: secondValue }];
+  });
+  const baseYear = data[0]?.year;
   return (
-    <div className="analysis-trend-chart is-comparison" role="img" aria-label="두 기업의 2021년부터 2025년까지 매출 성장 지수 비교">
+    <div className="analysis-trend-chart is-comparison" role="img" aria-label="두 기업의 공통 관측 기간 매출 성장 지수 비교">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 7, right: 5, bottom: 0, left: 5 }}>
           <CartesianGrid vertical={false} stroke="#e8efeb" strokeDasharray="2 3" />
@@ -102,7 +111,7 @@ export function ComparisonTrendChart({
           <YAxis hide domain={['dataMin', 'dataMax']} />
           <Tooltip
             formatter={(value, name) => [`${Number(value).toFixed(1)}`, name === 'a' ? '기업 A' : '기업 B']}
-            labelFormatter={(year) => `${year}년 · 2021=100`}
+            labelFormatter={(year) => `${year}년 · ${baseYear ?? '기준연도'}=100`}
             contentStyle={{ border: '1px solid #d7e4dd', borderRadius: 7, padding: '6px 8px', fontSize: 9 }}
           />
           <Line type="monotone" dataKey="a" stroke="#107c41" strokeWidth={2.2} dot={{ r: 2.5, fill: '#fff', strokeWidth: 1.5 }} activeDot={{ r: 4 }} />

@@ -48,6 +48,9 @@ export interface WorkflowDocument {
   readonly name: string;
   readonly updated_at: string;
   readonly graph: WorkflowGraph;
+  readonly kind: 'standard' | 'user';
+  readonly editable: boolean;
+  readonly template: boolean;
 }
 
 export type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed';

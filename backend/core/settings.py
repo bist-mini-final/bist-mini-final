@@ -28,11 +28,50 @@ def _positive_int_environment(name: str, default: int) -> int:
     return value
 
 
+def _positive_float_environment(name: str, default: float) -> float:
+    raw_value = os.getenv(name, str(default))
+    try:
+        value = float(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a number") from error
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than 0")
+    return value
+
+
+def _boolean_environment(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"true", "1", "yes", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 KUBERNETES_WORKFLOW_QUEUE = os.getenv(
     "KUBERNETES_WORKFLOW_QUEUE",
     "workflow-core",
 )
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
+INGESTION_SHARDS_ENABLED = _boolean_environment(
+    "INGESTION_SHARDS_ENABLED",
+    False,
+)
+INGESTION_SHARD_POLL_SECONDS = _positive_float_environment(
+    "INGESTION_SHARD_POLL_SECONDS",
+    1.0,
+)
+INGESTION_SHARD_WAIT_TIMEOUT_SECONDS = _positive_int_environment(
+    "INGESTION_SHARD_WAIT_TIMEOUT_SECONDS",
+    21_000,
+)
+INGESTION_VECTOR_SHARD_SIZE = _positive_int_environment(
+    "INGESTION_VECTOR_SHARD_SIZE",
+    4096,
+)
 
 # PostgreSQL + pgvector Configuration
 DATABASE_URL = os.getenv(

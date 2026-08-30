@@ -45,6 +45,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import Field
 
+from backend.storage.spreadsheets.structured_cell_text import (
+    normalize_row_headers,
+    resolved_cell_value,
+    serialize_structured_cell,
+)
 from modules.common.base_module import (
     BaseModule,
     DocumentContextDTO,
@@ -62,6 +67,53 @@ from modules.retrieval.ports import ContextExpansionStorePort
 from modules.retrieval.rrf_fusion import RetrievalDTO
 
 logger = logging.getLogger(__name__)
+
+_STRUCTURED_FIELD_PATTERN = re.compile(
+    r"(?:^|\|)\s*(Company|Sheet|Row Header|Column Header|Cell Value):\s*([^|]*)",
+    re.IGNORECASE,
+)
+
+
+def _header_list(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value or "").strip()
+    return [part.strip() for part in text.split(" > ") if part.strip()]
+
+
+def _real_cell_value(value: Any) -> str:
+    return resolved_cell_value(value) or ""
+
+
+def _structured_fields(text: str) -> Dict[str, str]:
+    return {key.casefold(): value.strip() for key, value in _STRUCTURED_FIELD_PATTERN.findall(text)}
+
+
+def _canonical_source_text(
+    cell: Dict[str, Any],
+    *,
+    fallback_company: str = "",
+    fallback_sheet: str = "",
+) -> str:
+    """Render current and legacy cell records through the canonical five-field contract."""
+
+    fields = _structured_fields(str(cell.get("source_text") or ""))
+    value = _real_cell_value(cell.get("cell_value")) or _real_cell_value(fields.get("cell value"))
+    if not value:
+        return ""
+
+    company = str(cell.get("company_name") or fields.get("company") or fallback_company).strip()
+    sheet = str(cell.get("sheet_name") or fields.get("sheet") or fallback_sheet).strip()
+    row_headers = _header_list(cell.get("row_header") or fields.get("row header"))
+    row_headers = normalize_row_headers(row_headers, company_name=company)
+    column_headers = _header_list(cell.get("column_header") or fields.get("column header"))
+    return serialize_structured_cell(
+        sheet,
+        row_headers,
+        column_headers,
+        value,
+        company_name=company,
+    )
 
 
 # ==============================================================================
@@ -184,7 +236,7 @@ class PgContextExpanderModule(BaseModule):
         outputs=["context_json"],
         config_fields=["top_k", "max_blocks"],
         raw_output=True,
-        version="2",
+        version="3",
     )
     input_model = PgContextExpanderInputDTO
     config_model = PgContextExpanderConfigDTO
@@ -247,24 +299,33 @@ class PgContextExpanderModule(BaseModule):
         seen_blocks: Set[str] = set()
         expanded_cells: List[Dict[str, Any]] = []
         seen_cell_coords: Set[Tuple[str, str]] = set()
+        fallback_cells: List[Dict[str, Any]] = []
 
         for candidate in retrieval_items:
             t = candidate.text.strip()
-            # Only add raw candidate text if it contains a real numeric value, not '?'
-            if t and "Cell Value: ?" not in t and t not in seen_blocks:
-                seen_blocks.add(t)
-                context_blocks.append(t)
             _, sheet, _, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
             coord_match = re.search(r"([A-Za-z]+)(\d+)", candidate.cell_id)
             coord_str = coord_match.group(0) if coord_match else ""
-            if sheet and coord_str and (sheet, coord_str) not in seen_cell_coords:
-                seen_cell_coords.add((sheet, coord_str))
-                expanded_cells.append(
+            canonical_candidate = _canonical_source_text(
+                {"source_text": t},
+                fallback_company=str(doc_context_dict.get("company_name") or ""),
+                fallback_sheet=sheet,
+            )
+            if canonical_candidate and canonical_candidate not in seen_blocks:
+                seen_blocks.add(canonical_candidate)
+                context_blocks.append(canonical_candidate)
+            elif t and not _structured_fields(t) and t not in seen_blocks:
+                # An unstructured retrieval hit may still help expansion/routing,
+                # but it is never promoted to a verifiable citation cell.
+                seen_blocks.add(t)
+                context_blocks.append(t)
+            if canonical_candidate and sheet and coord_str:
+                fallback_cells.append(
                     {
                         "cell_id": candidate.cell_id,
                         "sheet_name": sheet,
                         "cell_coord": coord_str,
-                        "source_text": candidate.text,
+                        "source_text": canonical_candidate,
                     }
                 )
 
@@ -296,42 +357,12 @@ class PgContextExpanderModule(BaseModule):
                             value.get("col_index") or 0,
                         ),
                     ):
-                        raw_text = (cell.get("source_text") or "").strip()
-                        actual_value = str(cell.get("cell_value") or "").strip()
-                        if raw_text and actual_value and actual_value != "?":
-                            raw_text = re.sub(
-                                r"Cell Value:\s*\?(?=\s*(?:\||$))",
-                                f"Cell Value: {actual_value}",
-                                raw_text,
-                            )
-                        if not raw_text:
-                            c_name = cell.get("company_name") or doc_context_dict.get(
-                                "company_name", ""
-                            )
-                            s_name = cell.get("sheet_name") or sheet
-                            rh = (
-                                " > ".join(cell["row_header"])
-                                if isinstance(cell.get("row_header"), list)
-                                else str(cell.get("row_header") or "")
-                            )
-                            ch = (
-                                " > ".join(cell["column_header"])
-                                if isinstance(cell.get("column_header"), list)
-                                else str(cell.get("column_header") or "")
-                            )
-                            val = actual_value
-                            parts = []
-                            if c_name:
-                                parts.append(f"Company: {c_name}")
-                            if s_name:
-                                parts.append(f"Sheet: {s_name}")
-                            if rh:
-                                parts.append(f"Row Header: {rh}")
-                            if ch:
-                                parts.append(f"Column Header: {ch}")
-                            if val:
-                                parts.append(f"Cell Value: {val}")
-                            raw_text = " | ".join(parts)
+                        actual_value = _real_cell_value(cell.get("cell_value"))
+                        raw_text = _canonical_source_text(
+                            cell,
+                            fallback_company=str(doc_context_dict.get("company_name") or ""),
+                            fallback_sheet=sheet,
+                        )
 
                         if raw_text and raw_text not in seen_blocks:
                             seen_blocks.add(raw_text)
@@ -339,7 +370,13 @@ class PgContextExpanderModule(BaseModule):
 
                         coord = cell.get("cell_coord") or ""
                         s_name = cell.get("sheet_name") or sheet
-                        if coord and s_name and (s_name, coord) not in seen_cell_coords:
+                        if (
+                            raw_text
+                            and actual_value
+                            and coord
+                            and s_name
+                            and (s_name, coord) not in seen_cell_coords
+                        ):
                             seen_cell_coords.add((s_name, coord))
                             cid = cell.get("cell_id") or f"{s_name} Cell {coord}"
                             expanded_cells.append(
@@ -356,6 +393,15 @@ class PgContextExpanderModule(BaseModule):
                             break
                     if len(context_blocks) >= cfg.max_blocks:
                         break
+
+        # Use a value-bearing retrieval candidate only when DB row expansion did
+        # not return that coordinate. Header-only (`Cell Value: ?`) candidates
+        # never become evidence.
+        for cell in fallback_cells:
+            key = (cell["sheet_name"], cell["cell_coord"])
+            if key not in seen_cell_coords:
+                seen_cell_coords.add(key)
+                expanded_cells.append(cell)
 
         context_blocks = context_blocks[: cfg.max_blocks]
         if not context_blocks:

@@ -1,5 +1,14 @@
+import { useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {
+  cellCitationLabel,
+  normalizeCellCitations,
+  parseCellCitationHref,
+  type CellCitation,
+} from '../../../shared/markdown/cellCitations';
+import './MarkdownAnswer.css';
 
 interface MarkdownAnswerProps {
   markdown: string;
@@ -31,18 +40,88 @@ export function normalizeMarkdownTables(markdown: string) {
   }).join('\n');
 }
 
+interface TooltipPosition {
+  readonly left: number;
+  readonly top: number;
+  readonly placement: 'above' | 'below';
+}
+
+function CellCitationChip({ citation }: { readonly citation: CellCitation }) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const tooltipId = useId();
+  const [position, setPosition] = useState<TooltipPosition | null>(null);
+  const label = cellCitationLabel(citation);
+  const details = [
+    ['기업', citation.company],
+    ['시트', citation.sheet],
+    ['셀', citation.cell],
+    ['행 항목', citation.rowHeader],
+    ['열 항목', citation.columnHeader],
+    ['셀 값', citation.cellValue],
+  ].filter((entry): entry is [string, string] => Boolean(entry[1]));
+
+  const showTooltip = () => {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const tooltipWidth = Math.min(352, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - tooltipWidth - 12));
+    const placement = rect.bottom + 220 > window.innerHeight && rect.top > 220 ? 'above' : 'below';
+    setPosition({ left, top: placement === 'above' ? rect.top - 8 : rect.bottom + 8, placement });
+  };
+
+  return (
+    <>
+      <span
+        ref={anchorRef}
+        className="reader-citation"
+        tabIndex={0}
+        aria-describedby={position ? tooltipId : undefined}
+        onMouseEnter={showTooltip}
+        onMouseLeave={() => setPosition(null)}
+        onFocus={showTooltip}
+        onBlur={() => setPosition(null)}
+      >
+        {label}
+      </span>
+      {position && createPortal(
+        <aside
+          id={tooltipId}
+          className="reader-citation-tooltip"
+          role="tooltip"
+          data-placement={position.placement}
+          style={{ left: position.left, top: position.top }}
+        >
+          <strong>{label} 셀 출처</strong>
+          <dl>
+            {details.map(([term, value]) => (
+              <div key={term} style={{ display: 'contents' }}>
+                <dt>{term}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </aside>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
   return (
     <div className="reader-markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ href, children }) => href?.startsWith('https://citation.local/')
-            ? <span className="chatbot-citation-chip">{children}</span>
-            : <a href={href}>{children}</a>,
+          a: ({ href, children }) => {
+            const citation = parseCellCitationHref(href);
+            return citation
+              ? <CellCitationChip citation={citation} />
+              : <a href={href}>{children}</a>;
+          },
         }}
       >
-        {normalizeMarkdownTables(markdown)}
+        {normalizeCellCitations(normalizeMarkdownTables(markdown))}
       </ReactMarkdown>
     </div>
   );

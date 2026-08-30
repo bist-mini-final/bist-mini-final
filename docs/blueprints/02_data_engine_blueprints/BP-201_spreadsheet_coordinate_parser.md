@@ -1,114 +1,59 @@
-# [BP-201] 2D 그리드 셀 좌표계 파서 & 마크다운 직렬화
-> **Document Code:** `BP-201` | **Category:** Data Engine Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`backend/storage/spreadsheets/`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/), [`modules/structure/cell_text_serializer.py`](file:///c:/Repos/bist-mini-final/modules/structure/cell_text_serializer.py)
+# [BP-201] Spreadsheet 2D 좌표 정규화와 직렬화
+> **Document Code:** `BP-201` | **Category:** Data Engine Blueprint | **Status:** Implemented & Operational
+> **Source Roots:** [`backend/storage/spreadsheets/`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/), [`modules/structure/`](file:///c:/Repos/bist-mini-final/modules/structure/)
 
 ---
 
-## 1. 2D 스프레드시트 파싱 및 좌표계 정규화 (Coordinate Parsing Engine)
+## 1. 목적
 
-기업 재무 엑셀은 **병합 셀(Merged Cells), 빈 행/열, 숨김 시트(Hidden Sheets), 다층 복합 헤더(Multi-level Headers)**를 포함하고 있어 단순 CSV 형태로는 RAG 색인이 불가능합니다. `bist-mini-final`은 2D 그리드 좌표계를 완벽히 정규화하는 파싱 파이프라인을 갖추고 있습니다.
+재무 workbook의 값은 cell 하나만으로 의미가 완성되지 않습니다. 행 계정명, 열 기간, unit, 병합 header, sheet와 company scope를 보존해 검색 text와 source evidence를 함께 만들어야 합니다.
+
+---
+
+## 2. 정규화 규칙
+
+1. workbook과 sheet의 원래 순서·이름을 보존합니다.
+2. merged range의 anchor 값을 해당 header 문맥을 해석할 때 공유하되 원본 좌표는 바꾸지 않습니다.
+3. cell은 row/column index와 Excel coordinate를 모두 가집니다.
+4. formula cell은 값과 formula/source 표현을 혼동하지 않도록 명시적으로 처리합니다.
+5. blank/hidden 영역의 포함 여부는 parser config와 source metadata로 남깁니다.
+6. amount의 currency·scale·period를 가능한 한 명시적 metadata로 분리합니다.
+
+---
+
+## 3. `header_with_value` 검색 표현
+
+```text
+Company: {company} | Sheet: {sheet} | Row Header: {row_header_path} | Column Header: {column_header_path} | Cell Value: {display_value}
+```
+
+직렬화 text는 dense embedding과 keyword index가 같은 cell 의미를 공유하도록 합니다. `Company`는 `Row Header`에 섞지 않는 독립 필드이며, table `title` 영역의 회사명·출처·단위·기간 설명도 행 계정명 계층에 포함하지 않습니다. raw workbook 값, `cell_coord`, row/column index, unit과 source 정보는 별도 metadata에 남겨 reader와 BI가 evidence로 참조합니다.
+
+`header_only` 변형의 `Cell Value: ?`는 검색 recall 보조용이며 사용자 답변의 근거가 될 수 없습니다. Context Expander는 같은 좌표의 `header_with_value`/실제 metadata 값을 우선 복원하고, Reader는 값이 없는 셀을 인용 후보에서 제외합니다.
+
+---
+
+## 4. 후속 검색 흐름
 
 ```mermaid
 flowchart LR
-    XLSX["Raw Excel File (.xlsx)"] --> LOAD["OpenPyXL Data-Only Loader"]
-    LOAD --> VIS["Hidden Sheet Filter (state != 'hidden')"]
-    VIS --> MERGE["Merged Cell Value Broadcast"]
-    MERGE --> NORM["2D Sparse Grid Coordinate Mapper (A1 -> [row, col])"]
-    NORM --> SERIAL["Structured Cell Text Serializer"]
-    SERIAL --> CHUNK["Dense & Sparse Search Chunks"]
+    XLSX["workbook"] --> GRID["2D cell grid"]
+    GRID --> STRUCTURE["validated table regions"]
+    STRUCTURE --> SERIALIZE["cell_text_serializer"]
+    SERIALIZE --> EMBED["cell_text_embedder"]
+    EMBED --> INDEX["pgvector + keyword metadata"]
+    INDEX --> RETRIEVE["dense/keyword + RRF"]
+    RETRIEVE --> EXPAND["neighbor/header context"]
+    EXPAND --> READER["answer + cited cells"]
 ```
 
----
-
-## 2. 병합 셀 브로드캐스팅 및 좌표 정규화 규칙
-
-1. **병합 셀 값 전파 (Merged Cell Broadcast)**:
-   - 병합 영역 `A1:C1`에 "재무상태표 (2023)" 값이 있을 때, 실제 데이터 추출 시 `A1`, `B1`, `C1` 전체에 부모 헤더 문맥을 전파하여 검색 시 누락을 방지합니다.
-2. **2D 직교 좌표계 표준화 (Zero-Hardcoding)**:
-   - `Row Index`: 1-indexed 양의 정수 (예: `1`, `2`, `100`)
-   - `Column Index / Letter`: 1-indexed 정수 및 영문 알파벳 좌표 (예: `1` ↔ `A`, `27` ↔ `AA`)
-   - **원본 시트명 보존 (Raw Sheet Identity)**:
-     - 엑셀마다 `포괄손익계산서(연결)`, `Income Statement`, `3.재무상태표`, `Sheet1` 등 임의의 명칭이 들어오므로, **불안정한 하드코딩 정적 매핑(`손익계산서->IS`)을 전면 배제**합니다.
-     - 원본 시트명 문자열(`sheet_name: str`)과 시트 순환 인덱스(`sheet_index: int`)를 단일 진실 원천(SSOT)으로 그대로 보존하며, 표준 재무제표 분류가 필요할 경우 **Luna VLM / LLM 구조 분석기가 시트 내용과 헤더를 종합 분석하여 동적으로 시맨틱 태깅**합니다.
+구조 감지 실패 시 임의의 header heuristic으로 계속 적재하지 않습니다. 구조 감지와 좌표 정규화는 분리돼 있어 외부 vision 결과도 실제 workbook bounds와 대조합니다.
 
 ---
 
-## 3. 단일 표준 직렬화 규격 (Canonical Structured Cell Format)
+## 5. 무결성·성능 검증
 
-`bist-mini-final`은 입력 패턴의 파편화를 방지하고 토큰 소비를 극소화하기 위해, **인덱싱(Dense/Sparse)부터 LLM 프롬프트 문맥 주입까지 100% 일원화된 단일 표준 포맷(`header_with_value`)만을 사용**합니다.
-
-### 3.1 직렬화 표준 EBNF 문법 (Canonical Grammar)
-```text
-CanonicalChunk ::= "Company: " CompanyName 
-                   " | Sheet: " SheetName 
-                   " | Row: " RowHierarchy 
-                   " | Col: " ColumnHierarchy 
-                   " | Value: " Value 
-                   [" | Unit: " UnitName]
-```
-
-### 3.2 직렬화 실례
-- **입력 셀 좌표**: `삼성전자_2023.xlsx` ➡️ `포괄손익계산서(연결)!C15`
-- **감지된 메타데이터**:
-  - `Company`: 삼성전자
-  - `Sheet`: 포괄손익계산서(연결)
-  - `Row Hierarchy`: `[Ⅰ. 영업수익 > 1. 매출총이익 > Ⅴ. 영업이익]`
-  - `Col Hierarchy`: `[2023.12 (제 55기)]`
-  - `Value`: `6,567,200`
-  - `Unit`: `백만원`
-- **단일 표준 직렬화 텍스트 (Single Canonical String)**:
-  ```text
-  Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2023.12 (제 55기)] | Value: 6,567,200 | Unit: 백만원
-  ```
-
----
-
-## 4. 단일화 아키텍처의 이점 및 파이프라인 흐름 (Zero-Fragmentation Architecture)
-
-마크다운 표(`| --- |`) 문법의 파편화된 변형을 배제하고 단일 직렬화 포맷을 고수함으로써 얻는 핵심 이점과 엔드투엔드 데이터 흐름은 다음과 같습니다:
-
-```mermaid
-flowchart TD
-    CELL["Spreadsheet Cell<br>(Row, Col, Value)"] --> CANONICAL["단일 표준 직렬화<br>(header_with_value)"]
-    
-    subgraph IndexingLayer ["1 & 2. 듀얼 색인 (Dual Indexing)"]
-        CANONICAL --> DENSE["1. pgvector Dense 임베딩 (3072d)"]
-        CANONICAL --> SPARSE["2. Native TSVector BM25 FTS 색인"]
-    end
-
-    subgraph RetrievalLayer ["하이브리드 검색 & RRF 융합 (BP-303)"]
-        DENSE -.-> RET_D["Dense 벡터 검색"]
-        SPARSE -.-> RET_S["Sparse 키워드 검색"]
-        RET_D --> RRF["RRF 상호 순위 융합 (k=60)"]
-        RET_S --> RRF
-    end
-
-    subgraph GenerationLayer ["문맥 확장 및 추론"]
-        RRF --> EXPAND["3. Context Expander<br>(융합된 Top-K 셀의 2D 이웃 셀 결합)"]
-        EXPAND --> PROMPT["4. LLM Reader (GPT-5.6 Luna)<br>프롬프트 Context 주입"]
-    end
-```
-
-1. **극적인 토큰 효율성 (40~50% Token Saving)**:
-   - 마크다운 표 구문(`|`, `---`, 정렬 태그, 빈 셀 공백 등)에 낭비되는 불필요한 토큰을 완전히 제거하여 동일한 컨텍스트 윈도우 안에 **2배 더 많은 핵심 근거 셀**을 주입할 수 있습니다.
-2. **입력 패턴 단일화 (Zero Pattern Fragmentation)**:
-   - 임베딩 생성 시점, 키워드 색인 시점, RRF 융합 후 LLM에게 전달되는 시점의 텍스트 규격이 100% 동일하므로, 파서 변환 오류가 원천 배제되고 LLM의 Key-Value 파싱 정확도가 극대화됩니다.
-3. **Context Expander의 이웃 셀 주입 방식**:
-   - 특정 셀이 검색되었을 때, 상하위 계정과목과 시계열 비교 셀들을 각각 단일 라인으로 나열(`\n` 구분)하여 직관적이고 군더더기 없는 완벽한 추론 문맥을 형성합니다:
-   ```text
-   [Context Block]
-   Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출액] | Col: [2022.12 (제 54기)] | Value: 302,231,360 | Unit: 백만원
-   Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출액] | Col: [2023.12 (제 55기)] | Value: 258,935,494 | Unit: 백만원
-   Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2022.12 (제 54기)] | Value: 43,370,290 | Unit: 백만원
-   Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row: [영업수익 > 매출총이익 > 영업이익] | Col: [2023.12 (제 55기)] | Value: 6,567,200 | Unit: 백만원
-   ```
-
----
-
-## 5. 리팩토링 타깃 (Refactoring Targets)
-
-1. **구현됨 — 대용량 시트 읽기 경로**:
-   - 워크북 카탈로그, 인제스천, 기업 엔터티 추출과 첨부 파일 파서는 `load_workbook(read_only=True, data_only=True)`로 순차 읽기를 사용합니다. 대형 파일은 업로드 제한(500MB)과 worker 단위 실행으로 추가 격리합니다.
-   - 렌더링이 필요한 VLM 구조 감지 경로는 이미지·수식 좌표 접근을 위해 일반 workbook 객체를 사용하므로, 해당 경로의 메모리 상한을 별도로 계측·개선하는 일은 남아 있습니다.
-2. **구현됨 — 수식/값 듀얼 보존**:
-   - `LunaVlmStructureDetector`는 `data_only=False`와 `data_only=True` workbook을 함께 열어 원본 수식과 계산값을 동시에 참조합니다. 따라서 수식 문서화와 값 기반 인덱싱을 같은 분석 결과에 결합할 수 있습니다.
+- 병합 header, 다층 header, 음수·괄호 숫자, 단위 행, 여러 FY 열에 대한 fixture test를 유지합니다.
+- serialized record에서 workbook/sheet/cell 좌표를 역추적할 수 있어야 합니다.
+- batch size와 artifact 사용량은 데이터셋 benchmark로 조정하며 근거 없는 고정 절감률을 문서화하지 않습니다.
+- large workbook parsing은 API 이벤트 루프가 아니라 worker thread/one-shot worker에서 실행합니다.
