@@ -1,6 +1,7 @@
 # [BP-203] 대용량 Binary COPY와 pgvector 인덱싱
-> **Document Code:** `BP-203` | **Category:** Data Engine Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py), [`backend/storage/data_sources/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/shard_coordinator.py)
+> **Document Code:** `BP-203` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure`, `backend/domains/data_sources/workers`, `backend/platform/pgvector`, `jobs`
+> **Current References:** [`backend/domains/data_sources/application/shard_coordinator.py`](../../../backend/domains/data_sources/application/shard_coordinator.py), [`backend/domains/data_sources/infrastructure/filesystem/embedding_artifacts.py`](../../../backend/domains/data_sources/infrastructure/filesystem/embedding_artifacts.py), [`backend/domains/data_sources/infrastructure/postgres/shards.py`](../../../backend/domains/data_sources/infrastructure/postgres/shards.py), [`backend/domains/data_sources/infrastructure/pgvector/`](../../../backend/domains/data_sources/infrastructure/pgvector), [`backend/domains/data_sources/workers/`](../../../backend/domains/data_sources/workers), [`backend/platform/pgvector/binary_copy.py`](../../../backend/platform/pgvector/binary_copy.py)
 
 ---
 
@@ -77,6 +78,7 @@ WHERE collection_id = '{collection_uuid}'::uuid
 ## 4. 메모리 격리 및 SSE 실시간 진행률 스트리밍 (Memory Isolation & SSE Telemetry)
 
 - **`memoryview` 세그먼트 스트리밍**: 수만 행의 대형 워크북이라도 DB 전송 프레임 전체를 한 번에 만들지 않습니다. 분산 COPY Job은 artifact range view를 사용해 Python float 목록을 만들지 않고 little-endian raw bytes를 직접 읽으며, 로컬 fallback은 기존 `batch_size=1000` 스트림을 유지합니다.
+- `PgVectorBinaryCopyStream`은 artifact raw batch 변환과 일반 vector sequence 변환을 별도 경계로 유지합니다. 두 경로는 network byte order 변환 뒤 동일한 row framing과 progress callback을 공유합니다.
 - **재시도 멱등성**: `(staging collection UUID, global embedding index)`의 UUIDv5를 row ID로 사용합니다. 같은 shard를 재실행하면 해당 결정적 ID 범위를 한 트랜잭션에서 삭제한 뒤 COPY하므로 중복 row가 생기지 않습니다.
 - **실시간 SSE 프로그레스 이벤트 (`Server-Sent Events`)**:
   - `progress_callback({"completed_batches", "total_batches", "completed_items", "total_items"})`가 실행 상태에 저장되고 SSE 상태 갱신에 반영됩니다.
@@ -85,14 +87,14 @@ WHERE collection_id = '{collection_uuid}'::uuid
 
 ---
 
-## 5. 리팩토링 타깃 (Refactoring Targets)
+## 5. 확정된 구현 결정
 
 1. **구현됨 — Binary COPY 단일 스트리밍 경로 (Zero Legacy Code Policy)**:
    - `PgVectorBinaryCopyStream`이 float32 artifact와 일반 벡터 시퀀스를 모두 동일한 PostgreSQL Binary COPY row framing으로 변환합니다.
    - `PgVectorStore.put_documents()`의 embedding row 쓰기에서 `execute_values`/multi-row INSERT 경로를 제거했습니다. 동적 임베딩도 bounded batch로 생성한 뒤 동일한 COPY 연결에 스트리밍합니다.
-2. **구현됨 — Halfvec 대신 binary quantization + exact rerank 채택**:
-   - 원본은 정확 재정렬을 위해 float32 `vector`로 유지합니다. HNSW 인덱스만 1-bit 표현을 사용하므로 fp16 `halfvec` 인덱스보다 작고, 최종 순위는 원본 코사인 거리로 보정됩니다.
-   - `halfvec` 인덱스를 함께 만들면 동일 검색 목적의 인덱스가 중복되고 메모리·빌드 시간이 증가하므로 현재 운영 전략에서는 추가하지 않습니다. `GET /api/v1/data-sources/db-status`가 `binary_quantized_hnsw_exact_rerank` 전략과 실제 인덱스 수를 반환합니다.
+2. **구현됨 — Halfvec 대신 binary quantization + 원본 거리 보정 채택**:
+   - 원본은 정확한 코사인 거리 계산을 위해 float32 `vector`로 유지합니다. HNSW 인덱스만 1-bit 표현을 사용하므로 fp16 `halfvec` 인덱스보다 작고, 최종 순위는 후보의 원본 코사인 거리로 보정됩니다.
+   - `halfvec` 인덱스를 함께 만들면 동일 검색 목적의 인덱스가 중복되고 메모리·빌드 시간이 증가하므로 현재 운영 전략에서는 추가하지 않습니다. `GET /api/v1/data-sources/db-status`는 적용 중인 검색 전략과 실제 인덱스 수를 반환합니다.
 3. **결정 완료 — 물리 파티션 대신 컬렉션 로컬 파티션 전략 유지**:
    - 모든 벡터는 immutable `collection_id`로 범위를 제한하고, 컬렉션 UUID별 partial HNSW를 생성합니다. PostgreSQL 실행계획에서 해당 인덱스가 직접 선택됩니다.
    - `company_name`은 수정 가능한 JSON 메타데이터이고 현재 인덱싱 계약에는 `fiscal_year`가 필수가 아닙니다. 이를 물리 파티션 키로 쓰면 기업명 변경 시 대량 row 이동이 발생하고 연도 없는 행을 안정적으로 분배할 수 없습니다.
@@ -102,3 +104,16 @@ WHERE collection_id = '{collection_uuid}'::uuid
    - 부모 workflow Job은 child shard barrier를 기다리면서 진행률과 실행/대기 Job 수를 SSE 상태에 기록합니다.
    - embedding part는 순서대로 하나의 content-addressed artifact로 결합하고, COPY 완료 후 document count를 검증한 뒤 HNSW와 collection publish를 한 번만 수행합니다.
    - publish 후 operation advisory lock 안에서 part vector와 shard manifest를 제거해 canonical artifact와 PostgreSQL collection만 남깁니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- shard 계획, barrier, publish 조건과 retry 정책은 `data_sources/application`이 소유합니다.
+- artifact 파일과 도메인 queue repository는 `data_sources/infrastructure`, worker process adapter는 `data_sources/workers`에 둡니다.
+- pgvector protocol, COPY encoder와 connection primitive는 `platform/pgvector`가 제공하되 collection publish 의미는 domain adapter가 결정합니다.
+- module은 `PgVectorStore` facade가 아니라 ingestion port를 호출하며 transaction과 client를 직접 만들지 않습니다.
+- `backend/storage` facade 없이 staging→검증→index→publish가 data-source port/adapter로 실행되고 child Job이 선언형 catalog와 일치합니다. platform Binary COPY는 raw-vector Protocol만 알아 domain 구현을 역참조하지 않습니다.
+- `backend/platform/pgvector`는 Binary COPY framing·codec·공통 오류만, `backend/domains/data_sources/infrastructure/pgvector`는 collection SQL·staging·검증·publish를 소유합니다.
+- embedding/vector shard worker는 공통 `LeasedWorker` 수명주기를 사용하고 operation/phase/shard index, deterministic row ID와 artifact 순서 계약으로 retry를 멱등하게 만듭니다.
+- dimension, shard size, HNSW parameter, collection publish 방식 또는 artifact format을 바꾸면 schema/worker/job renderer/검색 호환 테스트와 이 문서를 같은 변경에서 갱신합니다.

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "formulas": [
+    {
+      "formula_id": "operating_margin",
+      "expression": "operating_income / revenue * 100",
+      "variables": ["operating_income", "revenue"]
+    },
+    {
+      "formula_id": "net_margin",
+      "expression": "net_income / revenue * 100",
+      "variables": ["net_income", "revenue"]
+    },
+    {
+      "formula_id": "free_cash_flow",
+      "expression": "operating_cash_flow + capital_expenditure",
+      "variables": ["operating_cash_flow", "capital_expenditure"]
+    },
+    {
+      "formula_id": "free_cash_flow_margin",
+      "expression": "free_cash_flow / revenue * 100",
+      "variables": ["free_cash_flow", "revenue"]
+    },
+    {
+      "formula_id": "debt_ratio",
+      "expression": "total_liabilities / total_assets * 100",
+      "variables": ["total_liabilities", "total_assets"]
+    },
+    {
+      "formula_id": "net_debt_ratio",
+      "expression": "net_debt / total_assets * 100",
+      "variables": ["net_debt", "total_assets"]
+    },
+    {
+      "formula_id": "net_debt",
+      "expression": "total_debt - cash_and_short_term_investments",
+      "variables": ["total_debt", "cash_and_short_term_investments"]
+    }
+  ]
+}
+

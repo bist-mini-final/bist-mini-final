@@ -1,10 +1,11 @@
 # [BP-103] Durable queue, lease와 동시성 제어
-> **Document Code:** `BP-103` | **Category:** Concurrency Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/engine/worker/main.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/main.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/data_sources/ingestion_shards.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/ingestion_shards.py)
+> **Document Code:** `BP-103` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/shared/application`, `backend/platform/postgres`, `backend/domains/*/application`, `backend/domains/*/infrastructure/postgres`, `backend/domains/*/workers`
+> **Current References:** [`backend/shared/application/leases.py`](../../../backend/shared/application/leases.py), [`backend/domains/workflow/application/leases.py`](../../../backend/domains/workflow/application/leases.py), [`backend/domains/workflow/workers/main.py`](../../../backend/domains/workflow/workers/main.py), [`backend/domains/workflow/infrastructure/postgres/`](../../../backend/domains/workflow/infrastructure/postgres), [`backend/domains/data_sources/infrastructure/postgres/shards.py`](../../../backend/domains/data_sources/infrastructure/postgres/shards.py)
 
 ---
 
-## 1. 세 단계 소유권
+## 1. Queue별 소유권 모델
 
 ```mermaid
 flowchart LR
@@ -13,11 +14,22 @@ flowchart LR
     TOKEN --> EXECUTE["execute and persist"]
 ```
 
+위 세 단계는 workflow run에 적용됩니다.
+
 1. row lock은 여러 worker가 같은 queue row를 동시에 candidate로 선택하지 못하게 합니다.
-2. session advisory lock은 transaction commit 이후 실행 전체에 대한 상호 배제를 제공합니다. DB session이 종료되면 lock도 해제됩니다.
-3. `worker_id`와 UUID `lease_token`은 모든 heartbeat·terminal update에서 현재 세대를 검증합니다. 이전 worker의 늦은 update는 row count 불일치로 거부됩니다.
+2. session advisory lock은 transaction commit 이후 workflow 실행 전체에 대한 상호 배제를 제공합니다. DB session이 종료되면 lock도 해제됩니다.
+3. `worker_id`와 UUID `lease_token`은 workflow heartbeat·terminal update에서 현재 세대를 검증합니다. 이전 worker의 늦은 update는 row count 불일치로 거부됩니다.
 
 workflow advisory key는 `hashtextextended(..., 0)`의 64-bit 값을 사용합니다.
+
+| Queue | Claim | 실행 소유권 | Heartbeat | Stale 기준 |
+| :--- | :--- | :--- | :--- | :--- |
+| Workflow | `SKIP LOCKED` | advisory lock + `worker_id` + `lease_token` | 15초 | 180초 |
+| Ingestion shard | `SKIP LOCKED` | `worker_id` + `lease_token`; shard 간 병렬 | 30초 | 180초 |
+| BI materialization/question | `SKIP LOCKED` 또는 원자 claim | `worker_id`와 상태 조건부 update | 30초 | 180초 |
+| Benchmark | `SKIP LOCKED` | `worker_id`와 pause/cancel FSM | 30초 | 180초 |
+
+공통 `LeasedWorker` template은 ingestion shard와 BI materialization처럼 claim→execute→complete/fail 수명주기가 같은 worker에 적용합니다. Workflow는 실행 전체 advisory session을, benchmark는 pause/cancel 상태 기계를 추가로 소유하므로 공통 `LeaseHeartbeat` primitive만 재사용합니다.
 
 ---
 
@@ -57,7 +69,7 @@ workflow worker의 기본 heartbeat는 15초, stale window는 180초입니다. b
 ## 4. Stale recovery
 
 - queue claim은 queued row뿐 아니라 heartbeat가 stale한 running row를 회수할 수 있습니다.
-- 새 claim은 새 lease token을 발급해 이전 세대를 무효화합니다.
+- token 기반 queue는 새 claim에서 새 lease token을 발급하고, worker-id 기반 queue는 조건부 owner update로 이전 세대를 무효화합니다.
 - API startup의 recovery와 다음 worker claim은 미완료 durable 상태를 재평가합니다.
 - `cancel_requested`는 cooperative cancellation이며 `/jobs` 관제 API가 직접 Pod/lease를 삭제하지 않습니다.
 - PostgreSQL이 상태 원본이고 Redis Pub/Sub는 lease나 lock으로 사용하지 않습니다.
@@ -85,3 +97,15 @@ workflow run과 달리 shard 실행 전체를 session advisory lock으로 직렬
 - COPY retry는 동일 ID 범위를 delete+COPY하는 단일 트랜잭션입니다.
 - 부모 finalizer는 모든 현재 shard가 succeeded이고 staging row count가 예상 문서 수와 같을 때만 HNSW를 생성하고 publish합니다.
 - 최종 실패 shard는 부모 모듈을 실패시키며 workflow retry가 failed shard의 attempt budget을 새로 시작합니다.
+
+---
+
+## 7. 책임 분리와 구조 완료 조건
+
+- lease token, heartbeat clock과 transaction primitive는 `shared`에 두되 queue 상태 전이 정책은 각 domain application이 소유합니다.
+- `FOR UPDATE`, advisory lock, token-guarded update SQL은 domain infrastructure의 PostgreSQL adapter가 구현합니다.
+- worker는 claim 결과를 application command로 전달하며 repository SQL이나 Kubernetes client를 직접 조립하지 않습니다.
+- Redis를 lock·lease·queue의 진실 공급원으로 승격하지 않습니다.
+- workflow·ingestion·BI·benchmark의 queue policy와 SQL은 각 vertical slice에 있고, 공통 heartbeat/lifecycle primitive만 shared에 남아 있습니다.
+- 구조 계약 테스트는 domain worker가 infrastructure를 직접 조립하거나 legacy engine/storage 경로를 다시 import하지 못하게 합니다.
+- queue column, stale window, heartbeat 주기 또는 KEDA pending query를 변경할 때 domain schema·repository·worker·`jobs` catalog·BP-104·BP-503을 함께 갱신합니다.

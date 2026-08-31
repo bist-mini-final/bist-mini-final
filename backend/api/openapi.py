@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from backend.api.versioning import API_VERSION
-from backend.bootstrap.container import ApplicationContainer
+from backend.bootstrap.application import ApplicationContainer
 
 logger = logging.getLogger("backend.api.openapi")
 

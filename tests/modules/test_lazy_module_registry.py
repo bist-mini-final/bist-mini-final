@@ -6,8 +6,8 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from backend.engine.runtime.registry_base import BaseModuleRegistry
 from modules.common.base_module import BaseModule, ModuleDefinition
+from modules.registry import BaseModuleRegistry
 
 
 class LazyInput(BaseModel):
@@ -44,7 +44,9 @@ class LazyModule(BaseModule[LazyInput, LazyOutput, LazyConfig]):
 
 
 def test_factory_constructs_singleton_only_on_first_get(tmp_path) -> None:
-    from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+    from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+        EmbeddingArtifactStore,
+    )
 
     registry = BaseModuleRegistry(EmbeddingArtifactStore(tmp_path))
     created: list[LazyModule] = []
@@ -66,7 +68,9 @@ def test_factory_constructs_singleton_only_on_first_get(tmp_path) -> None:
 
 
 def test_factory_rejects_contract_mismatch(tmp_path) -> None:
-    from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+    from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+        EmbeddingArtifactStore,
+    )
 
     registry = BaseModuleRegistry(EmbeddingArtifactStore(tmp_path))
     registry.register_factory("wrong.type", LazyModule)
@@ -76,7 +80,9 @@ def test_factory_rejects_contract_mismatch(tmp_path) -> None:
 
 
 def test_async_registry_boundary_executes_sync_module(tmp_path) -> None:
-    from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+    from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+        EmbeddingArtifactStore,
+    )
 
     registry = BaseModuleRegistry(EmbeddingArtifactStore(tmp_path))
     registry.register_factory("test.lazy", LazyModule)

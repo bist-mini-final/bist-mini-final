@@ -5,8 +5,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
-from backend.storage.pgvector_store import PgVectorReplacePlan
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.shared.application.vector import PgVectorReplacePlan
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 
 
@@ -39,11 +41,11 @@ def test_pgvector_writer_execution(tmp_path: Path) -> None:
     artifact_store = EmbeddingArtifactStore(tmp_path / "vectors")
     artifact_id = "a" * 64
     artifact_store.put(artifact_id, [[0.1, 0.2], [0.3, 0.4]])
-    db_manager = MagicMock()
+    source_files = MagicMock()
     pgvector_store = MagicMock()
     module = PgVectorIndexWriterModule(
         artifact_store=artifact_store,
-        db_manager=db_manager,
+        source_files=source_files,
         pgvector_store=pgvector_store,
         processed_dir=tmp_path,
     )
@@ -66,13 +68,13 @@ def test_pgvector_writer_execution(tmp_path: Path) -> None:
     vectors = pgvector_store.put_documents.call_args.kwargs["vectors"]
     assert vectors[0] == pytest.approx([0.1, 0.2])
     assert len(vectors) == 2
-    db_manager.save_source_file.assert_called_once()
+    source_files.save_source_file.assert_called_once()
 
 
 def test_pgvector_writer_delegates_to_vector_copy_jobs(tmp_path: Path) -> None:
     artifact_store = EmbeddingArtifactStore(tmp_path / "vectors")
     artifact_id = "c" * 64
-    db_manager = MagicMock()
+    source_files = MagicMock()
     pgvector_store = MagicMock()
     coordinator = MagicMock()
     coordinator.enabled = True
@@ -87,7 +89,7 @@ def test_pgvector_writer_delegates_to_vector_copy_jobs(tmp_path: Path) -> None:
     pgvector_store.prepare_collection_replace.return_value = plan
     module = PgVectorIndexWriterModule(
         artifact_store=artifact_store,
-        db_manager=db_manager,
+        source_files=source_files,
         pgvector_store=pgvector_store,
         processed_dir=tmp_path,
         shard_coordinator=coordinator,

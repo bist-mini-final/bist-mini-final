@@ -6,16 +6,17 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.benchmark_routes import create_benchmark_router
-from backend.engine.job_catalog import canonical_workflow
-from backend.engine.workflows.models import WorkflowSaveRequest
-from backend.engine.workflows.store import WorkflowStore
-from backend.features.benchmark.database_schema import BENCHMARK_SCHEMA_SQL
+from backend.domains.benchmark.application import BenchmarkApplicationService
+from backend.domains.benchmark.application.ports import BenchmarkSetDocument
+from backend.domains.benchmark.infrastructure.postgres import BENCHMARK_SCHEMA_SQL
+from backend.domains.benchmark.presentation import create_benchmark_router
+from backend.domains.workflow.domain.models import WorkflowSaveRequest
+from backend.domains.workflow.infrastructure.job_catalog import canonical_workflow
+from backend.domains.workflow.infrastructure.persistence import WorkflowStore
 from jobs import BENCHMARK_JOB
 
 
@@ -57,8 +58,13 @@ class BenchmarkKubernetesContractTests(unittest.TestCase):
                 return {"id": job_id}
 
         store = RecordingStore()
+
+        class EmptyBenchmarkSets:
+            def list_documents(self) -> tuple[BenchmarkSetDocument, ...]:
+                return ()
+
         database = SimpleNamespace(database_url="postgresql://contract")
-        run_store = SimpleNamespace(db_manager=database)
+        run_store = SimpleNamespace(repository=database)
         with tempfile.TemporaryDirectory() as directory:
             workflow_store = WorkflowStore(Path(directory))
             rag_workflow = canonical_workflow("rag_query")
@@ -70,26 +76,24 @@ class BenchmarkKubernetesContractTests(unittest.TestCase):
                     graph=rag_workflow.graph,
                 ),
             )
-            with patch(
-                "backend.api.benchmark_routes.BenchmarkPostgresStore",
-                return_value=store,
-            ):
-                app = FastAPI()
-                app.include_router(
-                    create_benchmark_router(
-                        workflow_store,
-                        run_store,  # type: ignore[arg-type]
-                        SimpleNamespace(),  # type: ignore[arg-type]
-                    )
-                )
-                response = TestClient(app).post(
-                    "/benchmarks/jobs",
-                    json={
-                        "workflow_ids": ["rag_query", "rag_query_variant"],
-                        "cases": [{"id": "case-1", "question": "test"}],
-                        "execution_scope": "pre_retrieval",
-                    },
-                )
+            service = BenchmarkApplicationService(
+                store=store,  # type: ignore[arg-type]
+                workflow_store=workflow_store,
+                run_store=run_store,  # type: ignore[arg-type]
+                workflow_execution=SimpleNamespace(),  # type: ignore[arg-type]
+                benchmark_sets=EmptyBenchmarkSets(),
+                queue_available=True,
+            )
+            app = FastAPI()
+            app.include_router(create_benchmark_router(service))
+            response = TestClient(app).post(
+                "/benchmarks/jobs",
+                json={
+                    "workflow_ids": ["rag_query", "rag_query_variant"],
+                    "cases": [{"id": "case-1", "question": "test"}],
+                    "execution_scope": "pre_retrieval",
+                },
+            )
 
         self.assertEqual(response.status_code, 202)
         self.assertEqual(store.enqueued, [response.json()["id"]])

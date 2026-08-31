@@ -9,21 +9,21 @@ from unittest.mock import MagicMock, call, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.features.bi.api_routes import create_bi_router
-from backend.features.bi.api_services import BiApiServices
-from backend.features.bi.database_schema import (
-    BI_SCHEMA_LOCK_KEY,
-    BI_SCHEMA_SQL,
-    ensure_bi_schema,
-)
-from backend.features.bi.materialization_models import BiCompanyIndexEntry
-from backend.features.bi.models import (
+from backend.domains.bi.application import BiApiServices
+from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
+from backend.domains.bi.domain.models import (
     BiCompany,
     BiMaterializationJob,
     BiMaterializationSource,
     CompanyId,
     IndexId,
 )
+from backend.domains.bi.infrastructure.postgres.database_schema import (
+    BI_SCHEMA_LOCK_KEY,
+    BI_SCHEMA_SQL,
+    ensure_bi_schema,
+)
+from backend.domains.bi.presentation.routes import create_bi_router
 from jobs import BI_MATERIALIZATION_JOB, BI_QUESTION_JOB
 
 
@@ -118,7 +118,7 @@ class BiKubernetesContractTests(unittest.TestCase):
         cursor = connection.cursor.return_value.__enter__.return_value
 
         with patch(
-            "backend.features.bi.database_schema.get_pooled_raw_connection",
+            "backend.domains.bi.infrastructure.postgres.database_schema.get_pooled_raw_connection",
             return_value=pooled,
         ):
             ensure_bi_schema("postgresql://example")

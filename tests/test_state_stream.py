@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from dataclasses import dataclass
 
-from backend.core.state_stream import SharedStateStream
+from backend.shared.application.state_stream import SharedStateStream
 
 
 @dataclass(frozen=True, slots=True)

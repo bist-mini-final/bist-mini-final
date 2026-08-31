@@ -4,7 +4,8 @@ import { APP_ROUTES, findRoute } from '../routes';
 describe('APP_ROUTES registry', () => {
   it('registers all required routes with valid metadata', () => {
     const paths = APP_ROUTES.map((r) => r.path);
-    expect(paths).toContain('/');
+    expect(paths).not.toContain('/');
+    expect(paths).toContain('/chatbot');
     expect(paths).toContain('/playground');
     expect(paths).toContain('/data-sources');
     expect(paths).toContain('/dashboard');
@@ -17,12 +18,12 @@ describe('APP_ROUTES registry', () => {
   });
 
   it('has ready status for core pages', () => {
-    const home = APP_ROUTES.find((r) => r.path === '/');
+    const chatbot = APP_ROUTES.find((r) => r.path === '/chatbot');
     const playground = APP_ROUTES.find((r) => r.path === '/playground');
     const dataSources = APP_ROUTES.find((r) => r.path === '/data-sources');
     const dashboard = APP_ROUTES.find((r) => r.path === '/dashboard');
 
-    expect(home?.status).toBe('ready');
+    expect(chatbot?.status).toBe('ready');
     expect(playground?.status).toBe('ready');
     expect(dataSources?.status).toBe('ready');
     expect(dashboard?.status).toBe('ready');
@@ -31,5 +32,10 @@ describe('APP_ROUTES registry', () => {
   it('resolves the documented BI compatibility path without duplicating navigation', () => {
     expect(findRoute('/bi')?.path).toBe('/dashboard');
     expect(APP_ROUTES.filter((route) => route.path === '/dashboard')).toHaveLength(1);
+  });
+
+  it('resolves the removed home path to the new-chat workspace', () => {
+    expect(findRoute('/')?.path).toBe('/chatbot');
+    expect(findRoute('/')?.label).toBe('새 채팅');
   });
 });

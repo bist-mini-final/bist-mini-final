@@ -1,6 +1,7 @@
 # [BP-201] Spreadsheet 2D 좌표 정규화와 직렬화
-> **Document Code:** `BP-201` | **Category:** Data Engine Blueprint | **Status:** Implemented & Operational
-> **Source Roots:** [`backend/storage/spreadsheets/`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/), [`modules/structure/`](file:///c:/Repos/bist-mini-final/modules/structure/)
+> **Document Code:** `BP-201` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/data_sources/domain`, `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/filesystem`, `modules/structure`
+> **Current References:** [`backend/domains/data_sources/infrastructure/spreadsheets/`](../../../backend/domains/data_sources/infrastructure/spreadsheets), [`modules/structure/`](../../../modules/structure)
 
 ---
 
@@ -18,6 +19,8 @@
 4. formula cell은 값과 formula/source 표현을 혼동하지 않도록 명시적으로 처리합니다.
 5. blank/hidden 영역의 포함 여부는 parser config와 source metadata로 남깁니다.
 6. amount의 currency·scale·period를 가능한 한 명시적 metadata로 분리합니다.
+
+구현 책임은 `cell_semantics.py`의 좌표·값 record 수집, `grid_structure.py`의 occupied grid·병합 영역·header tree, `table_geometry.py`의 pixel/cell 경계 변환, `sheet_renderer.py`의 원본 시트 rasterization으로 분리합니다. renderer 내부에서도 값 포맷, fill, border, text alignment를 독립 단계로 유지해 날짜·회계 형식 수정이 좌표 기하학에 영향을 주지 않게 합니다.
 
 ---
 
@@ -57,3 +60,17 @@ flowchart LR
 - serialized record에서 workbook/sheet/cell 좌표를 역추적할 수 있어야 합니다.
 - batch size와 artifact 사용량은 데이터셋 benchmark로 조정하며 근거 없는 고정 절감률을 문서화하지 않습니다.
 - large workbook parsing은 API 이벤트 루프가 아니라 worker thread/one-shot worker에서 실행합니다.
+- formula workbook과 cached-value workbook을 함께 읽으며 cached 값이 없는 formula도 formula record로 보존합니다. 일반 빈 셀만 컨텍스트에서 제외합니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- 좌표, 셀 의미, header path와 evidence identity는 `data_sources/domain`의 provider·파일 형식 비종속 계약입니다.
+- workbook 읽기, openpyxl 변환, raster 좌표 변환은 `data_sources/infrastructure/filesystem` adapter가 담당합니다.
+- serialization use case와 parser port는 `data_sources/application`, DAG adapter는 `modules/structure`에 둡니다.
+- renderer나 parser가 pgvector 저장소, HTTP DTO 또는 외부 vision client를 직접 import하지 않습니다.
+- 이전 `backend/storage/spreadsheets` 구현은 data sources infrastructure로 이동했고 수평 storage package는 제거됐습니다.
+- workbook catalog와 renderer는 bootstrap에서 생성해 module에 주입합니다. module은 경로·provider·DB client를 자체 생성하지 않으며 저장 capability는 좁은 port로 받습니다.
+- `structured-cell-v6-company-scoped`, `header_only`/`header_with_value`, header hierarchy 조합 생성과 unresolved-value 필터가 현재 직렬화 계약입니다.
+- variant, serialization version, unresolved marker 또는 좌표 metadata를 바꾸면 기존 collection 호환성·재적재 전략·BP-303 Reader 경계를 함께 검토합니다.

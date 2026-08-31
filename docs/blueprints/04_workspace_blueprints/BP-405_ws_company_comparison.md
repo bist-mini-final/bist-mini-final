@@ -1,6 +1,7 @@
 # [BP-405] Company Comparison 스냅샷 워크스페이스 청사진
-> **Document Code:** `BP-405` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/features/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/features/company_comparison/), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`frontend/src/pages/CompanyComparisonPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx), [`frontend/src/features/company-comparison/`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/)
+> **Document Code:** `BP-405` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/company_comparison`, `backend/domains/bi/application`, `backend/shared/application`, `backend/platform/postgres`, `frontend/src/features/company-comparison`, `frontend/src/pages`
+> **Current References:** [`backend/domains/company_comparison/`](../../../backend/domains/company_comparison), [`backend/bootstrap/company_comparison.py`](../../../backend/bootstrap/company_comparison.py), [`backend/shared/application/snapshots.py`](../../../backend/shared/application/snapshots.py), [`backend/platform/postgres/versioned_snapshots.py`](../../../backend/platform/postgres/versioned_snapshots.py), [`frontend/src/pages/CompanyComparisonPage.tsx`](../../../frontend/src/pages/CompanyComparisonPage.tsx), [`frontend/src/features/company-comparison/`](../../../frontend/src/features/company-comparison)
 
 ---
 
@@ -81,13 +82,27 @@ BI의 계산식과 기업 비교의 점수 정책은 의미가 다르므로 공�
 
 ## 5. 프론트엔드 구성
 
-- [`CompanyComparisonPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx): 단일 정식 페이지, 순위·선택·비교·스냅샷 갱신 조립
-- [`api.ts`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/api.ts): 조회와 refresh API
-- [`schemas.ts`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/schemas.ts): Zod 응답 계약 검증
-- [`metricRanking.ts`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/metricRanking.ts): 지표별 표시 순위
-- [`analysis.ts`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/analysis.ts): 순위 사유와 동적 관측 기간 추이
-- [`CompanyComparisonCharts.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/CompanyComparisonCharts.tsx): 단일 기업 및 공통 관측 기간 비교 차트
+- [`CompanyComparisonPage.tsx`](../../../frontend/src/pages/CompanyComparisonPage.tsx): 단일 정식 페이지, 순위·선택·비교·스냅샷 갱신 조립
+- [`api.ts`](../../../frontend/src/features/company-comparison/api.ts): 조회와 refresh API
+- [`schemas.ts`](../../../frontend/src/features/company-comparison/schemas.ts): Zod 응답 계약 검증
+- [`metricRanking.ts`](../../../frontend/src/features/company-comparison/metricRanking.ts): 지표별 표시 순위
+- [`analysis.ts`](../../../frontend/src/features/company-comparison/analysis.ts): 순위 사유와 동적 관측 기간 추이
+- [`CompanyComparisonCharts.tsx`](../../../frontend/src/features/company-comparison/CompanyComparisonCharts.tsx): 단일 기업 및 공통 관측 기간 비교 차트
 
 UI는 실제/예측 기간을 시각적으로 구분하고, 스냅샷 상태·생성 시각·scoring/forecast version·포함/제외 기업·근거 수를 서버 응답에서 표시합니다. refresh 실패 시 이전 응답을 새 데이터처럼 합성하지 않습니다.
 
 기업명 링크는 `/dashboard?companyId={id}`로 이동합니다. 이 딥링크만 화면 간 선택 문맥을 전달하며 기업 비교 API가 BI API namespace를 대체하지 않습니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- 비교 score, tier, rank, forecast assumption과 exclusion policy는 company comparison domain이 소유합니다.
+- snapshot build/refresh/query와 BI snapshot reader port는 application, BI facade adapter는 domain infrastructure, 범용 versioned repository 구현은 `platform/postgres`, REST DTO는 presentation에 둡니다.
+- BI와 공통화하는 것은 immutable snapshot lifecycle primitive뿐이며 metric·score service 상속이나 공용 DTO를 만들지 않습니다.
+- score/model, snapshot application, BI integration adapter와 REST presentation이 company comparison vertical slice로 이동했으며 이전 root/API 호환 경로는 제거됐습니다.
+- 공통 snapshot protocol은 `shared/application`, PostgreSQL atomic-head 구현은 `platform/postgres`가 소유하며 BI namespace와 독립된 회귀·구조 계약이 이를 검증합니다.
+- BI snapshot 추가·삭제는 comparison current head를 자동 변경하지 않습니다. 사용자가 comparison refresh를 실행하면 현재 검증 가능한 BI heads를 다시 읽어 새 immutable comparison snapshot을 발행합니다.
+- build는 외부 LLM 없이 결정론적으로 수행하고 source fingerprint·schema/scoring/forecast version·포함/제외 사유를 payload에 남깁니다.
+- 최소 2개 검증 기업, 필수 metric/evidence, competition rank와 actual/forecast 구분이 publish hard gate입니다.
+- scoring/forecast/source eligibility를 바꾸면 version 상향, golden calculation, API/frontend schema와 BP-403·BP-503을 함께 갱신합니다.

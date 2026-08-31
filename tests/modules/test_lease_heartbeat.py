@@ -5,7 +5,7 @@ from threading import Event
 
 import pytest
 
-from backend.engine.worker.lease import LeaseHeartbeat, LeaseLostError
+from backend.shared.application.leases import LeaseHeartbeat, LeaseLostError
 
 
 def _heartbeat(

@@ -1,0 +1,1 @@
+"""Financial BI infrastructure adapters."""

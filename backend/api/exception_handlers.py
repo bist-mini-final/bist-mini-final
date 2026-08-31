@@ -9,9 +9,33 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from backend.api.error_mapping import error_envelope, http_error_envelope
+from backend.shared.domain import (
+    ApplicationConflict,
+    ApplicationError,
+    ApplicationInternalError,
+    ApplicationValidationError,
+    PayloadTooLargeError,
+    ResourceNotFoundError,
+    RetryableInfrastructureError,
+)
 from modules.common.exceptions import PipelineBaseError
 
 logger = logging.getLogger("backend.api.exceptions")
+
+
+def _application_status_code(error: ApplicationError) -> int:
+    mappings = (
+        (PayloadTooLargeError, 413),
+        (ResourceNotFoundError, 404),
+        (ApplicationConflict, 409),
+        (ApplicationValidationError, 422),
+        (RetryableInfrastructureError, 503),
+        (ApplicationInternalError, 500),
+    )
+    return next(
+        (status_code for error_type, status_code in mappings if isinstance(error, error_type)),
+        500,
+    )
 
 
 def register_global_exception_handlers(application: FastAPI) -> None:
@@ -62,6 +86,22 @@ def register_global_exception_handlers(application: FastAPI) -> None:
             status_code=exc.status_code,
             content=http_error_envelope(exc.detail, exc.status_code),
             headers=exc.headers,
+        )
+
+    @application.exception_handler(ApplicationError)
+    async def application_exception_handler(
+        request: Request,
+        exc: ApplicationError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(
+            status_code=_application_status_code(exc),
+            content=error_envelope(
+                code=exc.code,
+                message=exc.message,
+                retryable=exc.retryable,
+                context=exc.context,
+            ),
         )
 
     @application.exception_handler(Exception)

@@ -32,7 +32,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,

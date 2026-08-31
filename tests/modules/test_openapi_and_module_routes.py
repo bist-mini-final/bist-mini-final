@@ -6,7 +6,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from backend.main import create_app
+from backend.entrypoints.asgi import create_app
 
 
 class OpenApiAndModuleRoutesTests(unittest.TestCase):
@@ -67,6 +67,9 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertTrue(all(path.startswith("/api/v1/") for path in product_paths))
         self.assertIn("/api/v1/company-comparisons/snapshot", paths)
         self.assertIn("/api/v1/company-comparisons/snapshot/refresh", paths)
+        self.assertIn("/api/v1/data-sources/files", paths)
+        self.assertIn("/api/v1/data-sources/indexes", paths)
+        self.assertIn("/api/v1/data-sources/ingestion-jobs", paths)
         self.assertNotIn("/api/v1/company-comparisons/analyze", paths)
         self.assertNotIn("/api/v1/company-comparisons/league", paths)
 
@@ -85,8 +88,12 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertNotIn("Deprecation", canonical.headers)
 
     def test_chatbot_documentation_alias_matches_the_canonical_chat_api(self) -> None:
-        canonical = self.client.get("/api/v1/chat/sessions", params={"client_id": "test-client-0001"})
-        alias = self.client.get("/api/v1/chatbot/sessions", params={"client_id": "test-client-0001"})
+        canonical = self.client.get(
+            "/api/v1/chat/sessions", params={"client_id": "test-client-0001"}
+        )
+        alias = self.client.get(
+            "/api/v1/chatbot/sessions", params={"client_id": "test-client-0001"}
+        )
         paths = self.client.get("/openapi.json").json()["paths"]
 
         self.assertEqual(canonical.status_code, alias.status_code)

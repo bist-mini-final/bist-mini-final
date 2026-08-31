@@ -79,7 +79,30 @@ class DataScopeStorePort(Protocol):
     async def list_data_scopes_async(self) -> List[Dict[str, Any]]: ...
 
 
+class CellMetadataLookupPort(Protocol):
+    def fetch_cells_by_metadata(
+        self,
+        *,
+        cell_identifiers: Sequence[str],
+        cell_references: Optional[Sequence[Dict[str, Any]]] = None,
+        workbook_hash: Optional[str] = None,
+        company_name: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]: ...
+
+    async def fetch_cells_by_metadata_async(
+        self,
+        *,
+        cell_identifiers: Sequence[str],
+        cell_references: Optional[Sequence[Dict[str, Any]]] = None,
+        workbook_hash: Optional[str] = None,
+        company_name: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]: ...
+
+
 __all__ = [
+    "CellMetadataLookupPort",
     "ContextExpansionStorePort",
     "DataScopeStorePort",
     "DenseVectorSearchPort",

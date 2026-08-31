@@ -6,8 +6,8 @@ import asyncio
 import os
 import unittest
 
-from backend.core.state_stream import SharedStateStream
-from backend.core.state_stream_broker import RedisStateStreamBroker
+from backend.platform.redis.state_stream_broker import RedisStateStreamBroker
+from backend.shared.application.state_stream import SharedStateStream
 
 REDIS_URL = os.getenv("REDIS_URL")
 

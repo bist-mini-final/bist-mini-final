@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.storage.pgvector_store import (
+from backend.domains.data_sources.infrastructure.pgvector import (
     VECTOR_INDEX_STRATEGY,
     VECTOR_PARTITION_STRATEGY,
     PgVectorStore,

@@ -1,6 +1,6 @@
 # BIST Mini Final
 
-재무 스프레드시트 구조 분석, Luna VLM 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 근거 기반 응답, BI 대시보드와 RAG 벤치마크를 제공하는 RAG & BI 플랫폼입니다.
+재무 스프레드시트 구조 분석, 외부 vision 기반 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 셀 근거 기반 응답, BI 대시보드·기업 비교와 RAG 벤치마크를 제공하는 Excel RAG 플랫폼입니다.
 
 이 문서는 저장소를 처음 받은 개발자가 **로컬 웹 애플리케이션을 실행하고, 필요할 때 k3d/KEDA 워커까지 구성**할 수 있도록 현재 프로젝트 설정을 기준으로 작성되었습니다.
 
@@ -93,7 +93,7 @@ npm --prefix frontend ci
 터미널 1 — FastAPI 백엔드:
 
 ```bash
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+uv run uvicorn backend.entrypoints.asgi:app --host 0.0.0.0 --port 8765 --reload
 ```
 
 터미널 2 — React/Vite 프론트엔드:
@@ -214,7 +214,7 @@ Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
 ./deploy/kubernetes/local.sh status
 ```
 
-`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
+`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 `uv.lock`에 고정된 CPU 애플리케이션 의존성만 설치합니다.
 
 개발용 `.env`의 `DATABASE_URL`이 원격 DB를 가리킬 때 로컬 DB로 실행하려면 다음처럼 한 번만 재정의합니다.
 
@@ -281,16 +281,20 @@ Kubernetes 없이 큐 동작을 디버깅할 때 사용할 수 있습니다. 각
 
 ```bash
 # workflow-core 큐 1건
-uv run python -m backend.engine.worker.main
+uv run python -m backend.entrypoints.worker workflow
 
 # BI materialization 1건
-uv run python -m backend.features.bi.materialization_worker_main
+uv run python -m backend.entrypoints.worker bi-materialization
 
 # BI 질문 최대 1 batch
-uv run python -m backend.features.bi.question_worker_main
+uv run python -m backend.entrypoints.worker bi-question
 
 # benchmark 1건
-uv run python -m backend.features.benchmark.worker_main
+uv run python -m backend.entrypoints.worker benchmark
+
+# ingestion embedding/vector shard 각각 1건
+uv run python -m backend.entrypoints.worker ingestion-embedding
+uv run python -m backend.entrypoints.worker ingestion-vector
 ```
 
 큐가 비어 있으면 정상적으로 메시지를 출력하고 종료합니다. 연속 처리가 필요하면 KEDA 구성을 사용하세요.
@@ -307,8 +311,7 @@ uv run ruff check .
 uv run pyright
 
 # Frontend
-npm --prefix frontend test
-npm --prefix frontend run build
+npm --prefix frontend run check
 ```
 
 프론트엔드 빌드 결과는 루트의 `dist/`에 생성됩니다.
@@ -338,7 +341,7 @@ uv --version
 Windows에서 이미 `.venv`가 준비되어 있다면 임시로 다음과 같이 실행할 수 있습니다.
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+.\.venv\Scripts\python.exe -m uvicorn backend.entrypoints.asgi:app --host 0.0.0.0 --port 8765 --reload
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
@@ -375,21 +378,23 @@ API와 DB만 실행한 상태에서는 정상적인 현상입니다. `./deploy/k
 ```text
 bist-mini-final/
 ├── backend/
-│   ├── api/                  # FastAPI 라우트, 버전, 미들웨어, SSE
-│   ├── bootstrap/            # 애플리케이션/런타임 컨테이너와 lifecycle
-│   ├── engine/               # DAG 실행 엔진, 워크플로 서비스, 워커
-│   ├── features/             # BI 및 benchmark 기능
-│   └── storage/              # PostgreSQL 풀과 저장소
+│   ├── api/                  # router 결합, 미들웨어, 예외, OpenAPI/SPA/probe
+│   ├── bootstrap/            # application object graph와 HTTP/worker lifecycle
+│   ├── core/                 # 런타임 환경 설정만 보유
+│   ├── domains/              # 7개 bounded context vertical slice
+│   ├── entrypoints/          # ASGI·worker·관리 명령 process adapter
+│   ├── platform/             # PostgreSQL, pgvector, OpenAI, Redis, K8s adapter
+│   └── shared/               # 상태 stream, lease, embedding 등 공통 계약
 ├── frontend/                 # React 18, TypeScript, Vite
 ├── modules/                  # RAG 파이프라인 모듈 및 Pydantic 계약
-├── jobs/                     # canonical DAG와 배치 엔트리포인트
+├── jobs/                     # canonical DAG/worker Job 선언과 K8s projection
 ├── deploy/
 │   ├── compose/              # 로컬 pgvector
 │   ├── docker/               # backend, worker, frontend 이미지
 │   └── kubernetes/           # k3d/KEDA 스크립트와 매니페스트
 ├── docs/
-│   ├── blueprints/           # 시스템 설계도
-│   └── final_report/         # 최종 보고서
+│   ├── blueprints/           # 시스템·데이터·UI·검증 청사진
+│   └── CURRENT_IMPLEMENTATION_BASELINE.md
 ├── tests/                    # Python 계약 및 통합 테스트
 ├── .env.example              # 환경 변수 템플릿
 ├── pyproject.toml            # Python 프로젝트와 도구 설정
@@ -418,4 +423,4 @@ bist-mini-final/
 - `modules/`가 파이프라인 모듈 계약의 단일 소스입니다.
 - FastAPI는 요청 검증, 큐 등록, 조회, SSE 관찰을 담당합니다.
 - KEDA는 PostgreSQL 큐 길이에 따라 one-shot 워커를 0개부터 확장합니다.
-- 상세 설계는 `docs/blueprints/`를 참고하세요.
+- 상세 설계와 현재 검증 수치는 각각 [`docs/blueprints/`](docs/blueprints/)와 [`docs/CURRENT_IMPLEMENTATION_BASELINE.md`](docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 참고하세요.

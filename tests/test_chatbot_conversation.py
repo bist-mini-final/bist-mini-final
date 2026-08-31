@@ -1,12 +1,12 @@
 from types import SimpleNamespace
 
-from backend.features.chatbot.conversation import (
+from backend.domains.chatbot.application.grounding import finalize_grounded_answer
+from backend.domains.chatbot.domain import (
     company_aliases,
     company_identity_answer,
     is_recent_question_request,
     needs_rag,
 )
-from backend.features.chatbot.grounding import finalize_grounded_answer
 
 
 def test_bistelligence_korean_alias_is_a_registered_company_alias() -> None:

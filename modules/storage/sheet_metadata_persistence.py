@@ -52,7 +52,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Union, cast
 
 from pydantic import Field
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,
@@ -62,6 +64,7 @@ from modules.common.base_module import (
 )
 from modules.common.exceptions import DocumentParsingError, StorageError
 from modules.storage.pgvector_index_writer import VectorIndexDTO
+from modules.storage.ports import SourceFileRepositoryPort
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
 from modules.structure.luna_vlm_structure_detector import SpreadsheetStructureOutput
 
@@ -117,49 +120,41 @@ class SheetMetadataPersistenceModule(BaseModule):
 
     def __init__(
         self,
-        db_manager: Any,
+        source_files: SourceFileRepositoryPort,
         catalog: WorkbookCatalog,
     ) -> None:
         """Initialize with dependencies owned by the runtime composition root."""
         super().__init__()
-        self._db_manager = db_manager
+        self._source_files = source_files
         self.catalog = catalog
 
-    def execute(
+    @staticmethod
+    def _detected_tables(structure: StructureSourceDTO) -> List[Any]:
+        if isinstance(structure, WorkbookSelectionDTO):
+            return []
+        return list(structure.tables)
+
+    def _visible_sheet_names(
         self,
-        input_data: SheetMetadataPersistenceInputDTO,
-        config: Optional[EmptyModuleConfigDTO] = None,
-    ) -> Dict[str, Any]:
-        """Persist workbook sheet metadata and detected tables for the selected visible sheets."""
-        structure = input_data.structure_input
-        index = input_data.index_input
-        if structure.workbook_hash != index.workbook_hash:
-            raise ModuleExecutionError("구조 분석과 인덱스의 workbook_hash가 다릅니다")
-
-        database = self._db_manager
-        if not database.is_connected():
-            raise StorageError("시트 메타데이터를 저장할 DB에 연결할 수 없습니다")
-
-        workbook_path = self.catalog.resolve(structure.file_name)
-
-        detected_tables = (
-            []
-            if isinstance(structure, WorkbookSelectionDTO)
-            else structure.tables
+        structure: StructureSourceDTO,
+        workbook_path: Any,
+        detected_tables: List[Any],
+    ) -> List[str]:
+        if structure.sheet_names:
+            return list(structure.sheet_names)
+        if detected_tables:
+            table_sheets = {table.sheet_name for table in detected_tables}
+            return [
+                sheet_name
+                for sheet_name in self.catalog.sheet_names(workbook_path)
+                if sheet_name in table_sheets
+            ]
+        raise ModuleExecutionError(
+            "저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다"
         )
 
-        if structure.sheet_names:
-            visible_sheets = list(structure.sheet_names)
-        elif detected_tables:
-            catalog_sheets = self.catalog.sheet_names(workbook_path)
-            table_sheets = {t.sheet_name for t in detected_tables}
-            visible_sheets = [s for s in catalog_sheets if s in table_sheets]
-        else:
-            raise ModuleExecutionError(
-                "저장할 시트 목록(sheet_names) 또는 감지된 테이블(tables)이 지정되지 않았습니다"
-            )
-
-        sheet_dimensions: Dict[str, tuple[int, int]] = {}
+    @staticmethod
+    def _sheet_dimensions(workbook_path: Any) -> Dict[str, tuple[int, int]]:
         try:
             import openpyxl
 
@@ -169,49 +164,64 @@ class SheetMetadataPersistenceModule(BaseModule):
                 data_only=True,
             )
             try:
+                dimensions: Dict[str, tuple[int, int]] = {}
                 for sheet_name in workbook.sheetnames:
                     worksheet = workbook[sheet_name]
                     if worksheet.max_row is None or worksheet.max_column is None:
                         cast(Any, worksheet).calculate_dimension(force=True)
-                    sheet_dimensions[sheet_name] = (
+                    dimensions[sheet_name] = (
                         worksheet.max_row or 0,
                         worksheet.max_column or 0,
                     )
+                return dimensions
             finally:
                 workbook.close()
         except Exception as error:
             raise DocumentParsingError(f"시트 크기 측정 실패: {error}") from error
 
-        sheets_data: List[Dict[str, Any]] = []
+    @staticmethod
+    def _sheet_records(
+        visible_sheets: List[str],
+        dimensions: Dict[str, tuple[int, int]],
+        detected_tables: List[Any],
+    ) -> List[Dict[str, Any]]:
+        records: List[Dict[str, Any]] = []
         for sheet_index, sheet_name in enumerate(visible_sheets):
-            if sheet_name not in sheet_dimensions:
+            if sheet_name not in dimensions:
                 logger.warning("Skipping sheet '%s' not found in workbook dimensions", sheet_name)
                 continue
-            rows, columns = sheet_dimensions[sheet_name]
-            sheet_tables = [
-                table.model_dump(mode="json")
-                for table in detected_tables
-                if table.sheet_name == sheet_name
-            ]
-            sheets_data.append(
+            rows, columns = dimensions[sheet_name]
+            records.append(
                 {
                     "sheet_name": sheet_name,
                     "sheet_index": sheet_index,
                     "is_visible": True,
                     "row_count": rows,
                     "column_count": columns,
-                    "detected_tables": sheet_tables,
+                    "detected_tables": [
+                        table.model_dump(mode="json")
+                        for table in detected_tables
+                        if table.sheet_name == sheet_name
+                    ],
                 }
             )
+        return records
 
+    def _persist_sheets(
+        self,
+        workbook_hash: str,
+        sheets_data: List[Dict[str, Any]],
+    ) -> None:
         try:
-            database.save_sheets(
-                file_id=structure.workbook_hash,
+            self._source_files.save_sheets(
+                file_id=workbook_hash,
                 sheets_info=sheets_data,
             )
         except Exception as error:
             raise StorageError(f"시트 메타데이터 저장 실패: {error}") from error
 
+    @staticmethod
+    def _sheet_summary(sheets_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         return {
             "sheets_saved": len(sheets_data),
             "sheet_details": [
@@ -224,6 +234,33 @@ class SheetMetadataPersistenceModule(BaseModule):
                 for sheet in sheets_data
             ],
         }
+
+    def execute(
+        self,
+        input_data: SheetMetadataPersistenceInputDTO,
+        config: Optional[EmptyModuleConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        """Persist workbook sheet metadata and detected tables for the selected visible sheets."""
+        structure = input_data.structure_input
+        index = input_data.index_input
+        if structure.workbook_hash != index.workbook_hash:
+            raise ModuleExecutionError("구조 분석과 인덱스의 workbook_hash가 다릅니다")
+
+        database = self._source_files
+        if not database.is_connected():
+            raise StorageError("시트 메타데이터를 저장할 DB에 연결할 수 없습니다")
+
+        workbook_path = self.catalog.resolve(structure.file_name)
+        detected_tables = self._detected_tables(structure)
+        visible_sheets = self._visible_sheet_names(
+            structure,
+            workbook_path,
+            detected_tables,
+        )
+        dimensions = self._sheet_dimensions(workbook_path)
+        sheets_data = self._sheet_records(visible_sheets, dimensions, detected_tables)
+        self._persist_sheets(structure.workbook_hash, sheets_data)
+        return self._sheet_summary(sheets_data)
 
 
 # ==============================================================================

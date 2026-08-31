@@ -1,6 +1,7 @@
 # [BP-301] DAG 검증과 durable 실행
-> **Document Code:** `BP-301` | **Category:** Pipeline Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/models.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/models.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`backend/engine/workflows/service.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/service.py)
+> **Document Code:** `BP-301` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/workflow/domain`, `backend/domains/workflow/application`, `backend/domains/workflow/infrastructure`, `backend/domains/workflow/presentation`, `backend/domains/workflow/workers`
+> **Current References:** [`backend/domains/workflow/domain/`](../../../backend/domains/workflow/domain), [`backend/domains/workflow/application/`](../../../backend/domains/workflow/application), [`backend/domains/workflow/infrastructure/`](../../../backend/domains/workflow/infrastructure), [`backend/domains/workflow/presentation/`](../../../backend/domains/workflow/presentation), [`backend/domains/workflow/workers/`](../../../backend/domains/workflow/workers)
 
 ---
 
@@ -52,6 +53,8 @@ Node는 pending, running, succeeded, skipped, failed 상태와 input/config/outp
 - signal hard timeout이 필요한 node는 플랫폼 제약에 따라 순차 경로를 사용할 수 있습니다.
 - node 전후와 결과 publish 전에 cancel/lease ownership을 다시 확인합니다.
 
+`WorkflowExecutor`는 실행 수명주기와 공개 facade만 소유합니다. resume 계획은 `WorkflowResumePlanner`, 위상 batch 진행은 `WorkflowBatchRunner`, 단일 node 준비·실행·결과 기록은 `WorkflowNodeRunner`가 담당합니다.
+
 Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 DAG node 상태를 유지하면서 내부 work item을 `ingestion_shards`에 fan-out합니다. child KEDA Job은 별도 DAG node가 아니며, 부모 node는 durable barrier를 기다리는 동안 `running` 상태와 shard 진행률을 저장합니다. 따라서 사용자 워크플로 pin 계약은 바뀌지 않고 실행 구현만 batch-level 병렬화됩니다.
 
 ---
@@ -71,3 +74,15 @@ Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 
 - source workbook/index/workflow revision이 바뀌면 이전 결과를 현재 결과로 재사용하지 않습니다.
 - cache 정리는 `DELETE /api/v1/cache`에서 명시적으로 수행합니다.
 - 품질과 latency 비교는 같은 workflow/dataset/provider 설정으로 benchmark합니다.
+
+---
+
+## 7. 책임 분리와 구조 완료 조건
+
+- graph, pin, run/node state와 전이 policy는 `workflow/domain`에 둡니다.
+- validate, save, submit, cancel, resume, execute command/query와 required ports는 `workflow/application`이 소유합니다.
+- PostgreSQL store, Kubernetes dispatcher와 cache adapter는 `workflow/infrastructure`, REST/SSE는 `workflow/presentation`, lease process는 `workflow/workers`에 둡니다.
+- executor는 presentation DTO, provider client, concrete store를 import하지 않고 application port와 module registry 계약만 사용합니다.
+- workflow vertical slice, 내부 canonical import와 workflow SQL/row mapping의 domain PostgreSQL adapter 이전이 완료됐습니다. 구조 gate가 외부 호환 shim과 수평 storage facade의 재도입을 차단합니다.
+- workflow presentation은 HTTP/SSE projection만, application은 검증·submit·resume/cancel과 executor orchestration만, infrastructure는 PostgreSQL/Kubernetes/cache adapter만 소유합니다.
+- graph/state/pin 또는 resume semantics를 바꾸면 저장 schema version, API DTO, Playground runtime projection과 durable recovery 테스트를 함께 갱신합니다.

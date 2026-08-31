@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
+from backend.shared.presentation import ApiErrorDetail, ApiErrorEnvelope
 
 
 def error_envelope(

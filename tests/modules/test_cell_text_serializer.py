@@ -4,11 +4,16 @@ from pathlib import Path
 
 import openpyxl
 
-from backend.storage.spreadsheets.structured_cell_text import (
+from backend.domains.data_sources.infrastructure.spreadsheets.structured_cell_text import (
+    UNKNOWN_FIELD,
     extract_resolved_cell_value,
+    generate_header_combinations,
     resolved_cell_value,
+    serialize_structured_cell,
 )
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.structure.cell_text_serializer import (
     CellTextSerializerConfigDTO,
     CellTextSerializerInputDTO,
@@ -29,6 +34,38 @@ def test_resolved_cell_value_distinguishes_search_placeholder_from_evidence() ->
         == "62753"
     )
     assert extract_resolved_cell_value("Cell Value: ?") is None
+
+
+def test_header_hierarchy_contract_keeps_search_and_evidence_variants() -> None:
+    combinations = generate_header_combinations(
+        ["Assets", "Current Assets", "Cash"],
+        ["Fiscal Year", "2024-12-31"],
+    )
+    assert combinations[0] == (
+        ["Assets", "Current Assets", "Cash"],
+        ["Fiscal Year", "2024-12-31"],
+    )
+    assert (["Cash"], ["2024-12-31"]) in combinations
+    assert (["Current Assets", "Cash"], ["Fiscal Year"]) in combinations
+
+    row_headers, column_headers = combinations[0]
+    search_text = serialize_structured_cell(
+        "Balance_Sheet",
+        row_headers,
+        column_headers,
+        UNKNOWN_FIELD,
+        company_name="Nexora Labs",
+    )
+    evidence_text = serialize_structured_cell(
+        "Balance_Sheet",
+        row_headers,
+        column_headers,
+        "10081",
+        company_name="Nexora Labs",
+    )
+    assert search_text.endswith("Cell Value: ?")
+    assert extract_resolved_cell_value(search_text) is None
+    assert extract_resolved_cell_value(evidence_text) == "10081"
 
 
 def test_cell_text_serializer_execution(tmp_path: Path) -> None:

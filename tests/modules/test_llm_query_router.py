@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.providers.openai_responses import OpenAIResponseResult
+from backend.platform.openai.responses import OpenAIResponseResult
 from modules.common.base_module import ModuleExecutionError, QueryContextDTO
 from modules.query.decomposer import SubqueriesDTO, SubqueryItem
 from modules.query.llm_query_router import (
