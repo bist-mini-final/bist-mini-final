@@ -1,6 +1,4 @@
-"""Compatibility exports for operations workload models."""
-
-from backend.domains.operations.domain import (
+from .models import (
     KubernetesResourceSummary,
     KubernetesWorkloadSnapshot,
     WorkflowLeaseSummary,

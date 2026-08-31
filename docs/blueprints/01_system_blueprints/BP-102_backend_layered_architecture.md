@@ -133,8 +133,8 @@ jobs/                            # 선언형 표준 Job 정의
 | :--- | :--- | :--- |
 | `backend/entrypoints`, `backend/bootstrap` | ASGI·CLI·통합 worker 진입점과 `application.py`, `http.py`, `workers.py` 조립 경계 구현 | 도메인별 조립 함수가 아직 일부 legacy bootstrap/feature 구현을 감쌈 |
 | `backend/shared` | state stream, embedding port, lease worker, observability context를 application 계약으로 분리 | identifiers, clock, result/pagination/transaction/event 계약은 필요한 유스케이스 이동 시 도입 필요 |
-| `backend/domains` | workflow, data sources, BI, company comparison, chatbot, benchmark vertical slice 완료 | operations의 application/presentation/infrastructure 이전이 남음 |
-| `backend/api` | workflow/data sources/BI/comparison/chatbot/benchmark는 호환 shim, operations와 공통 artifact/evidence/module route를 직접 보유 | 최종 router 결합 전용 계층보다 책임이 넓음 |
+| `backend/domains` | workflow, data sources, BI, company comparison, chatbot, benchmark, operations vertical slice 완료 | 공통 artifact/evidence/module endpoint의 최종 소유권 정리가 남음 |
+| `backend/api` | 7개 product domain route는 호환 shim, 공통 artifact/evidence/module route를 직접 보유 | 최종 router 결합 전용 계층보다 책임이 넓음 |
 | `backend/platform` | PostgreSQL pool, pgvector, OpenAI, Redis broker, telemetry adapter를 canonical 경로로 이전 | Kubernetes/filesystem adapter와 도메인 고유 SQL의 vertical slice 이동 필요 |
 | 호환 수평 패키지 | `features`, `storage`, `providers`, `engine`, `core`, `contracts`, `cli`가 남아 있음 | 도메인·platform·shared·process adapter 경계로 책임 이전이 필요 |
 | 호환 진입 경로 | `backend/main.py`와 이전 provider/core/storage 경로는 re-export shim | 외부 호출 전환 후 shim 삭제 필요 |
@@ -151,7 +151,7 @@ jobs/                            # 선언형 표준 Job 정의
 5. company comparison 완료: BI snapshot reader adapter, 결정론적 build service, presentation과 공통 versioned snapshot port/adapter를 이전합니다.
 6. 완료: chatbot의 domain policy, application facade/port, PostgreSQL·filesystem adapter와 presentation을 vertical slice로 이전합니다.
 7. 완료: benchmark 요청·평가 모델, application port/use case, filesystem/PostgreSQL adapter, presentation과 주입형 worker를 vertical slice로 이전합니다.
-8. operations의 read-only queue·lease·workload 관제를 vertical slice로 이전합니다.
+8. 완료: operations의 read-only queue·lease·workload projection, Kubernetes adapter와 presentation을 vertical slice로 이전합니다.
 9. 실제 유스케이스가 요구하는 clock, identifier, result/pagination/transaction/event 계약만 `shared`에 추가하고 PostgreSQL 구현은 `platform/postgres`에 둡니다.
 10. 도메인 route가 이동한 뒤 `backend/api`를 router 결합과 공통 HTTP 정책만 남도록 축소합니다.
 11. 호환 import 사용량을 0으로 만든 패키지부터 제거하고 목표 트리를 검사하는 구조 계약 테스트를 단계적으로 강화합니다.

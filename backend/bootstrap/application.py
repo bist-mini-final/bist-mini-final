@@ -52,12 +52,13 @@ from backend.domains.data_sources.infrastructure import (
     SpreadsheetVectorCatalogAdapter,
 )
 from backend.domains.data_sources.infrastructure.filesystem import LocalSourceFileStorage
+from backend.domains.operations.application import OperationsQueryService
+from backend.domains.operations.infrastructure import KubernetesMonitor
 from backend.domains.workflow.application.execution_service import WorkflowExecutionService
 from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 from backend.platform.openai.embeddings import OpenAIEmbeddingEncoder
 from backend.platform.openai.provider import OpenAIProvider
 from backend.platform.openai.responses import OpenAIResponsesClient
-from backend.providers.kubernetes_monitor import KubernetesMonitor
 from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.pgvector_probe import PgVectorConnectionProbe
 
@@ -178,13 +179,19 @@ class DomainServicesContainer:
     company_comparison: CompanyComparisonService
     chatbot: ChatApiServices
     data_sources: DataSourceApiServices
-    job_monitor: KubernetesMonitor
+    operations: OperationsQueryService
 
     @property
     def chat_suggestions(self) -> ChatSuggestionService:
         """Compatibility view for lifecycle refresh hooks."""
 
         return self.chatbot.suggestions
+
+    @property
+    def job_monitor(self) -> OperationsQueryService:
+        """Compatibility view for the former job monitor service name."""
+
+        return self.operations
 
     @classmethod
     def create(
@@ -262,7 +269,9 @@ class DomainServicesContainer:
                     runtime.pgvector_probe,
                 ),
             ),
-            job_monitor=KubernetesMonitor(queue_reader=runtime.services.db_manager),
+            operations=OperationsQueryService(
+                KubernetesMonitor(queue_reader=runtime.services.db_manager)
+            ),
         )
 
 

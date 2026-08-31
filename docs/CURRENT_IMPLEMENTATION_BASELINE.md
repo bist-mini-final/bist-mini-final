@@ -39,14 +39,14 @@
 
 - 목표 구조는 얇은 `entrypoints`, 단일 `bootstrap`, 도메인별 `domain/application/infrastructure/presentation/workers` vertical slice와 `platform` adapter 경계를 사용한다. 읽기 전용 작업 관제는 `operations` bounded context가 소유한다. 현재 구현은 이 목표로 이동 중인 과도기 구조이며 완료 상태가 아니다.
 - 1단계 process/platform 경계는 실제 코드로 전환됐다. ASGI·CLI·worker는 `backend/entrypoints`, 조립은 `backend/bootstrap/application.py`, `http.py`, `workers.py`가 소유하며 여섯 worker 사양은 `backend.entrypoints.worker` 하나로 진입한다.
-- `backend/api`는 workflow, data sources, BI, company comparison, chatbot, benchmark 경로가 호환 re-export로 축소됐지만, operations와 공통 artifact/evidence/module route를 함께 보유한다. 최종적으로는 router 결합, middleware, exception handler, versioning만 남기고 도메인 presentation을 각 `backend/domains/<domain>/presentation`으로 이동한다.
+- `backend/api`는 workflow, data sources, BI, company comparison, chatbot, benchmark, operations 경로가 호환 re-export로 축소됐지만, 공통 artifact/evidence/module route를 함께 보유한다. 최종적으로는 router 결합, middleware, exception handler, versioning만 남기고 남은 presentation 책임을 소유 domain으로 이동한다.
 - workflow는 `domain/application/infrastructure/presentation/workers` vertical slice로 이전됐다. domain·application·presentation·worker의 역방향 의존 금지와 process entrypoint 경계는 구조 계약 테스트가 검증한다. workflow SQL 구현은 아직 호환 `DatabaseManager` 뒤에 있어 domain PostgreSQL adapter로 더 좁혀야 한다.
 - data sources는 `domain/application/infrastructure/presentation/workers` vertical slice로 이전됐다. 파일 저장·스프레드시트 렌더링·임베딩 artifact·분산 shard 실행은 data sources infrastructure가, 파일/ingestion/shard orchestration은 application이 소유한다. 이전 `api/data_source_*`, `storage/data_sources`, `storage/spreadsheets`, `storage/embedding_artifacts`, `platform/data_sources`는 호환 re-export다.
 - BI는 `domain/application/infrastructure/presentation/workers` vertical slice로 이전됐다. 저장소/provider 오류는 application 계약에서 번역하고 worker는 bootstrap을 생성하지 않고 주입된 runner/store만 실행한다. 이전 `features/bi`와 `api/bi_routes.py`는 호환 re-export다.
 - company comparison은 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. BI application facade는 comparison infrastructure adapter 뒤에 있고, 공통 snapshot protocol/PostgreSQL 구현은 각각 `shared/application`, `platform/postgres`가 소유한다. 이전 root module과 API/storage 경로는 호환 re-export다.
 - chatbot은 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. bootstrap이 `ChatApiServices`를 조립하고 presentation은 application facade만 받으며, 대화 정책·grounding·attachment·세션 저장의 이전 feature/API 경로는 호환 re-export다.
 - benchmark는 `domain/application/infrastructure/presentation/workers` vertical slice로 이전됐다. 요청·평가 모델, 실행·채점 유스케이스, benchmark-set filesystem source, PostgreSQL queue, HTTP DTO와 주입형 worker가 분리됐으며 이전 feature/API 경로는 호환 re-export다.
-- operations는 목표 하위 계층을 모두 갖추지 않았고 작업 관제 application/presentation 책임이 아직 `features`, `providers`, `api`에 남아 있다.
+- operations는 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. workload·lease projection 모델, read-only query service, Kubernetes in-cluster/kubectl adapter와 `/jobs` presentation이 분리됐으며 이전 feature/provider/API 경로는 호환 re-export다.
 - PostgreSQL pool과 범용 repository primitive는 `backend/platform/postgres`, OpenAI transport·Responses·embedding·pricing은 `backend/platform/openai`, Redis broker와 telemetry 구현은 각각 `backend/platform/redis`, `backend/platform/telemetry`가 소유한다. state stream, embedding port, lease worker와 observability context는 `backend/shared/application` 계약으로 분리됐다. 도메인 SQL·mapping은 아직 각 domain infrastructure로 이동해야 한다. `DatabaseManager`와 `PgVectorStore`는 이 이동 중 호출을 보존하는 하위 호환 facade다.
 - `backend/bootstrap`만 concrete adapter를 조립하는 것이 최종 규칙이다. 현재 `backend/features`, `backend/storage`, `backend/providers`, `backend/core`, `backend/contracts`, `backend/engine`은 호환성과 단계적 이전을 위해 남아 있으며 목표 디렉터리 구조의 최종 위치는 아니다.
 - 이전 `backend/main.py`, `bootstrap/container.py`, `providers/*`, `storage/connection_pool.py`, `core/state_stream*`, `core/telemetry.py`, `engine/workflows`, `engine/orchestration`, `engine/runtime`, `engine/worker`와 `api/workflow_*` 경로는 외부 호출 호환용 re-export만 남았다. 애플리케이션 내부 import는 새 canonical 경로만 사용하며 구조 계약 테스트가 회귀를 막는다.
@@ -59,7 +59,7 @@
 
 2026-08-31 로컬 전체 검증 결과:
 
-- Backend: 248 passed, 2 skipped
+- Backend: 249 passed, 2 skipped
 - Frontend: 167 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Backend C901 migration budget: 0개(새 복잡도 hotspot 즉시 실패)
