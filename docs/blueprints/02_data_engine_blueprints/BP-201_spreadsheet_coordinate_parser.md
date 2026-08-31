@@ -1,7 +1,7 @@
 # [BP-201] Spreadsheet 2D 좌표 정규화와 직렬화
-> **Document Code:** `BP-201` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-201` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Infrastructure Migrated / Module Port Pending
 > **Target Ownership:** `backend/domains/data_sources/domain`, `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/filesystem`, `modules/structure`
-> **Current References:** [`backend/storage/spreadsheets/`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/), [`modules/structure/`](file:///c:/Repos/bist-mini-final/modules/structure/)
+> **Current References:** [`backend/domains/data_sources/infrastructure/spreadsheets/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/spreadsheets/), [`modules/structure/`](file:///c:/Repos/bist-mini-final/modules/structure/)
 
 ---
 
@@ -70,4 +70,4 @@ flowchart LR
 - workbook 읽기, openpyxl 변환, raster 좌표 변환은 `data_sources/infrastructure/filesystem` adapter가 담당합니다.
 - serialization use case와 parser port는 `data_sources/application`, DAG adapter는 `modules/structure`에 둡니다.
 - renderer나 parser가 pgvector 저장소, HTTP DTO 또는 외부 vision client를 직접 import하지 않습니다.
-- 현재 `backend/storage/spreadsheets` 책임이 위 위치로 이동하고 module이 application port만 사용할 때 구조 migration을 완료합니다.
+- 이전 `backend/storage/spreadsheets` 구현은 data sources infrastructure로 이동했습니다. module의 renderer/catalog 의존을 application port로 좁히는 작업이 끝나면 이 세부 구조 migration을 완료합니다.

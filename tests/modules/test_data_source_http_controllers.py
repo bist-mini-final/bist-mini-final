@@ -9,22 +9,22 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from backend.api.data_source_controller import (
+from backend.domains.data_sources.presentation.controller import (
     DataSourceHttpController,
     UpdateIndexCompanyRequestDTO,
 )
-from backend.api.data_source_ingestion_controller import IngestionHttpController
+from backend.domains.data_sources.presentation.ingestion_controller import IngestionHttpController
 
 
 def _data_source_controller(tmp_path) -> tuple[DataSourceHttpController, MagicMock]:
-    vectors = MagicMock()
+    catalog = MagicMock()
     controller = DataSourceHttpController(
         processed_dir=tmp_path,
+        file_storage=cast(Any, MagicMock()),
         file_service=cast(Any, MagicMock()),
-        pgvector_store=cast(Any, vectors),
-        embedding_encoder=cast(Any, MagicMock()),
+        catalog=cast(Any, catalog),
     )
-    return controller, vectors
+    return controller, catalog
 
 
 def test_company_update_is_normalized_at_the_http_boundary(tmp_path) -> None:
@@ -63,7 +63,7 @@ def test_ingestion_delete_cancels_active_run_before_removing_partial_index() -> 
     jobs.cancel.return_value = cancelled_run
     jobs.target_index_id.return_value = "index-partial"
     vectors.list_indexes.return_value = [{"index_id": "index-partial"}]
-    vectors.delete.return_value = True
+    vectors.delete_index.return_value = True
     runs.delete.return_value = True
     controller = IngestionHttpController(
         cast(Any, jobs),
@@ -75,7 +75,7 @@ def test_ingestion_delete_cancels_active_run_before_removing_partial_index() -> 
 
     jobs.cancel.assert_called_once_with("run-1")
     jobs.target_index_id.assert_called_once_with(cancelled_run)
-    vectors.delete.assert_called_once_with("index-partial")
+    vectors.delete_index.assert_called_once_with("index-partial")
     runs.delete.assert_called_once_with("run-1")
     assert result["index_deleted"] is True
     assert result["source_file_preserved"] is True

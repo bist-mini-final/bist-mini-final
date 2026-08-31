@@ -6,13 +6,15 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+        EmbeddingArtifactStore,
+    )
     from backend.storage.db_manager import DatabaseManager
-    from backend.storage.embedding_artifacts import EmbeddingArtifactStore
     from backend.storage.pgvector_store import PgVectorStore
 
 _EXPORT_MODULES = {
     "DatabaseManager": "backend.storage.db_manager",
-    "EmbeddingArtifactStore": "backend.storage.embedding_artifacts",
+    "EmbeddingArtifactStore": "backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts",
     "PgVectorStore": "backend.storage.pgvector_store",
 }
 

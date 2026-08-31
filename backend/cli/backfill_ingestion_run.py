@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from backend.bootstrap.application import ApplicationContainer
+from backend.domains.data_sources.application.ingestion_jobs import IngestionJobService
 from backend.domains.workflow.domain.models import RunBatchState, RunNodeState, WorkflowRun
-from backend.storage.data_sources.ingestion_jobs import IngestionJobService
 
 
 def _timestamp(value: object) -> str:

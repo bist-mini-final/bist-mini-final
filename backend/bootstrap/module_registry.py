@@ -2,15 +2,21 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from backend.domains.data_sources.application.shard_coordinator import IngestionShardCoordinator
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.sheet_renderer import (
+    ExcelSheetRenderer,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.platform.pgvector import PgVectorRepositorySet
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
-from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.common.base_module import BaseModule
 from modules.embedding.cell_text_embedder import CellTextEmbedderModule
 from modules.embedding.query_embedder import EmbedderModule

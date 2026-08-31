@@ -4,14 +4,16 @@ from pathlib import Path
 
 import openpyxl
 
-from backend.storage.spreadsheets.structured_cell_text import (
+from backend.domains.data_sources.infrastructure.spreadsheets.structured_cell_text import (
     UNKNOWN_FIELD,
     extract_resolved_cell_value,
     generate_header_combinations,
     resolved_cell_value,
     serialize_structured_cell,
 )
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.structure.cell_text_serializer import (
     CellTextSerializerConfigDTO,
     CellTextSerializerInputDTO,

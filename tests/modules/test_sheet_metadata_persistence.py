@@ -6,7 +6,9 @@ from unittest.mock import MagicMock
 import openpyxl
 import pytest
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.exceptions import ModuleExecutionError
 from modules.storage.pgvector_index_writer import VectorIndexDTO
 from modules.storage.processed_file_selector import WorkbookSelectionDTO

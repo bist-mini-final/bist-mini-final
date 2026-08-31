@@ -52,7 +52,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Union, cast
 
 from pydantic import Field
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,

@@ -13,14 +13,14 @@ from backend.bootstrap.application import (
     DomainServicesContainer,
     ExecutionContainer,
 )
+from backend.domains.data_sources.workers.embedding import (
+    EmbeddingShardWorker,
+)
+from backend.domains.data_sources.workers.vector import VectorShardWorker
 from backend.features.bi.materialization_worker_main import BiMaterializationWorker
 from backend.features.chatbot.repository import ChatSessionRepository
 from backend.platform.postgres.repositories import SyncPostgresRepository
 from backend.shared.application.workers import LeasedWorker
-from backend.storage.data_sources.embedding_shard_worker_main import (
-    EmbeddingShardWorker,
-)
-from backend.storage.data_sources.vector_shard_worker_main import VectorShardWorker
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.repositories import (
@@ -79,6 +79,17 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.shared.infrastructure.database",
         "backend.shared.infrastructure.observability",
         "backend.storage.connection_pool",
+        "backend.storage.data_sources",
+        "backend.storage.embedding_artifacts",
+        "backend.storage.spreadsheets",
+        "backend.platform.data_sources",
+        "backend.api.data_source_controller",
+        "backend.api.data_source_database_routes",
+        "backend.api.data_source_file_routes",
+        "backend.api.data_source_index_routes",
+        "backend.api.data_source_ingestion_controller",
+        "backend.api.data_source_ingestion_routes",
+        "backend.api.data_source_routes",
         "backend.api.workflow_controller",
         "backend.api.workflow_routes",
     )
@@ -139,6 +150,58 @@ def test_workflow_vertical_slice_has_no_legacy_or_inverted_dependencies() -> Non
                 if imported.startswith(forbidden):
                     violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"workflow layer inversion: {violations}"
+
+
+def test_data_sources_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:
+    forbidden_by_layer = {
+        "domain": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "application": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "presentation": (
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.data_sources.infrastructure",
+        ),
+        "workers": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.data_sources.infrastructure",
+        ),
+    }
+    violations: list[str] = []
+    for layer, forbidden in forbidden_by_layer.items():
+        root = f"backend/domains/data_sources/{layer}"
+        for path in _python_files(root):
+            for imported, line in _imported_modules(path):
+                if imported.startswith(forbidden):
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
+                    )
+    assert not violations, f"data sources layer inversion: {violations}"
 
 
 def test_process_entrypoints_only_import_bootstrap() -> None:

@@ -5,6 +5,9 @@ from threading import Barrier, get_ident
 
 from pydantic import BaseModel
 
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
 from backend.domains.workflow.application.executor import WorkflowExecutor
 from backend.domains.workflow.domain.models import (
     CanvasPosition,
@@ -14,7 +17,6 @@ from backend.domains.workflow.domain.models import (
     WorkflowNode,
 )
 from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,

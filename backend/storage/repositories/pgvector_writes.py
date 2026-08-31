@@ -12,11 +12,15 @@ import psycopg2.extras
 from langchain_core.documents import Document
 
 from backend.contracts.vector import PgVectorReplacePlan
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactVectors,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document import (
+    cell_items_to_langchain_documents,
+)
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.embedding_artifacts import EmbeddingArtifactVectors
 from backend.storage.pgvector_binary_copy import copy_documents
 from backend.storage.pgvector_errors import PgVectorStoreError
-from backend.storage.spreadsheets.langchain_document import cell_items_to_langchain_documents
 from modules.common.config import DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_MODEL
 
 from .base import PgVectorConnectionCapability

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
 from modules.common.base_module import QueryContextDTO
 from modules.query.semantic_query_matcher import (
     QueryExample,

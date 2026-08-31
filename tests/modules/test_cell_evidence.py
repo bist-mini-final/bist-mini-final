@@ -10,7 +10,9 @@ from openpyxl import Workbook
 from PIL import Image
 
 from backend.api.cell_evidence_routes import create_cell_evidence_router
-from backend.storage.spreadsheets.cell_evidence import locate_cell_artifact
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_evidence import (
+    locate_cell_artifact,
+)
 
 
 class FakePgVectorStore:

@@ -14,6 +14,8 @@ from typing import Optional
 from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
+    INGESTION_SHARD_POLL_SECONDS,
+    INGESTION_SHARD_WAIT_TIMEOUT_SECONDS,
     INGESTION_SHARDS_ENABLED,
     PROCESSED_DATA_DIR,
     RUN_DIR,
@@ -21,19 +23,23 @@ from backend.core.settings import (
     VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
+from backend.domains.data_sources.application.shard_coordinator import IngestionShardCoordinator
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.filesystem.shard_artifacts import (
+    IngestionShardArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.postgres.shards import (
+    PostgresIngestionShardRepository,
+)
 from backend.domains.workflow.application.executor import WorkflowExecutor
 from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore, WorkflowStore
 from backend.platform.openai.pricing import calculate_openai_cost
 from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.platform.telemetry.tracing import trace_node_execution
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.data_sources.ingestion_shards import (
-    PostgresIngestionShardRepository,
-)
-from backend.storage.data_sources.shard_artifacts import IngestionShardArtifactStore
-from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from backend.storage.pgvector_store import PgVectorStore
 
 from .module_registry import ModuleRegistry
@@ -83,6 +89,8 @@ def create_workflow_runtime_services(
         IngestionShardArtifactStore(embedding_store),
         enabled=INGESTION_SHARDS_ENABLED and database_connected,
         pgvector_store=pg_store,
+        poll_seconds=INGESTION_SHARD_POLL_SECONDS,
+        wait_timeout_seconds=INGESTION_SHARD_WAIT_TIMEOUT_SECONDS,
     )
     registry = ModuleRegistry(
         completion_client=completion_client,

@@ -5,7 +5,9 @@ from __future__ import annotations
 from threading import RLock
 from typing import Any, Callable, Dict, Iterable
 
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
 from modules.common.base_module import BaseModule
 
 _CONFIG_UNSET = object()

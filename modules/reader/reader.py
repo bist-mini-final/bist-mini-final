@@ -65,7 +65,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from langchain_core.tools import ArgsSchema, BaseTool
 from pydantic import BaseModel, Field
 
-from backend.storage.spreadsheets.structured_cell_text import (
+from backend.domains.data_sources.infrastructure.spreadsheets.structured_cell_text import (
     extract_resolved_cell_value,
     resolved_cell_value,
     serialize_structured_cell,

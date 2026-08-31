@@ -5,11 +5,19 @@ from unittest.mock import MagicMock
 
 import openpyxl
 
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_visibility import (
+    WorksheetVisibility,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.sheet_renderer import (
+    ExcelSheetRenderer,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.table_geometry import (
+    compute_sheet_layout,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from backend.platform.openai.responses import OpenAIResponseResult
-from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility
-from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
-from backend.storage.spreadsheets.table_geometry import compute_sheet_layout
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
 from modules.structure.luna_vlm_structure_detector import (
     LunaVlmStructureDetectorConfigDTO,
     LunaVlmStructureDetectorModule,
