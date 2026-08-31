@@ -6,19 +6,17 @@ from datetime import datetime
 from secrets import randbelow
 from zoneinfo import ZoneInfo
 
-from backend.domains.bi.application import BiApiServices
-
-from .ports import ChatSuggestionRepositoryPort
+from .ports import BiCompanyCatalogPort, ChatSuggestionRepositoryPort
 
 
 class ChatSuggestionService:
     def __init__(
         self,
         repository: ChatSuggestionRepositoryPort,
-        bi_services: BiApiServices,
+        bi_catalog: BiCompanyCatalogPort,
     ) -> None:
         self._repository = repository
-        self._bi_services = bi_services
+        self._bi_catalog = bi_catalog
 
     def refresh_if_due(self, *, force: bool = False) -> list[str]:
         seoul_today = datetime.now(ZoneInfo("Asia/Seoul")).date()
@@ -28,7 +26,7 @@ class ChatSuggestionService:
 
         companies = [
             entry.company.display_name
-            for entry in self._bi_services.store.list_companies()
+            for entry in self._bi_catalog.list_companies()
         ]
         questions = self._questions_for(companies or ["IBM"], randbelow(10_000))
         self._repository.replace_for_date(seoul_today, questions)
@@ -54,4 +52,3 @@ class ChatSuggestionService:
 
 
 __all__ = ["ChatSuggestionService"]
-

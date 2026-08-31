@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
-from typing import Protocol
+from typing import Any, Protocol
+
+
+class BiCompanyCatalogPort(Protocol):
+    def list_companies(self) -> Sequence[Any]: ...
+
+    def get_current(self, company_id: Any) -> Any | None: ...
 
 
 class ChatSuggestionRepositoryPort(Protocol):
@@ -14,5 +21,4 @@ class ChatSuggestionRepositoryPort(Protocol):
     ) -> None: ...
 
 
-__all__ = ["ChatSuggestionRepositoryPort"]
-
+__all__ = ["BiCompanyCatalogPort", "ChatSuggestionRepositoryPort"]

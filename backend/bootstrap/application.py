@@ -13,6 +13,7 @@ from backend.bootstrap.runtime import (
 )
 from backend.core.settings import (
     CACHE_DIR,
+    CHAT_UPLOAD_DIR,
     EMBEDDING_ARTIFACT_DIR,
     KUBERNETES_WORKFLOW_QUEUE,
     PGVECTOR_URL,
@@ -23,8 +24,17 @@ from backend.core.settings import (
     WORKFLOW_DIR,
 )
 from backend.domains.bi.application import BiApiServices
-from backend.domains.chatbot.application import ChatSuggestionService
-from backend.domains.chatbot.infrastructure.postgres import ChatSuggestionRepository
+from backend.domains.chatbot.application import (
+    ChatApiServices,
+    ChatAttachmentService,
+    ChatConversationService,
+    ChatSuggestionService,
+)
+from backend.domains.chatbot.infrastructure.filesystem import LocalChatAttachmentStorage
+from backend.domains.chatbot.infrastructure.postgres import (
+    ChatSessionRepository,
+    ChatSuggestionRepository,
+)
 from backend.domains.company_comparison.application import CompanyComparisonService
 from backend.domains.data_sources.application import DataSourceFileService
 from backend.domains.data_sources.application.ingestion_jobs import IngestionJobService
@@ -158,9 +168,15 @@ class DomainServicesContainer:
 
     bi_services: BiApiServices
     company_comparison: CompanyComparisonService
-    chat_suggestions: ChatSuggestionService
+    chatbot: ChatApiServices
     data_sources: DataSourceApiServices
     job_monitor: KubernetesMonitor
+
+    @property
+    def chat_suggestions(self) -> ChatSuggestionService:
+        """Compatibility view for lifecycle refresh hooks."""
+
+        return self.chatbot.suggestions
 
     @classmethod
     def create(
@@ -180,15 +196,32 @@ class DomainServicesContainer:
             runtime.embedding_encoder,
         )
         file_storage = LocalSourceFileStorage(runtime.paths.processed_dir)
+        chat_suggestions = ChatSuggestionService(
+            ChatSuggestionRepository(runtime.services.db_manager),
+            bi_services.store,
+        )
         return cls(
             bi_services=bi_services,
             company_comparison=create_company_comparison_service(
                 bi_services.store,
                 database_url=runtime.services.db_manager.database_url,
             ),
-            chat_suggestions=ChatSuggestionService(
-                ChatSuggestionRepository(runtime.services.db_manager),
-                bi_services,
+            chatbot=ChatApiServices(
+                conversations=ChatConversationService(
+                    repository=ChatSessionRepository(runtime.services.db_manager),
+                    workflow_store=runtime.services.workflow_store,
+                    run_store=runtime.services.run_store,
+                    workflow_executor=runtime.services.workflow_executor,
+                    workflow_dispatcher=execution.workflow_dispatcher,
+                    completion_client=runtime.completion_client,
+                    bi_catalog=bi_services.store,
+                    execution_logs=runtime.services.db_manager,
+                    evidence_cells=runtime.services.pgvector_store,
+                ),
+                suggestions=chat_suggestions,
+                attachments=ChatAttachmentService(
+                    LocalChatAttachmentStorage(CHAT_UPLOAD_DIR)
+                ),
             ),
             data_sources=DataSourceApiServices(
                 processed_dir=runtime.paths.processed_dir,

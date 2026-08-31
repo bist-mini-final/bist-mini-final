@@ -29,7 +29,8 @@ from backend.domains.bi.domain.models import (
     UnavailableObservation,
 )
 from backend.domains.bi.infrastructure.integrations.fast_rag_adapter import FastRagPipelineAdapter
-from backend.features.chatbot.attachments import compact_evidence, extract_text
+from backend.domains.chatbot.application import compact_evidence
+from backend.domains.chatbot.infrastructure.filesystem import extract_text
 
 
 def test_ranked_cell_aliases_cover_financial_sheet_abbreviations() -> None:

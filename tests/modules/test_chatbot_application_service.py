@@ -48,7 +48,7 @@ def service(repository: InMemoryChatRepository) -> ChatConversationService:
         workflow_executor=unused,
         workflow_dispatcher=unused,
         completion_client=unused,
-        bi_services=unused,
+        bi_catalog=unused,
         execution_logs=unused,
         evidence_cells=unused,
     )

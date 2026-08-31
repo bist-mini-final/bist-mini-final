@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
-from backend.api.chat_routes import create_chat_router
 from backend.bootstrap.application import ApplicationContainer
 from backend.domains.bi.presentation.routes import create_bi_router
+from backend.domains.chatbot.presentation import create_chat_router
 from backend.domains.company_comparison.presentation.routes import create_company_comparison_router
 from backend.domains.data_sources.presentation import create_data_source_router
 from backend.domains.workflow.presentation import create_workflow_router
@@ -36,23 +36,10 @@ def create_api_router(
     router.include_router(
         create_company_comparison_router(domain.company_comparison)
     )
-    workflow_dispatcher = execution.workflow_dispatcher
     workflow_execution = execution.workflow_execution
     workflow_store = services.workflow_store
     run_store = services.run_store
-    workflow_executor = services.workflow_executor
-    chat_router = create_chat_router(
-        db_manager=services.db_manager,
-        workflow_store=workflow_store,
-        run_store=run_store,
-        workflow_executor=workflow_executor,
-        workflow_dispatcher=workflow_dispatcher,
-        completion_client=runtime.completion_client,
-        bi_services=domain.bi_services,
-        suggestion_service=domain.chat_suggestions,
-        pgvector_store=services.pgvector_store,
-        prefix="",
-    )
+    chat_router = create_chat_router(domain.chatbot, prefix="")
     router.include_router(chat_router, prefix="/chat")
     router.include_router(
         chat_router,
