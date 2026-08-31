@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createUuid } from '../../shared/lib/uuid';
 import { pipelineApi } from '../playground/services/api';
 import { chatApi } from './chatApi';
 import type {
@@ -19,7 +20,7 @@ const CLIENT_KEY = 'rag-flow:chat-client-id';
 function clientId(): string {
   let id = localStorage.getItem(CLIENT_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = createUuid();
     localStorage.setItem(CLIENT_KEY, id);
   }
   return id;
@@ -222,7 +223,7 @@ export function useChatController() {
       if (uploadedAttachment) setAttachment(null);
 
       const localUser: ChatMessage = {
-        id: `local-${crypto.randomUUID()}`,
+        id: `local-${createUuid()}`,
         role: 'user',
         content,
         status: 'completed',
@@ -289,7 +290,7 @@ export function useChatController() {
         setActive((current) => current && ({
           ...current,
           messages: [...(current.messages ?? []), {
-            id: `error-${crypto.randomUUID()}`,
+            id: `error-${createUuid()}`,
             role: 'assistant',
             content: message,
             status: 'failed',

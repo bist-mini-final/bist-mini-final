@@ -262,6 +262,8 @@ New-NetFirewallRule -DisplayName "Excel RAG k3d Ingress HTTP 8080" `
 
 검증은 먼저 호스트에서 `http://localhost:8080`, 같은 LAN의 다른 장치에서 `http://<고정-LAN-IP>:8080`, 마지막으로 Wi-Fi를 끈 휴대전화 데이터에서 `http://kosa165.iptime.org:8080` 순서로 수행합니다. 일부 공유기는 NAT loopback을 지원하지 않아 같은 LAN에서 DDNS 주소로 접속할 때만 timeout이 발생할 수 있습니다.
 
+일반 HTTP 원격 origin은 브라우저의 secure context가 아니므로 `crypto.randomUUID()`가 제공되지 않을 수 있습니다. 프론트의 client-side 식별자는 공통 UUID 유틸에서 `crypto.getRandomValues()` 기반 폴백을 사용합니다. 이는 브라우저 호환 조치일 뿐 전송 구간을 암호화하지 않으므로, 공개 서비스의 HTTPS 요구사항을 대체하지 않습니다.
+
 > **보안 경계:** 8443은 예약 포트일 뿐 TLS 인증서가 자동 구성되는 것은 아닙니다. 인증·인가가 없는 개발 배포를 인터넷에 그대로 공개하면 제3자가 데이터 조회, 파일 업로드, Job 실행 및 유료 모델 호출을 수행할 수 있습니다. 외부 공개 시에는 VPN 또는 공유기 source-IP 제한을 우선 사용하고, 공개 서비스라면 TLS reverse proxy와 인증 계층을 먼저 구성합니다.
 
 원격 레지스트리로 배포할 때는 이미지를 별도로 `docker push`한 후, import를 끄고 불변 태그를 지정합니다.

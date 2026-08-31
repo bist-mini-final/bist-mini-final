@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createUuid } from '../../../shared/lib/uuid';
 import {
   ResponsiveGridLayout,
   verticalCompactor,
@@ -96,7 +97,7 @@ export function BiDashboardGrid(props: BiDashboardGridProps) {
     const measure = containerRef.current;
     if (!activeItem || !isBiCardId(activeItem.i) || !pointer || !measure || width <= 0) return;
     const activeCardId = activeItem.i;
-    dragRowIdRef.current ??= `row-${crypto.randomUUID()}`;
+    dragRowIdRef.current ??= `row-${createUuid()}`;
     const bounds = measure.getBoundingClientRect();
     const projection = projectBiGridDrop({
       activeCardId,
@@ -119,7 +120,7 @@ export function BiDashboardGrid(props: BiDashboardGridProps) {
   };
 
   const handleDragStart: EventCallback = (_layout, _oldItem, newItem, _placeholder, event) => {
-    dragRowIdRef.current = `row-${crypto.randomUUID()}`;
+    dragRowIdRef.current = `row-${createUuid()}`;
     updateDragPreview(newItem, event);
   };
 
