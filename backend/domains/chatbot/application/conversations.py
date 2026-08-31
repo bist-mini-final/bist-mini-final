@@ -4,21 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from backend.domains.bi.application import BiApiServices
-from backend.domains.workflow.domain.models import WorkflowExecutionRequest
-from backend.features.chatbot.attachments import compact_evidence
-from backend.features.chatbot.conversation import (
+from backend.domains.chatbot.domain import (
     company_aliases,
     company_identity_answer,
     is_recent_question_request,
     needs_rag,
 )
-from backend.features.chatbot.grounding import (
-    INSUFFICIENT_EVIDENCE_ANSWER,
-    EvidenceCellStorePort,
-    ExecutionLogStorePort,
-    finalize_grounded_answer,
-)
+from backend.domains.workflow.domain.models import WorkflowExecutionRequest
 from backend.shared.domain import ResourceNotFoundError, RetryableInfrastructureError
 from modules.common.config import DEFAULT_READER_MODEL
 
@@ -28,6 +20,14 @@ from .answer_formatting import (
     visualization_card_id,
     with_company_intro,
 )
+from .attachments import compact_evidence
+from .grounding import (
+    INSUFFICIENT_EVIDENCE_ANSWER,
+    EvidenceCellStorePort,
+    ExecutionLogStorePort,
+    finalize_grounded_answer,
+)
+from .ports import BiCompanyCatalogPort
 
 _CHART_TERMS = ("그래프", "차트", "추이", "추세", "변화", "비교", "연도별")
 
@@ -132,7 +132,7 @@ class ChatConversationService:
         workflow_executor: WorkflowExecutorPort,
         workflow_dispatcher: WorkflowDispatcherPort,
         completion_client: CompletionClientPort,
-        bi_services: BiApiServices,
+        bi_catalog: BiCompanyCatalogPort,
         execution_logs: ExecutionLogStorePort,
         evidence_cells: EvidenceCellStorePort,
     ) -> None:
@@ -142,7 +142,7 @@ class ChatConversationService:
         self._workflow_executor = workflow_executor
         self._workflow_dispatcher = workflow_dispatcher
         self._completion_client = completion_client
-        self._bi_services = bi_services
+        self._bi_catalog = bi_catalog
         self._execution_logs = execution_logs
         self._evidence_cells = evidence_cells
 
@@ -331,11 +331,11 @@ class ChatConversationService:
         lowered = question.lower()
         if not any(term in lowered for term in _CHART_TERMS):
             return None
-        for entry in self._bi_services.store.list_companies():
+        for entry in self._bi_catalog.list_companies():
             if any(
                 alias.casefold() in lowered
                 for alias in company_aliases(entry.company.display_name)
-            ) and self._bi_services.store.get_current(entry.company.company_id) is not None:
+            ) and self._bi_catalog.get_current(entry.company.company_id) is not None:
                 return {
                     "company_id": str(entry.company.company_id),
                     "card_id": visualization_card_id(question),

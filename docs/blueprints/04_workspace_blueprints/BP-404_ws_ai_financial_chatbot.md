@@ -1,7 +1,7 @@
 # [BP-404] AI Financial Chatbot 워크스페이스 명세서
-> **Document Code:** `BP-404` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Document Code:** `BP-404` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Vertical Slice Complete / Frontend Aligned
 > **Target Ownership:** `backend/domains/chatbot`, `backend/domains/workflow/application`, `backend/platform/openai`, `frontend/src/features/chatbot`
-> **Current References:** [`backend/api/chat_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/chat_routes.py), [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`backend/features/chatbot/`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx)
+> **Current References:** [`backend/domains/chatbot/domain/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/domain/), [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`backend/domains/chatbot/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/presentation/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx)
 
 ---
 
@@ -16,16 +16,17 @@ flowchart TD
     subgraph ChatServices ["Chatbot Core Services"]
         REPO["ChatSessionRepository (chat_sessions, chat_messages)"]
         SUGG["ChatSuggestionService (Dynamic Financial Prompts)"]
-        ATTACH["Attachment Processor (compact_evidence / save_upload)"]
+        ATTACH["ChatAttachmentService / LocalChatAttachmentStorage"]
         CONV["Conversation Policy (회사 식별 / 일반 질문 / RAG 라우팅)"]
         GROUND["Grounding Policy (실행 근거 셀 검증 / 인용 보강)"]
         TABLE_REP["Inline Markdown Table Repair Engine"]
     end
 
-    ROUTER <--> REPO
-    ROUTER <--> SUGG
-    ROUTER <--> ATTACH
-    ROUTER --> CONV
+    ROUTER --> API["ChatApiServices"]
+    API --> REPO
+    API --> SUGG
+    API --> ATTACH
+    API --> CONV
     ROUTER --> TABLE_REP
     ROUTER <-->|RAG Execution| PIPELINE["RAG Pipeline Job / FastRagAdapter"]
     PIPELINE --> GROUND
@@ -64,7 +65,8 @@ flowchart TD
 
 ## 4. 책임 분리와 구조 완료 조건
 
-- conversation/session/message, routing policy와 grounded answer 검증은 chatbot domain/application이 소유합니다.
-- RAG 실행은 workflow application port, source cell 확인은 data sources evidence port로 요청하며 상대 domain repository를 직접 import하지 않습니다.
-- OpenAI conversation transport는 platform, chat repository와 integration adapter는 chatbot infrastructure, REST DTO는 chatbot presentation에 둡니다.
-- `backend/features/chatbot`과 `backend/api/chat_routes.py`의 책임이 vertical slice로 이동하고 근거 검증 회귀 테스트가 유지될 때 구조 migration을 완료합니다.
+- 회사 식별·일반 질문·RAG 선택 정책과 attachment 오류는 chatbot domain이 소유하고, conversation/session/message orchestration과 grounded answer 검증은 application이 소유합니다.
+- RAG 실행, BI 회사 조회, source cell 확인은 chatbot application에 정의된 소비자 관점 port로 요청하며 상대 domain repository를 직접 import하지 않습니다.
+- OpenAI conversation transport는 platform, chat session·suggestion PostgreSQL repository와 로컬 attachment adapter는 chatbot infrastructure, REST DTO와 upload transport는 chatbot presentation에 둡니다.
+- bootstrap은 `ChatApiServices`에 conversation, suggestion, attachment 유스케이스를 조립하며 presentation은 concrete 저장소나 provider를 생성하지 않습니다.
+- 이전 `backend/features/chatbot/*`과 `backend/api/chat_routes.py`는 외부 import 호환 re-export만 남고, 애플리케이션 내부 import와 구조 계약 테스트는 canonical vertical slice만 사용합니다.

@@ -14,11 +14,11 @@ from backend.bootstrap.application import (
     ExecutionContainer,
 )
 from backend.domains.bi.workers.materialization import BiMaterializationWorker
+from backend.domains.chatbot.infrastructure.postgres import ChatSessionRepository
 from backend.domains.data_sources.workers.embedding import (
     EmbeddingShardWorker,
 )
 from backend.domains.data_sources.workers.vector import VectorShardWorker
-from backend.features.chatbot.repository import ChatSessionRepository
 from backend.platform.postgres.repositories import SyncPostgresRepository
 from backend.shared.application.workers import LeasedWorker
 from backend.storage.db_manager import DatabaseManager
@@ -94,6 +94,8 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.api.bi_routes",
         "backend.storage.audit_schema",
         "backend.api.company_comparison_routes",
+        "backend.api.chat_routes",
+        "backend.features.chatbot",
         "backend.domains.company_comparison.errors",
         "backend.domains.company_comparison.league_scoring",
         "backend.domains.company_comparison.models",
@@ -307,6 +309,49 @@ def test_company_comparison_vertical_slice_has_no_inverted_dependencies() -> Non
                         f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
                     )
     assert not violations, f"company comparison layer inversion: {violations}"
+
+
+def test_chatbot_vertical_slice_has_no_inverted_dependencies() -> None:
+    forbidden_by_layer = {
+        "domain": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "application": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.chatbot.infrastructure",
+        ),
+        "presentation": (
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.chatbot.infrastructure",
+        ),
+    }
+    violations: list[str] = []
+    for layer, forbidden in forbidden_by_layer.items():
+        root = f"backend/domains/chatbot/{layer}"
+        for path in _python_files(root):
+            for imported, line in _imported_modules(path):
+                if imported.startswith(forbidden):
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
+                    )
+    assert not violations, f"chatbot layer inversion: {violations}"
 
 
 def test_process_entrypoints_only_import_bootstrap() -> None:
