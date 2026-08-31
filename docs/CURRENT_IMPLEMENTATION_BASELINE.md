@@ -49,7 +49,7 @@
 - operations는 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. workload·lease projection 모델, read-only query service, Kubernetes in-cluster/kubectl adapter와 `/jobs` presentation이 분리됐으며 이전 feature/provider/API 경로는 제거됐다.
 - PostgreSQL pool과 범용 repository primitive는 `backend/platform/postgres`, pgvector Binary COPY와 오류 계약은 `backend/platform/pgvector`, OpenAI transport·Responses·embedding·pricing은 `backend/platform/openai`, Redis broker와 telemetry 구현은 각각 `backend/platform/redis`, `backend/platform/telemetry`가 소유한다. state stream, embedding port, lease worker와 observability context는 `backend/shared/application` 계약으로 분리됐다. collection catalog/retrieval/publish SQL gateway는 `data_sources/infrastructure/pgvector`로 이동했고 module은 좁은 port만 받는다.
 - `backend/bootstrap`만 concrete adapter를 조립한다. `backend/features`, `backend/providers`, `backend/contracts`, `backend/engine`의 Python source와 `bootstrap/container.py`는 제거됐고 구조 계약 테스트가 재도입을 막는다. `backend/core`에는 런타임 설정만 남아 있다.
-- `backend/storage`는 제거됐다. source-file/sheet repository와 schema는 data sources, workflow run/queue/lease/history repository와 schema는 workflow, chatbot schema는 chatbot이 소유한다. Bootstrap은 domain schema fragment와 concrete adapter를 조립만 한다. `backend/main.py`는 ASGI 외부 실행 호환 entrypoint로만 남아 있다.
+- `backend/storage`는 제거됐다. source-file/sheet repository와 schema는 data sources, workflow run/queue/lease/history repository와 schema는 workflow, chatbot schema는 chatbot이 소유한다. Bootstrap은 domain schema fragment와 concrete adapter를 조립만 한다. ASGI·worker·관리 명령은 모두 `backend/entrypoints` 아래에 있다.
 - OpenAI Responses 호출은 provider가 transport와 응답 파싱을, `BaseLLMModule`이 structured/text/agentic module lifecycle과 usage 집계를 소유한다.
 - spreadsheet 구조 감지는 전처리된 시트 계약, 병렬 분석 batch, 범위 정규화 단계를 분리하며 renderer는 값 포맷·fill·border·text 배치를 독립 helper로 유지한다.
 - one-shot queue worker는 `LeasedWorker` template method를 상속해 claim, heartbeat, terminal transition을 공유한다. pause/cancel 같은 별도 상태 기계를 가진 worker는 공통 lease primitive만 재사용한다.
@@ -59,7 +59,7 @@
 
 2026-08-31 로컬 전체 검증 결과:
 
-- Backend: 295 passed, 2 skipped
+- Backend: 298 passed, 2 skipped
 - Frontend: 167 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Backend C901 migration budget: 0개(새 복잡도 hotspot 즉시 실패)

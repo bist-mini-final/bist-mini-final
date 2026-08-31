@@ -1,10 +1,10 @@
 """Execute one backend module from a JSON request without the frontend.
 
 Examples:
-    python -m backend.tools.run_module json_transformer --request request.json
+    python -m backend.entrypoints.cli run-module query_input --request request.json
     printf '{"input":{"any_json":{"a":1}},"config":{}}' \
-      | python -m backend.tools.run_module json_transformer
-    python -m backend.tools.run_module json_transformer --contract
+      | python -m backend.entrypoints.cli run-module query_input
+    python -m backend.entrypoints.cli run-module query_input --contract
 """
 
 from __future__ import annotations

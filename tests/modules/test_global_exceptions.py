@@ -5,7 +5,7 @@ import unittest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from backend.main import register_global_exception_handlers
+from backend.entrypoints.asgi import register_global_exception_handlers
 from backend.shared.domain import ResourceNotFoundError
 from modules.common.exceptions import (
     DocumentParsingError,
@@ -121,7 +121,7 @@ class GlobalExceptionHandlerTests(unittest.TestCase):
         self.assertEqual(detail["message"], "대상을 찾을 수 없습니다")
 
     def test_healthz_and_probes(self) -> None:
-        from backend.main import create_app
+        from backend.entrypoints.asgi import create_app
         prod_app = create_app()
         client = TestClient(prod_app)
 
