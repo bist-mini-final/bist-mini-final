@@ -1,6 +1,7 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import { IconButton } from '../../shared/ui';
 import type { ChatSession } from './types';
+import './ChatSessionSidebar.css';
 
 interface ChatSessionSidebarProps {
   readonly sessions: ChatSession[];
