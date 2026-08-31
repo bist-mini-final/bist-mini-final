@@ -1,9 +1,7 @@
 """Narrow pgvector repositories presented to pipeline modules.
 
-``PgVectorStore`` remains the SQL gateway during migration, but no pipeline
-module receives that god object. Each module is wired to the smallest storage
-capability it needs, which permits the SQL implementation to be extracted
-without changing module contracts.
+``PgVectorStore`` is confined to this infrastructure package. Pipeline modules
+receive only the smallest application capability they need.
 """
 
 from __future__ import annotations
@@ -15,7 +13,8 @@ from langchain_core.documents import Document
 
 from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.shared.application.vector import PgVectorReplacePlan
-from backend.storage.pgvector_store import PgVectorStore
+
+from .store import PgVectorStore
 
 
 class PgVectorCatalogRepository:

@@ -1,16 +1,6 @@
-"""Capability-focused pgvector adapters."""
+"""Domain-neutral pgvector transport primitives."""
 
-from .repositories import (
-    PgVectorCatalogRepository,
-    PgVectorIngestionRepository,
-    PgVectorRepositorySet,
-    PgVectorRetrievalRepository,
-)
+from .binary_copy import PgVectorBinaryCopyStream, copy_documents
+from .errors import PgVectorStoreError
 
-__all__ = [
-    "PgVectorCatalogRepository",
-    "PgVectorIngestionRepository",
-    "PgVectorRepositorySet",
-    "PgVectorRetrievalRepository",
-]
-
+__all__ = ["PgVectorBinaryCopyStream", "PgVectorStoreError", "copy_documents"]

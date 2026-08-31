@@ -135,11 +135,11 @@ jobs/                            # 선언형 표준 Job 정의
 
 | 영역 | 현재 상태 | 목표 대비 차이 |
 | :--- | :--- | :--- |
-| `backend/entrypoints`, `backend/bootstrap` | ASGI·CLI·통합 worker 진입점과 `application.py`, `http.py`, `workers.py` 조립 경계 구현 | `DatabaseManager`와 `PgVectorStore`의 잔여 concrete 조립을 좁은 adapter 조립으로 교체해야 함 |
+| `backend/entrypoints`, `backend/bootstrap` | ASGI·CLI·통합 worker 진입점과 `application.py`, `http.py`, `workers.py` 조립 경계 구현 | `DatabaseManager`의 잔여 concrete 조립을 source-file/workflow adapter 조립으로 교체해야 함 |
 | `backend/shared` | state stream, embedding port, lease worker, observability context를 application 계약으로 분리 | identifiers, clock, result/pagination/transaction/event 계약은 필요한 유스케이스 이동 시 도입 필요 |
 | `backend/domains` | workflow, data sources, BI, company comparison, chatbot, benchmark, operations vertical slice와 domain presentation 소유권 완료 | storage facade가 가진 workflow/data-source SQL·mapping을 각 infrastructure로 더 분해해야 함 |
 | `backend/api` | router 결합과 공통 HTTP edge 정책만 보유하며 파일 allowlist가 구조 테스트로 고정됨 | 목표와 일치 |
-| `backend/platform` | PostgreSQL pool/audit/snapshot, pgvector adapter, OpenAI, Kubernetes, Redis, filesystem, telemetry를 canonical 경로로 이전 | `backend/storage`의 범용 pgvector primitive를 흡수해야 함 |
+| `backend/platform` | PostgreSQL pool/audit/snapshot, pgvector Binary COPY/error, OpenAI, Kubernetes, Redis, filesystem, telemetry를 canonical 경로로 이전 | 목표와 일치 |
 | 제거된 수평 패키지 | `features`, `providers`, `engine`, `contracts` Python source와 이전 API/provider/core shim 제거 | 구조 테스트로 재도입 금지; `storage` 실제 구현 분해만 남음 |
 | 호환 진입 경로 | `backend/main.py`는 ASGI 외부 실행 호환 entrypoint | 배포 command 전환 후 선택적으로 제거 가능 |
 | `modules`, `jobs` | 원자 모듈과 선언형 Job 경계를 별도 루트로 유지 | 목표와 일치 |
@@ -159,7 +159,7 @@ jobs/                            # 선언형 표준 Job 정의
 9. 실제 유스케이스가 요구하는 clock, identifier, result/pagination/transaction/event 계약만 `shared`에 추가하고 PostgreSQL 구현은 `platform/postgres`에 둡니다.
 10. 완료: 도메인 route를 각 presentation으로 이동하고 `backend/api`를 router 결합과 공통 HTTP edge 정책만 남도록 축소합니다.
 11. 완료: `features`, `providers`, `engine`, `contracts`와 이전 API/core/storage shim을 제거하고 목표 트리를 검사하는 구조 계약 테스트를 강화합니다.
-12. 잔여 `backend/storage` 구현을 platform primitive와 domain repository로 분해하고 호출자를 좁은 application port로 전환한 뒤 패키지를 제거합니다.
+12. 진행 중: pgvector transport와 data-source SQL gateway 분리는 완료했습니다. 잔여 `DatabaseManager`를 source-file/workflow repository로 분해하고 호출자를 좁은 application port로 전환한 뒤 `backend/storage`를 제거합니다.
 
 ---
 
@@ -185,9 +185,9 @@ jobs/                            # 선언형 표준 Job 정의
 
 - application은 catalog, ingestion, retrieval, queue, snapshot처럼 유스케이스가 요구하는 좁은 repository `Protocol`을 각각 정의합니다. 하나의 범용 DB manager port를 만들지 않습니다.
 - domain infrastructure repository는 `platform/postgres`의 connection factory와 transaction 구현을 주입받고 SQL·row mapping·optimistic/lease guard를 소유합니다. private connection에 접근하거나 pool을 직접 생성하지 않습니다.
-- `platform/pgvector`는 vector codec, COPY protocol, connection과 extension capability를 제공하지만 collection publish, evidence lookup 같은 도메인 의미를 알지 않습니다.
+- `platform/pgvector`는 vector codec, COPY protocol과 공통 오류 계약을 제공하지만 collection publish, evidence lookup 같은 도메인 의미를 알지 않습니다. 해당 SQL은 `data_sources/infrastructure/pgvector`가 소유합니다.
 - pipeline module은 legacy `PgVectorStore`나 SQL gateway를 import하지 않고 application capability port에만 의존합니다.
-- 현재 `DatabaseManager`, `PgVectorStore`, repository mixin은 migration 중 호출을 보존하는 compatibility facade입니다. 새 기능을 추가하지 않고 좁은 adapter로 위임한 뒤 호출자가 0이 되면 삭제합니다.
+- `PgVectorStore`는 data-sources infrastructure 내부 구현으로 격리됐고 pipeline module에는 노출되지 않습니다. 잔여 `DatabaseManager`와 source-file/workflow repository mixin은 migration 중 facade이므로 새 기능을 추가하지 않고 좁은 adapter로 교체한 뒤 삭제합니다.
 - 동적 SQL 식별자는 driver의 SQL composition API를 사용하고 값은 parameter binding을 사용합니다.
 
 ---

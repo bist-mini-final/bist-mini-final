@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from backend.storage.pgvector_store import PgVectorStore
+from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
 from modules.common.base_module import QueryContextDTO
 from modules.query.decomposer import SubqueryItem
 from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO

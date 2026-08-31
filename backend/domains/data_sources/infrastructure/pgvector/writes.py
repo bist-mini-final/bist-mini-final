@@ -17,13 +17,13 @@ from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts 
 from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document import (
     cell_items_to_langchain_documents,
 )
+from backend.platform.pgvector.binary_copy import copy_documents
+from backend.platform.pgvector.errors import PgVectorStoreError
 from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.shared.application.vector import PgVectorReplacePlan
-from backend.storage.pgvector_binary_copy import copy_documents
-from backend.storage.pgvector_errors import PgVectorStoreError
 from modules.common.config import DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_MODEL
 
-from .base import PgVectorConnectionCapability
+from .capabilities import PgVectorConnectionCapability
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 # [BP-203] 대용량 Binary COPY와 pgvector 인덱싱
 > **Document Code:** `BP-203` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure`, `backend/domains/data_sources/workers`, `backend/platform/pgvector`, `jobs`
-> **Current References:** [`backend/domains/data_sources/application/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/application/shard_coordinator.py), [`backend/domains/data_sources/infrastructure/filesystem/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/filesystem/embedding_artifacts.py), [`backend/domains/data_sources/infrastructure/postgres/shards.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/postgres/shards.py), [`backend/domains/data_sources/workers/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/workers/), [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py)
+> **Current References:** [`backend/domains/data_sources/application/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/application/shard_coordinator.py), [`backend/domains/data_sources/infrastructure/filesystem/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/filesystem/embedding_artifacts.py), [`backend/domains/data_sources/infrastructure/postgres/shards.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/postgres/shards.py), [`backend/domains/data_sources/infrastructure/pgvector/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/pgvector/), [`backend/domains/data_sources/workers/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/workers/), [`backend/platform/pgvector/binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/platform/pgvector/binary_copy.py)
 
 ---
 
@@ -113,4 +113,4 @@ WHERE collection_id = '{collection_uuid}'::uuid
 - artifact 파일과 도메인 queue repository는 `data_sources/infrastructure`, worker process adapter는 `data_sources/workers`에 둡니다.
 - pgvector protocol, COPY encoder와 connection primitive는 `platform/pgvector`가 제공하되 collection publish 의미는 domain adapter가 결정합니다.
 - module은 `PgVectorStore` facade가 아니라 ingestion port를 호출하며 transaction과 client를 직접 만들지 않습니다.
-- `backend/storage` facade 없이 staging→검증→index→publish가 port/adapter로 실행되고 child Job이 선언형 catalog와 일치할 때 구조 migration을 완료합니다.
+- `backend/storage` facade 없이 staging→검증→index→publish가 data-source port/adapter로 실행되고 child Job이 선언형 catalog와 일치합니다. platform Binary COPY는 raw-vector Protocol만 알아 domain 구현을 역참조하지 않습니다.
