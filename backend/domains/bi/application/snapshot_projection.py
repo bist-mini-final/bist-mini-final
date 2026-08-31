@@ -32,10 +32,10 @@ class BiSnapshotProjection:
 def project_build_input(build_input: BiSnapshotBuildInput) -> BiSnapshotProjection:
     """
     Create a snapshot projection from build input using periods current at generation time.
-    
+
     Parameters:
         build_input (BiSnapshotBuildInput): Build data containing the request, profile, extracted results, and generation timestamp.
-    
+
     Returns:
         BiSnapshotProjection: Projection populated with the build input values and selected current periods.
     """
@@ -58,10 +58,10 @@ def project_refresh_input(
 ) -> BiSnapshotProjection:
     """
     Create a snapshot projection from refresh input.
-    
+
     Parameters:
     	refresh_input (BiSnapshotRefreshInput): Refresh data, including the base snapshot, optional profile overrides, job identifier, extracted results, and generation timestamp.
-    
+
     Returns:
     	BiSnapshotProjection: Projection containing the refreshed snapshot data, current periods, and resolved currency and amount scale.
     """

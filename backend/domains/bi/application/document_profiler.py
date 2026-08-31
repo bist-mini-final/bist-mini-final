@@ -71,10 +71,10 @@ class BiDocumentProfiler:
     def profile(self, request: BiMaterializationRequest) -> BiProfilingResult:
         """
         Build a document profile from indexed workbook context.
-        
+
         Parameters:
         	request (BiMaterializationRequest): Request identifying the workbook and source index to profile.
-        
+
         Returns:
         	BiProfilingResult: A document profile containing discovered periods, currency, scale, relevant sheets, and trusted evidence, or a profiling failure describing why profiling could not be completed.
         """
@@ -188,10 +188,10 @@ class BiDocumentProfiler:
     ) -> BiPeriodDiscoveryReaderResponse:
         """
         Extract structured financial period information from the provided document context.
-        
+
         Parameters:
             payload (str): Document context supplied to the structured completion client.
-        
+
         Returns:
             BiPeriodDiscoveryReaderResponse: Validated discovered periods and their supporting evidence.
         """
@@ -218,10 +218,10 @@ class BiDocumentProfiler:
         payload: str,
     ) -> BiUnitDiscoveryReaderResponse:
         """Identify the explicitly stated currency and display scale in financial document context.
-        
+
         Parameters:
             payload (str): Structured document context used to identify the currency and display scale.
-        
+
         Returns:
             BiUnitDiscoveryReaderResponse: The validated currency, display scale, and supporting evidence."""
         raw_response = self._client.complete_structured(
@@ -249,10 +249,10 @@ class BiDocumentProfiler:
     def _request_id(request: BiMaterializationRequest) -> str:
         """
         Create a deterministic profile request identifier from the request's company, workbook, and index identity.
-        
+
         Parameters:
         	request (BiMaterializationRequest): Materialization request whose source identity is used to generate the identifier.
-        
+
         Returns:
         	str: A profile-prefixed hexadecimal identifier.
         """
@@ -344,11 +344,11 @@ class BiDocumentProfiler:
     ) -> tuple[BiProfileRetrievalRequest, ...]:
         """
         Builds profile retrieval requests for the configured workbook scope.
-        
+
         Parameters:
         	request (BiMaterializationRequest): Materialization request containing the source workbook.
         	request_id (str): Identifier shared by the generated retrieval requests.
-        
+
         Returns:
         	tuple[BiProfileRetrievalRequest, ...]: Retrieval requests for the profile questions or each workbook sheet.
         """
