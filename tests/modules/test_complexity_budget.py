@@ -15,18 +15,7 @@ COMPLEXITY_PATTERN = re.compile(r"^`([^`]+)` is too complex \((\d+) > 10\)$")
 # Deleting or reducing an entry is allowed; adding one or exceeding its current
 # budget fails the suite.
 LEGACY_COMPLEXITY_BUDGETS = {
-    ("backend/api/bi_routes.py", "create_bi_router"): 12,
-    ("backend/api/exception_handlers.py", "register_global_exception_handlers"): 12,
-    ("backend/api/module_routes.py", "create_module_router"): 12,
-    ("backend/api/workflow_routes.py", "create_workflow_router"): 12,
     ("backend/cli/documentation/module_docs.py", "_placeholder"): 13,
-    ("backend/domains/bi/domain/formula_dsl.py", "_evaluate_node"): 13,
-    ("backend/features/benchmark/service.py", "execute_benchmark_comparison"): 17,
-    ("backend/features/benchmark/worker_main.py", "_run"): 14,
-    ("backend/features/bi/fast_rag_adapter.py", "_fetch_ranked_cells"): 16,
-    ("backend/features/bi/snapshot_builder.py", "_assemble"): 11,
-    ("backend/features/chatbot/attachments.py", "compact_evidence"): 11,
-    ("backend/features/chatbot/attachments.py", "extract_text"): 13,
     ("backend/storage/pgvector_binary_copy.py", "_load_vector_batch"): 12,
     ("backend/storage/repositories/pgvector_retrieval.py", "_cell_metadata_query"): 18,
     ("backend/storage/repositories/pgvector_retrieval.py", "fetch_rows_cells"): 12,

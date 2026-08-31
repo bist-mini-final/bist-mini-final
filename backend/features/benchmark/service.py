@@ -103,29 +103,34 @@ def _workflow_for_scope(
     if execution_scope == "full":
         return workflow
     nodes = [
-        node for node in workflow.graph.nodes
-        if node.module_type in PRE_RETRIEVAL_MODULE_TYPES
+        node for node in workflow.graph.nodes if node.module_type in PRE_RETRIEVAL_MODULE_TYPES
     ]
     node_ids = {node.id for node in nodes}
-    if not any(
-        node.module_type == "decomposer"
-        for node in nodes
-    ):
+    if not any(node.module_type == "decomposer" for node in nodes):
         raise ValueError(f"{workflow.id} has no decomposition node for pre-retrieval evaluation")
-    graph = workflow.graph.model_copy(update={
-        "nodes": nodes,
-        "edges": [
-            edge for edge in workflow.graph.edges
-            if edge.source in node_ids and edge.target in node_ids
-        ],
-    })
+    graph = workflow.graph.model_copy(
+        update={
+            "nodes": nodes,
+            "edges": [
+                edge
+                for edge in workflow.graph.edges
+                if edge.source in node_ids and edge.target in node_ids
+            ],
+        }
+    )
     return workflow.model_copy(update={"graph": graph})
 
 
 def _seconds_between(started_at: Optional[str], completed_at: Optional[str]) -> Optional[float]:
     if not started_at or not completed_at:
         return None
-    return max(0.0, (datetime.fromisoformat(completed_at).timestamp() - datetime.fromisoformat(started_at).timestamp()))
+    return max(
+        0.0,
+        (
+            datetime.fromisoformat(completed_at).timestamp()
+            - datetime.fromisoformat(started_at).timestamp()
+        ),
+    )
 
 
 def _numbers(text: str) -> List[float]:
@@ -200,12 +205,14 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
                 router = {
                     "kind": str(metrics.get("kind") or "unknown"),
                     "target": first_scope.get("company_name"),
-                    "sheets": list(dict.fromkeys(
-                        sheet
-                        for scope in scopes
-                        if isinstance(scope, dict)
-                        for sheet in scope.get("sheets", [])
-                    )),
+                    "sheets": list(
+                        dict.fromkeys(
+                            sheet
+                            for scope in scopes
+                            if isinstance(scope, dict)
+                            for sheet in scope.get("sheets", [])
+                        )
+                    ),
                     "matched": bool(scopes),
                     "latency_seconds": float(metrics.get("latency_seconds", 0) or 0),
                     "total_tokens": int(usage.get("total_tokens", 0) or 0),
@@ -215,11 +222,7 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
             metrics = output.get("metrics")
             if isinstance(routes, list) and isinstance(metrics, dict):
                 usage = metrics.get("api_usage") or {}
-                first_route = (
-                    routes[0]
-                    if routes and isinstance(routes[0], dict)
-                    else {}
-                )
+                first_route = routes[0] if routes and isinstance(routes[0], dict) else {}
                 first_collections = first_route.get("collections") or []
                 first_collection = (
                     first_collections[0]
@@ -239,21 +242,19 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
                         )
                     ),
                     "matched": bool(routes),
-                    "latency_seconds": float(
-                        metrics.get("latency_seconds", 0) or 0
-                    ),
+                    "latency_seconds": float(metrics.get("latency_seconds", 0) or 0),
                     "total_tokens": int(usage.get("total_tokens", 0) or 0),
-                    "estimated_cost_usd": float(
-                        metrics.get("estimated_cost_usd", 0) or 0
-                    ),
+                    "estimated_cost_usd": float(metrics.get("estimated_cost_usd", 0) or 0),
                 }
-        node_rows.append({
-            "node_id": state.node_id,
-            "module_type": state.module_type,
-            "status": state.status,
-            "cache_hit": state.cache_hit,
-            "latency_seconds": seconds,
-        })
+        node_rows.append(
+            {
+                "node_id": state.node_id,
+                "module_type": state.module_type,
+                "status": state.status,
+                "cache_hit": state.cache_hit,
+                "latency_seconds": seconds,
+            }
+        )
     backend_seconds = sum(row["latency_seconds"] or 0 for row in node_rows)
     return {
         "run_id": run.id,
@@ -344,12 +345,12 @@ def _route_score(case: BenchmarkCase, router: Optional[Dict[str, Any]]) -> Optio
     expected_sheets = {sheet.casefold() for sheet in case.expected_sheets or []}
     actual_sheets = {str(sheet).casefold() for sheet in router.get("sheets", [])}
     sheets_recall = (
-        len(expected_sheets & actual_sheets) / len(expected_sheets)
-        if expected_sheets else 1.0
+        len(expected_sheets & actual_sheets) / len(expected_sheets) if expected_sheets else 1.0
     )
     sheets_precision = (
         len(expected_sheets & actual_sheets) / len(actual_sheets)
-        if actual_sheets else (1.0 if not expected_sheets else 0.0)
+        if actual_sheets
+        else (1.0 if not expected_sheets else 0.0)
     )
     sheets_exact = case.expected_sheets is None or actual_sheets == expected_sheets
     return {
@@ -376,7 +377,11 @@ def _plan_score(case: BenchmarkCase, decomposition: Any) -> Optional[Dict[str, A
     expected_periods = set(case.expected_plan.periods)
     metric_overlap = expected_metrics & actual_metrics
     metric_recall = len(metric_overlap) / len(expected_metrics) if expected_metrics else 1.0
-    metric_precision = len(metric_overlap) / len(actual_metrics) if actual_metrics else (1.0 if not expected_metrics else 0.0)
+    metric_precision = (
+        len(metric_overlap) / len(actual_metrics)
+        if actual_metrics
+        else (1.0 if not expected_metrics else 0.0)
+    )
     metrics_correct = not expected_metrics or actual_metrics == expected_metrics
     periods_correct = not expected_periods or actual_periods == expected_periods
     return {
@@ -449,6 +454,379 @@ def _intermediate_score(
     return {"correct": all(checks.values()), "checks": checks}
 
 
+def _cache_mode(request: BenchmarkRequest) -> str:
+    return "all" if request.use_cache and request.cache_mode == "off" else request.cache_mode
+
+
+def _progress(
+    callback: Optional[Any],
+    *,
+    event: str,
+    completed: int,
+    total: int,
+    case_index: int,
+    case: BenchmarkCase,
+    workflow_id: str,
+    run_id: str | None,
+    **extra: Any,
+) -> None:
+    if callback:
+        callback(
+            {
+                "event": event,
+                "completed": completed,
+                "total": total,
+                "case_index": case_index,
+                "case_id": case.id,
+                "question": case.question,
+                "workflow_id": workflow_id,
+                "run_id": run_id,
+                **extra,
+            }
+        )
+
+
+def _create_or_resume_run(
+    request: BenchmarkRequest,
+    case: BenchmarkCase,
+    workflow: WorkflowDocument,
+    query_node_id: str,
+    workflow_executor: WorkflowExecutor,
+    resume_run_id: str | None,
+) -> Any:
+    if resume_run_id is not None:
+        return workflow_executor.run_store.load_summary(resume_run_id)
+    cache_mode = _cache_mode(request)
+    return workflow_executor.create_run(
+        workflow,
+        WorkflowExecutionRequest(
+            inputs={query_node_id: {"query": case.question}},
+            use_cache=cache_mode != "off",
+            cache_only_module_types=["pgvector_data_scope"] if cache_mode == "index_only" else None,
+        ),
+    )
+
+
+def _wait_for_benchmark_run(
+    run: Any,
+    workflow_executor: WorkflowExecutor,
+    workflow_dispatcher: RunDispatcher,
+) -> Any:
+    deadline = time.monotonic() + 3600
+    while True:
+        summary = workflow_executor.run_store.load_summary(run.id)
+        if summary.status in ("completed", "failed", "paused"):
+            return workflow_executor.run_store.load(run.id)
+        if time.monotonic() >= deadline:
+            workflow_dispatcher.cancel(run.id)
+            raise DagExecutionError(f"Kubernetes benchmark run timeout: {run.id}")
+        time.sleep(0.5)
+
+
+def _require_completed_run(run: Any) -> None:
+    if run.status == "completed":
+        return
+    failed_node = next(
+        (state for state in run.nodes.values() if state.status == "failed"),
+        None,
+    )
+    raise DagExecutionError(
+        failed_node.error
+        if failed_node is not None and failed_node.error
+        else f"Kubernetes benchmark run ended with {run.status}"
+    )
+
+
+def _unscored_answer(case: BenchmarkCase) -> Dict[str, Any]:
+    return {
+        "scored": False,
+        "correct": None,
+        "matched_numbers": 0,
+        "expected_numbers": len(case.expected_numbers),
+        "matched_terms": 0,
+        "expected_terms": len(case.expected_terms),
+    }
+
+
+def _failed_answer_score(request: BenchmarkRequest, case: BenchmarkCase) -> Dict[str, Any]:
+    has_expectations = bool(case.expected_numbers or case.expected_terms)
+    should_score = request.execution_scope == "full" and has_expectations
+    return {
+        **_unscored_answer(case),
+        "scored": should_score,
+        "correct": False if should_score else None,
+    }
+
+
+def _score_case(
+    request: BenchmarkRequest,
+    case: BenchmarkCase,
+    metrics: Dict[str, Any],
+) -> Dict[str, Any]:
+    score = (
+        _score(case, metrics["answer"])
+        if request.execution_scope == "full"
+        else _unscored_answer(case)
+    )
+    route_score = _route_score(case, metrics["router"])
+    plan_score = _plan_score(case, metrics["decomposition"])
+    sheet_score = _sheet_score(case, metrics["router"], metrics["decomposition"])
+    return {
+        "score": score,
+        "route_score": route_score,
+        "plan_score": plan_score,
+        "sheet_score": sheet_score,
+        "intermediate_score": _intermediate_score(
+            case,
+            route_score,
+            plan_score,
+            sheet_score,
+        ),
+    }
+
+
+def _empty_run_metrics() -> Dict[str, Any]:
+    return {
+        "run_id": None,
+        "status": "failed",
+        "latency_seconds": 0,
+        "total_tokens": 0,
+        "estimated_cost_usd": 0,
+        "reused_tokens": 0,
+        "reused_cost_usd": 0,
+        "cache_hits": 0,
+        "node_runs": 0,
+        "llm_fallback_calls": 0,
+        "plan_reused": None,
+        "decomposition": None,
+        "answer": "",
+        "router": None,
+        "timeline": [],
+    }
+
+
+def _failed_case_row(
+    request: BenchmarkRequest,
+    case: BenchmarkCase,
+    workflow_id: str,
+    run: Any,
+    error: Exception,
+) -> Dict[str, Any]:
+    metrics = _run_metrics(run) if run is not None else _empty_run_metrics()
+    scores = _score_case(request, case, metrics)
+    scores["score"] = _failed_answer_score(request, case)
+    return {
+        "workflow_id": workflow_id,
+        "case_id": case.id,
+        "question": case.question,
+        **metrics,
+        **scores,
+        "error": str(error),
+    }
+
+
+def _execute_case(
+    request: BenchmarkRequest,
+    case: BenchmarkCase,
+    workflow_id: str,
+    workflow: WorkflowDocument,
+    query_node_id: str,
+    workflow_executor: WorkflowExecutor,
+    workflow_dispatcher: RunDispatcher,
+    *,
+    resume_run_id: str | None,
+    await_permission: Optional[Any],
+    on_running: Optional[Any],
+) -> tuple[Dict[str, Any], Any]:
+    run = None
+    try:
+        if await_permission:
+            await_permission()
+        run = _create_or_resume_run(
+            request,
+            case,
+            workflow,
+            query_node_id,
+            workflow_executor,
+            resume_run_id,
+        )
+        if on_running:
+            on_running(run.id)
+        if resume_run_id is None:
+            workflow_dispatcher.submit(run.id)
+        run = _wait_for_benchmark_run(run, workflow_executor, workflow_dispatcher)
+        _require_completed_run(run)
+        metrics = _run_metrics(run)
+        return (
+            {
+                "workflow_id": workflow_id,
+                "case_id": case.id,
+                "question": case.question,
+                **metrics,
+                **_score_case(request, case, metrics),
+                "error": None,
+            },
+            run,
+        )
+    except DagExecutionCancelled:
+        raise
+    except (DagExecutionError, ValueError) as error:
+        return _failed_case_row(request, case, workflow_id, run, error), run
+
+
+def _answer_summary(group: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    scored = [row for row in group if row["score"]["scored"]]
+    return {
+        "scored_cases": len(scored),
+        "accuracy": round(sum(bool(row["score"]["correct"]) for row in scored) / len(scored), 4)
+        if scored
+        else None,
+    }
+
+
+def _resource_summary(group: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    return {
+        "average_latency_seconds": round(mean(row["latency_seconds"] for row in group), 3),
+        "average_tokens": round(mean(row["total_tokens"] for row in group), 1),
+        "average_cost_usd": round(mean(row["estimated_cost_usd"] for row in group), 6),
+        "average_reused_tokens": round(mean(row["reused_tokens"] for row in group), 1),
+        "average_reused_cost_usd": round(mean(row["reused_cost_usd"] for row in group), 6),
+        "cache_hits": sum(row["cache_hits"] for row in group),
+        "node_runs": sum(row["node_runs"] for row in group),
+        "llm_fallback_calls": sum(row["llm_fallback_calls"] for row in group),
+        "errors": sum(row["error"] is not None for row in group),
+    }
+
+
+def _plan_summary(group: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    decisions = [row for row in group if row["plan_reused"] is not None]
+    planned = [row for row in group if row["plan_score"] is not None]
+    reused = [row for row in planned if row["plan_reused"] is True]
+    return {
+        "plan_reuse_count": sum(row["plan_reused"] is True for row in decisions),
+        "plan_reuse_coverage": round(
+            sum(row["plan_reused"] is True for row in decisions) / len(decisions), 4
+        )
+        if decisions
+        else None,
+        "plan_cases": len(planned),
+        "plan_accuracy": round(
+            sum(row["plan_score"]["correct"] for row in planned) / len(planned), 4
+        )
+        if planned
+        else None,
+        "plan_reuse_precision": round(
+            sum(row["plan_score"]["correct"] for row in reused) / len(reused), 4
+        )
+        if reused
+        else None,
+        "unsafe_plan_reuse_count": sum(not row["plan_score"]["correct"] for row in reused),
+    }
+
+
+def _sheet_summary(group: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    rows = [row for row in group if row["sheet_score"] is not None]
+    return {
+        "sheet_cases": len(rows),
+        "sheet_exact_accuracy": round(
+            sum(row["sheet_score"]["correct"] for row in rows) / len(rows), 4
+        )
+        if rows
+        else None,
+        "average_sheet_precision": round(mean(row["sheet_score"]["precision"] for row in rows), 4)
+        if rows
+        else None,
+        "average_sheet_recall": round(mean(row["sheet_score"]["recall"] for row in rows), 4)
+        if rows
+        else None,
+    }
+
+
+def _intermediate_summary(group: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    rows = [row for row in group if row["intermediate_score"] is not None]
+    return {
+        "intermediate_cases": len(rows),
+        "intermediate_accuracy": round(
+            sum(row["intermediate_score"]["correct"] for row in rows) / len(rows), 4
+        )
+        if rows
+        else None,
+    }
+
+
+def _route_summary(group: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    routed = [row for row in group if row["route_score"] is not None]
+    router_rows = [row for row in group if row["router"] is not None]
+    attempts = [row for row in routed if row["router"] and row["router"].get("matched")]
+    positives = [row for row in routed if not row["route_score"]["expected_abstain"]]
+    positive_attempts = [row for row in positives if row["router"] and row["router"].get("matched")]
+    abstentions = [row for row in routed if row["route_score"]["expected_abstain"]]
+    return {
+        "route_cases": len(routed),
+        "route_accuracy": round(
+            sum(row["route_score"]["correct"] for row in routed) / len(routed), 4
+        )
+        if routed
+        else None,
+        "route_attempts": len(attempts),
+        "route_abstentions": len(routed) - len(attempts),
+        "route_coverage": round(len(positive_attempts) / len(positives), 4) if positives else None,
+        "route_precision": round(
+            sum(row["route_score"]["correct"] for row in attempts) / len(attempts), 4
+        )
+        if attempts
+        else None,
+        "abstention_cases": len(abstentions),
+        "abstention_accuracy": round(
+            sum(row["route_score"]["correct"] for row in abstentions) / len(abstentions), 4
+        )
+        if abstentions
+        else None,
+        **_router_resource_summary(router_rows),
+    }
+
+
+def _router_resource_summary(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    return {
+        "router_kind": rows[0]["router"]["kind"] if rows else None,
+        "average_router_latency_seconds": round(
+            mean(row["router"]["latency_seconds"] for row in rows), 3
+        )
+        if rows
+        else None,
+        "average_router_tokens": round(mean(row["router"]["total_tokens"] for row in rows), 1)
+        if rows
+        else None,
+        "average_router_cost_usd": round(
+            mean(row["router"]["estimated_cost_usd"] for row in rows), 6
+        )
+        if rows
+        else None,
+    }
+
+
+def _benchmark_summary(
+    request: BenchmarkRequest,
+    rows: Sequence[Dict[str, Any]],
+) -> list[Dict[str, Any]]:
+    summary: list[Dict[str, Any]] = []
+    for workflow_id in request.workflow_ids:
+        group = [row for row in rows if row["workflow_id"] == workflow_id]
+        summary.append(
+            {
+                "workflow_id": workflow_id,
+                "cases": len(group),
+                **_answer_summary(group),
+                **_resource_summary(group),
+                **_plan_summary(group),
+                **_sheet_summary(group),
+                **_intermediate_summary(group),
+                **_route_summary(group),
+            }
+        )
+    return summary
+
+
 def execute_benchmark_comparison(
     request: BenchmarkRequest,
     workflow_store: WorkflowStore,
@@ -461,12 +839,8 @@ def execute_benchmark_comparison(
 ) -> Dict[str, Any]:
     """Run a comparison and report each case/workflow transition to the caller."""
     workflows = validate_workflows(request, workflow_store)
-
     rows = list(initial_rows)
-    completed_identities = {
-        (str(row.get("workflow_id")), str(row.get("case_id")))
-        for row in rows
-    }
+    completed_identities = {(str(row.get("workflow_id")), str(row.get("case_id"))) for row in rows}
     completed = len(rows)
     total = len(request.cases) * len(workflows)
     for case_index, case in enumerate(request.cases):
@@ -474,172 +848,69 @@ def execute_benchmark_comparison(
             if (workflow_id, case.id) in completed_identities:
                 continue
             run = None
-            try:
-                if await_permission:
-                    await_permission()
-                resuming_active_run = (
-                    resume_active is not None
-                    and resume_active[:2] == (workflow_id, case.id)
-                )
-                if on_progress:
-                    on_progress({"event": "started", "completed": completed, "total": total, "case_index": case_index, "case_id": case.id, "question": case.question, "workflow_id": workflow_id, "run_id": resume_active[2] if resuming_active_run and resume_active is not None else None})
-                cache_mode = "all" if request.use_cache and request.cache_mode == "off" else request.cache_mode
-                if resuming_active_run:
-                    assert resume_active is not None
-                    run = workflow_executor.run_store.load_summary(resume_active[2])
-                else:
-                    run = workflow_executor.create_run(workflow, WorkflowExecutionRequest(
-                        inputs={query_node_id: {"query": case.question}},
-                        use_cache=cache_mode != "off",
-                        cache_only_module_types=["pgvector_data_scope"]
-                        if cache_mode == "index_only"
-                        else None,
-                    ))
-                if on_progress:
-                    on_progress({"event": "running", "completed": completed, "total": total, "case_index": case_index, "case_id": case.id, "question": case.question, "workflow_id": workflow_id, "run_id": run.id})
-                if not resuming_active_run:
-                    workflow_dispatcher.submit(run.id)
-                deadline = time.monotonic() + 3600
-                while True:
-                    summary = workflow_executor.run_store.load_summary(run.id)
-                    if summary.status in ("completed", "failed", "paused"):
-                        run = workflow_executor.run_store.load(run.id)
-                        break
-                    if time.monotonic() >= deadline:
-                        workflow_dispatcher.cancel(run.id)
-                        raise DagExecutionError(
-                            f"Kubernetes benchmark run timeout: {run.id}"
-                        )
-                    time.sleep(0.5)
-                if run.status != "completed":
-                    failed_node = next(
-                        (
-                            state
-                            for state in run.nodes.values()
-                            if state.status == "failed"
-                        ),
-                        None,
+            resuming = resume_active is not None and resume_active[:2] == (
+                workflow_id,
+                case.id,
+            )
+            resume_run_id = resume_active[2] if resuming and resume_active else None
+            _progress(
+                on_progress,
+                event="started",
+                completed=completed,
+                total=total,
+                case_index=case_index,
+                case=case,
+                workflow_id=workflow_id,
+                run_id=resume_run_id,
+            )
+            row, run = _execute_case(
+                request,
+                case,
+                workflow_id,
+                workflow,
+                query_node_id,
+                workflow_executor,
+                workflow_dispatcher,
+                resume_run_id=resume_run_id,
+                await_permission=await_permission,
+                on_running=lambda run_id, completed=completed, case_index=case_index, case=case, workflow_id=workflow_id: (
+                    _progress(
+                        on_progress,
+                        event="running",
+                        completed=completed,
+                        total=total,
+                        case_index=case_index,
+                        case=case,
+                        workflow_id=workflow_id,
+                        run_id=run_id,
                     )
-                    raise DagExecutionError(
-                        failed_node.error
-                        if failed_node is not None and failed_node.error
-                        else f"Kubernetes benchmark run ended with {run.status}"
-                    )
-                metrics = _run_metrics(run)
-                score = (
-                    _score(case, metrics["answer"])
-                    if request.execution_scope == "full"
-                    else {"scored": False, "correct": None, "matched_numbers": 0, "expected_numbers": len(case.expected_numbers), "matched_terms": 0, "expected_terms": len(case.expected_terms)}
-                )
-                route_score = _route_score(case, metrics["router"])
-                plan_score = _plan_score(case, metrics["decomposition"])
-                sheet_score = _sheet_score(case, metrics["router"], metrics["decomposition"])
-                intermediate_score = _intermediate_score(case, route_score, plan_score, sheet_score)
-                error = None
-            except DagExecutionCancelled:
-                # A cancelled comparison must not continue with the next item.
-                raise
-            except (DagExecutionError, ValueError) as exc:
-                metrics = _run_metrics(run) if run is not None else {"run_id": None, "status": "failed", "latency_seconds": 0, "total_tokens": 0, "estimated_cost_usd": 0, "reused_tokens": 0, "reused_cost_usd": 0, "cache_hits": 0, "node_runs": 0, "llm_fallback_calls": 0, "plan_reused": None, "decomposition": None, "answer": "", "router": None, "timeline": []}
-                score = {
-                    "scored": request.execution_scope == "full" and bool(case.expected_numbers or case.expected_terms),
-                    "correct": False if request.execution_scope == "full" and (case.expected_numbers or case.expected_terms) else None,
-                    "matched_numbers": 0,
-                    "expected_numbers": len(case.expected_numbers),
-                    "matched_terms": 0,
-                    "expected_terms": len(case.expected_terms),
-                }
-                route_score = _route_score(case, None)
-                plan_score = _plan_score(case, metrics["decomposition"])
-                sheet_score = _sheet_score(case, metrics["router"], metrics["decomposition"])
-                intermediate_score = _intermediate_score(case, route_score, plan_score, sheet_score)
-                error = str(exc)
-            rows.append({"workflow_id": workflow_id, "case_id": case.id, "question": case.question, **metrics, "score": score, "route_score": route_score, "plan_score": plan_score, "sheet_score": sheet_score, "intermediate_score": intermediate_score, "error": error})
+                ),
+            )
+            rows.append(row)
             completed += 1
-            if on_progress:
-                on_progress({"event": "completed", "completed": completed, "total": total, "case_index": case_index, "case_id": case.id, "question": case.question, "workflow_id": workflow_id, "run_id": None, "error": error, "run": run_snapshot(run) if run else None, "result_row": rows[-1]})
+            _progress(
+                on_progress,
+                event="completed",
+                completed=completed,
+                total=total,
+                case_index=case_index,
+                case=case,
+                workflow_id=workflow_id,
+                run_id=None,
+                error=row["error"],
+                run=run_snapshot(run) if run else None,
+                result_row=row,
+            )
 
-    summary = []
-    for workflow_id in request.workflow_ids:
-        group = [row for row in rows if row["workflow_id"] == workflow_id]
-        scored = [row for row in group if row["score"]["scored"]]
-        routed = [row for row in group if row["route_score"] is not None]
-        router_rows = [row for row in group if row["router"] is not None]
-        route_attempts = [
-            row for row in routed
-            if row["router"] is not None and row["router"].get("matched")
-        ]
-        positive_routes = [row for row in routed if not row["route_score"]["expected_abstain"]]
-        positive_route_attempts = [
-            row for row in positive_routes
-            if row["router"] is not None and row["router"].get("matched")
-        ]
-        abstention_rows = [row for row in routed if row["route_score"]["expected_abstain"]]
-        known_plan_decisions = [row for row in group if row["plan_reused"] is not None]
-        planned = [row for row in group if row["plan_score"] is not None]
-        reused_plans = [row for row in planned if row["plan_reused"] is True]
-        sheet_rows = [row for row in group if row["sheet_score"] is not None]
-        intermediate_rows = [row for row in group if row["intermediate_score"] is not None]
-        summary.append({
-            "workflow_id": workflow_id, "cases": len(group), "scored_cases": len(scored),
-            "accuracy": round(sum(bool(row["score"]["correct"]) for row in scored) / len(scored), 4) if scored else None,
-            "average_latency_seconds": round(mean(row["latency_seconds"] for row in group), 3),
-            "average_tokens": round(mean(row["total_tokens"] for row in group), 1),
-            "average_cost_usd": round(mean(row["estimated_cost_usd"] for row in group), 6),
-            "average_reused_tokens": round(mean(row["reused_tokens"] for row in group), 1),
-            "average_reused_cost_usd": round(mean(row["reused_cost_usd"] for row in group), 6),
-            "cache_hits": sum(row["cache_hits"] for row in group),
-            "node_runs": sum(row["node_runs"] for row in group),
-            "llm_fallback_calls": sum(row["llm_fallback_calls"] for row in group),
-            "plan_reuse_count": sum(row["plan_reused"] is True for row in known_plan_decisions),
-            "plan_reuse_coverage": round(
-                sum(row["plan_reused"] is True for row in known_plan_decisions) / len(known_plan_decisions), 4
-            ) if known_plan_decisions else None,
-            "plan_cases": len(planned),
-            "plan_accuracy": round(
-                sum(row["plan_score"]["correct"] for row in planned) / len(planned), 4
-            ) if planned else None,
-            "plan_reuse_precision": round(
-                sum(row["plan_score"]["correct"] for row in reused_plans) / len(reused_plans), 4
-            ) if reused_plans else None,
-            "unsafe_plan_reuse_count": sum(
-                not row["plan_score"]["correct"] for row in reused_plans
-            ),
-            "sheet_cases": len(sheet_rows),
-            "sheet_exact_accuracy": round(
-                sum(row["sheet_score"]["correct"] for row in sheet_rows) / len(sheet_rows), 4
-            ) if sheet_rows else None,
-            "average_sheet_precision": round(
-                mean(row["sheet_score"]["precision"] for row in sheet_rows), 4
-            ) if sheet_rows else None,
-            "average_sheet_recall": round(
-                mean(row["sheet_score"]["recall"] for row in sheet_rows), 4
-            ) if sheet_rows else None,
-            "intermediate_cases": len(intermediate_rows),
-            "intermediate_accuracy": round(
-                sum(row["intermediate_score"]["correct"] for row in intermediate_rows) / len(intermediate_rows), 4
-            ) if intermediate_rows else None,
-            "errors": sum(row["error"] is not None for row in group), "route_cases": len(routed),
-            "route_accuracy": round(sum(row["route_score"]["correct"] for row in routed) / len(routed), 4) if routed else None,
-            "route_attempts": len(route_attempts),
-            "route_abstentions": len(routed) - len(route_attempts),
-            "route_coverage": round(
-                len(positive_route_attempts) / len(positive_routes), 4
-            ) if positive_routes else None,
-            "route_precision": round(
-                sum(row["route_score"]["correct"] for row in route_attempts) / len(route_attempts), 4
-            ) if route_attempts else None,
-            "abstention_cases": len(abstention_rows),
-            "abstention_accuracy": round(
-                sum(row["route_score"]["correct"] for row in abstention_rows) / len(abstention_rows), 4
-            ) if abstention_rows else None,
-            "router_kind": router_rows[0]["router"]["kind"] if router_rows else None,
-            "average_router_latency_seconds": round(mean(row["router"]["latency_seconds"] for row in router_rows), 3) if router_rows else None,
-            "average_router_tokens": round(mean(row["router"]["total_tokens"] for row in router_rows), 1) if router_rows else None,
-            "average_router_cost_usd": round(mean(row["router"]["estimated_cost_usd"] for row in router_rows), 6) if router_rows else None,
-        })
-    cache_mode = "all" if request.use_cache and request.cache_mode == "off" else request.cache_mode
-    return {"execution_mode": "sequential_isolated", "execution_scope": request.execution_scope, "use_cache": cache_mode != "off", "cache_mode": cache_mode, "summary": summary, "results": rows}
+    cache_mode = _cache_mode(request)
+    return {
+        "execution_mode": "sequential_isolated",
+        "execution_scope": request.execution_scope,
+        "use_cache": cache_mode != "off",
+        "cache_mode": cache_mode,
+        "summary": _benchmark_summary(request, rows),
+        "results": rows,
+    }
 
 
 def validate_workflows(
@@ -654,9 +925,7 @@ def validate_workflows(
             raise FileNotFoundError(f"Workflow not found: {workflow_id}") from error
         query_nodes = [node for node in workflow.graph.nodes if node.module_type == "query_input"]
         if len(query_nodes) != 1:
-            raise ValueError(
-                f"{workflow_id} must contain exactly one query_input node"
-            )
+            raise ValueError(f"{workflow_id} must contain exactly one query_input node")
         scoped_workflow = _workflow_for_scope(workflow, request.execution_scope)
         workflows[workflow_id] = (scoped_workflow, query_nodes[0].id)
 

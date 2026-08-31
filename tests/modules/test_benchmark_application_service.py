@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -8,7 +9,13 @@ from backend.domains.benchmark.application.service import (
     BenchmarkApplicationService,
     BenchmarkQueueUnavailableError,
 )
-from backend.features.benchmark.service import BenchmarkCase, BenchmarkRequest
+from backend.engine.job_catalog import canonical_workflow
+from backend.engine.workflows import DagExecutionError
+from backend.features.benchmark.service import (
+    BenchmarkCase,
+    BenchmarkRequest,
+    execute_benchmark_comparison,
+)
 
 
 class BenchmarkStore:
@@ -88,3 +95,40 @@ def test_cancel_job_cancels_the_active_workflow_run() -> None:
 
     assert result == {"id": "benchmark-job-1", "status": "cancelling"}
     assert execution.cancelled == ["run-1"]
+
+
+def test_benchmark_execution_preserves_failed_rows_and_progress_contract() -> None:
+    workflow = canonical_workflow("rag_query")
+    assert workflow is not None
+
+    class Workflows:
+        def load(self, workflow_id: str):
+            return workflow.model_copy(update={"id": workflow_id})
+
+    class Executor:
+        def create_run(self, *_args, **_kwargs):
+            raise DagExecutionError("worker unavailable")
+
+    events: list[dict[str, Any]] = []
+    request = BenchmarkRequest(
+        workflow_ids=["rag-a", "rag-b"],
+        cases=[BenchmarkCase(id="case-1", question="test", expected_terms=["answer"])],
+    )
+
+    result = execute_benchmark_comparison(
+        request,
+        cast(Any, Workflows()),
+        cast(Any, Executor()),
+        cast(Any, SimpleNamespace()),
+        events.append,
+    )
+
+    assert len(result["results"]) == 2
+    assert all(row["error"] == "worker unavailable" for row in result["results"])
+    assert all(row["score"]["correct"] is False for row in result["results"])
+    assert [event["event"] for event in events] == [
+        "started",
+        "completed",
+        "started",
+        "completed",
+    ]

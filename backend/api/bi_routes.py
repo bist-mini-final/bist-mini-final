@@ -67,11 +67,13 @@ def _create_state_streams(
                 job.completed_requests,
                 job.total_requests,
             ),
-            terminal=lambda job: job.status
-            in (
-                MaterializationStatus.READY,
-                MaterializationStatus.PARTIAL,
-                MaterializationStatus.FAILED,
+            terminal=lambda job: (
+                job.status
+                in (
+                    MaterializationStatus.READY,
+                    MaterializationStatus.PARTIAL,
+                    MaterializationStatus.FAILED,
+                )
             ),
             broker=broker,
             topic_prefix="bi-materialization",
@@ -122,11 +124,7 @@ async def _materialization_events(
                 MaterializationStatus.FAILED,
             )
             yield {
-                "event": (
-                    "materialization_completed"
-                    if terminal
-                    else "materialization_progress"
-                ),
+                "event": ("materialization_completed" if terminal else "materialization_progress"),
                 "data": json.dumps(job.model_dump(mode="json"), ensure_ascii=False),
             }
     except Exception as error:
@@ -149,13 +147,9 @@ async def _question_events(
         async for progress in stream.subscribe(job_id, initial=initial):
             if await request.is_disconnected():
                 return
-            terminal = (
-                progress.queued_questions == 0 and progress.running_questions == 0
-            )
+            terminal = progress.queued_questions == 0 and progress.running_questions == 0
             yield {
-                "event": (
-                    "question_job_completed" if terminal else "question_job_progress"
-                ),
+                "event": ("question_job_completed" if terminal else "question_job_progress"),
                 "data": json.dumps(
                     progress.model_dump(mode="json"),
                     ensure_ascii=False,
@@ -171,42 +165,8 @@ async def _question_events(
         }
 
 
-def create_bi_router(
-    services: BiApiServices,
-    *,
-    state_stream_broker: StateStreamBroker | None = None,
-) -> APIRouter:
-    """Wire BI application methods to their stable HTTP contracts."""
-
-    router = APIRouter(prefix="/bi")
-    application = BiApplicationService(services)
-    streams = _create_state_streams(application, state_stream_broker)
-
-    @router.get(
-        "/companies",
-        tags=["BI 기업 목록 및 개요"],
-        response_model=BiCompanyListResponse,
-        summary="BI 등록 기업 목록 및 대시보드 상태 조회",
-        description="인덱싱된 전체 기업 목록, 바인딩된 워크북 정보, 최신 머티리얼라이제이션 스냅샷 상태를 반환합니다.",
-        responses={500: {"model": ApiErrorEnvelope}},
-    )
-    async def list_companies() -> BiCompanyListResponse:
-        return await application.list_companies()
-
-    @router.get(
-        "/materialization-candidates",
-        tags=["BI 머티리얼라이제이션 작업"],
-        response_model=BiMaterializationCandidateListResponse,
-        summary="BI 스냅샷 생성 후보 기업 조회",
-        description=(
-            "인덱싱은 완료됐지만 최신 원본에 대응하는 BI 스냅샷이 없고, "
-            "현재 생성 작업도 실행 중이지 않은 기업을 반환합니다."
-        ),
-        responses={500: {"model": ApiErrorEnvelope}},
-    )
-    async def list_materialization_candidates(
-    ) -> BiMaterializationCandidateListResponse:
-        return await application.list_materialization_candidates()
+def _create_dashboard_router(application: BiApplicationService) -> APIRouter:
+    router = APIRouter()
 
     @router.get(
         "/companies/{company_id}/dashboard",
@@ -256,6 +216,61 @@ def create_bi_router(
     async def delete_dashboard(company_id: IdentifierPath) -> Response:
         await application.delete_dashboard(CompanyId(company_id))
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.post(
+        "/companies/{company_id}/refresh",
+        tags=["BI 지표 질문 및 배치 계산"],
+        response_model=BiDashboardSnapshot,
+        summary="현재 관측값으로 대시보드 재계산",
+        description="질문과 답변을 추가하지 않고 현재 원천 관측값으로 파생 지표와 스냅샷을 다시 계산합니다.",
+        responses={
+            404: {"model": ApiErrorEnvelope},
+            409: {"model": ApiErrorEnvelope},
+            500: {"model": ApiErrorEnvelope},
+        },
+    )
+    def refresh_dashboard(company_id: IdentifierPath) -> BiDashboardSnapshot:
+        return application.refresh_dashboard(CompanyId(company_id))
+
+    return router
+
+
+def create_bi_router(
+    services: BiApiServices,
+    *,
+    state_stream_broker: StateStreamBroker | None = None,
+) -> APIRouter:
+    """Wire BI application methods to their stable HTTP contracts."""
+
+    router = APIRouter(prefix="/bi")
+    application = BiApplicationService(services)
+    streams = _create_state_streams(application, state_stream_broker)
+    router.include_router(_create_dashboard_router(application))
+
+    @router.get(
+        "/companies",
+        tags=["BI 기업 목록 및 개요"],
+        response_model=BiCompanyListResponse,
+        summary="BI 등록 기업 목록 및 대시보드 상태 조회",
+        description="인덱싱된 전체 기업 목록, 바인딩된 워크북 정보, 최신 머티리얼라이제이션 스냅샷 상태를 반환합니다.",
+        responses={500: {"model": ApiErrorEnvelope}},
+    )
+    async def list_companies() -> BiCompanyListResponse:
+        return await application.list_companies()
+
+    @router.get(
+        "/materialization-candidates",
+        tags=["BI 머티리얼라이제이션 작업"],
+        response_model=BiMaterializationCandidateListResponse,
+        summary="BI 스냅샷 생성 후보 기업 조회",
+        description=(
+            "인덱싱은 완료됐지만 최신 원본에 대응하는 BI 스냅샷이 없고, "
+            "현재 생성 작업도 실행 중이지 않은 기업을 반환합니다."
+        ),
+        responses={500: {"model": ApiErrorEnvelope}},
+    )
+    async def list_materialization_candidates() -> BiMaterializationCandidateListResponse:
+        return await application.list_materialization_candidates()
 
     @router.post(
         "/materializations",
@@ -312,21 +327,6 @@ def create_bi_router(
             ),
             ping=15,
         )
-
-    @router.post(
-        "/companies/{company_id}/refresh",
-        tags=["BI 지표 질문 및 배치 계산"],
-        response_model=BiDashboardSnapshot,
-        summary="현재 관측값으로 대시보드 재계산",
-        description="질문과 답변을 추가하지 않고 현재 원천 관측값으로 파생 지표와 스냅샷을 다시 계산합니다.",
-        responses={
-            404: {"model": ApiErrorEnvelope},
-            409: {"model": ApiErrorEnvelope},
-            500: {"model": ApiErrorEnvelope},
-        },
-    )
-    def refresh_dashboard(company_id: IdentifierPath) -> BiDashboardSnapshot:
-        return application.refresh_dashboard(CompanyId(company_id))
 
     @router.post(
         "/companies/{company_id}/reset",

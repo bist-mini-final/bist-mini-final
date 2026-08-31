@@ -48,9 +48,7 @@ def _validate_node(node: ast.AST, variables: frozenset[str]) -> None:
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 raise FormulaDefinitionError("formula constants must be numeric")
         case _:
-            raise FormulaDefinitionError(
-                f"unsupported formula syntax: {type(node).__name__}"
-            )
+            raise FormulaDefinitionError(f"unsupported formula syntax: {type(node).__name__}")
 
 
 def parse_formula(
@@ -69,9 +67,7 @@ def parse_formula(
     except SyntaxError as exc:
         raise FormulaDefinitionError(f"invalid formula syntax: {formula_id}") from exc
     _validate_node(parsed, frozenset(variables))
-    referenced = {
-        node.id for node in ast.walk(parsed) if isinstance(node, ast.Name)
-    }
+    referenced = {node.id for node in ast.walk(parsed) if isinstance(node, ast.Name)}
     if referenced != set(variables):
         raise FormulaDefinitionError(
             f"declared variables do not match expression for formula {formula_id}"
@@ -117,6 +113,23 @@ def load_formula_catalog() -> Mapping[str, FormulaDefinition]:
     return formulas
 
 
+def _evaluate_binary(operator: ast.operator, left: Decimal, right: Decimal) -> Decimal:
+    match operator:
+        case ast.Add():
+            return left + right
+        case ast.Sub():
+            return left - right
+        case ast.Mult():
+            return left * right
+        case ast.Div():
+            try:
+                return left / right
+            except ZeroDivisionError as exc:
+                raise FormulaEvaluationError("zero_denominator") from exc
+        case _:
+            raise FormulaEvaluationError("unsupported binary operator")
+
+
 def _evaluate_node(node: ast.AST, values: Mapping[str, Decimal]) -> Decimal:
     match node:
         case ast.Expression(body=body):
@@ -133,22 +146,11 @@ def _evaluate_node(node: ast.AST, values: Mapping[str, Decimal]) -> Decimal:
         case ast.UnaryOp(op=ast.USub(), operand=operand):
             return -_evaluate_node(operand, values)
         case ast.BinOp(left=left, op=operator, right=right):
-            left_value = _evaluate_node(left, values)
-            right_value = _evaluate_node(right, values)
-            match operator:
-                case ast.Add():
-                    return left_value + right_value
-                case ast.Sub():
-                    return left_value - right_value
-                case ast.Mult():
-                    return left_value * right_value
-                case ast.Div():
-                    try:
-                        return left_value / right_value
-                    except ZeroDivisionError as exc:
-                        raise FormulaEvaluationError("zero_denominator") from exc
-                case _:
-                    raise FormulaEvaluationError("unsupported binary operator")
+            return _evaluate_binary(
+                operator,
+                _evaluate_node(left, values),
+                _evaluate_node(right, values),
+            )
         case _:
             raise FormulaEvaluationError("unsupported expression node")
 
@@ -174,4 +176,3 @@ __all__ = [
     "load_formula_catalog",
     "parse_formula",
 ]
-
