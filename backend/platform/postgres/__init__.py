@@ -8,6 +8,7 @@ from .pool import (
     get_pooled_async_connection,
     get_pooled_raw_connection,
 )
+from .probe import PostgresConnectionProbe
 from .repositories import (
     AsyncPostgresRepository,
     DatabaseUrlProvider,
@@ -17,6 +18,7 @@ from .repositories import (
 __all__ = [
     "AsyncPostgresRepository",
     "DatabaseUrlProvider",
+    "PostgresConnectionProbe",
     "SyncPostgresRepository",
     "close_async_pool",
     "close_pool",

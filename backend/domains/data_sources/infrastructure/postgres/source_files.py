@@ -7,12 +7,42 @@ from typing import Any, Dict, List
 
 import psycopg2.extras
 
+from backend.core.settings import PGVECTOR_URL
 from backend.platform.postgres.pool import get_pooled_async_connection
+from backend.platform.postgres.repositories import SyncPostgresRepository
 
-from .base import DatabaseConnectionCapability
 
+class PostgresSourceFileRepository(SyncPostgresRepository):
+    """Persist source-file and worksheet metadata in PostgreSQL."""
 
-class SourceFileRepositoryMixin(DatabaseConnectionCapability):
+    def __init__(self, database_url: str = PGVECTOR_URL) -> None:
+        super().__init__(database_url)
+
+    def _raw_connection(self) -> Any:
+        return self.connection()
+
+    def is_connected(self) -> bool:
+        try:
+            connection = self.connection()
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT 1;")
+                return True
+            finally:
+                connection.close()
+        except Exception:
+            return False
+
+    async def is_connected_async(self) -> bool:
+        try:
+            async with get_pooled_async_connection(self.database_url) as connection:
+                async with connection.cursor() as cursor:
+                    await cursor.execute("SELECT 1;")
+                    await cursor.fetchone()
+            return True
+        except Exception:
+            return False
+
     def save_source_file(
         self,
         file_id: str,
@@ -234,4 +264,4 @@ class SourceFileRepositoryMixin(DatabaseConnectionCapability):
             conn.close()
 
 
-__all__ = ["SourceFileRepositoryMixin"]
+__all__ = ["PostgresSourceFileRepository"]

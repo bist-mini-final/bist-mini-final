@@ -50,7 +50,7 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     register_bi_exception_handlers(application)
 
     application.include_router(
-        create_system_router(shared_container.runtime.services.db_manager.is_connected)
+        create_system_router(shared_container.runtime.services.database_probe.is_connected)
     )
     api_router = create_api_router(
         shared_container,

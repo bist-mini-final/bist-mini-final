@@ -41,4 +41,21 @@ class IndexCompanyWriterPort(Protocol):
     ) -> Dict[str, Any]: ...
 
 
-__all__ = ["IndexCompanyWriterPort", "VectorIngestionPort"]
+class SourceFileRepositoryPort(Protocol):
+    def is_connected(self) -> bool: ...
+
+    def save_source_file(
+        self,
+        file_id: str,
+        file_name: str,
+        file_hash: str,
+        file_type: str,
+        file_size: int,
+        storage_path: str,
+        **values: Any,
+    ) -> None: ...
+
+    def save_sheets(self, file_id: str, sheets_info: list[Dict[str, Any]]) -> None: ...
+
+
+__all__ = ["IndexCompanyWriterPort", "SourceFileRepositoryPort", "VectorIngestionPort"]

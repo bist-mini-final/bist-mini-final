@@ -220,14 +220,14 @@ class DomainServicesContainer:
         )
         file_storage = LocalSourceFileStorage(runtime.paths.processed_dir)
         chat_suggestions = ChatSuggestionService(
-            ChatSuggestionRepository(runtime.services.db_manager),
+            ChatSuggestionRepository(runtime.services.database_url),
             bi_services.store,
         )
         return cls(
             bi_services=bi_services,
             benchmark=BenchmarkApplicationService(
                 store=BenchmarkPostgresStore(
-                    runtime.services.db_manager.database_url
+                    runtime.services.database_url
                 ),
                 workflow_store=runtime.services.workflow_store,
                 run_store=runtime.services.run_store,
@@ -239,18 +239,18 @@ class DomainServicesContainer:
             ),
             company_comparison=create_company_comparison_service(
                 bi_services.store,
-                database_url=runtime.services.db_manager.database_url,
+                database_url=runtime.services.database_url,
             ),
             chatbot=ChatApiServices(
                 conversations=ChatConversationService(
-                    repository=ChatSessionRepository(runtime.services.db_manager),
+                    repository=ChatSessionRepository(runtime.services.database_url),
                     workflow_store=runtime.services.workflow_store,
                     run_store=runtime.services.run_store,
                     workflow_executor=runtime.services.workflow_executor,
                     workflow_dispatcher=execution.workflow_dispatcher,
                     completion_client=runtime.completion_client,
                     bi_catalog=bi_services.store,
-                    execution_logs=runtime.services.db_manager,
+                    execution_logs=runtime.services.workflow_runs,
                     evidence_cells=runtime.services.pgvector_store,
                 ),
                 suggestions=chat_suggestions,
@@ -264,7 +264,7 @@ class DomainServicesContainer:
                 file_storage=file_storage,
                 files=DataSourceFileService(
                     storage=file_storage,
-                    metadata=runtime.services.db_manager,
+                    metadata=runtime.services.source_files,
                     vector_indexes=runtime.services.pgvector_store,
                     ingestion=IngestionSubmissionAdapter(ingestion),
                     inspector=SourceFileInspectorAdapter(),
@@ -290,7 +290,7 @@ class DomainServicesContainer:
                 ),
             ),
             operations=OperationsQueryService(
-                KubernetesMonitor(queue_reader=runtime.services.db_manager)
+                KubernetesMonitor(queue_reader=runtime.services.workflow_runs)
             ),
         )
 

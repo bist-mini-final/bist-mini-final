@@ -34,15 +34,20 @@ from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
 from backend.domains.data_sources.infrastructure.postgres.shards import (
     PostgresIngestionShardRepository,
 )
+from backend.domains.data_sources.infrastructure.postgres.source_files import (
+    PostgresSourceFileRepository,
+)
 from backend.domains.workflow.application.executor import WorkflowExecutor
 from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore, WorkflowStore
+from backend.domains.workflow.infrastructure.postgres import PostgresWorkflowRunRepository
 from backend.platform.openai.pricing import calculate_openai_cost
 from backend.platform.openai.responses import OpenAIResponsesClient
+from backend.platform.postgres import PostgresConnectionProbe
 from backend.platform.telemetry.tracing import trace_node_execution
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.db_manager import DatabaseManager
 
 from .module_registry import ModuleRegistry
+from .schema import ensure_application_schema
 
 
 @dataclass(frozen=True)
@@ -50,7 +55,10 @@ class WorkflowRuntimeServices:
     """Services shared by workflow HTTP routes and Kubernetes workers."""
 
     pgvector_store: PgVectorStore
-    db_manager: DatabaseManager
+    database_url: str
+    database_probe: PostgresConnectionProbe
+    source_files: PostgresSourceFileRepository
+    workflow_runs: PostgresWorkflowRunRepository
     module_registry: ModuleRegistry
     workflow_store: WorkflowStore
     run_store: RunStore
@@ -69,23 +77,28 @@ def create_workflow_runtime_services(
     spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     vector_index_dir: Path = VECTOR_INDEX_DIR,
     pgvector_store: Optional[PgVectorStore] = None,
-    db_manager: Optional[DatabaseManager] = None,
+    database_probe: Optional[PostgresConnectionProbe] = None,
+    source_files: Optional[PostgresSourceFileRepository] = None,
+    workflow_runs: Optional[PostgresWorkflowRunRepository] = None,
     initialize_schema: bool = True,
     require_database: bool = False,
 ) -> WorkflowRuntimeServices:
     """Build one consistent workflow runtime for an API or worker process."""
 
-    database = db_manager or DatabaseManager()
-    database_connected = database.is_connected()
+    probe = database_probe or PostgresConnectionProbe()
+    database_url = probe.database_url
+    source_file_repository = source_files or PostgresSourceFileRepository(database_url)
+    workflow_run_repository = workflow_runs or PostgresWorkflowRunRepository(database_url)
+    database_connected = probe.is_connected()
     if require_database and not database_connected:
         raise RuntimeError("워크플로 런타임이 PostgreSQL 데이터베이스에 연결할 수 없습니다")
-    if database_connected and initialize_schema and not database.ensure_schema():
+    if database_connected and initialize_schema and not ensure_application_schema(database_url):
         raise RuntimeError("PostgreSQL 워크플로 스키마를 초기화할 수 없습니다")
 
-    pg_store = pgvector_store or PgVectorStore(database.database_url)
+    pg_store = pgvector_store or PgVectorStore(database_url)
     embedding_store = EmbeddingArtifactStore(embedding_artifact_dir)
     shard_coordinator = IngestionShardCoordinator(
-        PostgresIngestionShardRepository(database.database_url),
+        PostgresIngestionShardRepository(database_url),
         IngestionShardArtifactStore(embedding_store),
         enabled=INGESTION_SHARDS_ENABLED and database_connected,
         pgvector_store=pg_store,
@@ -98,14 +111,14 @@ def create_workflow_runtime_services(
         embedding_artifact_store=embedding_store,
         ingestion_shard_coordinator=shard_coordinator,
         pgvector_store=pg_store,
-        db_manager=database,
+        source_files=source_file_repository,
         processed_dir=processed_dir,
         spreadsheet_artifact_dir=spreadsheet_artifact_dir,
     )
     workflow_store = WorkflowStore(workflow_dir)
     run_store = RunStore(
         run_dir,
-        db_manager=database if database_connected else None,
+        repository=workflow_run_repository if database_connected else None,
         require_database=require_database,
     )
     workflow_executor = WorkflowExecutor(
@@ -117,7 +130,10 @@ def create_workflow_runtime_services(
     )
     return WorkflowRuntimeServices(
         pgvector_store=pg_store,
-        db_manager=database,
+        database_url=database_url,
+        database_probe=probe,
+        source_files=source_file_repository,
+        workflow_runs=workflow_run_repository,
         module_registry=registry,
         workflow_store=workflow_store,
         run_store=run_store,

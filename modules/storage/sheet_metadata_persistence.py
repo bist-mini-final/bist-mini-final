@@ -64,6 +64,7 @@ from modules.common.base_module import (
 )
 from modules.common.exceptions import DocumentParsingError, StorageError
 from modules.storage.pgvector_index_writer import VectorIndexDTO
+from modules.storage.ports import SourceFileRepositoryPort
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
 from modules.structure.luna_vlm_structure_detector import SpreadsheetStructureOutput
 
@@ -119,12 +120,12 @@ class SheetMetadataPersistenceModule(BaseModule):
 
     def __init__(
         self,
-        db_manager: Any,
+        source_files: SourceFileRepositoryPort,
         catalog: WorkbookCatalog,
     ) -> None:
         """Initialize with dependencies owned by the runtime composition root."""
         super().__init__()
-        self._db_manager = db_manager
+        self._source_files = source_files
         self.catalog = catalog
 
     @staticmethod
@@ -212,7 +213,7 @@ class SheetMetadataPersistenceModule(BaseModule):
         sheets_data: List[Dict[str, Any]],
     ) -> None:
         try:
-            self._db_manager.save_sheets(
+            self._source_files.save_sheets(
                 file_id=workbook_hash,
                 sheets_info=sheets_data,
             )
@@ -245,7 +246,7 @@ class SheetMetadataPersistenceModule(BaseModule):
         if structure.workbook_hash != index.workbook_hash:
             raise ModuleExecutionError("구조 분석과 인덱스의 workbook_hash가 다릅니다")
 
-        database = self._db_manager
+        database = self._source_files
         if not database.is_connected():
             raise StorageError("시트 메타데이터를 저장할 DB에 연결할 수 없습니다")
 

@@ -63,7 +63,7 @@ def create_bi_services(
     registry: ModuleRegistry,
 ) -> BiApiServices:
     clock = SystemClock()
-    store = PostgresBiStore(registry.db_manager.database_url)
+    store = PostgresBiStore(registry.database_url)
     questions = create_bi_question_service()
     return BiApiServices(
         store=store,
@@ -78,7 +78,7 @@ def create_bi_materialization_runner(
     completion_client: OpenAIResponsesClient,
 ) -> BiQueuedMaterializer:
     clock = SystemClock()
-    store = PostgresBiStore(registry.db_manager.database_url)
+    store = PostgresBiStore(registry.database_url)
     completion = BiStructuredCompletionAdapter(completion_client)
     profiles = PostgresBiDocumentProfileRepository()
     profiler = PersistedBiDocumentProfiler(
@@ -138,7 +138,7 @@ def create_bi_question_worker(
         BiQuestionWorker: Configured worker for processing and publishing BI questions.
     """
     service = create_bi_question_service()
-    store = PostgresBiStore(registry.db_manager.database_url)
+    store = PostgresBiStore(registry.database_url)
     snapshot_materializer = BiQuestionSnapshotMaterializer(
         BiQuestionSnapshotMaterializerServices(
             questions=service,
@@ -177,7 +177,7 @@ def create_bi_question_batch_worker(
         BiQuestionBatchWorker: Configured batch question worker.
     """
     service = create_bi_question_service()
-    store = PostgresBiStore(registry.db_manager.database_url)
+    store = PostgresBiStore(registry.database_url)
     snapshot_materializer = BiQuestionSnapshotMaterializer(
         BiQuestionSnapshotMaterializerServices(
             questions=service,

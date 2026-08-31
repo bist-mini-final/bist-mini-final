@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from .base import DatabaseConnectionCapability
+from .capabilities import WorkflowDatabaseCapability
 
 
-class WorkflowRunHistoryRepositoryMixin(DatabaseConnectionCapability):
+class WorkflowRunHistoryRepositoryMixin(WorkflowDatabaseCapability):
     """Read and delete workflow run history and node execution records."""
 
     def list_workflow_runs(self, workflow_id: Optional[str] = None) -> List[Dict[str, Any]]:

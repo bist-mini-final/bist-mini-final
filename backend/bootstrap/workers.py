@@ -107,7 +107,7 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
             embedding_store = runtime.services.module_registry.embedding_artifact_store
             artifacts = IngestionShardArtifactStore(embedding_store)
             repository = PostgresIngestionShardRepository(
-                runtime.services.db_manager.database_url
+                runtime.services.database_url
             )
             executor = (
                 OpenAIEmbeddingShardExecutor(artifacts, runtime.embedding_encoder)
@@ -133,7 +133,7 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
         runtime = RuntimeContainer.create(require_database=True)
         try:
             registry = runtime.services.module_registry
-            database_url = registry.db_manager.database_url
+            database_url = registry.database_url
             ensure_bi_schema(database_url)
             if kind == "bi-materialization":
                 return worker(
@@ -164,7 +164,7 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
         try:
             services = runtime.services
             return worker(
-                store=BenchmarkPostgresStore(services.db_manager.database_url),
+                store=BenchmarkPostgresStore(services.database_url),
                 workflow_store=services.workflow_store,
                 workflow_executor=services.workflow_executor,
                 workflow_dispatcher=KubernetesQueueDispatcher(

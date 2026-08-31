@@ -21,20 +21,19 @@ from backend.domains.data_sources.infrastructure.pgvector import (
     PgVectorStore,
     PgVectorWriteMixin,
 )
+from backend.domains.data_sources.infrastructure.postgres import PostgresSourceFileRepository
 from backend.domains.data_sources.workers.embedding import (
     EmbeddingShardWorker,
 )
 from backend.domains.data_sources.workers.vector import VectorShardWorker
-from backend.platform.postgres.repositories import SyncPostgresRepository
-from backend.shared.application.workers import LeasedWorker
-from backend.storage.db_manager import DatabaseManager
-from backend.storage.repositories import (
-    SourceFileRepositoryMixin,
+from backend.domains.workflow.infrastructure.postgres import (
+    PostgresWorkflowRunRepository,
     WorkflowRunHistoryRepositoryMixin,
     WorkflowRunQueueRepositoryMixin,
-    WorkflowRunRepositoryMixin,
     WorkflowRunStateRepositoryMixin,
 )
+from backend.platform.postgres.repositories import SyncPostgresRepository
+from backend.shared.application.workers import LeasedWorker
 from jobs import ALL_JOBS, WorkerJobDefinition
 from jobs.kubernetes import kubernetes_worker_specs
 
@@ -112,6 +111,8 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.domains.company_comparison.snapshot_builder",
         "backend.contracts.snapshots",
         "backend.storage.versioned_snapshot_store",
+        "backend.storage.db_manager",
+        "backend.storage.repositories",
         "backend.api.workflow_controller",
         "backend.api.workflow_routes",
     )
@@ -146,6 +147,7 @@ def test_removed_horizontal_compatibility_packages_have_no_python_sources() -> N
         "backend/engine",
         "backend/features",
         "backend/providers",
+        "backend/storage",
     )
     remaining = {
         root: [str(path.relative_to(PROJECT_ROOT)) for path in _python_files(root)]
@@ -595,12 +597,11 @@ def test_chat_repository_uses_shared_postgres_repository_boundary() -> None:
     assert issubclass(ChatSessionRepository, SyncPostgresRepository)
 
 
-def test_database_facades_compose_focused_storage_capabilities() -> None:
-    assert issubclass(DatabaseManager, SourceFileRepositoryMixin)
-    assert issubclass(DatabaseManager, WorkflowRunRepositoryMixin)
-    assert issubclass(WorkflowRunRepositoryMixin, WorkflowRunQueueRepositoryMixin)
-    assert issubclass(WorkflowRunRepositoryMixin, WorkflowRunStateRepositoryMixin)
-    assert issubclass(WorkflowRunRepositoryMixin, WorkflowRunHistoryRepositoryMixin)
+def test_domain_repositories_compose_focused_postgres_capabilities() -> None:
+    assert issubclass(PostgresSourceFileRepository, SyncPostgresRepository)
+    assert issubclass(PostgresWorkflowRunRepository, WorkflowRunQueueRepositoryMixin)
+    assert issubclass(PostgresWorkflowRunRepository, WorkflowRunStateRepositoryMixin)
+    assert issubclass(PostgresWorkflowRunRepository, WorkflowRunHistoryRepositoryMixin)
     assert issubclass(PgVectorStore, PgVectorWriteMixin)
     assert issubclass(PgVectorStore, PgVectorCatalogMixin)
     assert issubclass(PgVectorStore, PgVectorRetrievalMixin)

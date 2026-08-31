@@ -53,7 +53,6 @@ from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document
     lazy_cell_documents,
 )
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.db_manager import DatabaseManager
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,
@@ -62,7 +61,7 @@ from modules.common.base_module import (
     ModuleTaskPolicy,
 )
 from modules.embedding.cell_text_embedder import CellTextEmbeddingsDTO
-from modules.storage.ports import VectorIngestionPort
+from modules.storage.ports import SourceFileRepositoryPort, VectorIngestionPort
 
 logger = logging.getLogger(__name__)
 PGVECTOR_INSERT_BATCH_SIZE = 1000
@@ -113,14 +112,14 @@ class PgVectorIndexWriterModule(BaseModule):
     def __init__(
         self,
         artifact_store: EmbeddingArtifactStore,
-        db_manager: DatabaseManager,
+        source_files: SourceFileRepositoryPort,
         pgvector_store: VectorIngestionPort,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
         shard_coordinator: IngestionShardCoordinator | None = None,
     ) -> None:
         self.artifact_store = artifact_store
-        self.db_manager = db_manager
+        self.source_files = source_files
         self.pgvector_store = pgvector_store
         self.embedding_encoder = embedding_encoder
         self.processed_dir = processed_dir.resolve()
@@ -163,7 +162,7 @@ class PgVectorIndexWriterModule(BaseModule):
         )
 
         # 1. Save source file metadata to PostgreSQL
-        self.db_manager.save_source_file(
+        self.source_files.save_source_file(
             file_id=input_data.workbook_hash,
             file_name=input_data.file_name,
             file_hash=input_data.workbook_hash,

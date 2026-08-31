@@ -9,7 +9,19 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from threading import Lock
-from typing import Any, Collection, Dict, Generic, Iterator, List, Optional, Type, TypeVar
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Type,
+    TypeVar,
+    cast,
+)
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -223,13 +235,66 @@ class WorkflowStore:
 logger = logging.getLogger(__name__)
 
 
+class WorkflowRunPersistencePort(Protocol):
+    """Durable operations required by the workflow run projection."""
+
+    def is_connected(self) -> bool: ...
+
+    def find_ingestion_run_id_by_index(self, index_id: str) -> str | None: ...
+
+    def save_workflow_run(self, *args: Any, **kwargs: Any) -> None: ...
+
+    def save_workflow_node_progress(self, *args: Any, **kwargs: Any) -> None: ...
+
+    def save_workflow_node_state(self, *args: Any, **kwargs: Any) -> None: ...
+
+    def enqueue_workflow_run(self, *args: Any, **kwargs: Any) -> bool: ...
+
+    def request_workflow_cancel(self, run_id: str) -> bool: ...
+
+    def is_workflow_cancel_requested(self, run_id: str) -> bool: ...
+
+    def clear_workflow_cancel_request(self, run_id: str) -> bool: ...
+
+    def get_workflow_run(self, run_id: str) -> dict[str, Any] | None: ...
+
+    def get_workflow_node_execution_log(
+        self,
+        run_id: str,
+        node_id: str,
+    ) -> dict[str, Any] | None: ...
+
+    def get_workflow_run_summary(self, run_id: str) -> dict[str, Any] | None: ...
+
+    def list_workflow_run_summaries(
+        self,
+        workflow_id: str | None,
+        *,
+        limit: int | None,
+    ) -> list[dict[str, Any]]: ...
+
+    def list_pending_workflow_run_ids(
+        self,
+        workflow_ids: list[str] | None,
+    ) -> list[str]: ...
+
+    def list_pending_workflow_run_references(
+        self,
+        workflow_ids: list[str] | None,
+    ) -> list[dict[str, Any]]: ...
+
+    def delete_workflow_run(self, run_id: str) -> bool: ...
+
+    def clear_workflow_runs(self) -> int: ...
+
+
 class RunStore:
     """PostgreSQL source of truth with optional in-memory test operation."""
 
     def __init__(
         self,
         directory: Optional[Path] = None,
-        db_manager: Optional[Any] = None,
+        repository: Optional[Any] = None,
         *,
         require_database: bool = False,
     ) -> None:
@@ -245,14 +310,14 @@ class RunStore:
             f"workflow_lease_{id(self)}",
             default=None,
         )
-        self.db_manager = (
-            db_manager
-            if db_manager is not None
-            and getattr(db_manager, "is_connected", lambda: False)()
+        self.repository: WorkflowRunPersistencePort | None = (
+            cast(WorkflowRunPersistencePort, repository)
+            if repository is not None
+            and getattr(repository, "is_connected", lambda: False)()
             else None
         )
         self.require_database = require_database
-        if self.require_database and self.db_manager is None:
+        if self.require_database and self.repository is None:
             raise RuntimeError(
                 "WorkflowRun 영속화에는 PostgreSQL 연결이 필요합니다"
             )
@@ -261,12 +326,12 @@ class RunStore:
     def supports_durable_queue(self) -> bool:
         """Return whether this store can enqueue durable Kubernetes work."""
 
-        return self.db_manager is not None
+        return self.repository is not None
 
     def find_ingestion_run_id_by_index(self, index_id: str) -> str | None:
         """Resolve an ingestion run through the optional PostgreSQL projection."""
 
-        lookup = getattr(self.db_manager, "find_ingestion_run_id_by_index", None)
+        lookup = getattr(self.repository, "find_ingestion_run_id_by_index", None)
         if not callable(lookup):
             return None
         run_id = lookup(index_id)
@@ -387,9 +452,9 @@ class RunStore:
         """Persist to PostgreSQL before publishing the process-local copy."""
         run.updated_at = utc_now_iso()
         lease_token = self._lease_token_for(run.id)
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                self.db_manager.save_workflow_run(
+                self.repository.save_workflow_run(
                     self._database_copy(run),
                     lease_token=lease_token,
                 )
@@ -410,9 +475,9 @@ class RunStore:
         """Persist live progress durably before updating the local projection."""
         run.updated_at = utc_now_iso()
         lease_token = self._lease_token_for(run.id)
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                self.db_manager.save_workflow_node_progress(
+                self.repository.save_workflow_node_progress(
                     run,
                     node_id,
                     lease_token=lease_token,
@@ -439,10 +504,10 @@ class RunStore:
         """Persist one terminal node transition without rewriting the full run."""
 
         run.updated_at = utc_now_iso()
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
                 database_run = self._database_copy(run, (node_id,))
-                self.db_manager.save_workflow_node_state(
+                self.repository.save_workflow_node_state(
                     database_run,
                     node_id,
                     lease_token=self._lease_token_for(run.id),
@@ -473,12 +538,12 @@ class RunStore:
         priority: int = 0,
     ) -> bool:
         """Persist queue metadata in memory and DB."""
-        if self.db_manager is None:
+        if self.repository is None:
             raise RuntimeError(
                 "Kubernetes 배치 큐에는 PostgreSQL 연결이 필요합니다"
             )
         try:
-            enqueued = self.db_manager.enqueue_workflow_run(
+            enqueued = self.repository.enqueue_workflow_run(
                 run_id,
                 queue_name,
                 submission_attempt=submission_attempt,
@@ -504,9 +569,9 @@ class RunStore:
 
     def request_cancel(self, run_id: str) -> bool:
         """Persist cancellation in memory and DB."""
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                persisted = bool(self.db_manager.request_workflow_cancel(run_id))
+                persisted = bool(self.repository.request_workflow_cancel(run_id))
             except Exception as error:
                 raise RuntimeError(
                     "WorkflowRun 취소 요청을 PostgreSQL에 저장할 수 없습니다"
@@ -528,16 +593,16 @@ class RunStore:
         with self._memory_lock:
             if run_id in self._memory_runs and self._memory_runs[run_id].status == "paused":
                 return True
-        if self.db_manager is None:
+        if self.repository is None:
             return False
-        return bool(self.db_manager.is_workflow_cancel_requested(run_id))
+        return bool(self.repository.is_workflow_cancel_requested(run_id))
 
     def clear_cancel_request(self, run_id: str) -> None:
         """Clear durable and process-local cancellation before an explicit resume."""
 
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                self.db_manager.clear_workflow_cancel_request(run_id)
+                self.repository.clear_workflow_cancel_request(run_id)
             except Exception as error:
                 raise RuntimeError(
                     "WorkflowRun 취소 상태를 PostgreSQL에서 초기화할 수 없습니다"
@@ -556,9 +621,9 @@ class RunStore:
                 if run_id in self._memory_runs:
                     return self._memory_runs[run_id]
 
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                data = self.db_manager.get_workflow_run(run_id)
+                data = self.repository.get_workflow_run(run_id)
                 if data is not None:
                     run = self._hydrate_run(WorkflowRun.model_validate(data))
                     with self._memory_lock:
@@ -587,9 +652,9 @@ class RunStore:
     def load_node(self, run_id: str, node_id: str) -> RunNodeState:
         """Load one node's current full input/config/output DTO snapshot."""
 
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                data = self.db_manager.get_workflow_node_execution_log(run_id, node_id)
+                data = self.repository.get_workflow_node_execution_log(run_id, node_id)
                 if data is not None:
                     state = RunNodeState.model_validate(
                         {
@@ -632,9 +697,9 @@ class RunStore:
 
     def load_summary(self, run_id: str) -> WorkflowRun:
         """Load a compact run snapshot."""
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                data = self.db_manager.get_workflow_run_summary(run_id)
+                data = self.repository.get_workflow_run_summary(run_id)
                 if data is not None:
                     run = WorkflowRun.model_validate(data)
                     with self._memory_lock:
@@ -673,9 +738,9 @@ class RunStore:
                 if workflow_id is None or run.workflow_id == workflow_id
             ]
 
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                records = self.db_manager.list_workflow_run_summaries(
+                records = self.repository.list_workflow_run_summaries(
                     workflow_id,
                     limit=limit,
                 )
@@ -720,9 +785,9 @@ class RunStore:
     ) -> List[WorkflowRun]:
         """Load only queued/running runs."""
         allowed = set(workflow_ids) if workflow_ids is not None else None
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                run_ids = self.db_manager.list_pending_workflow_run_ids(
+                run_ids = self.repository.list_pending_workflow_run_ids(
                     sorted(allowed) if allowed is not None else None
                 )
                 return [self.load(run_id) for run_id in run_ids]
@@ -746,9 +811,9 @@ class RunStore:
     def delete(self, run_id: str) -> bool:
         """Remove one full run."""
         db_deleted = False
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                db_deleted = self.db_manager.delete_workflow_run(run_id)
+                db_deleted = self.repository.delete_workflow_run(run_id)
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 삭제 실패 (run_id=%s): %s", run_id, error)
                 if self.require_database:
@@ -772,9 +837,9 @@ class RunStore:
     def clear(self) -> int:
         """Delete all stored workflow runs."""
         db_cleared = 0
-        if self.db_manager is not None:
+        if self.repository is not None:
             try:
-                db_cleared = self.db_manager.clear_workflow_runs()
+                db_cleared = self.repository.clear_workflow_runs()
             except Exception as error:
                 logger.warning("DB에서 WorkflowRun 전체 삭제 실패: %s", error)
                 if self.require_database:

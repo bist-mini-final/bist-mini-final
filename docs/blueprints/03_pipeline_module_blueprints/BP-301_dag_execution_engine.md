@@ -83,4 +83,4 @@ Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 
 - validate, save, submit, cancel, resume, execute command/query와 required ports는 `workflow/application`이 소유합니다.
 - PostgreSQL store, Kubernetes dispatcher와 cache adapter는 `workflow/infrastructure`, REST/SSE는 `workflow/presentation`, lease process는 `workflow/workers`에 둡니다.
 - executor는 presentation DTO, provider client, concrete store를 import하지 않고 application port와 module registry 계약만 사용합니다.
-- workflow vertical slice와 내부 canonical import 전환은 완료됐습니다. workflow SQL/row mapping이 범용 `DatabaseManager` facade에서 domain PostgreSQL adapter로 이동하고 외부 호환 shim 제거 조건이 충족될 때 구조 migration을 완료합니다.
+- workflow vertical slice, 내부 canonical import와 workflow SQL/row mapping의 domain PostgreSQL adapter 이전이 완료됐습니다. 구조 gate가 외부 호환 shim과 수평 storage facade의 재도입을 차단합니다.

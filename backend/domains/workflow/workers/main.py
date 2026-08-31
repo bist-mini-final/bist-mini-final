@@ -31,7 +31,7 @@ class WorkflowWorkerServices(Protocol):
     module_registry: ModuleRegistryPort
     workflow_executor: Any
     run_store: Any
-    db_manager: Any
+    workflow_runs: Any
 
 
 class ModuleTaskTimeout(TimeoutError):
@@ -109,7 +109,7 @@ def _execute_claim(
     run_id = claim.run_id
     lease_token = claim.token
     try:
-        with services.db_manager.claim_workflow_run(
+        with services.workflow_runs.claim_workflow_run(
             run_id,
             queue_name=queue_name,
             worker_id=worker_id,
@@ -118,7 +118,7 @@ def _execute_claim(
         ):
             with services.run_store.workflow_lease(run_id, lease_token):
                 heartbeat = LeaseHeartbeat(
-                    lambda: services.db_manager.heartbeat_workflow_run(
+                    lambda: services.workflow_runs.heartbeat_workflow_run(
                         run_id,
                         worker_id,
                         lease_token,
@@ -188,7 +188,7 @@ def _execute_claim(
         raise
     except Exception as error:
         try:
-            services.db_manager.fail_workflow_run_claim(
+            services.workflow_runs.fail_workflow_run_claim(
                 run_id,
                 worker_id,
                 lease_token,
@@ -210,7 +210,7 @@ def run_one(
     """Claim and finish one item; skip candidates still owned by another worker."""
     excluded_run_ids: list[str] = []
     while True:
-        claim = services.db_manager.claim_next_workflow_run(
+        claim = services.workflow_runs.claim_next_workflow_run(
             queue_name,
             worker_id,
             stale_after_seconds=stale_after_seconds,

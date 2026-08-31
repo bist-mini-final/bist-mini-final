@@ -53,7 +53,10 @@ class WorkflowWorkerTests(unittest.TestCase):
         )
 
     def test_runtime_services_initialization(self) -> None:
-        with patch("backend.storage.db_manager.DatabaseManager.is_connected", return_value=True):
+        with patch(
+            "backend.platform.postgres.probe.PostgresConnectionProbe.is_connected",
+            return_value=True,
+        ):
             runtime = RuntimeContainer.create(
                 initialize_schema=False,
                 require_database=True,
@@ -67,7 +70,10 @@ class WorkflowWorkerTests(unittest.TestCase):
             runtime.close()
 
     def test_compile_task_plan_from_run(self) -> None:
-        with patch("backend.storage.db_manager.DatabaseManager.is_connected", return_value=True):
+        with patch(
+            "backend.platform.postgres.probe.PostgresConnectionProbe.is_connected",
+            return_value=True,
+        ):
             runtime = RuntimeContainer.create(
                 initialize_schema=False,
                 require_database=True,
@@ -96,6 +102,6 @@ class WorkflowWorkerTests(unittest.TestCase):
 
     def test_run_one_returns_none_when_queue_empty(self) -> None:
         mock_services = MagicMock()
-        mock_services.db_manager.claim_next_workflow_run.return_value = None
+        mock_services.workflow_runs.claim_next_workflow_run.return_value = None
         result = run_one("test-queue", "worker-1", services=mock_services)
         self.assertIsNone(result)
