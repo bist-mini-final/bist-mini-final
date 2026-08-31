@@ -307,8 +307,7 @@ uv run ruff check .
 uv run pyright
 
 # Frontend
-npm --prefix frontend test
-npm --prefix frontend run build
+npm --prefix frontend run check
 ```
 
 프론트엔드 빌드 결과는 루트의 `dist/`에 생성됩니다.
@@ -377,9 +376,12 @@ bist-mini-final/
 ├── backend/
 │   ├── api/                  # FastAPI 라우트, 버전, 미들웨어, SSE
 │   ├── bootstrap/            # 애플리케이션/런타임 컨테이너와 lifecycle
+│   ├── domains/              # 도메인 규칙, application use case와 port
 │   ├── engine/               # DAG 실행 엔진, 워크플로 서비스, 워커
-│   ├── features/             # BI 및 benchmark 기능
-│   └── storage/              # PostgreSQL 풀과 저장소
+│   ├── features/             # BI·benchmark·chat 계산 및 infrastructure 구현
+│   ├── platform/             # pgvector 등 좁은 adapter 경계
+│   ├── shared/               # 공통 domain error, DB base, 관측성
+│   └── storage/              # PostgreSQL 풀, capability repository, artifact
 ├── frontend/                 # React 18, TypeScript, Vite
 ├── modules/                  # RAG 파이프라인 모듈 및 Pydantic 계약
 ├── jobs/                     # canonical DAG와 배치 엔트리포인트
@@ -388,8 +390,8 @@ bist-mini-final/
 │   ├── docker/               # backend, worker, frontend 이미지
 │   └── kubernetes/           # k3d/KEDA 스크립트와 매니페스트
 ├── docs/
-│   ├── blueprints/           # 시스템 설계도
-│   └── final_report/         # 최종 보고서
+│   ├── blueprints/           # 시스템·데이터·UI·검증 청사진
+│   └── CURRENT_IMPLEMENTATION_BASELINE.md
 ├── tests/                    # Python 계약 및 통합 테스트
 ├── .env.example              # 환경 변수 템플릿
 ├── pyproject.toml            # Python 프로젝트와 도구 설정

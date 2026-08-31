@@ -1,12 +1,14 @@
 # [BP-402] Data Sources 워크스페이스
 > **Document Code:** `BP-402` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational  
-> **Source Files:** [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
+> **Source Files:** [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py), [`backend/api/data_source_ingestion_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_ingestion_controller.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
 
 ---
 
 ## 1. 제품 책임
 
 Data Sources는 spreadsheet 원본 등록, preview/download, durable ingestion 작업, pgvector index 조회·검색·삭제, DB 연결 상태를 제공하는 데이터 엔지니어링 워크스페이스입니다. 현재 공개 기능에 수동 bounding-box 편집/승인 API와 전용 ingestion SSE는 없습니다.
+
+HTTP composition은 `data_source_routes.py`가 담당하고 file/index/ingestion/database router를 조합합니다. 파일 수명주기와 index 검색·기업명 변경은 `DataSourceHttpController`, ingestion DTO 변환과 상태 projection은 `DataSourceIngestionController`가 담당하므로 개별 route는 입력 바인딩과 status code만 소유합니다.
 
 ---
 
@@ -54,13 +56,13 @@ flowchart LR
 
 | Module type | 책임 |
 | :--- | :--- |
-| `ingestion.processed_file_selector` | 처리 대상 workbook/파일 선택 |
-| `structure.luna_vlm_structure_detector` | 외부 vision provider 기반 sheet region 감지 |
-| `structure.cell_text_serializer` | 2D 좌표와 header 문맥을 검색 텍스트로 직렬화 |
-| `embedding.cell_text_embedder` | cell text를 embedding artifact로 변환 |
-| `storage.pgvector_index_writer` | artifact를 PostgreSQL/pgvector에 Binary COPY |
-| `profiling.company_entity_extractor` | 기업 식별 정보 추출 |
-| `profiling.sheet_metadata_persistence` | sheet/profile 메타데이터 영속화 |
+| `processed_file_selector` | 처리 대상 workbook/파일 선택 |
+| `luna_vlm_structure_detector` | 외부 vision provider 기반 sheet region 감지 |
+| `cell_text_serializer` | 2D 좌표와 header 문맥을 검색 텍스트로 직렬화 |
+| `cell_text_embedder` | cell text를 embedding artifact로 변환 |
+| `pgvector_index_writer` | artifact를 PostgreSQL/pgvector에 Binary COPY |
+| `company_entity_extractor` | 기업 식별 정보 추출 |
+| `sheet_metadata_persistence` | sheet/profile 메타데이터 영속화 |
 
 전체 module pin 계약은 [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 따릅니다.
 

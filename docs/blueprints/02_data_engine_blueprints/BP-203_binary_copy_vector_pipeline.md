@@ -77,6 +77,7 @@ WHERE collection_id = '{collection_uuid}'::uuid
 ## 4. 메모리 격리 및 SSE 실시간 진행률 스트리밍 (Memory Isolation & SSE Telemetry)
 
 - **`memoryview` 세그먼트 스트리밍**: 수만 행의 대형 워크북이라도 DB 전송 프레임 전체를 한 번에 만들지 않습니다. 분산 COPY Job은 artifact range view를 사용해 Python float 목록을 만들지 않고 little-endian raw bytes를 직접 읽으며, 로컬 fallback은 기존 `batch_size=1000` 스트림을 유지합니다.
+- `PgVectorBinaryCopyStream`은 artifact raw batch 변환과 일반 vector sequence 변환을 별도 경계로 유지합니다. 두 경로는 network byte order 변환 뒤 동일한 row framing과 progress callback을 공유합니다.
 - **재시도 멱등성**: `(staging collection UUID, global embedding index)`의 UUIDv5를 row ID로 사용합니다. 같은 shard를 재실행하면 해당 결정적 ID 범위를 한 트랜잭션에서 삭제한 뒤 COPY하므로 중복 row가 생기지 않습니다.
 - **실시간 SSE 프로그레스 이벤트 (`Server-Sent Events`)**:
   - `progress_callback({"completed_batches", "total_batches", "completed_items", "total_items"})`가 실행 상태에 저장되고 SSE 상태 갱신에 반영됩니다.
@@ -85,7 +86,7 @@ WHERE collection_id = '{collection_uuid}'::uuid
 
 ---
 
-## 5. 리팩토링 타깃 (Refactoring Targets)
+## 5. 확정된 구현 결정
 
 1. **구현됨 — Binary COPY 단일 스트리밍 경로 (Zero Legacy Code Policy)**:
    - `PgVectorBinaryCopyStream`이 float32 artifact와 일반 벡터 시퀀스를 모두 동일한 PostgreSQL Binary COPY row framing으로 변환합니다.

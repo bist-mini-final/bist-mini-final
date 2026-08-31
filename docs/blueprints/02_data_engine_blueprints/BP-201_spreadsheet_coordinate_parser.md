@@ -19,6 +19,8 @@
 5. blank/hidden 영역의 포함 여부는 parser config와 source metadata로 남깁니다.
 6. amount의 currency·scale·period를 가능한 한 명시적 metadata로 분리합니다.
 
+구현 책임은 `cell_semantics.py`의 좌표·값 record 수집, `grid_structure.py`의 occupied grid·병합 영역·header tree, `table_geometry.py`의 pixel/cell 경계 변환, `sheet_renderer.py`의 원본 시트 rasterization으로 분리합니다. renderer 내부에서도 값 포맷, fill, border, text alignment를 독립 단계로 유지해 날짜·회계 형식 수정이 좌표 기하학에 영향을 주지 않게 합니다.
+
 ---
 
 ## 3. `header_with_value` 검색 표현
@@ -57,3 +59,4 @@ flowchart LR
 - serialized record에서 workbook/sheet/cell 좌표를 역추적할 수 있어야 합니다.
 - batch size와 artifact 사용량은 데이터셋 benchmark로 조정하며 근거 없는 고정 절감률을 문서화하지 않습니다.
 - large workbook parsing은 API 이벤트 루프가 아니라 worker thread/one-shot worker에서 실행합니다.
+- formula workbook과 cached-value workbook을 함께 읽으며 cached 값이 없는 formula도 formula record로 보존합니다. 일반 빈 셀만 컨텍스트에서 제외합니다.

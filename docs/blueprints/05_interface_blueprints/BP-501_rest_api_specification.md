@@ -1,6 +1,6 @@
 # [BP-501] REST API와 DTO 규격
 > **Document Code:** `BP-501` | **Category:** Interface Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py)
+> **Source Files:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py), [`backend/api/workflow_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_controller.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py)
 
 ---
 
@@ -56,6 +56,7 @@
 | POST | `/api/v1/workflows/{workflow_id}/runs` | durable run 등록 |
 | GET | `/api/v1/runs` | run 목록 |
 | GET | `/api/v1/runs/{run_id}` | run 상태 |
+| GET | `/api/v1/runs/{run_id}/nodes/{node_id}` | 단일 node 실행 상태·입력·출력 |
 | POST | `/api/v1/runs/{run_id}/resume` | 재개/재등록 |
 | POST | `/api/v1/runs/{run_id}/cancel` | 취소 요청 |
 | GET | `/api/v1/runs/{run_id}/stream` | run SSE |
@@ -86,6 +87,7 @@
 | GET | `/api/v1/data-sources/db-status` | 현재 DB probe |
 | POST | `/api/v1/data-sources/db-connect` | 지정 DB 연결 검사 |
 | GET | `/api/v1/spreadsheet-artifacts/{workbook_hash}/sheets/{sheet_name}` | render artifact |
+| POST | `/api/v1/evidence/cells/resolve` | 셀 인용을 workbook·sheet image·bbox 근거로 해석 |
 
 ### Benchmark, jobs, maintenance
 
@@ -136,3 +138,4 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - frontend는 TypeScript type만 신뢰하지 않고 외부 JSON을 Zod로 runtime 검증합니다.
 - comparison snapshot은 source/evidence/assumption/rank link를 model validator로 검증합니다.
 - route 변경은 [`tests/modules/test_openapi_and_module_routes.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_openapi_and_module_routes.py)와 frontend client tests를 함께 갱신합니다.
+- route 함수는 request binding과 HTTP response만 담당하고 여러 저장소·도메인 단계를 직접 조율하지 않습니다. Workflow와 Data Sources는 focused controller가 application 호출과 response projection을 담당합니다.

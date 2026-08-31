@@ -1,5 +1,5 @@
 # [BP-104] K8s, KEDA ScaledJob & 인프라 토폴로지
-> **Document Code:** `BP-104` | **Category:** Infrastructure & DevOps Blueprint | **Status:** Approved Baseline  
+> **Document Code:** `BP-104` | **Category:** Infrastructure & DevOps Blueprint | **Status:** Implemented & Operational
 > **Source Files:** [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/manifests/), [`deploy/helm/bist/`](file:///c:/Repos/bist-mini-final/deploy/helm/bist/), [`deploy/docker/`](file:///c:/Repos/bist-mini-final/deploy/docker/), [`deploy/compose/docker-compose.yml`](file:///c:/Repos/bist-mini-final/deploy/compose/docker-compose.yml)
 
 ---
@@ -249,7 +249,7 @@ sequenceDiagram
 1. **구현됨 — KEDA/Job/Pod 상태 모니터링**: 이름, 상태, Ready, 성공/실패 수, 생성 시각, condition 메시지 표시.
 2. **구현됨 — 최소 권한**: `pods`, `jobs`, `scaledjobs`의 `get/list/watch`만 허용하며 Secret, 로그, 생성·수정·삭제 권한은 부여하지 않음.
 3. **구현됨 — Lease/큐 상세 관제**: `workflow_runs`의 작업 ID, 큐, priority, 재시도 횟수, 하트비트 경과, 잔여 TTL, stale 여부와 Kubernetes Job/Pod 이름의 상관관계를 표시합니다. lease token 원문은 노출하지 않습니다.
-4. **To-Be — 로그 및 운영 명령**: 인증·감사·RBAC 정책이 확정되기 전까지 로그 스트리밍과 취소/회복 명령은 제공하지 않음.
+4. **범위 제외 — 로그 및 운영 명령**: 인증·감사·RBAC 정책이 확정되기 전까지 로그 스트리밍과 취소/회복 명령은 제공하지 않음. 이는 미완료 리팩토링이 아니라 보안 정책 경계임.
 
 ---
 
@@ -272,9 +272,9 @@ sequenceDiagram
 
 ---
 
-## 6. 구현 기준선과 남은 운영 과제
+## 6. 구현 기준선과 운영 정책 경계
 
 1. **구현됨 — Helm Chart 표준화**: `deploy/helm/bist/`가 API/UI/Redis, migration hook, RBAC, Ingress, 여섯 ScaledJob, `TriggerAuthentication`을 하나의 release로 렌더링합니다. `values.yaml`은 운영 기준, `values-k3d.yaml`은 로컬 검증 기준입니다.
 2. **구현됨 — KEDA Trigger 인증 Secret 분리**: `bist-keda-postgresql` Secret의 `PGVECTOR_URL`을 `bist-postgresql` TriggerAuthentication이 참조합니다. DB URL은 ScaledJob metadata와 로그에 직접 넣지 않습니다.
 3. **구현됨 — 다중 Pod SSE 알림**: `bist-redis`와 `REDIS_URL`이 Pub/Sub 변경 신호를 전달합니다. PostgreSQL 재조회와 0.5초 폴링 fallback으로 Pub/Sub 유실·장애가 상태 정합성을 손상시키지 않습니다.
-4. **부분 구현 — 운영 관제 확장**: 읽기 전용 큐/Lease 상관관계는 구현됐습니다. 로그 스트리밍과 인증·감사가 수반되는 작업 제어는 별도 운영 정책이 확정될 때까지 제공하지 않습니다.
+4. **범위 결정 — 읽기 전용 운영 관제**: 큐/Lease 상관관계까지 제공하며 로그 스트리밍과 인증·감사가 수반되는 작업 제어는 별도 운영 제품·정책이 확정될 때까지 추가하지 않습니다.
