@@ -5,16 +5,15 @@ from threading import Barrier, get_ident
 
 from pydantic import BaseModel
 
-from backend.engine.runtime.registry_base import BaseModuleRegistry
-from backend.engine.workflows.executor import WorkflowExecutor
-from backend.engine.workflows.models import (
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.domain.models import (
     CanvasPosition,
     WorkflowDocument,
     WorkflowExecutionRequest,
     WorkflowGraph,
     WorkflowNode,
 )
-from backend.engine.workflows.store import ResultCache, RunStore
+from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_module import (
     BaseModule,
@@ -23,6 +22,7 @@ from modules.common.base_module import (
     ModuleInputDTO,
     ModuleTaskPolicy,
 )
+from modules.registry import BaseModuleRegistry
 
 
 class ParallelInput(ModuleInputDTO):

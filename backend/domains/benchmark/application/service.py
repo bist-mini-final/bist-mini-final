@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
-from backend.engine.workflows import WorkflowExecutionPort, WorkflowStore
+from backend.domains.workflow.application.execution_service import WorkflowExecutionPort
+from backend.domains.workflow.application.ports import WorkflowDefinitionRepository
 from backend.features.benchmark.postgres_store import BenchmarkStoreError
 from backend.features.benchmark.service import (
     BENCHMARK_SET_DIR,
@@ -78,7 +79,7 @@ class BenchmarkApplicationService:
         self,
         *,
         store: BenchmarkStorePort,
-        workflow_store: WorkflowStore,
+        workflow_store: WorkflowDefinitionRepository,
         run_store: BenchmarkRunStorePort,
         workflow_execution: WorkflowExecutionPort,
         queue_available: bool,

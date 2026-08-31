@@ -43,7 +43,7 @@ from backend.features.bi.queued_materializer import (
 from backend.platform.openai.responses import OpenAIResponsesClient
 
 if TYPE_CHECKING:
-    from backend.engine.runtime.registry import ModuleRegistry
+    from backend.bootstrap.module_registry import ModuleRegistry
 
 
 BI_READER_MODEL: Final = "gpt-5.6-luna"

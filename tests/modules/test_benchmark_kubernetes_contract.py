@@ -12,9 +12,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.api.benchmark_routes import create_benchmark_router
-from backend.engine.job_catalog import canonical_workflow
-from backend.engine.workflows.models import WorkflowSaveRequest
-from backend.engine.workflows.store import WorkflowStore
+from backend.domains.workflow.domain.models import WorkflowSaveRequest
+from backend.domains.workflow.infrastructure.job_catalog import canonical_workflow
+from backend.domains.workflow.infrastructure.persistence import WorkflowStore
 from backend.features.benchmark.database_schema import BENCHMARK_SCHEMA_SQL
 from jobs import BENCHMARK_JOB
 

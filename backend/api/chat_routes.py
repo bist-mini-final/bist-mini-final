@@ -11,12 +11,9 @@ from pydantic import BaseModel, Field
 from backend.domains.bi.application import BiApiServices
 from backend.domains.chatbot.application import ChatSuggestionService
 from backend.domains.chatbot.application.conversations import ChatConversationService
-from backend.engine.workflows import (
-    RunDispatcher,
-    RunStore,
-    WorkflowExecutor,
-    WorkflowStore,
-)
+from backend.domains.workflow.application.dispatching import RunDispatcher
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.infrastructure.persistence import RunStore, WorkflowStore
 from backend.features.chatbot.attachments import save_upload
 from backend.features.chatbot.grounding import EvidenceCellStorePort
 from backend.features.chatbot.repository import ChatSessionRepository

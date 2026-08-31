@@ -6,8 +6,8 @@ from time import sleep
 
 from backend.bootstrap.application import RuntimeContainer
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
-from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.workflows import DagExecutionCancelled
+from backend.domains.workflow.domain import DagExecutionCancelled
+from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 from backend.features.benchmark.service import (
     BenchmarkRequest,
     execute_benchmark_comparison,

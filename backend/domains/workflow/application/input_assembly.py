@@ -6,18 +6,18 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from backend.domains.workflow.domain import DagExecutionError
-from backend.engine.runtime.registry_base import BaseModuleRegistry
 
 from .graph_validation import WorkflowPortResolver
+from .module_registry import ModuleRegistryPort
 
 if TYPE_CHECKING:
-    from backend.engine.workflows.models import WorkflowEdge, WorkflowNode, WorkflowRun
+    from backend.domains.workflow.domain.models import WorkflowEdge, WorkflowNode, WorkflowRun
 
 
 class WorkflowInputAssembler:
     def __init__(
         self,
-        module_registry: BaseModuleRegistry,
+        module_registry: ModuleRegistryPort,
         port_resolver: WorkflowPortResolver,
     ) -> None:
         self._module_registry = module_registry

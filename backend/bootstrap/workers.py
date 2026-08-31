@@ -7,11 +7,14 @@ from importlib import import_module
 from types import MappingProxyType
 from typing import cast
 
+from backend.bootstrap.application import RuntimeContainer
+from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
+
 WorkerMain = Callable[..., int]
 
 WORKER_TARGETS = MappingProxyType(
     {
-        "workflow": "backend.engine.worker.main:main",
+        "workflow": "backend.domains.workflow.workers.main:main",
         "ingestion-embedding": (
             "backend.storage.data_sources.embedding_shard_worker_main:main"
         ),
@@ -49,7 +52,18 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
 
     worker = _load_worker(kind)
     if kind == "workflow":
-        return worker(tuple(argv))
+        runtime = RuntimeContainer.create(
+            initialize_schema=False,
+            require_database=True,
+        )
+        try:
+            return worker(
+                tuple(argv),
+                services=runtime.services,
+                default_queue=KUBERNETES_WORKFLOW_QUEUE,
+            )
+        finally:
+            runtime.close()
     if argv:
         raise ValueError(f"{kind} worker는 추가 인자를 지원하지 않습니다: {list(argv)}")
     return worker()

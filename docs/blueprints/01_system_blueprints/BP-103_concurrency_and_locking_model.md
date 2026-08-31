@@ -1,7 +1,7 @@
 # [BP-103] Durable queue, lease와 동시성 제어
 > **Document Code:** `BP-103` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/shared/application`, `backend/platform/postgres`, `backend/domains/*/application`, `backend/domains/*/infrastructure/postgres`, `backend/domains/*/workers`
-> **Current References:** [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/engine/worker/main.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/main.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/data_sources/ingestion_shards.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/ingestion_shards.py)
+> **Current References:** [`backend/shared/application/leases.py`](file:///c:/Repos/bist-mini-final/backend/shared/application/leases.py), [`backend/domains/workflow/application/leases.py`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/application/leases.py), [`backend/domains/workflow/workers/main.py`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/workers/main.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/data_sources/ingestion_shards.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/ingestion_shards.py)
 
 ---
 

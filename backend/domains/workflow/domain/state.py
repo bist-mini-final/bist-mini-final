@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from backend.engine.workflows.models import RunNodeState, WorkflowRun
+from .models import RunNodeState, WorkflowRun
 
 
 def _utc_now_iso() -> str:

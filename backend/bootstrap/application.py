@@ -7,6 +7,10 @@ from pathlib import Path
 
 from backend.bootstrap.bi import create_bi_services
 from backend.bootstrap.company_comparison import create_company_comparison_service
+from backend.bootstrap.runtime import (
+    WorkflowRuntimeServices,
+    create_workflow_runtime_services,
+)
 from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
@@ -21,12 +25,8 @@ from backend.domains.bi.application import BiApiServices
 from backend.domains.chatbot.application import ChatSuggestionService
 from backend.domains.chatbot.infrastructure.postgres import ChatSuggestionRepository
 from backend.domains.company_comparison.application import CompanyComparisonService
-from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.runtime.services import (
-    WorkflowRuntimeServices,
-    create_workflow_runtime_services,
-)
-from backend.engine.workflows import WorkflowExecutionService
+from backend.domains.workflow.application.execution_service import WorkflowExecutionService
+from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 from backend.platform.openai.embeddings import OpenAIEmbeddingEncoder
 from backend.platform.openai.provider import OpenAIProvider
 from backend.platform.openai.responses import OpenAIResponsesClient

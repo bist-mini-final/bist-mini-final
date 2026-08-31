@@ -12,10 +12,11 @@ from backend.domains.workflow.domain import (
     DagExecutionError,
     format_execution_error,
 )
-from backend.engine.runtime.registry_base import BaseModuleRegistry
+
+from .module_registry import ModuleRegistryPort
 
 if TYPE_CHECKING:
-    from backend.engine.workflows.models import (
+    from backend.domains.workflow.domain.models import (
         WorkflowEdge,
         WorkflowGraph,
         WorkflowNode,
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
 
 
 class WorkflowPortResolver:
-    def __init__(self, module_registry: BaseModuleRegistry) -> None:
+    def __init__(self, module_registry: ModuleRegistryPort) -> None:
         self._module_registry = module_registry
 
     def resolve(
@@ -70,7 +71,7 @@ class WorkflowPortResolver:
 class WorkflowGraphValidator:
     def __init__(
         self,
-        module_registry: BaseModuleRegistry,
+        module_registry: ModuleRegistryPort,
         port_resolver: WorkflowPortResolver,
     ) -> None:
         self._module_registry = module_registry

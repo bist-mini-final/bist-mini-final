@@ -1,7 +1,7 @@
 # [BP-301] DAG 검증과 durable 실행
-> **Document Code:** `BP-301` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-301` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Mostly Aligned
 > **Target Ownership:** `backend/domains/workflow/domain`, `backend/domains/workflow/application`, `backend/domains/workflow/infrastructure`, `backend/domains/workflow/presentation`, `backend/domains/workflow/workers`
-> **Current References:** [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/batch_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/batch_runner.py), [`backend/engine/workflows/node_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/node_runner.py), [`backend/engine/workflows/models.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/models.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`backend/engine/workflows/service.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/service.py)
+> **Current References:** [`backend/domains/workflow/domain/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/domain/), [`backend/domains/workflow/application/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/application/), [`backend/domains/workflow/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/infrastructure/), [`backend/domains/workflow/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/), [`backend/domains/workflow/workers/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/workers/)
 
 ---
 
@@ -83,4 +83,4 @@ Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 
 - validate, save, submit, cancel, resume, execute command/query와 required ports는 `workflow/application`이 소유합니다.
 - PostgreSQL store, Kubernetes dispatcher와 cache adapter는 `workflow/infrastructure`, REST/SSE는 `workflow/presentation`, lease process는 `workflow/workers`에 둡니다.
 - executor는 presentation DTO, provider client, concrete store를 import하지 않고 application port와 module registry 계약만 사용합니다.
-- 현재 `backend/engine/workflows`와 `backend/engine/worker` 호출자가 0이고 workflow vertical slice가 동일한 회귀 테스트를 통과할 때 구조 migration을 완료합니다.
+- workflow vertical slice와 내부 canonical import 전환은 완료됐습니다. workflow SQL/row mapping이 범용 `DatabaseManager` facade에서 domain PostgreSQL adapter로 이동하고 외부 호환 shim 제거 조건이 충족될 때 구조 migration을 완료합니다.

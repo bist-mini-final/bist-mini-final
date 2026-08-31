@@ -6,8 +6,8 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from backend.engine.runtime.registry_base import BaseModuleRegistry
 from modules.common.base_module import BaseModule, ModuleDefinition
+from modules.registry import BaseModuleRegistry
 
 
 class LazyInput(BaseModel):

@@ -1,7 +1,7 @@
 # [BP-101] 시스템 전체 배치도와 실행 토폴로지
 > **Document Code:** `BP-101` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/domains`, `backend/platform`, `backend/shared`, `backend/api`, `modules`, `jobs`
-> **Current References:** [`backend/entrypoints/`](file:///c:/Repos/bist-mini-final/backend/entrypoints/), [`backend/bootstrap/application.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/application.py), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/engine/runtime/services.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/services.py)
+> **Current References:** [`backend/entrypoints/`](file:///c:/Repos/bist-mini-final/backend/entrypoints/), [`backend/bootstrap/application.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/application.py), [`backend/bootstrap/runtime.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/runtime.py), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/)
 
 ---
 

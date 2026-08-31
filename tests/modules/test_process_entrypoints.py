@@ -33,9 +33,21 @@ def test_worker_registry_exposes_all_deployment_kinds() -> None:
 
 def test_workflow_worker_receives_queue_arguments() -> None:
     worker = Mock(return_value=0)
-    with patch("backend.bootstrap.workers._load_worker", return_value=worker):
+    runtime = Mock()
+    with (
+        patch("backend.bootstrap.workers._load_worker", return_value=worker),
+        patch(
+            "backend.bootstrap.workers.RuntimeContainer.create",
+            return_value=runtime,
+        ),
+    ):
         assert run_worker("workflow", ("--queue", "workflow-core")) == 0
-    worker.assert_called_once_with(("--queue", "workflow-core"))
+    worker.assert_called_once_with(
+        ("--queue", "workflow-core"),
+        services=runtime.services,
+        default_queue="workflow-core",
+    )
+    runtime.close.assert_called_once_with()
 
 
 def test_specialized_worker_rejects_undeclared_arguments() -> None:
