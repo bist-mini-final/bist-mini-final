@@ -16,14 +16,6 @@ COMPLEXITY_PATTERN = re.compile(r"^`([^`]+)` is too complex \((\d+) > 10\)$")
 # budget fails the suite.
 LEGACY_COMPLEXITY_BUDGETS = {
     ("backend/cli/documentation/module_docs.py", "_placeholder"): 13,
-    ("backend/storage/pgvector_binary_copy.py", "_load_vector_batch"): 12,
-    ("backend/storage/repositories/pgvector_retrieval.py", "_cell_metadata_query"): 18,
-    ("backend/storage/repositories/pgvector_retrieval.py", "fetch_rows_cells"): 12,
-    ("backend/storage/spreadsheets/cell_semantics.py", "collect_non_empty_cells"): 12,
-    ("backend/storage/spreadsheets/grid_structure.py", "occupied_cells"): 15,
-    ("backend/storage/spreadsheets/grid_structure.py", "build_column_header_tree"): 11,
-    ("backend/storage/spreadsheets/sheet_renderer.py", "_cell_text_and_color"): 16,
-    ("backend/storage/spreadsheets/sheet_renderer.py", "render"): 23,
     ("modules/storage/sheet_metadata_persistence.py", "execute"): 11,
     ("modules/structure/luna_vlm_structure_detector.py", "_validate_table"): 25,
     ("modules/structure/luna_vlm_structure_detector.py", "execute"): 13,
