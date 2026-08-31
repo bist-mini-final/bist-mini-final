@@ -82,13 +82,10 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 
 ## 4. 범위와 구현 결정
 
-1. **Cross-Encoder Re-ranker — 범위 제외 (Out of Scope)**:
-   - 검색 순위는 pgvector Dense 검색, BM25 Sparse 검색, RRF 융합의 현재 경로를 기준선으로 유지한다.
-   - `bge-reranker-large`, Cohere Re-rank 등 별도 재순위 모델의 추가·운영은 이 프로젝트의 구현 범위에 포함하지 않는다.
-2. **구현됨 — 명시적 bounded row expansion**:
+1. **구현됨 — 명시적 bounded row expansion**:
    - 기본은 검색된 단일 행의 실제 값 셀을 복원하고 `adjacent_radius`를 지정한 경우에만 최대 20행 반경으로 확장합니다. 문서에 과거 기재된 고정 $\pm 3$행 동작은 현재 계약이 아닙니다.
-   - 현재 persisted cell metadata에는 versioned `table_id`와 `data_range`가 없으므로 런타임이 Luna 범위를 추정해 임의로 잘라내지 않습니다. adaptive table window가 필요해지면 serializer metadata schema, 기존 collection 재적재, retrieval contract를 함께 버전 변경합니다.
-3. **구현됨 — 비동기 검색 및 2D 컨텍스트 확장**:
+   - 현재 persisted cell metadata에는 versioned `table_id`와 `data_range`가 없으므로 런타임이 표 범위를 추정해 임의로 잘라내지 않습니다. adaptive table window가 필요해지면 serializer metadata schema, 기존 collection 재적재, retrieval contract를 함께 버전 변경합니다.
+2. **구현됨 — 비동기 검색 및 2D 컨텍스트 확장**:
    - Dense와 keyword 검색은 `AsyncConnectionPool`을 사용하고 동일 배치에서 `TaskGroup`으로 병렬 실행합니다.
    - Context Expander는 검색 후보를 컬렉션·시트별 행 집합으로 묶어 `fetch_rows_cells_async()`를 병렬 호출합니다. 동기·비동기 경로는 동일한 정규화·중복 제거·출력 렌더러를 공유합니다.
    - Reader의 `lookup_cell_metadata` 도구도 LangChain `ainvoke()`에서 `fetch_cells_by_metadata_async()`를 직접 await하므로 도구 반복 중 이벤트 루프를 차단하지 않습니다.

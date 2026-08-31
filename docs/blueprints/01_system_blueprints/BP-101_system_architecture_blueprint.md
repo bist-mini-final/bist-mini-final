@@ -31,7 +31,7 @@ flowchart TB
     DOMAIN --> PG
 ```
 
-로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다. 표 구조 감지가 필요한 현재 경로는 외부 OpenAI vision provider를 사용하고, 검색 기준선은 Dense + PostgreSQL keyword + RRF + 2D context expansion입니다.
+표 구조 감지가 필요한 현재 경로는 외부 OpenAI vision provider를 사용하고, 검색 기준선은 Dense + PostgreSQL keyword + RRF + 2D context expansion입니다.
 
 ---
 

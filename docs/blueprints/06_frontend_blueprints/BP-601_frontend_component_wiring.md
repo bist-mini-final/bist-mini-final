@@ -9,25 +9,25 @@
 ```mermaid
 graph TD
     ROOT["main.tsx (Root Provider & StrictMode)"] --> APP["App.tsx"]
-    APP --> SHELL["AppShell.tsx (Header, Global Nav, Theme Switcher)"]
+    APP --> CHAT_STATE["ChatWorkspaceProvider (Persistent Sessions & Active Conversation)"]
+    CHAT_STATE --> SHELL["AppShell.tsx (Excel RAG Sidebar, Global Nav, Session History)"]
     
     SHELL --> ROUTER["AppRouter (History-based SPA Router)"]
     
-    ROUTER --> P_HOME["HomePage (/)"]
+    ROUTER --> P_CHAT["ChatbotPage (/chatbot, / redirect) -> ChatbotView [운영중]"]
     ROUTER --> P_PLAY["PlaygroundPage (/playground) -> PlaygroundView"]
     ROUTER --> P_DS["DataSourcesPage (/data-sources) -> DataSourcesView"]
     ROUTER --> P_BI["BiPage (/dashboard, alias /bi) -> BiPage / BiDashboard"]
-    ROUTER --> P_CHAT["ChatbotPage (/chatbot) -> ChatbotView [운영중]"]
     ROUTER --> P_COMP["CompanyComparisonPage (/company-comparison) -> Snapshot Comparison"]
     ROUTER --> P_JOBS["JobsPage (/jobs) -> KEDA/Job/Pod monitor"]
     ROUTER --> P_SET["SettingsPage (/settings) -> SettingsView"]
     ROUTER --> P_404["NotFoundPage (404 Fallback)"]
 
     P_PLAY --> XYFLOW["@xyflow/react (Custom Nodes, Minimap, Controls)"]
-    P_DS --> GRID_VIEW["Spreadsheet Table & VLM Overlay Inspector"]
+    P_DS --> GRID_VIEW["Spreadsheet Table & Structure Overlay Inspector"]
     P_BI --> RECHARTS["Recharts (Area, Bar, Line, ResponsiveContainer)"]
     P_BI --> HEATMAP["FinancialHealthHeatmap (종합 재무 건전성 히트맵)"]
-    P_CHAT --> CHAT_VIEW["ChatbotView (Session Sidebar, Message Bubble, MathJax, Inline Chart)"]
+    P_CHAT --> CHAT_VIEW["ChatbotView (Global Session History, Message Bubble, MathJax, Inline Chart)"]
     P_COMP --> LEAGUE_VIEW["Metric ranking + actual/forecast trends + evidence status + two-company comparison + BI deep link"]
     P_JOBS --> JOB_MONITOR["5-second read-only Kubernetes workload polling"]
 ```
@@ -38,11 +38,11 @@ graph TD
 
 | URL Path | 라우트 이름 | 렌더링 컴포넌트 | 워크스페이스 상태 |
 | :--- | :--- | :--- | :--- |
-| `/` | `Home` | [`HomePage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/HomePage.tsx) | 메인 랜딩 & 워크스페이스 런처 허브 |
+| `/` | `Redirect` | `/chatbot` | 별도 홈 없이 새 채팅 워크스페이스로 이동 |
 | `/playground` | `Pipeline Playground` | [`PlaygroundPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx) | **[운영중]** React Flow 2D DAG 빌더 & 실행 |
 | `/data-sources` | `Data Sources` | [`DataSourcesPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx) | **[운영중]** 스프레드시트 뷰어 & pgvector 관리 |
 | `/dashboard` (`/bi` 호환 별칭) | `Financial BI` | [`BiPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 21개 근거 기반 지표 차트 |
-| `/chatbot` | `AI Financial Chatbot` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 세션 기반 대화형 챗봇 & 인라인 시각화 |
+| `/chatbot` | `새 채팅` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 전역 세션 이력 기반 대화형 챗봇 & 인라인 시각화 |
 | `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 버전형 비교 스냅샷 기반 순위, 실제/예측 추이, evidence 상태, 선택 기업·2개 기업 비교 및 BI 딥링크 |
 | `/jobs` | `Jobs` | [`JobsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/JobsPage.tsx) | **[운영중]** KEDA/Job/Pod와 PostgreSQL 큐·Lease 읽기 전용 상관 관제 |
 | `/settings` | `Settings` | [`SettingsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/SettingsPage.tsx) | **[운영중]** 시스템·연결 설정 화면 |

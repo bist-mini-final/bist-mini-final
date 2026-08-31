@@ -91,9 +91,9 @@ WHERE collection_id = '{collection_uuid}'::uuid
 1. **구현됨 — Binary COPY 단일 스트리밍 경로 (Zero Legacy Code Policy)**:
    - `PgVectorBinaryCopyStream`이 float32 artifact와 일반 벡터 시퀀스를 모두 동일한 PostgreSQL Binary COPY row framing으로 변환합니다.
    - `PgVectorStore.put_documents()`의 embedding row 쓰기에서 `execute_values`/multi-row INSERT 경로를 제거했습니다. 동적 임베딩도 bounded batch로 생성한 뒤 동일한 COPY 연결에 스트리밍합니다.
-2. **구현됨 — Halfvec 대신 binary quantization + exact rerank 채택**:
-   - 원본은 정확 재정렬을 위해 float32 `vector`로 유지합니다. HNSW 인덱스만 1-bit 표현을 사용하므로 fp16 `halfvec` 인덱스보다 작고, 최종 순위는 원본 코사인 거리로 보정됩니다.
-   - `halfvec` 인덱스를 함께 만들면 동일 검색 목적의 인덱스가 중복되고 메모리·빌드 시간이 증가하므로 현재 운영 전략에서는 추가하지 않습니다. `GET /api/v1/data-sources/db-status`가 `binary_quantized_hnsw_exact_rerank` 전략과 실제 인덱스 수를 반환합니다.
+2. **구현됨 — Halfvec 대신 binary quantization + 원본 거리 보정 채택**:
+   - 원본은 정확한 코사인 거리 계산을 위해 float32 `vector`로 유지합니다. HNSW 인덱스만 1-bit 표현을 사용하므로 fp16 `halfvec` 인덱스보다 작고, 최종 순위는 후보의 원본 코사인 거리로 보정됩니다.
+   - `halfvec` 인덱스를 함께 만들면 동일 검색 목적의 인덱스가 중복되고 메모리·빌드 시간이 증가하므로 현재 운영 전략에서는 추가하지 않습니다. `GET /api/v1/data-sources/db-status`는 적용 중인 검색 전략과 실제 인덱스 수를 반환합니다.
 3. **결정 완료 — 물리 파티션 대신 컬렉션 로컬 파티션 전략 유지**:
    - 모든 벡터는 immutable `collection_id`로 범위를 제한하고, 컬렉션 UUID별 partial HNSW를 생성합니다. PostgreSQL 실행계획에서 해당 인덱스가 직접 선택됩니다.
    - `company_name`은 수정 가능한 JSON 메타데이터이고 현재 인덱싱 계약에는 `fiscal_year`가 필수가 아닙니다. 이를 물리 파티션 키로 쓰면 기업명 변경 시 대량 row 이동이 발생하고 연도 없는 행을 안정적으로 분배할 수 없습니다.
