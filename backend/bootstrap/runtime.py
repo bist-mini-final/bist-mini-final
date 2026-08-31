@@ -20,7 +20,6 @@ from backend.core.settings import (
     PROCESSED_DATA_DIR,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
-    VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
 from backend.domains.data_sources.application.shard_coordinator import IngestionShardCoordinator
@@ -75,7 +74,6 @@ def create_workflow_runtime_services(
     processed_dir: Path = PROCESSED_DATA_DIR,
     embedding_artifact_dir: Path = EMBEDDING_ARTIFACT_DIR,
     spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
-    vector_index_dir: Path = VECTOR_INDEX_DIR,
     pgvector_store: Optional[PgVectorStore] = None,
     database_probe: Optional[PostgresConnectionProbe] = None,
     source_files: Optional[PostgresSourceFileRepository] = None,

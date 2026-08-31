@@ -1,6 +1,6 @@
 {
   "include": ["modules", "backend", "tests"],
-  "exclude": ["backend/infrastructure", ".venv"],
+  "exclude": [".venv"],
   "venvPath": ".",
   "venv": ".venv",
   "pythonVersion": "3.12",

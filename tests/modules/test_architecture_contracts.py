@@ -162,6 +162,37 @@ def test_backend_root_contains_no_legacy_process_module() -> None:
     assert not (PROJECT_ROOT / "backend/main.py").exists()
 
 
+def test_removed_repository_directories_do_not_reappear() -> None:
+    removed = (
+        "notebooks",
+        "frontend/src/features/company-comparison-v2",
+        "jobs/workflow_worker",
+        "backend/entrypoints/commands/documentation",
+        "backend/platform/data_sources",
+        "backend/contracts",
+        "backend/data_sources",
+        "backend/documentation",
+        "backend/embeddings",
+        "backend/engine",
+        "backend/features",
+        "backend/llm",
+        "backend/modules",
+        "backend/orchestration",
+        "backend/providers",
+        "backend/retrieval",
+        "backend/runtime",
+        "backend/spreadsheets",
+        "backend/storage",
+        "backend/vision",
+        "backend/workflows",
+        "data/processed",
+        "data/raw",
+        "data/virtual",
+    )
+    remaining = [path for path in removed if (PROJECT_ROOT / path).exists()]
+    assert not remaining, f"removed repository directories remain: {remaining}"
+
+
 def test_backend_python_sources_use_the_target_top_level_packages() -> None:
     allowed = {
         "api",

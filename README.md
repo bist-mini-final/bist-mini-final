@@ -214,7 +214,7 @@ Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
 ./deploy/kubernetes/local.sh status
 ```
 
-`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 CPU 전용 PyTorch 잠금을 사용합니다.
+`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 `uv.lock`에 고정된 CPU 애플리케이션 의존성만 설치합니다.
 
 개발용 `.env`의 `DATABASE_URL`이 원격 DB를 가리킬 때 로컬 DB로 실행하려면 다음처럼 한 번만 재정의합니다.
 

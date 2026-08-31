@@ -21,7 +21,6 @@ from backend.core.settings import (
     PROCESSED_DATA_DIR,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
-    VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
 )
 from backend.domains.benchmark.application import BenchmarkApplicationService
@@ -80,7 +79,6 @@ class RuntimePaths:
     processed_dir: Path = PROCESSED_DATA_DIR
     embedding_artifact_dir: Path = EMBEDDING_ARTIFACT_DIR
     spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR
-    vector_index_dir: Path = VECTOR_INDEX_DIR
 
 
 @dataclass
@@ -120,7 +118,6 @@ class RuntimeContainer:
             processed_dir=runtime_paths.processed_dir,
             embedding_artifact_dir=runtime_paths.embedding_artifact_dir,
             spreadsheet_artifact_dir=runtime_paths.spreadsheet_artifact_dir,
-            vector_index_dir=runtime_paths.vector_index_dir,
             initialize_schema=initialize_schema,
             require_database=require_database,
         )
