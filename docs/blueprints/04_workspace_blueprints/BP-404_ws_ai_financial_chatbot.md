@@ -1,6 +1,7 @@
 # [BP-404] AI Financial Chatbot 워크스페이스 명세서
-> **Document Code:** `BP-404` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/api/chat_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/chat_routes.py), [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`backend/features/chatbot/`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx)
+> **Document Code:** `BP-404` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Target Ownership:** `backend/domains/chatbot`, `backend/domains/workflow/application`, `backend/platform/openai`, `frontend/src/features/chatbot`
+> **Current References:** [`backend/api/chat_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/chat_routes.py), [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`backend/features/chatbot/`](file:///c:/Repos/bist-mini-final/backend/features/chatbot/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx)
 
 ---
 
@@ -11,7 +12,7 @@ AI 금융 챗봇은 자연어 재무 질의에 대해 **PostgreSQL 기반 대화
 ```mermaid
 flowchart TD
     UI["ChatbotView (React 18 SPA)"] <-->|REST API| ROUTER["FastAPI Chatbot Router (/api/v1/chat)"]
-    
+
     subgraph ChatServices ["Chatbot Core Services"]
         REPO["ChatSessionRepository (chat_sessions, chat_messages)"]
         SUGG["ChatSuggestionService (Dynamic Financial Prompts)"]
@@ -52,9 +53,18 @@ flowchart TD
 
 ## 3. 대화 라우팅과 근거 안전성
 
-* 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 `ChatConversationService`가 조율하고 `features/chatbot/conversation.py`의 결정적 정책을 사용합니다. 기업 수치·실적 조회만 `rag_query` 워크플로로 보냅니다.
+* 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 chatbot application의 결정적 routing policy가 조율합니다. 기업 수치·실적 조회만 workflow application port를 통해 `rag_query` 실행으로 보냅니다.
 * 검색 서브쿼리의 `Cell Value: ?`는 Dense 유사도 검색용 와일드카드이므로 검색 단계까지 보존합니다. Reader에는 실제 `Cell Value`가 확인된 셀만 전달하며, 원시 검색 힌트나 자리표시자 셀은 Context Blocks·근거·추가 DB 조회 결과에서 모두 제외합니다.
 * RAG 응답은 실행 결과의 `expand-context` 셀 또는 실행 로그에서 복구한 pgvector 셀과 대조합니다. 검증 가능한 셀이 없거나 응답의 셀 인용이 실행 근거와 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
 * 모델이 근거 셀을 사용했지만 인용 표기를 생략한 경우 `grounding.py`가 최대 6개의 `[Sheet: ... | Cell: ...]` 근거를 보강합니다.
 * 프런트엔드는 `chatMarkdown.ts`에서 접힌 GFM 표와 이스케이프 문자를 정규화하고, `shared/markdown/cellCitations.ts`에서 셀 인용과 상세 메타데이터를 분리합니다. 본문에는 `시트 · 셀` 배지만 노출하며 hover 또는 keyboard focus 시 기업, 행 항목, 열 항목, 셀 값 상세를 포털 툴팁으로 표시합니다. 같은 공용 Markdown 렌더러를 챗봇과 Playground Reader 노드가 사용합니다.
 * 셀 배지를 활성화하면 `CellEvidenceProvider`가 resolve API를 호출하고 `CellEvidenceModal`에서 서버가 생성한 원본 sheet PNG를 엽니다. 응답 cell bbox를 강조하며 확대·축소·화면 맞춤·근거 셀 이동과 pointer drag pan을 지원합니다. 인덱스와 workbook 근거 연결이 없으면 임의 이미지를 대체하지 않고 명시적 실패 상태를 표시합니다.
+
+---
+
+## 4. 책임 분리와 구조 완료 조건
+
+- conversation/session/message, routing policy와 grounded answer 검증은 chatbot domain/application이 소유합니다.
+- RAG 실행은 workflow application port, source cell 확인은 data sources evidence port로 요청하며 상대 domain repository를 직접 import하지 않습니다.
+- OpenAI conversation transport는 platform, chat repository와 integration adapter는 chatbot infrastructure, REST DTO는 chatbot presentation에 둡니다.
+- `backend/features/chatbot`과 `backend/api/chat_routes.py`의 책임이 vertical slice로 이동하고 근거 검증 회귀 테스트가 유지될 때 구조 migration을 완료합니다.

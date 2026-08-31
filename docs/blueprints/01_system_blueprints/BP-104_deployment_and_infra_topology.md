@@ -1,6 +1,7 @@
 # [BP-104] K8s, KEDA ScaledJob & 인프라 토폴로지
-> **Document Code:** `BP-104` | **Category:** Infrastructure & DevOps Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/manifests/), [`deploy/helm/bist/`](file:///c:/Repos/bist-mini-final/deploy/helm/bist/), [`deploy/docker/`](file:///c:/Repos/bist-mini-final/deploy/docker/), [`deploy/compose/docker-compose.yml`](file:///c:/Repos/bist-mini-final/deploy/compose/docker-compose.yml)
+> **Document Code:** `BP-104` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `deploy`, `backend/entrypoints/worker.py`, `backend/bootstrap/workers.py`, `backend/platform/kubernetes`, `backend/domains/operations`, `backend/domains/*/workers`, `jobs`
+> **Current References:** [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/manifests/), [`deploy/helm/bist/`](file:///c:/Repos/bist-mini-final/deploy/helm/bist/), [`deploy/docker/`](file:///c:/Repos/bist-mini-final/deploy/docker/), [`deploy/compose/docker-compose.yml`](file:///c:/Repos/bist-mini-final/deploy/compose/docker-compose.yml)
 
 ---
 
@@ -16,7 +17,7 @@ graph TB
 
     subgraph K8sCluster ["Kubernetes Cluster (Namespace: bist-batch)"]
         INGRESS["Ingress Controller (Port 80/443)"]
-        
+
         subgraph FrontendGroup ["Frontend Pods (Nginx)"]
             FE["bist-frontend (Replicas: 1~3)<br>React 18 SPA Dist (/playground, /chatbot, /bi)"]
         end
@@ -45,7 +46,7 @@ graph TB
     INGRESS -->|/api/* -> Core API| BE
     INGRESS -->|/docs, /redoc -> API Specs| BE
     INGRESS -->|/jobs -> K8s Job Monitor| BE
-    
+
     BE -->|기본: 외부 DB 연결| PG_EXTERNAL
     BE -->|SSE state-change signal| REDIS
     BE -.->|선택: 내장 DB 활성화 시| PG_INTERNAL
@@ -182,7 +183,7 @@ flowchart TD
 
 PostgreSQL 대기열 테이블의 미처리 작업 수에 따라 워커 Pod를 0개에서 동적으로 스케일아웃합니다. 현재 `workflow-worker`, `ingestion-embedding`, `ingestion-vector`, `bi-materialization`, `bi-question`, `benchmark`의 여섯 ScaledJob을 사용하며, 각 트리거의 PostgreSQL 접속 문자열은 워커 환경 변수와 분리된 `TriggerAuthentication`에서 읽습니다. 전역 `KUBERNETES_MAX_JOBS`보다 phase별 안전 한도가 우선하며 embedding은 최대 4, vector COPY는 최대 2입니다.
 
-### ScaledJob 매니페스트 발췌 (`deploy/kubernetes/manifests/scaledjob.yaml`)
+### 목표 worker entrypoint가 반영된 ScaledJob 규격
 ```yaml
 apiVersion: keda.sh/v1alpha1
 kind: ScaledJob
@@ -197,7 +198,7 @@ spec:
         containers:
         - name: worker
           image: bist-workflow-worker:local
-          command: ["python", "-m", "backend.engine.worker.main"]
+          command: ["python", "-m", "backend.bootstrap.workers", "workflow"]
           resources:
             requests:
               cpu: 1000m
@@ -278,3 +279,13 @@ sequenceDiagram
 2. **구현됨 — KEDA Trigger 인증 Secret 분리**: `bist-keda-postgresql` Secret의 `PGVECTOR_URL`을 `bist-postgresql` TriggerAuthentication이 참조합니다. DB URL은 ScaledJob metadata와 로그에 직접 넣지 않습니다.
 3. **구현됨 — 다중 Pod SSE 알림**: `bist-redis`와 `REDIS_URL`이 Pub/Sub 변경 신호를 전달합니다. PostgreSQL 재조회와 0.5초 폴링 fallback으로 Pub/Sub 유실·장애가 상태 정합성을 손상시키지 않습니다.
 4. **범위 결정 — 읽기 전용 운영 관제**: 큐/Lease 상관관계까지 제공하며 로그 스트리밍과 인증·감사가 수반되는 작업 제어는 별도 운영 제품·정책이 확정될 때까지 추가하지 않습니다.
+
+---
+
+## 7. 배포 소유권과 구조 완료 조건
+
+- `deploy/`는 container image, Helm, raw manifest와 로컬 실행 UX를 소유하고 business queue 종류를 Python 분기로 재정의하지 않습니다.
+- `jobs/`는 표준 Job 이름·command·resource profile을 선언하며 Helm/KEDA renderer가 같은 catalog를 소비합니다.
+- `backend/platform/kubernetes`는 API client와 workload 조회·제출 adapter만 제공하고, 어떤 작업을 제출할지는 domain application port가 결정합니다.
+- worker image의 정식 진입점은 `backend.bootstrap.workers` 하나이며 kind별 domain worker는 bootstrap registry에서 명시적으로 조립합니다.
+- 모든 ScaledJob이 선언형 catalog와 일치하고 `backend.engine` compatibility entrypoint를 참조하지 않을 때 구조 migration을 완료합니다.

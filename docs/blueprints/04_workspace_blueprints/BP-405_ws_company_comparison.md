@@ -1,6 +1,7 @@
 # [BP-405] Company Comparison 스냅샷 워크스페이스 청사진
-> **Document Code:** `BP-405` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/api/company_comparison_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/company_comparison_routes.py), [`backend/bootstrap/company_comparison.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/company_comparison.py), [`backend/domains/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/domains/company_comparison/), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`frontend/src/pages/CompanyComparisonPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx), [`frontend/src/features/company-comparison/`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/)
+> **Document Code:** `BP-405` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Target Ownership:** `backend/domains/company_comparison`, `backend/domains/bi/application`, `frontend/src/features/company-comparison`, `frontend/src/pages`
+> **Current References:** [`backend/api/company_comparison_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/company_comparison_routes.py), [`backend/bootstrap/company_comparison.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/company_comparison.py), [`backend/domains/company_comparison/`](file:///c:/Repos/bist-mini-final/backend/domains/company_comparison/), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`frontend/src/pages/CompanyComparisonPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx), [`frontend/src/features/company-comparison/`](file:///c:/Repos/bist-mini-final/frontend/src/features/company-comparison/)
 
 ---
 
@@ -91,3 +92,12 @@ BI의 계산식과 기업 비교의 점수 정책은 의미가 다르므로 공�
 UI는 실제/예측 기간을 시각적으로 구분하고, 스냅샷 상태·생성 시각·scoring/forecast version·포함/제외 기업·근거 수를 서버 응답에서 표시합니다. refresh 실패 시 이전 응답을 새 데이터처럼 합성하지 않습니다.
 
 기업명 링크는 `/dashboard?companyId={id}`로 이동합니다. 이 딥링크만 화면 간 선택 문맥을 전달하며 기업 비교 API가 BI API namespace를 대체하지 않습니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- 비교 score, tier, rank, forecast assumption과 exclusion policy는 company comparison domain이 소유합니다.
+- snapshot build/refresh/query와 BI snapshot reader port는 application, versioned repository는 infrastructure, REST DTO는 presentation에 둡니다.
+- BI와 공통화하는 것은 immutable snapshot lifecycle primitive뿐이며 metric·score service 상속이나 공용 DTO를 만들지 않습니다.
+- `backend/api/company_comparison_routes.py`, bootstrap service factory와 shared storage facade의 도메인 책임이 vertical slice로 이동하고 BI namespace와 독립된 회귀 계약이 통과할 때 구조 migration을 완료합니다.

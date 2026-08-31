@@ -1,12 +1,13 @@
 # [BP-202] 외부 Vision 기반 시트 구조 감지
-> **Document Code:** `BP-202` | **Category:** Data Engine Blueprint | **Status:** Implemented with External Provider
-> **Source Files:** [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py), [`backend/storage/spreadsheets/sheet_renderer.py`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/sheet_renderer.py), [`backend/storage/spreadsheets/cell_type_overlay.py`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/cell_type_overlay.py)
+> **Document Code:** `BP-202` | **Contract State:** Target Architecture | **Capability State:** Operational via External Provider | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/vision`, `backend/platform/openai`, `modules/structure`
+> **Current References:** [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py), [`backend/storage/spreadsheets/sheet_renderer.py`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/sheet_renderer.py), [`backend/storage/spreadsheets/cell_type_overlay.py`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/cell_type_overlay.py)
 
 ---
 
 ## 1. Provider 계약
 
-`luna_vlm_structure_detector`라는 module type과 `LunaVlmStructureDetectorModule` 클래스 이름은 유지되지만 현재 추론은 `OpenAIResponsesClient`를 통해 외부 OpenAI vision model에 위임합니다. 실제 model ID는 런타임 설정으로 결정되며 문서에서 특정 Codex/ChatGPT 모델 이름으로 고정하지 않습니다.
+목표 module 계약은 provider 중립적인 `vision_structure_detector`입니다. application port는 prepared sheet와 구조화 결과만 알고, 실제 추론은 외부 OpenAI vision adapter에 위임합니다. model ID와 transport는 런타임 설정으로 결정되며 module contract에 provider 제품명을 고정하지 않습니다. 현재 공개된 compatibility module type은 저장된 workflow migration이 끝날 때까지 alias로만 유지할 수 있습니다.
 
 ---
 
@@ -14,7 +15,7 @@
 
 ```mermaid
 sequenceDiagram
-    participant Module as LunaVlmStructureDetectorModule
+    participant Module as VisionStructureDetectorModule
     participant Renderer as ExcelSheetRenderer
     participant Artifact as Spreadsheet Artifact Directory
     participant Vision as OpenAIResponsesClient
@@ -47,6 +48,16 @@ sequenceDiagram
 
 ---
 
-## 4. 현재 UI와의 관계
+## 4. UI와의 계약
 
 Data Sources는 서버가 만든 spreadsheet preview와 감지 region을 조회할 수 있지만 수동 bounding-box 편집·승인 workflow는 현재 공개 계약이 아닙니다. 편집 기능을 추가하려면 사용자 수정 좌표, 원본 추론 좌표, 승인자, 버전, 재색인 트리거를 함께 저장하는 별도 감사 모델이 먼저 필요합니다.
+
+---
+
+## 5. 책임 분리와 구조 완료 조건
+
+- `data_sources/application`은 `VisionStructureDetector` port와 batch orchestration을 소유합니다.
+- `data_sources/infrastructure/vision`은 provider 응답을 도메인 구조 계약으로 변환합니다.
+- `platform/openai`는 인증, timeout, retry, transport와 provider 응답 파싱 primitive만 제공합니다.
+- `modules/structure`는 application port를 호출하는 DAG adapter이며 OpenAI client를 생성하지 않습니다.
+- provider 중립 port가 정착하고 compatibility module type 외에 provider 이름이 domain/application에 남지 않을 때 구조 migration을 완료합니다.

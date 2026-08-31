@@ -1,6 +1,7 @@
 # [BP-402] Data Sources 워크스페이스
-> **Document Code:** `BP-402` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational  
-> **Source Files:** [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py), [`backend/api/data_source_ingestion_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_ingestion_controller.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
+> **Document Code:** `BP-402` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Target Ownership:** `backend/domains/data_sources`, `backend/platform/pgvector`, `backend/platform/openai`, `frontend/src/features/data-sources`, `frontend/src/pages`
+> **Current References:** [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py), [`backend/api/data_source_ingestion_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_ingestion_controller.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
 
 ---
 
@@ -12,7 +13,7 @@ HTTP composition은 `data_source_routes.py`가 담당하고 file/index/ingestion
 
 ---
 
-## 2. 현재 API
+## 2. 공개 API 계약
 
 | 기능 | API |
 | :--- | :--- |
@@ -87,3 +88,12 @@ flowchart LR
 - 브라우저에서 전체 workbook을 편집하는 virtualized spreadsheet editor
 
 향후 수동 검수 기능이 필요하면 좌표 version, 승인 이력, 재색인 일관성을 먼저 설계해야 합니다.
+
+---
+
+## 7. 책임 분리와 구조 완료 조건
+
+- data source aggregate, ingestion state와 삭제/rename policy는 domain, command/query와 ports는 application이 소유합니다.
+- upload·preview·index REST/SSE는 presentation, workbook·PostgreSQL·pgvector adapter는 infrastructure가 소유합니다.
+- UI feature는 파일/collection/job state를 분리하고 모든 mutation에 busy·error·revalidation 상태를 제공합니다.
+- API controller, storage spreadsheet, shard coordinator 책임이 data sources vertical slice로 이동하고 route 내부 orchestration이 없어질 때 구조 migration을 완료합니다.
