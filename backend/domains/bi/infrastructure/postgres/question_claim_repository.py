@@ -91,5 +91,3 @@ class PostgresBiQuestionClaimer:
                 reason=str(error),
             ) from error
         return tuple(BiQuestionRecord.model_validate(row) for row in rows)
-
-
