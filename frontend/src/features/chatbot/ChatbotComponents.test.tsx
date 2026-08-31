@@ -1,6 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SIDEBAR_CONTEXT_SLOT_ID } from '../../app/SidebarContextPortal';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { ChatComposer } from './ChatComposer';
 import { ChatMessages } from './ChatMessages';
 import { ChatSessionSidebar } from './ChatSessionSidebar';
@@ -13,10 +12,6 @@ const SESSION: ChatSession = {
   updated_at: '2026-08-30T01:00:00Z',
   messages: [],
 };
-
-afterEach(() => {
-  document.getElementById(SIDEBAR_CONTEXT_SLOT_ID)?.remove();
-});
 
 describe('ChatComposer', () => {
   it('submits Enter, preserves Shift+Enter, and exposes the stop action while running', () => {
@@ -103,10 +98,7 @@ describe('ChatMessages', () => {
 });
 
 describe('ChatSessionSidebar', () => {
-  it('renders route-owned session controls into the application sidebar slot', async () => {
-    const host = document.createElement('div');
-    host.id = SIDEBAR_CONTEXT_SLOT_ID;
-    document.body.append(host);
+  it('renders reusable session controls for the application sidebar', () => {
     const onSelectSession = vi.fn();
 
     render(
@@ -114,14 +106,13 @@ describe('ChatSessionSidebar', () => {
         sessions={[SESSION]}
         activeSessionId={SESSION.id}
         disabled={false}
-        onNewSession={vi.fn()}
         onSelectSession={onSelectSession}
         onRenameSession={vi.fn()}
         onDeleteSession={vi.fn()}
       />,
     );
 
-    await waitFor(() => expect(host).toHaveTextContent('IBM 재무 분석'));
+    expect(screen.getByText('대화 이력')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'IBM 재무 분석' }));
     expect(onSelectSession).toHaveBeenCalledWith(SESSION.id);
   });

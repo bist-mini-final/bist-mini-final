@@ -1,16 +1,14 @@
 import {
-  Bot,
   Boxes,
   ChartNoAxesCombined,
   Database,
-  House,
+  MessageSquarePlus,
   Scale,
   Settings,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
 import { type ComponentType, lazy } from 'react';
-import { HomePage } from '../pages/HomePage';
 
 const loadChatbotPage = () => import('../pages/ChatbotPage');
 const loadSettingsPage = () => import('../pages/SettingsPage');
@@ -63,12 +61,13 @@ export interface AppRoute {
 /** Single route registry. Add a page here to expose it in routing and navigation. */
 export const APP_ROUTES: readonly AppRoute[] = [
   {
-    path: '/',
-    label: '홈',
-    shortLabel: 'Home',
-    description: '서비스와 작업공간의 시작점',
-    icon: House,
-    component: HomePage,
+    path: '/chatbot',
+    label: '새 채팅',
+    shortLabel: 'Chat',
+    description: '자연어로 질의하는 대화형 재무 비서',
+    icon: MessageSquarePlus,
+    component: ChatbotPage,
+    preload: loadChatbotPage,
     status: 'ready',
   },
   {
@@ -99,16 +98,6 @@ export const APP_ROUTES: readonly AppRoute[] = [
     icon: ChartNoAxesCombined,
     component: BiPage,
     preload: loadBiPage,
-    status: 'ready',
-  },
-  {
-    path: '/chatbot',
-    label: 'AI 챗봇',
-    shortLabel: 'Chatbot',
-    description: '자연어로 질의하는 대화형 재무 비서',
-    icon: Bot,
-    component: ChatbotPage,
-    preload: loadChatbotPage,
     status: 'ready',
   },
   {
@@ -145,6 +134,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
 
 /** Compatibility paths retained for links published by the architecture docs. */
 export const ROUTE_ALIASES: Readonly<Record<string, string>> = {
+  '/': '/chatbot',
   '/bi': '/dashboard',
 };
 
