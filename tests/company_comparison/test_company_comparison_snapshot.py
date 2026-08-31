@@ -7,9 +7,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.company_comparison_routes import create_company_comparison_router
-from backend.contracts.snapshots import VersionedSnapshotRecord
-from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
 from backend.domains.bi.domain.models import (
     AmountScale,
     AvailableObservation,
@@ -33,11 +30,13 @@ from backend.domains.bi.domain.models import (
     ValueKind,
 )
 from backend.domains.company_comparison.application import CompanyComparisonService
-from backend.domains.company_comparison.errors import ComparisonDataError
-from backend.domains.company_comparison.models import CompanyComparisonSnapshot
-from backend.domains.company_comparison.snapshot_builder import (
+from backend.domains.company_comparison.application.snapshot_builder import (
     CompanyComparisonSnapshotBuilder,
 )
+from backend.domains.company_comparison.domain.errors import ComparisonDataError
+from backend.domains.company_comparison.domain.models import CompanyComparisonSnapshot
+from backend.domains.company_comparison.presentation.routes import create_company_comparison_router
+from backend.shared.application.snapshots import VersionedSnapshotRecord
 
 
 def _snapshot(
@@ -305,18 +304,8 @@ class FakeSource:
     def __init__(self, snapshots: tuple[BiDashboardSnapshot, ...]) -> None:
         self.items = {snapshot.company.company_id: snapshot for snapshot in snapshots}
 
-    async def list_companies_async(self):
-        return tuple(
-            BiCompanyIndexEntry(
-                company=snapshot.company,
-                source=snapshot.source,
-                current_snapshot_id=snapshot.snapshot.snapshot_id,
-            )
-            for snapshot in self.items.values()
-        )
-
-    async def get_current_many_async(self, company_ids):
-        return {company_id: self.items[company_id] for company_id in company_ids}
+    async def load_current_snapshots(self) -> tuple[BiDashboardSnapshot, ...]:
+        return tuple(self.items.values())
 
 
 class MemorySnapshotRepository:

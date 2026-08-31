@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
 from backend.api.chat_routes import create_chat_router
-from backend.api.company_comparison_routes import create_company_comparison_router
 from backend.bootstrap.application import ApplicationContainer
 from backend.domains.bi.presentation.routes import create_bi_router
+from backend.domains.company_comparison.presentation.routes import create_company_comparison_router
 from backend.domains.data_sources.presentation import create_data_source_router
 from backend.domains.workflow.presentation import create_workflow_router
 from backend.shared.application.state_stream_broker import StateStreamBroker

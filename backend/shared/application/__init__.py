@@ -7,6 +7,7 @@ from .observability import (
     current_observability_context,
     observability_log_extra,
 )
+from .snapshots import VersionedSnapshotRecord, VersionedSnapshotRepository
 from .state_stream import SharedStateStream
 from .state_stream_broker import StateStreamBroker
 from .workers import LeasedWorker, WorkerLeaseSpec, default_worker_id
@@ -17,6 +18,8 @@ __all__ = [
     "ObservabilityContext",
     "SharedStateStream",
     "StateStreamBroker",
+    "VersionedSnapshotRecord",
+    "VersionedSnapshotRepository",
     "WorkerLeaseSpec",
     "bind_observability_context",
     "current_observability_context",

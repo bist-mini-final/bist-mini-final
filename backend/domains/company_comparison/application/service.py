@@ -4,22 +4,21 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from backend.contracts.snapshots import (
-    VersionedSnapshotRecord,
-    VersionedSnapshotRepository,
-)
-from backend.domains.bi.application.evidence import source_cell_value
-from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
-from backend.domains.bi.domain.models import BiDashboardSnapshot, CompanyId
-from backend.domains.company_comparison.errors import (
-    ComparisonDataError,
-    ComparisonSnapshotIntegrityError,
-)
-from backend.domains.company_comparison.models import CompanyComparisonSnapshot
-from backend.domains.company_comparison.snapshot_builder import (
+from backend.domains.bi.domain.models import BiDashboardSnapshot
+from backend.domains.company_comparison.application.snapshot_builder import (
     FORECAST_VERSION,
     SCORING_VERSION,
     CompanyComparisonSnapshotBuilder,
+)
+from backend.domains.company_comparison.domain.errors import (
+    ComparisonDataError,
+    ComparisonSnapshotIntegrityError,
+)
+from backend.domains.company_comparison.domain.models import CompanyComparisonSnapshot
+from backend.domains.data_sources.domain.cell_values import extract_resolved_cell_value
+from backend.shared.application.snapshots import (
+    VersionedSnapshotRecord,
+    VersionedSnapshotRepository,
 )
 
 SNAPSHOT_DOMAIN = "company-comparison"
@@ -27,12 +26,7 @@ SNAPSHOT_SCOPE = "global"
 
 
 class CompanyComparisonSourcePort(Protocol):
-    async def list_companies_async(self) -> tuple[BiCompanyIndexEntry, ...]: ...
-
-    async def get_current_many_async(
-        self,
-        company_ids: tuple[CompanyId, ...],
-    ) -> dict[CompanyId, BiDashboardSnapshot]: ...
+    async def load_current_snapshots(self) -> tuple[BiDashboardSnapshot, ...]: ...
 
 
 class CompanyComparisonService:
@@ -73,18 +67,7 @@ class CompanyComparisonService:
             return current
 
     async def refresh(self) -> CompanyComparisonSnapshot:
-        entries = await self._source.list_companies_async()
-        company_ids = tuple(
-            entry.company.company_id
-            for entry in entries
-            if entry.current_snapshot_id is not None
-        )
-        loaded = await self._source.get_current_many_async(company_ids)
-        source_snapshots = tuple(
-            loaded[company_id]
-            for company_id in company_ids
-            if company_id in loaded
-        )
+        source_snapshots = await self._source.load_current_snapshots()
         fingerprint = self._builder.source_fingerprint(source_snapshots)
         current = await self.current()
         if (
@@ -93,7 +76,7 @@ class CompanyComparisonService:
             and current.snapshot.scoring_version == SCORING_VERSION
             and current.snapshot.forecast_version == FORECAST_VERSION
             and all(
-                source_cell_value(item.source_text) is not None
+                extract_resolved_cell_value(item.source_text) is not None
                 for item in current.evidence
             )
         ):

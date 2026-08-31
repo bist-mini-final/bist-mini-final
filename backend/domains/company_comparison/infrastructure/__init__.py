@@ -1,0 +1,1 @@
+"""Company-comparison infrastructure adapters."""
