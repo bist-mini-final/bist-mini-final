@@ -100,6 +100,8 @@ class RetrievalDTO(ModuleDTO):
         description="결합 검색 결과가 참조하는 원본 문서 컨텍스트"
     )
     items: List[RrfCandidateDTO] = Field(description="RRF 점수 내림차순 결합 후보")
+
+
 class RrfFusionInputDTO(ModuleInputDTO):
     bm25_result: RankedSearchResultDTO = Field(description="BM25/Sparse 서브쿼리별 후보 순위")
     dense_result: RankedSearchResultDTO = Field(description="Dense 서브쿼리별 후보 순위")
@@ -154,20 +156,14 @@ class RrfFusionModule(BaseModule):
     config_model = RrfFusionConfigDTO
     output_model = RetrievalDTO
 
-    def execute(
-        self,
+    @staticmethod
+    def _validate_contexts(
         input_data: RrfFusionInputDTO,
-        config: Optional[RrfFusionConfigDTO] = None,
-    ) -> Dict[str, Any]:
-        cfg = config or RrfFusionConfigDTO()
-
+    ) -> tuple[QueryContextDTO, DocumentContextDTO]:
         bm25_query = input_data.bm25_result.query_context
         dense_query = input_data.dense_result.query_context
         if bm25_query.question_id != dense_query.question_id:
-            raise ModuleExecutionError(
-                "BM25와 Dense 결과의 question_id가 일치하지 않습니다"
-            )
-
+            raise ModuleExecutionError("BM25와 Dense 결과의 question_id가 일치하지 않습니다")
         bm25_document = input_data.bm25_result.document_context
         dense_document = input_data.dense_result.document_context
         if (
@@ -177,48 +173,54 @@ class RrfFusionModule(BaseModule):
             raise ModuleExecutionError(
                 "BM25와 Dense 결과의 문서 또는 인덱스 컨텍스트가 일치하지 않습니다"
             )
+        return bm25_query, bm25_document
 
-        scores_by_query_cell: Dict[CandidateKey, float] = {}
-        metadata_by_query_cell: Dict[CandidateKey, Tuple[int, RankedSearchCandidateDTO]] = {}
-
-        branches = [
+    @staticmethod
+    def _fused_candidates(
+        input_data: RrfFusionInputDTO,
+        cfg: RrfFusionConfigDTO,
+    ) -> Dict[CandidateKey, tuple[float, RankedSearchCandidateDTO]]:
+        scores: Dict[CandidateKey, float] = {}
+        metadata: Dict[CandidateKey, Tuple[int, RankedSearchCandidateDTO]] = {}
+        branches = (
             (input_data.bm25_result, cfg.bm25_weight),
             (input_data.dense_result, cfg.dense_weight),
-        ]
-
+        )
         for branch, weight in branches:
             if weight <= 0:
                 continue
-            branch_ranks: Dict[CandidateKey, int] = {}
+            ranks: Dict[CandidateKey, int] = {}
             for candidate in branch.items:
-                key = (
-                    candidate.matched_subquery,
-                    candidate.index_id,
-                    candidate.cell_id,
-                )
-                previous_rank = branch_ranks.get(key)
-                if previous_rank is not None and previous_rank <= candidate.rank:
+                key = (candidate.matched_subquery, candidate.index_id, candidate.cell_id)
+                if key in ranks and ranks[key] <= candidate.rank:
                     continue
-                branch_ranks[key] = candidate.rank
-                current = metadata_by_query_cell.get(key)
+                ranks[key] = candidate.rank
+                current = metadata.get(key)
                 if current is None or candidate.rank < current[0]:
-                    metadata_by_query_cell[key] = (candidate.rank, candidate)
+                    metadata[key] = (candidate.rank, candidate)
+            for key, rank in ranks.items():
+                scores[key] = scores.get(key, 0.0) + weight / (cfg.rrf_k + rank)
+        return {key: (score, metadata[key][1]) for key, score in scores.items()}
 
-            for key, rank in branch_ranks.items():
-                scores_by_query_cell[key] = scores_by_query_cell.get(key, 0.0) + (
-                    weight / (cfg.rrf_k + rank)
-                )
+    @staticmethod
+    def _best_by_cell(
+        fused: Dict[CandidateKey, tuple[float, RankedSearchCandidateDTO]],
+    ) -> Dict[Tuple[str, str], Tuple[float, RankedSearchCandidateDTO]]:
+        best: Dict[Tuple[str, str], Tuple[float, RankedSearchCandidateDTO]] = {}
+        for (_, index_id, cell_id), value in fused.items():
+            current = best.get((index_id, cell_id))
+            if current is None or value[0] > current[0]:
+                best[(index_id, cell_id)] = value
+        return best
 
-        best_by_cell: Dict[
-            Tuple[str, str], Tuple[float, RankedSearchCandidateDTO]
-        ] = {}
-        for key, score in scores_by_query_cell.items():
-            _, index_id, cell_id = key
-            candidate = metadata_by_query_cell[key][1]
-            candidate_key = (index_id, cell_id)
-            current = best_by_cell.get(candidate_key)
-            if current is None or score > current[0]:
-                best_by_cell[candidate_key] = (score, candidate)
+    def execute(
+        self,
+        input_data: RrfFusionInputDTO,
+        config: Optional[RrfFusionConfigDTO] = None,
+    ) -> Dict[str, Any]:
+        cfg = config or RrfFusionConfigDTO()
+        bm25_query, bm25_document = self._validate_contexts(input_data)
+        best_by_cell = self._best_by_cell(self._fused_candidates(input_data, cfg))
 
         ranked = sorted(
             best_by_cell.values(),

@@ -91,8 +91,8 @@ workerJobs:
   - name: workflow-worker
     appName: workflow-worker
     queue: workflow-core
-    module: backend.engine.worker.main
-    args: ["--queue", "workflow-core"]
+    module: backend.entrypoints.worker
+    args: ["workflow", "--queue", "workflow-core"]
     activeDeadlineSeconds: 21600
     mountData: true
     query: |-
@@ -105,8 +105,8 @@ workerJobs:
   - name: bi-materialization
     appName: bi-materialization-worker
     queue: bi-materialization
-    module: backend.features.bi.materialization_worker_main
-    args: []
+    module: backend.entrypoints.worker
+    args: ["bi-materialization"]
     activeDeadlineSeconds: 21600
     mountData: false
     query: |-
@@ -118,8 +118,8 @@ workerJobs:
   - name: ingestion-embedding
     appName: ingestion-embedding-worker
     queue: ingestion-embedding
-    module: backend.storage.data_sources.embedding_shard_worker_main
-    args: []
+    module: backend.entrypoints.worker
+    args: ["ingestion-embedding"]
     activeDeadlineSeconds: 900
     mountData: true
     maxReplicaCount: 4
@@ -132,8 +132,8 @@ workerJobs:
   - name: ingestion-vector
     appName: ingestion-vector-worker
     queue: ingestion-vector
-    module: backend.storage.data_sources.vector_shard_worker_main
-    args: []
+    module: backend.entrypoints.worker
+    args: ["ingestion-vector"]
     activeDeadlineSeconds: 1800
     mountData: true
     maxReplicaCount: 2
@@ -146,8 +146,8 @@ workerJobs:
   - name: bi-question
     appName: bi-question-worker
     queue: bi-question
-    module: backend.features.bi.question_worker_main
-    args: []
+    module: backend.entrypoints.worker
+    args: ["bi-question"]
     activeDeadlineSeconds: 2700
     mountData: false
     query: |-
@@ -158,8 +158,8 @@ workerJobs:
   - name: benchmark
     appName: benchmark-worker
     queue: benchmark
-    module: backend.features.benchmark.worker_main
-    args: []
+    module: backend.entrypoints.worker
+    args: ["benchmark"]
     activeDeadlineSeconds: 21600
     mountData: true
     query: |-

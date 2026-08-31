@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Mapping, Optional,
 
 from pydantic import Field
 
-from backend.providers.openai_pricing import calculate_openai_cost
+from backend.platform.openai.pricing import calculate_openai_cost
 
 if TYPE_CHECKING:
     pass

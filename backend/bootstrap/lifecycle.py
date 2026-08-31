@@ -13,9 +13,9 @@ from zoneinfo import ZoneInfo
 from anyio import to_thread
 from fastapi import FastAPI
 
-from backend.bootstrap.container import ApplicationContainer
+from backend.bootstrap.application import ApplicationContainer
 from backend.core.settings import PROJECT_DIR
-from backend.storage.connection_pool import close_async_pool, close_pool
+from backend.platform.postgres.pool import close_async_pool, close_pool
 
 logger = logging.getLogger("backend.bootstrap.lifecycle")
 

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
-from backend.providers.openai_pricing import calculate_openai_cost
+from backend.platform.openai.pricing import calculate_openai_cost
 from modules.common.base_embedder import (
     BaseEmbeddingModule,
     EmbeddingVector,

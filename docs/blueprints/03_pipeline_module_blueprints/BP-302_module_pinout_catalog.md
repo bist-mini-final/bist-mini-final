@@ -1,7 +1,8 @@
 # [BP-302] 19개 파이프라인 모듈 핀아웃 카탈로그
 
-> **Document Code:** `BP-302` | **Category:** Pipeline Module Contracts | **Status:** Implemented & Operational
-> **Canonical Source:** [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
+> **Document Code:** `BP-302` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `modules`, `backend/domains/workflow/application`, `backend/bootstrap`
+> **Current References:** [`backend/bootstrap/module_registry.py`](../../../backend/bootstrap/module_registry.py), [`backend/bootstrap/runtime.py`](../../../backend/bootstrap/runtime.py), [`modules/registry.py`](../../../modules/registry.py), [`modules/`](../../../modules)
 
 ---
 
@@ -37,7 +38,7 @@ classDiagram
 - `BaseEmbeddingModule`은 임베딩 차원 검증과 동기·비동기 인코딩을 공유합니다.
 - 네이티브 async 구현이 없는 동기 모듈은 실행기가 worker thread에 격리합니다.
 
-## 2. 현재 등록 목록
+## 2. 공개 등록 목록
 
 | 번호 | module type | 구현 클래스·파일 | 상속 | 역할 |
 | :---: | :--- | :--- | :--- | :--- |
@@ -63,6 +64,8 @@ classDiagram
 
 정확한 Input·Config·Output JSON Schema는 실행 중인 API의 `GET /api/v1/modules`, `GET /api/v1/modules/{module_type}`, `GET /api/v1/modules/schemas`를 단일 계약으로 사용합니다. 문서에 DTO 필드를 중복 복사하지 않아 코드 변경과의 드리프트를 방지합니다.
 
+복잡한 module은 `execute()` 안에서 저장소·파일·provider 단계를 섞지 않습니다. 현재 구조 감지는 `PreparedSheet` 전처리 계약과 `SheetAnalysisBatch` 병렬 결과 계약으로 분리되고, 시트 메타데이터 저장은 대상 시트 결정 → workbook 차원 측정 → persistence record 조립 → 저장 순서를 독립 메서드로 유지합니다. 공통 상속은 `BaseModule`, `BaseLLMModule`, `BaseEmbeddingModule`처럼 실제 lifecycle과 불변식을 공유할 때만 사용합니다.
+
 ## 3. 제품 도메인 서비스와의 관계
 
 | 도메인 | 주요 서비스 | 모듈과의 관계 |
@@ -76,5 +79,18 @@ classDiagram
 
 1. 모듈 추가·삭제 시 `ModuleRegistry`, Playground 목록, API contract test와 이 문서를 같은 변경에서 갱신합니다.
 2. 신규 제품 도메인 서비스를 모듈 개수에 포함하지 않습니다.
-3. 로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다. 원격 vision 모듈과 Dense + keyword + RRF 경로가 현재 기준선입니다.
+3. 외부 vision 모듈과 Dense + keyword + RRF 경로를 현재 실행 기준선으로 유지합니다.
 4. 자동 스캔보다 명시적 factory 등록을 유지하여 provider·storage 의존성 주입과 등록 순서를 코드 리뷰 가능하게 보존합니다.
+5. `modules/documentation.py`가 Pydantic schema에서 예시와 Markdown을 생성하므로 생성 문서를 직접 수정하지 않습니다.
+
+---
+
+## 5. 소유권과 구조 완료 조건
+
+- module class, input/config/output schema와 version은 `modules/`가 소유합니다.
+- registry protocol과 execution use case는 `workflow/application`, concrete factory 등록은 `bootstrap`이 소유합니다.
+- module 자동 검색과 import side effect를 사용하지 않으며 factory가 요구하는 capability는 명시적인 port로 전달합니다.
+- 저장된 workflow가 참조하는 module type rename은 alias·migration·deprecation 기간 없이 수행하지 않습니다.
+- registry composition과 runtime 조립은 `backend/bootstrap`, registry lifecycle은 `modules/registry.py`로 이동했고 module concrete client 생성 금지 gate가 통과합니다. 이전 `backend/engine/runtime` shim도 제거됐습니다.
+- 현재 factory 등록과 이 표는 모두 19개 type이며 BI·chatbot·benchmark·company comparison 서비스는 DAG module 수에 포함하지 않습니다.
+- 공개 type, version, pin 또는 DTO schema를 바꾸면 저장 workflow 호환성, OpenAPI component, Playground adapter와 module contract test를 함께 갱신합니다.

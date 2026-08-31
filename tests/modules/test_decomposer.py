@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from backend.providers.openai_responses import OpenAIResponseResult
+from backend.platform.openai.responses import OpenAIResponseResult
 from modules.common.base_module import QueryContextDTO
 from modules.query.decomposer import (
     DecomposerConfigDTO,

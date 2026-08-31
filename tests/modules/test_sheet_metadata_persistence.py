@@ -6,7 +6,9 @@ from unittest.mock import MagicMock
 import openpyxl
 import pytest
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.exceptions import ModuleExecutionError
 from modules.storage.pgvector_index_writer import VectorIndexDTO
 from modules.storage.processed_file_selector import WorkbookSelectionDTO
@@ -29,7 +31,7 @@ def test_sheet_metadata_persistence_execution(tmp_path: Path):
     mock_db.is_connected.return_value = True
 
     module = SheetMetadataPersistenceModule(
-        db_manager=mock_db,
+        source_files=mock_db,
         catalog=WorkbookCatalog(tmp_path),
     )
     input_dto = SheetMetadataPersistenceInputDTO(
@@ -56,7 +58,7 @@ def test_sheet_metadata_persistence_execution(tmp_path: Path):
 def test_sheet_metadata_persistence_hash_mismatch(tmp_path: Path):
     mock_db = MagicMock()
     module = SheetMetadataPersistenceModule(
-        db_manager=mock_db,
+        source_files=mock_db,
         catalog=WorkbookCatalog(tmp_path),
     )
 

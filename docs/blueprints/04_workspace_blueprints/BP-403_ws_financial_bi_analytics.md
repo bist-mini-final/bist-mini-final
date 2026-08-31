@@ -1,7 +1,8 @@
 # [BP-403] Financial BI Analytics 워크스페이스
 
-> **Document Code:** `BP-403` | **Category:** Workspace & Financial Analytics | **Status:** Implemented & Operational
-> **Canonical Source:** [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
+> **Document Code:** `BP-403` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/bi`, `backend/platform/postgres`, `frontend/src/features/bi`, `frontend/src/pages`
+> **Current References:** [`backend/domains/bi/`](../../../backend/domains/bi), [`backend/bootstrap/bi.py`](../../../backend/bootstrap/bi.py), [`frontend/src/features/bi/`](../../../frontend/src/features/bi)
 
 ---
 
@@ -29,7 +30,7 @@ flowchart LR
 
 ## 2. 21개 지표 계약
 
-현재 목록은 `backend/features/bi/models.py::MetricId`와 `catalog.py::METRIC_CATALOG`가 결정합니다.
+현재 목록은 `backend/domains/bi/domain/models.py::MetricId`와 `backend/domains/bi/domain/catalog.py::METRIC_CATALOG`가 결정합니다.
 
 | 종류 | 지표 |
 | :--- | :--- |
@@ -55,6 +56,7 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 | `GET` | `/api/v1/bi/companies` | current snapshot을 가진 기업 목록 |
 | `GET` | `/api/v1/bi/materialization-candidates` | 인덱싱 완료 후 스냅샷 미생성·원본 변경·생성 실패 기업 목록 |
 | `GET` | `/api/v1/bi/companies/{company_id}/dashboard` | 현재 `BiDashboardSnapshot` 조회 |
+| `DELETE` | `/api/v1/bi/companies/{company_id}/dashboard` | 해당 기업 current BI snapshot과 대시보드 노출 제거 |
 | `POST` | `/api/v1/bi/materializations` | 신규 BI materialization 등록 |
 | `GET` | `/api/v1/bi/materializations/{job_id}` | 작업 상태 조회 |
 | `GET` | `/api/v1/bi/materializations/{job_id}/stream` | materialization SSE |
@@ -72,4 +74,17 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 3. 비교 최신 FY의 매출·영업이익·총부채·총자산·순부채와 근거가 모두 있어야 점수 계산에 포함됩니다.
 4. BI의 21개 지표 계약 변경 시 Company Comparison source fingerprint와 정책 버전을 함께 검토합니다.
 
-세부 비교 계약은 [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md)를 따릅니다.
+세부 비교 계약은 [`BP-405`](BP-405_ws_company_comparison.md)를 따릅니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- metric definition, evidence requirement와 snapshot publication policy는 BI domain/application이 소유합니다.
+- source lookup·snapshot repository·materialization adapter는 BI infrastructure, API/SSE DTO는 BI presentation, durable process는 BI workers에 둡니다.
+- Company Comparison은 BI infrastructure를 import하지 않고 BI application의 snapshot reader port만 사용합니다.
+- 계산·application port·PostgreSQL/integration adapter·API/SSE·worker가 BI vertical slice로 이동했으며 이전 feature/API 호환 경로는 제거됐습니다.
+- 구조 계약 테스트는 BI domain/application/presentation/worker가 feature·storage·platform concrete 구현을 역참조하지 못하게 하며 21개 metric 및 snapshot 회귀 계약을 함께 검증합니다.
+- BI 스냅샷 추가/삭제/refresh/reset은 각각 별도 mutation이며 UI는 진행 상태와 실패를 이전 정상 snapshot과 구분합니다.
+- BI snapshot 생성만으로 comparison head를 암묵적으로 다시 발행하지 않습니다. 비교 데이터 갱신은 BP-405의 명시적 refresh 계약을 따릅니다.
+- metric catalog, 계산식, period/evidence 상태 또는 snapshot schema를 바꾸면 policy/version, comparison source fingerprint와 API/frontend schema를 같은 변경에서 갱신합니다.

@@ -9,12 +9,12 @@ PROCESSED_DATA_DIR = PROJECT_DIR / "data" / "source_files"
 SOURCE_FILES_DIR = PROCESSED_DATA_DIR
 SPREADSHEET_ARTIFACT_DIR = PROJECT_DIR / "data" / "artifacts" / "spreadsheets"
 EMBEDDING_ARTIFACT_DIR = PROJECT_DIR / "data" / "artifacts" / "embeddings"
-VECTOR_INDEX_DIR = PROJECT_DIR / "data" / "vector_db"
 DIST_DIR = PROJECT_DIR / "dist"
 WORKFLOW_DIR = PROJECT_DIR / "data" / "workflows"
 RUN_DIR = PROJECT_DIR / "data" / "runs"
 CACHE_DIR = PROJECT_DIR / "data" / "cache"
 CHAT_UPLOAD_DIR = PROJECT_DIR / "data" / "chat_uploads"
+BENCHMARK_SET_DIR = PROJECT_DIR / "data" / "benchmark_sets"
 
 
 def _positive_int_environment(name: str, default: int) -> int:

@@ -5,8 +5,8 @@ import json
 
 import httpx
 
-from backend.providers.openai_provider import OpenAIProvider
-from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.platform.openai.provider import OpenAIProvider
+from backend.platform.openai.responses import OpenAIResponsesClient
 
 
 def test_responses_client_uses_official_structured_output_shape() -> None:

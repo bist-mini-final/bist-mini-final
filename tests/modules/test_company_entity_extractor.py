@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.providers.openai_responses import OpenAIResponseResult
+from backend.platform.openai.responses import OpenAIResponseResult
 from modules.common.exceptions import StorageError
 from modules.storage.company_entity_extractor import (
     CompanyEntityExtractorConfigDTO,

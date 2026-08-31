@@ -2,9 +2,10 @@ import json
 from decimal import Decimal
 from unittest.mock import MagicMock
 
-from backend.features.bi.evidence import source_cell_value
-from backend.features.bi.extraction import BiMetricExtractionService
-from backend.features.bi.extraction_models import (
+from backend.domains.bi.application.evidence import source_cell_value
+from backend.domains.bi.application.extraction import BiMetricExtractionService
+from backend.domains.bi.application.metric_reader import BiMetricReader
+from backend.domains.bi.domain.extraction_models import (
     BiContextCell,
     BiMetricExtractionRequest,
     BiMetricReaderResponse,
@@ -12,8 +13,7 @@ from backend.features.bi.extraction_models import (
     BiRetrievedContext,
     ReaderContractFailure,
 )
-from backend.features.bi.metric_reader import BiMetricReader
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     AmountScale,
     BiMaterializationSource,
     IndexId,

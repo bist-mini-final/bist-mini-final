@@ -7,13 +7,17 @@ from typing import Any
 
 import pytest
 
-from backend.storage.data_sources.ingestion_shards import (
+from backend.domains.data_sources.application.shard_coordinator import IngestionShardCoordinator
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.filesystem.shard_artifacts import (
+    IngestionShardArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.postgres.shards import (
     IngestionShard,
     IngestionShardPhaseSnapshot,
 )
-from backend.storage.data_sources.shard_artifacts import IngestionShardArtifactStore
-from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 
 
 class ImmediateEmbeddingRepository:

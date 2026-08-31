@@ -12,7 +12,7 @@ BENCHMARK_JOB = WorkerJobDefinition(
         "비용을 채점해 PostgreSQL 결과로 확정합니다."
     ),
     queue_name="benchmark",
-    worker_entrypoint="backend.features.benchmark.worker_main:main",
+    worker_kind="benchmark",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="benchmark",
         mount_data_volume=True,

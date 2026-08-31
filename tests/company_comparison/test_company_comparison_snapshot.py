@@ -7,9 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.contracts.snapshots import VersionedSnapshotRecord
-from backend.features.bi.materialization_models import BiCompanyIndexEntry
-from backend.features.bi.models import (
+from backend.domains.bi.domain.models import (
     AmountScale,
     AvailableObservation,
     BiCompany,
@@ -31,12 +29,14 @@ from backend.features.bi.models import (
     SnapshotStatus,
     ValueKind,
 )
-from backend.features.company_comparison.api_routes import create_company_comparison_router
-from backend.features.company_comparison.errors import ComparisonDataError
-from backend.features.company_comparison.service import CompanyComparisonService
-from backend.features.company_comparison.snapshot_builder import (
+from backend.domains.company_comparison.application import CompanyComparisonService
+from backend.domains.company_comparison.application.snapshot_builder import (
     CompanyComparisonSnapshotBuilder,
 )
+from backend.domains.company_comparison.domain.errors import ComparisonDataError
+from backend.domains.company_comparison.domain.models import CompanyComparisonSnapshot
+from backend.domains.company_comparison.presentation.routes import create_company_comparison_router
+from backend.shared.application.snapshots import VersionedSnapshotRecord
 
 
 def _snapshot(
@@ -279,6 +279,20 @@ def test_builder_drops_placeholder_source_cells_from_comparison_evidence() -> No
     assert not any(item.cell_coord == "D22" for item in result.evidence)
 
 
+def test_snapshot_contract_rejects_unresolved_period_evidence() -> None:
+    snapshot = CompanyComparisonSnapshotBuilder().build(
+        (
+            _snapshot("company-a", "Alpha", growth=Decimal("0.10"), margin=Decimal("0.20")),
+            _snapshot("company-b", "Beta", growth=Decimal("0.04"), margin=Decimal("0.12")),
+        )
+    )
+    payload = snapshot.model_dump(mode="json")
+    payload["companies"][0]["periods"][0]["evidence_ids"] = ["E99999"]
+
+    with pytest.raises(ValueError, match="period evidence ids must resolve"):
+        CompanyComparisonSnapshot.model_validate(payload)
+
+
 def test_builder_rejects_fewer_than_two_complete_companies() -> None:
     with pytest.raises(ComparisonDataError, match="최소 2개"):
         CompanyComparisonSnapshotBuilder().build(
@@ -290,18 +304,8 @@ class FakeSource:
     def __init__(self, snapshots: tuple[BiDashboardSnapshot, ...]) -> None:
         self.items = {snapshot.company.company_id: snapshot for snapshot in snapshots}
 
-    async def list_companies_async(self):
-        return tuple(
-            BiCompanyIndexEntry(
-                company=snapshot.company,
-                source=snapshot.source,
-                current_snapshot_id=snapshot.snapshot.snapshot_id,
-            )
-            for snapshot in self.items.values()
-        )
-
-    async def get_current_many_async(self, company_ids):
-        return {company_id: self.items[company_id] for company_id in company_ids}
+    async def load_current_snapshots(self) -> tuple[BiDashboardSnapshot, ...]:
+        return tuple(self.items.values())
 
 
 class MemorySnapshotRepository:

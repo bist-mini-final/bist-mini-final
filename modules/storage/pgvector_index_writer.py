@@ -45,12 +45,14 @@ from typing import Any, Dict, Optional
 from pydantic import Field
 
 from backend.core.settings import INGESTION_VECTOR_SHARD_SIZE, PROCESSED_DATA_DIR
-from backend.providers.embeddings.ports import EmbeddingEncoder
-from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
-from backend.storage.db_manager import DatabaseManager
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
-from backend.storage.pgvector_store import PGVECTOR_INSERT_BATCH_SIZE, PgVectorStore
-from backend.storage.spreadsheets.langchain_document import lazy_cell_documents
+from backend.domains.data_sources.application.shard_coordinator import IngestionShardCoordinator
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document import (
+    lazy_cell_documents,
+)
+from backend.shared.application.embeddings import EmbeddingEncoder
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,
@@ -59,8 +61,10 @@ from modules.common.base_module import (
     ModuleTaskPolicy,
 )
 from modules.embedding.cell_text_embedder import CellTextEmbeddingsDTO
+from modules.storage.ports import SourceFileRepositoryPort, VectorIngestionPort
 
 logger = logging.getLogger(__name__)
+PGVECTOR_INSERT_BATCH_SIZE = 1000
 
 
 class VectorIndexDTO(ModuleDTO):
@@ -108,14 +112,14 @@ class PgVectorIndexWriterModule(BaseModule):
     def __init__(
         self,
         artifact_store: EmbeddingArtifactStore,
-        db_manager: DatabaseManager,
-        pgvector_store: PgVectorStore,
+        source_files: SourceFileRepositoryPort,
+        pgvector_store: VectorIngestionPort,
         embedding_encoder: Optional[EmbeddingEncoder] = None,
         processed_dir: Path = PROCESSED_DATA_DIR,
         shard_coordinator: IngestionShardCoordinator | None = None,
     ) -> None:
         self.artifact_store = artifact_store
-        self.db_manager = db_manager
+        self.source_files = source_files
         self.pgvector_store = pgvector_store
         self.embedding_encoder = embedding_encoder
         self.processed_dir = processed_dir.resolve()
@@ -137,7 +141,7 @@ class PgVectorIndexWriterModule(BaseModule):
             Dict[str, Any]: Metadata for the created index, including its identifier,
                 workbook, model, embedding dimension, and document count.
         """
-        collection_name = PgVectorStore.index_id(input_data.artifact_id)
+        collection_name = f"idx_{input_data.artifact_id}"
         distributed = self.shard_coordinator is not None and self.shard_coordinator.enabled
         progress_batch_size = (
             INGESTION_VECTOR_SHARD_SIZE if distributed else PGVECTOR_INSERT_BATCH_SIZE
@@ -158,7 +162,7 @@ class PgVectorIndexWriterModule(BaseModule):
         )
 
         # 1. Save source file metadata to PostgreSQL
-        self.db_manager.save_source_file(
+        self.source_files.save_source_file(
             file_id=input_data.workbook_hash,
             file_name=input_data.file_name,
             file_hash=input_data.workbook_hash,

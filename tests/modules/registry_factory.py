@@ -6,18 +6,20 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.engine.runtime.registry import ModuleRegistry
-from backend.storage.db_manager import DatabaseManager
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
-from backend.storage.pgvector_store import PgVectorStore
+from backend.bootstrap.module_registry import ModuleRegistry
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
+from backend.domains.data_sources.infrastructure.postgres import PostgresSourceFileRepository
 
 
 def create_test_registry(
     *,
-    db_manager: Any | None = None,
+    source_files: Any | None = None,
     artifact_dir: Path | None = None,
 ) -> ModuleRegistry:
-    database = db_manager or DatabaseManager()
+    repository = source_files or PostgresSourceFileRepository()
     return ModuleRegistry(
         completion_client=MagicMock(),
         embedding_encoder=MagicMock(),
@@ -25,7 +27,7 @@ def create_test_registry(
             artifact_dir
         ) if artifact_dir is not None else EmbeddingArtifactStore(),
         pgvector_store=PgVectorStore(),
-        db_manager=database,
+        source_files=repository,
     )
 
 

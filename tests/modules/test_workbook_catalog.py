@@ -5,7 +5,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import openpyxl
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 
 
 def _remove_worksheet_dimension(path: Path) -> None:

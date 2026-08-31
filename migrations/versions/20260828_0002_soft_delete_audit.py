@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-from backend.storage.audit_schema import (
+from backend.platform.postgres.audit_schema import (
     AUDIT_SCHEMA_SQL,
     BI_COMPANY_AUDIT_SQL,
     SOURCE_FILE_AUDIT_SQL,

@@ -3,9 +3,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.engine.orchestration import CompiledTaskNode, compile_task_plan
-from backend.engine.worker.main import execute_with_policy, run_one, runtime_services
-from backend.engine.workflows.models import (
+from backend.bootstrap.application import RuntimeContainer
+from backend.domains.workflow.application.task_plan import CompiledTaskNode, compile_task_plan
+from backend.domains.workflow.domain.models import (
     CanvasPosition,
     RunBatchState,
     RunNodeState,
@@ -14,6 +14,7 @@ from backend.engine.workflows.models import (
     WorkflowRun,
     utc_now_iso,
 )
+from backend.domains.workflow.workers.main import execute_with_policy, run_one
 
 
 class WorkflowWorkerTests(unittest.TestCase):
@@ -52,24 +53,38 @@ class WorkflowWorkerTests(unittest.TestCase):
         )
 
     def test_runtime_services_initialization(self) -> None:
-        with patch("backend.storage.db_manager.DatabaseManager.is_connected", return_value=True), \
-             patch("backend.storage.db_manager.DatabaseManager.ensure_schema", return_value=True):
-            services = runtime_services()
+        with patch(
+            "backend.platform.postgres.probe.PostgresConnectionProbe.is_connected",
+            return_value=True,
+        ):
+            runtime = RuntimeContainer.create(
+                initialize_schema=False,
+                require_database=True,
+            )
+            services = runtime.services
             self.assertIsNotNone(services.module_registry)
             self.assertIsNotNone(services.workflow_executor)
             self.assertIsNotNone(services.run_store)
             self.assertTrue(services.module_registry.has("query_input"))
             self.assertTrue(services.module_registry.has("decomposer"))
+            runtime.close()
 
     def test_compile_task_plan_from_run(self) -> None:
-        with patch("backend.storage.db_manager.DatabaseManager.is_connected", return_value=True), \
-             patch("backend.storage.db_manager.DatabaseManager.ensure_schema", return_value=True):
-            services = runtime_services()
+        with patch(
+            "backend.platform.postgres.probe.PostgresConnectionProbe.is_connected",
+            return_value=True,
+        ):
+            runtime = RuntimeContainer.create(
+                initialize_schema=False,
+                require_database=True,
+            )
+            services = runtime.services
             plan = compile_task_plan(self.workflow_run, services.module_registry)
             self.assertEqual(len(plan), 1)
             self.assertIsInstance(plan[0], CompiledTaskNode)
             self.assertEqual(plan[0].node_id, "q1")
             self.assertEqual(plan[0].module_type, "query_input")
+            runtime.close()
 
     def test_execute_with_policy_success(self) -> None:
         services = MagicMock()
@@ -87,7 +102,6 @@ class WorkflowWorkerTests(unittest.TestCase):
 
     def test_run_one_returns_none_when_queue_empty(self) -> None:
         mock_services = MagicMock()
-        mock_services.db_manager.claim_next_workflow_run.return_value = None
-        with patch("backend.engine.worker.main.runtime_services", return_value=mock_services):
-            result = run_one("test-queue", "worker-1")
-            self.assertIsNone(result)
+        mock_services.workflow_runs.claim_next_workflow_run.return_value = None
+        result = run_one("test-queue", "worker-1", services=mock_services)
+        self.assertIsNone(result)

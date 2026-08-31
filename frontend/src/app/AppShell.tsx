@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
+  Bell,
   BookOpen,
   Menu,
+  MessageSquarePlus,
   PanelLeftClose,
   PanelLeftOpen,
-  Workflow,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { ChatSessionSidebar } from '../features/chatbot/ChatSessionSidebar';
+import { useChatWorkspace } from '../features/chatbot/ChatWorkspaceProvider';
 import { CellEvidenceProvider } from '../shared/evidence/CellEvidenceProvider';
-import { Button, IconButton } from '../shared/ui';
+import { ConfirmDialog, IconButton, PromptDialog } from '../shared/ui';
 import { useFocusTrap } from '../shared/ui/useFocusTrap';
 import type { AppRoute } from './routes';
 import { APP_ROUTES } from './routes';
-import { AppLink } from './router';
-import { SIDEBAR_CONTEXT_SLOT_ID } from './SidebarContextPortal';
+import { AppLink, navigateTo } from './router';
 
 interface AppShellProps {
   activeRoute?: AppRoute;
@@ -24,6 +27,7 @@ interface AppShellProps {
 
 const SIDEBAR_STORAGE_KEY = 'rag-flow:sidebar-collapsed';
 const SYSTEM_ROUTE_PATHS = new Set(['/jobs', '/settings']);
+const TOP_ACTION_ROUTE_PATHS = new Set(['/chatbot']);
 
 function preloadRoute(route: AppRoute): void {
   if (!route.preload) return;
@@ -31,7 +35,9 @@ function preloadRoute(route: AppRoute): void {
 }
 
 export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
+  const chat = useChatWorkspace();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const mobileTriggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -46,6 +52,7 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
   });
 
   const toggleSidebar = () => {
+    setIsNotificationOpen(false);
     setIsSidebarCollapsed((prev) => {
       const next = !prev;
       try {
@@ -59,11 +66,32 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
 
   const isFullBleedPage = activeRoute?.path === '/playground';
   const isWorkspacePage = activeRoute?.path === '/chatbot';
-  const hasSidebarContext = activeRoute?.path === '/chatbot';
+
+  const startNewChat = () => {
+    chat.newSession();
+    setIsMobileNavOpen(false);
+    navigateTo('/chatbot');
+  };
+
+  const selectChatSession = (sessionId: string) => {
+    setIsMobileNavOpen(false);
+    navigateTo('/chatbot');
+    void chat.selectSession(sessionId);
+  };
 
   useEffect(() => {
     setIsMobileNavOpen(false);
+    setIsNotificationOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isNotificationOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsNotificationOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [isNotificationOpen]);
 
   useEffect(() => {
     if (previousPathRef.current === pathname) return;
@@ -87,51 +115,103 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
 
   return (
     <CellEvidenceProvider>
-      <div className={clsx('product-shell', isSidebarCollapsed && 'product-shell--collapsed')}>
-      <IconButton
-        ref={mobileTriggerRef}
-        className="product-mobile-trigger"
-        variant="secondary"
-        type="button"
-        onClick={() => setIsMobileNavOpen(true)}
-        aria-label="메뉴 열기"
-        aria-controls="product-sidebar"
-        aria-expanded={isMobileNavOpen}
-      >
-        <Menu size={19} />
-      </IconButton>
+      <div className="product-shell">
+        <IconButton
+          ref={mobileTriggerRef}
+          className="product-mobile-trigger"
+          variant="secondary"
+          type="button"
+          onClick={() => setIsMobileNavOpen(true)}
+          aria-label="메뉴 열기"
+          aria-controls="product-sidebar"
+          aria-expanded={isMobileNavOpen}
+        >
+          <Menu size={19} />
+        </IconButton>
 
-      <aside
-        ref={sidebarRef}
-        id="product-sidebar"
-        className={clsx(
-          'product-sidebar',
-          isSidebarCollapsed && 'product-sidebar--collapsed',
-          isMobileNavOpen && 'product-sidebar--open',
-          hasSidebarContext && 'product-sidebar--with-context',
-        )}
-        aria-label="서비스 내비게이션"
-        role={isMobileNavOpen ? 'dialog' : undefined}
-        aria-modal={isMobileNavOpen || undefined}
-        tabIndex={isMobileNavOpen ? -1 : undefined}
-      >
+        <aside
+          ref={sidebarRef}
+          id="product-sidebar"
+          className={clsx(
+            'product-sidebar',
+            isSidebarCollapsed && 'product-sidebar--collapsed',
+            isMobileNavOpen && 'product-sidebar--open',
+          )}
+          aria-label="서비스 내비게이션"
+          role={isMobileNavOpen ? 'dialog' : undefined}
+          aria-modal={isMobileNavOpen || undefined}
+          tabIndex={isMobileNavOpen ? -1 : undefined}
+        >
         <div className="product-brand">
-          <AppLink to="/" className="product-brand__link" title="RAG Flow 홈">
-            <span className="product-brand__mark" aria-hidden="true">
-              <Workflow size={18} strokeWidth={2.2} />
-            </span>
+          <AppLink to="/chatbot" className="product-brand__link" title="Excel RAG">
             <span className="product-brand__copy">
-              <strong>RAG Flow</strong>
-              <small>AI Workspace</small>
+              <strong>Excel RAG</strong>
             </span>
           </AppLink>
+          <div className="product-brand__actions">
+            <IconButton
+              className="product-brand__notification"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsNotificationOpen((open) => !open)}
+              aria-label="알림"
+              aria-expanded={isNotificationOpen}
+              title="알림"
+            >
+              <Bell size={16} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              className="product-sidebar__collapse-btn"
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidebar}
+              aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+              title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            >
+              {isSidebarCollapsed
+                ? <PanelLeftOpen size={16} aria-hidden="true" />
+                : <PanelLeftClose size={16} aria-hidden="true" />}
+            </IconButton>
+            <IconButton
+              className="product-sidebar__close"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMobileNavOpen(false)}
+              aria-label="메뉴 닫기"
+            >
+              <X size={17} aria-hidden="true" />
+            </IconButton>
+          </div>
+          {isNotificationOpen && (
+            <div className="product-brand__notification-popover" role="status">
+              <strong>알림</strong>
+              <span>새 알림이 없습니다.</span>
+            </div>
+          )}
         </div>
 
-        <div className="product-sidebar__divider" />
+        <button
+          type="button"
+          className={clsx(
+            'product-nav__item',
+            'product-nav__item--new-chat',
+            activeRoute?.path === '/chatbot' && 'is-active',
+          )}
+          onClick={startNewChat}
+          disabled={chat.isRunning}
+          aria-current={activeRoute?.path === '/chatbot' ? 'page' : undefined}
+          title="새 채팅"
+        >
+          <MessageSquarePlus size={18} strokeWidth={1.9} aria-hidden="true" />
+          <span className="product-nav__label">새 채팅</span>
+        </button>
+
+        <div className="product-sidebar__divider product-sidebar__primary-divider" />
 
         <nav className="product-nav" aria-label="주요 메뉴">
-          {/* <span className="product-nav__caption">WORKSPACE</span> */}
-          {APP_ROUTES.filter((route) => !SYSTEM_ROUTE_PATHS.has(route.path)).map((route) => {
+          {APP_ROUTES.filter((route) => (
+            !SYSTEM_ROUTE_PATHS.has(route.path) && !TOP_ACTION_ROUTE_PATHS.has(route.path)
+          )).map((route) => {
             const Icon = route.icon;
             const isActive = route.path === activeRoute?.path;
             return (
@@ -155,16 +235,17 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
           })}
         </nav>
 
-        {hasSidebarContext && (
-          <>
-            <div className="product-sidebar__divider product-sidebar__context-divider" />
-            <div
-              id={SIDEBAR_CONTEXT_SLOT_ID}
-              className="product-sidebar__context"
-              aria-label="챗봇 대화 탐색"
-            />
-          </>
-        )}
+        <div className="product-sidebar__divider product-sidebar__context-divider" />
+        <div className="product-sidebar__context" aria-label="챗봇 대화 탐색">
+          <ChatSessionSidebar
+            sessions={chat.sessions}
+            activeSessionId={chat.active?.id}
+            disabled={chat.isRunning}
+            onSelectSession={selectChatSession}
+            onRenameSession={chat.requestRename}
+            onDeleteSession={chat.requestDelete}
+          />
+        </div>
 
         <div className="product-sidebar__spacer" />
 
@@ -204,54 +285,62 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
             <ArrowUpRight className="product-sidebar__docs-arrow" size={14} aria-hidden="true" />
           </a>
 
-          <Button
-            className="product-sidebar__toggle-footer"
-            variant="ghost"
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            title={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-          >
-            {isSidebarCollapsed ? (
-              <PanelLeftOpen size={17} aria-hidden="true" />
-            ) : (
-              <>
-                <PanelLeftClose size={17} aria-hidden="true" />
-                <span>사이드바 접기</span>
-              </>
-            )}
-          </Button>
         </nav>
-      </aside>
+        </aside>
 
-      {isMobileNavOpen && (
-        <button
-          className="product-sidebar-backdrop"
-          type="button"
-          onClick={() => setIsMobileNavOpen(false)}
-          aria-label="메뉴 닫기"
+        {isMobileNavOpen && (
+          <button
+            className="product-sidebar-backdrop"
+            type="button"
+            onClick={() => setIsMobileNavOpen(false)}
+            aria-label="메뉴 닫기"
+          />
+        )}
+
+        <main
+          ref={mainRef}
+          tabIndex={-1}
+          className={clsx(
+            'product-page',
+            isFullBleedPage && 'product-page--playground'
+          )}
+        >
+          {isFullBleedPage ? children : (
+            <div
+              className={clsx(
+                'product-page__viewport',
+                isWorkspacePage && 'product-page__viewport--workspace',
+              )}
+            >
+              {children}
+            </div>
+          )}
+        </main>
+
+        <ConfirmDialog
+          open={chat.dialog?.type === 'delete'}
+          tone="danger"
+          title="대화를 삭제하시겠습니까?"
+          description="대화와 포함된 모든 메시지가 영구 삭제됩니다."
+          detail={chat.dialog?.type === 'delete' ? chat.dialog.session.title : undefined}
+          confirmLabel="대화 삭제"
+          busy={chat.isDialogBusy}
+          error={chat.dialogError}
+          onClose={chat.closeDialog}
+          onConfirm={() => { void chat.deleteSession(); }}
         />
-      )}
-
-      <main
-        ref={mainRef}
-        tabIndex={-1}
-        className={clsx(
-          'product-page',
-          isFullBleedPage && 'product-page--playground'
-        )}
-      >
-        {isFullBleedPage ? children : (
-          <div
-            className={clsx(
-              'product-page__viewport',
-              isWorkspacePage && 'product-page__viewport--workspace',
-            )}
-          >
-            {children}
-          </div>
-        )}
-      </main>
+        <PromptDialog
+          open={chat.dialog?.type === 'rename'}
+          title="대화 이름 변경"
+          description="사이드바에서 구분하기 쉬운 이름을 입력하세요."
+          label="대화 이름"
+          initialValue={chat.dialog?.type === 'rename' ? chat.dialog.session.title : ''}
+          confirmLabel="이름 변경"
+          busy={chat.isDialogBusy}
+          error={chat.dialogError}
+          onClose={chat.closeDialog}
+          onConfirm={(title) => { void chat.renameSession(title); }}
+        />
       </div>
     </CellEvidenceProvider>
   );

@@ -1,12 +1,23 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ChatWorkspaceProvider } from '../../features/chatbot/ChatWorkspaceProvider';
 import { AppShell } from '../AppShell';
 import { APP_ROUTES } from '../routes';
-import { SidebarContextPortal } from '../SidebarContextPortal';
+
+vi.mock('../../features/chatbot/chatApi', () => ({
+  chatApi: {
+    list: vi.fn().mockResolvedValue({ sessions: [] }),
+    suggestions: vi.fn().mockResolvedValue({ questions: [] }),
+  },
+}));
+
+function renderShell(shell: React.ReactElement) {
+  return render(<ChatWorkspaceProvider>{shell}</ChatWorkspaceProvider>);
+}
 
 describe('AppShell sidebar navigation', () => {
   it('places jobs with the bottom system routes', () => {
-    render(
+    renderShell(
       <AppShell pathname="/">
         <div>content</div>
       </AppShell>,
@@ -24,7 +35,7 @@ describe('AppShell sidebar navigation', () => {
   it('wraps document routes in the shared page viewport', () => {
     const dashboardRoute = APP_ROUTES.find((route) => route.path === '/dashboard');
 
-    render(
+    renderShell(
       <AppShell activeRoute={dashboardRoute} pathname="/dashboard">
         <div data-testid="dashboard-content">content</div>
       </AppShell>,
@@ -37,7 +48,7 @@ describe('AppShell sidebar navigation', () => {
   it('keeps the playground canvas full bleed', () => {
     const playgroundRoute = APP_ROUTES.find((route) => route.path === '/playground');
 
-    render(
+    renderShell(
       <AppShell activeRoute={playgroundRoute} pathname="/playground">
         <div data-testid="playground-content">canvas</div>
       </AppShell>,
@@ -49,44 +60,59 @@ describe('AppShell sidebar navigation', () => {
       .not.toHaveClass('product-page__viewport');
   });
 
-  it('shows chatbot-owned controls below the primary navigation', () => {
+  it('places the global new-chat action above features and history below them', () => {
     const chatbotRoute = APP_ROUTES.find((route) => route.path === '/chatbot');
 
-    render(
+    renderShell(
       <AppShell activeRoute={chatbotRoute} pathname="/chatbot">
-        <SidebarContextPortal>
-          <button type="button">새 대화</button>
-        </SidebarContextPortal>
+        <div>chat</div>
       </AppShell>,
     );
 
+    const newChat = screen.getByRole('button', { name: '새 채팅' });
+    const primaryNavigation = screen.getByRole('navigation', { name: '주요 메뉴' });
     const sidebarContext = screen.getByLabelText('챗봇 대화 탐색');
+    expect(newChat.nextElementSibling).toHaveClass('product-sidebar__primary-divider');
+    expect(primaryNavigation.nextElementSibling)
+      .toHaveClass('product-sidebar__context-divider');
     expect(sidebarContext.previousElementSibling)
       .toHaveClass('product-sidebar__context-divider');
-    expect(within(sidebarContext).getByRole('button', { name: '새 대화' }))
-      .toBeInTheDocument();
+    expect(within(sidebarContext).getByText('대화 이력')).toBeInTheDocument();
+  });
+
+  it('keeps conversation history available outside the chat route', () => {
+    const dashboardRoute = APP_ROUTES.find((route) => route.path === '/dashboard');
+
+    renderShell(
+      <AppShell activeRoute={dashboardRoute} pathname="/dashboard">
+        <div>dashboard</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByLabelText('챗봇 대화 탐색')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '새 채팅' })).toBeInTheDocument();
   });
 
   it('preloads a lazy route when navigation intent is detected', () => {
-    const chatbotRoute = APP_ROUTES.find((route) => route.path === '/chatbot');
-    expect(chatbotRoute).toBeDefined();
-    if (!chatbotRoute) return;
+    const playgroundRoute = APP_ROUTES.find((route) => route.path === '/playground');
+    expect(playgroundRoute).toBeDefined();
+    if (!playgroundRoute) return;
 
-    const originalPreload = chatbotRoute.preload;
+    const originalPreload = playgroundRoute.preload;
     const preload = vi.fn().mockResolvedValue(undefined);
-    chatbotRoute.preload = preload;
+    playgroundRoute.preload = preload;
 
     try {
-      render(
+      renderShell(
         <AppShell pathname="/">
           <div>content</div>
         </AppShell>,
       );
 
-      fireEvent.mouseEnter(screen.getByRole('link', { name: 'AI 챗봇' }));
+      fireEvent.mouseEnter(screen.getByRole('link', { name: '플레이그라운드' }));
       expect(preload).toHaveBeenCalledOnce();
     } finally {
-      chatbotRoute.preload = originalPreload;
+      playgroundRoute.preload = originalPreload;
     }
   });
 });

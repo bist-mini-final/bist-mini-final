@@ -44,8 +44,9 @@ from typing import Any, ClassVar, Dict, List, Literal, Optional
 import openpyxl
 from pydantic import BaseModel, Field, model_validator
 
-from backend.storage.pgvector_store import PgVectorStore
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.base_llm import (
     BaseLLMModule,
     ModuleConfigDTO,
@@ -56,6 +57,7 @@ from modules.common.base_llm import (
 from modules.common.config import DEFAULT_ENTITY_EXTRACTOR_MODEL
 from modules.common.exceptions import ProviderApiError, StorageError
 from modules.storage.pgvector_index_writer import VectorIndexDTO
+from modules.storage.ports import IndexCompanyWriterPort
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +163,7 @@ class CompanyEntityExtractorModule(BaseLLMModule):
     def __init__(
         self,
         completion_client: Any,
-        pgvector_store: PgVectorStore,
+        pgvector_store: IndexCompanyWriterPort,
         catalog: WorkbookCatalog,
     ) -> None:
         super().__init__(completion_client=completion_client)

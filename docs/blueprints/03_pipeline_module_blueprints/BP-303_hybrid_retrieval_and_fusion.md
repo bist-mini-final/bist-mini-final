@@ -1,6 +1,7 @@
 # [BP-303] Dense + Sparse + RRF 융합 & 셀 확장 회로
-> **Document Code:** `BP-303` | **Category:** Retrieval & Fusion Blueprint | **Status:** Approved Baseline  
-> **Source Files:** [`modules/retrieval/pgvector_retriever.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/pgvector_retriever.py), [`modules/retrieval/postgres_native_keyword_retriever.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/postgres_native_keyword_retriever.py), [`modules/retrieval/rrf_fusion.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/rrf_fusion.py), [`modules/retrieval/context_expander.py`](file:///c:/Repos/bist-mini-final/modules/retrieval/context_expander.py)
+> **Document Code:** `BP-303` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `modules/retrieval`, `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/postgres`, `backend/platform/pgvector`
+> **Current References:** [`modules/retrieval/pgvector_retriever.py`](../../../modules/retrieval/pgvector_retriever.py), [`modules/retrieval/postgres_native_keyword_retriever.py`](../../../modules/retrieval/postgres_native_keyword_retriever.py), [`modules/retrieval/rrf_fusion.py`](../../../modules/retrieval/rrf_fusion.py), [`modules/retrieval/context_expander.py`](../../../modules/retrieval/context_expander.py)
 
 ---
 
@@ -13,7 +14,7 @@
 ```mermaid
 flowchart TD
     QUERY["사용자 질의 (User Financial Query)"] --> SCOPE["PgVectorDataScopeModule (기업/시트/연도 필터 생성)"]
-    
+
     subgraph ParallelRetrieval ["병렬 검색 계층 (Parallel Retrieval Layer)"]
         SCOPE --> DENSE["1. PgVectorRetrieverModule<br>(3072d Cosine Similarity ANN)"]
         SCOPE --> SPARSE["2. PostgresNativeKeywordRetrieverModule<br>(TSVector BM25 Full-Text Search)"]
@@ -21,7 +22,7 @@ flowchart TD
 
     DENSE -->|Ranked Dense Candidates| RRF["3. RrfFusionModule<br>(Reciprocal Rank Fusion, k=60)"]
     SPARSE -->|Ranked Sparse Candidates| RRF
-    
+
     RRF -->|Top-K Fused Candidates| EXPAND["4. PgContextExpanderModule<br>(2D 그리드 셀 좌표 기반 Row/Table 확장)"]
     EXPAND --> READER["ReaderModule (LLM 수식 검증 및 답변 생성)"]
 ```
@@ -53,7 +54,7 @@ $$
 ```mermaid
 graph TD
     TARGET["Retrieved Top-K Cell: samsung:포괄손익계산서:C15 (영업이익: 6,567,200)"]
-    
+
     subgraph ContextExpansion ["2D Grid Context Expansion Engine"]
         HDR["1. 상위 열 헤더 복원 (제 55기, 2023.12)"]
         STUB["2. 좌측 행 계층 경로 복원 (영업수익 > 매출총이익 > 영업이익)"]
@@ -80,14 +81,24 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 
 ---
 
-## 4. 리팩토링 타깃 (Refactoring Targets)
+## 4. 범위와 구현 결정
 
-1. **Cross-Encoder Re-ranker — 범위 제외 (Out of Scope)**:
-   - 검색 순위는 pgvector Dense 검색, BM25 Sparse 검색, RRF 융합의 현재 경로를 기준선으로 유지한다.
-   - `bge-reranker-large`, Cohere Re-rank 등 별도 재순위 모델의 추가·운영은 이 프로젝트의 구현 범위에 포함하지 않는다.
-2. **동적 윈도우 크기(Adaptive Window Sizing)**:
-   - 고정된 $\pm 3$행 확장이 아닌, Luna VLM이 감지한 `data_range` 경계 내에서만 스마트하게 확장하여 토큰 낭비 방지.
-3. **구현됨 — 비동기 검색 및 2D 컨텍스트 확장**:
+1. **구현됨 — 명시적 bounded row expansion**:
+   - 기본은 검색된 단일 행의 실제 값 셀을 복원하고 `adjacent_radius`를 지정한 경우에만 최대 20행 반경으로 확장합니다. 문서에 과거 기재된 고정 $\pm 3$행 동작은 현재 계약이 아닙니다.
+   - 현재 persisted cell metadata에는 versioned `table_id`와 `data_range`가 없으므로 런타임이 표 범위를 추정해 임의로 잘라내지 않습니다. adaptive table window가 필요해지면 serializer metadata schema, 기존 collection 재적재, retrieval contract를 함께 버전 변경합니다.
+2. **구현됨 — 비동기 검색 및 2D 컨텍스트 확장**:
    - Dense와 keyword 검색은 `AsyncConnectionPool`을 사용하고 동일 배치에서 `TaskGroup`으로 병렬 실행합니다.
    - Context Expander는 검색 후보를 컬렉션·시트별 행 집합으로 묶어 `fetch_rows_cells_async()`를 병렬 호출합니다. 동기·비동기 경로는 동일한 정규화·중복 제거·출력 렌더러를 공유합니다.
    - Reader의 `lookup_cell_metadata` 도구도 LangChain `ainvoke()`에서 `fetch_cells_by_metadata_async()`를 직접 await하므로 도구 반복 중 이벤트 루프를 차단하지 않습니다.
+
+---
+
+## 5. 책임 분리와 구조 완료 조건
+
+- query normalization, candidate와 evidence DTO, 실제 값만 Reader로 전달하는 정책은 data sources application contract로 둡니다.
+- Dense/keyword SQL과 cell expansion mapping은 `data_sources/infrastructure/postgres`, 범용 vector connection·codec은 `platform/pgvector`가 소유합니다.
+- retrieval module은 각 capability port를 호출하고 RRF처럼 순수한 결합 알고리즘은 module 내부에서 provider 독립적으로 유지합니다.
+- `Cell Value: ?` 후보는 retrieval recall에는 남기되 Reader input projection에서는 값 존재 여부를 공통 정책으로 강제합니다.
+- module의 legacy storage facade import는 제거됐고 Dense/keyword/context expansion은 data-source retrieval port를 통해 같은 sync/async 정규화 계약을 사용합니다.
+- 검색 기준선은 Dense + PostgreSQL keyword + RRF(`k=60`) + 2D context expansion입니다.
+- 검색 recall 단계의 `?`와 Reader evidence 단계의 실제 값 필터는 서로 다른 의도적 계약입니다. 어느 한쪽을 바꾸면 BP-201·BP-404와 검색/근거 회귀 테스트를 함께 갱신합니다.

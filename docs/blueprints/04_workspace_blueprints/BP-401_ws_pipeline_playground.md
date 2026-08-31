@@ -1,6 +1,7 @@
 # [BP-401] Pipeline Playground 워크스페이스
-> **Document Code:** `BP-401` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/), [`frontend/src/pages/PlaygroundPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx), [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py)
+> **Document Code:** `BP-401` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/workflow/presentation`, `backend/domains/workflow/application`, `frontend/src/features/playground`, `frontend/src/pages`
+> **Current References:** [`frontend/src/features/playground/`](../../../frontend/src/features/playground), [`frontend/src/pages/PlaygroundPage.tsx`](../../../frontend/src/pages/PlaygroundPage.tsx), [`backend/domains/workflow/presentation/routes.py`](../../../backend/domains/workflow/presentation/routes.py)
 
 ---
 
@@ -40,9 +41,9 @@ flowchart LR
 
 ---
 
-## 4. 현재 19개 module
+## 4. 등록 module catalog
 
-정확한 type 목록과 pin 계약은 [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 사용합니다. 과거 UI 문서에 있던 `MultiQueryExpander`, `SparseBm25Retriever`, `AgenticReasoner`, `FactChecker`, `ConfidenceScorer` 등은 현재 registry type이 아닙니다.
+정확한 type 목록과 pin 계약은 [`BP-302`](../03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 사용합니다. 과거 UI 문서에 있던 `MultiQueryExpander`, `SparseBm25Retriever`, `AgenticReasoner`, `FactChecker`, `ConfidenceScorer` 등은 현재 registry type이 아닙니다.
 
 ---
 
@@ -53,3 +54,15 @@ flowchart LR
 - trace는 output 전체를 무조건 polling하지 않고 backend summary projection을 사용합니다.
 - 실행 취소는 `POST /api/v1/runs/{run_id}/cancel`, 재개는 `/resume`으로 요청합니다.
 - 캐시 정리는 별도 `DELETE /api/v1/cache` 계약을 사용합니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- frontend feature는 편집 state, canvas, module catalog, run monitor를 소유하고 backend DTO를 runtime schema로 검증합니다.
+- workflow presentation은 route·schema·SSE projection만 제공하고 DAG 검증·실행 판단은 application command/query로 위임합니다.
+- module 설정 panel은 registry schema와 현재 run projection을 사용하며 DB/provider 내부 schema를 노출하지 않습니다.
+- workflow HTTP 책임은 domain presentation으로 이동했고 page는 feature 조립만 수행합니다. 공개 workflow/OpenAPI/Playground 계약 테스트가 이 경계를 고정합니다.
+- module 설정 modal은 왼쪽 Input DTO, 가운데 Config DTO, 오른쪽 현재 Output DTO를 표시하고 cache/history가 아닌 선택 node의 현재 실행 상태를 관찰합니다.
+- 실행 중 edge는 backend node 상태 projection으로 animation을 표시하며 SSE 단절 시 REST snapshot으로 복구합니다.
+- catalog/pin/run state를 바꾸면 BP-301·BP-302·BP-501·BP-502와 Playground schema/edge/settings tests를 함께 갱신합니다.
