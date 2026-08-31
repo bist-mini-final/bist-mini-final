@@ -8,8 +8,9 @@ from typing import Any, Sequence
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.job_routes import create_job_router
-from backend.providers.kubernetes_monitor import KubernetesMonitor
+from backend.domains.operations.application import OperationsQueryService
+from backend.domains.operations.infrastructure import KubernetesMonitor
+from backend.domains.operations.presentation import create_job_router
 
 
 class FakeQueueReader:
@@ -115,7 +116,11 @@ def test_jobs_endpoint_is_get_only(monkeypatch: Any) -> None:
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     app = FastAPI()
     app.include_router(
-        create_job_router(KubernetesMonitor(command_runner=_runner, cache_seconds=0))
+        create_job_router(
+            OperationsQueryService(
+                KubernetesMonitor(command_runner=_runner, cache_seconds=0)
+            )
+        )
     )
     client = TestClient(app)
 
