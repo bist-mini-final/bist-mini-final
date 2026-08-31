@@ -27,17 +27,13 @@ def _has_value(value: Any) -> bool:
     return value is not None and (not isinstance(value, str) or bool(value.strip()))
 
 
-def occupied_cells(
+def _direct_occupied_cells(
     worksheet,
-    max_rows: int,
-    max_columns: int,
+    visibility: WorksheetVisibility,
+    row_limit: int,
+    column_limit: int,
 ) -> Set[Coordinate]:
-    """Build the non-empty grid used by the PDF's four-neighbour BFS."""
-
-    row_limit = min(worksheet.max_row or 1, max_rows)
-    column_limit = min(worksheet.max_column or 1, max_columns)
     occupied: Set[Coordinate] = set()
-    visibility = WorksheetVisibility.from_worksheet(worksheet)
     for row in range(1, row_limit + 1):
         if visibility.row_hidden(row):
             continue
@@ -45,13 +41,18 @@ def occupied_cells(
             if visibility.column_hidden(column):
                 continue
             cell = worksheet.cell(row=row, column=column)
-            if cell.data_type == "e":
-                continue
-            if _has_value(cell.value):
+            if cell.data_type != "e" and _has_value(cell.value):
                 occupied.add((row, column))
+    return occupied
 
-    # A merged title/header is one semantic cell spanning the whole merge range.
-    # Marking its covered coordinates keeps BFS geometry faithful to Excel.
+
+def _merged_occupied_cells(
+    worksheet,
+    visibility: WorksheetVisibility,
+    row_limit: int,
+    column_limit: int,
+) -> Set[Coordinate]:
+    occupied: Set[Coordinate] = set()
     for merged_range in worksheet.merged_cells.ranges:
         if merged_range.min_row > row_limit or merged_range.min_col > column_limit:
             continue
@@ -70,6 +71,29 @@ def occupied_cells(
                 if not visibility.column_hidden(column):
                     occupied.add((row, column))
     return occupied
+
+
+def occupied_cells(
+    worksheet,
+    max_rows: int,
+    max_columns: int,
+) -> Set[Coordinate]:
+    """Build the non-empty grid used by the PDF's four-neighbour BFS."""
+
+    row_limit = min(worksheet.max_row or 1, max_rows)
+    column_limit = min(worksheet.max_column or 1, max_columns)
+    visibility = WorksheetVisibility.from_worksheet(worksheet)
+    return _direct_occupied_cells(
+        worksheet,
+        visibility,
+        row_limit,
+        column_limit,
+    ) | _merged_occupied_cells(
+        worksheet,
+        visibility,
+        row_limit,
+        column_limit,
+    )
 
 
 def connected_components(occupied: Set[Coordinate]) -> List[Set[Coordinate]]:
@@ -310,6 +334,80 @@ def _merge_origin_map(worksheet) -> Dict[Coordinate, Tuple[int, int, int, int]]:
     return origins
 
 
+def _header_node(
+    worksheet,
+    visibility: WorksheetVisibility,
+    merge_origins: Dict[Coordinate, Tuple[int, int, int, int]],
+    bounds: CellBounds,
+    header_end_row: int,
+    data_start_column: int,
+    row: int,
+    column: int,
+) -> Dict[str, Any] | None:
+    cell = worksheet.cell(row=row, column=column)
+    if isinstance(cell, MergedCell) or not _has_value(cell.value):
+        return None
+    merged = merge_origins.get((row, column), (row, row, column, column))
+    visible_columns = [
+        candidate
+        for candidate in range(
+            max(data_start_column, merged[2]),
+            min(bounds.max_column, merged[3]) + 1,
+        )
+        if not visibility.column_hidden(candidate)
+    ]
+    visible_rows = [
+        candidate
+        for candidate in range(row, min(header_end_row, merged[1]) + 1)
+        if not visibility.row_hidden(candidate)
+    ]
+    if not visible_columns or not visible_rows:
+        return None
+    return {
+        "name": str(cell.value).strip(),
+        "col_start": visible_columns[0],
+        "col_end": visible_columns[-1],
+        "row_start": row,
+        "row_end": visible_rows[-1],
+        "children": [],
+        "parent": None,
+    }
+
+
+def _attach_header_parents(nodes: List[Dict[str, Any]]) -> None:
+    nodes.sort(key=lambda node: (node["row_start"], node["col_start"], node["col_end"]))
+    for child in nodes:
+        parents = [
+            candidate
+            for candidate in nodes
+            if candidate["row_start"] < child["row_start"]
+            and candidate["col_start"] <= child["col_start"]
+            and candidate["col_end"] >= child["col_end"]
+        ]
+        if not parents:
+            continue
+        parent = max(
+            parents,
+            key=lambda candidate: (
+                candidate["row_start"],
+                -(candidate["col_end"] - candidate["col_start"]),
+            ),
+        )
+        child["parent"] = parent
+        parent["children"].append(child)
+
+
+def _serialize_header_node(node: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "name": node["name"],
+        "col_start": node["col_start"],
+        "col_end": node["col_end"],
+        "row_start": node["row_start"],
+        "row_end": node["row_end"],
+        "children": [_serialize_header_node(child) for child in node["children"]],
+    }
+
+
 def build_column_header_tree(
     worksheet,
     bounds: CellBounds,
@@ -330,66 +428,18 @@ def build_column_header_tree(
         for column in range(data_start_column, bounds.max_column + 1):
             if visibility.column_hidden(column):
                 continue
-            cell = worksheet.cell(row=row, column=column)
-            if isinstance(cell, MergedCell) or not _has_value(cell.value):
-                continue
-            merged = merge_origins.get((row, column), (row, row, column, column))
-            visible_columns = [
-                candidate
-                for candidate in range(
-                    max(data_start_column, merged[2]),
-                    min(bounds.max_column, merged[3]) + 1,
-                )
-                if not visibility.column_hidden(candidate)
-            ]
-            visible_rows = [
-                candidate
-                for candidate in range(row, min(header_end_row, merged[1]) + 1)
-                if not visibility.row_hidden(candidate)
-            ]
-            if not visible_columns or not visible_rows:
-                continue
-            mutable_nodes.append(
-                {
-                    "name": str(cell.value).strip(),
-                    "col_start": visible_columns[0],
-                    "col_end": visible_columns[-1],
-                    "row_start": row,
-                    "row_end": visible_rows[-1],
-                    "children": [],
-                    "parent": None,
-                }
+            node = _header_node(
+                worksheet,
+                visibility,
+                merge_origins,
+                bounds,
+                header_end_row,
+                data_start_column,
+                row,
+                column,
             )
+            if node is not None:
+                mutable_nodes.append(node)
 
-    mutable_nodes.sort(key=lambda node: (node["row_start"], node["col_start"], node["col_end"]))
-    for child in mutable_nodes:
-        parents = [
-            candidate
-            for candidate in mutable_nodes
-            if candidate["row_start"] < child["row_start"]
-            and candidate["col_start"] <= child["col_start"]
-            and candidate["col_end"] >= child["col_end"]
-        ]
-        if not parents:
-            continue
-        parent = max(
-            parents,
-            key=lambda candidate: (
-                candidate["row_start"],
-                -(candidate["col_end"] - candidate["col_start"]),
-            ),
-        )
-        child["parent"] = parent
-        parent["children"].append(child)
-
-    def serialize(node: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "name": node["name"],
-            "col_start": node["col_start"],
-            "col_end": node["col_end"],
-            "row_start": node["row_start"],
-            "row_end": node["row_end"],
-            "children": [serialize(child) for child in node["children"]],
-        }
-
-    return [serialize(node) for node in mutable_nodes if node["parent"] is None]
+    _attach_header_parents(mutable_nodes)
+    return [_serialize_header_node(node) for node in mutable_nodes if node["parent"] is None]

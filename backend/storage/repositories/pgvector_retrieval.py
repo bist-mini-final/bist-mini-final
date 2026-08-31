@@ -403,15 +403,7 @@ class PgVectorRetrievalMixin(PgVectorConnectionCapability):
             ) from error
 
     @staticmethod
-    def _cell_metadata_query(
-        *,
-        clean_ids: Sequence[str],
-        workbook_hash: Optional[str],
-        company_name: Optional[str],
-        collection_uuid: Optional[str],
-        limit: int,
-        cell_references: Optional[Sequence[Dict[str, Optional[str]]]],
-    ) -> Optional[tuple[str, List[Any]]]:
+    def _cell_search_targets(clean_ids: Sequence[str]) -> List[str]:
         extracted_coords: List[str] = []
         for cell_id in clean_ids:
             parts = cell_id.replace(":", " ").replace("!", " ").split()
@@ -423,84 +415,117 @@ class PgVectorRetrievalMixin(PgVectorConnectionCapability):
                     and any(character.isdigit() for character in candidate)
                 ):
                     extracted_coords.append(candidate.upper())
-        all_search_targets = list(
-            dict.fromkeys(item.upper() for item in [*clean_ids, *extracted_coords])
-        )
-        where_clauses: List[str] = []
+        return list(dict.fromkeys(item.upper() for item in [*clean_ids, *extracted_coords]))
+
+    @staticmethod
+    def _group_cell_references(
+        cell_references: Sequence[Dict[str, Optional[str]]],
+    ) -> Dict[str, List[str]]:
+        groups: Dict[str, List[str]] = {
+            "triple_companies": [],
+            "triple_sheets": [],
+            "triple_coords": [],
+            "sheet_pair_sheets": [],
+            "sheet_pair_coords": [],
+            "company_pair_companies": [],
+            "company_pair_coords": [],
+            "unqualified_coords": [],
+        }
+        for reference in cell_references:
+            coord = (reference.get("cell_coord") or "").strip().upper()
+            if not coord:
+                continue
+            sheet = (reference.get("sheet_name") or "").strip().upper()
+            company = (reference.get("company_name") or "").strip().upper()
+            if company and sheet:
+                groups["triple_companies"].append(company)
+                groups["triple_sheets"].append(sheet)
+                groups["triple_coords"].append(coord)
+            elif sheet:
+                groups["sheet_pair_sheets"].append(sheet)
+                groups["sheet_pair_coords"].append(coord)
+            elif company:
+                groups["company_pair_companies"].append(company)
+                groups["company_pair_coords"].append(coord)
+            else:
+                groups["unqualified_coords"].append(coord)
+        return groups
+
+    @staticmethod
+    def _cell_reference_predicates(
+        groups: Dict[str, List[str]],
+    ) -> tuple[List[str], List[Any]]:
+        clauses: List[str] = []
         params: List[Any] = []
+        if groups["unqualified_coords"]:
+            clauses.append("UPPER(cmetadata->>'cell_coord') = ANY(%s)")
+            params.append(list(dict.fromkeys(groups["unqualified_coords"])))
+        if groups["sheet_pair_coords"]:
+            clauses.append(
+                """EXISTS (
+                    SELECT 1
+                    FROM unnest(%s::text[], %s::text[])
+                        AS reference(sheet_name, cell_coord)
+                    WHERE UPPER(cmetadata->>'sheet_name') = reference.sheet_name
+                      AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
+                )"""
+            )
+            params.extend([groups["sheet_pair_sheets"], groups["sheet_pair_coords"]])
+        if groups["company_pair_coords"]:
+            clauses.append(
+                """EXISTS (
+                    SELECT 1
+                    FROM unnest(%s::text[], %s::text[])
+                        AS reference(company_name, cell_coord)
+                    WHERE UPPER(COALESCE(cmetadata->>'company_name', '')) = reference.company_name
+                      AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
+                )"""
+            )
+            params.extend([groups["company_pair_companies"], groups["company_pair_coords"]])
+        if groups["triple_coords"]:
+            clauses.append(
+                """EXISTS (
+                    SELECT 1
+                    FROM unnest(%s::text[], %s::text[], %s::text[])
+                        AS reference(company_name, sheet_name, cell_coord)
+                    WHERE UPPER(COALESCE(cmetadata->>'company_name', '')) = reference.company_name
+                      AND UPPER(cmetadata->>'sheet_name') = reference.sheet_name
+                      AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
+                )"""
+            )
+            params.extend(
+                [
+                    groups["triple_companies"],
+                    groups["triple_sheets"],
+                    groups["triple_coords"],
+                ]
+            )
+        return clauses, params
+
+    @classmethod
+    def _cell_metadata_query(
+        cls,
+        *,
+        clean_ids: Sequence[str],
+        workbook_hash: Optional[str],
+        company_name: Optional[str],
+        collection_uuid: Optional[str],
+        limit: int,
+        cell_references: Optional[Sequence[Dict[str, Optional[str]]]],
+    ) -> Optional[tuple[str, List[Any]]]:
+        search_targets = cls._cell_search_targets(clean_ids)
         if cell_references is None:
-            where_clauses.append(
+            where_clauses = [
                 """(
                     cmetadata->>'cell_id' = ANY(%s)
                     OR cmetadata->>'cell_coord' = ANY(%s)
                     OR UPPER(cmetadata->>'cell_coord') = ANY(%s)
                 )"""
-            )
-            params.extend([list(clean_ids), all_search_targets, all_search_targets])
+            ]
+            params: List[Any] = [list(clean_ids), search_targets, search_targets]
         else:
-            triple_companies: List[str] = []
-            triple_sheets: List[str] = []
-            triple_coords: List[str] = []
-            sheet_pair_sheets: List[str] = []
-            sheet_pair_coords: List[str] = []
-            company_pair_companies: List[str] = []
-            company_pair_coords: List[str] = []
-            unqualified_coords: List[str] = []
-            for reference in cell_references:
-                coord = (reference.get("cell_coord") or "").strip().upper()
-                if not coord:
-                    continue
-                ref_sheet = (reference.get("sheet_name") or "").strip()
-                ref_company = (reference.get("company_name") or "").strip()
-                if ref_company and ref_sheet:
-                    triple_companies.append(ref_company.upper())
-                    triple_sheets.append(ref_sheet.upper())
-                    triple_coords.append(coord)
-                elif ref_sheet:
-                    sheet_pair_sheets.append(ref_sheet.upper())
-                    sheet_pair_coords.append(coord)
-                elif ref_company:
-                    company_pair_companies.append(ref_company.upper())
-                    company_pair_coords.append(coord)
-                else:
-                    unqualified_coords.append(coord)
-            if unqualified_coords:
-                where_clauses.append("UPPER(cmetadata->>'cell_coord') = ANY(%s)")
-                params.append(list(dict.fromkeys(unqualified_coords)))
-            if sheet_pair_coords:
-                where_clauses.append(
-                    """EXISTS (
-                        SELECT 1
-                        FROM unnest(%s::text[], %s::text[])
-                            AS reference(sheet_name, cell_coord)
-                        WHERE UPPER(cmetadata->>'sheet_name') = reference.sheet_name
-                          AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
-                    )"""
-                )
-                params.extend([sheet_pair_sheets, sheet_pair_coords])
-            if company_pair_coords:
-                where_clauses.append(
-                    """EXISTS (
-                        SELECT 1
-                        FROM unnest(%s::text[], %s::text[])
-                            AS reference(company_name, cell_coord)
-                        WHERE UPPER(COALESCE(cmetadata->>'company_name', '')) = reference.company_name
-                          AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
-                    )"""
-                )
-                params.extend([company_pair_companies, company_pair_coords])
-            if triple_coords:
-                where_clauses.append(
-                    """EXISTS (
-                        SELECT 1
-                        FROM unnest(%s::text[], %s::text[], %s::text[])
-                            AS reference(company_name, sheet_name, cell_coord)
-                        WHERE UPPER(COALESCE(cmetadata->>'company_name', '')) = reference.company_name
-                          AND UPPER(cmetadata->>'sheet_name') = reference.sheet_name
-                          AND UPPER(cmetadata->>'cell_coord') = reference.cell_coord
-                    )"""
-                )
-                params.extend([triple_companies, triple_sheets, triple_coords])
+            groups = cls._group_cell_references(cell_references)
+            where_clauses, params = cls._cell_reference_predicates(groups)
             if not where_clauses:
                 return None
 
@@ -921,6 +946,37 @@ class PgVectorRetrievalMixin(PgVectorConnectionCapability):
             logger.warning("fetch_rows_cells_async 실패: %s", error)
             return {}
 
+    @staticmethod
+    def _rows_cells_scope(
+        collection_name: Optional[str],
+        workbook_hash: Optional[str],
+        sheet_name: Optional[str],
+    ) -> tuple[str, List[Any], str, List[Any]]:
+        collection_names = [
+            name.strip() for name in (collection_name or "").split(",") if name.strip()
+        ]
+        clauses: List[str] = []
+        scope_params: List[Any] = []
+        cte_params: List[Any] = []
+        collection_cte_sql = ""
+        if collection_names:
+            collection_cte_sql = (
+                "target_collections AS ("
+                "SELECT uuid FROM langchain_pg_collection WHERE name = ANY(%s)"
+                "),"
+            )
+            cte_params.append(collection_names)
+            clauses.append("collection_id IN (SELECT uuid FROM target_collections)")
+        elif workbook_hash:
+            hashes = [value.strip() for value in workbook_hash.split(",") if value.strip()]
+            clauses.append("cmetadata->>'workbook_hash' = ANY(%s)")
+            scope_params.append(hashes)
+        if sheet_name:
+            clauses.append("cmetadata->>'sheet_name' = %s")
+            scope_params.append(sheet_name)
+        scope_sql = " AND " + " AND ".join(clauses) if clauses else ""
+        return collection_cte_sql, cte_params, scope_sql, scope_params
+
     def fetch_rows_cells(
         self,
         collection_name: Optional[str],
@@ -936,37 +992,9 @@ class PgVectorRetrievalMixin(PgVectorConnectionCapability):
         conn = self._read_connection()
         try:
             with conn.cursor() as cur:
-                if collection_name:
-                    collection_names = [
-                        name.strip() for name in collection_name.split(",") if name.strip()
-                    ]
-                else:
-                    collection_names = []
-
-                scope_clauses: List[str] = []
-                scope_params: List[Any] = []
-                cte_params: List[Any] = []
-                if collection_names:
-                    collection_cte_sql = (
-                        "target_collections AS ("
-                        "SELECT uuid FROM langchain_pg_collection WHERE name = ANY(%s)"
-                        "),"
-                    )
-                    cte_params.append(collection_names)
-                    scope_clauses.append("collection_id IN (SELECT uuid FROM target_collections)")
-                else:
-                    collection_cte_sql = ""
-                if workbook_hash and not collection_names:
-                    workbook_hashes = [
-                        value.strip() for value in workbook_hash.split(",") if value.strip()
-                    ]
-                    scope_clauses.append("cmetadata->>'workbook_hash' = ANY(%s)")
-                    scope_params.append(workbook_hashes)
-                if sheet_name:
-                    scope_clauses.append("cmetadata->>'sheet_name' = %s")
-                    scope_params.append(sheet_name)
-
-                scope_sql = " AND " + " AND ".join(scope_clauses) if scope_clauses else ""
+                collection_cte_sql, cte_params, scope_sql, scope_params = self._rows_cells_scope(
+                    collection_name, workbook_hash, sheet_name
+                )
 
                 query_sql = f"""
                     WITH {collection_cte_sql}
@@ -1022,41 +1050,7 @@ class PgVectorRetrievalMixin(PgVectorConnectionCapability):
                     *scope_params,
                 ]
                 cur.execute(query_sql, tuple(params))
-                results: Dict[int, List[Dict[str, Any]]] = {}
-                from openpyxl.utils.cell import column_index_from_string
-
-                for cid, doc, meta, resolved_row, resolved_col in cur.fetchall():
-                    cmetadata = meta if isinstance(meta, dict) else {}
-                    col_idx = resolved_col
-                    if col_idx is None and cmetadata.get("cell_coord"):
-                        col_match = re.match(r"^([A-Za-z]+)", cmetadata.get("cell_coord", ""))
-                        if col_match:
-                            try:
-                                col_idx = column_index_from_string(col_match.group(1))
-                            except Exception:
-                                pass
-
-                    results.setdefault(int(resolved_row), []).append(
-                        {
-                            "cell_id": cid or cmetadata.get("cell_id", ""),
-                            "cell_coord": cmetadata.get("cell_coord", ""),
-                            "cell_value": cmetadata.get("cell_value", ""),
-                            "sheet_name": cmetadata.get("sheet_name", ""),
-                            "row_header": cmetadata.get("row_header", []),
-                            "column_header": cmetadata.get("column_header", []),
-                            "company_name": cmetadata.get("company_name", ""),
-                            "row_index": resolved_row,
-                            "col_index": col_idx,
-                            "source_text": doc or "",
-                        }
-                    )
-                # Sort each row's cells by col_index ascending
-                for r_idx, r_cells in results.items():
-                    r_cells.sort(
-                        key=lambda c: (c.get("col_index") is None, c.get("col_index") or 0)
-                    )
-                    results[r_idx] = r_cells[: max(1, limit_per_row)]
-                return results
+                return self._rows_cells_rows(cur.fetchall(), limit_per_row)
         except Exception as err:
             logger.warning("fetch_rows_cells 실패: %s", err)
             return {}

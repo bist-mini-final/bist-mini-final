@@ -54,9 +54,7 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
                 "COPY 대상 문서 개수와 float32 벡터 개수가 일치하지 않습니다"
             )
         dimension = (
-            vectors.dimension
-            if isinstance(vectors, EmbeddingArtifactVectors)
-            else len(vectors[0])
+            vectors.dimension if isinstance(vectors, EmbeddingArtifactVectors) else len(vectors[0])
         )
         if not 0 < dimension <= 32_767:
             raise ModuleExecutionError(
@@ -100,66 +98,62 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
 
     def _load_vector_batch(self) -> None:
         if isinstance(self._vectors, EmbeddingArtifactVectors):
-            assert self._raw_batches is not None
-            try:
-                raw = next(self._raw_batches)
-            except StopIteration as error:
-                raise ModuleExecutionError(
-                    "float32 아티팩트가 문서 개수보다 먼저 종료되었습니다"
-                ) from error
-            if len(raw) % self._bytes_per_vector != 0:
-                raise ModuleExecutionError(
-                    "float32 아티팩트 배치가 벡터 경계에 맞지 않습니다"
-                )
-            vector_count = len(raw) // self._bytes_per_vector
-            words = array("I")
-            if words.itemsize != 4:
-                raise ModuleExecutionError(
-                    "현재 플랫폼의 32비트 word 크기가 PostgreSQL COPY 형식과 다릅니다"
-                )
-            words.frombytes(raw)
-            # Artifact bytes are little-endian and PostgreSQL binary values use
-            # network byte order. Swapping the raw words avoids float objects.
-            if sys.byteorder == "little":
-                words.byteswap()
+            words, vector_count = self._artifact_batch_words()
         else:
-            stop = min(
-                self._sequence_batch_start + self._batch_size,
-                len(self._vectors),
-            )
-            if stop <= self._sequence_batch_start:
-                raise ModuleExecutionError(
-                    "벡터 시퀀스가 문서 개수보다 먼저 종료되었습니다"
-                )
-            words = array("f")
-            for vector in self._vectors[self._sequence_batch_start:stop]:
-                if len(vector) != self._dimension:
-                    raise ModuleExecutionError(
-                        "COPY 벡터 차원이 컬렉션 메타데이터와 일치하지 않습니다"
-                    )
-                try:
-                    words.extend(float(value) for value in vector)
-                except (TypeError, ValueError, OverflowError) as error:
-                    raise ModuleExecutionError(
-                        "COPY 벡터에 float32로 변환할 수 없는 값이 있습니다"
-                    ) from error
-            if words.itemsize != 4:
-                raise ModuleExecutionError(
-                    "현재 플랫폼의 float32 word 크기가 PostgreSQL COPY 형식과 다릅니다"
-                )
-            if sys.byteorder == "little":
-                words.byteswap()
-            vector_count = stop - self._sequence_batch_start
-            self._sequence_batch_start = stop
+            words, vector_count = self._sequence_batch_words()
         self._current_batch = memoryview(words).cast("B")
         self._current_batch_position = 0
         self._current_batch_count = vector_count
 
+    def _artifact_batch_words(self) -> tuple[array, int]:
+        assert self._raw_batches is not None
+        try:
+            raw = next(self._raw_batches)
+        except StopIteration as error:
+            raise ModuleExecutionError(
+                "float32 아티팩트가 문서 개수보다 먼저 종료되었습니다"
+            ) from error
+        if len(raw) % self._bytes_per_vector != 0:
+            raise ModuleExecutionError("float32 아티팩트 배치가 벡터 경계에 맞지 않습니다")
+        words = array("I")
+        if words.itemsize != 4:
+            raise ModuleExecutionError(
+                "현재 플랫폼의 32비트 word 크기가 PostgreSQL COPY 형식과 다릅니다"
+            )
+        words.frombytes(raw)
+        if sys.byteorder == "little":
+            words.byteswap()
+        return words, len(raw) // self._bytes_per_vector
+
+    def _sequence_batch_words(self) -> tuple[array, int]:
+        stop = min(
+            self._sequence_batch_start + self._batch_size,
+            len(self._vectors),
+        )
+        if stop <= self._sequence_batch_start:
+            raise ModuleExecutionError("벡터 시퀀스가 문서 개수보다 먼저 종료되었습니다")
+        words = array("f")
+        for vector in self._vectors[self._sequence_batch_start : stop]:
+            if len(vector) != self._dimension:
+                raise ModuleExecutionError("COPY 벡터 차원이 컬렉션 메타데이터와 일치하지 않습니다")
+            try:
+                words.extend(float(value) for value in vector)
+            except (TypeError, ValueError, OverflowError) as error:
+                raise ModuleExecutionError(
+                    "COPY 벡터에 float32로 변환할 수 없는 값이 있습니다"
+                ) from error
+        if words.itemsize != 4:
+            raise ModuleExecutionError(
+                "현재 플랫폼의 float32 word 크기가 PostgreSQL COPY 형식과 다릅니다"
+            )
+        if sys.byteorder == "little":
+            words.byteswap()
+        vector_count = stop - self._sequence_batch_start
+        self._sequence_batch_start = stop
+        return words, vector_count
+
     def _next_vector(self) -> memoryview:
-        if (
-            self._current_batch is None
-            or self._current_batch_position >= self._current_batch_count
-        ):
+        if self._current_batch is None or self._current_batch_position >= self._current_batch_count:
             self._load_vector_batch()
         assert self._current_batch is not None
         start = self._current_batch_position * self._bytes_per_vector
@@ -217,12 +211,9 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         )
         self._document_index += 1
 
-        if (
-            self._progress_callback is not None
-            and (
-                self._document_index % self._batch_size == 0
-                or self._document_index == len(self._documents)
-            )
+        if self._progress_callback is not None and (
+            self._document_index % self._batch_size == 0
+            or self._document_index == len(self._documents)
         ):
             completed_batches = min(
                 self._total_batches,

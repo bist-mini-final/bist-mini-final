@@ -59,6 +59,39 @@ def _semantic_type(formula_cell, value_cell) -> str:
     return "text"
 
 
+def _cell_record(
+    formula_worksheet,
+    value_worksheet,
+    merged: Dict[Tuple[int, int], str],
+    row: int,
+    column: int,
+) -> Dict[str, Any] | None:
+    formula_cell = formula_worksheet.cell(row=row, column=column)
+    if isinstance(formula_cell, MergedCell):
+        return None
+    value_cell = value_worksheet.cell(row=row, column=column)
+    raw_value = formula_cell.value
+    value = value_cell.value
+    if value is None and formula_cell.data_type != "f":
+        value = raw_value
+    if value is None and formula_cell.data_type != "f":
+        return None
+    if isinstance(value, str) and not value.strip() and formula_cell.data_type != "f":
+        return None
+    record: Dict[str, Any] = {
+        "coord": f"{get_column_letter(column)}{row}",
+        "row": row,
+        "column": column,
+        "type": _semantic_type(formula_cell, value_cell),
+        "value": _display_value(value),
+    }
+    if formula_cell.data_type == "f":
+        record.update(is_formula=True, formula=str(raw_value))
+    if merged_range := merged.get((row, column)):
+        record["merged_range"] = merged_range
+    return record
+
+
 def collect_non_empty_cells(
     formula_worksheet,
     value_worksheet,
@@ -85,32 +118,15 @@ def collect_non_empty_cells(
                 or value_visibility.column_hidden(column)
             ):
                 continue
-            formula_cell = formula_worksheet.cell(row=row, column=column)
-            if isinstance(formula_cell, MergedCell):
+            record = _cell_record(
+                formula_worksheet,
+                value_worksheet,
+                merged,
+                row,
+                column,
+            )
+            if record is None:
                 continue
-            value_cell = value_worksheet.cell(row=row, column=column)
-            raw_value = formula_cell.value
-            value = value_cell.value
-            if value is None and formula_cell.data_type != "f":
-                value = raw_value
-            if value is None and formula_cell.data_type != "f":
-                continue
-            if isinstance(value, str) and not value.strip() and formula_cell.data_type != "f":
-                continue
-
-            record: Dict[str, Any] = {
-                "coord": f"{get_column_letter(column)}{row}",
-                "row": row,
-                "column": column,
-                "type": _semantic_type(formula_cell, value_cell),
-                "value": _display_value(value),
-            }
-            if formula_cell.data_type == "f":
-                record["is_formula"] = True
-                record["formula"] = str(raw_value)
-            merged_range = merged.get((row, column))
-            if merged_range:
-                record["merged_range"] = merged_range
             records.append(record)
             if len(records) > max_context_cells:
                 raise ValueError(
@@ -127,15 +143,9 @@ def compact_sheet_context(
 ) -> Dict[str, Any]:
     """Group cell facts by row to reduce local-model prompt tokens."""
 
-    visible_rows = [
-        index
-        for index, height in enumerate(layout.row_heights, start=1)
-        if height > 0
-    ]
+    visible_rows = [index for index, height in enumerate(layout.row_heights, start=1) if height > 0]
     visible_columns = [
-        index
-        for index, width in enumerate(layout.column_widths, start=1)
-        if width > 0
+        index for index, width in enumerate(layout.column_widths, start=1) if width > 0
     ]
     if not visible_rows or not visible_columns:
         raise ValueError(f"시트 {sheet_name}에 표시된 셀 영역이 없습니다")
@@ -157,8 +167,5 @@ def compact_sheet_context(
         ),
         "cell_count": len(cells),
         "cell_tuple": ["excel_coord", "value_type", "value", "optional_flags"],
-        "rows": [
-            {"row": row, "cells": row_cells}
-            for row, row_cells in sorted(rows.items())
-        ],
+        "rows": [{"row": row, "cells": row_cells} for row, row_cells in sorted(rows.items())],
     }

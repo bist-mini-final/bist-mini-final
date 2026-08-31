@@ -66,6 +66,7 @@ def test_chat_evidence_keeps_sheet_line_near_question_match() -> None:
 def test_workbook_text_extraction_skips_hidden_vendor_sheets() -> None:
     workbook = Workbook()
     visible = workbook.active
+    assert visible is not None
     visible.title = "Income_Statement"
     visible.append(["Revenue", 120])
     hidden = workbook.create_sheet("VendorPayload")
