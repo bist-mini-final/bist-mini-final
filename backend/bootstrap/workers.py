@@ -10,7 +10,17 @@ from types import MappingProxyType
 from typing import cast
 
 from backend.bootstrap.application import RuntimeContainer
+from backend.bootstrap.bi import (
+    create_bi_materialization_runner,
+    create_bi_question_batch_worker,
+)
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
+from backend.domains.bi.infrastructure.postgres.database_schema import ensure_bi_schema
+from backend.domains.bi.infrastructure.postgres.store import PostgresBiStore
+from backend.domains.bi.workers.question_batch import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MAX_WORKERS,
+)
 from backend.domains.data_sources.infrastructure import (
     OpenAIEmbeddingShardExecutor,
     PgVectorCopyShardExecutor,
@@ -33,8 +43,8 @@ WORKER_TARGETS = MappingProxyType(
         "ingestion-vector": (
             "backend.domains.data_sources.workers.vector:main"
         ),
-        "bi-materialization": "backend.features.bi.materialization_worker_main:main",
-        "bi-question": "backend.features.bi.question_worker_main:main",
+        "bi-materialization": "backend.domains.bi.workers.materialization:main",
+        "bi-question": "backend.domains.bi.workers.question_batch:main",
         "benchmark": "backend.features.benchmark.worker_main:main",
     }
 )
@@ -105,6 +115,44 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
                 )
             )
             return worker(repository=repository, executor=executor)
+        finally:
+            runtime.close()
+    if kind in {"bi-materialization", "bi-question"}:
+        logging.basicConfig(
+            level=getattr(
+                logging,
+                os.getenv("LOG_LEVEL", "INFO").upper(),
+                logging.INFO,
+            ),
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        )
+        runtime = RuntimeContainer.create(require_database=True)
+        try:
+            registry = runtime.services.module_registry
+            database_url = registry.db_manager.database_url
+            ensure_bi_schema(database_url)
+            if kind == "bi-materialization":
+                return worker(
+                    store=PostgresBiStore(database_url),
+                    runner=create_bi_materialization_runner(
+                        registry,
+                        runtime.completion_client,
+                    ),
+                )
+            batch_size = int(
+                os.getenv("BI_QUESTION_BATCH_SIZE", str(DEFAULT_BATCH_SIZE))
+            )
+            max_workers = int(
+                os.getenv("BI_QUESTION_MAX_WORKERS", str(DEFAULT_MAX_WORKERS))
+            )
+            return worker(
+                worker=create_bi_question_batch_worker(
+                    registry,
+                    runtime.completion_client,
+                    batch_size=batch_size,
+                    max_workers=max_workers,
+                )
+            )
         finally:
             runtime.close()
     if argv:

@@ -1,14 +1,3 @@
-"""Shared BI-to-RAG boundary errors."""
+"""Compatibility import for BI retrieval errors."""
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True, slots=True)
-class RagPipelineContractError(Exception):
-    code: str
-
-    def __str__(self) -> str:
-        return self.code
-
-
-__all__ = ["RagPipelineContractError"]
+from backend.domains.bi.application.rag_errors import *  # noqa: F403

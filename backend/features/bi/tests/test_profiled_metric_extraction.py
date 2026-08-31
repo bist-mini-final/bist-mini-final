@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from backend.domains.bi.application.extraction import BiMetricExtractionService
 from backend.domains.bi.domain.extraction_models import (
     BiContextCell,
     BiMetricExtractionRequest,
@@ -18,7 +19,6 @@ from backend.domains.bi.domain.models import (
     PeriodId,
     PeriodKind,
 )
-from backend.features.bi.extraction import BiMetricExtractionService
 
 
 class FixedRetriever:

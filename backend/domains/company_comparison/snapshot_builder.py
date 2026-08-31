@@ -11,6 +11,7 @@ from math import pow
 from statistics import fmean
 from typing import Final, TypedDict
 
+from backend.domains.bi.application.evidence import verifiable_cells
 from backend.domains.bi.domain.models import (
     AmountScale,
     AvailableObservation,
@@ -21,7 +22,6 @@ from backend.domains.bi.domain.models import (
     MetricSeries,
     SnapshotStatus,
 )
-from backend.features.bi.evidence import verifiable_cells
 
 from .errors import ComparisonDataError
 from .league_scoring import (

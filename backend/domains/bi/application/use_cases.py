@@ -7,11 +7,22 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Final
 
+from backend.domains.bi.application.dashboard_recalculation import (
+    BiDashboardRecalculationError,
+    recalculate_dashboard,
+)
 from backend.domains.bi.application.dtos import (
     BiCompanyListResponse,
     BiCompanySummary,
     BiMaterializationAccepted,
     BiMaterializationCandidateListResponse,
+)
+from backend.domains.bi.application.errors import (
+    BiDashboardDeleteActiveError,
+    BiPostgresStoreError,
+    BiQuestionRegistrationError,
+    BiQuestionRepositoryError,
+    BiQuestionResetActiveError,
 )
 from backend.domains.bi.application.projections import (
     accepted,
@@ -32,19 +43,6 @@ from backend.domains.bi.domain.models import (
 )
 from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
 from backend.domains.bi.domain.question_records import BiQuestionJobProgress
-from backend.features.bi.dashboard_recalculation import (
-    BiDashboardRecalculationError,
-    recalculate_dashboard,
-)
-from backend.features.bi.postgres_store import (
-    BiDashboardDeleteActiveError,
-    BiPostgresStoreError,
-)
-from backend.features.bi.question_repository import (
-    BiQuestionRegistrationError,
-    BiQuestionResetActiveError,
-)
-from backend.features.bi.question_repository_queries import BiQuestionRepositoryError
 from backend.shared.domain import (
     ApplicationConflict,
     ResourceNotFoundError,

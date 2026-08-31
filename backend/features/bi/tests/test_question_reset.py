@@ -1,5 +1,9 @@
 from datetime import UTC, date, datetime
 
+from backend.domains.bi.application.question_service import (
+    BiQuestionRepositoryPort,
+    BiQuestionService,
+)
 from backend.domains.bi.domain.models import (
     BiMaterializationRequest,
     BiMaterializationSource,
@@ -21,10 +25,6 @@ from backend.domains.bi.domain.question_records import (
     BiQuestionStart,
     QuestionId,
     WorkflowRunId,
-)
-from backend.features.bi.question_service import (
-    BiQuestionRepositoryPort,
-    BiQuestionService,
 )
 
 AS_OF = datetime(2026, 8, 25, tzinfo=UTC)

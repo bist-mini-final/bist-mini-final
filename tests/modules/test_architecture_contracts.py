@@ -13,11 +13,11 @@ from backend.bootstrap.application import (
     DomainServicesContainer,
     ExecutionContainer,
 )
+from backend.domains.bi.workers.materialization import BiMaterializationWorker
 from backend.domains.data_sources.workers.embedding import (
     EmbeddingShardWorker,
 )
 from backend.domains.data_sources.workers.vector import VectorShardWorker
-from backend.features.bi.materialization_worker_main import BiMaterializationWorker
 from backend.features.chatbot.repository import ChatSessionRepository
 from backend.platform.postgres.repositories import SyncPostgresRepository
 from backend.shared.application.workers import LeasedWorker
@@ -90,6 +90,9 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.api.data_source_ingestion_controller",
         "backend.api.data_source_ingestion_routes",
         "backend.api.data_source_routes",
+        "backend.features.bi",
+        "backend.api.bi_routes",
+        "backend.storage.audit_schema",
         "backend.api.workflow_controller",
         "backend.api.workflow_routes",
     )
@@ -202,6 +205,58 @@ def test_data_sources_vertical_slice_has_no_legacy_or_inverted_dependencies() ->
                         f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
                     )
     assert not violations, f"data sources layer inversion: {violations}"
+
+
+def test_bi_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:
+    forbidden_by_layer = {
+        "domain": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "application": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "presentation": (
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.bi.infrastructure",
+        ),
+        "workers": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.bi.infrastructure",
+        ),
+    }
+    violations: list[str] = []
+    for layer, forbidden in forbidden_by_layer.items():
+        root = f"backend/domains/bi/{layer}"
+        for path in _python_files(root):
+            for imported, line in _imported_modules(path):
+                if imported.startswith(forbidden):
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
+                    )
+    assert not violations, f"BI layer inversion: {violations}"
 
 
 def test_process_entrypoints_only_import_bootstrap() -> None:

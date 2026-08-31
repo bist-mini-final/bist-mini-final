@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.bi_routes import register_bi_exception_handlers
 from backend.api.exception_handlers import register_global_exception_handlers
 from backend.api.middleware import RequestObservabilityMiddleware
 from backend.api.openapi import OPENAPI_TAGS, custom_openapi_schema
@@ -16,6 +15,7 @@ from backend.api.versioning import API_V1_PREFIX, API_VERSION, LEGACY_API_PREFIX
 from backend.bootstrap.application import ApplicationContainer
 from backend.bootstrap.lifecycle import create_lifespan
 from backend.core.settings import DEV_CORS_ORIGINS, REDIS_URL
+from backend.domains.bi.presentation.routes import register_bi_exception_handlers
 from backend.platform.redis.state_stream_broker import create_state_stream_broker
 
 

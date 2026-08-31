@@ -1,5 +1,11 @@
 from datetime import UTC, date, datetime
 
+from backend.domains.bi.application.question_snapshot import (
+    BiQuestionSnapshotMaterializer,
+    BiQuestionSnapshotMaterializerServices,
+)
+from backend.domains.bi.application.queued_materializer import BiQueuedMaterializer
+from backend.domains.bi.application.snapshot_builder import BiSnapshotBuilder
 from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
     BiSnapshotBuildInput,
@@ -25,12 +31,6 @@ from backend.domains.bi.domain.question_records import (
     QuestionId,
     QuestionVersion,
 )
-from backend.features.bi.question_snapshot import (
-    BiQuestionSnapshotMaterializer,
-    BiQuestionSnapshotMaterializerServices,
-)
-from backend.features.bi.queued_materializer import BiQueuedMaterializer
-from backend.features.bi.snapshot_builder import BiSnapshotBuilder
 
 AS_OF = datetime(2026, 8, 25, tzinfo=UTC)
 REFRESH_JOB_ID = JobId("job-refresh")

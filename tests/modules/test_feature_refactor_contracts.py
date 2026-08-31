@@ -7,6 +7,7 @@ from io import BytesIO
 
 from openpyxl import Workbook
 
+from backend.domains.bi.application.snapshot_builder import BiSnapshotBuilder
 from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
 from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
 from backend.domains.bi.domain.materialization_models import (
@@ -27,8 +28,7 @@ from backend.domains.bi.domain.models import (
     SnapshotStatus,
     UnavailableObservation,
 )
-from backend.features.bi.fast_rag_adapter import FastRagPipelineAdapter
-from backend.features.bi.snapshot_builder import BiSnapshotBuilder
+from backend.domains.bi.infrastructure.integrations.fast_rag_adapter import FastRagPipelineAdapter
 from backend.features.chatbot.attachments import compact_evidence, extract_text
 
 
