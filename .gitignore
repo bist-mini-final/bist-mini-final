@@ -68,39 +68,14 @@ yarn-error.log*
 pnpm-debug.log*
 outputs/
 output/
-data/runs/*
-data/raw/*
-!data/runs/.gitkeep
-data/cache/*
-!data/cache/.gitkeep
-# data/artifacts/ — 모든 런타임 생성 파일 무시
-# 포함: Luna VLM 렌더/타일 이미지, serialized_docs.json 캐시,
-# 임베딩 .f32 및 ingestion shard manifest/part 파일
-data/artifacts/*
-data/artifacts/**
-!data/artifacts/embeddings/
-!data/artifacts/embeddings/.gitkeep
-!data/artifacts/spreadsheets/
-!data/artifacts/spreadsheets/.gitkeep
-# 구 경로 (레거시) — settings.py 기준 경로는 data/artifacts/spreadsheets/
-data/spreadsheet_artifacts/
-data/vector_db/*
-!data/vector_db/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
-data/source_files/*
-!data/source_files/.gitkeep
-data/sources/*
-!data/sources/.gitkeep
-data/chat_uploads/*
-!data/chat_uploads/.gitkeep
-data/virtual/
-data/virtual/*
-!data/virtual/.gitkeep
-data/workflows/*
-!data/workflows/.gitkeep
+data/runs/
+data/cache/
+data/artifacts/
+data/source_files/
+data/chat_uploads/
+data/workflows/
+data/benchmark_sets/
 tmp/
-data/benchmarks/*
 
 # OS / editors
 .DS_Store

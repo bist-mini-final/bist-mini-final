@@ -30,7 +30,6 @@ RUN mkdir -p \
     /app/data/runs \
     /app/data/cache \
     /app/data/source_files \
-    /app/data/vector_db \
     /app/data/artifacts/embeddings \
     /app/data/artifacts/spreadsheets \
     && python -m compileall -q /app/backend /app/modules /app/jobs \

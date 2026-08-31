@@ -2,8 +2,6 @@ target-version = "py312"
 line-length = 100
 extend-exclude = [
   ".venv",
-  "backend/infrastructure",
-  "notebooks",
 ]
 
 [lint]
@@ -17,5 +15,3 @@ ignore = [
 
 [lint.per-file-ignores]
 "tests/**/*.py" = ["B017"]
-"backend/core/config.py" = ["F403", "F401"]
-"backend/storage/db_manager.py" = ["PERF401"]
