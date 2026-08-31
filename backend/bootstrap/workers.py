@@ -15,6 +15,7 @@ from backend.bootstrap.bi import (
     create_bi_question_batch_worker,
 )
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
+from backend.domains.benchmark.infrastructure.postgres import BenchmarkPostgresStore
 from backend.domains.bi.infrastructure.postgres.database_schema import ensure_bi_schema
 from backend.domains.bi.infrastructure.postgres.store import PostgresBiStore
 from backend.domains.bi.workers.question_batch import (
@@ -31,6 +32,7 @@ from backend.domains.data_sources.infrastructure.filesystem import (
 from backend.domains.data_sources.infrastructure.postgres import (
     PostgresIngestionShardRepository,
 )
+from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 
 WorkerMain = Callable[..., int]
 
@@ -45,7 +47,7 @@ WORKER_TARGETS = MappingProxyType(
         ),
         "bi-materialization": "backend.domains.bi.workers.materialization:main",
         "bi-question": "backend.domains.bi.workers.question_batch:main",
-        "benchmark": "backend.features.benchmark.worker_main:main",
+        "benchmark": "backend.domains.benchmark.workers.main:main",
     }
 )
 
@@ -73,6 +75,8 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
     """Build and run one registered worker without leaking targets to deploy specs."""
 
     worker = _load_worker(kind)
+    if kind != "workflow" and argv:
+        raise ValueError(f"{kind} worker는 추가 인자를 지원하지 않습니다: {list(argv)}")
     if kind == "workflow":
         runtime = RuntimeContainer.create(
             initialize_schema=False,
@@ -155,8 +159,22 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
             )
         finally:
             runtime.close()
-    if argv:
-        raise ValueError(f"{kind} worker는 추가 인자를 지원하지 않습니다: {list(argv)}")
+    if kind == "benchmark":
+        runtime = RuntimeContainer.create(require_database=True)
+        try:
+            services = runtime.services
+            return worker(
+                store=BenchmarkPostgresStore(services.db_manager.database_url),
+                workflow_store=services.workflow_store,
+                workflow_executor=services.workflow_executor,
+                workflow_dispatcher=KubernetesQueueDispatcher(
+                    services.workflow_executor,
+                    services.run_store,
+                    KUBERNETES_WORKFLOW_QUEUE,
+                ),
+            )
+        finally:
+            runtime.close()
     return worker()
 
 

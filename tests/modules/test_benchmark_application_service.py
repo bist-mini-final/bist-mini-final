@@ -5,17 +5,14 @@ from typing import Any, cast
 
 import pytest
 
+from backend.domains.benchmark.application.execution import execute_benchmark_comparison
 from backend.domains.benchmark.application.service import (
     BenchmarkApplicationService,
     BenchmarkQueueUnavailableError,
 )
+from backend.domains.benchmark.domain import BenchmarkCase, BenchmarkRequest
 from backend.domains.workflow.domain import DagExecutionError
 from backend.domains.workflow.infrastructure.job_catalog import canonical_workflow
-from backend.features.benchmark.service import (
-    BenchmarkCase,
-    BenchmarkRequest,
-    execute_benchmark_comparison,
-)
 
 
 class BenchmarkStore:
@@ -59,6 +56,7 @@ def application(
         workflow_store=unused,
         run_store=unused,
         workflow_execution=cast(Any, execution),
+        benchmark_sets=unused,
         queue_available=queue_available,
     )
 

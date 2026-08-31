@@ -328,10 +328,10 @@ class DatabaseManager(
         """
         conn = None
         try:
-            from backend.domains.bi.infrastructure.postgres.database_schema import BI_SCHEMA_SQL
-            from backend.features.benchmark.database_schema import (
+            from backend.domains.benchmark.infrastructure.postgres import (
                 BENCHMARK_SCHEMA_SQL,
             )
+            from backend.domains.bi.infrastructure.postgres.database_schema import BI_SCHEMA_SQL
 
             conn = self._raw_connection()
             try:
