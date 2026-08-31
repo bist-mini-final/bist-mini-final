@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+from backend.domains.bi.application.materializer import ClockPort
 from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
 from backend.domains.bi.domain.models import (
     BiCompany,
@@ -14,7 +15,6 @@ from backend.domains.bi.domain.models import (
 )
 from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
 from backend.domains.bi.domain.question_records import BiQuestionJobProgress
-from backend.features.bi.materializer import ClockPort
 
 
 class BiApiStorePort(Protocol):

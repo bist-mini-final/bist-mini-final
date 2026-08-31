@@ -8,6 +8,7 @@ from backend.contracts.snapshots import (
     VersionedSnapshotRecord,
     VersionedSnapshotRepository,
 )
+from backend.domains.bi.application.evidence import source_cell_value
 from backend.domains.bi.domain.materialization_models import BiCompanyIndexEntry
 from backend.domains.bi.domain.models import BiDashboardSnapshot, CompanyId
 from backend.domains.company_comparison.errors import (
@@ -20,7 +21,6 @@ from backend.domains.company_comparison.snapshot_builder import (
     SCORING_VERSION,
     CompanyComparisonSnapshotBuilder,
 )
-from backend.features.bi.evidence import source_cell_value
 
 SNAPSHOT_DOMAIN = "company-comparison"
 SNAPSHOT_SCOPE = "global"

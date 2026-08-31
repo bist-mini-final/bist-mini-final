@@ -1,5 +1,10 @@
 from datetime import UTC, datetime
 
+from backend.domains.bi.application.question_publishing import (
+    BiPublishingQuestionService,
+    BiQuestionPublicationError,
+    BiQuestionPublicationFailureReporter,
+)
 from backend.domains.bi.domain.models import (
     BiMaterializationJob,
     CompanyId,
@@ -22,12 +27,7 @@ from backend.domains.bi.domain.question_records import (
     QuestionVersion,
     WorkflowRunId,
 )
-from backend.features.bi.postgres_store import BiPostgresStoreError
-from backend.features.bi.question_publishing import (
-    BiPublishingQuestionService,
-    BiQuestionPublicationError,
-    BiQuestionPublicationFailureReporter,
-)
+from backend.domains.bi.infrastructure.postgres.store import BiPostgresStoreError
 
 NOW = datetime(2026, 8, 25, tzinfo=UTC)
 

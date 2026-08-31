@@ -5,8 +5,8 @@ import pytest
 from pydantic import ValidationError
 
 from backend.domains.bi.domain.models import BiDashboardSnapshot
-from backend.features.bi.postgres_store import PostgresBiStore
-from backend.features.bi.snapshot_compatibility import normalize_snapshot_payload
+from backend.domains.bi.domain.snapshot_compatibility import normalize_snapshot_payload
+from backend.domains.bi.infrastructure.postgres.store import PostgresBiStore
 
 
 def _snapshot_payload() -> dict[str, object]:

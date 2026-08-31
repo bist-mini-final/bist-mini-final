@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from threading import Barrier
 
+from backend.domains.bi.application.document_profiler import BiDocumentProfiler
+from backend.domains.bi.application.metric_reader import JsonValue
+from backend.domains.bi.application.profile_models import BiProfileRetrievalRequest
 from backend.domains.bi.domain.extraction_models import BiContextCell, BiRetrievedContext
 from backend.domains.bi.domain.materialization_models import BiDocumentProfile
 from backend.domains.bi.domain.models import (
@@ -12,9 +15,6 @@ from backend.domains.bi.domain.models import (
     CompanyId,
     IndexId,
 )
-from backend.features.bi.document_profiler import BiDocumentProfiler
-from backend.features.bi.metric_reader import JsonValue
-from backend.features.bi.profile_models import BiProfileRetrievalRequest
 
 
 class SingleSheetCatalog:

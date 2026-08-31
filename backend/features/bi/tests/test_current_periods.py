@@ -1,5 +1,7 @@
 from datetime import UTC, date, datetime
 
+from backend.domains.bi.application.question_service import build_current_question_batch
+from backend.domains.bi.application.snapshot_projection import project_build_input
 from backend.domains.bi.domain.current_periods import select_current_periods
 from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
@@ -16,8 +18,6 @@ from backend.domains.bi.domain.models import (
     PeriodKind,
 )
 from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
-from backend.features.bi.question_service import build_current_question_batch
-from backend.features.bi.snapshot_projection import project_build_input
 
 AS_OF = datetime(2026, 8, 24, tzinfo=UTC)
 

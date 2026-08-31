@@ -1,8 +1,8 @@
 # [BP-403] Financial BI Analytics 워크스페이스
 
-> **Document Code:** `BP-403` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Document Code:** `BP-403` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Vertical Slice Complete / Frontend Aligned
 > **Target Ownership:** `backend/domains/bi`, `backend/platform/postgres`, `frontend/src/features/bi`, `frontend/src/pages`
-> **Current References:** [`backend/domains/bi/application/`](file:///c:/Repos/bist-mini-final/backend/domains/bi/application/), [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
+> **Current References:** [`backend/domains/bi/`](file:///c:/Repos/bist-mini-final/backend/domains/bi/), [`backend/bootstrap/bi.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/bi.py), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
 
 ---
 
@@ -82,4 +82,5 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 - metric definition, evidence requirement와 snapshot publication policy는 BI domain/application이 소유합니다.
 - source lookup·snapshot repository·materialization adapter는 BI infrastructure, API/SSE DTO는 BI presentation, durable process는 BI workers에 둡니다.
 - Company Comparison은 BI infrastructure를 import하지 않고 BI application의 snapshot reader port만 사용합니다.
-- `backend/features/bi`의 계산·schema 책임이 BI vertical slice로 이동하고 21개 metric 및 snapshot 회귀 계약이 유지될 때 구조 migration을 완료합니다.
+- 계산·application port·PostgreSQL/integration adapter·API/SSE·worker가 BI vertical slice로 이동했습니다. 이전 `backend/features/bi`와 `backend/api/bi_routes.py`는 외부 import 호환 re-export만 유지합니다.
+- 구조 계약 테스트는 BI domain/application/presentation/worker가 feature·storage·platform concrete 구현을 역참조하지 못하게 하며 21개 metric 및 snapshot 회귀 계약을 함께 검증합니다.

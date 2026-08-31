@@ -37,9 +37,9 @@ import logging
 from typing import Any
 
 from backend.core.settings import PGVECTOR_URL
+from backend.platform.postgres.audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
 from backend.platform.postgres.repositories import SyncPostgresRepository
 
-from .audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
 from .connection_pool import get_pooled_async_connection
 from .repositories import (
     SourceFileRepositoryMixin,
@@ -328,10 +328,10 @@ class DatabaseManager(
         """
         conn = None
         try:
+            from backend.domains.bi.infrastructure.postgres.database_schema import BI_SCHEMA_SQL
             from backend.features.benchmark.database_schema import (
                 BENCHMARK_SCHEMA_SQL,
             )
-            from backend.features.bi.database_schema import BI_SCHEMA_SQL
 
             conn = self._raw_connection()
             try:

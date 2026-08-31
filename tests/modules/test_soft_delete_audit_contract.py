@@ -1,5 +1,5 @@
-from backend.features.bi.database_schema import BI_SCHEMA_SQL
-from backend.storage.audit_schema import AUDIT_SCHEMA_SQL
+from backend.domains.bi.infrastructure.postgres.database_schema import BI_SCHEMA_SQL
+from backend.platform.postgres.audit_schema import AUDIT_SCHEMA_SQL
 from backend.storage.db_manager import DDL_INIT
 
 
