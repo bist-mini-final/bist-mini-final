@@ -13,8 +13,6 @@ from sse_starlette.sse import EventSourceResponse
 from starlette import status
 
 from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
-from backend.core.state_stream import SharedStateStream
-from backend.core.state_stream_broker import StateStreamBroker
 from backend.domains.bi.application import (
     BiApiServices,
     BiApplicationService,
@@ -37,6 +35,8 @@ from backend.domains.bi.domain.models import (
 )
 from backend.domains.bi.domain.question_records import BiQuestionJobProgress
 from backend.features.bi.postgres_store import BiPostgresStoreError
+from backend.shared.application.state_stream import SharedStateStream
+from backend.shared.application.state_stream_broker import StateStreamBroker
 
 IdentifierPath = Annotated[
     str,

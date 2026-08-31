@@ -1,6 +1,6 @@
-"""Explicit PostgreSQL session and repository foundations."""
+"""Compatibility imports for :mod:`backend.platform.postgres.repositories`."""
 
-from .repositories import (
+from backend.platform.postgres.repositories import (
     AsyncPostgresRepository,
     DatabaseUrlProvider,
     SyncPostgresRepository,
@@ -11,4 +11,3 @@ __all__ = [
     "DatabaseUrlProvider",
     "SyncPostgresRepository",
 ]
-

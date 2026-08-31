@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from backend.engine.worker.base import LeasedWorker, WorkerLeaseSpec
-from backend.shared.infrastructure.observability import (
+from backend.shared.application.observability import (
     ObservabilityContext,
     bind_observability_context,
     current_observability_context,
 )
+from backend.shared.application.workers import LeasedWorker, WorkerLeaseSpec
 
 
 @dataclass(frozen=True, slots=True)

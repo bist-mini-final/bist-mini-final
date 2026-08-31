@@ -1,5 +1,5 @@
 """Application and worker composition roots."""
 
-from .container import ApplicationContainer, RuntimeContainer
+from .application import ApplicationContainer, RuntimeContainer
 
 __all__ = ["ApplicationContainer", "RuntimeContainer"]

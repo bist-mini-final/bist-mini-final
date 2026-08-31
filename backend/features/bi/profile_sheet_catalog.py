@@ -6,7 +6,7 @@ from psycopg2.extras import RealDictCursor
 from backend.core.settings import PGVECTOR_URL
 from backend.domains.bi.domain.extraction_models import BiContextCell, BiRetrievedContext
 from backend.domains.bi.domain.models import BiMaterializationSource
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 from .profile_models import BiProfileRetrievalRequest
 from .rag_errors import RagPipelineContractError

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from backend.shared.infrastructure.database import (
+from backend.platform.postgres.repositories import (
     DatabaseUrlProvider,
     SyncPostgresRepository,
 )

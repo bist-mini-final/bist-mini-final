@@ -10,8 +10,8 @@ from uuid import UUID
 from langchain_core.documents import Document
 
 from backend.core.settings import PGVECTOR_URL
-from backend.providers.embeddings.ports import EmbeddingEncoder
-from backend.storage.connection_pool import get_pooled_async_connection
+from backend.platform.postgres.pool import get_pooled_async_connection
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.pgvector_errors import PgVectorStoreError
 from backend.storage.spreadsheets.langchain_document import langchain_document_to_cell_item
 from modules.common.config import DEFAULT_EMBEDDING_MODEL

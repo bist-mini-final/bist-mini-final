@@ -6,8 +6,8 @@ import logging
 import os
 from typing import Any, cast
 
-from backend.bootstrap.container import RuntimeContainer
-from backend.engine.worker.base import (
+from backend.bootstrap.application import RuntimeContainer
+from backend.shared.application.workers import (
     LeasedWorker,
     WorkerLeaseSpec,
     default_worker_id,

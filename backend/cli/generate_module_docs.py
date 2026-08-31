@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from backend.bootstrap.container import RuntimeContainer
+from collections.abc import Sequence
+
+from backend.bootstrap.application import RuntimeContainer
 from backend.cli.documentation.module_docs import write_module_guides
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
+    if argv:
+        raise ValueError(f"generate-module-docs는 추가 인자를 지원하지 않습니다: {list(argv)}")
     container = RuntimeContainer.create(initialize_schema=False)
     try:
         registry = container.services.module_registry

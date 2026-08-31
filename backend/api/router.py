@@ -3,8 +3,8 @@ from fastapi import APIRouter
 from backend.api.bi_routes import create_bi_router
 from backend.api.chat_routes import create_chat_router
 from backend.api.company_comparison_routes import create_company_comparison_router
-from backend.bootstrap.container import ApplicationContainer
-from backend.core.state_stream_broker import StateStreamBroker
+from backend.bootstrap.application import ApplicationContainer
+from backend.shared.application.state_stream_broker import StateStreamBroker
 
 from .benchmark_routes import create_benchmark_router
 from .cell_evidence_routes import create_cell_evidence_router

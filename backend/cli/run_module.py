@@ -17,7 +17,7 @@ from typing import Any, Sequence
 
 from pydantic import ValidationError
 
-from backend.bootstrap.container import RuntimeContainer
+from backend.bootstrap.application import RuntimeContainer
 from modules.common.base_module import ModuleExecutionError, ModuleExecutionRequestDTO
 
 

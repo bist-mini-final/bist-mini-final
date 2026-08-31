@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator
 from typing import Any, cast
 
 from backend.api.workflow_controller import workflow_run_events
-from backend.core.state_stream import SharedStateStream
 from backend.engine.workflows.models import (
     CanvasPosition,
     NodeStatus,
@@ -17,6 +16,7 @@ from backend.engine.workflows.models import (
     WorkflowRun,
     utc_now_iso,
 )
+from backend.shared.application.state_stream import SharedStateStream
 
 
 def _run(

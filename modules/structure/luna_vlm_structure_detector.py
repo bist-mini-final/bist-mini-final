@@ -48,7 +48,7 @@ from openpyxl.utils.cell import range_boundaries
 from pydantic import Field
 
 from backend.core.settings import SPREADSHEET_ARTIFACT_DIR
-from backend.providers.openai_responses import OpenAIResponseResult, OpenAIResponsesError
+from backend.platform.openai.responses import OpenAIResponseResult, OpenAIResponsesError
 from backend.storage.spreadsheets.cell_semantics import (
     collect_non_empty_cells,
     compact_sheet_context,

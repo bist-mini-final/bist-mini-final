@@ -6,7 +6,7 @@ from typing import Final
 import psycopg2
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 BENCHMARK_SCHEMA_SQL: Final = """
 CREATE TABLE IF NOT EXISTS benchmark_jobs (

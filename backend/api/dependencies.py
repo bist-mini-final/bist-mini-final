@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from backend.bootstrap.container import ApplicationContainer
+from backend.bootstrap.application import ApplicationContainer
 from backend.domains.bi.application import BiApiServices
 from backend.engine.runtime.registry import ModuleRegistry
 from backend.engine.runtime.services import WorkflowRuntimeServices

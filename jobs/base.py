@@ -91,22 +91,23 @@ class KubernetesWorkerPolicy:
 
 @dataclass(frozen=True, kw_only=True)
 class WorkerJobDefinition(BaseJobDefinition):
-    """Leased queue handler with one explicit Python entrypoint."""
+    """Leased queue handler selected by one stable process-level worker kind."""
 
-    worker_entrypoint: str
+    worker_kind: str
     kubernetes: KubernetesWorkerPolicy
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        module_name, separator, function_name = self.worker_entrypoint.partition(":")
-        if not separator or not module_name or not function_name:
-            raise ValueError(
-                f"worker job {self.job_id} entrypoint는 module:function 형식이어야 합니다"
-            )
+        if not self.worker_kind or ":" in self.worker_kind:
+            raise ValueError(f"worker job {self.job_id}의 worker_kind가 유효하지 않습니다")
+
+    @property
+    def worker_entrypoint(self) -> str:
+        return "backend.entrypoints.worker:main"
 
     @property
     def worker_module(self) -> str:
-        return self.worker_entrypoint.partition(":")[0]
+        return "backend.entrypoints.worker"
 
 
 JobDefinition: TypeAlias = DagJobDefinition | WorkerJobDefinition

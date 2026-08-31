@@ -52,6 +52,7 @@ class JobsDefinitionTests(unittest.TestCase):
                 self.assertTrue(job.nodes)
             else:
                 self.assertTrue(job.worker_entrypoint)
+                self.assertTrue(job.worker_kind)
             self.assertTrue(bool(job.name))
             self.assertTrue(bool(job.description))
 

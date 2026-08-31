@@ -1,1 +1,1 @@
-"""Kubernetes workflow worker package; use ``backend.engine.worker.main``."""
+"""Compatibility workflow worker package; use ``backend.entrypoints.worker``."""

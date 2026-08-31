@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import Field
 
-from backend.providers.openai_responses import OpenAIResponseResult
+from backend.platform.openai.responses import OpenAIResponseResult
 from modules.common.base_llm import BaseLLMModule, calculate_openai_cost
 from modules.common.base_module import (
     BaseModule,

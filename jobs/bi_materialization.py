@@ -60,7 +60,7 @@ BI_MATERIALIZATION_JOB = WorkerJobDefinition(
         "대시보드 스냅샷을 PostgreSQL에 적재합니다."
     ),
     queue_name="bi-materialization",
-    worker_entrypoint="backend.features.bi.materialization_worker_main:main",
+    worker_kind="bi-materialization",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="bi-materialization",
         pending_query="""
@@ -83,7 +83,7 @@ BI_QUESTION_JOB = WorkerJobDefinition(
         "BI_QUESTION_BATCH_SIZE / BI_QUESTION_MAX_WORKERS 환경 변수로 튜닝 가능."
     ),
     queue_name="bi-question",
-    worker_entrypoint="backend.features.bi.question_worker_main:main",
+    worker_kind="bi-question",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="bi-question",
         # batch_size=16 x 최대 90초/질문 + 여유 = 2700 초

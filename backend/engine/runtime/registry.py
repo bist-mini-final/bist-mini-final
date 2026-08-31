@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from backend.core.settings import PROCESSED_DATA_DIR, SPREADSHEET_ARTIFACT_DIR
+from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.platform.pgvector import PgVectorRepositorySet
-from backend.providers.embeddings.ports import EmbeddingEncoder
-from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore

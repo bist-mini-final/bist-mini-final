@@ -17,7 +17,7 @@ from backend.domains.bi.domain.question_records import (
     JobId,
     QuestionId,
 )
-from backend.storage.connection_pool import (
+from backend.platform.postgres.pool import (
     get_pooled_async_connection,
     get_pooled_raw_connection,
 )

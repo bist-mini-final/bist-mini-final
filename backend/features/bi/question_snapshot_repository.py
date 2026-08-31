@@ -8,7 +8,7 @@ from backend.core.settings import PGVECTOR_URL
 from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
 from backend.domains.bi.domain.models import JobId
 from backend.domains.bi.domain.question_records import BiAnswerOutcome, BiQuestionStatus
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 
 @dataclass(frozen=True, slots=True)

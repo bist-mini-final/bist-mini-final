@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
-from backend.core.state_stream import SharedStateStream
-from backend.core.state_stream_broker import create_state_stream_broker
+from backend.platform.redis.state_stream_broker import create_state_stream_broker
+from backend.shared.application.state_stream import SharedStateStream
 
 
 class InMemoryStateStreamBroker:

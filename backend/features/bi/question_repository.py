@@ -19,7 +19,7 @@ from backend.domains.bi.domain.question_records import (
     QuestionId,
     WorkflowRunId,
 )
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 from .question_claim_repository import PostgresBiQuestionClaimer
 from .question_repository_queries import (

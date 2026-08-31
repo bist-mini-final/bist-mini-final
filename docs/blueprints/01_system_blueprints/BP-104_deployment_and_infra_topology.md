@@ -198,7 +198,7 @@ spec:
         containers:
         - name: worker
           image: bist-workflow-worker:local
-          command: ["python", "-m", "backend.bootstrap.workers", "workflow"]
+          command: ["python", "-m", "backend.entrypoints.worker", "workflow"]
           resources:
             requests:
               cpu: 1000m
@@ -287,5 +287,5 @@ sequenceDiagram
 - `deploy/`는 container image, Helm, raw manifest와 로컬 실행 UX를 소유하고 business queue 종류를 Python 분기로 재정의하지 않습니다.
 - `jobs/`는 표준 Job 이름·command·resource profile을 선언하며 Helm/KEDA renderer가 같은 catalog를 소비합니다.
 - `backend/platform/kubernetes`는 API client와 workload 조회·제출 adapter만 제공하고, 어떤 작업을 제출할지는 domain application port가 결정합니다.
-- worker image의 정식 진입점은 `backend.bootstrap.workers` 하나이며 kind별 domain worker는 bootstrap registry에서 명시적으로 조립합니다.
+- worker image의 정식 진입점은 `backend.entrypoints.worker` 하나이며 kind별 domain worker는 `backend.bootstrap.workers` registry에서 명시적으로 조립합니다.
 - 모든 ScaledJob이 선언형 catalog와 일치하고 `backend.engine` compatibility entrypoint를 참조하지 않을 때 구조 migration을 완료합니다.

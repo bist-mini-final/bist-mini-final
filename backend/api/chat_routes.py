@@ -20,7 +20,7 @@ from backend.engine.workflows import (
 from backend.features.chatbot.attachments import save_upload
 from backend.features.chatbot.grounding import EvidenceCellStorePort
 from backend.features.chatbot.repository import ChatSessionRepository
-from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.storage.db_manager import DatabaseManager
 
 

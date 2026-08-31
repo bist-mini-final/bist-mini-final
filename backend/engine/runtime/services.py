@@ -23,8 +23,8 @@ from backend.core.settings import (
 )
 from backend.engine.workflows.executor import WorkflowExecutor
 from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
-from backend.providers.embeddings.ports import EmbeddingEncoder
-from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.platform.openai.responses import OpenAIResponsesClient
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.data_sources.ingestion_shards import (
     PostgresIngestionShardRepository,
 )

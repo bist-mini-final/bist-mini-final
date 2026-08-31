@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 from textwrap import dedent
 from typing import get_type_hints
 
-from backend.bootstrap.container import (
+from backend.bootstrap.application import (
     ApplicationContainer,
     DomainServicesContainer,
     ExecutionContainer,
 )
-from backend.engine.worker.base import LeasedWorker
 from backend.features.bi.materialization_worker_main import BiMaterializationWorker
 from backend.features.chatbot.repository import ChatSessionRepository
-from backend.shared.infrastructure.database import SyncPostgresRepository
+from backend.platform.postgres.repositories import SyncPostgresRepository
+from backend.shared.application.workers import LeasedWorker
 from backend.storage.data_sources.embedding_shard_worker_main import (
     EmbeddingShardWorker,
 )
@@ -48,6 +49,42 @@ def _python_files(relative_root: str) -> list[Path]:
     return sorted((PROJECT_ROOT / relative_root).rglob("*.py"))
 
 
+def _imported_modules(path: Path) -> list[tuple[str, int]]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imports: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            imports.append((node.module or "", node.lineno))
+        elif isinstance(node, ast.Import):
+            imports.extend((alias.name, node.lineno) for alias in node.names)
+    return imports
+
+
+def test_application_code_uses_canonical_stage_one_boundaries() -> None:
+    legacy_prefixes = (
+        "backend.bootstrap.container",
+        "backend.core.state_stream",
+        "backend.core.state_stream_broker",
+        "backend.core.telemetry",
+        "backend.engine.worker.base",
+        "backend.engine.worker.lease",
+        "backend.providers.embeddings",
+        "backend.providers.openai_pricing",
+        "backend.providers.openai_provider",
+        "backend.providers.openai_responses",
+        "backend.shared.infrastructure.database",
+        "backend.shared.infrastructure.observability",
+        "backend.storage.connection_pool",
+    )
+    violations: list[str] = []
+    for root in ("backend", "modules", "jobs"):
+        for path in _python_files(root):
+            for imported, line in _imported_modules(path):
+                if imported.startswith(legacy_prefixes):
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
+    assert not violations, f"legacy stage-one imports remain: {violations}"
+
+
 def test_features_never_import_http_api_layer() -> None:
     violations: list[str] = []
     for path in _python_files("backend/features"):
@@ -61,15 +98,12 @@ def test_features_never_import_http_api_layer() -> None:
     assert not violations, f"feature -> API layer inversion: {sorted(set(violations))}"
 
 
-def test_domain_packages_do_not_import_outer_layers() -> None:
-    forbidden_prefixes = (
-        "backend.api",
-        "backend.platform",
-        "backend.providers",
-        "backend.storage",
-    )
+def test_domain_core_and_application_do_not_import_outer_layers() -> None:
+    always_forbidden = ("backend.api", "backend.providers", "backend.storage")
     violations: list[str] = []
     for path in _python_files("backend/domains"):
+        relative = path.relative_to(PROJECT_ROOT)
+        is_domain_infrastructure = "infrastructure" in relative.parts
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             imported: list[str] = []
@@ -77,6 +111,11 @@ def test_domain_packages_do_not_import_outer_layers() -> None:
                 imported = [node.module or ""]
             elif isinstance(node, ast.Import):
                 imported = [alias.name for alias in node.names]
+            forbidden_prefixes = (
+                always_forbidden
+                if is_domain_infrastructure
+                else (*always_forbidden, "backend.platform")
+            )
             if any(name.startswith(forbidden_prefixes) for name in imported):
                 violations.append(f"{path.relative_to(PROJECT_ROOT)}:{getattr(node, 'lineno', 0)}")
     assert not violations, f"domain -> outer layer dependency: {violations}"
@@ -85,7 +124,7 @@ def test_domain_packages_do_not_import_outer_layers() -> None:
 def test_framework_state_access_is_confined_to_the_composition_boundary() -> None:
     allowed = {
         Path("backend/api/dependencies.py"),
-        Path("backend/main.py"),
+        Path("backend/bootstrap/http.py"),
     }
     violations: list[str] = []
     for path in _python_files("backend"):
@@ -93,7 +132,7 @@ def test_framework_state_access_is_confined_to_the_composition_boundary() -> Non
         if relative in allowed:
             continue
         source = path.read_text(encoding="utf-8")
-        if ".app.state" in source or "application.state" in source:
+        if re.search(r"\b(?:app|application)\.state\b", source):
             violations.append(str(relative))
     assert not violations, f"framework state escaped composition boundary: {violations}"
 
@@ -172,7 +211,21 @@ def test_kubernetes_specs_are_projected_from_worker_jobs() -> None:
         spec = by_name[job.kubernetes.deployment_name]
         assert spec.queue_name == job.queue_name
         assert spec.worker_module == job.worker_module
+        assert spec.arguments == (job.worker_kind,)
         assert spec.pending_query == dedent(job.kubernetes.pending_query).strip()
+
+
+def test_kubernetes_specs_use_the_unified_worker_entrypoint() -> None:
+    specs = kubernetes_worker_specs(ALL_JOBS)
+    assert {spec.worker_module for spec in specs} == {"backend.entrypoints.worker"}
+    assert {spec.arguments[0] for spec in specs} == {
+        "workflow",
+        "ingestion-embedding",
+        "ingestion-vector",
+        "bi-materialization",
+        "bi-question",
+        "benchmark",
+    }
 
 
 def test_feature_packages_do_not_own_kubernetes_yaml() -> None:

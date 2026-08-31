@@ -10,7 +10,7 @@ from backend.domains.bi.domain.extraction_models import (
     MetricReaderResult,
     ReaderContractFailure,
 )
-from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.platform.openai.responses import OpenAIResponsesClient
 
 from .evidence import verifiable_cells
 

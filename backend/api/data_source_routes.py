@@ -18,7 +18,7 @@ from backend.platform.data_sources import (
     IngestionSubmissionAdapter,
     SourceFileInspectorAdapter,
 )
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.data_sources import IngestionJobService
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.pgvector_probe import PgVectorConnectionProbe

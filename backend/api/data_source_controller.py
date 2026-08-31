@@ -13,7 +13,7 @@ from backend.domains.data_sources.application import (
     DataSourceFileService,
     UploadSourceFileCommand,
 )
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.spreadsheets.ingestion import (
     delete_vector_index,

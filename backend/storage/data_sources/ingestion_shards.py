@@ -11,7 +11,7 @@ import psycopg2.extras
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 IngestionShardPhase = Literal["embedding", "vector_copy"]
 IngestionShardStatus = Literal["queued", "running", "succeeded", "failed"]

@@ -12,7 +12,7 @@ from backend.domains.bi.domain.materialization_models import (
     BiProfilingResult,
 )
 from backend.domains.bi.domain.models import BiMaterializationRequest, BiMaterializationSource
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 PROFILE_VERSION: Final = "7"
 

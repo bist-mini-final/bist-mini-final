@@ -20,11 +20,11 @@ from backend.domains.bi.domain.question_records import (
     QuestionId,
     WorkflowRunId,
 )
-from backend.engine.worker.lease import (
+from backend.platform.openai.responses import OpenAIResponsesError
+from backend.shared.application.leases import (
     LeaseHeartbeat,
     terminate_process_on_lease_loss,
 )
-from backend.providers.openai_responses import OpenAIResponsesError
 from modules.common.exceptions import ModuleExecutionError
 
 from .question_pipeline import BiQuestionSourceError

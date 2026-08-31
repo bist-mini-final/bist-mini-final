@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.core.settings import PROCESSED_DATA_DIR
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import ModuleExecutionError
 

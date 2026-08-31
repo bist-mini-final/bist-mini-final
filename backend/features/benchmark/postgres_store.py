@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 
 @dataclass(frozen=True, slots=True)

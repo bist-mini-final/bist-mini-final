@@ -8,7 +8,6 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from backend.core.telemetry import trace_node_execution
 from backend.domains.workflow.application import (
     WorkflowInputAssembler,
     WorkflowResultCache,
@@ -16,7 +15,8 @@ from backend.domains.workflow.application import (
 )
 from backend.domains.workflow.domain import DagExecutionError
 from backend.engine.runtime.registry_base import BaseModuleRegistry
-from backend.providers.openai_pricing import calculate_openai_cost
+from backend.platform.openai.pricing import calculate_openai_cost
+from backend.platform.telemetry.tracing import trace_node_execution
 from modules.common.base_module import BaseModule
 
 from .history import compact_history_value

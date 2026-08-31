@@ -38,6 +38,6 @@ RUN mkdir -p \
 
 USER appuser
 
-ENTRYPOINT ["python", "-m", "backend.engine.worker.main"]
+ENTRYPOINT ["python", "-m", "backend.entrypoints.worker"]
 
 FROM base AS runtime
