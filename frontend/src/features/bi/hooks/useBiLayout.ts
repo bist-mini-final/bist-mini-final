@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createUuid } from '../../../shared/lib/uuid';
 import {
   CARD_REGISTRY,
   DEFAULT_CARD_LAYOUT,
@@ -176,7 +177,7 @@ export function useBiLayout(): BiLayoutController {
       const fallback = DEFAULT_CARD_LAYOUT.find((card) => card.cardId === cardId);
       const restoredCard: BiCardLayoutItem = {
         cardId,
-        rowId: `row-${crypto.randomUUID()}`,
+        rowId: `row-${createUuid()}`,
         size: fallback?.size ?? definition.defaultSize,
         x: 0,
         y: current.cards.reduce((maximum, card) => Math.max(maximum, card.y), 0) + 10,
