@@ -1,6 +1,6 @@
 # [BP-102] 백엔드 modular monolith와 의존성 규칙
 > **Document Code:** `BP-102` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
-> **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/shared`, `backend/domains`, `backend/platform`, `backend/api`, `modules`, `jobs`
+> **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/core/settings.py`, `backend/shared`, `backend/domains`, `backend/platform`, `backend/api`, `modules`, `jobs`
 > **Current References:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
 
 ---
@@ -52,15 +52,21 @@ flowchart TD
 
 ```text
 backend/
+├── core/
+│   └── settings.py              # 환경 변수와 project path 정의만 허용
+│
 ├── entrypoints/                 # 실행 가능한 process adapter
 │   ├── asgi.py                  # HTTP bootstrap 호출
 │   ├── cli.py                   # 관리 command dispatch
+│   ├── commands/                # 관리 command process adapter
 │   └── worker.py                # worker bootstrap 호출
 │
 ├── bootstrap/                   # 객체 조립과 프로세스 생명주기
 │   ├── application.py
 │   ├── http.py
-│   └── workers.py
+│   ├── workers.py
+│   ├── schema.py                # domain schema fragment 조립
+│   └── commands/                # 관리 command use case 조립
 │
 ├── shared/                      # 도메인 비종속 공통 계약
 │   ├── domain/
@@ -141,7 +147,7 @@ jobs/                            # 선언형 표준 Job 정의
 | `backend/api` | router 결합과 공통 HTTP edge 정책만 보유하며 파일 allowlist가 구조 테스트로 고정됨 | 목표와 일치 |
 | `backend/platform` | PostgreSQL pool/audit/snapshot, pgvector Binary COPY/error, OpenAI, Kubernetes, Redis, filesystem, telemetry를 canonical 경로로 이전 | 목표와 일치 |
 | 제거된 수평 패키지 | `features`, `providers`, `engine`, `contracts`, `storage` Python source와 이전 API/provider/core shim 제거 | 구조 테스트로 재도입 금지 |
-| 호환 진입 경로 | `backend/main.py`는 ASGI 외부 실행 호환 entrypoint | 배포 command 전환 후 선택적으로 제거 가능 |
+| process adapter | ASGI·worker·CLI와 관리 command가 `backend/entrypoints` 아래에 위치 | 목표와 일치 |
 | `modules`, `jobs` | 원자 모듈과 선언형 Job 경계를 별도 루트로 유지 | 목표와 일치 |
 
 디렉터리 생성이나 일부 의존성 역전만을 근거로 완료 처리하지 않습니다. 호환 패키지의 책임 이전, domain presentation/infrastructure/workers 정착, 호환 import 제거가 끝나고 구조 계약 테스트가 목표 트리를 검증할 때만 `Structure State: Complete`로 전환합니다.

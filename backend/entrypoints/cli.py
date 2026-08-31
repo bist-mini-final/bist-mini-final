@@ -12,10 +12,10 @@ CommandMain = Callable[[Sequence[str] | None], int]
 
 COMMAND_TARGETS = MappingProxyType(
     {
-        "run-module": "backend.cli.run_module:main",
-        "generate-module-docs": "backend.cli.generate_module_docs:main",
-        "backfill-ingestion-run": "backend.cli.backfill_ingestion_run:main",
-        "compact-legacy-chunks": "backend.cli.compact_legacy_key_stats_chunks:main",
+        "run-module": "backend.entrypoints.commands.run_module:main",
+        "generate-module-docs": "backend.entrypoints.commands.generate_module_docs:main",
+        "backfill-ingestion-run": "backend.entrypoints.commands.backfill_ingestion_run:main",
+        "compact-legacy-chunks": "backend.entrypoints.commands.compact_legacy_key_stats_chunks:main",
     }
 )
 

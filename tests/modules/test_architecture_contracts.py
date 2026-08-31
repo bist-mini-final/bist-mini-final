@@ -144,6 +144,7 @@ def test_api_package_contains_only_common_http_composition() -> None:
 def test_removed_horizontal_compatibility_packages_have_no_python_sources() -> None:
     removed = (
         "backend/contracts",
+        "backend/cli",
         "backend/engine",
         "backend/features",
         "backend/providers",
@@ -155,6 +156,32 @@ def test_removed_horizontal_compatibility_packages_have_no_python_sources() -> N
         if _python_files(root)
     }
     assert not remaining, f"removed compatibility sources remain: {remaining}"
+
+
+def test_backend_root_contains_no_legacy_process_module() -> None:
+    assert not (PROJECT_ROOT / "backend/main.py").exists()
+
+
+def test_backend_python_sources_use_the_target_top_level_packages() -> None:
+    allowed = {
+        "api",
+        "bootstrap",
+        "core",
+        "domains",
+        "entrypoints",
+        "platform",
+        "shared",
+    }
+    actual = {
+        path.relative_to(PROJECT_ROOT / "backend").parts[0]
+        for path in _python_files("backend")
+        if len(path.relative_to(PROJECT_ROOT / "backend").parts) > 1
+    }
+    assert actual == allowed
+    core_files = {
+        path.name for path in _python_files("backend/core")
+    }
+    assert core_files == {"__init__.py", "settings.py"}
 
 
 def test_workflow_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:

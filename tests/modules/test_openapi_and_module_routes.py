@@ -6,7 +6,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from backend.main import create_app
+from backend.entrypoints.asgi import create_app
 
 
 class OpenApiAndModuleRoutesTests(unittest.TestCase):

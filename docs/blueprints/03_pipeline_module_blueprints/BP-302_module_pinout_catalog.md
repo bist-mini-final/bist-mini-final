@@ -81,7 +81,7 @@ classDiagram
 2. 신규 제품 도메인 서비스를 모듈 개수에 포함하지 않습니다.
 3. 외부 vision 모듈과 Dense + keyword + RRF 경로를 현재 실행 기준선으로 유지합니다.
 4. 자동 스캔보다 명시적 factory 등록을 유지하여 provider·storage 의존성 주입과 등록 순서를 코드 리뷰 가능하게 보존합니다.
-5. `backend/cli/documentation/module_docs.py`가 Pydantic schema에서 예시와 Markdown을 생성하므로 생성 문서를 직접 수정하지 않습니다.
+5. `modules/documentation.py`가 Pydantic schema에서 예시와 Markdown을 생성하므로 생성 문서를 직접 수정하지 않습니다.
 
 ---
 
