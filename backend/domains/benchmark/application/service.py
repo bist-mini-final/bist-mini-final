@@ -2,28 +2,28 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any
 from uuid import uuid4
 
+from backend.domains.benchmark.domain import BenchmarkCase, BenchmarkRequest
 from backend.domains.workflow.application.execution_service import WorkflowExecutionPort
 from backend.domains.workflow.application.ports import WorkflowDefinitionRepository
-from backend.features.benchmark.postgres_store import BenchmarkStoreError
-from backend.features.benchmark.service import (
-    BENCHMARK_SET_DIR,
-    BENCHMARK_SET_NAMES,
-    BenchmarkCase,
-    BenchmarkRequest,
-    run_snapshot,
-    validate_workflows,
-)
 from backend.shared.domain import (
     ApplicationConflict,
     ApplicationInternalError,
     ApplicationValidationError,
     ResourceNotFoundError,
     RetryableInfrastructureError,
+)
+
+from .execution import run_snapshot, validate_workflows
+from .ports import (
+    BenchmarkRunStorePort,
+    BenchmarkSetSourceError,
+    BenchmarkSetSourcePort,
+    BenchmarkStoreError,
+    BenchmarkStorePort,
 )
 
 
@@ -51,27 +51,6 @@ class BenchmarkQueueUnavailableError(BenchmarkUnavailableError):
     code = "BENCHMARK_QUEUE_UNAVAILABLE"
 
 
-class BenchmarkStorePort(Protocol):
-    def enqueue(
-        self,
-        job_id: str,
-        request_payload: dict[str, Any],
-        total: int,
-        created_at: datetime,
-    ) -> dict[str, Any]: ...
-
-    def get(self, job_id: str) -> dict[str, Any] | None: ...
-    def request_cancel(self, job_id: str) -> dict[str, Any] | None: ...
-    def request_pause(self, job_id: str) -> dict[str, Any] | None: ...
-    def request_resume(self, job_id: str) -> dict[str, Any] | None: ...
-    def list_results(self, limit: int = 50) -> list[dict[str, Any]]: ...
-    def get_result(self, benchmark_id: str) -> dict[str, Any] | None: ...
-
-
-class BenchmarkRunStorePort(Protocol):
-    def load_summary(self, run_id: str) -> Any: ...
-
-
 class BenchmarkApplicationService:
     """Coordinate benchmark validation, durable queueing, control, and inspection."""
 
@@ -82,28 +61,33 @@ class BenchmarkApplicationService:
         workflow_store: WorkflowDefinitionRepository,
         run_store: BenchmarkRunStorePort,
         workflow_execution: WorkflowExecutionPort,
+        benchmark_sets: BenchmarkSetSourcePort,
         queue_available: bool,
     ) -> None:
         self._store = store
         self._workflow_store = workflow_store
         self._run_store = run_store
         self._workflow_execution = workflow_execution
+        self._benchmark_sets = benchmark_sets
         self._queue_available = queue_available
 
     def list_benchmark_sets(self) -> dict[str, Any]:
         sets: list[dict[str, Any]] = []
-        for path in sorted(BENCHMARK_SET_DIR.glob("*.json")):
+        try:
+            documents = self._benchmark_sets.list_documents()
+        except BenchmarkSetSourceError as error:
+            raise BenchmarkSetError(str(error)) from error
+        for document in documents:
             try:
-                raw_cases = json.loads(path.read_text(encoding="utf-8"))
-                cases = [BenchmarkCase.model_validate(item) for item in raw_cases]
-            except (OSError, ValueError, TypeError) as error:
+                cases = [BenchmarkCase.model_validate(item) for item in document.cases]
+            except (ValueError, TypeError) as error:
                 raise BenchmarkSetError(
-                    f"올바르지 않은 벤치마크 세트 파일 ({path.name}): {error}"
+                    f"올바르지 않은 벤치마크 세트 ({document.set_id}): {error}"
                 ) from error
             sets.append(
                 {
-                    "id": path.stem,
-                    "name": BENCHMARK_SET_NAMES.get(path.stem, path.stem),
+                    "id": document.set_id,
+                    "name": document.name,
                     "cases": [case.model_dump(mode="json", exclude_none=True) for case in cases],
                 }
             )

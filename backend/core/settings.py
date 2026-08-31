@@ -15,6 +15,7 @@ WORKFLOW_DIR = PROJECT_DIR / "data" / "workflows"
 RUN_DIR = PROJECT_DIR / "data" / "runs"
 CACHE_DIR = PROJECT_DIR / "data" / "cache"
 CHAT_UPLOAD_DIR = PROJECT_DIR / "data" / "chat_uploads"
+BENCHMARK_SET_DIR = PROJECT_DIR / "data" / "benchmark_sets"
 
 
 def _positive_int_environment(name: str, default: int) -> int:

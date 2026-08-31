@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from backend.bootstrap.application import ApplicationContainer
+from backend.domains.benchmark.presentation import create_benchmark_router
 from backend.domains.bi.presentation.routes import create_bi_router
 from backend.domains.chatbot.presentation import create_chat_router
 from backend.domains.company_comparison.presentation.routes import create_company_comparison_router
@@ -8,7 +9,6 @@ from backend.domains.data_sources.presentation import create_data_source_router
 from backend.domains.workflow.presentation import create_workflow_router
 from backend.shared.application.state_stream_broker import StateStreamBroker
 
-from .benchmark_routes import create_benchmark_router
 from .cell_evidence_routes import create_cell_evidence_router
 from .job_routes import create_job_router
 from .module_routes import create_module_router
@@ -69,10 +69,6 @@ def create_api_router(
         create_data_source_router(domain.data_sources)
     )
     router.include_router(
-        create_benchmark_router(
-            workflow_store=workflow_store,
-            run_store=run_store,
-            workflow_execution=workflow_execution,
-        )
+        create_benchmark_router(domain.benchmark)
     )
     return router

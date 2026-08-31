@@ -12,6 +12,7 @@ from backend.bootstrap.runtime import (
     create_workflow_runtime_services,
 )
 from backend.core.settings import (
+    BENCHMARK_SET_DIR,
     CACHE_DIR,
     CHAT_UPLOAD_DIR,
     EMBEDDING_ARTIFACT_DIR,
@@ -22,6 +23,11 @@ from backend.core.settings import (
     SPREADSHEET_ARTIFACT_DIR,
     VECTOR_INDEX_DIR,
     WORKFLOW_DIR,
+)
+from backend.domains.benchmark.application import BenchmarkApplicationService
+from backend.domains.benchmark.infrastructure import (
+    BenchmarkPostgresStore,
+    LocalBenchmarkSetSource,
 )
 from backend.domains.bi.application import BiApiServices
 from backend.domains.chatbot.application import (
@@ -58,6 +64,7 @@ from backend.storage.pgvector_probe import PgVectorConnectionProbe
 
 @dataclass(frozen=True)
 class RuntimePaths:
+    benchmark_set_dir: Path = BENCHMARK_SET_DIR
     workflow_dir: Path = WORKFLOW_DIR
     run_dir: Path = RUN_DIR
     cache_dir: Path = CACHE_DIR
@@ -167,6 +174,7 @@ class DomainServicesContainer:
     """Own product-facing services without HTTP or process lifecycle concerns."""
 
     bi_services: BiApiServices
+    benchmark: BenchmarkApplicationService
     company_comparison: CompanyComparisonService
     chatbot: ChatApiServices
     data_sources: DataSourceApiServices
@@ -202,6 +210,18 @@ class DomainServicesContainer:
         )
         return cls(
             bi_services=bi_services,
+            benchmark=BenchmarkApplicationService(
+                store=BenchmarkPostgresStore(
+                    runtime.services.db_manager.database_url
+                ),
+                workflow_store=runtime.services.workflow_store,
+                run_store=runtime.services.run_store,
+                workflow_execution=execution.workflow_execution,
+                benchmark_sets=LocalBenchmarkSetSource(
+                    runtime.paths.benchmark_set_dir
+                ),
+                queue_available=runtime.services.run_store.supports_durable_queue,
+            ),
             company_comparison=create_company_comparison_service(
                 bi_services.store,
                 database_url=runtime.services.db_manager.database_url,
