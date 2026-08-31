@@ -93,6 +93,13 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.features.bi",
         "backend.api.bi_routes",
         "backend.storage.audit_schema",
+        "backend.api.company_comparison_routes",
+        "backend.domains.company_comparison.errors",
+        "backend.domains.company_comparison.league_scoring",
+        "backend.domains.company_comparison.models",
+        "backend.domains.company_comparison.snapshot_builder",
+        "backend.contracts.snapshots",
+        "backend.storage.versioned_snapshot_store",
         "backend.api.workflow_controller",
         "backend.api.workflow_routes",
     )
@@ -257,6 +264,49 @@ def test_bi_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:
                         f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
                     )
     assert not violations, f"BI layer inversion: {violations}"
+
+
+def test_company_comparison_vertical_slice_has_no_inverted_dependencies() -> None:
+    forbidden_by_layer = {
+        "domain": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "application": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.company_comparison.infrastructure",
+        ),
+        "presentation": (
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.company_comparison.infrastructure",
+        ),
+    }
+    violations: list[str] = []
+    for layer, forbidden in forbidden_by_layer.items():
+        root = f"backend/domains/company_comparison/{layer}"
+        for path in _python_files(root):
+            for imported, line in _imported_modules(path):
+                if imported.startswith(forbidden):
+                    violations.append(
+                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
+                    )
+    assert not violations, f"company comparison layer inversion: {violations}"
 
 
 def test_process_entrypoints_only_import_bootstrap() -> None:

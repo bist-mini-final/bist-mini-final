@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from backend.domains.bi.application import BiApiStorePort
 from backend.domains.company_comparison.application import CompanyComparisonService
-from backend.storage.versioned_snapshot_store import PostgresVersionedSnapshotRepository
+from backend.domains.company_comparison.infrastructure.integrations.bi_snapshots import (
+    CompanyComparisonBiSourceAdapter,
+)
+from backend.platform.postgres.versioned_snapshots import (
+    PostgresVersionedSnapshotRepository,
+)
 
 
 def create_company_comparison_service(
@@ -13,7 +18,7 @@ def create_company_comparison_service(
     database_url: str,
 ) -> CompanyComparisonService:
     return CompanyComparisonService(
-        source=source,
+        source=CompanyComparisonBiSourceAdapter(source),
         snapshots=PostgresVersionedSnapshotRepository(database_url),
     )
 
