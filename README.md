@@ -247,6 +247,23 @@ KUBERNETES_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rag_flow \
 kubectl -n bist-batch port-forward service/frontend-ui 8080:80
 ```
 
+Windows Git Bash에서는 MSYS가 k3d volume 인자의 컨테이너 경로를 Windows 경로로 바꾸지 않도록 `local.sh`가 `cygpath`와 `MSYS_NO_PATHCONV`를 적용합니다. 재생성·삭제 시에는 PostgreSQL 컨테이너를 기존 k3d 네트워크에서 먼저 분리해 stale network를 방지하고, 새 클러스터가 준비되면 자동으로 다시 연결합니다. DB 컨테이너와 데이터 volume은 삭제하지 않습니다. `bash`가 WSL relay를 가리키면서 `/bin/bash`를 찾지 못하는 PC에서는 `C:\Program Files\Git\bin\bash.exe deploy/kubernetes/local.sh ...`처럼 Git Bash 실행 파일을 명시합니다.
+
+### 공유기 외부 접속
+
+클러스터를 `recreate`한 뒤 공유기에서 TCP `외부 8080 → Kubernetes 호스트의 고정 LAN IP:8080`을 설정하면 `http://kosa165.iptime.org:8080`으로 Ingress에 접근할 수 있습니다. SPA와 `/api/*` 요청은 같은 Ingress를 통과하므로 프론트 개발 포트나 backend `8765`를 별도로 공개하지 않습니다. 현재 호스트 주소를 공유기의 DHCP 예약으로 고정하고 Windows 방화벽 인바운드 TCP 8080 허용, DDNS의 공인 IP 일치, 이중 NAT·CGNAT 여부도 함께 확인해야 합니다. 외부 포트 80을 내부 8080으로 전달하면 URL에서 `:8080`을 생략할 수 있습니다.
+
+관리자 PowerShell에서 Private 네트워크용 방화벽 규칙을 한 번 등록합니다.
+
+```powershell
+New-NetFirewallRule -DisplayName "Excel RAG k3d Ingress HTTP 8080" `
+  -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080 -Profile Private
+```
+
+검증은 먼저 호스트에서 `http://localhost:8080`, 같은 LAN의 다른 장치에서 `http://<고정-LAN-IP>:8080`, 마지막으로 Wi-Fi를 끈 휴대전화 데이터에서 `http://kosa165.iptime.org:8080` 순서로 수행합니다. 일부 공유기는 NAT loopback을 지원하지 않아 같은 LAN에서 DDNS 주소로 접속할 때만 timeout이 발생할 수 있습니다.
+
+> **보안 경계:** 8443은 예약 포트일 뿐 TLS 인증서가 자동 구성되는 것은 아닙니다. 인증·인가가 없는 개발 배포를 인터넷에 그대로 공개하면 제3자가 데이터 조회, 파일 업로드, Job 실행 및 유료 모델 호출을 수행할 수 있습니다. 외부 공개 시에는 VPN 또는 공유기 source-IP 제한을 우선 사용하고, 공개 서비스라면 TLS reverse proxy와 인증 계층을 먼저 구성합니다.
+
 원격 레지스트리로 배포할 때는 이미지를 별도로 `docker push`한 후, import를 끄고 불변 태그를 지정합니다.
 
 ```bash

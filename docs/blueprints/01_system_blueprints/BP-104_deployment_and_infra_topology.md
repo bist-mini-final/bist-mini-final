@@ -103,6 +103,14 @@ RAM·disk·포트의 포괄적 preflight나 `wget`/PowerShell/urllib downloader 
 
 Compose는 PostgreSQL/pgvector 개발 DB만 관리하며 API/UI/worker 전체의 Kubernetes 대체 트랙이 아닙니다.
 
+### 2.2.1 Host·공유기 포트 경계
+
+- k3d load balancer는 host `8080 → Ingress 80`, host `8443 → Ingress 443`으로 생성됩니다. Windows Git Bash에서는 `cygpath -am`으로 data volume host 경로를 정규화하고 해당 k3d 호출에만 `MSYS_NO_PATHCONV=1`을 적용합니다. 재생성·삭제 전에는 PostgreSQL 컨테이너를 k3d 네트워크에서 분리하고 새 클러스터 생성 후 재연결하여 DB 데이터는 보존하면서 stale network를 방지합니다.
+- 외부 DDNS 접속은 공유기 TCP `외부 8080 → Kubernetes host 고정 LAN IP:8080` 한 개로 구성합니다. Host IP는 DHCP 예약으로 고정합니다. React SPA와 `/api/*`가 같은 Ingress를 사용하므로 `5173`, `5183`, backend `8765`를 외부에 공개하지 않습니다.
+- 외부 접속 전 관리자 권한으로 Windows Private profile의 TCP 8080 inbound rule을 등록하고 DDNS 공인 IP, 이중 NAT·CGNAT를 확인합니다. 외부 80을 내부 8080으로 전달하면 URL의 포트 표기를 생략할 수 있습니다.
+- 검증 순서는 host `localhost:8080` → 같은 LAN의 `고정-IP:8080` → 모바일 데이터의 DDNS URL입니다. 같은 LAN의 DDNS 접속만 실패하면 공유기의 NAT loopback 미지원일 수 있으므로 외부망 결과로 판정합니다.
+- 8443 매핑만으로 TLS가 활성화되지는 않습니다. 인증·인가가 없는 개발 배포는 VPN/source-IP 제한 뒤에서만 사용하며, 공개 서비스는 TLS reverse proxy와 인증 계층을 선행합니다.
+
 ---
 
 ### 2.3 Kubernetes 통합 배포와 DB 전용 개발 모드

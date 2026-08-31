@@ -256,20 +256,54 @@ start_database() {
   )
 }
 
+disconnect_database_from_cluster_network() {
+  local cluster_network="k3d-${CLUSTER_NAME}"
+  if docker inspect bist-pgvector >/dev/null 2>&1 \
+    && docker network inspect "${cluster_network}" >/dev/null 2>&1 \
+    && docker inspect bist-pgvector \
+      --format '{{json .NetworkSettings.Networks}}' | grep -q "\"${cluster_network}\""; then
+    docker network disconnect "${cluster_network}" bist-pgvector
+  fi
+}
+
+remove_stale_cluster_network() {
+  local cluster_network="k3d-${CLUSTER_NAME}"
+  if docker network inspect "${cluster_network}" >/dev/null 2>&1; then
+    disconnect_database_from_cluster_network
+    docker network rm "${cluster_network}" >/dev/null
+  fi
+}
+
 ensure_cluster() {
+  local data_directory
   if k3d cluster list --no-headers 2>/dev/null | awk '{print $1}' | grep -qx "${CLUSTER_NAME}"; then
     if [[ "$(k3d cluster list --no-headers | awk -v name="${CLUSTER_NAME}" '$1 == name {print $2}')" != "1/1" ]]; then
       k3d cluster start "${CLUSTER_NAME}" >/dev/null
     fi
   else
-    k3d cluster create "${CLUSTER_NAME}" \
-      --servers 1 \
-      --agents 0 \
-      --wait \
-      --k3s-arg "--disable=traefik@server:0" \
-      --port "8080:80@loadbalancer" \
-      --port "8443:443@loadbalancer" \
-      --volume "${PROJECT_ROOT}/data:/mnt/bist-data@server:0"
+    remove_stale_cluster_network
+    data_directory="${PROJECT_ROOT}/data"
+    if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]] \
+      && command -v cygpath >/dev/null 2>&1; then
+      data_directory="$(cygpath -am "${data_directory}")"
+      MSYS_NO_PATHCONV=1 k3d cluster create "${CLUSTER_NAME}" \
+        --servers 1 \
+        --agents 0 \
+        --wait \
+        --k3s-arg "--disable=traefik@server:0" \
+        --port "8080:80@loadbalancer" \
+        --port "8443:443@loadbalancer" \
+        --volume "${data_directory}:/mnt/bist-data@server:0"
+    else
+      k3d cluster create "${CLUSTER_NAME}" \
+        --servers 1 \
+        --agents 0 \
+        --wait \
+        --k3s-arg "--disable=traefik@server:0" \
+        --port "8080:80@loadbalancer" \
+        --port "8443:443@loadbalancer" \
+        --volume "${data_directory}:/mnt/bist-data@server:0"
+    fi
   fi
   kubectl config use-context "k3d-${CLUSTER_NAME}" >/dev/null
   if docker inspect bist-pgvector >/dev/null 2>&1 \
@@ -543,6 +577,7 @@ case "${ACTION}" in
     ;;
   recreate)
     check_tools
+    disconnect_database_from_cluster_network
     k3d cluster delete "${CLUSTER_NAME}" || true
     start_database
     ensure_cluster
@@ -591,6 +626,7 @@ case "${ACTION}" in
     k3d cluster stop "${CLUSTER_NAME}" || true
     ;;
   destroy)
+    disconnect_database_from_cluster_network
     k3d cluster delete "${CLUSTER_NAME}" || true
     ;;
   *)
