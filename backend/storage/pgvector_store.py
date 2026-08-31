@@ -6,8 +6,12 @@ import threading
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from backend.contracts.vector import PgVectorReplacePlan
 from backend.core.settings import PGVECTOR_URL
+from backend.platform.postgres.pool import (
+    get_pooled_async_connection,
+    get_pooled_raw_connection,
+)
+from backend.shared.application.vector import PgVectorReplacePlan
 from backend.storage.pgvector_errors import PgVectorStoreError
 from backend.storage.repositories.pgvector_catalog import (
     VECTOR_INDEX_STRATEGY,
@@ -19,8 +23,6 @@ from backend.storage.repositories.pgvector_writes import (
     PGVECTOR_INSERT_BATCH_SIZE,
     PgVectorWriteMixin,
 )
-
-from .connection_pool import get_pooled_async_connection, get_pooled_raw_connection
 
 
 class PgVectorStore(

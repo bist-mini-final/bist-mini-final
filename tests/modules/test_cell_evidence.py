@@ -9,10 +9,12 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 from PIL import Image
 
-from backend.api.cell_evidence_routes import create_cell_evidence_router
+from backend.domains.data_sources.application import CellEvidenceService
+from backend.domains.data_sources.infrastructure.spreadsheets import LocalCellArtifactLocator
 from backend.domains.data_sources.infrastructure.spreadsheets.cell_evidence import (
     locate_cell_artifact,
 )
+from backend.domains.data_sources.presentation import create_cell_evidence_router
 
 
 class FakePgVectorStore:
@@ -96,12 +98,13 @@ def test_cell_evidence_route_scopes_lookup_by_company(tmp_path: Path) -> None:
     app = FastAPI()
     app.include_router(
         create_cell_evidence_router(
-            pgvector_store=FakePgVectorStore(
-                file_name=file_name,
-                workbook_hash=workbook_hash,
-            ),  # type: ignore[arg-type]
-            processed_dir=processed_dir,
-            artifact_dir=artifact_dir,
+            CellEvidenceService(
+                FakePgVectorStore(
+                    file_name=file_name,
+                    workbook_hash=workbook_hash,
+                ),  # type: ignore[arg-type]
+                LocalCellArtifactLocator(processed_dir, artifact_dir),
+            )
         )
     )
     response = TestClient(app).get(
@@ -133,12 +136,13 @@ def test_cell_evidence_route_accepts_persisted_full_company_alias(tmp_path: Path
     app = FastAPI()
     app.include_router(
         create_cell_evidence_router(
-            pgvector_store=FakePgVectorStore(
-                file_name=file_name,
-                workbook_hash=workbook_hash,
-            ),  # type: ignore[arg-type]
-            processed_dir=processed_dir,
-            artifact_dir=artifact_dir,
+            CellEvidenceService(
+                FakePgVectorStore(
+                    file_name=file_name,
+                    workbook_hash=workbook_hash,
+                ),  # type: ignore[arg-type]
+                LocalCellArtifactLocator(processed_dir, artifact_dir),
+            )
         )
     )
     response = TestClient(app).get(

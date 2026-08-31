@@ -1,3 +1,5 @@
+from .artifacts import SpreadsheetArtifactService
+from .evidence import CellEvidenceQuery, CellEvidenceService
 from .files import (
     DataSourceFileNotFound,
     DataSourceFileService,
@@ -12,7 +14,10 @@ __all__ = [
     "DataSourceFileService",
     "DataSourceFileTooLarge",
     "DataSourceFileWriteError",
+    "CellEvidenceQuery",
+    "CellEvidenceService",
     "IngestionJobService",
     "IngestionRequest",
+    "SpreadsheetArtifactService",
     "UploadSourceFileCommand",
 ]

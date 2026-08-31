@@ -11,7 +11,6 @@ from uuid import UUID, uuid4, uuid5
 import psycopg2.extras
 from langchain_core.documents import Document
 
-from backend.contracts.vector import PgVectorReplacePlan
 from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
     EmbeddingArtifactVectors,
 )
@@ -19,6 +18,7 @@ from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document
     cell_items_to_langchain_documents,
 )
 from backend.shared.application.embeddings import EmbeddingEncoder
+from backend.shared.application.vector import PgVectorReplacePlan
 from backend.storage.pgvector_binary_copy import copy_documents
 from backend.storage.pgvector_errors import PgVectorStoreError
 from modules.common.config import DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_MODEL

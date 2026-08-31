@@ -1,7 +1,7 @@
 # [BP-502] SSE 상태 스트리밍 규격
 > **Document Code:** `BP-502` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/domains/*/presentation/sse.py`, `backend/shared/application`, `backend/platform/redis`
-> **Current References:** [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/core/state_stream.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream.py), [`backend/core/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream_broker.py)
+> **Current References:** [`backend/domains/workflow/presentation/routes.py`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/routes.py), [`backend/shared/application/state_stream.py`](file:///c:/Repos/bist-mini-final/backend/shared/application/state_stream.py), [`backend/shared/application/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/shared/application/state_stream_broker.py), [`backend/platform/redis/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/platform/redis/state_stream_broker.py)
 
 ---
 
@@ -78,4 +78,4 @@ Endpoint: `GET /api/v1/runs/{run_id}/stream`
 - event envelope와 cursor/reconnect semantics는 shared application contract, domain별 projection은 해당 presentation의 `sse.py`가 소유합니다.
 - Redis adapter는 hint publish/subscribe만 제공하며 domain state를 저장하거나 event payload를 진실 공급원으로 만들지 않습니다.
 - SSE endpoint는 application query로 현재 PostgreSQL snapshot을 읽고 hint 수신 시 재조회합니다.
-- `backend/core/state_stream*` 책임이 shared/platform/domain presentation으로 분리되고 다중 Pod·Redis 장애 계약 테스트가 통과할 때 구조 migration을 완료합니다.
+- 이전 `backend/core/state_stream*` 책임은 shared contract, Redis platform adapter와 domain presentation으로 분리됐습니다. 다중 Pod·Redis 장애 계약 테스트가 이 경계를 검증합니다.

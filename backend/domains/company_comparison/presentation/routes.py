@@ -5,10 +5,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from starlette import status
 
-from backend.contracts import ApiErrorEnvelope
 from backend.domains.company_comparison.application import CompanyComparisonService
 from backend.domains.company_comparison.domain.errors import ComparisonDataError
 from backend.domains.company_comparison.domain.models import CompanyComparisonSnapshot
+from backend.shared.presentation import ApiErrorEnvelope
 
 
 def create_company_comparison_router(

@@ -101,6 +101,9 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.api.job_routes",
         "backend.features.job_monitoring",
         "backend.providers.kubernetes_monitor",
+        "backend.api.cell_evidence_routes",
+        "backend.api.module_routes",
+        "backend.api.spreadsheet_artifact_routes",
         "backend.domains.company_comparison.errors",
         "backend.domains.company_comparison.league_scoring",
         "backend.domains.company_comparison.models",
@@ -117,6 +120,37 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
                 if imported.startswith(legacy_prefixes):
                     violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"legacy stage-one imports remain: {violations}"
+
+
+def test_api_package_contains_only_common_http_composition() -> None:
+    allowed = {
+        "__init__.py",
+        "error_mapping.py",
+        "exception_handlers.py",
+        "middleware.py",
+        "openapi.py",
+        "router.py",
+        "spa.py",
+        "system_routes.py",
+        "versioning.py",
+    }
+    actual = {path.name for path in (PROJECT_ROOT / "backend/api").glob("*.py")}
+    assert actual == allowed
+
+
+def test_removed_horizontal_compatibility_packages_have_no_python_sources() -> None:
+    removed = (
+        "backend/contracts",
+        "backend/engine",
+        "backend/features",
+        "backend/providers",
+    )
+    remaining = {
+        root: [str(path.relative_to(PROJECT_ROOT)) for path in _python_files(root)]
+        for root in removed
+        if _python_files(root)
+    }
+    assert not remaining, f"removed compatibility sources remain: {remaining}"
 
 
 def test_workflow_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:
@@ -503,10 +537,7 @@ def test_domain_core_and_application_do_not_import_outer_layers() -> None:
 
 
 def test_framework_state_access_is_confined_to_the_composition_boundary() -> None:
-    allowed = {
-        Path("backend/api/dependencies.py"),
-        Path("backend/bootstrap/http.py"),
-    }
+    allowed: set[Path] = set()
     violations: list[str] = []
     for path in _python_files("backend"):
         relative = path.relative_to(PROJECT_ROOT)

@@ -42,7 +42,11 @@ from backend.domains.chatbot.infrastructure.postgres import (
     ChatSuggestionRepository,
 )
 from backend.domains.company_comparison.application import CompanyComparisonService
-from backend.domains.data_sources.application import DataSourceFileService
+from backend.domains.data_sources.application import (
+    CellEvidenceService,
+    DataSourceFileService,
+    SpreadsheetArtifactService,
+)
 from backend.domains.data_sources.application.ingestion_jobs import IngestionJobService
 from backend.domains.data_sources.application.services import DataSourceApiServices
 from backend.domains.data_sources.infrastructure import (
@@ -51,7 +55,11 @@ from backend.domains.data_sources.infrastructure import (
     SourceFileInspectorAdapter,
     SpreadsheetVectorCatalogAdapter,
 )
-from backend.domains.data_sources.infrastructure.filesystem import LocalSourceFileStorage
+from backend.domains.data_sources.infrastructure.filesystem import (
+    LocalSourceFileStorage,
+    LocalSpreadsheetArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets import LocalCellArtifactLocator
 from backend.domains.operations.application import OperationsQueryService
 from backend.domains.operations.infrastructure import KubernetesMonitor
 from backend.domains.workflow.application.execution_service import WorkflowExecutionService
@@ -267,6 +275,18 @@ class DomainServicesContainer:
                 database=PgVectorDatabaseAdapter(
                     runtime.services.pgvector_store,
                     runtime.pgvector_probe,
+                ),
+                evidence=CellEvidenceService(
+                    runtime.services.pgvector_store,
+                    LocalCellArtifactLocator(
+                        runtime.paths.processed_dir,
+                        runtime.paths.spreadsheet_artifact_dir,
+                    ),
+                ),
+                artifacts=SpreadsheetArtifactService(
+                    LocalSpreadsheetArtifactStore(
+                        runtime.paths.spreadsheet_artifact_dir
+                    )
                 ),
             ),
             operations=OperationsQueryService(
