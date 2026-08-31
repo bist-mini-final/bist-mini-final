@@ -1,19 +1,24 @@
 import { Suspense, useEffect } from 'react';
 import { AppShell } from './app/AppShell';
 import { findRoute } from './app/routes';
-import { usePathname } from './app/router';
+import { navigateTo, usePathname } from './app/router';
+import { ChatWorkspaceProvider } from './features/chatbot/ChatWorkspaceProvider';
 import { NotFoundPage } from './pages/NotFoundPage';
 
-function App() {
+function AppContent() {
   const pathname = usePathname();
   const activeRoute = findRoute(pathname);
   const Page = activeRoute?.component;
 
   useEffect(() => {
     document.title = activeRoute
-      ? `${activeRoute.label} · RAG Flow`
-      : '페이지를 찾을 수 없음 · RAG Flow';
+      ? `${activeRoute.label} · Excel RAG`
+      : '페이지를 찾을 수 없음 · Excel RAG';
   }, [activeRoute]);
+
+  useEffect(() => {
+    if (pathname === '/') navigateTo('/chatbot', true);
+  }, [pathname]);
 
   return (
     <AppShell activeRoute={activeRoute} pathname={pathname}>
@@ -25,6 +30,14 @@ function App() {
         <NotFoundPage />
       )}
     </AppShell>
+  );
+}
+
+function App() {
+  return (
+    <ChatWorkspaceProvider>
+      <AppContent />
+    </ChatWorkspaceProvider>
   );
 }
 

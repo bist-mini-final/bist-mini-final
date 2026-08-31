@@ -94,7 +94,7 @@ export function Header({
 
         <div className="app-header__brand-divider" aria-hidden="true" />
 
-        <div className="brand-mark" aria-label="Excel RAG Flow" title="Excel RAG Flow Visualizer">
+        <div className="brand-mark" aria-label="Excel RAG" title="Excel RAG">
           <FileSpreadsheet className="h-4 w-4" />
         </div>
 
