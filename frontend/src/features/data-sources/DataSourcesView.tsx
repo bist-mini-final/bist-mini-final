@@ -20,6 +20,7 @@ export function DataSourcesView() {
     dbStatus,
     isLoading,
     error,
+    activePipelineRuns,
     activePipelineRun,
     canResumeActivePipeline,
     isViewingTracker,
@@ -89,11 +90,9 @@ export function DataSourcesView() {
           <VectorIndexList
             indexes={indexes}
             isLoading={isLoading}
-            activeRunningPipeline={activePipelineRun}
+            activeRunningPipelines={activePipelineRuns}
             failedRuns={visibleFailedRuns}
-            onResumePipeline={() => {
-              if (activePipelineRun) controller.viewFailedRunLog(activePipelineRun);
-            }}
+            onViewPipeline={controller.viewPipelineRun}
             onViewFailedLog={controller.viewFailedRunLog}
             onDeletePipeline={controller.requestDeletePipeline}
             deletingPipelineId={deletingPipelineId}

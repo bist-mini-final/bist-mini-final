@@ -129,9 +129,10 @@ export const dataSourceApi = {
     fileName?: string,
     signal?: AbortSignal
   ): Promise<IngestionJobResponse[]> {
-    const query = fileName ? `?file_name=${encodeURIComponent(fileName)}` : '';
+    const query = new URLSearchParams({ limit: '100' });
+    if (fileName) query.set('file_name', fileName);
     const data = await requestJson<{ jobs: IngestionJobResponse[]; total: number }>(
-      `/api/data-sources/ingestion-jobs${query}`,
+      `/api/data-sources/ingestion-jobs?${query.toString()}`,
       signal
     );
     return data.jobs;

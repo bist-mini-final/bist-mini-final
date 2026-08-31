@@ -117,7 +117,7 @@ describe('VectorIndexList', () => {
     render(
       <VectorIndexList
         indexes={[index]}
-        activeRunningPipeline={pipeline}
+        activeRunningPipelines={[pipeline]}
         onDetailClick={vi.fn()}
         onSearchClick={vi.fn()}
         onDeleteClick={vi.fn()}
@@ -155,7 +155,7 @@ describe('VectorIndexList', () => {
     render(
       <VectorIndexList
         indexes={[index]}
-        activeRunningPipeline={completed}
+        activeRunningPipelines={[completed]}
         onDetailClick={vi.fn()}
         onSearchClick={vi.fn()}
         onDeleteClick={vi.fn()}
@@ -165,6 +165,51 @@ describe('VectorIndexList', () => {
 
     expect(screen.getByText('completed.xlsx')).toBeInTheDocument();
     expect(screen.getByText('42개')).toBeInTheDocument();
+  });
+
+  it('renders every concurrently active ingestion pipeline', () => {
+    const pipeline = (pipelineId: string, fileName: string): PipelineRunState => ({
+      pipelineId,
+      targetIndexId: `${pipelineId}-index`,
+      fileName,
+      model: 'text-embedding-3-large',
+      batchSize: 2048,
+      status: 'running',
+      currentStageIndex: 0,
+      progressPercent: 25,
+      elapsedSeconds: 8,
+      modules: [{
+        id: `${pipelineId}-selector`,
+        name: '파일 선택',
+        moduleType: 'processed_file_selector',
+        category: 'Source',
+        icon: FileSpreadsheet,
+        status: 'running',
+        sublogs: [],
+      }],
+    });
+    const first = pipeline('run-first', 'first.xlsx');
+    const second = pipeline('run-second', 'second.xlsx');
+    const onViewPipeline = vi.fn();
+
+    render(
+      <VectorIndexList
+        indexes={[]}
+        activeRunningPipelines={[first, second]}
+        onViewPipeline={onViewPipeline}
+        onDetailClick={vi.fn()}
+        onSearchClick={vi.fn()}
+        onDeleteClick={vi.fn()}
+        onCreateClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('first.xlsx')).toBeInTheDocument();
+    expect(screen.getByText('second.xlsx')).toBeInTheDocument();
+    const progressButtons = screen.getAllByRole('button', { name: /진행상황 \/ 모듈 로그/i });
+    expect(progressButtons).toHaveLength(2);
+    fireEvent.click(progressButtons[1]);
+    expect(onViewPipeline).toHaveBeenCalledWith(second);
   });
 
   it('edits a company name and refreshes the persisted collection list', async () => {
