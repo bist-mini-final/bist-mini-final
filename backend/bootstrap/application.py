@@ -59,6 +59,7 @@ from backend.domains.data_sources.infrastructure.filesystem import (
     LocalSourceFileStorage,
     LocalSpreadsheetArtifactStore,
 )
+from backend.domains.data_sources.infrastructure.pgvector import PgVectorConnectionProbe
 from backend.domains.data_sources.infrastructure.spreadsheets import LocalCellArtifactLocator
 from backend.domains.operations.application import OperationsQueryService
 from backend.domains.operations.infrastructure import KubernetesMonitor
@@ -68,7 +69,6 @@ from backend.platform.openai.embeddings import OpenAIEmbeddingEncoder
 from backend.platform.openai.provider import OpenAIProvider
 from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.pgvector_probe import PgVectorConnectionProbe
 
 
 @dataclass(frozen=True)

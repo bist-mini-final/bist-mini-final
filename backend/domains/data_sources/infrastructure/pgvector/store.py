@@ -7,19 +7,20 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from backend.core.settings import PGVECTOR_URL
+from backend.platform.pgvector.errors import PgVectorStoreError
 from backend.platform.postgres.pool import (
     get_pooled_async_connection,
     get_pooled_raw_connection,
 )
 from backend.shared.application.vector import PgVectorReplacePlan
-from backend.storage.pgvector_errors import PgVectorStoreError
-from backend.storage.repositories.pgvector_catalog import (
+
+from .catalog import (
     VECTOR_INDEX_STRATEGY,
     VECTOR_PARTITION_STRATEGY,
     PgVectorCatalogMixin,
 )
-from backend.storage.repositories.pgvector_retrieval import PgVectorRetrievalMixin
-from backend.storage.repositories.pgvector_writes import (
+from .retrieval import PgVectorRetrievalMixin
+from .writes import (
     PGVECTOR_INSERT_BATCH_SIZE,
     PgVectorWriteMixin,
 )

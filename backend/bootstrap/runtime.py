@@ -30,6 +30,7 @@ from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts 
 from backend.domains.data_sources.infrastructure.filesystem.shard_artifacts import (
     IngestionShardArtifactStore,
 )
+from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
 from backend.domains.data_sources.infrastructure.postgres.shards import (
     PostgresIngestionShardRepository,
 )
@@ -40,7 +41,6 @@ from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.platform.telemetry.tracing import trace_node_execution
 from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.pgvector_store import PgVectorStore
 
 from .module_registry import ModuleRegistry
 

@@ -6,6 +6,10 @@ from backend.domains.data_sources.application.shard_coordinator import Ingestion
 from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
     EmbeddingArtifactStore,
 )
+from backend.domains.data_sources.infrastructure.pgvector import (
+    PgVectorRepositorySet,
+    PgVectorStore,
+)
 from backend.domains.data_sources.infrastructure.spreadsheets.sheet_renderer import (
     ExcelSheetRenderer,
 )
@@ -13,10 +17,8 @@ from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog i
     WorkbookCatalog,
 )
 from backend.platform.openai.responses import OpenAIResponsesClient
-from backend.platform.pgvector import PgVectorRepositorySet
 from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.pgvector_store import PgVectorStore
 from modules.common.base_module import BaseModule
 from modules.embedding.cell_text_embedder import CellTextEmbedderModule
 from modules.embedding.query_embedder import EmbedderModule

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .pgvector_store import PgVectorStore
+from .store import PgVectorStore
 
 
 class PgVectorConnectionProbe:

@@ -10,8 +10,8 @@ from backend.bootstrap.module_registry import ModuleRegistry
 from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
     EmbeddingArtifactStore,
 )
+from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.pgvector_store import PgVectorStore
 
 
 def create_test_registry(

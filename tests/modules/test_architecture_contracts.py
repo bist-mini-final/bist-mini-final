@@ -15,6 +15,12 @@ from backend.bootstrap.application import (
 )
 from backend.domains.bi.workers.materialization import BiMaterializationWorker
 from backend.domains.chatbot.infrastructure.postgres import ChatSessionRepository
+from backend.domains.data_sources.infrastructure.pgvector import (
+    PgVectorCatalogMixin,
+    PgVectorRetrievalMixin,
+    PgVectorStore,
+    PgVectorWriteMixin,
+)
 from backend.domains.data_sources.workers.embedding import (
     EmbeddingShardWorker,
 )
@@ -22,11 +28,7 @@ from backend.domains.data_sources.workers.vector import VectorShardWorker
 from backend.platform.postgres.repositories import SyncPostgresRepository
 from backend.shared.application.workers import LeasedWorker
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.pgvector_store import PgVectorStore
 from backend.storage.repositories import (
-    PgVectorCatalogMixin,
-    PgVectorRetrievalMixin,
-    PgVectorWriteMixin,
     SourceFileRepositoryMixin,
     WorkflowRunHistoryRepositoryMixin,
     WorkflowRunQueueRepositoryMixin,
@@ -575,7 +577,7 @@ def test_pipeline_modules_depend_on_pgvector_ports_not_the_sql_gateway() -> None
     violations: list[str] = []
     for path in _python_files("modules"):
         source = path.read_text(encoding="utf-8")
-        if "backend.storage.pgvector_store" in source:
+        if "infrastructure.pgvector.store" in source:
             violations.append(str(path.relative_to(PROJECT_ROOT)))
     assert not violations, f"module -> pgvector SQL gateway dependency: {violations}"
 

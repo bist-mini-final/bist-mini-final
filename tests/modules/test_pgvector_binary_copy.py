@@ -13,8 +13,12 @@ from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts 
     EmbeddingArtifactStore,
     EmbeddingArtifactVectors,
 )
-from backend.storage.pgvector_binary_copy import PgVectorBinaryCopyStream
-from backend.storage.pgvector_store import PgVectorReplacePlan, PgVectorStore, PgVectorStoreError
+from backend.domains.data_sources.infrastructure.pgvector import (
+    PgVectorReplacePlan,
+    PgVectorStore,
+    PgVectorStoreError,
+)
+from backend.platform.pgvector import PgVectorBinaryCopyStream
 
 
 def test_binary_copy_stream_avoids_python_vector_materialization(
@@ -154,7 +158,7 @@ def test_binary_copy_stream_accepts_retry_stable_document_ids() -> None:
 def test_prepared_copy_reuses_deterministic_ids_on_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import backend.storage.repositories.pgvector_writes as store_module
+    import backend.domains.data_sources.infrastructure.pgvector.writes as store_module
 
     copied = MagicMock()
     monkeypatch.setattr(store_module, "copy_documents", copied)
@@ -193,7 +197,7 @@ def test_pgvector_store_routes_artifact_vectors_to_binary_copy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import backend.storage.repositories.pgvector_writes as store_module
+    import backend.domains.data_sources.infrastructure.pgvector.writes as store_module
 
     artifact_store = EmbeddingArtifactStore(tmp_path)
     artifact_id = "f" * 64
@@ -239,7 +243,7 @@ def test_binary_copy_failure_rolls_back_and_removes_staging_collection(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import backend.storage.repositories.pgvector_writes as store_module
+    import backend.domains.data_sources.infrastructure.pgvector.writes as store_module
 
     artifact_store = EmbeddingArtifactStore(tmp_path)
     artifact_id = "1" * 64

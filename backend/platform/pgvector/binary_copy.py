@@ -8,15 +8,41 @@ import struct
 import sys
 from array import array
 from collections import deque
-from typing import Any, Callable, Deque, Dict, Iterator, Optional, Sequence
+from typing import (
+    Any,
+    Callable,
+    Deque,
+    Dict,
+    Iterator,
+    Optional,
+    Protocol,
+    Sequence,
+    overload,
+    runtime_checkable,
+)
 from uuid import UUID, uuid4
 
 from langchain_core.documents import Document
 
-from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
-    EmbeddingArtifactVectors,
-)
-from modules.common.base_module import ModuleExecutionError
+from .errors import PgVectorStoreError
+
+
+@runtime_checkable
+class RawVectorBatchSource(Protocol):
+    """Vector source that exposes validated little-endian float32 batches."""
+
+    @property
+    def dimension(self) -> int: ...
+
+    def __len__(self) -> int: ...
+
+    @overload
+    def __getitem__(self, index: int) -> Sequence[float]: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[Sequence[float]]: ...
+
+    def iter_raw_batches(self, batch_size: int) -> Iterator[bytes]: ...
 
 _COPY_HEADER = b"PGCOPY\n\xff\r\n\x00" + struct.pack("!II", 0, 0)
 _COPY_TRAILER = struct.pack("!h", -1)
@@ -43,7 +69,7 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
     def __init__(
         self,
         documents: Sequence[Document],
-        vectors: EmbeddingArtifactVectors | Sequence[Sequence[float]],
+        vectors: RawVectorBatchSource | Sequence[Sequence[float]],
         collection_uuid: str,
         *,
         batch_size: int,
@@ -52,14 +78,14 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
     ) -> None:
         super().__init__()
         if len(documents) != len(vectors):
-            raise ModuleExecutionError(
+            raise PgVectorStoreError(
                 "COPY 대상 문서 개수와 float32 벡터 개수가 일치하지 않습니다"
             )
         dimension = (
-            vectors.dimension if isinstance(vectors, EmbeddingArtifactVectors) else len(vectors[0])
+            vectors.dimension if isinstance(vectors, RawVectorBatchSource) else len(vectors[0])
         )
         if not 0 < dimension <= 32_767:
-            raise ModuleExecutionError(
+            raise PgVectorStoreError(
                 f"PostgreSQL vector 바이너리 차원이 올바르지 않습니다: {dimension}"
             )
         self._documents = documents
@@ -68,11 +94,11 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         self._batch_size = max(1, batch_size)
         self._progress_callback = progress_callback
         if document_ids is not None and len(document_ids) != len(documents):
-            raise ModuleExecutionError("COPY document ID 개수가 문서 개수와 일치하지 않습니다")
+            raise PgVectorStoreError("COPY document ID 개수가 문서 개수와 일치하지 않습니다")
         self._document_ids = document_ids
         self._raw_batches: Iterator[bytes] | None = (
             vectors.iter_raw_batches(self._batch_size)
-            if isinstance(vectors, EmbeddingArtifactVectors)
+            if isinstance(vectors, RawVectorBatchSource)
             else None
         )
         self._sequence_batch_start = 0
@@ -99,7 +125,7 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         return True
 
     def _load_vector_batch(self) -> None:
-        if isinstance(self._vectors, EmbeddingArtifactVectors):
+        if isinstance(self._vectors, RawVectorBatchSource):
             words, vector_count = self._artifact_batch_words()
         else:
             words, vector_count = self._sequence_batch_words()
@@ -112,14 +138,14 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
         try:
             raw = next(self._raw_batches)
         except StopIteration as error:
-            raise ModuleExecutionError(
+            raise PgVectorStoreError(
                 "float32 아티팩트가 문서 개수보다 먼저 종료되었습니다"
             ) from error
         if len(raw) % self._bytes_per_vector != 0:
-            raise ModuleExecutionError("float32 아티팩트 배치가 벡터 경계에 맞지 않습니다")
+            raise PgVectorStoreError("float32 아티팩트 배치가 벡터 경계에 맞지 않습니다")
         words = array("I")
         if words.itemsize != 4:
-            raise ModuleExecutionError(
+            raise PgVectorStoreError(
                 "현재 플랫폼의 32비트 word 크기가 PostgreSQL COPY 형식과 다릅니다"
             )
         words.frombytes(raw)
@@ -133,19 +159,19 @@ class PgVectorBinaryCopyStream(io.RawIOBase):
             len(self._vectors),
         )
         if stop <= self._sequence_batch_start:
-            raise ModuleExecutionError("벡터 시퀀스가 문서 개수보다 먼저 종료되었습니다")
+            raise PgVectorStoreError("벡터 시퀀스가 문서 개수보다 먼저 종료되었습니다")
         words = array("f")
         for vector in self._vectors[self._sequence_batch_start : stop]:
             if len(vector) != self._dimension:
-                raise ModuleExecutionError("COPY 벡터 차원이 컬렉션 메타데이터와 일치하지 않습니다")
+                raise PgVectorStoreError("COPY 벡터 차원이 컬렉션 메타데이터와 일치하지 않습니다")
             try:
                 words.extend(float(value) for value in vector)
             except (TypeError, ValueError, OverflowError) as error:
-                raise ModuleExecutionError(
+                raise PgVectorStoreError(
                     "COPY 벡터에 float32로 변환할 수 없는 값이 있습니다"
                 ) from error
         if words.itemsize != 4:
-            raise ModuleExecutionError(
+            raise PgVectorStoreError(
                 "현재 플랫폼의 float32 word 크기가 PostgreSQL COPY 형식과 다릅니다"
             )
         if sys.byteorder == "little":
@@ -275,7 +301,7 @@ def copy_documents(
     *,
     collection_uuid: str,
     documents: Sequence[Document],
-    vectors: EmbeddingArtifactVectors | Sequence[Sequence[float]],
+    vectors: RawVectorBatchSource | Sequence[Sequence[float]],
     batch_size: int,
     progress_callback: Optional[Callable[[Dict[str, int]], None]] = None,
     document_ids: Optional[Sequence[str]] = None,
@@ -306,5 +332,6 @@ def copy_documents(
 
 __all__ = [
     "PgVectorBinaryCopyStream",
+    "RawVectorBatchSource",
     "copy_documents",
 ]
