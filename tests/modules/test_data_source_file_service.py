@@ -11,6 +11,7 @@ from backend.domains.data_sources.application import (
     DataSourceFileTooLarge,
     UploadSourceFileCommand,
 )
+from backend.domains.data_sources.infrastructure.filesystem import LocalSourceFileStorage
 
 
 class FakeMetadata:
@@ -85,7 +86,7 @@ def _service(tmp_path: Path) -> tuple[DataSourceFileService, FakeMetadata, FakeV
     vectors = FakeVectors()
     return (
         DataSourceFileService(
-            processed_dir=tmp_path,
+            storage=LocalSourceFileStorage(tmp_path),
             metadata=metadata,
             vector_indexes=vectors,
             ingestion=FakeIngestion(),

@@ -1,7 +1,7 @@
 # [BP-501] REST API와 DTO 규격
 > **Document Code:** `BP-501` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/domains/*/presentation`, `backend/api/router.py`, `backend/api/middleware.py`, `backend/api/exception_handlers.py`, `backend/api/versioning.py`
-> **Current References:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py), [`backend/api/workflow_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_controller.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py)
+> **Current References:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py), [`backend/domains/workflow/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/), [`backend/domains/data_sources/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/presentation/)
 
 ---
 

@@ -15,6 +15,7 @@ from backend.core.settings import (
     CACHE_DIR,
     EMBEDDING_ARTIFACT_DIR,
     KUBERNETES_WORKFLOW_QUEUE,
+    PGVECTOR_URL,
     PROCESSED_DATA_DIR,
     RUN_DIR,
     SPREADSHEET_ARTIFACT_DIR,
@@ -25,6 +26,16 @@ from backend.domains.bi.application import BiApiServices
 from backend.domains.chatbot.application import ChatSuggestionService
 from backend.domains.chatbot.infrastructure.postgres import ChatSuggestionRepository
 from backend.domains.company_comparison.application import CompanyComparisonService
+from backend.domains.data_sources.application import DataSourceFileService
+from backend.domains.data_sources.application.ingestion_jobs import IngestionJobService
+from backend.domains.data_sources.application.services import DataSourceApiServices
+from backend.domains.data_sources.infrastructure import (
+    IngestionSubmissionAdapter,
+    PgVectorDatabaseAdapter,
+    SourceFileInspectorAdapter,
+    SpreadsheetVectorCatalogAdapter,
+)
+from backend.domains.data_sources.infrastructure.filesystem import LocalSourceFileStorage
 from backend.domains.workflow.application.execution_service import WorkflowExecutionService
 from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 from backend.platform.openai.embeddings import OpenAIEmbeddingEncoder
@@ -148,14 +159,27 @@ class DomainServicesContainer:
     bi_services: BiApiServices
     company_comparison: CompanyComparisonService
     chat_suggestions: ChatSuggestionService
+    data_sources: DataSourceApiServices
     job_monitor: KubernetesMonitor
 
     @classmethod
     def create(
         cls,
         runtime: RuntimeContainer,
+        execution: ExecutionContainer,
     ) -> "DomainServicesContainer":
         bi_services = create_bi_services(runtime.services.module_registry)
+        ingestion = IngestionJobService(
+            runtime.services.workflow_store,
+            runtime.services.run_store,
+            runtime.services.workflow_executor,
+            execution.workflow_dispatcher,
+        )
+        catalog = SpreadsheetVectorCatalogAdapter(
+            runtime.services.pgvector_store,
+            runtime.embedding_encoder,
+        )
+        file_storage = LocalSourceFileStorage(runtime.paths.processed_dir)
         return cls(
             bi_services=bi_services,
             company_comparison=create_company_comparison_service(
@@ -165,6 +189,25 @@ class DomainServicesContainer:
             chat_suggestions=ChatSuggestionService(
                 ChatSuggestionRepository(runtime.services.db_manager),
                 bi_services,
+            ),
+            data_sources=DataSourceApiServices(
+                processed_dir=runtime.paths.processed_dir,
+                configured_database_url=PGVECTOR_URL,
+                file_storage=file_storage,
+                files=DataSourceFileService(
+                    storage=file_storage,
+                    metadata=runtime.services.db_manager,
+                    vector_indexes=runtime.services.pgvector_store,
+                    ingestion=IngestionSubmissionAdapter(ingestion),
+                    inspector=SourceFileInspectorAdapter(),
+                ),
+                ingestion=ingestion,
+                runs=runtime.services.run_store,
+                catalog=catalog,
+                database=PgVectorDatabaseAdapter(
+                    runtime.services.pgvector_store,
+                    runtime.pgvector_probe,
+                ),
             ),
             job_monitor=KubernetesMonitor(queue_reader=runtime.services.db_manager),
         )
@@ -185,10 +228,11 @@ class ApplicationContainer:
         runtime: RuntimeContainer | None = None,
     ) -> "ApplicationContainer":
         shared_runtime = runtime or RuntimeContainer.create(require_database=True)
+        execution = ExecutionContainer.create(shared_runtime)
         return cls(
             runtime=shared_runtime,
-            execution=ExecutionContainer.create(shared_runtime),
-            domain=DomainServicesContainer.create(shared_runtime),
+            execution=execution,
+            domain=DomainServicesContainer.create(shared_runtime, execution),
         )
 
     @property

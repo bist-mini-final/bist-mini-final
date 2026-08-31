@@ -46,7 +46,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from openpyxl.utils.cell import coordinate_to_tuple
 from pydantic import Field
 
-from backend.storage.spreadsheets.structured_cell_text import (
+from backend.domains.data_sources.infrastructure.spreadsheets.structured_cell_text import (
     normalize_row_headers,
     resolved_cell_value,
     serialize_structured_cell,

@@ -1,7 +1,7 @@
 # [BP-202] 외부 Vision 기반 시트 구조 감지
 > **Document Code:** `BP-202` | **Contract State:** Target Architecture | **Capability State:** Operational via External Provider | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/vision`, `backend/platform/openai`, `modules/structure`
-> **Current References:** [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py), [`backend/storage/spreadsheets/sheet_renderer.py`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/sheet_renderer.py), [`backend/storage/spreadsheets/cell_type_overlay.py`](file:///c:/Repos/bist-mini-final/backend/storage/spreadsheets/cell_type_overlay.py)
+> **Current References:** [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py), [`backend/domains/data_sources/infrastructure/spreadsheets/sheet_renderer.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/spreadsheets/sheet_renderer.py), [`backend/domains/data_sources/infrastructure/spreadsheets/cell_type_overlay.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/spreadsheets/cell_type_overlay.py)
 
 ---
 

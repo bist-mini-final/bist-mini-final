@@ -8,8 +8,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_evidence import (
+    locate_cell_artifact,
+)
 from backend.storage.pgvector_store import PgVectorStore
-from backend.storage.spreadsheets.cell_evidence import locate_cell_artifact
 
 
 def _matching_indexes(

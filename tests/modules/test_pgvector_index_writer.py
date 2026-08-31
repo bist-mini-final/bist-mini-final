@@ -5,7 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
 from backend.storage.pgvector_store import PgVectorReplacePlan
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 

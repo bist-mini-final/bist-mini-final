@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar
 
-from backend.storage.spreadsheets.structured_cell_text import (
+from backend.domains.data_sources.infrastructure.spreadsheets.structured_cell_text import (
     extract_resolved_cell_value,
 )
 

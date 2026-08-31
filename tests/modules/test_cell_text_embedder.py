@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from backend.storage.data_sources.shard_coordinator import DistributedEmbeddingResult
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
+from backend.domains.data_sources.application.shard_coordinator import DistributedEmbeddingResult
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
 from modules.common.base_embedder import calculate_embedding_cost
 from modules.embedding.cell_text_embedder import (
     CellTextEmbedderConfigDTO,

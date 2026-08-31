@@ -45,11 +45,15 @@ from typing import Any, Dict, Optional
 from pydantic import Field
 
 from backend.core.settings import INGESTION_VECTOR_SHARD_SIZE, PROCESSED_DATA_DIR
+from backend.domains.data_sources.application.shard_coordinator import IngestionShardCoordinator
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactStore,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document import (
+    lazy_cell_documents,
+)
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
-from backend.storage.embedding_artifacts import EmbeddingArtifactStore
-from backend.storage.spreadsheets.langchain_document import lazy_cell_documents
 from modules.common.base_module import (
     BaseModule,
     EmptyModuleConfigDTO,

@@ -47,8 +47,10 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from pydantic import Field
 
-from backend.storage.spreadsheets.cell_visibility import worksheet_visible
-from backend.storage.spreadsheets.structured_cell_text import (
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_visibility import (
+    worksheet_visible,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.structured_cell_text import (
     SERIALIZATION_VERSION,
     UNKNOWN_FIELD,
     WorksheetValueReader,
@@ -58,7 +60,9 @@ from backend.storage.spreadsheets.structured_cell_text import (
     serialize_structured_cell,
     sheet_code,
 )
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.base_module import (
     BaseModule,
     ModuleConfigDTO,

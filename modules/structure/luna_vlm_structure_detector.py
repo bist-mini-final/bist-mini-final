@@ -48,21 +48,36 @@ from openpyxl.utils.cell import range_boundaries
 from pydantic import Field
 
 from backend.core.settings import SPREADSHEET_ARTIFACT_DIR
-from backend.platform.openai.responses import OpenAIResponseResult, OpenAIResponsesError
-from backend.storage.spreadsheets.cell_semantics import (
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_semantics import (
     collect_non_empty_cells,
     compact_sheet_context,
 )
-from backend.storage.spreadsheets.cell_type_overlay import render_cell_type_overlay
-from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility, worksheet_visible
-from backend.storage.spreadsheets.grid_structure import build_column_header_tree
-from backend.storage.spreadsheets.prompt_guidance import (
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_type_overlay import (
+    render_cell_type_overlay,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.cell_visibility import (
+    WorksheetVisibility,
+    worksheet_visible,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.grid_structure import (
+    build_column_header_tree,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.prompt_guidance import (
     TABLE_UNIFICATION_GUIDANCE,
     TEXT_CELL_ROLE_GUIDANCE,
 )
-from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
-from backend.storage.spreadsheets.table_geometry import CellBounds, SheetLayout, cell_bounds_bbox
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.sheet_renderer import (
+    ExcelSheetRenderer,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.table_geometry import (
+    CellBounds,
+    SheetLayout,
+    cell_bounds_bbox,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
+from backend.platform.openai.responses import OpenAIResponseResult, OpenAIResponsesError
 from modules.common.base_module import (
     BaseModule,
     ModuleConfigDTO,

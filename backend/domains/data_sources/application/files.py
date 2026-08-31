@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
-from uuid import uuid4
 
-from anyio import open_file, to_thread
+from anyio import to_thread
 
 from backend.shared.domain import (
     ApplicationInternalError,
     PayloadTooLargeError,
     ResourceNotFoundError,
 )
+
+from .ports import SourceFileStorageLimitExceeded, SourceFileStoragePort
 
 MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 WORKBOOK_SUFFIXES = frozenset({".xlsx", ".xlsm"})
@@ -85,25 +85,17 @@ class UploadSourceFileCommand:
     batch_size: int
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 class DataSourceFileService:
     def __init__(
         self,
         *,
-        processed_dir: Path,
+        storage: SourceFileStoragePort,
         metadata: SourceFileMetadataPort,
         vector_indexes: VectorIndexCleanupPort,
         ingestion: IngestionSubmissionPort,
         inspector: SourceFileInspectorPort,
     ) -> None:
-        self._processed_dir = processed_dir
+        self._storage = storage
         self._metadata = metadata
         self._vector_indexes = vector_indexes
         self._ingestion = ingestion
@@ -114,32 +106,23 @@ class DataSourceFileService:
         command: UploadSourceFileCommand,
         chunks: AsyncIterable[bytes],
     ) -> dict[str, Any]:
-        safe_filename = Path(command.file_name).name
-        destination = self._processed_dir / safe_filename
-        temporary = self._processed_dir / (
-            f".{safe_filename}.{uuid4().hex}.uploading"
-        )
         try:
-            self._processed_dir.mkdir(parents=True, exist_ok=True)
-            digest = hashlib.sha256()
-            size_bytes = 0
-            async with await open_file(temporary, "wb") as buffer:
-                async for chunk in chunks:
-                    size_bytes += len(chunk)
-                    if size_bytes > MAX_UPLOAD_SIZE_BYTES:
-                        raise DataSourceFileTooLarge(
-                            "파일 크기는 500MB를 초과할 수 없습니다."
-                        )
-                    digest.update(chunk)
-                    await buffer.write(chunk)
-            await to_thread.run_sync(temporary.replace, destination)
-            file_hash = digest.hexdigest()
-        except DataSourceFileTooLarge:
-            temporary.unlink(missing_ok=True)
-            raise
+            stored = await self._storage.save(
+                command.file_name,
+                chunks,
+                max_size_bytes=MAX_UPLOAD_SIZE_BYTES,
+            )
+        except SourceFileStorageLimitExceeded as error:
+            raise DataSourceFileTooLarge(
+                "파일 크기는 500MB를 초과할 수 없습니다."
+            ) from error
         except Exception as error:
-            temporary.unlink(missing_ok=True)
             raise DataSourceFileWriteError(f"파일 저장 실패: {error}") from error
+
+        safe_filename = stored.file_name
+        destination = stored.path
+        size_bytes = stored.size_bytes
+        file_hash = stored.sha256
 
         if await self._metadata.is_connected_async():
             try:
@@ -192,22 +175,18 @@ class DataSourceFileService:
         actor_id: str,
         request_id: str | None,
     ) -> dict[str, Any]:
-        safe_filename = Path(file_name).name
-        target = self._processed_dir / safe_filename
-        if not target.is_file():
-            raise DataSourceFileNotFound("파일을 찾을 수 없습니다.")
-
-        workbook_hash: str | None = None
-        if target.suffix.lower() in HASHED_FILE_SUFFIXES:
-            try:
-                workbook_hash = _sha256_file(target)
-            except Exception as error:
-                logger.warning("파일 해시 계산 실패 (인덱스 정리 건너뜀): %s", error)
-
         try:
-            target.unlink()
+            deleted = self._storage.delete(
+                file_name,
+                hash_suffixes=HASHED_FILE_SUFFIXES,
+            )
+        except FileNotFoundError:
+            raise DataSourceFileNotFound("파일을 찾을 수 없습니다.")
         except Exception as error:
             raise DataSourceFileWriteError(f"파일 삭제 실패: {error}") from error
+
+        safe_filename = deleted.file_name
+        workbook_hash = deleted.sha256
 
         deleted_indexes = 0
         if workbook_hash and self._vector_indexes.is_connected():

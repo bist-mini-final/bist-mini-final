@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from langchain_core.documents import Document
 
-from backend.storage.embedding_artifacts import (
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
     EmbeddingArtifactStore,
     EmbeddingArtifactVectors,
 )

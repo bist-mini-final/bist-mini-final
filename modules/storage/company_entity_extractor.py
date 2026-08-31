@@ -44,7 +44,9 @@ from typing import Any, ClassVar, Dict, List, Literal, Optional
 import openpyxl
 from pydantic import BaseModel, Field, model_validator
 
-from backend.storage.spreadsheets.workbook_catalog import WorkbookCatalog
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
+    WorkbookCatalog,
+)
 from modules.common.base_llm import (
     BaseLLMModule,
     ModuleConfigDTO,

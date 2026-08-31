@@ -1,7 +1,7 @@
 # [BP-402] Data Sources 워크스페이스
-> **Document Code:** `BP-402` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Document Code:** `BP-402` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Vertical Slice Complete / Frontend Aligned
 > **Target Ownership:** `backend/domains/data_sources`, `backend/platform/pgvector`, `backend/platform/openai`, `frontend/src/features/data-sources`, `frontend/src/pages`
-> **Current References:** [`backend/api/data_source_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_routes.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py), [`backend/api/data_source_ingestion_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_ingestion_controller.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
+> **Current References:** [`backend/domains/data_sources/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/), [`backend/bootstrap/application.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/application.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
 
 ---
 
@@ -9,7 +9,7 @@
 
 Data Sources는 spreadsheet 원본 등록, preview/download, durable ingestion 작업, pgvector index 조회·검색·삭제, DB 연결 상태를 제공하는 데이터 엔지니어링 워크스페이스입니다. 현재 공개 기능에 수동 bounding-box 편집/승인 API와 전용 ingestion SSE는 없습니다.
 
-HTTP composition은 `data_source_routes.py`가 담당하고 file/index/ingestion/database router를 조합합니다. 파일 수명주기와 index 검색·기업명 변경은 `DataSourceHttpController`, ingestion DTO 변환과 상태 projection은 `DataSourceIngestionController`가 담당하므로 개별 route는 입력 바인딩과 status code만 소유합니다.
+도메인 presentation의 `routes.py`가 file/index/ingestion/database router를 조합합니다. 파일 수명주기와 index 검색·기업명 변경은 `DataSourceHttpController`, ingestion DTO 변환과 상태 projection은 `IngestionHttpController`가 담당하므로 개별 route는 입력 바인딩과 status code만 소유합니다. Bootstrap은 local source-file storage, PostgreSQL/pgvector adapter와 application service를 한 번 조립합니다.
 
 ---
 
@@ -96,4 +96,5 @@ flowchart LR
 - data source aggregate, ingestion state와 삭제/rename policy는 domain, command/query와 ports는 application이 소유합니다.
 - upload·preview·index REST/SSE는 presentation, workbook·PostgreSQL·pgvector adapter는 infrastructure가 소유합니다.
 - UI feature는 파일/collection/job state를 분리하고 모든 mutation에 busy·error·revalidation 상태를 제공합니다.
-- API controller, storage spreadsheet, shard coordinator 책임이 data sources vertical slice로 이동하고 route 내부 orchestration이 없어질 때 구조 migration을 완료합니다.
+- API controller, spreadsheet/artifact filesystem 구현, shard coordinator/repository/worker가 data sources vertical slice로 이동했고 route 내부 orchestration을 제거했습니다. 구조 계약 테스트는 application/presentation/worker의 legacy·역방향 import를 차단합니다.
+- 범용 pgvector connection/COPY facade의 `backend/platform/pgvector` 최종 이전은 데이터 소스가 아니라 platform migration 단계에서 완료합니다.

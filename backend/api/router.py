@@ -4,12 +4,12 @@ from backend.api.bi_routes import create_bi_router
 from backend.api.chat_routes import create_chat_router
 from backend.api.company_comparison_routes import create_company_comparison_router
 from backend.bootstrap.application import ApplicationContainer
+from backend.domains.data_sources.presentation import create_data_source_router
 from backend.domains.workflow.presentation import create_workflow_router
 from backend.shared.application.state_stream_broker import StateStreamBroker
 
 from .benchmark_routes import create_benchmark_router
 from .cell_evidence_routes import create_cell_evidence_router
-from .data_source_routes import create_data_source_router
 from .job_routes import create_job_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
@@ -79,17 +79,7 @@ def create_api_router(
         )
     )
     router.include_router(
-        create_data_source_router(
-            processed_dir=paths.processed_dir,
-            embedding_encoder=runtime.embedding_encoder,
-            pgvector_store=pgvector_store,
-            connection_probe=runtime.pgvector_probe,
-            db_manager=services.db_manager,
-            workflow_store=workflow_store,
-            run_store=run_store,
-            workflow_executor=workflow_executor,
-            workflow_dispatcher=workflow_dispatcher,
-        )
+        create_data_source_router(domain.data_sources)
     )
     router.include_router(
         create_benchmark_router(

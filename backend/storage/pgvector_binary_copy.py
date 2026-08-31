@@ -13,7 +13,9 @@ from uuid import UUID, uuid4
 
 from langchain_core.documents import Document
 
-from backend.storage.embedding_artifacts import EmbeddingArtifactVectors
+from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
+    EmbeddingArtifactVectors,
+)
 from modules.common.base_module import ModuleExecutionError
 
 _COPY_HEADER = b"PGCOPY\n\xff\r\n\x00" + struct.pack("!II", 0, 0)

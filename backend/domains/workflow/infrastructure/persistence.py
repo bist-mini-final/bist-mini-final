@@ -263,6 +263,15 @@ class RunStore:
 
         return self.db_manager is not None
 
+    def find_ingestion_run_id_by_index(self, index_id: str) -> str | None:
+        """Resolve an ingestion run through the optional PostgreSQL projection."""
+
+        lookup = getattr(self.db_manager, "find_ingestion_run_id_by_index", None)
+        if not callable(lookup):
+            return None
+        run_id = lookup(index_id)
+        return run_id if isinstance(run_id, str) else None
+
     def _externalize_output(self, run_id: str, node_id: str, value: Any) -> Any:
         """Store large JSON output once on the shared volume and return a DB ref."""
 
