@@ -1,7 +1,7 @@
 # [BP-301] DAG 검증과 durable 실행
-> **Document Code:** `BP-301` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Mostly Aligned
+> **Document Code:** `BP-301` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/domains/workflow/domain`, `backend/domains/workflow/application`, `backend/domains/workflow/infrastructure`, `backend/domains/workflow/presentation`, `backend/domains/workflow/workers`
-> **Current References:** [`backend/domains/workflow/domain/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/domain/), [`backend/domains/workflow/application/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/application/), [`backend/domains/workflow/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/infrastructure/), [`backend/domains/workflow/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/), [`backend/domains/workflow/workers/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/workers/)
+> **Current References:** [`backend/domains/workflow/domain/`](../../../backend/domains/workflow/domain), [`backend/domains/workflow/application/`](../../../backend/domains/workflow/application), [`backend/domains/workflow/infrastructure/`](../../../backend/domains/workflow/infrastructure), [`backend/domains/workflow/presentation/`](../../../backend/domains/workflow/presentation), [`backend/domains/workflow/workers/`](../../../backend/domains/workflow/workers)
 
 ---
 
@@ -84,3 +84,5 @@ Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 
 - PostgreSQL store, Kubernetes dispatcher와 cache adapter는 `workflow/infrastructure`, REST/SSE는 `workflow/presentation`, lease process는 `workflow/workers`에 둡니다.
 - executor는 presentation DTO, provider client, concrete store를 import하지 않고 application port와 module registry 계약만 사용합니다.
 - workflow vertical slice, 내부 canonical import와 workflow SQL/row mapping의 domain PostgreSQL adapter 이전이 완료됐습니다. 구조 gate가 외부 호환 shim과 수평 storage facade의 재도입을 차단합니다.
+- workflow presentation은 HTTP/SSE projection만, application은 검증·submit·resume/cancel과 executor orchestration만, infrastructure는 PostgreSQL/Kubernetes/cache adapter만 소유합니다.
+- graph/state/pin 또는 resume semantics를 바꾸면 저장 schema version, API DTO, Playground runtime projection과 durable recovery 테스트를 함께 갱신합니다.

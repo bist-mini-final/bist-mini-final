@@ -1,7 +1,7 @@
 # [BP-104] K8s, KEDA ScaledJob & 인프라 토폴로지
-> **Document Code:** `BP-104` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-104` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `deploy`, `backend/entrypoints/worker.py`, `backend/bootstrap/workers.py`, `backend/platform/kubernetes`, `backend/domains/operations`, `backend/domains/*/workers`, `jobs`
-> **Current References:** [`deploy/kubernetes/local.sh`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/manifests/), [`deploy/helm/bist/`](file:///c:/Repos/bist-mini-final/deploy/helm/bist/), [`deploy/docker/`](file:///c:/Repos/bist-mini-final/deploy/docker/), [`deploy/compose/docker-compose.yml`](file:///c:/Repos/bist-mini-final/deploy/compose/docker-compose.yml)
+> **Current References:** [`deploy/kubernetes/local.sh`](../../../deploy/kubernetes/local.sh), [`deploy/kubernetes/manifests/`](../../../deploy/kubernetes/manifests), [`deploy/helm/bist/`](../../../deploy/helm/bist), [`deploy/docker/`](../../../deploy/docker), [`deploy/compose/docker-compose.yml`](../../../deploy/compose/docker-compose.yml)
 
 ---
 
@@ -19,11 +19,11 @@ graph TB
         INGRESS["Ingress Controller (Port 80/443)"]
 
         subgraph FrontendGroup ["Frontend Pods (Nginx)"]
-            FE["bist-frontend (Replicas: 1~3)<br>React 18 SPA Dist (/playground, /chatbot, /bi)"]
+            FE["bist-frontend (Replicas: 2 by default)<br>React 18 SPA (/chatbot, /playground, /data-sources, /dashboard, /company-comparison, /jobs, /settings)"]
         end
 
         subgraph BackendGroup ["Backend API & Admin Pods (FastAPI)"]
-            BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/v1/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• K8s Job Dashboard (/jobs)"]
+            BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/v1/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• Job snapshot API (/api/v1/jobs)"]
         end
 
         REDIS["bist-redis<br>Pub/Sub state-change relay"]
@@ -45,7 +45,6 @@ graph TB
     INGRESS -->|/ -> User Frontend UI| FE
     INGRESS -->|/api/* -> Core API| BE
     INGRESS -->|/docs, /redoc -> API Specs| BE
-    INGRESS -->|/jobs -> K8s Job Monitor| BE
 
     BE -->|기본: 외부 DB 연결| PG_EXTERNAL
     BE -->|SSE state-change signal| REDIS
@@ -59,109 +58,58 @@ graph TB
 
 ---
 
-## 2. 베이직 환경 적응형 로컬 배포 파이프라인 (Adaptive Zero-Config Deployment)
+## 2. 로컬 배포기와 실제 사전 조건
 
-아무런 개발 도구(Docker, k3d, kubectl, helm 등)가 설치되어 있지 않은 **완전 순정(Fresh/Bare-Metal) OS 환경에서도 배포 실패 없이 구동**될 수 있도록, **5단계 사전 진단(Pre-Flight Diagnostics) ➡️ 제로-컨피그 자가 설치(Self-Bootstrapping) ➡️ 2-Track 배포 전략**을 구현합니다.
+`deploy/kubernetes/local.sh`는 Docker 기반 로컬 통합 환경을 반복 가능하게 구성하는 Bash entrypoint입니다. 완전한 bare-metal 무의존 설치기는 아니며 Docker daemon과 Bash 실행 환경은 사전 조건입니다. Windows에서는 WSL2 또는 Git Bash에서 실행합니다.
 
 ```mermaid
 flowchart TD
-    START["🚀 배포 스크립트 실행<br>(./deploy/kubernetes/local.sh all)"] --> PREFLIGHT{"1. Pre-Flight 환경 진단"}
-
-    subgraph PreflightChecks ["5대 Pre-Flight 진단 항목"]
-        C1["① Bash 실행 환경 감지 (WSL / Git Bash / macOS / Linux)"]
-        C2["② 하드웨어 리소스 진단 (RAM >= 4GB, Disk >= 10GB)"]
-        C3["③ 포트 충돌 검사 (Port 8080, 5432 점유 여부)"]
-        C4["④ Docker 엔진 설치 및 데몬 기동 여부 검증"]
-        C5["⑤ CLI 도구 존재 여부 (k3d, kubectl, helm, uv)"]
-    end
-
-    PREFLIGHT --> PreflightChecks
-    PreflightChecks --> AUTO_INSTALL["2. 제로-글로벌 도구 자동 설치<br>(호스트 오염 없이 .tools/bin 로컬 격리 다운로드)"]
-
-    AUTO_INSTALL --> TRACK_DECISION{"3. 배포 트랙 선택"}
-
-    subgraph TrackA ["Track A: Full Kubernetes 모드 (표준 KEDA 클러스터)"]
-        A1["k3d 클러스터 생성 (bist-local)"] --> A2["로컬 컨테이너 이미지 빌드"]
-        A2 --> A3["KEDA Operator Helm 설치"]
-        A3 --> A4["Ingress & ScaledJob 매니페스트 적용"]
-    end
-
-    subgraph TrackB ["Track B: Zero-K8s 경량 모드 (저사양/K8s 미지원 환경 Fallback)"]
-        B1["docker-compose.yml 1-Click 구동"]
-        B2["Nginx + FastAPI + PostgreSQL + Worker 컨테이너 일체 기동"]
-    end
-
-    TRACK_DECISION -- "K8s 지원 환경 (기본값)" --> TrackA
-    TRACK_DECISION -- "K8s 비활성 / DB만 필요" --> TrackB
-
-    TrackA --> READY["✅ 배포 완료! http://localhost:8080 즉시 접속"]
-    TrackB --> READY
+    START["./deploy/kubernetes/local.sh all"] --> CHECK["Docker daemon + k3d + kubectl + Helm + project Python 확인"]
+    CHECK --> DB["로컬 Compose DB 시작 또는 외부 PostgreSQL SELECT 1 검증"]
+    DB --> MIGRATE["alembic upgrade head"]
+    MIGRATE --> CLUSTER["기존 bist-local 재사용 또는 k3d 생성"]
+    CLUSTER --> CONTROL["KEDA + metrics-server + ingress-nginx 설치"]
+    CONTROL --> IMAGE["backend/frontend/worker 이미지 build + k3d import"]
+    IMAGE --> SECRET["application/KEDA Secret과 ScaledJob render"]
+    SECRET --> APP["migration Job → API/UI/Redis rollout → readiness 확인"]
+    APP --> READY["http://localhost:8080"]
 ```
 
----
+### 2.1 도구 확인과 설치 범위
 
-### 2.1 5대 Pre-Flight 사전 진단 및 자가 치료(Self-Bootstrapping) 원칙
-
-| 진단 항목 | 발생 가능한 문제점 (Risk) | 자동 복구 및 자가 설치 동작 (Self-Healing) |
+| 도구 | 현재 `local.sh` 동작 | 실패 시 경계 |
 | :--- | :--- | :--- |
-| **① OS & 쉘 호환성** | Windows 환경에서 bash `.sh` 미지원 | 단일 POSIX bash 배포기(`deploy/kubernetes/local.sh`)를 사용합니다. Windows에서는 WSL2 또는 Git Bash에서 실행합니다. |
-| **② 하드웨어 리소스** | 메모리 부족으로 K8s Pod OOM 크래시 | 가용 RAM을 사전 검사하여 4GB 미만일 경우 경고 알림 및 **경량 Track B(docker-compose) 전환 권고**. |
-| **③ 포트 충돌 검사** | 기존 8080, 5432 포트 중복 점유 | 포트 충돌 감지 시 에러로 죽지 않고 환경 변수(`PORT=8081`)로 대체 포트 자동 바인딩 제안. |
-| **④ Docker 엔진 검증** | Docker 미설치 또는 데몬 정지 | OS별 다중 Fallback(winget, curl 쉘, direct DMG/EXE 다운로드)을 통해 설치 가이드 및 데몬 기동 루프 실행. |
-| **⑤ K8s CLI 도구 자동화** | `k3d`, `kubectl`, `helm` 미설치 | **패키지 매니저 유무와 무관하게**, 공식 정적 바이너리(Static Binary)를 프로젝트 로컬 디렉토리([`.tools/bin/`](file:///c:/Repos/bist-mini-final/deploy/kubernetes/local.sh))에 자동 다운로드하여 `PATH`에 격리 바인딩. |
+| Docker | 존재 여부와 daemon 응답 확인; macOS+Homebrew에서만 설치 시도 | 그 외 OS는 설치 안내 후 중단 |
+| k3d | Homebrew 또는 공식 install script 사용 | downloader/권한 실패 시 중단 |
+| kubectl | Homebrew 또는 `curl`로 공식 binary를 `.tools/bin`에 설치 | `curl`이 없거나 download 실패 시 중단 |
+| Helm | Homebrew 또는 공식 `get_helm.sh` 사용 | 설치 후 실행 파일을 찾지 못하면 중단 |
+| uv/Python | 프로젝트 `.venv`를 우선하고 필요 시 Homebrew 또는 uv installer로 `uv sync --frozen` | 프로젝트 dependency import 실패 시 중단 |
+| Node/npm | 존재 여부 확인; macOS+Homebrew에서 설치 | 그 외 OS는 설치 필요 경고. container image build 자체는 Dockerfile에서 수행 |
+
+RAM·disk·포트의 포괄적 preflight나 `wget`/PowerShell/urllib downloader chain은 현재 구현하지 않습니다. 동시 worker 상한은 배포 시 `capacity.py`가 Docker resource를 기준으로 계산하며, 기존 k3d cluster에 8080 ingress mapping이 없으면 자동 삭제하지 않고 `recreate` 또는 port-forward를 안내합니다.
+
+### 2.2 지원 action과 파괴성 경계
+
+| Action | 역할 | 상태 변경 범위 |
+| :--- | :--- | :--- |
+| `setup-tools`, `check` | 도구·프로젝트 Python 확인 | 필요한 도구 설치를 시도할 수 있음 |
+| `cluster` | DB, k3d, KEDA, metrics-server, ingress 구성 | cluster/control plane 변경 |
+| `build` | 3개 image build/import | container image와 k3d image store 변경 |
+| `deploy` | DB migration, Secret, ScaledJob, API/UI/Redis 반영 | 기존 cluster를 보존하고 workload 갱신 |
+| `all` | cluster + build + deploy + status | 표준 로컬 통합 배포 |
+| `recreate` | 기존 지정 cluster 삭제 후 전부 재생성 | 명시적으로 `bist-local` cluster를 삭제 |
+| `restart`, `down`, `destroy` | cluster 시작/중지/삭제 | action 이름에 표시된 cluster 상태만 변경 |
+| `status`, `logs*` | resource/worker log 확인 | 읽기 전용 |
+
+Compose는 PostgreSQL/pgvector 개발 DB만 관리하며 API/UI/worker 전체의 Kubernetes 대체 트랙이 아닙니다.
 
 ---
 
-### 2.2 제로-디펜던시 환경별 다중 Fallback 설치 매트릭스 (All-Case Tool Installation Matrix)
+### 2.3 Kubernetes 통합 배포와 DB 전용 개발 모드
 
-새 환경에서 패키지 매니저(`brew`, `winget`)나 기본 다운로더(`curl`, `wget`)의 가용성이 다를 수 있으므로, `local.sh`는 감지 가능한 설치·실행 경로를 순서대로 시도하고 실패 원인을 명확히 출력합니다:
-
-```mermaid
-flowchart TD
-    subgraph DownloaderFallback ["1. 다운로더 도구 폴백 체인 (Download Tool Fallback)"]
-        D1{"curl 존재하는가?"}
-        D2{"wget 존재하는가?"}
-        D3{"python3 (urllib) 존재하는가?"}
-        D4["OS 네이티브 패키지 관리자로 curl 설치 (apt/dnf/apk/zypper)"]
-        D_WIN["Windows: PowerShell 네이티브 Invoke-WebRequest 사용 (외부도구 0개 요구)"]
-
-        D1 -- Yes --> EXEC_CURL["curl로 바이너리 다운로드"]
-        D1 -- No --> D2
-        D2 -- Yes --> EXEC_WGET["wget으로 바이너리 다운로드"]
-        D2 -- No --> D3
-        D3 -- Yes --> EXEC_PY["Python urllib으로 바이너리 다운로드"]
-        D3 -- No --> D4
-    end
-
-    subgraph BinaryInstall ["2. 정적 바이너리 격리 배치 (Zero Global Pollution)"]
-        B_K3D["k3d 바이너리 -> .tools/bin/k3d"]
-        B_KUBECTL["kubectl 바이너리 -> .tools/bin/kubectl"]
-        B_HELM["helm 바이너리 -> .tools/bin/helm"]
-        B_UV["uv 바이너리 -> .tools/bin/uv"]
-    end
-
-    EXEC_CURL --> BinaryInstall
-    EXEC_WGET --> BinaryInstall
-    EXEC_PY --> BinaryInstall
-    D_WIN --> BinaryInstall
-```
-
-| 대상 도구 | 1차 시도 (Primary) | 2차 폴백 (Fallback 1) | 3차 폴백 (Fallback 2 / Extreme) |
-| :--- | :--- | :--- | :--- |
-| **다운로더** | `curl` (기본 탑재 도구) | `wget` (대체 CLI) | `python3 -c "import urllib.request..."` 또는 Windows `Invoke-WebRequest` |
-| **Docker Engine** | `winget` (Win) / `brew` (Mac) | `https://get.docker.com` (Linux 자동 쉘) | 공식 Docker Desktop Installer (.exe / .dmg) 직접 다운로드 후 실행 |
-| **k3d** | OS 패키지 매니저 | 공식 인스톨 스크립트 (`install.sh`) | GitHub Releases Direct Static Binary (`.tools/bin/k3d`) |
-| **kubectl** | OS 패키지 매니저 | `dl.k8s.io` 공식 정적 바이너리 직접 다운로드 | 프로젝트 로컬 격리 바인딩 (`.tools/bin/kubectl`) |
-| **helm** | OS 패키지 매니저 | 공식 `get_helm.sh` 스크립트 | Tarball 아카이브 다운로드 후 `.tools/bin/helm` 압축 해제 |
-| **권한 격리** | 일반 사용자 권한 (`non-root`) | `sudo` 없이 8080/8443 포트 사용 | 시스템 전역 디렉토리 침범 0건 (`.tools/bin/` 로컬 디렉토리만 사용) |
-
----
-
-### 2.3 2-Track 배포 전략 (Enterprise K8s vs Zero-K8s Fallback)
-
-1. **Track A (로컬 통합 검증): Kubernetes + KEDA (`deploy/kubernetes/local.sh all`)**
+1. **로컬 통합 검증: Kubernetes + KEDA (`deploy/kubernetes/local.sh all`)**
    - k3d, Redis, KEDA, NGINX Ingress, API/UI, 6개 워커 종류를 한 번에 배치합니다. 기존 클러스터에 8080/8443 포트가 없으면 스크립트가 삭제하지 않고 `recreate` 또는 `kubectl port-forward`를 안내합니다.
-2. **Track B (DB 개발): Docker Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
+2. **DB 전용 개발: Docker Compose (`docker compose -f deploy/compose/docker-compose.yml up -d`)**
    - Compose 파일은 PostgreSQL/pgvector 개발 DB만 관리합니다. API/UI는 README의 개발 서버 명령으로 별도 실행하고, one-shot 워커는 필요한 경우 수동 실행합니다.
 
 ---
@@ -198,7 +146,8 @@ spec:
         containers:
         - name: worker
           image: bist-workflow-worker:local
-          command: ["python", "-m", "backend.entrypoints.worker", "workflow"]
+          command: ["python", "-m", "backend.entrypoints.worker"]
+          args: ["workflow", "--queue", "workflow-core"]
           resources:
             requests:
               cpu: 1000m
@@ -206,16 +155,22 @@ spec:
             limits:
               cpu: "2"
               memory: 3Gi
-  pollingInterval: 5
-  successfulJobsHistoryLimit: 5
-  failedJobsHistoryLimit: 10
-  maxReplicaCount: 10
+  pollingInterval: 2
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  maxReplicaCount: 4
   triggers:
   - type: postgresql
     authenticationRef:
       name: bist-postgresql
     metadata:
-      query: "SELECT COUNT(*) FROM workflow_runs WHERE status = 'queued' AND available_at <= NOW();"
+      query: >-
+        SELECT COUNT(*) FROM workflow_runs
+        WHERE queue_name = 'workflow-core'
+          AND cancel_requested = FALSE
+          AND ((status = 'queued' AND available_at <= NOW())
+            OR (status = 'running' AND
+                (heartbeat_at IS NULL OR heartbeat_at < NOW() - (180 * INTERVAL '1 second'))))
       targetQueryValue: "1"
 ```
 
@@ -289,3 +244,5 @@ sequenceDiagram
 - `backend/platform/kubernetes`는 API client와 workload 조회·제출 adapter만 제공하고, 어떤 작업을 제출할지는 domain application port가 결정합니다.
 - worker image의 정식 진입점은 `backend.entrypoints.worker` 하나이며 kind별 domain worker는 `backend.bootstrap.workers` registry에서 명시적으로 조립합니다.
 - 모든 ScaledJob은 선언형 catalog와 통합 `backend.entrypoints.worker`를 사용하며 이전 `backend.engine` entrypoint는 제거됐습니다. renderer와 실제 manifest 계약이 계속 일치해야 합니다.
+- raw manifest renderer와 Helm values는 같은 여섯 worker kind, queue, command, pending query와 phase별 replica 상한을 유지하며 CI가 선언형 `jobs` catalog와 렌더 결과를 대조합니다.
+- image, queue, resource, Secret key, migration order 또는 local action을 바꾸면 Dockerfile/manifest/Helm/renderer/README와 BP-103·BP-503을 같은 변경에서 갱신합니다.

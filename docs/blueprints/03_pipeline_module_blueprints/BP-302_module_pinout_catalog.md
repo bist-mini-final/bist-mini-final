@@ -1,8 +1,8 @@
 # [BP-302] 19개 파이프라인 모듈 핀아웃 카탈로그
 
-> **Document Code:** `BP-302` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Mostly Aligned
+> **Document Code:** `BP-302` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `modules`, `backend/domains/workflow/application`, `backend/bootstrap`
-> **Current References:** [`backend/bootstrap/module_registry.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/module_registry.py), [`backend/bootstrap/runtime.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/runtime.py), [`modules/registry.py`](file:///c:/Repos/bist-mini-final/modules/registry.py), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
+> **Current References:** [`backend/bootstrap/module_registry.py`](../../../backend/bootstrap/module_registry.py), [`backend/bootstrap/runtime.py`](../../../backend/bootstrap/runtime.py), [`modules/registry.py`](../../../modules/registry.py), [`modules/`](../../../modules)
 
 ---
 
@@ -92,3 +92,5 @@ classDiagram
 - module 자동 검색과 import side effect를 사용하지 않으며 factory가 요구하는 capability는 명시적인 port로 전달합니다.
 - 저장된 workflow가 참조하는 module type rename은 alias·migration·deprecation 기간 없이 수행하지 않습니다.
 - registry composition과 runtime 조립은 `backend/bootstrap`, registry lifecycle은 `modules/registry.py`로 이동했고 module concrete client 생성 금지 gate가 통과합니다. 이전 `backend/engine/runtime` shim도 제거됐습니다.
+- 현재 factory 등록과 이 표는 모두 19개 type이며 BI·chatbot·benchmark·company comparison 서비스는 DAG module 수에 포함하지 않습니다.
+- 공개 type, version, pin 또는 DTO schema를 바꾸면 저장 workflow 호환성, OpenAPI component, Playground adapter와 module contract test를 함께 갱신합니다.

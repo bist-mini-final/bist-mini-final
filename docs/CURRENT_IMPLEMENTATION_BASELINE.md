@@ -11,6 +11,8 @@
 - Pipeline Playground, Data Sources, Financial BI, AI Financial Chatbot, Company Comparison, Jobs, Settings를 제공한다.
 - Financial BI와 Company Comparison은 독립 제품 도메인이다. 비교 도메인은 검증된 BI 스냅샷을 입력으로 읽지만 전용 API, DTO, 정책과 스냅샷 수명주기를 유지한다.
 - 공개 REST namespace는 `/api/v1`이며 `/api`는 비노출 호환 alias다.
+- OpenAPI 정식 계약은 63개 path와 73개 HTTP operation이다. `/api`와 `/api/v1/chatbot` 호환 별칭은 schema에 포함하지 않는다.
+- frontend는 7개 정식 route를 제공하고 `/`는 새 채팅, `/bi`는 `/dashboard`로 연결한다.
 
 ## 실행·저장 기준선
 
@@ -34,6 +36,7 @@
 - 애플리케이션 테이블은 `alembic_version`을 제외하고 22개다.
 - BI와 Company Comparison snapshot은 불변 발행본과 current pointer를 분리한다.
 - workflow와 child shard queue는 lease token, heartbeat, stale recovery를 사용한다.
+- BI materialization/question과 benchmark queue는 worker-id 조건부 갱신, heartbeat와 stale recovery를 사용하며 workflow의 advisory-lock/token 모델을 억지로 공유하지 않는다.
 
 ## 백엔드 구조 기준선
 
@@ -54,16 +57,18 @@
 - spreadsheet 구조 감지는 전처리된 시트 계약, 병렬 분석 batch, 범위 정규화 단계를 분리하며 renderer는 값 포맷·fill·border·text 배치를 독립 helper로 유지한다.
 - one-shot queue worker는 `LeasedWorker` template method를 상속해 claim, heartbeat, terminal transition을 공유한다. pause/cancel 같은 별도 상태 기계를 가진 worker는 공통 lease primitive만 재사용한다.
 - HTTP와 worker는 request/run/job/worker correlation context를 공유한다.
+- BP-101~701의 구조 상태는 모두 `Complete`이며 문서별 current reference가 존재하는 경로인지 정합성 검사한다.
 
 ## 검증 기준선
 
 2026-08-31 로컬 전체 검증 결과:
 
-- Backend: 298 passed, 2 skipped
-- Frontend: 167 passed
+- Backend: 301 passed, 2 skipped
+- Frontend: 168 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Backend C901 migration budget: 0개(새 복잡도 hotspot 즉시 실패)
 - Kubernetes renderer: 6개 `ScaledJob`
+- 문서 정합성: BP 20개 모두 `Structure State: Complete`, 하드코딩된 로컬 절대 링크와 제외 기능 참조 0건
 
 테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다.
 

@@ -1,7 +1,7 @@
 # [BP-102] 백엔드 modular monolith와 의존성 규칙
 > **Document Code:** `BP-102` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/core/settings.py`, `backend/shared`, `backend/domains`, `backend/platform`, `backend/api`, `modules`, `jobs`
-> **Current References:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
+> **Current References:** [`backend/api/`](../../../backend/api), [`backend/domains/`](../../../backend/domains), [`backend/bootstrap/`](../../../backend/bootstrap), [`backend/platform/`](../../../backend/platform), [`backend/shared/`](../../../backend/shared), [`modules/`](../../../modules)
 
 ---
 
@@ -137,7 +137,7 @@ jobs/                            # 선언형 표준 Job 정의
 
 ### 2.1 현재 구현과의 차이
 
-현재 트리는 목표 구조를 구현했습니다. 정확한 파일 수와 검증 결과는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)에서 관리하며, 아래 표는 완료된 구조 경계를 기록합니다.
+현재 트리는 목표 구조를 구현했습니다. 정확한 파일 수와 검증 결과는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](../../CURRENT_IMPLEMENTATION_BASELINE.md)에서 관리하며, 아래 표는 완료된 구조 경계를 기록합니다.
 
 | 영역 | 현재 상태 | 목표 대비 차이 |
 | :--- | :--- | :--- |
@@ -253,9 +253,9 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - 공개 API·DB schema·저장 데이터는 구조 리팩토링만으로 변경하지 않음.
 - 함수별 cyclomatic complexity는 10 이하를 기본으로 하며 현재 legacy C901 예외는 없음.
 
-규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py), Ruff와 Pyright로 검증합니다. 허용된 최상위 패키지, 도메인별 계층 위치, `api`의 결합 전용 책임과 호환 import 제거가 hard gate로 활성화돼 있습니다.
+규칙은 [`tests/modules/test_architecture_contracts.py`](../../../tests/modules/test_architecture_contracts.py), Ruff와 Pyright로 검증합니다. 허용된 최상위 패키지, 도메인별 계층 위치, `api`의 결합 전용 책임과 호환 import 제거가 hard gate로 활성화돼 있습니다.
 
-### 7.1 단계적으로 활성화할 목표 구조 게이트
+### 7.1 활성화된 목표 구조 hard gate
 
 - `domains/*/domain`은 같은 domain과 `shared/domain` 외 패키지를 import하지 않습니다.
 - `domains/*/application`은 domain 및 application port만 의존하며 platform/storage concrete 구현을 import하지 않습니다.
@@ -265,4 +265,4 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - 제거된 `backend/features`, `backend/providers`, `backend/engine`, `backend/contracts` Python source가 다시 생기지 않아야 합니다.
 - `backend/storage` Python source가 다시 생기지 않고, 런타임 설정 외 수평 `core` 책임이 생기지 않아야 합니다.
 
-API allowlist, 제거된 수평 패키지와 domain 의존 방향 gate는 현재 hard gate로 동작합니다.
+위 API allowlist, 제거된 수평 패키지, domain 의존 방향과 entrypoint→bootstrap gate는 모두 현재 hard gate로 동작합니다. 새로운 예외 allowlist를 추가해 위반을 숨기지 않고 책임 이동 또는 소비자 port 도입으로 해결합니다.
