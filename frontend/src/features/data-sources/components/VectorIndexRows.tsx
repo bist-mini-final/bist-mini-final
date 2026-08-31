@@ -36,14 +36,14 @@ function formatDate(iso: string): string {
 interface ActivePipelineRowProps {
   readonly pipeline: PipelineRunState;
   readonly deleting: boolean;
-  readonly onResume?: () => void;
+  readonly onView?: (run: PipelineRunState) => void;
   readonly onDelete?: (run: PipelineRunState) => void;
 }
 
 export function ActivePipelineRow({
   pipeline,
   deleting,
-  onResume,
+  onView,
   onDelete,
 }: ActivePipelineRowProps) {
   const isPaused = pipeline.status === 'paused';
@@ -94,7 +94,7 @@ export function ActivePipelineRow({
             variant="primary"
             size="sm"
             type="button"
-            onClick={onResume}
+            onClick={() => onView?.(pipeline)}
             title={isPaused ? '중단된 파이프라인 확인 및 재개' : '실시간 파이프라인 HUD 및 모듈 로그로 재진입'}
           >
             <Layers size={13} /> 진행상황 / 모듈 로그

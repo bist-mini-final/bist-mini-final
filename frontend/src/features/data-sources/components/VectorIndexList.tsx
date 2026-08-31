@@ -13,9 +13,9 @@ import {
 interface VectorIndexListProps {
   indexes: VectorIndexInfo[];
   isLoading?: boolean;
-  activeRunningPipeline?: PipelineRunState | null;
+  activeRunningPipelines?: PipelineRunState[];
   failedRuns?: PipelineRunState[];
-  onResumePipeline?: () => void;
+  onViewPipeline?: (run: PipelineRunState) => void;
   onViewFailedLog?: (run: PipelineRunState) => void;
   onDeletePipeline?: (run: PipelineRunState) => void;
   deletingPipelineId?: string | null;
@@ -38,9 +38,9 @@ const ACTIVE_PIPELINE_STATUSES = new Set<PipelineRunState['status']>([
 export function VectorIndexList({
   indexes,
   isLoading,
-  activeRunningPipeline,
+  activeRunningPipelines = [],
   failedRuns = [],
-  onResumePipeline,
+  onViewPipeline,
   onViewFailedLog,
   onDeletePipeline,
   deletingPipelineId,
@@ -93,19 +93,19 @@ export function VectorIndexList({
     }
   };
 
-  const pipelineIsActive = Boolean(
-    activeRunningPipeline && ACTIVE_PIPELINE_STATUSES.has(activeRunningPipeline.status),
+  const activePipelines = activeRunningPipelines.filter(
+    (pipeline) => ACTIVE_PIPELINE_STATUSES.has(pipeline.status),
   );
   const hiddenIndexIds = new Set(
     [
-      ...(pipelineIsActive && activeRunningPipeline ? [activeRunningPipeline] : []),
+      ...activePipelines,
       ...failedRuns,
     ]
       .filter((run): run is PipelineRunState => Boolean(run.targetIndexId))
       .map((run) => run.targetIndexId!),
   );
   const visibleIndexes = indexes.filter((index) => !hiddenIndexIds.has(index.index_id));
-  const hasContent = visibleIndexes.length > 0 || failedRuns.length > 0 || pipelineIsActive;
+  const hasContent = visibleIndexes.length > 0 || failedRuns.length > 0 || activePipelines.length > 0;
 
   return (
     <div className="ds-panel">
@@ -153,14 +153,15 @@ export function VectorIndexList({
               </tr>
             </thead>
             <tbody>
-              {activeRunningPipeline && pipelineIsActive && (
+              {activePipelines.map((pipeline) => (
                 <ActivePipelineRow
-                  pipeline={activeRunningPipeline}
-                  deleting={deletingPipelineId === activeRunningPipeline.pipelineId}
-                  onResume={onResumePipeline}
+                  key={pipeline.pipelineId}
+                  pipeline={pipeline}
+                  deleting={deletingPipelineId === pipeline.pipelineId}
+                  onView={onViewPipeline}
                   onDelete={onDeletePipeline}
                 />
-              )}
+              ))}
               {failedRuns.map((run) => (
                 <FailedPipelineRow
                   key={run.pipelineId}

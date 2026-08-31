@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PipelineRunState } from './pipelineTypes';
 import { dataSourceApi } from './services/dataSourceApi';
 import type { DbStatusInfo, IngestionJobResponse, VectorIndexInfo } from './types';
@@ -11,6 +11,7 @@ const RESTORABLE_JOB_STATUSES = new Set<IngestionJobResponse['status']>([
   'running',
   'paused',
 ]);
+const ACTIVE_PIPELINE_SYNC_INTERVAL_MS = 2_000;
 
 export type DeleteTarget =
   | { readonly type: 'index'; readonly indexId: string }
@@ -20,6 +21,27 @@ export function findRestorableIngestionJob(
   jobs: IngestionJobResponse[],
 ): IngestionJobResponse | null {
   return jobs.find((job) => RESTORABLE_JOB_STATUSES.has(job.status)) ?? null;
+}
+
+export function activePipelinesFromJobs(
+  jobs: IngestionJobResponse[],
+): PipelineRunState[] {
+  return jobs
+    .filter((job) => RESTORABLE_JOB_STATUSES.has(job.status))
+    .sort((left, right) => (
+      new Date(right.run.created_at).getTime() - new Date(left.run.created_at).getTime()
+    ))
+    .map(pipelineFromIngestionJob);
+}
+
+function updateActivePipeline(
+  runs: PipelineRunState[],
+  pipeline: PipelineRunState,
+): PipelineRunState[] {
+  const remaining = runs.filter((run) => run.pipelineId !== pipeline.pipelineId);
+  return RESTORABLE_JOB_STATUSES.has(pipeline.status)
+    ? [pipeline, ...remaining]
+    : remaining;
 }
 
 function isServerRun(pipelineId?: string): boolean {
@@ -52,6 +74,7 @@ export function useDataSourcesController() {
   const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePipelineRuns, setActivePipelineRuns] = useState<PipelineRunState[]>([]);
   const [activePipelineRun, setActivePipelineRun] = useState<PipelineRunState | null>(null);
   const [isViewingTracker, setIsViewingTracker] = useState(false);
   const [isCancellingPipeline, setIsCancellingPipeline] = useState(false);
@@ -63,9 +86,26 @@ export function useDataSourcesController() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [detailIndexId, setDetailIndexId] = useState<string | null>(null);
   const [searchTargetIndex, setSearchTargetIndex] = useState<VectorIndexInfo | null>(null);
+  const knownActivePipelineIds = useRef<Set<string>>(new Set());
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
+  const reconcileIngestionJobs = useCallback((jobs: IngestionJobResponse[]): boolean => {
+    const pipelines = jobs.map(pipelineFromIngestionJob);
+    const activePipelines = activePipelinesFromJobs(jobs);
+    const nextActiveIds = new Set(activePipelines.map((pipeline) => pipeline.pipelineId));
+    const hasTerminalTransition = [...knownActivePipelineIds.current].some(
+      (pipelineId) => !nextActiveIds.has(pipelineId),
+    );
+    knownActivePipelineIds.current = nextActiveIds;
+    setActivePipelineRuns(activePipelines);
+    setFailedRuns(latestFailedRuns(jobs));
+    setActivePipelineRun((current) => current
+      ? pipelines.find((pipeline) => pipeline.pipelineId === current.pipelineId) ?? current
+      : current);
+    return hasTerminalTransition;
+  }, []);
+
+  const synchronizeData = useCallback(async (showLoading: boolean) => {
+    if (showLoading) setIsLoading(true);
     setError(null);
     try {
       const [indexesResponse, dbResponse, jobsResponse] = await Promise.all([
@@ -75,17 +115,45 @@ export function useDataSourcesController() {
       ]);
       setIndexes(indexesResponse);
       if (dbResponse) setDbStatus(dbResponse);
-      setFailedRuns(latestFailedRuns(jobsResponse));
+      reconcileIngestionJobs(jobsResponse);
     } catch (fetchError: unknown) {
       setError(errorMessage(fetchError, 'pgvector 데이터베이스 목록을 불러오지 못했습니다.'));
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
-  }, []);
+  }, [reconcileIngestionJobs]);
+
+  const synchronizeActivePipelines = useCallback(async () => {
+    try {
+      const jobs = await dataSourceApi.listIngestionJobs();
+      if (reconcileIngestionJobs(jobs)) {
+        setIndexes(await dataSourceApi.listIndexes());
+      }
+    } catch (syncError: unknown) {
+      setError(errorMessage(syncError, '실행 중인 인덱싱 목록을 동기화하지 못했습니다.'));
+    }
+  }, [reconcileIngestionJobs]);
+
+  const fetchData = useCallback(
+    () => synchronizeData(true),
+    [synchronizeData],
+  );
 
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  const hasLivePipelineRuns = activePipelineRuns.some(
+    (pipeline) => pipeline.status === 'queued' || pipeline.status === 'running',
+  );
+
+  useEffect(() => {
+    if (!hasLivePipelineRuns) return undefined;
+    const intervalId = window.setInterval(() => {
+      void synchronizeActivePipelines();
+    }, ACTIVE_PIPELINE_SYNC_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [hasLivePipelineRuns, synchronizeActivePipelines]);
 
   useEffect(() => {
     const runId = localStorage.getItem(ACTIVE_JOB_KEY);
@@ -148,11 +216,12 @@ export function useDataSourcesController() {
       setError(null);
       const pipeline = pipelineFromIngestionJob(job);
       setActivePipelineRun(pipeline);
+      setActivePipelineRuns((current) => updateActivePipeline(current, pipeline));
       if (!terminalHandled && pipeline.status === 'completed') {
         terminalHandled = true;
         localStorage.removeItem(ACTIVE_JOB_KEY);
         setFailedRuns((current) => current.filter((run) => run.pipelineId !== runId));
-        void fetchData();
+        void synchronizeData(false);
       } else if (!terminalHandled && pipeline.status === 'failed') {
         terminalHandled = true;
         setFailedRuns((current) => [
@@ -182,7 +251,7 @@ export function useDataSourcesController() {
       stopped = true;
       controller.abort();
     };
-  }, [activePipelineId, activePipelineStatus, deletingPipelineId, fetchData]);
+  }, [activePipelineId, activePipelineStatus, deletingPipelineId, synchronizeData]);
 
   const startUploadPipeline = async (file: File, model: string, batchSize: number) => {
     setIsUploadOpen(false);
@@ -195,7 +264,9 @@ export function useDataSourcesController() {
       if (!job) throw new Error('인덱싱 작업 ID를 받지 못했습니다.');
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);
       localStorage.removeItem(PENDING_FILE_KEY);
-      setActivePipelineRun(pipelineFromIngestionJob(job));
+      const pipeline = pipelineFromIngestionJob(job);
+      setActivePipelineRuns((current) => updateActivePipeline(current, pipeline));
+      setActivePipelineRun(pipeline);
       setIsViewingTracker(true);
     } catch (uploadError: unknown) {
       localStorage.removeItem(PENDING_FILE_KEY);
@@ -236,6 +307,7 @@ export function useDataSourcesController() {
       };
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);
       setFailedRuns((current) => current.filter((candidate) => candidate.pipelineId !== job.job_id));
+      setActivePipelineRuns((current) => updateActivePipeline(current, runningState));
       setActivePipelineRun(runningState);
     } catch (resumeError: unknown) {
       setError(errorMessage(resumeError, '인덱싱 작업을 재개하지 못했습니다.'));
@@ -252,6 +324,7 @@ export function useDataSourcesController() {
       const paused = pipelineFromIngestionJob(job);
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);
       setFailedRuns((current) => current.filter((candidate) => candidate.pipelineId !== job.job_id));
+      setActivePipelineRuns((current) => updateActivePipeline(current, paused));
       setActivePipelineRun(paused);
     } catch (cancelError: unknown) {
       setError(errorMessage(cancelError, '인덱싱 작업을 중단하지 못했습니다.'));
@@ -270,6 +343,9 @@ export function useDataSourcesController() {
         localStorage.removeItem(PENDING_FILE_KEY);
       }
       setFailedRuns((current) => current.filter((candidate) => candidate.pipelineId !== run.pipelineId));
+      setActivePipelineRuns((current) => current.filter(
+        (candidate) => candidate.pipelineId !== run.pipelineId,
+      ));
       if (activePipelineRun?.pipelineId === run.pipelineId) {
         setActivePipelineRun(null);
         setIsViewingTracker(false);
@@ -293,17 +369,20 @@ export function useDataSourcesController() {
     }
   };
 
-  const visibleFailedRuns = useMemo(() => failedRuns.filter(
-    (run) => !activePipelineRun
-      || !['queued', 'running', 'paused'].includes(activePipelineRun.status)
-      || (run.pipelineId !== activePipelineRun.pipelineId && run.fileName !== activePipelineRun.fileName),
-  ), [activePipelineRun, failedRuns]);
+  const visibleFailedRuns = useMemo(() => {
+    const activePipelineIds = new Set(activePipelineRuns.map((run) => run.pipelineId));
+    const activeFileNames = new Set(activePipelineRuns.map((run) => run.fileName));
+    return failedRuns.filter((run) => (
+      !activePipelineIds.has(run.pipelineId) && !activeFileNames.has(run.fileName)
+    ));
+  }, [activePipelineRuns, failedRuns]);
 
   return {
     indexes,
     dbStatus,
     isLoading,
     error,
+    activePipelineRuns,
     activePipelineRun,
     canResumeActivePipeline: Boolean(
       activePipelineRun
@@ -328,6 +407,10 @@ export function useDataSourcesController() {
     openSearch: setSearchTargetIndex,
     closeSearch: () => setSearchTargetIndex(null),
     startUploadPipeline,
+    viewPipelineRun: (run: PipelineRunState) => {
+      setActivePipelineRun(run);
+      setIsViewingTracker(true);
+    },
     viewFailedRunLog: (run: PipelineRunState) => {
       setActivePipelineRun(run);
       setIsViewingTracker(true);
