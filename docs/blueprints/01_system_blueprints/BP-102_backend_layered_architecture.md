@@ -1,7 +1,7 @@
 # [BP-102] 백엔드 modular monolith와 의존성 규칙
-> **Document Code:** `BP-102` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-102` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/shared`, `backend/domains`, `backend/platform`, `backend/api`, `modules`, `jobs`
-> **Current References:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`backend/storage/`](file:///c:/Repos/bist-mini-final/backend/storage/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
+> **Current References:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
 
 ---
 
@@ -131,22 +131,22 @@ jobs/                            # 선언형 표준 Job 정의
 
 ### 2.1 현재 구현과의 차이
 
-현재 트리는 목표 구조로 이동 중인 과도기입니다. 정확한 파일 수와 import 수는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)에서 관리하며, 이 문서는 변하지 않는 migration 차이의 종류만 정의합니다.
+현재 트리는 목표 구조를 구현했습니다. 정확한 파일 수와 검증 결과는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)에서 관리하며, 아래 표는 완료된 구조 경계를 기록합니다.
 
 | 영역 | 현재 상태 | 목표 대비 차이 |
 | :--- | :--- | :--- |
-| `backend/entrypoints`, `backend/bootstrap` | ASGI·CLI·통합 worker 진입점과 `application.py`, `http.py`, `workers.py` 조립 경계 구현 | `DatabaseManager`의 잔여 concrete 조립을 source-file/workflow adapter 조립으로 교체해야 함 |
+| `backend/entrypoints`, `backend/bootstrap` | ASGI·CLI·통합 worker 진입점, domain schema fragment와 concrete adapter 조립 구현 | 목표와 일치 |
 | `backend/shared` | state stream, embedding port, lease worker, observability context를 application 계약으로 분리 | identifiers, clock, result/pagination/transaction/event 계약은 필요한 유스케이스 이동 시 도입 필요 |
-| `backend/domains` | workflow, data sources, BI, company comparison, chatbot, benchmark, operations vertical slice와 domain presentation 소유권 완료 | storage facade가 가진 workflow/data-source SQL·mapping을 각 infrastructure로 더 분해해야 함 |
+| `backend/domains` | workflow, data sources, BI, company comparison, chatbot, benchmark, operations vertical slice와 domain presentation·schema·repository 소유권 완료 | 목표와 일치 |
 | `backend/api` | router 결합과 공통 HTTP edge 정책만 보유하며 파일 allowlist가 구조 테스트로 고정됨 | 목표와 일치 |
 | `backend/platform` | PostgreSQL pool/audit/snapshot, pgvector Binary COPY/error, OpenAI, Kubernetes, Redis, filesystem, telemetry를 canonical 경로로 이전 | 목표와 일치 |
-| 제거된 수평 패키지 | `features`, `providers`, `engine`, `contracts` Python source와 이전 API/provider/core shim 제거 | 구조 테스트로 재도입 금지; `storage` 실제 구현 분해만 남음 |
+| 제거된 수평 패키지 | `features`, `providers`, `engine`, `contracts`, `storage` Python source와 이전 API/provider/core shim 제거 | 구조 테스트로 재도입 금지 |
 | 호환 진입 경로 | `backend/main.py`는 ASGI 외부 실행 호환 entrypoint | 배포 command 전환 후 선택적으로 제거 가능 |
 | `modules`, `jobs` | 원자 모듈과 선언형 Job 경계를 별도 루트로 유지 | 목표와 일치 |
 
 디렉터리 생성이나 일부 의존성 역전만을 근거로 완료 처리하지 않습니다. 호환 패키지의 책임 이전, domain presentation/infrastructure/workers 정착, 호환 import 제거가 끝나고 구조 계약 테스트가 목표 트리를 검증할 때만 `Structure State: Complete`로 전환합니다.
 
-### 2.2 잔여 전환 순서
+### 2.2 전환 완료 기록
 
 1. 완료: ASGI·CLI·통합 worker 진입점, bootstrap 조립 파일과 PostgreSQL/OpenAI/Redis/telemetry canonical adapter 경계를 확립합니다.
 2. 완료: workflow presentation/infrastructure/workers vertical slice와 application port를 정착시키고 이전 engine/API 경로를 제거합니다.
@@ -159,7 +159,7 @@ jobs/                            # 선언형 표준 Job 정의
 9. 실제 유스케이스가 요구하는 clock, identifier, result/pagination/transaction/event 계약만 `shared`에 추가하고 PostgreSQL 구현은 `platform/postgres`에 둡니다.
 10. 완료: 도메인 route를 각 presentation으로 이동하고 `backend/api`를 router 결합과 공통 HTTP edge 정책만 남도록 축소합니다.
 11. 완료: `features`, `providers`, `engine`, `contracts`와 이전 API/core/storage shim을 제거하고 목표 트리를 검사하는 구조 계약 테스트를 강화합니다.
-12. 진행 중: pgvector transport와 data-source SQL gateway 분리는 완료했습니다. 잔여 `DatabaseManager`를 source-file/workflow repository로 분해하고 호출자를 좁은 application port로 전환한 뒤 `backend/storage`를 제거합니다.
+12. 완료: pgvector transport/data-source SQL gateway를 분리하고 `DatabaseManager`를 source-file/workflow repository로 해체한 뒤 `backend/storage`를 제거했습니다.
 
 ---
 
@@ -187,7 +187,7 @@ jobs/                            # 선언형 표준 Job 정의
 - domain infrastructure repository는 `platform/postgres`의 connection factory와 transaction 구현을 주입받고 SQL·row mapping·optimistic/lease guard를 소유합니다. private connection에 접근하거나 pool을 직접 생성하지 않습니다.
 - `platform/pgvector`는 vector codec, COPY protocol과 공통 오류 계약을 제공하지만 collection publish, evidence lookup 같은 도메인 의미를 알지 않습니다. 해당 SQL은 `data_sources/infrastructure/pgvector`가 소유합니다.
 - pipeline module은 legacy `PgVectorStore`나 SQL gateway를 import하지 않고 application capability port에만 의존합니다.
-- `PgVectorStore`는 data-sources infrastructure 내부 구현으로 격리됐고 pipeline module에는 노출되지 않습니다. 잔여 `DatabaseManager`와 source-file/workflow repository mixin은 migration 중 facade이므로 새 기능을 추가하지 않고 좁은 adapter로 교체한 뒤 삭제합니다.
+- `PgVectorStore`는 data-sources infrastructure 내부 구현으로 격리됐고 pipeline module에는 노출되지 않습니다. source-file과 workflow repository는 각 domain infrastructure에서 `SyncPostgresRepository` connection primitive와 명시적 capability composition을 사용합니다.
 - 동적 SQL 식별자는 driver의 SQL composition API를 사용하고 값은 parameter binding을 사용합니다.
 
 ---
@@ -240,14 +240,14 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - `domains/*/application`에서 platform과 concrete provider/storage/engine import 금지.
 - `domains/*/infrastructure`만 application port 구현을 위해 platform adapter를 사용할 수 있음.
 - `modules`에서 DB/provider concrete client 생성 금지.
-- `modules`에서 `backend.storage.pgvector_store` import 금지.
+- `modules`에서 data-source pgvector SQL gateway import 금지.
 - domain repository에서 private DB connection 접근 금지.
 - 동일 수명주기의 one-shot worker는 `LeasedWorker` 상속.
 - BI와 Company Comparison 계산을 공통 base service로 합치지 않음. 공유 대상은 versioned snapshot 저장 수명주기와 infrastructure primitive뿐임.
 - 공개 API·DB schema·저장 데이터는 구조 리팩토링만으로 변경하지 않음.
 - 함수별 cyclomatic complexity는 10 이하를 기본으로 하며 현재 legacy C901 예외는 없음.
 
-규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py), Ruff와 Pyright로 검증합니다. 목표 구조의 모든 gate가 아직 활성화된 것은 아니므로 통과 중인 테스트만으로 migration 완료를 선언하지 않습니다. 최종 단계에서는 허용된 최상위 패키지, 도메인별 계층 위치, `api`의 결합 전용 책임과 호환 import 제거를 hard gate로 둡니다.
+규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py), Ruff와 Pyright로 검증합니다. 허용된 최상위 패키지, 도메인별 계층 위치, `api`의 결합 전용 책임과 호환 import 제거가 hard gate로 활성화돼 있습니다.
 
 ### 7.1 단계적으로 활성화할 목표 구조 게이트
 
@@ -257,6 +257,6 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - `backend/api`에는 도메인 고유 route/controller/schema가 남지 않습니다.
 - `backend/entrypoints`는 bootstrap 외 backend package를 직접 import하지 않습니다.
 - 제거된 `backend/features`, `backend/providers`, `backend/engine`, `backend/contracts` Python source가 다시 생기지 않아야 합니다.
-- `backend/storage` 호출자와 구현 파일이 0이 되고, 런타임 설정 외 수평 `core` 책임이 생기지 않아야 합니다.
+- `backend/storage` Python source가 다시 생기지 않고, 런타임 설정 외 수평 `core` 책임이 생기지 않아야 합니다.
 
-API allowlist와 제거된 수평 패키지 gate는 현재 hard gate로 동작합니다. `backend/storage` 제거 gate는 마지막 repository/pgvector 분해 단계에서 활성화합니다.
+API allowlist, 제거된 수평 패키지와 domain 의존 방향 gate는 현재 hard gate로 동작합니다.

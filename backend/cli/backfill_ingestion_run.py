@@ -114,7 +114,7 @@ def backfill_ingestion_run(
     workbook_hash = str(metadata.get("workbook_hash") or "")
     if not workbook_hash:
         raise RuntimeError("collection metadata에 workbook_hash가 없습니다")
-    sheets = services.db_manager.list_sheets(workbook_hash)
+    sheets = services.source_files.list_sheets(workbook_hash)
     if not sheets:
         raise RuntimeError(
             "복구할 sheet/table metadata가 없습니다. 원본 Excel을 다시 인덱싱하세요"

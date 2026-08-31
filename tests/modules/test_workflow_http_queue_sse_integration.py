@@ -18,13 +18,14 @@ from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.domains.data_sources.infrastructure.postgres import PostgresSourceFileRepository
 from backend.domains.workflow.application.execution_service import WorkflowExecutionService
 from backend.domains.workflow.application.executor import WorkflowExecutor
 from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore, WorkflowStore
+from backend.domains.workflow.infrastructure.postgres import PostgresWorkflowRunRepository
 from backend.domains.workflow.presentation import create_workflow_router
 from backend.domains.workflow.workers.main import WorkflowWorkerServices, run_one
-from backend.storage.db_manager import DatabaseManager
 from tests.modules.registry_factory import create_test_registry
 
 INTEGRATION_DATABASE_URL = os.getenv("INTEGRATION_DATABASE_URL")
@@ -37,7 +38,7 @@ INTEGRATION_DATABASE_URL = os.getenv("INTEGRATION_DATABASE_URL")
 class WorkflowHttpQueueSseIntegrationTests(unittest.TestCase):
     def test_http_queue_worker_and_sse_reach_a_completed_terminal_state(self) -> None:
         assert INTEGRATION_DATABASE_URL is not None
-        database = DatabaseManager(INTEGRATION_DATABASE_URL)
+        database = PostgresWorkflowRunRepository(INTEGRATION_DATABASE_URL)
         self.assertTrue(database.is_connected())
         workflow_id = f"queue-sse-{uuid4().hex}"
         queue_name = f"queue-sse-{uuid4().hex[:12]}"
@@ -45,9 +46,9 @@ class WorkflowHttpQueueSseIntegrationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            run_store = RunStore(root / "runs", db_manager=database, require_database=True)
+            run_store = RunStore(root / "runs", repository=database, require_database=True)
             registry = create_test_registry(
-                db_manager=database,
+                source_files=PostgresSourceFileRepository(INTEGRATION_DATABASE_URL),
                 artifact_dir=root / "artifacts",
             )
             executor = WorkflowExecutor(registry, run_store, ResultCache(root / "cache"))
@@ -101,7 +102,7 @@ class WorkflowHttpQueueSseIntegrationTests(unittest.TestCase):
                 )
 
                 worker_services = SimpleNamespace(
-                    db_manager=database,
+                    workflow_runs=database,
                     run_store=run_store,
                     workflow_executor=executor,
                     module_registry=registry,

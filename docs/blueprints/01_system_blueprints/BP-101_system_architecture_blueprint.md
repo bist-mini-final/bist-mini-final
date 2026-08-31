@@ -127,4 +127,4 @@ classDiagram
 
 정확한 현재 수치와 범위는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 우선합니다.
 
-구조 완료는 BP-102의 목표 트리와 import gate가 모두 활성화되고, 잔여 `backend/storage` facade가 platform/domain infrastructure 경계로 분해됐을 때 선언합니다.
+BP-102의 목표 트리와 import gate가 활성화됐고 수평 storage facade도 platform/domain infrastructure 경계로 분해됐습니다. 이후 구조 변경은 동일 gate를 통과해야 합니다.

@@ -172,7 +172,7 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
 
     def test_progress_persistence_failure_is_not_silenced(self) -> None:
         database = RecordingDatabase()
-        store = RunStore(db_manager=database, require_database=True)
+        store = RunStore(repository=database, require_database=True)
         run = store.save(workflow_run_with_output(None))
         database.fail_progress = True
 
@@ -255,7 +255,7 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
         database = RecordingDatabase()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            run_store = RunStore(root / "runs", db_manager=database)
+            run_store = RunStore(root / "runs", repository=database)
             run_store.save(workflow_run_with_output({"answer": "현재 답변"}))
             app = FastAPI()
             app.include_router(
@@ -280,7 +280,7 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
         large_output = {"payload": "x" * (140 * 1024)}
         with tempfile.TemporaryDirectory() as directory:
             run_directory = Path(directory)
-            store = RunStore(run_directory, db_manager=database)
+            store = RunStore(run_directory, repository=database)
             store.save(workflow_run_with_output(large_output))
 
             self.assertIsNotNone(database.saved)
@@ -292,7 +292,7 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
                 1,
             )
 
-            reloaded = RunStore(run_directory, db_manager=database).load(
+            reloaded = RunStore(run_directory, repository=database).load(
                 "run-artifact-test"
             )
             self.assertEqual(reloaded.nodes["query"].output, large_output)
@@ -300,7 +300,7 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
     def test_terminal_node_save_uses_partial_database_write(self) -> None:
         database = RecordingDatabase()
         with tempfile.TemporaryDirectory() as directory:
-            store = RunStore(Path(directory), db_manager=database)
+            store = RunStore(Path(directory), repository=database)
             run = workflow_run_with_output({"answer": "ok"})
             store.save_node(run, "query")
 
@@ -309,7 +309,7 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
     def test_kubernetes_submission_is_idempotent(self) -> None:
         database = RecordingDatabase()
         with tempfile.TemporaryDirectory() as directory:
-            store = RunStore(Path(directory), db_manager=database)
+            store = RunStore(Path(directory), repository=database)
             run = workflow_run_with_output(None).model_copy(
                 update={"status": "queued"}
             )
@@ -330,8 +330,8 @@ class KubernetesWorkflowContractTests(unittest.TestCase):
         dispatcher = RecordingDispatcher()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            run_store = RunStore(root / "runs", db_manager=database)
-            registry = create_test_registry(db_manager=database)
+            run_store = RunStore(root / "runs", repository=database)
+            registry = create_test_registry()
             executor = WorkflowExecutor(registry, run_store, ResultCache(root / "cache"))
             workflow_store = WorkflowStore(root / "workflows")
             app = FastAPI()

@@ -1,5 +1,5 @@
 # [BP-701] 계약 테스트와 벤치마크 청사진
-> **Document Code:** `BP-701` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-701` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `tests`, `frontend/src/**/*.test.*`, `.github/workflows`, architecture contract tooling
 > **Current References:** [`tests/`](file:///c:/Repos/bist-mini-final/tests/), [`frontend/src/`](file:///c:/Repos/bist-mini-final/frontend/src/), [`.github/workflows/ci.yml`](file:///c:/Repos/bist-mini-final/.github/workflows/ci.yml)
 
@@ -109,7 +109,7 @@ npm run build
 | 2. Workflow slice | workflow domain/application import allowlist, presentation/infrastructure/workers 위치 강제 |
 | 3. Product slices | data sources, BI, comparison, chatbot, benchmark에 같은 allowlist 순차 적용 |
 | 4. Composition | 완료: `backend/api` 파일 allowlist와 bootstrap-only object construction 강제 |
-| 5. Compatibility removal | 진행 중: `features/providers/engine/contracts`와 route/core/storage shim 삭제 완료, 실제 `storage` 구현 분해 후 패키지 삭제 |
+| 5. Compatibility removal | 완료: `features/providers/engine/contracts/storage`와 route/core shim 삭제, 재도입 금지 |
 
 각 단계는 다음 조건을 모두 만족한 커밋에서만 hard gate로 전환합니다.
 

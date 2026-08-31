@@ -7,11 +7,11 @@ from typing import Any, Dict, List, Optional
 
 import psycopg2.extras
 
-from .base import DatabaseConnectionCapability
-from .workflow_queue import WorkflowLeaseLost
+from .capabilities import WorkflowDatabaseCapability
+from .queue import WorkflowLeaseLost
 
 
-class WorkflowRunStateRepositoryMixin(DatabaseConnectionCapability):
+class WorkflowRunStateRepositoryMixin(WorkflowDatabaseCapability):
     """Persist and project current workflow and node execution state."""
 
     def save_workflow_run(

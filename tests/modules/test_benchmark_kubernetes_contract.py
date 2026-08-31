@@ -64,7 +64,7 @@ class BenchmarkKubernetesContractTests(unittest.TestCase):
                 return ()
 
         database = SimpleNamespace(database_url="postgresql://contract")
-        run_store = SimpleNamespace(db_manager=database)
+        run_store = SimpleNamespace(repository=database)
         with tempfile.TemporaryDirectory() as directory:
             workflow_store = WorkflowStore(Path(directory))
             rag_workflow = canonical_workflow("rag_query")

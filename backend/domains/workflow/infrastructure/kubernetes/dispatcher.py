@@ -78,7 +78,7 @@ class KubernetesQueueDispatcher:
 
         allowed = set(workflow_ids) if workflow_ids is not None else None
         recovered = 0
-        database = self.run_store.db_manager
+        database = self.run_store.repository
         if database is not None:
             references = database.list_pending_workflow_run_references(
                 sorted(allowed) if allowed is not None else None

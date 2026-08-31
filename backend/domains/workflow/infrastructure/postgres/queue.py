@@ -15,12 +15,12 @@ from backend.domains.workflow.application.leases import (
     WorkflowRunLease,
 )
 
-from .base import DatabaseConnectionCapability
+from .capabilities import WorkflowDatabaseCapability
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowRunQueueRepositoryMixin(DatabaseConnectionCapability):
+class WorkflowRunQueueRepositoryMixin(WorkflowDatabaseCapability):
     """Queue claim, lease heartbeat, cancellation, and operational depth access."""
 
     @contextmanager

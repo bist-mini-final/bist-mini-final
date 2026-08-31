@@ -10,6 +10,7 @@ from backend.domains.data_sources.infrastructure.pgvector import (
     PgVectorRepositorySet,
     PgVectorStore,
 )
+from backend.domains.data_sources.infrastructure.postgres import PostgresSourceFileRepository
 from backend.domains.data_sources.infrastructure.spreadsheets.sheet_renderer import (
     ExcelSheetRenderer,
 )
@@ -18,7 +19,6 @@ from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog i
 )
 from backend.platform.openai.responses import OpenAIResponsesClient
 from backend.shared.application.embeddings import EmbeddingEncoder
-from backend.storage.db_manager import DatabaseManager
 from modules.common.base_module import BaseModule
 from modules.embedding.cell_text_embedder import CellTextEmbedderModule
 from modules.embedding.query_embedder import EmbedderModule
@@ -55,13 +55,14 @@ class ModuleRegistry(BaseModuleRegistry):
         embedding_artifact_store: EmbeddingArtifactStore,
         ingestion_shard_coordinator: IngestionShardCoordinator | None = None,
         pgvector_store: PgVectorStore,
-        db_manager: DatabaseManager,
+        source_files: PostgresSourceFileRepository,
         processed_dir: Path = PROCESSED_DATA_DIR,
         spreadsheet_artifact_dir: Path = SPREADSHEET_ARTIFACT_DIR,
     ) -> None:
         self.pgvector_store = pgvector_store
         self.pgvector_repositories = PgVectorRepositorySet.create(pgvector_store)
-        self.db_manager = db_manager
+        self.source_files = source_files
+        self.database_url = source_files.database_url
         super().__init__(embedding_artifact_store)
         workbook_catalog = WorkbookCatalog(processed_dir)
         sheet_renderer = ExcelSheetRenderer()
@@ -116,7 +117,7 @@ class ModuleRegistry(BaseModuleRegistry):
                 self._factory(
                     PgVectorIndexWriterModule,
                     artifact_store=embedding_artifact_store,
-                    db_manager=self.db_manager,
+                    source_files=self.source_files,
                     pgvector_store=self.pgvector_repositories.ingestion,
                     embedding_encoder=embedding_encoder,
                     processed_dir=processed_dir,
@@ -142,7 +143,7 @@ class ModuleRegistry(BaseModuleRegistry):
                 ),
                 self._factory(
                     SheetMetadataPersistenceModule,
-                    db_manager=self.db_manager,
+                    source_files=self.source_files,
                     catalog=workbook_catalog,
                 ),
                 self._factory(QaExampleLoaderModule),

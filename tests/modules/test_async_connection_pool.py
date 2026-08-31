@@ -4,12 +4,12 @@ import asyncio
 from uuid import uuid4
 
 from backend.core.settings import PGVECTOR_URL
+from backend.domains.data_sources.infrastructure.postgres import PostgresSourceFileRepository
 from backend.platform.postgres.pool import (
     close_async_pool,
     get_async_pool,
     get_pooled_async_connection,
 )
-from backend.storage.db_manager import DatabaseManager
 
 
 def test_async_connection_pool_is_reused_and_executes_without_thread_adapter() -> None:
@@ -26,12 +26,12 @@ def test_async_connection_pool_is_reused_and_executes_without_thread_adapter() -
     asyncio.run(scenario())
 
 
-def test_database_manager_persists_source_metadata_with_async_pool() -> None:
+def test_source_file_repository_persists_metadata_with_async_pool() -> None:
     async def scenario() -> None:
         file_id = uuid4().hex
-        manager = DatabaseManager(PGVECTOR_URL, ensure_schema=False)
-        assert await manager.is_connected_async()
-        await manager.save_source_file_async(
+        repository = PostgresSourceFileRepository(PGVECTOR_URL)
+        assert await repository.is_connected_async()
+        await repository.save_source_file_async(
             file_id=file_id,
             file_name="async-upload.xlsx",
             file_hash=file_id,
