@@ -11,15 +11,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COMPLEXITY_PATTERN = re.compile(r"^`([^`]+)` is too complex \((\d+) > 10\)$")
 
-# Existing hotspots are explicit migration debt, not a blanket C901 exemption.
-# Deleting or reducing an entry is allowed; adding one or exceeding its current
-# budget fails the suite.
-LEGACY_COMPLEXITY_BUDGETS = {
-    ("backend/cli/documentation/module_docs.py", "_placeholder"): 13,
-    ("modules/storage/sheet_metadata_persistence.py", "execute"): 11,
-    ("modules/structure/luna_vlm_structure_detector.py", "_validate_table"): 25,
-    ("modules/structure/luna_vlm_structure_detector.py", "execute"): 13,
-}
+# Every previous hotspot has been retired. Keep the explicit map so any future
+# exception must be reviewed as visible migration debt instead of being hidden
+# behind a blanket C901 exemption.
+LEGACY_COMPLEXITY_BUDGETS: dict[tuple[str, str], int] = {}
 
 
 def _complexity_violations() -> dict[tuple[str, str], int]:

@@ -60,6 +60,27 @@ def _dto_table(schema: Mapping[str, Any]) -> str:
     return "\n".join(rows)
 
 
+def _string_placeholder(name: str) -> str:
+    if name == "file_name":
+        return "example.xlsx"
+    if name in {"question_text", "query"}:
+        return "사용자 질문"
+    return f"<{name}>"
+
+
+def _typed_placeholder(name: str, schema: Mapping[str, Any]) -> Any:
+    kind = schema.get("type")
+    if kind == "string":
+        return _string_placeholder(name)
+    if kind in {"integer", "number"}:
+        return schema.get("minimum", 1)
+    if kind == "boolean":
+        return False
+    if kind == "array":
+        return []
+    return {}
+
+
 def _placeholder(name: str, schema: Mapping[str, Any]) -> Any:
     if "default" in schema:
         default = schema["default"]
@@ -89,20 +110,7 @@ def _placeholder(name: str, schema: Mapping[str, Any]) -> Any:
             {},
         )
         return _placeholder(name, concrete)
-    kind = schema.get("type")
-    if kind == "string":
-        if name == "file_name":
-            return "example.xlsx"
-        if name in {"question_text", "query"}:
-            return "사용자 질문"
-        return f"<{name}>"
-    if kind in {"integer", "number"}:
-        return schema.get("minimum", 1)
-    if kind == "boolean":
-        return False
-    if kind == "array":
-        return []
-    return {}
+    return _typed_placeholder(name, schema)
 
 
 def _request_example(module: BaseModule) -> dict[str, Any]:
