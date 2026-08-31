@@ -66,6 +66,10 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.core.state_stream",
         "backend.core.state_stream_broker",
         "backend.core.telemetry",
+        "backend.engine.job_catalog",
+        "backend.engine.orchestration",
+        "backend.engine.runtime",
+        "backend.engine.workflows",
         "backend.engine.worker.base",
         "backend.engine.worker.lease",
         "backend.providers.embeddings",
@@ -75,6 +79,8 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
         "backend.shared.infrastructure.database",
         "backend.shared.infrastructure.observability",
         "backend.storage.connection_pool",
+        "backend.api.workflow_controller",
+        "backend.api.workflow_routes",
     )
     violations: list[str] = []
     for root in ("backend", "modules", "jobs"):
@@ -83,6 +89,67 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
                 if imported.startswith(legacy_prefixes):
                     violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"legacy stage-one imports remain: {violations}"
+
+
+def test_workflow_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:
+    forbidden_by_layer = {
+        "domain": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "application": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+        ),
+        "presentation": (
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.workflow.infrastructure",
+        ),
+        "workers": (
+            "backend.api",
+            "backend.bootstrap",
+            "backend.engine",
+            "backend.features",
+            "backend.platform",
+            "backend.providers",
+            "backend.storage",
+            "backend.domains.workflow.infrastructure",
+        ),
+    }
+    violations: list[str] = []
+    for layer, forbidden in forbidden_by_layer.items():
+        root = f"backend/domains/workflow/{layer}"
+        for path in _python_files(root):
+            for imported, line in _imported_modules(path):
+                if imported.startswith(forbidden):
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
+    assert not violations, f"workflow layer inversion: {violations}"
+
+
+def test_process_entrypoints_only_import_bootstrap() -> None:
+    violations: list[str] = []
+    for path in _python_files("backend/entrypoints"):
+        for imported, line in _imported_modules(path):
+            if imported.startswith("backend.") and not imported.startswith(
+                "backend.bootstrap"
+            ):
+                violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
+    assert not violations, f"entrypoint bypassed bootstrap: {violations}"
 
 
 def test_features_never_import_http_api_layer() -> None:

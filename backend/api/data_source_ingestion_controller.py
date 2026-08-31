@@ -6,7 +6,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from backend.engine.workflows import DagExecutionError, RunStore
+from backend.domains.workflow.domain import DagExecutionError
+from backend.domains.workflow.infrastructure.persistence import RunStore
 from backend.storage.data_sources import IngestionJobService
 from backend.storage.data_sources import IngestionRequest as IngestRequestDTO
 from backend.storage.pgvector_store import PgVectorStore

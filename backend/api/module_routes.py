@@ -13,8 +13,8 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from backend.api.dependencies import get_module_registry
+from backend.bootstrap.module_registry import ModuleRegistry
 from backend.cli.documentation.module_docs import render_module_markdown
-from backend.engine.runtime.registry import ModuleRegistry
 
 
 # ==============================================================================

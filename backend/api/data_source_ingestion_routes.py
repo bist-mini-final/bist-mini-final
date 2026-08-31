@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi import Path as FastPath
 
-from backend.engine.workflows import RunStore
+from backend.domains.workflow.infrastructure.persistence import RunStore
 from backend.storage.data_sources import IngestionJobService
 from backend.storage.data_sources import IngestionRequest as IngestRequestDTO
 from backend.storage.pgvector_store import PgVectorStore

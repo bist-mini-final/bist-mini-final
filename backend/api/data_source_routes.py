@@ -8,12 +8,9 @@ from fastapi import APIRouter
 
 from backend.core.settings import PROCESSED_DATA_DIR
 from backend.domains.data_sources.application import DataSourceFileService
-from backend.engine.workflows import (
-    RunDispatcher,
-    RunStore,
-    WorkflowExecutor,
-    WorkflowStore,
-)
+from backend.domains.workflow.application.dispatching import RunDispatcher
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.infrastructure.persistence import RunStore, WorkflowStore
 from backend.platform.data_sources import (
     IngestionSubmissionAdapter,
     SourceFileInspectorAdapter,

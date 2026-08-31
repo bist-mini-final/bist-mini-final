@@ -9,10 +9,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.api.workflow_routes import create_workflow_router
-from backend.engine.job_catalog import canonical_workflow
-from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.workflows.executor import WorkflowExecutor
-from backend.engine.workflows.models import (
+from backend.domains.workflow.application.execution_service import WorkflowExecutionService
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.domain.models import (
     CanvasPosition,
     RunBatchState,
     RunNodeState,
@@ -22,8 +21,9 @@ from backend.engine.workflows.models import (
     WorkflowSaveRequest,
     utc_now_iso,
 )
-from backend.engine.workflows.service import WorkflowExecutionService
-from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
+from backend.domains.workflow.infrastructure.job_catalog import canonical_workflow
+from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
+from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore, WorkflowStore
 from tests.modules.registry_factory import create_test_registry
 
 

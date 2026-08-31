@@ -279,7 +279,7 @@ class PooledConnectionWrapper:
 
 def get_pooled_raw_connection(database_url: str, timeout_seconds: float = 15.0) -> PooledConnectionWrapper:
     """Borrow a connection from the process-wide pool and wrap it so .close() returns it to pool.
-    
+
     If the pool is temporarily exhausted, waits up to timeout_seconds with exponential/short backoff.
     """
     pool = get_pool(database_url)

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from backend.engine.job_catalog import workflow_from_job
-from backend.engine.workflows.executor import WorkflowExecutor
-from backend.engine.workflows.models import WorkflowExecutionRequest
-from backend.engine.workflows.store import ResultCache, RunStore
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.domain.models import WorkflowExecutionRequest
+from backend.domains.workflow.infrastructure.job_catalog import workflow_from_job
+from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore
 from backend.storage.data_sources.ingestion_jobs import (
     IngestionJobService,
     IngestionRequest,

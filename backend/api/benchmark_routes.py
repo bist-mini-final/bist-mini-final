@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 
 from backend.core.settings import PGVECTOR_URL
 from backend.domains.benchmark.application import BenchmarkApplicationService
-from backend.engine.workflows import RunStore, WorkflowExecutionPort, WorkflowStore
+from backend.domains.workflow.application.execution_service import WorkflowExecutionPort
+from backend.domains.workflow.infrastructure.persistence import RunStore, WorkflowStore
 from backend.features.benchmark.postgres_store import BenchmarkPostgresStore
 from backend.features.benchmark.service import BenchmarkRequest
 

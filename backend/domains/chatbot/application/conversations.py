@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from backend.domains.bi.application import BiApiServices
-from backend.engine.workflows import WorkflowExecutionRequest
+from backend.domains.workflow.domain.models import WorkflowExecutionRequest
 from backend.features.chatbot.attachments import compact_evidence
 from backend.features.chatbot.conversation import (
     company_aliases,

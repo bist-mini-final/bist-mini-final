@@ -12,18 +12,18 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from typing import cast
 from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.api.workflow_routes import create_workflow_router
-from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.worker.main import run_one
-from backend.engine.workflows.executor import WorkflowExecutor
-from backend.engine.workflows.service import WorkflowExecutionService
-from backend.engine.workflows.store import ResultCache, RunStore, WorkflowStore
+from backend.domains.workflow.application.execution_service import WorkflowExecutionService
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
+from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore, WorkflowStore
+from backend.domains.workflow.workers.main import WorkflowWorkerServices, run_one
 from backend.storage.db_manager import DatabaseManager
 from tests.modules.registry_factory import create_test_registry
 
@@ -106,18 +106,15 @@ class WorkflowHttpQueueSseIntegrationTests(unittest.TestCase):
                     workflow_executor=executor,
                     module_registry=registry,
                 )
-                with patch(
-                    "backend.engine.worker.main.runtime_services",
-                    return_value=worker_services,
-                ):
-                    self.assertEqual(
-                        run_one(
-                            queue_name,
-                            "http-queue-sse-contract-worker",
-                            heartbeat_seconds=0.01,
-                        ),
-                        run_id,
-                    )
+                self.assertEqual(
+                    run_one(
+                        queue_name,
+                        "http-queue-sse-contract-worker",
+                        services=cast(WorkflowWorkerServices, worker_services),
+                        heartbeat_seconds=0.01,
+                    ),
+                    run_id,
+                )
 
                 completed = client.get(f"/api/v1/runs/{run_id}")
                 self.assertEqual(completed.status_code, 200)

@@ -5,8 +5,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from backend.domains.workflow.domain import DagExecutionError
-from backend.engine.runtime.registry_base import BaseModuleRegistry
-from backend.engine.workflows.models import (
+from backend.domains.workflow.domain.models import (
     RunBatchState,
     RunNodeState,
     WorkflowDocument,
@@ -15,6 +14,7 @@ from backend.engine.workflows.models import (
 )
 
 from .graph_validation import WorkflowGraphValidator
+from .module_registry import ModuleRegistryPort
 from .ports import WorkflowRunRepository
 
 
@@ -23,7 +23,7 @@ class WorkflowRunFactory:
 
     def __init__(
         self,
-        module_registry: BaseModuleRegistry,
+        module_registry: ModuleRegistryPort,
         graph_validator: WorkflowGraphValidator,
         run_store: WorkflowRunRepository,
     ) -> None:

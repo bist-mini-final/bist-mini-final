@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.application.node_runner import WorkflowNodeRunner
 from backend.domains.workflow.domain import DagExecutionError
-from backend.engine.job_catalog import workflow_from_job
-from backend.engine.workflows.executor import WorkflowExecutor
-from backend.engine.workflows.models import WorkflowExecutionRequest
-from backend.engine.workflows.node_runner import WorkflowNodeRunner
-from backend.engine.workflows.store import ResultCache, RunStore
+from backend.domains.workflow.domain.models import WorkflowExecutionRequest
+from backend.domains.workflow.infrastructure.job_catalog import workflow_from_job
+from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore
 from jobs import RAG_QUERY_JOB
 from tests.modules.registry_factory import create_test_registry
 

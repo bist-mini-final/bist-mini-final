@@ -4,6 +4,7 @@ from backend.api.bi_routes import create_bi_router
 from backend.api.chat_routes import create_chat_router
 from backend.api.company_comparison_routes import create_company_comparison_router
 from backend.bootstrap.application import ApplicationContainer
+from backend.domains.workflow.presentation import create_workflow_router
 from backend.shared.application.state_stream_broker import StateStreamBroker
 
 from .benchmark_routes import create_benchmark_router
@@ -12,7 +13,6 @@ from .data_source_routes import create_data_source_router
 from .job_routes import create_job_router
 from .module_routes import create_module_router
 from .spreadsheet_artifact_routes import create_spreadsheet_artifact_router
-from .workflow_routes import create_workflow_router
 
 
 def create_api_router(

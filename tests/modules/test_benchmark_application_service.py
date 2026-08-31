@@ -9,8 +9,8 @@ from backend.domains.benchmark.application.service import (
     BenchmarkApplicationService,
     BenchmarkQueueUnavailableError,
 )
-from backend.engine.job_catalog import canonical_workflow
-from backend.engine.workflows import DagExecutionError
+from backend.domains.workflow.domain import DagExecutionError
+from backend.domains.workflow.infrastructure.job_catalog import canonical_workflow
 from backend.features.benchmark.service import (
     BenchmarkCase,
     BenchmarkRequest,

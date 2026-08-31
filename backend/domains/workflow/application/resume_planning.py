@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from backend.domains.workflow.domain import WorkflowRunStateReducer
-from backend.engine.workflows.models import WorkflowRun
+from backend.domains.workflow.domain.models import WorkflowRun
 
 
 class WorkflowResumePlanner:

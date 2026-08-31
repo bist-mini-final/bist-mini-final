@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from typing import Any, cast
 
 from backend.api.workflow_controller import workflow_run_events
-from backend.engine.workflows.models import (
+from backend.domains.workflow.domain.models import (
     CanvasPosition,
     NodeStatus,
     RunBatchState,

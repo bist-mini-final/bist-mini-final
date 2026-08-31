@@ -4,31 +4,20 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Any, Collection, Dict, Iterator, List, Optional
 from uuid import uuid4
 
 import psycopg2.extras
 
+from backend.domains.workflow.application.leases import (
+    WorkflowLeaseLost,
+    WorkflowRunAlreadyClaimed,
+    WorkflowRunLease,
+)
+
 from .base import DatabaseConnectionCapability
 
 logger = logging.getLogger(__name__)
-
-
-class WorkflowRunAlreadyClaimed(RuntimeError):
-    """Raised when another database-connected worker owns the same run."""
-
-
-class WorkflowLeaseLost(RuntimeError):
-    """Raised when a worker tries to persist with an obsolete lease token."""
-
-
-@dataclass(frozen=True)
-class WorkflowRunLease:
-    """A single claim generation shared by every worker persistence operation."""
-
-    run_id: str
-    token: str
 
 
 class WorkflowRunQueueRepositoryMixin(DatabaseConnectionCapability):

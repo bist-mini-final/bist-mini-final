@@ -12,15 +12,11 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.engine.workflows import (
-    DagExecutionError,
-    RunDispatcher,
-    RunStore,
-    WorkflowExecutionRequest,
-    WorkflowExecutor,
-    WorkflowRun,
-    WorkflowStore,
-)
+from backend.domains.workflow.application.dispatching import RunDispatcher
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.domain import DagExecutionError
+from backend.domains.workflow.domain.models import WorkflowExecutionRequest, WorkflowRun
+from backend.domains.workflow.infrastructure.persistence import RunStore, WorkflowStore
 from backend.storage.pgvector_store import PgVectorStore
 from modules.common.config import DEFAULT_EMBEDDING_MODEL
 

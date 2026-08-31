@@ -5,14 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from backend.engine.workflows.models import (
+from backend.domains.workflow.domain.models import (
     RunNodeState,
     WorkflowDocument,
     WorkflowExecutionRequest,
     WorkflowRun,
     WorkflowSaveRequest,
 )
-from backend.engine.workflows.service import WorkflowExecutionPort
+
+from .execution_service import WorkflowExecutionPort
 
 
 class WorkflowDefinitionStorePort(Protocol):

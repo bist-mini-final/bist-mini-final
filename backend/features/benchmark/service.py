@@ -13,14 +13,13 @@ from typing import Any, Dict, List, Literal, Optional, Sequence
 from pydantic import BaseModel, Field, model_validator
 
 from backend.core.settings import PROJECT_DIR
-from backend.engine.workflows import (
-    DagExecutionCancelled,
-    DagExecutionError,
-    RunDispatcher,
+from backend.domains.workflow.application.dispatching import RunDispatcher
+from backend.domains.workflow.application.executor import WorkflowExecutor
+from backend.domains.workflow.application.ports import WorkflowDefinitionRepository
+from backend.domains.workflow.domain import DagExecutionCancelled, DagExecutionError
+from backend.domains.workflow.domain.models import (
     WorkflowDocument,
     WorkflowExecutionRequest,
-    WorkflowExecutor,
-    WorkflowStore,
 )
 
 
@@ -829,7 +828,7 @@ def _benchmark_summary(
 
 def execute_benchmark_comparison(
     request: BenchmarkRequest,
-    workflow_store: WorkflowStore,
+    workflow_store: WorkflowDefinitionRepository,
     workflow_executor: WorkflowExecutor,
     workflow_dispatcher: RunDispatcher,
     on_progress: Optional[Any] = None,
@@ -915,7 +914,7 @@ def execute_benchmark_comparison(
 
 def validate_workflows(
     request: BenchmarkRequest,
-    workflow_store: WorkflowStore,
+    workflow_store: WorkflowDefinitionRepository,
 ) -> Dict[str, tuple[WorkflowDocument, str]]:
     workflows = {}
     for workflow_id in request.workflow_ids:
