@@ -1,6 +1,7 @@
 # [BP-501] REST API와 DTO 규격
-> **Document Code:** `BP-501` | **Category:** Interface Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py), [`backend/api/workflow_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_controller.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py)
+> **Document Code:** `BP-501` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/domains/*/presentation`, `backend/api/router.py`, `backend/api/middleware.py`, `backend/api/exception_handlers.py`, `backend/api/versioning.py`
+> **Current References:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py), [`backend/api/workflow_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_controller.py), [`backend/api/data_source_controller.py`](file:///c:/Repos/bist-mini-final/backend/api/data_source_controller.py)
 
 ---
 
@@ -14,7 +15,7 @@
 
 ---
 
-## 2. 현재 endpoint catalog
+## 2. 공개 endpoint 계약
 
 ### BI와 Company Comparison
 
@@ -138,4 +139,13 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - frontend는 TypeScript type만 신뢰하지 않고 외부 JSON을 Zod로 runtime 검증합니다.
 - comparison snapshot은 source/evidence/assumption/rank link를 model validator로 검증합니다.
 - route 변경은 [`tests/modules/test_openapi_and_module_routes.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_openapi_and_module_routes.py)와 frontend client tests를 함께 갱신합니다.
-- route 함수는 request binding과 HTTP response만 담당하고 여러 저장소·도메인 단계를 직접 조율하지 않습니다. Workflow와 Data Sources는 focused controller가 application 호출과 response projection을 담당합니다.
+- route 함수는 request binding, application command/query 호출과 HTTP response projection만 담당하고 저장소·도메인 단계를 직접 조율하지 않습니다. 별도 HTTP controller가 필요하더라도 해당 domain presentation 내부에 두며 `backend/api`로 올리지 않습니다.
+
+---
+
+## 5. 소유권과 구조 완료 조건
+
+- 각 domain presentation은 자신의 router, Pydantic schema, HTTP error mapping과 OpenAPI tag를 소유합니다.
+- `backend/api/router.py`는 domain router를 결합하고 middleware, exception handler와 versioning만 적용합니다.
+- application DTO와 HTTP DTO를 동일 객체로 강제하지 않으며 presentation mapping을 명시적으로 둡니다.
+- `backend/api`에서 도메인 route/controller/schema가 제거되고 OpenAPI snapshot이 동일 공개 계약을 유지할 때 구조 migration을 완료합니다.

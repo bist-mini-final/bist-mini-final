@@ -1,16 +1,17 @@
 # [BP-503] PostgreSQL·pgvector 물리 스키마
-> **Document Code:** `BP-503` | **Category:** Interface & Physical Schema Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/repositories/source_files.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/source_files.py), [`backend/storage/repositories/workflow_runs.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/workflow_runs.py), [`backend/features/bi/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/database_schema.py), [`backend/features/benchmark/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/database_schema.py), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
+> **Document Code:** `BP-503` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/shared/application`, `backend/platform/postgres`, `backend/domains/*/infrastructure/postgres`, `migrations`
+> **Current References:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/repositories/source_files.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/source_files.py), [`backend/storage/repositories/workflow_runs.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/workflow_runs.py), [`backend/features/bi/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/bi/database_schema.py), [`backend/features/benchmark/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/database_schema.py), [`backend/storage/versioned_snapshot_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/versioned_snapshot_store.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
 
 ---
 
-## 1. 현재 스키마 기준선
+## 1. 영속 스키마 계약
 
-- 데이터베이스: PostgreSQL 16 + pgvector
-- Alembic head: `20260829_0005`
-- 애플리케이션 테이블: 22개 (`alembic_version` 제외)
-- 실제 런타임 DDL의 기준: storage/feature `*_SCHEMA_SQL`와 Alembic migration
-- 과거 문서의 `benchmark_runs`, `benchmark_results`는 폐기됐으며 현재 이름은 `benchmark_jobs`, `benchmark_result_rows`입니다.
+- 지원 데이터베이스는 PostgreSQL 16과 pgvector입니다.
+- production DDL의 유일한 canonical source는 선형 Alembic revision chain입니다. 현재 head와 table 수는 구현 기준선에서 관리합니다.
+- application startup initializer와 package별 `*_SCHEMA_SQL`은 migration 기간의 검증·개발 호환 경로이며 새 production schema를 정의하지 않습니다.
+- table은 하나의 bounded context가 소유하고, 공유 pool/transaction을 제외한 SQL과 row mapping은 해당 domain infrastructure에 둡니다.
+- 폐기된 table 이름은 새 코드·문서·migration 생성 기준으로 재사용하지 않습니다.
 
 ---
 
@@ -116,3 +117,13 @@ domain_snapshot_heads(
 | `20260829_0005` | 분산 Excel embedding/vector COPY용 `ingestion_shards` durable queue |
 
 새 배포는 애플리케이션 시작 전에 `alembic upgrade head`를 완료해야 합니다. 애플리케이션의 idempotent schema initializer는 개발·호환 안전망이지 migration을 대체하지 않습니다.
+
+---
+
+## 7. 스키마 소유권과 구조 완료 조건
+
+- 각 table·constraint·mapping은 하나의 domain infrastructure가 소유하고 다른 domain은 공개 application port로만 접근합니다.
+- sync/async session과 transaction primitive는 shared infrastructure, driver/pool/codec은 platform PostgreSQL·pgvector adapter에 둡니다.
+- cross-domain foreign key는 aggregate 수명주기를 실제로 공유할 때만 허용하고 편의 join을 위해 repository 소유권을 섞지 않습니다.
+- production schema 변경은 Alembic만 수행하며 startup initializer는 제거 가능한 compatibility 경로로 관리합니다.
+- `backend/storage`와 `backend/features/*/database_schema.py` 소유권이 vertical slice로 이동하고 migration drift 검증이 hard gate가 될 때 구조 migration을 완료합니다.

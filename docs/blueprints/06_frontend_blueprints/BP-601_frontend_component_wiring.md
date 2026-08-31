@@ -1,6 +1,7 @@
 # [BP-601] 프론트엔드 SPA 컴포넌트 배선도 & 접근성(a11y) 표준
-> **Document Code:** `BP-601` | **Category:** Frontend Architecture Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`frontend/src/App.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/App.tsx), [`frontend/src/app/routes.ts`](file:///c:/Repos/bist-mini-final/frontend/src/app/routes.ts), [`frontend/src/features/`](file:///c:/Repos/bist-mini-final/frontend/src/features/)
+> **Document Code:** `BP-601` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Aligned
+> **Target Ownership:** `frontend/src/app`, `frontend/src/pages`, `frontend/src/features`, `frontend/src/shared`
+> **Current References:** [`frontend/src/App.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/App.tsx), [`frontend/src/app/routes.ts`](file:///c:/Repos/bist-mini-final/frontend/src/app/routes.ts), [`frontend/src/features/`](file:///c:/Repos/bist-mini-final/frontend/src/features/)
 
 ---
 
@@ -11,9 +12,9 @@ graph TD
     ROOT["main.tsx (Root Provider & StrictMode)"] --> APP["App.tsx"]
     APP --> CHAT_STATE["ChatWorkspaceProvider (Persistent Sessions & Active Conversation)"]
     CHAT_STATE --> SHELL["AppShell.tsx (Excel RAG Sidebar, Global Nav, Session History)"]
-    
+
     SHELL --> ROUTER["AppRouter (History-based SPA Router)"]
-    
+
     ROUTER --> P_CHAT["ChatbotPage (/chatbot, / redirect) -> ChatbotView [운영중]"]
     ROUTER --> P_PLAY["PlaygroundPage (/playground) -> PlaygroundView"]
     ROUTER --> P_DS["DataSourcesPage (/data-sources) -> DataSourcesView"]
@@ -84,3 +85,13 @@ graph TD
 ## 6. 셀 근거 검증 viewport
 
 `CellEvidenceProvider`는 Markdown 셀 배지의 활성화를 전역에서 받아 lazy-loaded `CellEvidenceModal`을 엽니다. modal은 resolve API가 반환한 sheet image와 cell bbox를 연결하고 확대·축소·화면 맞춤·근거 셀 이동을 제공합니다. 큰 sheet canvas는 공용 `useDragPan` pointer hook으로 이동하며 button·link·form control 위의 drag는 시작하지 않습니다.
+
+---
+
+## 7. 프론트엔드 소유권과 완료 조건
+
+- `app`은 provider·router·shell, `pages`는 route 단위 feature 조립, `features`는 제품 상태·API·view, `shared`는 도메인 비종속 UI·hook·token을 소유합니다.
+- page는 고유 viewport와 중복 header/card/button CSS를 만들지 않고 공용 `PageShell`, layout primitive와 design token을 사용합니다.
+- feature 간 공유는 상대 feature 내부 파일 import가 아니라 명시적 public entrypoint 또는 shared primitive로 제한합니다.
+- API response는 feature 경계에서 runtime schema로 검증하고 server state와 local draft state를 분리합니다.
+- 접근성, typography, spacing, action size와 async feedback 계약이 모든 정식 route의 visual/interaction regression으로 고정될 때 `Structure State: Aligned`를 유지합니다.

@@ -1,6 +1,7 @@
 # [BP-301] DAG 검증과 durable 실행
-> **Document Code:** `BP-301` | **Category:** Pipeline Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/batch_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/batch_runner.py), [`backend/engine/workflows/node_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/node_runner.py), [`backend/engine/workflows/models.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/models.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`backend/engine/workflows/service.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/service.py)
+> **Document Code:** `BP-301` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/domains/workflow/domain`, `backend/domains/workflow/application`, `backend/domains/workflow/infrastructure`, `backend/domains/workflow/presentation`, `backend/domains/workflow/workers`
+> **Current References:** [`backend/engine/workflows/executor.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/executor.py), [`backend/engine/workflows/batch_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/batch_runner.py), [`backend/engine/workflows/node_runner.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/node_runner.py), [`backend/engine/workflows/models.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/models.py), [`backend/engine/workflows/store.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/store.py), [`backend/engine/workflows/service.py`](file:///c:/Repos/bist-mini-final/backend/engine/workflows/service.py)
 
 ---
 
@@ -73,3 +74,13 @@ Excel ingestion의 `cell_text_embedder`와 `pgvector_index_writer`는 하나의 
 - source workbook/index/workflow revision이 바뀌면 이전 결과를 현재 결과로 재사용하지 않습니다.
 - cache 정리는 `DELETE /api/v1/cache`에서 명시적으로 수행합니다.
 - 품질과 latency 비교는 같은 workflow/dataset/provider 설정으로 benchmark합니다.
+
+---
+
+## 7. 책임 분리와 구조 완료 조건
+
+- graph, pin, run/node state와 전이 policy는 `workflow/domain`에 둡니다.
+- validate, save, submit, cancel, resume, execute command/query와 required ports는 `workflow/application`이 소유합니다.
+- PostgreSQL store, Kubernetes dispatcher와 cache adapter는 `workflow/infrastructure`, REST/SSE는 `workflow/presentation`, lease process는 `workflow/workers`에 둡니다.
+- executor는 presentation DTO, provider client, concrete store를 import하지 않고 application port와 module registry 계약만 사용합니다.
+- 현재 `backend/engine/workflows`와 `backend/engine/worker` 호출자가 0이고 workflow vertical slice가 동일한 회귀 테스트를 통과할 때 구조 migration을 완료합니다.

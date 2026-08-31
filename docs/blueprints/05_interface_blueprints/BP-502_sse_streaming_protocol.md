@@ -1,6 +1,7 @@
 # [BP-502] SSE 상태 스트리밍 규격
-> **Document Code:** `BP-502` | **Category:** Interface Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/core/state_stream.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream.py), [`backend/core/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream_broker.py)
+> **Document Code:** `BP-502` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/domains/*/presentation/sse.py`, `backend/shared/application`, `backend/platform/redis`
+> **Current References:** [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py), [`backend/core/state_stream.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream.py), [`backend/core/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/core/state_stream_broker.py)
 
 ---
 
@@ -69,3 +70,12 @@ Endpoint: `GET /api/v1/runs/{run_id}/stream`
 ## 5. 다중 Pod 검증
 
 통합 테스트는 서로 다른 `SharedStateStream` 인스턴스가 Redis hint를 받고 polling interval을 기다리지 않고 DB loader를 다시 호출하는지, Redis 장애 때 polling으로 진행되는지, workflow terminal event가 한 번 전달되는지를 검증합니다.
+
+---
+
+## 6. 소유권과 구조 완료 조건
+
+- event envelope와 cursor/reconnect semantics는 shared application contract, domain별 projection은 해당 presentation의 `sse.py`가 소유합니다.
+- Redis adapter는 hint publish/subscribe만 제공하며 domain state를 저장하거나 event payload를 진실 공급원으로 만들지 않습니다.
+- SSE endpoint는 application query로 현재 PostgreSQL snapshot을 읽고 hint 수신 시 재조회합니다.
+- `backend/core/state_stream*` 책임이 shared/platform/domain presentation으로 분리되고 다중 Pod·Redis 장애 계약 테스트가 통과할 때 구조 migration을 완료합니다.

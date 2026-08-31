@@ -1,6 +1,7 @@
 # [BP-102] 백엔드 modular monolith와 의존성 규칙
-> **Document Code:** `BP-102` | **Category:** System Architecture Blueprint | **Status:** Partially Implemented · Migration In Progress
-> **Source Roots:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/engine/`](file:///c:/Repos/bist-mini-final/backend/engine/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
+> **Document Code:** `BP-102` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/shared`, `backend/domains`, `backend/platform`, `backend/api`, `modules`, `jobs`
+> **Current References:** [`backend/api/`](file:///c:/Repos/bist-mini-final/backend/api/), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/bootstrap/`](file:///c:/Repos/bist-mini-final/backend/bootstrap/), [`backend/engine/`](file:///c:/Repos/bist-mini-final/backend/engine/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/), [`backend/shared/`](file:///c:/Repos/bist-mini-final/backend/shared/), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
 
 ---
 
@@ -10,6 +11,7 @@
 
 ```mermaid
 flowchart TD
+    ENTRY["Process Entrypoints\nasgi · cli · worker"]
     API["HTTP Composition\nbackend/api"]
     BOOT["Composition Root\nbackend/bootstrap"]
     PRESENTATION["Domain Presentation\nroutes · schemas · SSE"]
@@ -17,24 +19,29 @@ flowchart TD
     DOMAIN["Domain Rules\nstate · errors · value contracts"]
     WORKER["Domain Workers\none-shot lifecycle · lease"]
     MODULE["Pipeline Modules\n19 typed atomic modules"]
-    ADAPTER["Infrastructure Adapters\ndomain infrastructure · platform"]
-    SHARED["Shared Kernel\ndomain · application · infrastructure primitives"]
+    INFRA["Domain Infrastructure\nrepository · integration mapping"]
+    PLATFORM["Platform Adapters\ndriver · transport · client"]
+    SHARED["Shared Kernel\ndomain · application contracts"]
 
+    ENTRY --> BOOT
     API --> PRESENTATION
     PRESENTATION --> APP
     BOOT --> API
     BOOT --> PRESENTATION
     BOOT --> WORKER
-    BOOT --> ADAPTER
+    BOOT --> INFRA
+    BOOT --> PLATFORM
     APP --> DOMAIN
     WORKER --> APP
     WORKER --> MODULE
-    ADAPTER --> APP
+    INFRA --> APP
+    INFRA --> PLATFORM
     MODULE --> APP
     APP --> SHARED
     DOMAIN --> SHARED
     WORKER --> SHARED
-    ADAPTER --> SHARED
+    INFRA --> SHARED
+    PLATFORM --> SHARED
 ```
 
 화살표는 목표 compile-time 의존 방향입니다. Bootstrap은 유일한 예외로 구체 구현 전체를 알고 객체 그래프를 조립합니다.
@@ -45,6 +52,11 @@ flowchart TD
 
 ```text
 backend/
+├── entrypoints/                 # 실행 가능한 process adapter
+│   ├── asgi.py                  # HTTP bootstrap 호출
+│   ├── cli.py                   # 관리 command dispatch
+│   └── worker.py                # worker bootstrap 호출
+│
 ├── bootstrap/                   # 객체 조립과 프로세스 생명주기
 │   ├── application.py
 │   ├── http.py
@@ -55,16 +67,13 @@ backend/
 │   │   ├── errors.py
 │   │   ├── identifiers.py
 │   │   └── clock.py
-│   ├── application/
-│   │   ├── pagination.py
-│   │   └── results.py
-│   └── infrastructure/
-│       ├── database/
-│       │   ├── sync_session.py
-│       │   ├── async_session.py
-│       │   └── transaction.py
-│       ├── telemetry/
-│       └── files/
+│   └── application/
+│       ├── pagination.py
+│       ├── results.py
+│       ├── transactions.py
+│       ├── events.py
+│       ├── leases.py
+│       └── workers.py
 │
 ├── domains/
 │   ├── workflow/
@@ -90,14 +99,17 @@ backend/
 │   ├── bi/
 │   ├── company_comparison/
 │   ├── chatbot/
-│   └── benchmark/
+│   ├── benchmark/
+│   └── operations/              # 읽기 전용 queue·lease·workload 관제
 │
 ├── platform/                    # 외부 시스템 어댑터
-│   ├── postgres/
+│   ├── postgres/                # driver, pool, transaction 구현
 │   ├── pgvector/
 │   ├── openai/
 │   ├── kubernetes/
-│   └── redis/
+│   ├── redis/
+│   ├── filesystem/
+│   └── telemetry/
 │
 └── api/
     ├── router.py                # 도메인 router 결합만 수행
@@ -109,31 +121,31 @@ modules/                         # 원자적 DAG 모듈
 jobs/                            # 선언형 표준 Job 정의
 ```
 
-각 제품 도메인은 같은 하위 계층 이름을 사용하되 필요하지 않은 계층을 억지로 만들지 않습니다. `api`는 도메인 router를 결합하는 조립 계층이며 도메인별 HTTP DTO와 route는 각 도메인의 `presentation`에 둡니다. `platform`은 여러 도메인이 공유하는 외부 시스템 client와 기반 adapter만 소유하고, 도메인 고유 repository 구현은 해당 도메인의 `infrastructure`에 둡니다.
+각 제품 도메인은 같은 하위 계층 이름을 사용하되 필요하지 않은 계층을 억지로 만들지 않습니다. `entrypoints`는 process 시작, `bootstrap`은 object graph 조립, `api`는 domain router 결합을 담당합니다. 도메인별 HTTP DTO와 route는 각 domain `presentation`에 둡니다. `platform`은 여러 도메인이 공유하는 외부 system client, driver, pool과 transaction 구현만 소유하고, 도메인 고유 SQL·repository·mapping은 해당 domain `infrastructure`에 둡니다. `shared`에는 transaction protocol 같은 안정적인 계약만 두며 concrete session 구현을 넣지 않습니다.
+
+도메인 간 호출은 Python 내부 import가 아니라도 같은 경계를 지킵니다. 소비 domain의 application이 필요한 capability port를 정의하고, 제공 domain의 공개 application facade를 감싸는 integration adapter를 bootstrap이 연결합니다. BI와 Company Comparison처럼 데이터 수명주기가 다른 도메인은 공통 base service로 합치지 않고 명시적인 snapshot reader port로 연결합니다.
 
 ### 2.1 현재 구현과의 차이
 
-2026-08-31 기준 현재 트리는 목표 구조로 이동 중인 과도기입니다. `domains`, `bootstrap`, `shared`, `platform`, `modules`, `jobs` 경계는 생성됐지만 다음 호환 패키지와 수평 계층이 남아 있습니다.
+현재 트리는 목표 구조로 이동 중인 과도기입니다. 정확한 파일 수와 import 수는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)에서 관리하며, 이 문서는 변하지 않는 migration 차이의 종류만 정의합니다.
 
 | 영역 | 현재 상태 | 목표 대비 차이 |
 | :--- | :--- | :--- |
 | `backend/bootstrap` | `container.py`, `lifecycle.py`, `bi.py`, `company_comparison.py` | HTTP·worker·application composition root가 목표 파일 단위로 분리되지 않음 |
-| `backend/shared` | 공통 error, repository base, observability만 존재 | identifiers, clock, application result/pagination, session/transaction, telemetry/files 경계가 미구성 |
+| `backend/shared` | 공통 error, repository base, observability만 존재 | identifiers, clock, application result/pagination/transaction/event 계약이 미구성되고 concrete 책임과 혼재함 |
 | `backend/domains` | workflow·BI 중심으로 domain/application 도입, chatbot 일부 infrastructure 도입 | 모든 도메인이 infrastructure/presentation/workers까지 일관된 vertical slice를 갖추지 않았고 application 일부가 `features`·`engine` 구체 구현을 직접 import함 |
-| `backend/api` | 27개 Python 파일에서 도메인 route/controller/DTO를 직접 보유 | 최종 router 결합 전용 계층보다 책임이 넓음 |
-| `backend/platform` | pgvector와 data-source adapter만 존재 | PostgreSQL/OpenAI/Kubernetes/Redis adapter가 `storage`, `providers`, `engine`, `core`에 분산됨 |
-| 호환 수평 패키지 | `features` 59개, `storage` 42개, `providers` 9개, `engine` 23개, `cli` 7개, `core` 5개, `contracts` 4개 Python 파일 | 도메인·platform·shared·process adapter 경계로 이전되지 않은 구현이 다수 존재 |
-| 프로세스 진입점 | `backend/main.py`와 `backend/cli`가 별도 진입점 역할 | application/http/worker bootstrap과 CLI adapter의 최종 위치 결정이 필요 |
+| `backend/api` | 도메인 route/controller/DTO를 직접 보유 | 최종 router 결합 전용 계층보다 책임이 넓음 |
+| `backend/platform` | pgvector와 data-source adapter만 존재 | PostgreSQL/OpenAI/Kubernetes/Redis/filesystem/telemetry adapter가 `storage`, `providers`, `engine`, `core`에 분산됨 |
+| 호환 수평 패키지 | `features`, `storage`, `providers`, `engine`, `core`, `contracts`, `cli`가 남아 있음 | 도메인·platform·shared·process adapter 경계로 책임 이전이 필요 |
+| 프로세스 진입점 | `backend/main.py`와 `backend/cli`가 별도 진입점 역할 | `entrypoints`의 얇은 ASGI/CLI/worker adapter와 bootstrap 조립 책임으로 분리 필요 |
 | `modules`, `jobs` | 원자 모듈과 선언형 Job 경계를 별도 루트로 유지 | 목표와 일치 |
 
-정적 import 조사에서는 `backend/domains`에서 호환 수평 패키지(`features`, `engine`, `contracts` 등)로 향하는 직접 import 문장이 26개, `backend/api`에서 domain 또는 수평 구현 패키지로 향하는 import 문장이 68개 확인됩니다. 모든 import가 같은 위험도를 갖는 것은 아니지만, domain application의 port 전환과 API 축소가 아직 끝나지 않았음을 보여주는 migration 지표로 사용합니다.
-
-따라서 이 문서의 `Status`는 디렉터리 생성이나 일부 의존성 역전만을 근거로 완료 처리하지 않습니다. `features/storage/providers/core/contracts/engine`의 책임 이전, 도메인 presentation/infrastructure/workers 정착, 호환 import 제거가 끝나고 구조 계약 테스트가 목표 트리를 검증할 때 완료로 전환합니다.
+디렉터리 생성이나 일부 의존성 역전만을 근거로 완료 처리하지 않습니다. 호환 패키지의 책임 이전, domain presentation/infrastructure/workers 정착, 호환 import 제거가 끝나고 구조 계약 테스트가 목표 트리를 검증할 때만 `Structure State: Complete`로 전환합니다.
 
 ### 2.2 잔여 전환 순서
 
 1. 현재 허용 중인 `domains → features/engine/contracts` 직접 의존을 목록화하고 application port 또는 shared domain contract로 대체합니다.
-2. DB session/transaction, clock, identifier, result/pagination 계약을 `shared` 목표 위치에 만들고 기존 facade가 이를 위임하도록 전환합니다.
+2. clock, identifier, result/pagination/transaction/event 계약을 `shared`에 만들고 PostgreSQL session/transaction 구현은 `platform/postgres`로 이전합니다.
 3. OpenAI, Kubernetes, Redis, PostgreSQL 기반 client를 `platform`으로 모으고 도메인 고유 adapter는 각 domain `infrastructure`로 이동합니다.
 4. workflow부터 presentation/infrastructure/workers vertical slice를 완성한 뒤 data sources, BI, company comparison, chatbot, benchmark 순서로 반복합니다.
 5. 도메인 route가 이동한 뒤 `backend/api`를 router 결합과 공통 HTTP 정책만 남도록 축소합니다.
@@ -141,31 +153,49 @@ jobs/                            # 선언형 표준 Job 정의
 
 ---
 
-## 3. 현재 구현에서 확보된 책임 경계
+## 3. 목표 책임 경계
 
-| 경계 | 책임 | 대표 구현 |
+| 경계 | 책임 | 목표 위치 |
 | :--- | :--- | :--- |
-| Presentation | `/api/v1`, Pydantic 입력, status code, SSE, 표준 오류 envelope | `backend/api/*_routes.py`, `workflow_controller.py`, `data_source_controller.py`, `data_source_ingestion_controller.py`, `exception_handlers.py` |
-| Domain | 프레임워크와 저장소에 독립적인 상태·오류·값 규칙 | `workflow/domain/state.py`, `workflow/domain/errors.py` |
-| Application | 유스케이스 orchestration과 요구 port | `GraphValidator`, `WorkflowInputAssembler`, `DataSourceFileService`, `BiApplicationService`, `CompanyComparisonService`, `ChatConversationService`, `BenchmarkApplicationService` |
-| Engine | DAG 실행, durable queue, worker lease와 retry/timeout policy | `WorkflowExecutor`, `WorkflowBatchRunner`, `WorkflowNodeRunner`, `KubernetesQueueDispatcher`, `LeasedWorker` |
-| Modules | 입력·출력·config pin 계약을 가진 재사용 실행 단위 | `BaseModule`, `BaseModuleRegistry`, 19개 module type |
-| Infrastructure | PostgreSQL, pgvector, OpenAI, artifact, snapshot 구현 | shared repository bases, pgvector capability repositories, provider adapters |
-| Bootstrap | 프로세스 수명주기와 concrete object graph | `ApplicationContainer`, `RuntimeContainer`, `ExecutionContainer`, `DomainServicesContainer` |
+| Presentation | Pydantic 입출력, HTTP status, SSE projection, application 호출 | `backend/domains/<domain>/presentation` |
+| Domain | 프레임워크와 저장소에 독립적인 entity, value object, state, policy, domain error | `backend/domains/<domain>/domain` |
+| Application | command/query use case, transaction boundary, 요구 port와 결과 DTO | `backend/domains/<domain>/application` |
+| Workers | one-shot process adapter, claim 실행과 application use case 호출 | `backend/domains/<domain>/workers` |
+| Modules | 입력·출력·config pin 계약을 가진 재사용 원자 실행 단위 | `modules` |
+| Domain Infrastructure | 도메인 repository, SQL mapping, filesystem·provider integration adapter | `backend/domains/<domain>/infrastructure` |
+| Platform | 범용 PostgreSQL/pgvector/OpenAI/Kubernetes/Redis client와 transport | `backend/platform` |
+| Shared | 도메인 비종속 primitive와 application protocol | `backend/shared` |
+| Entrypoints | ASGI·CLI·worker process 시작과 종료 코드 | `backend/entrypoints` |
+| Bootstrap | 프로세스 수명주기와 concrete object graph | `backend/bootstrap/application.py`, `http.py`, `workers.py` |
+| API Composition | router 결합, middleware, exception handler, versioning | `backend/api` |
 
 ---
 
 ## 4. 저장소와 pgvector 경계
 
-- `SyncPostgresRepository`와 `AsyncPostgresRepository`가 connection/transaction 수명주기를 공개 메서드로 제공합니다. feature repository가 `DatabaseManager._raw_connection()`에 접근하지 않습니다.
-- `PgVectorCatalogRepository`, `PgVectorIngestionRepository`, `PgVectorRetrievalRepository`는 서로 다른 외부 capability를 노출합니다. 내부 facade도 `PgVectorCatalogMixin`, `PgVectorWriteMixin`, `PgVectorRetrievalMixin`으로 같은 책임 경계를 유지합니다.
-- pipeline module은 `backend.storage.pgvector_store`를 import하지 않고 module port에만 의존합니다.
-- `DatabaseManager`는 `SourceFileRepositoryMixin`과 `WorkflowRunRepositoryMixin`을 조합합니다. workflow facade는 다시 queue, state, history capability를 조합합니다. `PgVectorStore`는 catalog, write, retrieval mixin을 조합하는 하위 호환 facade입니다. 외부 호출 경로는 유지하되 저장 책임별 파일 경계를 갖습니다.
+- application은 catalog, ingestion, retrieval, queue, snapshot처럼 유스케이스가 요구하는 좁은 repository `Protocol`을 각각 정의합니다. 하나의 범용 DB manager port를 만들지 않습니다.
+- domain infrastructure repository는 `platform/postgres`의 connection factory와 transaction 구현을 주입받고 SQL·row mapping·optimistic/lease guard를 소유합니다. private connection에 접근하거나 pool을 직접 생성하지 않습니다.
+- `platform/pgvector`는 vector codec, COPY protocol, connection과 extension capability를 제공하지만 collection publish, evidence lookup 같은 도메인 의미를 알지 않습니다.
+- pipeline module은 legacy `PgVectorStore`나 SQL gateway를 import하지 않고 application capability port에만 의존합니다.
+- 현재 `DatabaseManager`, `PgVectorStore`, repository mixin은 migration 중 호출을 보존하는 compatibility facade입니다. 새 기능을 추가하지 않고 좁은 adapter로 위임한 뒤 호출자가 0이 되면 삭제합니다.
 - 동적 SQL 식별자는 driver의 SQL composition API를 사용하고 값은 parameter binding을 사용합니다.
 
 ---
 
-## 5. Worker 상속과 관측성
+## 5. 공통 lifecycle 상속과 관측성
+
+상속은 구현 중복이 아니라 동일한 lifecycle과 불변식을 강제할 때만 사용합니다.
+
+| 대상 | 허용 공통화 | 확장 지점 |
+| :--- | :--- | :--- |
+| 모든 DAG module | `BaseModule` template | typed input/config/output와 `run`/`run_async` |
+| LLM module | `BaseLLMModule` | prompt·response schema·tool policy |
+| embedding module | `BaseEmbeddingModule` | text preparation과 batch policy |
+| 동일 lease one-shot worker | `LeasedWorker[Claim, Output]` | claim·execute·complete·fail |
+| repository | application `Protocol` + 작은 adapter 조합 | domain별 query와 mapping; 범용 CRUD base 금지 |
+| versioned snapshot | immutable publish/head primitive 조합 | BI·comparison별 payload와 validation; service 상속 금지 |
+
+`BaseService`, 범용 domain repository, 여러 bounded context의 정책을 합친 manager class는 만들지 않습니다. 공통 추출 기준은 단지 코드 모양이 같은지가 아니라 상태 전이, 오류 의미와 transaction 경계가 동일한지입니다.
 
 동일한 one-shot 수명주기를 가진 ingestion embedding, ingestion vector COPY, BI materialization worker는 `LeasedWorker[Claim, Output]`를 상속합니다.
 
@@ -182,9 +212,10 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 
 ## 6. DI와 비동기 규칙
 
-- `RuntimeContainer.create()`가 OpenAI clients, embedding adapter, `WorkflowRuntimeServices`, paths, pgvector probe를 구성합니다.
-- `ExecutionContainer.create(runtime)`가 durable workflow dispatcher와 execution service를 구성합니다.
-- `DomainServicesContainer.create(runtime)`가 BI, company comparison, chat suggestion, jobs monitor application service를 구성합니다.
+- `bootstrap/application.py`가 platform resource, domain infrastructure와 application facade를 구성합니다.
+- `bootstrap/http.py`가 application graph, domain router와 HTTP lifecycle을 결합합니다.
+- `bootstrap/workers.py`가 job kind에 맞는 domain worker를 명시적 registry에서 조립합니다.
+- `entrypoints`는 위 factory를 호출하고 process exit/cleanup만 처리합니다.
 - FastAPI hot path는 native async DB/provider method를 우선합니다.
 - 동기 `RunStore`, 파일 해시·이동, openpyxl 파싱은 worker thread 또는 one-shot worker로 격리합니다.
 - DAG의 동일 위상 batch는 `TaskGroup`으로 병렬 실행하되 timeout/상태 병합 계약을 지킵니다.
@@ -195,7 +226,9 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 
 ## 7. 실행 가능한 의존성 불변식
 
-- `backend/domains`에서 `backend.api`, `backend.platform`, `backend.providers`, `backend.storage` import 금지.
+- `domains/*/domain`에서 application/infrastructure/presentation/platform import 금지.
+- `domains/*/application`에서 platform과 concrete provider/storage/engine import 금지.
+- `domains/*/infrastructure`만 application port 구현을 위해 platform adapter를 사용할 수 있음.
 - `backend/features`에서 `backend.api` import 금지.
 - `modules`에서 DB/provider concrete client 생성 금지.
 - `modules`에서 `backend.storage.pgvector_store` import 금지.
@@ -205,14 +238,15 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - 공개 API·DB schema·저장 데이터는 구조 리팩토링만으로 변경하지 않음.
 - 함수별 cyclomatic complexity는 10 이하를 기본으로 하며 현재 legacy C901 예외는 없음.
 
-현재 규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py)와 Ruff/Pyright로 검증하며 현재 15개 계약 테스트는 통과합니다. 다만 이 테스트는 domain의 일부 outer-layer import 금지, module의 concrete client 생성 금지, 일부 facade·worker 상속관계만 확인하며 목표 디렉터리의 완성 여부는 아직 검증하지 않습니다. 최종 전환 단계에서는 허용된 최상위 패키지, 도메인별 계층 위치, `api`의 결합 전용 책임과 호환 import 제거를 별도 구조 계약으로 추가해야 합니다.
+규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py), Ruff와 Pyright로 검증합니다. 목표 구조의 모든 gate가 아직 활성화된 것은 아니므로 통과 중인 테스트만으로 migration 완료를 선언하지 않습니다. 최종 단계에서는 허용된 최상위 패키지, 도메인별 계층 위치, `api`의 결합 전용 책임과 호환 import 제거를 hard gate로 둡니다.
 
-### 7.1 아직 활성화하지 않은 목표 구조 게이트
+### 7.1 단계적으로 활성화할 목표 구조 게이트
 
 - `domains/*/domain`은 같은 domain과 `shared/domain` 외 패키지를 import하지 않습니다.
 - `domains/*/application`은 domain 및 application port만 의존하며 `features`, `storage`, `providers`, `engine`의 concrete 구현을 import하지 않습니다.
 - `domains/*/presentation`은 application use case만 호출하고 infrastructure adapter를 직접 생성하지 않습니다.
 - `backend/api`에는 도메인 고유 route/controller/schema가 남지 않습니다.
+- `backend/entrypoints`는 bootstrap 외 backend package를 직접 import하지 않습니다.
 - `backend/features`, `backend/storage`, `backend/providers`, `backend/engine`, `backend/core`, `backend/contracts`의 호환 import 수가 0이어야 합니다.
 
 이 게이트는 현재 코드에 즉시 적용하면 다수의 알려진 위반으로 실패하므로, 각 migration 단계에서 해당 위반을 제거한 뒤 순차적으로 테스트를 켭니다.

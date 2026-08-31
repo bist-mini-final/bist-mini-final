@@ -1,6 +1,7 @@
 # [BP-103] Durable queue, lease와 동시성 제어
-> **Document Code:** `BP-103` | **Category:** Concurrency Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/engine/worker/main.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/main.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/data_sources/ingestion_shards.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/ingestion_shards.py)
+> **Document Code:** `BP-103` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/shared/application`, `backend/platform/postgres`, `backend/domains/*/application`, `backend/domains/*/infrastructure/postgres`, `backend/domains/*/workers`
+> **Current References:** [`backend/engine/worker/lease.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/lease.py), [`backend/engine/worker/main.py`](file:///c:/Repos/bist-mini-final/backend/engine/worker/main.py), [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/data_sources/ingestion_shards.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/ingestion_shards.py)
 
 ---
 
@@ -85,3 +86,13 @@ workflow run과 달리 shard 실행 전체를 session advisory lock으로 직렬
 - COPY retry는 동일 ID 범위를 delete+COPY하는 단일 트랜잭션입니다.
 - 부모 finalizer는 모든 현재 shard가 succeeded이고 staging row count가 예상 문서 수와 같을 때만 HNSW를 생성하고 publish합니다.
 - 최종 실패 shard는 부모 모듈을 실패시키며 workflow retry가 failed shard의 attempt budget을 새로 시작합니다.
+
+---
+
+## 7. 책임 분리와 구조 완료 조건
+
+- lease token, heartbeat clock과 transaction primitive는 `shared`에 두되 queue 상태 전이 정책은 각 domain application이 소유합니다.
+- `FOR UPDATE`, advisory lock, token-guarded update SQL은 domain infrastructure의 PostgreSQL adapter가 구현합니다.
+- worker는 claim 결과를 application command로 전달하며 repository SQL이나 Kubernetes client를 직접 조립하지 않습니다.
+- Redis를 lock·lease·queue의 진실 공급원으로 승격하지 않습니다.
+- workflow와 ingestion의 현재 lease 구현이 각 vertical slice로 이동하고 공통 lifecycle primitive만 shared에 남을 때 구조 migration을 완료합니다.

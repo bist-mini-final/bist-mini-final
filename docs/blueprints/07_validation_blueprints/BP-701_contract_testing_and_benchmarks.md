@@ -1,6 +1,7 @@
 # [BP-701] 계약 테스트와 벤치마크 청사진
-> **Document Code:** `BP-701` | **Category:** Validation Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`tests/`](file:///c:/Repos/bist-mini-final/tests/), [`frontend/src/`](file:///c:/Repos/bist-mini-final/frontend/src/), [`.github/workflows/ci.yml`](file:///c:/Repos/bist-mini-final/.github/workflows/ci.yml)
+> **Document Code:** `BP-701` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `tests`, `frontend/src/**/*.test.*`, `.github/workflows`, architecture contract tooling
+> **Current References:** [`tests/`](file:///c:/Repos/bist-mini-final/tests/), [`frontend/src/`](file:///c:/Repos/bist-mini-final/frontend/src/), [`.github/workflows/ci.yml`](file:///c:/Repos/bist-mini-final/.github/workflows/ci.yml)
 
 ---
 
@@ -19,14 +20,17 @@ flowchart TB
 
 ## 2. 핵심 불변식
 
-- feature는 `backend.api`를 import하지 않습니다.
-- `backend/domains`는 API/platform/provider/legacy storage를 import하지 않습니다.
-- module은 DB/provider 객체를 직접 생성하지 않습니다.
-- module은 pgvector SQL gateway 대신 capability port를 사용합니다.
-- feature repository는 private DB connection에 접근하지 않습니다.
+- `domains/*/domain`은 같은 domain과 `shared/domain`만 import합니다.
+- `domains/*/application`은 domain, shared application/domain과 명시적 port만 의존하며 concrete infrastructure를 import하지 않습니다.
+- domain infrastructure와 presentation은 application 쪽으로 의존하고 서로를 직접 호출하지 않습니다.
+- 서로 다른 domain은 상대 infrastructure/presentation을 import하지 않습니다.
+- `backend/api` allowlist는 router, middleware, exception handler와 versioning뿐입니다.
+- `backend/bootstrap` 외 위치에서 concrete adapter object graph를 조립하지 않습니다.
+- module은 DB/provider 객체를 직접 생성하지 않고 capability port를 사용합니다.
+- platform은 domain use case를 import하지 않고 범용 transport/client만 제공합니다.
 - 동일한 one-shot lease 수명주기의 worker는 공통 template을 상속합니다.
 - rendered KEDA worker spec은 queue/command/environment 계약과 일치합니다.
-- Alembic revision chain의 head는 하나이며 현재 `20260829_0005`입니다.
+- Alembic revision chain의 head는 하나이며 runtime schema와 migration schema 사이 drift가 없어야 합니다.
 - `/api/v1` OpenAPI에 정식 route가 노출되고 제거된 comparison legacy route는 나타나지 않습니다.
 - registry는 정확히 19개 module type을 노출합니다.
 - BI는 21개 metric ID와 evidence 계약을 지킵니다.
@@ -80,7 +84,7 @@ npm test -- --run
 npm run build
 ```
 
-2026-08-31 기준 최근 전체 결과는 backend **235 passed, 2 skipped**, frontend **48 files / 168 passed**, Ruff/Pyright/ESLint/TypeScript typecheck/production build 통과, Kubernetes renderer **6 ScaledJobs**입니다. 새 검증을 실행하면 이 수치는 실제 결과로 갱신합니다.
+최근 실행 수치와 현재 통과 상태는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)에서만 관리합니다. 이 문서는 수치가 아니라 필수 검증 종류와 통과 조건을 정의합니다.
 
 ---
 
@@ -89,6 +93,28 @@ npm run build
 - module 변경: unit/schema/registry/OpenAPI/BP-302 동시 수정
 - DB 변경: migration/runtime schema/repository/model/BP-503 동시 수정
 - API 변경: route/DTO/OpenAPI contract/frontend client/BP-501 동시 수정
-- frontend route 변경: router/nav/home launcher/route test/BP-601 동시 수정
+- frontend route 변경: router/sidebar/deep link/route test/BP-601 동시 수정
 - comparison policy 변경: version 상향, golden calculation tests, BP-405 동시 수정
 - benchmark 목표와 실제 결과를 구분해 기록
+
+---
+
+## 7. 구조 migration gate와 ratchet
+
+구조 검증은 한 번에 모든 legacy 위반을 허용하거나 무시하지 않고 단계별 ratchet으로 강화합니다.
+
+| 단계 | Hard gate |
+| :--- | :--- |
+| 1. Shared/ports | domain/application의 신규 concrete import 금지, 기존 위반 수 증가 금지 |
+| 2. Workflow slice | workflow domain/application import allowlist, presentation/infrastructure/workers 위치 강제 |
+| 3. Product slices | data sources, BI, comparison, chatbot, benchmark에 같은 allowlist 순차 적용 |
+| 4. Composition | `backend/api` 파일 allowlist와 bootstrap-only object construction 강제 |
+| 5. Compatibility removal | `features/storage/providers/engine/core/contracts` import 0과 패키지 삭제 강제 |
+
+각 단계는 다음 조건을 모두 만족한 커밋에서만 hard gate로 전환합니다.
+
+1. 대상 slice의 unit·application·adapter·presentation contract test가 존재합니다.
+2. 공개 API와 DB schema snapshot diff가 의도된 변경만 포함합니다.
+3. 전체 정적 검사와 회귀 테스트가 통과합니다.
+4. compatibility import가 감소하며 새 예외 allowlist를 추가하지 않습니다.
+5. BP 문서의 `Structure State`와 현재 기준선을 같은 변경에서 갱신합니다.

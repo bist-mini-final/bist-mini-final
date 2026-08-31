@@ -1,7 +1,8 @@
 # [BP-403] Financial BI Analytics 워크스페이스
 
-> **Document Code:** `BP-403` | **Category:** Workspace & Financial Analytics | **Status:** Implemented & Operational
-> **Canonical Source:** [`backend/domains/bi/application/`](file:///c:/Repos/bist-mini-final/backend/domains/bi/application/), [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
+> **Document Code:** `BP-403` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Target Ownership:** `backend/domains/bi`, `backend/platform/postgres`, `frontend/src/features/bi`, `frontend/src/pages`
+> **Current References:** [`backend/domains/bi/application/`](file:///c:/Repos/bist-mini-final/backend/domains/bi/application/), [`backend/features/bi/`](file:///c:/Repos/bist-mini-final/backend/features/bi/), [`frontend/src/features/bi/`](file:///c:/Repos/bist-mini-final/frontend/src/features/bi/)
 
 ---
 
@@ -73,3 +74,12 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 4. BI의 21개 지표 계약 변경 시 Company Comparison source fingerprint와 정책 버전을 함께 검토합니다.
 
 세부 비교 계약은 [`BP-405`](file:///c:/Repos/bist-mini-final/docs/blueprints/04_workspace_blueprints/BP-405_ws_company_comparison.md)를 따릅니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- metric definition, evidence requirement와 snapshot publication policy는 BI domain/application이 소유합니다.
+- source lookup·snapshot repository·materialization adapter는 BI infrastructure, API/SSE DTO는 BI presentation, durable process는 BI workers에 둡니다.
+- Company Comparison은 BI infrastructure를 import하지 않고 BI application의 snapshot reader port만 사용합니다.
+- `backend/features/bi`의 계산·schema 책임이 BI vertical slice로 이동하고 21개 metric 및 snapshot 회귀 계약이 유지될 때 구조 migration을 완료합니다.

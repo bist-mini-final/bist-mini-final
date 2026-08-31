@@ -1,6 +1,7 @@
 # [BP-203] 대용량 Binary COPY와 pgvector 인덱싱
-> **Document Code:** `BP-203` | **Category:** Data Engine Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/repositories/pgvector_retrieval.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/pgvector_retrieval.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py), [`backend/storage/data_sources/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/shard_coordinator.py)
+> **Document Code:** `BP-203` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure`, `backend/domains/data_sources/workers`, `backend/platform/pgvector`, `jobs`
+> **Current References:** [`backend/storage/pgvector_binary_copy.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_binary_copy.py), [`backend/storage/pgvector_store.py`](file:///c:/Repos/bist-mini-final/backend/storage/pgvector_store.py), [`backend/storage/repositories/pgvector_retrieval.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/pgvector_retrieval.py), [`backend/storage/embedding_artifacts.py`](file:///c:/Repos/bist-mini-final/backend/storage/embedding_artifacts.py), [`backend/storage/data_sources/shard_coordinator.py`](file:///c:/Repos/bist-mini-final/backend/storage/data_sources/shard_coordinator.py)
 
 ---
 
@@ -103,3 +104,13 @@ WHERE collection_id = '{collection_uuid}'::uuid
    - 부모 workflow Job은 child shard barrier를 기다리면서 진행률과 실행/대기 Job 수를 SSE 상태에 기록합니다.
    - embedding part는 순서대로 하나의 content-addressed artifact로 결합하고, COPY 완료 후 document count를 검증한 뒤 HNSW와 collection publish를 한 번만 수행합니다.
    - publish 후 operation advisory lock 안에서 part vector와 shard manifest를 제거해 canonical artifact와 PostgreSQL collection만 남깁니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- shard 계획, barrier, publish 조건과 retry 정책은 `data_sources/application`이 소유합니다.
+- artifact 파일과 도메인 queue repository는 `data_sources/infrastructure`, worker process adapter는 `data_sources/workers`에 둡니다.
+- pgvector protocol, COPY encoder와 connection primitive는 `platform/pgvector`가 제공하되 collection publish 의미는 domain adapter가 결정합니다.
+- module은 `PgVectorStore` facade가 아니라 ingestion port를 호출하며 transaction과 client를 직접 만들지 않습니다.
+- `backend/storage` facade 없이 staging→검증→index→publish가 port/adapter로 실행되고 child Job이 선언형 catalog와 일치할 때 구조 migration을 완료합니다.

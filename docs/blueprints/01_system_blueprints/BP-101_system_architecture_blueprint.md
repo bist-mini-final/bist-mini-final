@@ -1,10 +1,11 @@
 # [BP-101] 시스템 전체 배치도와 실행 토폴로지
-> **Document Code:** `BP-101` | **Category:** System Architecture Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`backend/bootstrap/container.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py), [`backend/engine/runtime/services.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/services.py)
+> **Document Code:** `BP-101` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/domains`, `backend/platform`, `backend/shared`, `backend/api`, `modules`, `jobs`
+> **Current References:** [`backend/bootstrap/container.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/container.py), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/main.py`](file:///c:/Repos/bist-mini-final/backend/main.py), [`backend/engine/runtime/services.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/services.py)
 
 ---
 
-## 1. 현재 시스템 경계
+## 1. 목표 시스템 경계
 
 이 시스템은 React SPA, FastAPI control plane, PostgreSQL/pgvector 영속 계층, Redis 상태 변경 신호, KEDA one-shot worker로 구성됩니다. 제품 워크스페이스는 Pipeline Playground, Data Sources, Financial BI, AI Financial Chatbot, Company Comparison, Jobs, Settings로 나뉩니다.
 
@@ -12,26 +13,28 @@ Financial BI와 Company Comparison은 별도 제품 도메인입니다. 비교 �
 
 ```mermaid
 flowchart TB
-    SPA["React SPA\n8 ready routes"] --> API["FastAPI\n/api/v1"]
-    API --> USECASE["Domain application services\nports + use cases"]
-    APP["ApplicationContainer"] --> USECASE
-    APP --> RUNTIME["RuntimeContainer\nproviders + WorkflowRuntimeServices"]
-    APP --> EXEC["ExecutionContainer\nworkflow submission + recovery"]
-    APP --> DOMAIN["DomainServicesContainer\nBI + comparison + suggestions + jobs"]
+    SPA["React SPA\nfeature workspaces"] --> API["FastAPI composition\n/api/v1"]
+    API --> PRESENTATION["Domain presentation\nroutes + DTO + SSE"]
+    PRESENTATION --> USECASE["Domain application\nports + use cases"]
+    ENTRY["backend/entrypoints\nasgi + cli + worker"] --> BOOT["backend/bootstrap\napplication + http + workers"]
+    BOOT --> PRESENTATION
+    BOOT --> ADAPTERS["Domain infrastructure\nrepository + mapping"]
+    BOOT --> PLATFORM["Platform adapters\nPostgreSQL + pgvector + OpenAI + K8s + Redis"]
 
-    EXEC --> PGQ["PostgreSQL durable queues"]
+    USECASE --> PGQ["PostgreSQL durable queues"]
     PGQ --> KEDA["KEDA ScaledJobs"]
-    KEDA --> WORKERS["one-shot worker Pods\nlease + heartbeat"]
+    KEDA --> WORKERS["Domain one-shot workers\nlease + heartbeat"]
     WORKERS --> MODULES["ModuleRegistry\n19 registered module types"]
 
-    RUNTIME --> OPENAI["OpenAI Responses + Embeddings"]
-    RUNTIME --> PG["PostgreSQL 16 + pgvector"]
-    API --> REDIS["Redis Pub/Sub\nstate-change hints"]
-    API --> PG
-    DOMAIN --> PG
+    PLATFORM --> OPENAI["OpenAI Responses + Embeddings"]
+    PLATFORM --> PG["PostgreSQL 16 + pgvector"]
+    PLATFORM --> REDIS["Redis Pub/Sub\nstate-change hints"]
+    ADAPTERS --> PLATFORM
+    ADAPTERS -.-> USECASE
 ```
 
 표 구조 감지가 필요한 현재 경로는 외부 OpenAI vision provider를 사용하고, 검색 기준선은 Dense + PostgreSQL keyword + RRF + 2D context expansion입니다.
+점선은 domain infrastructure가 application이 정의한 port를 구현한다는 뜻이며 application이 concrete adapter를 import한다는 뜻이 아닙니다.
 
 ---
 
@@ -52,46 +55,51 @@ Company Comparison refresh는 외부 LLM을 호출하지 않는 제한된 집계
 
 ---
 
-## 3. 부트스트랩 객체 그래프
+## 3. 목표 부트스트랩 객체 그래프
 
 ```mermaid
 classDiagram
-    class ApplicationContainer {
-        +RuntimeContainer runtime
-        +ExecutionContainer execution
-        +DomainServicesContainer domain
-        +create()
-        +recover_pending_runs()
+    class ApplicationBootstrap {
+        +build_shared_resources()
+        +build_domain_adapters()
+        +build_use_cases()
         +close()
-        +aclose()
     }
-    class RuntimeContainer {
-        +OpenAIProvider openai_provider
-        +OpenAIResponsesClient completion_client
-        +EmbeddingEncoder embedding_encoder
-        +WorkflowRuntimeServices services
-        +RuntimePaths paths
-        +PgVectorConnectionProbe pgvector_probe
+    class HttpBootstrap {
+        +build_fastapi_app()
+        +compose_domain_routers()
+        +install_middleware()
     }
-    class ExecutionContainer {
-        +KubernetesQueueDispatcher workflow_dispatcher
-        +WorkflowExecutionService workflow_execution
-        +recover_pending_runs()
+    class WorkerBootstrap {
+        +build_worker(kind)
+        +run_one_shot()
     }
-    class DomainServicesContainer {
-        +BiApiServices bi_services
-        +CompanyComparisonService company_comparison
-        +ChatSuggestionService chat_suggestions
-        +KubernetesMonitor job_monitor
+    class DomainApplication {
+        +commands
+        +queries
+        +ports
     }
-    ApplicationContainer *-- RuntimeContainer
-    ApplicationContainer *-- ExecutionContainer
-    ApplicationContainer *-- DomainServicesContainer
-    ExecutionContainer --> RuntimeContainer
-    DomainServicesContainer --> RuntimeContainer
+    class DomainInfrastructure {
+        +repositories
+        +external_adapters
+    }
+    class PlatformAdapters {
+        +postgres
+        +pgvector
+        +openai
+        +kubernetes
+        +redis
+    }
+    ApplicationBootstrap *-- DomainApplication
+    ApplicationBootstrap *-- DomainInfrastructure
+    ApplicationBootstrap *-- PlatformAdapters
+    HttpBootstrap --> ApplicationBootstrap
+    WorkerBootstrap --> ApplicationBootstrap
 ```
 
-`ApplicationContainer`는 최상위 composition root입니다. `RuntimeContainer`는 웹과 워커가 공유하는 provider·DB·registry 설정을 만들고, `ExecutionContainer`는 control-plane 제출과 복구 책임을, `DomainServicesContainer`는 제품 서비스를 소유합니다. 호환 property는 남아 있지만 새 조립 코드는 `runtime`, `execution`, `domain`을 직접 사용합니다.
+`application.py`는 공유 resource, domain adapter와 use case를 조립합니다. `http.py`는 FastAPI 수명주기와 domain router 결합만 담당하고, `workers.py`는 동일 object graph에서 one-shot worker를 선택해 실행합니다. 세 진입점은 설정과 adapter factory를 공유하지만 HTTP·worker 수명주기를 서로 끌어오지 않습니다. 현재 container class는 이 목표로 이동하는 compatibility composition이며 최종 계약이 아닙니다.
+
+`backend/entrypoints`의 ASGI·CLI·worker 파일은 인자와 환경을 읽고 해당 bootstrap factory를 호출하는 얇은 process adapter입니다. 여기에는 repository 선택, route별 분기나 job policy를 두지 않습니다.
 
 ---
 
@@ -108,8 +116,9 @@ classDiagram
 ## 5. 아키텍처 불변식
 
 - 공개 API는 `/api/v1`을 기준으로 문서화합니다.
-- `backend/domains`는 API, platform, provider, legacy storage 같은 바깥 계층을 역참조하지 않습니다.
-- feature 호환 구현은 HTTP API 계층을 역참조하지 않습니다.
+- domain은 application, infrastructure, presentation을 역참조하지 않습니다.
+- application은 API, platform, provider, storage, engine concrete 구현을 역참조하지 않습니다.
+- 서로 다른 domain은 상대 domain의 infrastructure를 import하지 않고 application port로 협력합니다.
 - `modules/`는 DB/provider를 직접 생성하지 않고 주입받습니다.
 - pipeline module은 `PgVectorStore` SQL gateway가 아니라 retrieval/ingestion/catalog port에 의존합니다.
 - API 이벤트 루프에서 블로킹 DB·파일·CPU 작업을 직접 실행하지 않습니다.
@@ -117,3 +126,5 @@ classDiagram
 - 현재 모듈 카탈로그는 `ModuleRegistry`에 등록된 19개 type이 단일 기준입니다.
 
 정확한 현재 수치와 범위는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 우선합니다.
+
+구조 완료는 BP-102의 목표 트리와 import gate가 모두 활성화되고, 현재 compatibility container와 수평 패키지가 composition 경계에서 제거됐을 때만 선언합니다.

@@ -1,7 +1,8 @@
 # [BP-302] 19개 파이프라인 모듈 핀아웃 카탈로그
 
-> **Document Code:** `BP-302` | **Category:** Pipeline Module Contracts | **Status:** Implemented & Operational
-> **Canonical Source:** [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
+> **Document Code:** `BP-302` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Mostly Aligned
+> **Target Ownership:** `modules`, `backend/domains/workflow/application`, `backend/bootstrap`
+> **Current References:** [`backend/engine/runtime/registry.py`](file:///c:/Repos/bist-mini-final/backend/engine/runtime/registry.py), [`modules/`](file:///c:/Repos/bist-mini-final/modules/)
 
 ---
 
@@ -37,7 +38,7 @@ classDiagram
 - `BaseEmbeddingModule`은 임베딩 차원 검증과 동기·비동기 인코딩을 공유합니다.
 - 네이티브 async 구현이 없는 동기 모듈은 실행기가 worker thread에 격리합니다.
 
-## 2. 현재 등록 목록
+## 2. 공개 등록 목록
 
 | 번호 | module type | 구현 클래스·파일 | 상속 | 역할 |
 | :---: | :--- | :--- | :--- | :--- |
@@ -81,3 +82,13 @@ classDiagram
 3. 외부 vision 모듈과 Dense + keyword + RRF 경로를 현재 실행 기준선으로 유지합니다.
 4. 자동 스캔보다 명시적 factory 등록을 유지하여 provider·storage 의존성 주입과 등록 순서를 코드 리뷰 가능하게 보존합니다.
 5. `backend/cli/documentation/module_docs.py`가 Pydantic schema에서 예시와 Markdown을 생성하므로 생성 문서를 직접 수정하지 않습니다.
+
+---
+
+## 5. 소유권과 구조 완료 조건
+
+- module class, input/config/output schema와 version은 `modules/`가 소유합니다.
+- registry protocol과 execution use case는 `workflow/application`, concrete factory 등록은 `bootstrap`이 소유합니다.
+- module 자동 검색과 import side effect를 사용하지 않으며 factory가 요구하는 capability는 명시적인 port로 전달합니다.
+- 저장된 workflow가 참조하는 module type rename은 alias·migration·deprecation 기간 없이 수행하지 않습니다.
+- registry composition이 `backend/engine/runtime`에서 bootstrap/workflow 경계로 이동하고 module concrete client 생성 금지 gate가 통과할 때 구조 migration을 완료합니다.

@@ -1,6 +1,7 @@
 # [BP-401] Pipeline Playground 워크스페이스
-> **Document Code:** `BP-401` | **Category:** Workspace Blueprint | **Status:** Implemented & Operational
-> **Source Files:** [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/), [`frontend/src/pages/PlaygroundPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx), [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py)
+> **Document Code:** `BP-401` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
+> **Target Ownership:** `backend/domains/workflow/presentation`, `backend/domains/workflow/application`, `frontend/src/features/playground`, `frontend/src/pages`
+> **Current References:** [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/), [`frontend/src/pages/PlaygroundPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx), [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py)
 
 ---
 
@@ -40,7 +41,7 @@ flowchart LR
 
 ---
 
-## 4. 현재 19개 module
+## 4. 등록 module catalog
 
 정확한 type 목록과 pin 계약은 [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 사용합니다. 과거 UI 문서에 있던 `MultiQueryExpander`, `SparseBm25Retriever`, `AgenticReasoner`, `FactChecker`, `ConfidenceScorer` 등은 현재 registry type이 아닙니다.
 
@@ -53,3 +54,12 @@ flowchart LR
 - trace는 output 전체를 무조건 polling하지 않고 backend summary projection을 사용합니다.
 - 실행 취소는 `POST /api/v1/runs/{run_id}/cancel`, 재개는 `/resume`으로 요청합니다.
 - 캐시 정리는 별도 `DELETE /api/v1/cache` 계약을 사용합니다.
+
+---
+
+## 6. 책임 분리와 구조 완료 조건
+
+- frontend feature는 편집 state, canvas, module catalog, run monitor를 소유하고 backend DTO를 runtime schema로 검증합니다.
+- workflow presentation은 route·schema·SSE projection만 제공하고 DAG 검증·실행 판단은 application command/query로 위임합니다.
+- module 설정 panel은 registry schema와 현재 run projection을 사용하며 DB/provider 내부 schema를 노출하지 않습니다.
+- `backend/api/workflow_routes.py`의 도메인 책임이 workflow presentation으로 이동하고 page가 feature 조립만 수행할 때 구조 migration을 완료합니다.
