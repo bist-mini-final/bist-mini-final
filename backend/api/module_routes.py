@@ -25,7 +25,9 @@ class ModuleContractSummary(BaseModel):
 
     type: str = Field(..., description="고유 모듈 식별자 (예: 'decomposer', 'reader')")
     label: str = Field(..., description="UI 팔레트 표시용 사람이 읽을 수 있는 이름")
-    category: str = Field(..., description="모듈 분류 (Query, Embedding, Retrieval, Structure, Storage, Reader)")
+    category: str = Field(
+        ..., description="모듈 분류 (Query, Embedding, Retrieval, Structure, Storage, Reader)"
+    )
     description: str = Field(..., description="모듈의 기능 및 역할 설명")
     inputs: List[str] = Field(default_factory=list, description="필수 입력 포트 목록")
     outputs: List[str] = Field(default_factory=list, description="출력 포트 목록")
@@ -85,6 +87,57 @@ class AllModuleSchemasResponse(BaseModel):
     )
 
 
+def _module_categories(registry: ModuleRegistry) -> Dict[str, Any]:
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for definition in registry.definitions():
+        grouped.setdefault(definition.get("category", "General"), []).append(definition)
+    categories = [
+        ModuleCategoryGroup(
+            category=category,
+            count=len(modules),
+            module_types=[module["type"] for module in modules],
+            modules=modules,
+        ).model_dump(mode="json")
+        for category, modules in sorted(grouped.items())
+    ]
+    return {"categories": categories}
+
+
+def _module_schemas(registry: ModuleRegistry) -> Dict[str, Any]:
+    return {
+        "schemas": {
+            definition["type"]: {
+                "input_schema": definition.get("input_schema", {}),
+                "config_schema": definition.get("config_schema", {}),
+                "output_schema": definition.get("output_schema", {}),
+                "label": definition.get("label", definition["type"]),
+                "category": definition.get("category", "General"),
+            }
+            for definition in registry.definitions()
+        }
+    }
+
+
+def _module_definition(registry: ModuleRegistry, module_type: str) -> Dict[str, Any]:
+    try:
+        return registry.definition(module_type)
+    except KeyError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"모듈 '{module_type}'을 찾을 수 없습니다.",
+        ) from error
+
+
+def _module_markdown(registry: ModuleRegistry, module_type: str) -> str:
+    try:
+        return render_module_markdown(registry.get(module_type))
+    except KeyError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"모듈 '{module_type}'을 찾을 수 없습니다.",
+        ) from error
+
+
 # ==============================================================================
 # Router Factory
 # ==============================================================================
@@ -98,9 +151,7 @@ def create_module_router(module_registry: ModuleRegistry | None = None) -> APIRo
         return module_registry
 
     registry_dependency = (
-        resolve_module_registry
-        if module_registry is not None
-        else get_module_registry
+        resolve_module_registry if module_registry is not None else get_module_registry
     )
 
     @router.get(
@@ -131,22 +182,7 @@ def create_module_router(module_registry: ModuleRegistry | None = None) -> APIRo
         registry: ModuleRegistry = Depends(registry_dependency),
     ) -> Dict[str, Any]:
         """파이프라인 모듈을 기능별 카테고리로 그룹화하여 반환합니다."""
-        all_defs = registry.definitions()
-        grouped: Dict[str, List[Dict[str, Any]]] = {}
-        for definition in all_defs:
-            cat = definition.get("category", "General")
-            grouped.setdefault(cat, []).append(definition)
-
-        categories_list = [
-            ModuleCategoryGroup(
-                category=cat,
-                count=len(mods),
-                module_types=[m["type"] for m in mods],
-                modules=mods,
-            )
-            for cat, mods in sorted(grouped.items())
-        ]
-        return {"categories": [cg.model_dump(mode="json") for cg in categories_list]}
+        return _module_categories(registry)
 
     @router.get(
         "/modules/schemas",
@@ -161,17 +197,7 @@ def create_module_router(module_registry: ModuleRegistry | None = None) -> APIRo
         registry: ModuleRegistry = Depends(registry_dependency),
     ) -> Dict[str, Any]:
         """모든 등록된 모듈의 JSON 스키마 사전을 일괄 반환합니다."""
-        schemas_map: Dict[str, Dict[str, Any]] = {}
-        for definition in registry.definitions():
-            m_type = definition["type"]
-            schemas_map[m_type] = {
-                "input_schema": definition.get("input_schema", {}),
-                "config_schema": definition.get("config_schema", {}),
-                "output_schema": definition.get("output_schema", {}),
-                "label": definition.get("label", m_type),
-                "category": definition.get("category", "General"),
-            }
-        return {"schemas": schemas_map}
+        return _module_schemas(registry)
 
     @router.get(
         "/modules/{module_type}",
@@ -187,13 +213,7 @@ def create_module_router(module_registry: ModuleRegistry | None = None) -> APIRo
         registry: ModuleRegistry = Depends(registry_dependency),
     ) -> Dict[str, Any]:
         """단일 모듈의 입력, 설정, 출력 및 실행 스키마를 반환합니다."""
-        try:
-            return registry.definition(module_type)
-        except KeyError as error:
-            raise HTTPException(
-                status_code=404,
-                detail=f"모듈 '{module_type}'을 찾을 수 없습니다.",
-            ) from error
+        return _module_definition(registry, module_type)
 
     @router.get(
         "/modules/{module_type}/docs",
@@ -209,12 +229,6 @@ def create_module_router(module_registry: ModuleRegistry | None = None) -> APIRo
         registry: ModuleRegistry = Depends(registry_dependency),
     ) -> str:
         """모듈의 Pydantic DTO 구조로부터 마크다운 사용 가이드를 동적 렌더링합니다."""
-        try:
-            return render_module_markdown(registry.get(module_type))
-        except KeyError as error:
-            raise HTTPException(
-                status_code=404,
-                detail=f"모듈 '{module_type}'을 찾을 수 없습니다.",
-            ) from error
+        return _module_markdown(registry, module_type)
 
     return router

@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from hashlib import sha256
 from typing import assert_never
 
@@ -279,38 +280,63 @@ class FastRagPipelineAdapter:
         if not raw_cells:
             raise RagPipelineContractError(code="context_cells_missing")
 
+        cells_by_key = self._index_evidence_cells(raw_cells)
+        selected_list = self._select_ranked_cells(ranked_ids, cells_by_key)
+        if not selected_list:
+            selected_list = self._fallback_evidence_cells(raw_cells)
+        if not selected_list:
+            raise RagPipelineContractError(code="context_cells_missing")
+        return tuple(selected_list[: self._settings.context_cell_limit])
+
+    @staticmethod
+    def _evidence_cell(raw_cell: Mapping[str, object]) -> RankedEvidenceCell:
+        return RankedEvidenceCell.model_validate(
+            {
+                "cell_id": raw_cell.get("cell_id"),
+                "sheet_name": raw_cell.get("sheet_name"),
+                "cell_coord": raw_cell.get("cell_coord"),
+                "source_text": raw_cell.get("source_text"),
+            }
+        )
+
+    @staticmethod
+    def _evidence_keys(raw_cell: Mapping[str, object]) -> list[str]:
+        sheet = str(raw_cell.get("sheet_name") or "")
+        coord = str(raw_cell.get("cell_coord") or "")
+        keys = [
+            str(raw_cell.get("id") or ""),
+            str(raw_cell.get("cell_id") or ""),
+            coord,
+            f"{sheet} Cell {coord}",
+            f"{sheet}:{coord}",
+        ]
+        prefixes = {
+            "Income_Statement": "IS",
+            "Balance_Sheet": "BS",
+            "Cash_Flow": "CF",
+            "Key_Stats": "KS",
+        }
+        if prefix := prefixes.get(sheet):
+            keys.append(f"{prefix} Cell {coord}")
+        return [key for key in keys if key]
+
+    @classmethod
+    def _index_evidence_cells(
+        cls,
+        raw_cells: Sequence[Mapping[str, object]],
+    ) -> dict[str, RankedEvidenceCell]:
         cells_by_key: dict[str, RankedEvidenceCell] = {}
         for raw_cell in raw_cells:
-            cell = RankedEvidenceCell.model_validate(
-                {
-                    "cell_id": raw_cell.get("cell_id"),
-                    "sheet_name": raw_cell.get("sheet_name"),
-                    "cell_coord": raw_cell.get("cell_coord"),
-                    "source_text": raw_cell.get("source_text"),
-                }
-            )
-            keys = [
-                str(raw_cell.get("id") or ""),
-                str(raw_cell.get("cell_id") or ""),
-                str(raw_cell.get("cell_coord") or ""),
-                f"{raw_cell.get('sheet_name')} Cell {raw_cell.get('cell_coord')}",
-                f"{raw_cell.get('sheet_name')}:{raw_cell.get('cell_coord')}",
-            ]
-            sheet = str(raw_cell.get("sheet_name") or "")
-            coord = str(raw_cell.get("cell_coord") or "")
-            if sheet == "Income_Statement":
-                keys.append(f"IS Cell {coord}")
-            elif sheet == "Balance_Sheet":
-                keys.append(f"BS Cell {coord}")
-            elif sheet == "Cash_Flow":
-                keys.append(f"CF Cell {coord}")
-            elif sheet == "Key_Stats":
-                keys.append(f"KS Cell {coord}")
+            cell = cls._evidence_cell(raw_cell)
+            for key in cls._evidence_keys(raw_cell):
+                cells_by_key.setdefault(key, cell)
+        return cells_by_key
 
-            for k in keys:
-                if k:
-                    cells_by_key.setdefault(k, cell)
-
+    @staticmethod
+    def _select_ranked_cells(
+        ranked_ids: Sequence[str],
+        cells_by_key: Mapping[str, RankedEvidenceCell],
+    ) -> list[RankedEvidenceCell]:
         selected_list: list[RankedEvidenceCell] = []
         seen_ids: set[str] = set()
         for cell_id in ranked_ids:
@@ -318,21 +344,18 @@ class FastRagPipelineAdapter:
             if matched and matched.cell_id not in seen_ids:
                 seen_ids.add(matched.cell_id)
                 selected_list.append(matched)
+        return selected_list
 
-        if not selected_list and raw_cells:
-            for raw_cell in raw_cells:
-                cell = RankedEvidenceCell.model_validate(
-                    {
-                        "cell_id": raw_cell.get("cell_id"),
-                        "sheet_name": raw_cell.get("sheet_name"),
-                        "cell_coord": raw_cell.get("cell_coord"),
-                        "source_text": raw_cell.get("source_text"),
-                    }
-                )
-                if cell.cell_id not in seen_ids:
-                    seen_ids.add(cell.cell_id)
-                    selected_list.append(cell)
-
-        if not selected_list:
-            raise RagPipelineContractError(code="context_cells_missing")
-        return tuple(selected_list[: self._settings.context_cell_limit])
+    @classmethod
+    def _fallback_evidence_cells(
+        cls,
+        raw_cells: Sequence[Mapping[str, object]],
+    ) -> list[RankedEvidenceCell]:
+        selected: list[RankedEvidenceCell] = []
+        seen_ids: set[str] = set()
+        for raw_cell in raw_cells:
+            cell = cls._evidence_cell(raw_cell)
+            if cell.cell_id not in seen_ids:
+                seen_ids.add(cell.cell_id)
+                selected.append(cell)
+        return selected

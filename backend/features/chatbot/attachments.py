@@ -38,12 +38,13 @@ def _limit(text: str) -> str:
     normalized = text.replace("\x00", "").strip()
     if len(normalized) <= MAX_EXTRACTED_CHARS:
         return normalized
-    return normalized[:MAX_EXTRACTED_CHARS] + "\n\n[첨부 파일 내용이 길어 처음 60,000자만 사용했습니다.]"
+    return (
+        normalized[:MAX_EXTRACTED_CHARS]
+        + "\n\n[첨부 파일 내용이 길어 처음 60,000자만 사용했습니다.]"
+    )
 
 
-def compact_evidence(question: str, extracted_text: str) -> str:
-    """Select question-relevant spreadsheet rows before sending evidence to the LLM."""
-    lines = [line.strip() for line in extracted_text.splitlines() if line.strip()]
+def _question_terms(question: str) -> set[str]:
     terms = {
         term.casefold()
         for term in re.findall(r"[\w가-힣]{2,}", question)
@@ -52,10 +53,13 @@ def compact_evidence(question: str, extracted_text: str) -> str:
     for korean, aliases in _FINANCIAL_TERM_ALIASES.items():
         if korean in question:
             terms.update(aliases)
+    return terms
+
+
+def _relevant_rows(lines: list[str], terms: set[str]) -> list[str]:
     selected: list[str] = []
     current_sheet = ""
     recent: list[str] = []
-    # Keep the sheet name close to every matched row so the source stays interpretable.
     for line in lines:
         if line.startswith("[시트:"):
             current_sheet = line
@@ -66,20 +70,30 @@ def compact_evidence(question: str, extracted_text: str) -> str:
         if score:
             selected.extend([current_sheet, *recent[-2:], line])
         recent.append(line)
+    return selected
 
+
+def _representative_rows(lines: list[str]) -> list[str]:
+    selected: list[str] = []
+    sheet_rows: dict[str, int] = {}
+    current_sheet = ""
+    for line in lines:
+        if line.startswith("[시트:"):
+            current_sheet = line
+            sheet_rows.setdefault(current_sheet, 0)
+            continue
+        if current_sheet and sheet_rows[current_sheet] < 4:
+            selected.extend([current_sheet, line])
+            sheet_rows[current_sheet] += 1
+    return selected
+
+
+def compact_evidence(question: str, extracted_text: str) -> str:
+    """Select question-relevant spreadsheet rows before sending evidence to the LLM."""
+    lines = [line.strip() for line in extracted_text.splitlines() if line.strip()]
+    selected = _relevant_rows(lines, _question_terms(question))
     if not selected:
-        # General questions still receive representative rows from each sheet.
-        sheet_rows: dict[str, int] = {}
-        current_sheet = ""
-        for line in lines:
-            if line.startswith("[시트:"):
-                current_sheet = line
-                sheet_rows.setdefault(current_sheet, 0)
-                continue
-            if current_sheet and sheet_rows[current_sheet] < 4:
-                selected.extend([current_sheet, line])
-                sheet_rows[current_sheet] += 1
-
+        selected = _representative_rows(lines)
     deduplicated = list(dict.fromkeys(selected))
     result = "\n".join(deduplicated)
     if len(result) > MAX_EVIDENCE_CHARS:
@@ -103,7 +117,11 @@ def _extract_xlsx_xml(content: bytes) -> str:
             root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
             shared = [_xml_text(item) for item in root.findall(f"{namespace}si")]
         sheets = sorted(
-            (name for name in archive.namelist() if name.startswith("xl/worksheets/") and name.endswith(".xml")),
+            (
+                name
+                for name in archive.namelist()
+                if name.startswith("xl/worksheets/") and name.endswith(".xml")
+            ),
             key=str.casefold,
         )
         for sheet in sheets:
@@ -127,52 +145,64 @@ def _extract_xlsx_xml(content: bytes) -> str:
     return _limit("\n".join(lines))
 
 
+def _extract_json(content: bytes) -> str:
+    try:
+        document = json.loads(content.decode("utf-8-sig"))
+        return _limit(json.dumps(document, ensure_ascii=False, indent=2))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return _limit(content.decode("utf-8-sig", errors="replace"))
+
+
+def _extract_csv(content: bytes) -> str:
+    decoded = content.decode("utf-8-sig", errors="replace")
+    rows = csv.reader(decoded.splitlines())
+    return _limit("\n".join(" | ".join(cell.strip() for cell in row) for row in rows))
+
+
+def _worksheet_lines(worksheet) -> list[str]:
+    lines = [f"[시트: {worksheet.title}]"]
+    for row in worksheet.iter_rows(values_only=True):
+        values = [str(value).strip() for value in row if value is not None and str(value).strip()]
+        if values:
+            lines.append(" | ".join(values))
+        if sum(len(line) + 1 for line in lines) > MAX_SHEET_EXTRACTED_CHARS:
+            lines.append("[이 시트는 처음 6,000자만 사용했습니다.]")
+            break
+    return lines
+
+
+def _extract_workbook(content: bytes) -> str:
+    workbook = load_workbook(
+        BytesIO(content),
+        read_only=True,
+        data_only=True,
+        keep_links=False,
+    )
+    lines: list[str] = []
+    try:
+        for worksheet in workbook.worksheets:
+            if worksheet.sheet_state != "visible":
+                continue
+            lines.extend(_worksheet_lines(worksheet))
+            if sum(len(line) + 1 for line in lines) > MAX_EXTRACTED_CHARS:
+                return _limit("\n".join(lines))
+    finally:
+        workbook.close()
+    return _limit("\n".join(lines))
+
+
 def extract_text(file_name: str, content: bytes) -> str:
     """Extract a bounded, plain-text evidence context from supported local files."""
     suffix = Path(file_name).suffix.casefold()
     if suffix in {".txt", ".md"}:
         return _limit(content.decode("utf-8-sig", errors="replace"))
     if suffix == ".json":
-        try:
-            return _limit(json.dumps(json.loads(content.decode("utf-8-sig")), ensure_ascii=False, indent=2))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return _limit(content.decode("utf-8-sig", errors="replace"))
+        return _extract_json(content)
     if suffix == ".csv":
-        decoded = content.decode("utf-8-sig", errors="replace")
-        rows = csv.reader(decoded.splitlines())
-        return _limit("\n".join(" | ".join(cell.strip() for cell in row) for row in rows))
+        return _extract_csv(content)
     if suffix in {".xlsx", ".xlsm"}:
         try:
-            # External workbook links are irrelevant to chat evidence and some
-            # valid financial templates contain link metadata openpyxl cannot parse.
-            workbook = load_workbook(
-                BytesIO(content),
-                read_only=True,
-                data_only=True,
-                keep_links=False,
-            )
-            lines: list[str] = []
-            try:
-                for worksheet in workbook.worksheets:
-                    # Finance workbooks often keep a vendor/add-in payload in a
-                    # veryHidden sheet. It is not user data and can consume the
-                    # entire context window with binary-like text.
-                    if worksheet.sheet_state != "visible":
-                        continue
-                    worksheet_lines = [f"[시트: {worksheet.title}]"]
-                    for row in worksheet.iter_rows(values_only=True):
-                        values = [str(value).strip() for value in row if value is not None and str(value).strip()]
-                        if values:
-                            worksheet_lines.append(" | ".join(values))
-                        if sum(len(line) + 1 for line in worksheet_lines) > MAX_SHEET_EXTRACTED_CHARS:
-                            worksheet_lines.append("[이 시트는 처음 6,000자만 사용했습니다.]")
-                            break
-                    lines.extend(worksheet_lines)
-                    if sum(len(line) + 1 for line in lines) > MAX_EXTRACTED_CHARS:
-                        return _limit("\n".join(lines))
-            finally:
-                workbook.close()
-            return _limit("\n".join(lines))
+            return _extract_workbook(content)
         except (TypeError, ValueError):
             return _extract_xlsx_xml(content)
     raise ValueError("지원하지 않는 파일 형식입니다")
@@ -192,15 +222,26 @@ async def save_upload(file: UploadFile) -> tuple[str, str, str | None, int, str,
             raise HTTPException(status_code=413, detail="첨부 파일은 20MB를 초과할 수 없습니다")
         extracted = extract_text(safe_name, content)
         if not extracted:
-            raise HTTPException(status_code=422, detail="질문 근거로 사용할 텍스트를 추출하지 못했습니다")
+            raise HTTPException(
+                status_code=422, detail="질문 근거로 사용할 텍스트를 추출하지 못했습니다"
+            )
         attachment_id = f"attachment-{uuid4().hex}"
         CHAT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         destination = CHAT_UPLOAD_DIR / f"{attachment_id}{suffix}"
         destination.write_bytes(content)
-        return attachment_id, safe_name, file.content_type, len(content), str(destination.resolve()), extracted
+        return (
+            attachment_id,
+            safe_name,
+            file.content_type,
+            len(content),
+            str(destination.resolve()),
+            extracted,
+        )
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(status_code=422, detail=f"첨부 파일을 읽지 못했습니다: {error}") from error
+        raise HTTPException(
+            status_code=422, detail=f"첨부 파일을 읽지 못했습니다: {error}"
+        ) from error
     finally:
         await file.close()

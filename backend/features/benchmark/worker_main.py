@@ -18,9 +18,58 @@ from backend.features.benchmark.service import (
     execute_benchmark_comparison,
 )
 
-from .postgres_store import BenchmarkPostgresStore
+from .postgres_store import BenchmarkPostgresStore, ClaimedBenchmarkJob
 
 logger = logging.getLogger(__name__)
+
+
+def _await_permission(
+    store: BenchmarkPostgresStore,
+    claimed: ClaimedBenchmarkJob,
+    worker_id: str,
+    heartbeat: LeaseHeartbeat,
+) -> None:
+    announced_pause = False
+    while True:
+        heartbeat.raise_if_lost()
+        cancel_requested, pause_requested = store.control(claimed.job_id, worker_id)
+        if cancel_requested:
+            raise DagExecutionCancelled("벤치마크 실행이 중지되었습니다")
+        if not pause_requested:
+            if announced_pause:
+                store.mark_running(claimed.job_id, worker_id)
+            return
+        if not announced_pause:
+            store.mark_paused(claimed.job_id, worker_id)
+            announced_pause = True
+        sleep(0.25)
+
+
+def _update_progress(
+    store: BenchmarkPostgresStore,
+    claimed: ClaimedBenchmarkJob,
+    worker_id: str,
+    heartbeat: LeaseHeartbeat,
+    progress: dict[str, object],
+) -> None:
+    heartbeat.raise_if_lost()
+    if not store.update_progress(claimed.job_id, worker_id, progress):
+        raise RuntimeError("benchmark worker lease changed")
+
+
+def _resume_active(claimed: ClaimedBenchmarkJob) -> tuple[str, str, str] | None:
+    current = claimed.current_payload or {}
+    if (
+        claimed.active_run_id is None
+        or not isinstance(current.get("workflow_id"), str)
+        or not isinstance(current.get("case_id"), str)
+    ):
+        return None
+    return (
+        str(current["workflow_id"]),
+        str(current["case_id"]),
+        claimed.active_run_id,
+    )
 
 
 def _run(container: RuntimeContainer) -> int:
@@ -48,41 +97,10 @@ def _run(container: RuntimeContainer) -> int:
     heartbeat.start()
 
     def await_permission() -> None:
-        announced_pause = False
-        while True:
-            heartbeat.raise_if_lost()
-            cancel_requested, pause_requested = store.control(
-                claimed.job_id,
-                worker_id,
-            )
-            if cancel_requested:
-                raise DagExecutionCancelled("벤치마크 실행이 중지되었습니다")
-            if not pause_requested:
-                if announced_pause:
-                    store.mark_running(claimed.job_id, worker_id)
-                return
-            if not announced_pause:
-                store.mark_paused(claimed.job_id, worker_id)
-                announced_pause = True
-            sleep(0.25)
+        _await_permission(store, claimed, worker_id, heartbeat)
 
     def update(progress: dict[str, object]) -> None:
-        heartbeat.raise_if_lost()
-        if not store.update_progress(claimed.job_id, worker_id, progress):
-            raise RuntimeError("benchmark worker lease changed")
-
-    current = claimed.current_payload or {}
-    resume_active = None
-    if (
-        claimed.active_run_id is not None
-        and isinstance(current.get("workflow_id"), str)
-        and isinstance(current.get("case_id"), str)
-    ):
-        resume_active = (
-            str(current["workflow_id"]),
-            str(current["case_id"]),
-            claimed.active_run_id,
-        )
+        _update_progress(store, claimed, worker_id, heartbeat, progress)
 
     try:
         result = execute_benchmark_comparison(
@@ -93,7 +111,7 @@ def _run(container: RuntimeContainer) -> int:
             update,
             await_permission,
             claimed.result_rows,
-            resume_active,
+            _resume_active(claimed),
         )
         completed_at = datetime.now(UTC)
         result_record = {

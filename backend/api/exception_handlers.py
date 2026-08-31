@@ -23,6 +23,21 @@ from modules.common.exceptions import PipelineBaseError
 logger = logging.getLogger("backend.api.exceptions")
 
 
+def _application_status_code(error: ApplicationError) -> int:
+    mappings = (
+        (PayloadTooLargeError, 413),
+        (ResourceNotFoundError, 404),
+        (ApplicationConflict, 409),
+        (ApplicationValidationError, 422),
+        (RetryableInfrastructureError, 503),
+        (ApplicationInternalError, 500),
+    )
+    return next(
+        (status_code for error_type, status_code in mappings if isinstance(error, error_type)),
+        500,
+    )
+
+
 def register_global_exception_handlers(application: FastAPI) -> None:
     """Map framework, domain, validation, and unknown failures consistently."""
 
@@ -79,22 +94,8 @@ def register_global_exception_handlers(application: FastAPI) -> None:
         exc: ApplicationError,
     ) -> JSONResponse:
         del request
-        if isinstance(exc, PayloadTooLargeError):
-            status_code = 413
-        elif isinstance(exc, ResourceNotFoundError):
-            status_code = 404
-        elif isinstance(exc, ApplicationConflict):
-            status_code = 409
-        elif isinstance(exc, ApplicationValidationError):
-            status_code = 422
-        elif isinstance(exc, RetryableInfrastructureError):
-            status_code = 503
-        elif isinstance(exc, ApplicationInternalError):
-            status_code = 500
-        else:
-            status_code = 500
         return JSONResponse(
-            status_code=status_code,
+            status_code=_application_status_code(exc),
             content=error_envelope(
                 code=exc.code,
                 message=exc.message,

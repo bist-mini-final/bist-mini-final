@@ -64,29 +64,8 @@ def _create_cache_router(controller: WorkflowHttpController) -> APIRouter:
     return router
 
 
-def create_workflow_router(
-    *,
-    workflow_store: WorkflowStore,
-    run_store: RunStore,
-    workflow_execution: WorkflowExecutionPort,
-    state_stream_broker: StateStreamBroker | None = None,
-) -> APIRouter:
-    """Wire stable workflow HTTP endpoints to command/query application services."""
-
+def _create_workflow_definition_router(controller: WorkflowHttpController) -> APIRouter:
     router = APIRouter()
-    run_stream = SharedStateStream(
-        run_store.load_summary,
-        fingerprint=lambda run: run.updated_at,
-        terminal=lambda run: run.status in ("completed", "failed", "paused"),
-        broker=state_stream_broker,
-        topic_prefix="workflow-run",
-    )
-    controller = WorkflowHttpController(
-        WorkflowCommandService(workflow_store, workflow_execution),
-        WorkflowQueryService(workflow_store, run_store),
-        run_stream,
-    )
-    router.include_router(_create_cache_router(controller))
 
     @router.get(
         "/workflows",
@@ -132,6 +111,34 @@ def create_workflow_router(
         workflow_id: str = FastPath(..., description="삭제할 워크플로 식별자"),
     ) -> Dict[str, str]:
         return controller.delete_workflow(workflow_id)
+
+    return router
+
+
+def create_workflow_router(
+    *,
+    workflow_store: WorkflowStore,
+    run_store: RunStore,
+    workflow_execution: WorkflowExecutionPort,
+    state_stream_broker: StateStreamBroker | None = None,
+) -> APIRouter:
+    """Wire stable workflow HTTP endpoints to command/query application services."""
+
+    router = APIRouter()
+    run_stream = SharedStateStream(
+        run_store.load_summary,
+        fingerprint=lambda run: run.updated_at,
+        terminal=lambda run: run.status in ("completed", "failed", "paused"),
+        broker=state_stream_broker,
+        topic_prefix="workflow-run",
+    )
+    controller = WorkflowHttpController(
+        WorkflowCommandService(workflow_store, workflow_execution),
+        WorkflowQueryService(workflow_store, run_store),
+        run_stream,
+    )
+    router.include_router(_create_cache_router(controller))
+    router.include_router(_create_workflow_definition_router(controller))
 
     @router.post(
         "/workflows/{workflow_id}/runs",
