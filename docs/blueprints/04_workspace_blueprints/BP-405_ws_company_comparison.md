@@ -100,5 +100,5 @@ UI는 실제/예측 기간을 시각적으로 구분하고, 스냅샷 상태·�
 - 비교 score, tier, rank, forecast assumption과 exclusion policy는 company comparison domain이 소유합니다.
 - snapshot build/refresh/query와 BI snapshot reader port는 application, BI facade adapter는 domain infrastructure, 범용 versioned repository 구현은 `platform/postgres`, REST DTO는 presentation에 둡니다.
 - BI와 공통화하는 것은 immutable snapshot lifecycle primitive뿐이며 metric·score service 상속이나 공용 DTO를 만들지 않습니다.
-- score/model, snapshot application, BI integration adapter와 REST presentation이 company comparison vertical slice로 이동했습니다. 이전 root module과 `backend/api/company_comparison_routes.py`는 호환 re-export입니다.
+- score/model, snapshot application, BI integration adapter와 REST presentation이 company comparison vertical slice로 이동했으며 이전 root/API 호환 경로는 제거됐습니다.
 - 공통 snapshot protocol은 `shared/application`, PostgreSQL atomic-head 구현은 `platform/postgres`가 소유하며 BI namespace와 독립된 회귀·구조 계약이 이를 검증합니다.

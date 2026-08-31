@@ -18,11 +18,11 @@ from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.workflow_routes import create_workflow_router
 from backend.domains.workflow.application.execution_service import WorkflowExecutionService
 from backend.domains.workflow.application.executor import WorkflowExecutor
 from backend.domains.workflow.infrastructure.kubernetes import KubernetesQueueDispatcher
 from backend.domains.workflow.infrastructure.persistence import ResultCache, RunStore, WorkflowStore
+from backend.domains.workflow.presentation import create_workflow_router
 from backend.domains.workflow.workers.main import WorkflowWorkerServices, run_one
 from backend.storage.db_manager import DatabaseManager
 from tests.modules.registry_factory import create_test_registry

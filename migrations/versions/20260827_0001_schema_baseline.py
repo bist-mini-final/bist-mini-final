@@ -9,8 +9,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-from backend.features.benchmark.database_schema import BENCHMARK_SCHEMA_SQL
-from backend.features.bi.database_schema import BI_SCHEMA_SQL
+from backend.domains.benchmark.infrastructure.postgres import BENCHMARK_SCHEMA_SQL
+from backend.domains.bi.infrastructure.postgres import BI_SCHEMA_SQL
 from backend.storage.db_manager import DDL_INIT
 
 revision: str = "20260827_0001"

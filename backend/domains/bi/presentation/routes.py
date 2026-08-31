@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 from starlette import status
 
-from backend.contracts import ApiErrorDetail, ApiErrorEnvelope
 from backend.domains.bi.application import (
     BiApiServices,
     BiApplicationService,
@@ -38,6 +37,7 @@ from backend.domains.bi.domain.models import (
 from backend.domains.bi.domain.question_records import BiQuestionJobProgress
 from backend.shared.application.state_stream import SharedStateStream
 from backend.shared.application.state_stream_broker import StateStreamBroker
+from backend.shared.presentation import ApiErrorDetail, ApiErrorEnvelope
 
 IdentifierPath = Annotated[
     str,

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .artifacts import SpreadsheetArtifactService
+from .evidence import CellEvidenceService
 from .files import DataSourceFileService
 from .ingestion_jobs import IngestionJobService
 from .ports import (
@@ -25,6 +27,8 @@ class DataSourceApiServices:
     runs: IngestionRunRepository
     catalog: DataSourceCatalogPort
     database: DataSourceDatabasePort
+    evidence: CellEvidenceService
+    artifacts: SpreadsheetArtifactService
 
 
 __all__ = ["DataSourceApiServices"]

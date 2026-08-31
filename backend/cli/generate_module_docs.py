@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from backend.bootstrap.application import RuntimeContainer
-from backend.cli.documentation.module_docs import write_module_guides
+from modules.documentation import write_module_guides
 
 
 def main(argv: Sequence[str] | None = None) -> int:

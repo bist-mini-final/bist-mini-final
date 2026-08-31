@@ -24,7 +24,7 @@ flowchart TB
 - `domains/*/application`은 domain, shared application/domain과 명시적 port만 의존하며 concrete infrastructure를 import하지 않습니다.
 - domain infrastructure와 presentation은 application 쪽으로 의존하고 서로를 직접 호출하지 않습니다.
 - 서로 다른 domain은 상대 infrastructure/presentation을 import하지 않습니다.
-- `backend/api` allowlist는 router, middleware, exception handler와 versioning뿐입니다.
+- `backend/api` allowlist는 router composition, middleware, error/exception mapping, versioning, OpenAPI, SPA fallback과 system probe 같은 공통 HTTP edge 정책뿐입니다.
 - `backend/bootstrap` 외 위치에서 concrete adapter object graph를 조립하지 않습니다.
 - module은 DB/provider 객체를 직접 생성하지 않고 capability port를 사용합니다.
 - platform은 domain use case를 import하지 않고 범용 transport/client만 제공합니다.
@@ -108,8 +108,8 @@ npm run build
 | 1. Shared/ports | domain/application의 신규 concrete import 금지, 기존 위반 수 증가 금지 |
 | 2. Workflow slice | workflow domain/application import allowlist, presentation/infrastructure/workers 위치 강제 |
 | 3. Product slices | data sources, BI, comparison, chatbot, benchmark에 같은 allowlist 순차 적용 |
-| 4. Composition | `backend/api` 파일 allowlist와 bootstrap-only object construction 강제 |
-| 5. Compatibility removal | `features/storage/providers/engine/core/contracts` import 0과 패키지 삭제 강제 |
+| 4. Composition | 완료: `backend/api` 파일 allowlist와 bootstrap-only object construction 강제 |
+| 5. Compatibility removal | 진행 중: `features/providers/engine/contracts`와 route/core/storage shim 삭제 완료, 실제 `storage` 구현 분해 후 패키지 삭제 |
 
 각 단계는 다음 조건을 모두 만족한 커밋에서만 hard gate로 전환합니다.
 

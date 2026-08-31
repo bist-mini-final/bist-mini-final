@@ -1,7 +1,7 @@
 # [BP-503] PostgreSQL·pgvector 물리 스키마
 > **Document Code:** `BP-503` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
 > **Target Ownership:** `backend/shared/application`, `backend/platform/postgres`, `backend/domains/*/infrastructure/postgres`, `migrations`
-> **Current References:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/repositories/source_files.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/source_files.py), [`backend/storage/repositories/workflow_runs.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/workflow_runs.py), [`backend/domains/bi/infrastructure/postgres/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/domains/bi/infrastructure/postgres/database_schema.py), [`backend/features/benchmark/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/features/benchmark/database_schema.py), [`backend/platform/postgres/versioned_snapshots.py`](file:///c:/Repos/bist-mini-final/backend/platform/postgres/versioned_snapshots.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
+> **Current References:** [`backend/storage/db_manager.py`](file:///c:/Repos/bist-mini-final/backend/storage/db_manager.py), [`backend/storage/repositories/source_files.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/source_files.py), [`backend/storage/repositories/workflow_runs.py`](file:///c:/Repos/bist-mini-final/backend/storage/repositories/workflow_runs.py), [`backend/domains/bi/infrastructure/postgres/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/domains/bi/infrastructure/postgres/database_schema.py), [`backend/domains/benchmark/infrastructure/postgres/schema.py`](file:///c:/Repos/bist-mini-final/backend/domains/benchmark/infrastructure/postgres/schema.py), [`backend/platform/postgres/versioned_snapshots.py`](file:///c:/Repos/bist-mini-final/backend/platform/postgres/versioned_snapshots.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
 
 ---
 
@@ -126,4 +126,4 @@ domain_snapshot_heads(
 - sync/async session과 transaction primitive는 shared infrastructure, driver/pool/codec은 platform PostgreSQL·pgvector adapter에 둡니다.
 - cross-domain foreign key는 aggregate 수명주기를 실제로 공유할 때만 허용하고 편의 join을 위해 repository 소유권을 섞지 않습니다.
 - production schema 변경은 Alembic만 수행하며 startup initializer는 제거 가능한 compatibility 경로로 관리합니다.
-- `backend/storage`와 `backend/features/*/database_schema.py` 소유권이 vertical slice로 이동하고 migration drift 검증이 hard gate가 될 때 구조 migration을 완료합니다.
+- BI·benchmark schema 소유권은 vertical slice로 이동했습니다. 잔여 `backend/storage` schema/repository를 workflow와 data sources infrastructure로 분해하고 migration drift 검증이 hard gate가 될 때 구조 migration을 완료합니다.

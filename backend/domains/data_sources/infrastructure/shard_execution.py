@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from backend.contracts.vector import PgVectorReplacePlan
 from backend.domains.data_sources.infrastructure.filesystem.embedding_artifacts import (
     EmbeddingArtifactStore,
 )
@@ -12,6 +11,7 @@ from backend.domains.data_sources.infrastructure.spreadsheets.langchain_document
     lazy_cell_documents,
 )
 from backend.shared.application.embeddings import EmbeddingEncoder
+from backend.shared.application.vector import PgVectorReplacePlan
 from modules.common.exceptions import ModuleExecutionError
 
 from .filesystem.shard_artifacts import IngestionShardArtifactStore

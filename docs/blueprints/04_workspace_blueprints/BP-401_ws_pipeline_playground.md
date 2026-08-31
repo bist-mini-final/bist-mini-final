@@ -1,7 +1,7 @@
 # [BP-401] Pipeline Playground 워크스페이스
 > **Document Code:** `BP-401` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Partial / Frontend Aligned
 > **Target Ownership:** `backend/domains/workflow/presentation`, `backend/domains/workflow/application`, `frontend/src/features/playground`, `frontend/src/pages`
-> **Current References:** [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/), [`frontend/src/pages/PlaygroundPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx), [`backend/api/workflow_routes.py`](file:///c:/Repos/bist-mini-final/backend/api/workflow_routes.py)
+> **Current References:** [`frontend/src/features/playground/`](file:///c:/Repos/bist-mini-final/frontend/src/features/playground/), [`frontend/src/pages/PlaygroundPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx), [`backend/domains/workflow/presentation/routes.py`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/routes.py)
 
 ---
 
@@ -62,4 +62,4 @@ flowchart LR
 - frontend feature는 편집 state, canvas, module catalog, run monitor를 소유하고 backend DTO를 runtime schema로 검증합니다.
 - workflow presentation은 route·schema·SSE projection만 제공하고 DAG 검증·실행 판단은 application command/query로 위임합니다.
 - module 설정 panel은 registry schema와 현재 run projection을 사용하며 DB/provider 내부 schema를 노출하지 않습니다.
-- `backend/api/workflow_routes.py`의 도메인 책임이 workflow presentation으로 이동하고 page가 feature 조립만 수행할 때 구조 migration을 완료합니다.
+- workflow HTTP 책임은 domain presentation으로 이동했습니다. page가 feature 조립만 수행하고 공개 workflow 계약 테스트가 통과할 때 구조 migration을 완료합니다.

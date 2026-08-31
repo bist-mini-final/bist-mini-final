@@ -12,6 +12,10 @@ class ModuleRegistryPort(Protocol):
 
     def get(self, module_type: str) -> BaseModule: ...
 
+    def definitions(self) -> list[dict[str, Any]]: ...
+
+    def definition(self, module_type: str) -> dict[str, Any]: ...
+
     def execute(
         self,
         module_type: str,

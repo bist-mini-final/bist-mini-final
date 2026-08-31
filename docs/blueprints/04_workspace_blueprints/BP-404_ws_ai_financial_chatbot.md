@@ -69,4 +69,4 @@ flowchart TD
 - RAG 실행, BI 회사 조회, source cell 확인은 chatbot application에 정의된 소비자 관점 port로 요청하며 상대 domain repository를 직접 import하지 않습니다.
 - OpenAI conversation transport는 platform, chat session·suggestion PostgreSQL repository와 로컬 attachment adapter는 chatbot infrastructure, REST DTO와 upload transport는 chatbot presentation에 둡니다.
 - bootstrap은 `ChatApiServices`에 conversation, suggestion, attachment 유스케이스를 조립하며 presentation은 concrete 저장소나 provider를 생성하지 않습니다.
-- 이전 `backend/features/chatbot/*`과 `backend/api/chat_routes.py`는 외부 import 호환 re-export만 남고, 애플리케이션 내부 import와 구조 계약 테스트는 canonical vertical slice만 사용합니다.
+- 이전 feature/API 호환 경로는 제거됐고 애플리케이션 내부 import와 구조 계약 테스트는 canonical vertical slice만 사용합니다.

@@ -6,8 +6,8 @@ from typing import Any, Callable, Dict, Optional, Protocol, Sequence
 
 from langchain_core.documents import Document
 
-from backend.contracts.vector import PgVectorReplacePlan
 from backend.shared.application.embeddings import EmbeddingEncoder
+from backend.shared.application.vector import PgVectorReplacePlan
 
 
 class VectorIngestionPort(Protocol):

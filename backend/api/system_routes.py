@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
-from backend.api.dependencies import ContainerDependency
 from backend.api.versioning import API_VERSION
 
 
-def create_system_router() -> APIRouter:
+def create_system_router(is_database_connected: Callable[[], bool]) -> APIRouter:
     router = APIRouter(tags=["시스템 헬스 & 프로브"])
 
     @router.get("/healthz", summary="전체 시스템 헬스 상태 확인")
@@ -28,9 +28,9 @@ def create_system_router() -> APIRouter:
         return {"status": "alive"}
 
     @router.get("/readyz", summary="Kubernetes Readiness Probe")
-    def readiness_probe(container: ContainerDependency) -> JSONResponse:
+    def readiness_probe() -> JSONResponse:
         try:
-            connected = container.runtime.services.db_manager.is_connected()
+            connected = is_database_connected()
         except Exception as error:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

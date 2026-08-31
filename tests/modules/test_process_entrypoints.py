@@ -7,17 +7,13 @@ from unittest.mock import Mock, patch
 import pytest
 
 from backend.bootstrap.application import ApplicationContainer
-from backend.bootstrap.container import ApplicationContainer as CompatibilityContainer
 from backend.bootstrap.workers import registered_worker_kinds, run_worker
 from backend.platform.postgres.pool import ConnectionPoolRegistry
-from backend.storage.connection_pool import (
-    ConnectionPoolRegistry as CompatibilityPoolRegistry,
-)
 
 
 def test_compatibility_imports_resolve_to_canonical_types() -> None:
-    assert CompatibilityContainer is ApplicationContainer
-    assert CompatibilityPoolRegistry is ConnectionPoolRegistry
+    assert ApplicationContainer.__module__ == "backend.bootstrap.application"
+    assert ConnectionPoolRegistry.__module__ == "backend.platform.postgres.pool"
 
 
 def test_worker_registry_exposes_all_deployment_kinds() -> None:

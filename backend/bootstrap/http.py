@@ -37,8 +37,6 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
             on_shutdown=(state_stream_broker.aclose if state_stream_broker else None),
         ),
     )
-    application.state.container = shared_container
-    application.state.state_stream_broker = state_stream_broker
     application.openapi = lambda: custom_openapi_schema(application, shared_container)
 
     application.add_middleware(
@@ -51,7 +49,9 @@ def create_app(container: ApplicationContainer | None = None) -> FastAPI:
     register_global_exception_handlers(application)
     register_bi_exception_handlers(application)
 
-    application.include_router(create_system_router())
+    application.include_router(
+        create_system_router(shared_container.runtime.services.db_manager.is_connected)
+    )
     api_router = create_api_router(
         shared_container,
         state_stream_broker=state_stream_broker,

@@ -38,9 +38,9 @@ from typing import Any
 
 from backend.core.settings import PGVECTOR_URL
 from backend.platform.postgres.audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
+from backend.platform.postgres.pool import get_pooled_async_connection
 from backend.platform.postgres.repositories import SyncPostgresRepository
 
-from .connection_pool import get_pooled_async_connection
 from .repositories import (
     SourceFileRepositoryMixin,
     WorkflowLeaseLost,

@@ -97,7 +97,7 @@ classDiagram
     WorkerBootstrap --> ApplicationBootstrap
 ```
 
-`application.py`는 공유 resource, domain adapter와 use case를 조립합니다. `http.py`는 FastAPI 수명주기와 domain router 결합만 담당하고, `workers.py`는 동일 object graph에서 one-shot worker를 선택해 실행합니다. 세 진입점은 설정과 adapter factory를 공유하지만 HTTP·worker 수명주기를 서로 끌어오지 않습니다. 현재 container class는 이 목표로 이동하는 compatibility composition이며 최종 계약이 아닙니다.
+`application.py`는 공유 resource, domain adapter와 use case를 조립합니다. `http.py`는 FastAPI 수명주기와 domain router 결합만 담당하고, `workers.py`는 동일 object graph에서 one-shot worker를 선택해 실행합니다. 세 진입점은 설정과 adapter factory를 공유하지만 HTTP·worker 수명주기를 서로 끌어오지 않습니다. 이전 container class는 제거됐고 명시적 bootstrap 조립 함수가 유일한 composition root입니다.
 
 `backend/entrypoints`의 ASGI·CLI·worker 파일은 인자와 환경을 읽고 해당 bootstrap factory를 호출하는 얇은 process adapter입니다. 여기에는 repository 선택, route별 분기나 job policy를 두지 않습니다.
 
@@ -127,4 +127,4 @@ classDiagram
 
 정확한 현재 수치와 범위는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 우선합니다.
 
-구조 완료는 BP-102의 목표 트리와 import gate가 모두 활성화되고, 현재 compatibility container와 수평 패키지가 composition 경계에서 제거됐을 때만 선언합니다.
+구조 완료는 BP-102의 목표 트리와 import gate가 모두 활성화되고, 잔여 `backend/storage` facade가 platform/domain infrastructure 경계로 분해됐을 때 선언합니다.

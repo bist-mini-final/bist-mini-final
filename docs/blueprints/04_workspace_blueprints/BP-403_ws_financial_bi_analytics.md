@@ -82,5 +82,5 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 - metric definition, evidence requirement와 snapshot publication policy는 BI domain/application이 소유합니다.
 - source lookup·snapshot repository·materialization adapter는 BI infrastructure, API/SSE DTO는 BI presentation, durable process는 BI workers에 둡니다.
 - Company Comparison은 BI infrastructure를 import하지 않고 BI application의 snapshot reader port만 사용합니다.
-- 계산·application port·PostgreSQL/integration adapter·API/SSE·worker가 BI vertical slice로 이동했습니다. 이전 `backend/features/bi`와 `backend/api/bi_routes.py`는 외부 import 호환 re-export만 유지합니다.
+- 계산·application port·PostgreSQL/integration adapter·API/SSE·worker가 BI vertical slice로 이동했으며 이전 feature/API 호환 경로는 제거됐습니다.
 - 구조 계약 테스트는 BI domain/application/presentation/worker가 feature·storage·platform concrete 구현을 역참조하지 못하게 하며 21개 metric 및 snapshot 회귀 계약을 함께 검증합니다.
