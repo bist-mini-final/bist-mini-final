@@ -1365,6 +1365,7 @@
 .ds-index-table__storage { width: 7.5rem; }
 .ds-index-table__created { width: 8.125rem; }
 .ds-index-table__actions { width: 16.875rem; }
+.ds-mobile-list-cell { display: none; }
 
 .ds-pipeline-table-row td {
   background: color-mix(in srgb, var(--surface) 94%, var(--pipeline-row-tone));
@@ -1437,6 +1438,138 @@
 .ds-index-meta-value--info { color: var(--color-info); }
 
 @media (max-width: 640px) {
-  .ds-summary-grid { grid-template-columns: minmax(0, 1fr); }
+  .ds-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .ds-summary-card { min-height: 7.25rem; padding: 0.8rem; }
+  .ds-summary-card__header { align-items: flex-start; gap: 0.35rem; font-size: 0.62rem; }
+  .ds-summary-card__icon { width: 1.7rem; height: 1.7rem; flex: none; }
+  .ds-summary-card__value { margin-top: 0.55rem; font-size: 1.3rem; }
+  .ds-summary-card__value--text { font-size: 0.86rem; }
+  .ds-summary-card__caption { font-size: 0.56rem; line-height: 1.4; }
   .ds-panel { padding: 1rem; }
+}
+
+@media (max-width: 767px) {
+  .ds-panel { padding: 0; overflow: hidden; }
+  .ds-panel__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.9rem;
+  }
+  .ds-panel__actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+  .ds-panel__actions .ui-button { min-width: 0; justify-content: center; }
+  .ds-table-container { overflow: visible; border: 0; }
+  .ds-index-table,
+  .ds-index-table tbody { display: block; width: 100%; }
+  .ds-index-table thead { display: none; }
+  .ds-index-table tbody {
+    display: grid;
+    gap: 0.42rem;
+    padding: 0.55rem;
+    background: var(--surface-muted);
+  }
+  .ds-index-table tr {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgb(15 33 24 / 4%);
+  }
+  .ds-index-table tr > td:not(.ds-mobile-list-cell) { display: none; }
+  .ds-index-table td.ds-mobile-list-cell {
+    position: static;
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0.38rem 0.42rem;
+    box-shadow: none;
+    white-space: normal;
+  }
+  .ds-index-table tr:hover td.ds-mobile-list-cell { background: var(--surface-subtle); }
+  .ds-mobile-list-row {
+    display: grid;
+    min-width: 0;
+    width: 100%;
+    min-height: 2.25rem;
+    grid-template-columns: 1.8rem minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.38rem;
+  }
+  .ds-mobile-list-row--busy { grid-template-columns: 1.8rem minmax(0, 1fr) auto; }
+  .ds-mobile-list-state {
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: 0.5rem;
+    background: var(--brand-50);
+    color: var(--brand-700);
+  }
+  .ds-mobile-list-state.is-paused { background: #fff8e6; color: #9a640e; }
+  .ds-mobile-list-state.is-failed { background: #fff1ef; color: #a33a32; }
+  .ds-mobile-list-title,
+  .ds-mobile-index-identity strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-strong);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ds-mobile-list-meta {
+    color: var(--text-muted);
+    font-family: var(--font-code);
+    font-size: 0.61rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ds-mobile-list-meta.is-failed,
+  .ds-mobile-list-meta.is-danger { color: #a33a32; font-family: var(--font-ui); font-weight: 700; }
+  .ds-mobile-list-actions {
+    display: inline-grid;
+    grid-auto-flow: column;
+    gap: 0.22rem;
+  }
+  .ds-mobile-list-actions .ui-button,
+  .ds-mobile-company-editor .ui-button {
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    border-radius: 0.55rem;
+  }
+  .ds-mobile-index-identity {
+    display: flex;
+    min-width: 0;
+    min-height: 2rem;
+    grid-column: 1 / 3;
+    align-items: center;
+    gap: 0.42rem;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    padding: 0 0.15rem;
+    color: var(--brand-700);
+    text-align: left;
+  }
+  .ds-mobile-index-identity svg { flex: none; }
+  .ds-mobile-company-editor {
+    display: grid;
+    min-width: 0;
+    min-height: 2.25rem;
+    grid-template-columns: minmax(0, 1fr) 2rem 2rem;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .ds-mobile-company-editor .ds-company-inline-input {
+    width: 100%;
+    min-width: 0;
+    height: 2rem;
+    font-size: 1rem;
+  }
 }

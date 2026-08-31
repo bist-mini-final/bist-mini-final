@@ -2,6 +2,11 @@
 
 from typing import Any, Mapping, Optional, Protocol, Sequence
 
+from backend.domains.bi.domain.extraction_models import (
+    BiContextCell,
+    BiMetricExtractionRequest,
+)
+
 
 class ModuleRegistryPort(Protocol):
     def execute(
@@ -24,3 +29,14 @@ class RankedCellStorePort(Protocol):
         limit: int = 50,
         cell_references: Optional[list[dict[str, Optional[str]]]] = None,
     ) -> Sequence[Mapping[str, Any]]: ...
+
+
+class BiMetricEvidencePort(Protocol):
+    """Resolve exact, value-bearing evidence for a catalogued BI metric."""
+
+    def retrieve_metric_cells(
+        self,
+        request: BiMetricExtractionRequest,
+        *,
+        limit: int,
+    ) -> Sequence[BiContextCell]: ...

@@ -31,17 +31,18 @@ export const DecomposerNode = ({ id, data, selected }: DecomposerNodeProps) => {
       accent="#7c3aed"
       icon={GitBranch}
       eyebrow="Logic Module"
-      title="LLM Query Decomposer"
+      title="Scope-aware Query Decomposer"
       state={getExecutionNodeState(data.executionState)}
       selected={selected}
       width={360}
       nodeData={data}
-      inputPorts={['query_context']}
+      inputPorts={['query_context', 'scope_catalog']}
+      outputBranches={['retrieval_plan']}
       bodyClassName="space-y-3"
     >
       <div className="space-y-1.5">
         <label className="node-field-label" htmlFor={`decomposer-model-${id}`}>
-          <Bot className="h-3 w-3 text-violet-600" /> 질의 분해 LLM 모델
+          <Bot className="h-3 w-3 text-violet-600" /> 범위 지정·질의 분해 LLM 모델
         </label>
         <select
           id={`decomposer-model-${id}`}
@@ -69,9 +70,9 @@ export const DecomposerNode = ({ id, data, selected }: DecomposerNodeProps) => {
         >
           <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-violet-600" />
           <div className="min-w-0">
-            <p className="m-0 text-[11px] font-bold">서브쿼리 생성 요청 전송됨</p>
+            <p className="m-0 text-[11px] font-bold">검색 계획 생성 요청 전송됨</p>
             <p className="mt-1 mb-0 text-[10px] leading-relaxed text-violet-700">
-              LLM 응답을 기다리고 있습니다. 완료되면 다음 배치로 전달됩니다.
+              DB catalog 안에서 기업·시트별 서브쿼리를 생성하고 있습니다.
             </p>
           </div>
         </div>

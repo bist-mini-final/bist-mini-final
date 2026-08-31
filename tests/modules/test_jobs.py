@@ -67,14 +67,14 @@ class JobsDefinitionTests(unittest.TestCase):
                 {node_id for batch in batches for node_id in batch},
             )
 
-    def test_rag_query_embedder_accepts_the_router_retrieval_plan(self) -> None:
+    def test_rag_query_embedder_accepts_the_decomposer_retrieval_plan(self) -> None:
         executor = WorkflowExecutor(create_test_registry(), RunStore(), ResultCache())
         run = executor.create_run(
             workflow_from_job(RAG_QUERY_JOB),
             WorkflowExecutionRequest(),
         )
-        run.nodes["route"].status = "succeeded"
-        run.nodes["route"].output = {
+        run.nodes["decompose"].status = "succeeded"
+        run.nodes["decompose"].output = {
             "query_context": {
                 "question_id": "QUERY-TEST",
                 "question_text": "FY2025 Revenue?",
@@ -111,19 +111,19 @@ class JobsDefinitionTests(unittest.TestCase):
         )
         executor.module_registry.get("embedder").input_model.model_validate(payload)
 
-    def test_rag_query_uses_automatic_data_scope_routing(self) -> None:
+    def test_rag_query_decomposer_consumes_query_and_data_scope(self) -> None:
         node_types = {node.node_id: node.module_type for node in RAG_QUERY_JOB.nodes}
-        router_inputs = {
+        decomposer_inputs = {
             (edge.source, edge.target_input)
             for edge in RAG_QUERY_JOB.edges
-            if edge.target == "route"
+            if edge.target == "decompose"
         }
 
         self.assertEqual(node_types["data-scope"], "pgvector_data_scope")
         self.assertEqual(
-            router_inputs,
+            decomposer_inputs,
             {
-                ("decompose", "query_input"),
+                ("query", "query_context"),
                 ("data-scope", "scope_catalog"),
             },
         )
@@ -131,10 +131,20 @@ class JobsDefinitionTests(unittest.TestCase):
             {
                 node.node_id: node.values
                 for node in RAG_QUERY_JOB.nodes
-                if node.node_id in {"data-scope", "route"}
+                if node.node_id in {"data-scope", "decompose"}
             },
-            {"data-scope": {}, "route": {}},
+            {"data-scope": {}, "decompose": {}},
         )
+
+    def test_rag_query_canvas_separates_the_two_decomposer_inputs(self) -> None:
+        workflow = workflow_from_job(RAG_QUERY_JOB)
+        positions = {node.id: node.position for node in workflow.graph.nodes}
+
+        self.assertEqual(positions["query"].x, positions["data-scope"].x)
+        self.assertLess(positions["query"].y, positions["data-scope"].y)
+        self.assertGreater(positions["decompose"].x, positions["query"].x)
+        self.assertGreater(positions["decompose"].y, positions["query"].y)
+        self.assertLess(positions["decompose"].y, positions["data-scope"].y)
 
     def test_ingestion_typed_object_edge_supplies_structure_input(self) -> None:
         executor = WorkflowExecutor(create_test_registry(), RunStore(), ResultCache())
@@ -193,7 +203,7 @@ class JobsDefinitionTests(unittest.TestCase):
             WorkflowExecutionRequest(),
         )
 
-        for node_id in ("query", "data-scope", "route", "decompose"):
+        for node_id in ("query", "data-scope", "decompose"):
             run.nodes[node_id].status = "succeeded"
             run.nodes[node_id].output = {"preserved": node_id}
         run.nodes["keyword"].status = "failed"
@@ -210,7 +220,7 @@ class JobsDefinitionTests(unittest.TestCase):
         resumed = executor.prepare_resume(run.id)
 
         self.assertEqual(resumed.status, "queued")
-        for node_id in ("query", "data-scope", "route", "decompose"):
+        for node_id in ("query", "data-scope", "decompose"):
             self.assertEqual(resumed.nodes[node_id].status, "succeeded")
             self.assertEqual(resumed.nodes[node_id].output, {"preserved": node_id})
         for node_id in (

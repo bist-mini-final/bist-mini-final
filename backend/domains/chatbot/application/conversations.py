@@ -99,6 +99,7 @@ class ChatSessionRepositoryPort(Protocol):
         status: str,
         content: str,
         *,
+        evidence: list[dict[str, Any]] | None = None,
         suppress_visualization: bool = False,
     ) -> dict[str, Any] | None: ...
     def owns_run(self, run_id: str, client_id: str) -> bool: ...
@@ -295,14 +296,17 @@ class ChatConversationService:
             self._repository.recent_user_messages(session_id, limit=1) if session_id else []
         )
         company = self._conversation_company("", session_id) if session_id else None
-        answer = format_user_facing_answer(
-            finalize_grounded_answer(
-                reader_answer(run),
-                run,
-                self._execution_logs,
-                self._evidence_cells,
-            )
+        reader_result = reader_answer(run)
+        grounded = finalize_grounded_answer(
+            reader_result.answer_markdown if reader_result else None,
+            [item.model_dump(mode="json") for item in reader_result.evidence]
+            if reader_result
+            else None,
+            run,
+            self._execution_logs,
+            self._evidence_cells,
         )
+        answer = format_user_facing_answer(grounded.answer_markdown)
         if answer != INSUFFICIENT_EVIDENCE_ANSWER:
             answer = with_company_intro(
                 answer,
@@ -313,6 +317,7 @@ class ChatConversationService:
             run_id,
             "completed",
             answer,
+            evidence=[item.model_dump(mode="json") for item in grounded.evidence],
             suppress_visualization=answer == INSUFFICIENT_EVIDENCE_ANSWER,
         )
 

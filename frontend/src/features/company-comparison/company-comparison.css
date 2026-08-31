@@ -233,6 +233,8 @@
   color: var(--bm-text-main);
 }
 
+.league-mobile-ranking { display: none; }
+
 .league-pixel-table th {
   position: sticky;
   top: 0;
@@ -421,6 +423,129 @@
   .league-side-column { grid-template-columns: minmax(0, 1fr); }
 }
 
+@media (max-width: 767px) {
+  .financial-league-page { gap: 0.75rem; }
+  .league-top-filter-bar {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+  .filter-section-block { min-width: 0; align-items: stretch; flex-direction: column; gap: 0.4rem; }
+  .filter-section-block:nth-child(2) { justify-self: auto; }
+  .filter-pills-row {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scroll-snap-type: x proximity;
+  }
+  .dropdown-filter-pill,
+  .sort-status-pill { flex: none; scroll-snap-align: start; }
+  .filter-section-block:last-child .filter-pills-row { align-items: stretch; flex-direction: column; }
+  .filter-section-block:last-child .ui-button { width: 100%; justify-content: center; }
+  .league-table-scroll-wrap { display: none; }
+  .league-mobile-ranking { display: grid; gap: 0.65rem; padding: 0.65rem; }
+  .league-mobile-company {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    padding: 0.42rem 0.5rem;
+    box-shadow: 0 0.15rem 0.6rem -0.5rem rgb(14 60 37 / 32%);
+  }
+  .league-mobile-company.is-selected { border-color: var(--brand-300); background: var(--brand-50); }
+  .league-mobile-company__header {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 1.55rem minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.38rem;
+  }
+  .league-mobile-company__rank {
+    display: grid;
+    width: 1.45rem;
+    height: 1.45rem;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--brand-700);
+    font-size: 0.66rem;
+    font-weight: 800;
+  }
+  .league-mobile-company__name {
+    overflow: hidden;
+    color: var(--text-strong);
+    font-size: 0.72rem;
+    font-weight: 720;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .league-mobile-company__identity {
+    display: flex;
+    min-width: 0;
+    min-height: 2.35rem;
+    align-items: center;
+    gap: 0.5rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+  }
+  .league-mobile-company__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--text-strong);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .league-mobile-company__summary .tier-round-pill { min-width: 1.35rem; padding: 0.12rem 0.3rem; }
+  .league-mobile-company__compare {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--text-muted);
+    font-size: 0.61rem;
+  }
+  .league-mobile-company__compare input { width: 1rem; height: 1rem; accent-color: var(--brand-600); }
+  .league-mobile-company__metrics {
+    display: grid;
+    margin: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+  .league-mobile-company__metrics div {
+    min-width: 0;
+    border-radius: var(--radius-sm);
+    background: var(--surface-subtle);
+    padding: 0.55rem 0.6rem;
+  }
+  .league-mobile-company__metrics dt { color: var(--text-muted); font-size: 0.59rem; }
+  .league-mobile-company__metrics dd {
+    overflow: hidden;
+    margin: 0.15rem 0 0;
+    color: var(--text);
+    font-size: 0.75rem;
+    font-weight: 720;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .league-mobile-company__score {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.63rem;
+  }
+  .league-mobile-company__score strong { margin-left: auto; color: var(--text); }
+  .league-side-column { gap: 0.75rem; }
+  .league-bottom-status-bar { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
+  .footer-left-links { align-items: flex-start; flex-direction: column; }
+}
+
 /* Shared product visual system alignment */
 .company-custom-logo-svg {
   flex-shrink: 0;
@@ -443,3 +568,7 @@
 .league-pixel-table td { border-color: var(--border-subtle); }
 .league-table-row { transition: background var(--duration-fast) var(--ease-standard); }
 .league-table-row:hover { background: var(--surface-subtle); }
+
+@media (max-width: 767px) and (pointer: coarse) {
+  .dropdown-filter-pill { min-height: 2.75rem; }
+}

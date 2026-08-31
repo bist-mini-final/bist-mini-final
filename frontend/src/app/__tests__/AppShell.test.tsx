@@ -93,6 +93,26 @@ describe('AppShell sidebar navigation', () => {
     expect(screen.getByRole('button', { name: '새 채팅' })).toBeInTheDocument();
   });
 
+  it('provides a mobile top bar and an accessible menu drawer without bottom navigation', () => {
+    const dashboardRoute = APP_ROUTES.find((route) => route.path === '/dashboard');
+
+    renderShell(
+      <AppShell activeRoute={dashboardRoute} pathname="/dashboard">
+        <div>dashboard</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole('banner')).toHaveTextContent('Excel RAG');
+    expect(screen.getByRole('banner')).toHaveTextContent('BI 대시보드');
+    expect(screen.queryByRole('navigation', { name: '모바일 주요 메뉴' }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '전체 메뉴 열기' }));
+    const drawer = screen.getByRole('dialog', { name: '서비스 내비게이션' });
+    expect(drawer).toHaveClass('product-sidebar--open');
+    expect(within(drawer).getByRole('button', { name: '메뉴 닫기' })).toBeInTheDocument();
+  });
+
   it('preloads a lazy route when navigation intent is detected', () => {
     const playgroundRoute = APP_ROUTES.find((route) => route.path === '/playground');
     expect(playgroundRoute).toBeDefined();

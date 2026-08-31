@@ -457,9 +457,38 @@
 }
 
 @media (max-width: 600px) {
-  .chatbot-messages { padding: 0.85rem; }
-  .chatbot-message__body { max-width: 88%; }
-  .chatbot-visualization { height: 16rem; }
+  .product-page__viewport--workspace { padding: 0; }
+  .chatbot-page,
+  .chatbot-layout { gap: 0; }
+  .chatbot-panel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .chatbot-messages {
+    overscroll-behavior: contain;
+    padding: 0.85rem 0.75rem;
+    scroll-padding-bottom: 1rem;
+  }
+  .chatbot-empty { min-height: 100%; justify-content: flex-start; padding-top: clamp(2rem, 10vh, 5rem); }
+  .chatbot-examples__heading,
+  .chatbot-examples { width: 100%; }
+  .chatbot-examples button { min-height: 3rem; padding: 0.75rem; }
+  .chatbot-message { gap: 0.4rem; }
+  .chatbot-message__avatar { width: 1.65rem; height: 1.65rem; border-radius: 0.52rem; }
+  .chatbot-message__body { max-width: calc(100% - 2.05rem); padding: 0.65rem 0.72rem; }
+  .chatbot-visualization { width: 100%; height: 15rem; }
+  .chatbot-composer {
+    position: relative;
+    z-index: 2;
+    padding: 0.65rem 0.7rem calc(0.65rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -0.5rem 1.4rem -1.2rem rgb(13 54 34 / 42%);
+  }
+  .chatbot-composer textarea { min-height: 3.4rem; max-height: 8rem; resize: none; }
+  .chatbot-composer__actions .ui-button { min-height: 2.75rem; }
+  .chatbot-composer__actions .chatbot-attach { width: 2.75rem; }
+  .chatbot-composer__actions button[type='submit'],
+  .chatbot-composer__actions .chatbot-stop { min-width: 6.5rem; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

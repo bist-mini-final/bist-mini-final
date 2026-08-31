@@ -95,3 +95,20 @@
 .reader-citation-tooltip__row {
   display: contents;
 }
+
+.reader-evidence {
+  display: grid;
+  gap: 0.38rem;
+  margin-top: 0.85rem;
+}
+
+.reader-evidence > strong {
+  color: var(--text);
+  font-size: 0.75rem;
+}
+
+.reader-evidence__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}

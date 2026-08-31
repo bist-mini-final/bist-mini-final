@@ -34,6 +34,20 @@ CREATE TABLE IF NOT EXISTS sheets (
     parsed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS workbook_profiles (
+    profile_id VARCHAR(128) PRIMARY KEY,
+    workbook_hash CHAR(64) NOT NULL
+        REFERENCES source_files(file_id) ON DELETE CASCADE
+        CHECK (workbook_hash ~ '^[a-f0-9]{64}$'),
+    index_id VARCHAR(128) NOT NULL,
+    profile_version VARCHAR(32) NOT NULL,
+    status VARCHAR(16) NOT NULL CHECK (status IN ('ready', 'partial')),
+    profile_payload JSONB NOT NULL CHECK (jsonb_typeof(profile_payload) = 'object'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (workbook_hash, index_id, profile_version)
+);
+
 CREATE TABLE IF NOT EXISTS langchain_pg_collection (
     uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR NOT NULL UNIQUE,
@@ -73,6 +87,8 @@ CREATE INDEX IF NOT EXISTS idx_source_files_hash ON source_files(file_hash);
 CREATE INDEX IF NOT EXISTS idx_source_files_active
     ON source_files(created_at DESC) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_sheets_file_id ON sheets(file_id);
+CREATE INDEX IF NOT EXISTS idx_workbook_profiles_source
+    ON workbook_profiles(workbook_hash, index_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_langchain_cmetadata_gin
     ON langchain_pg_embedding USING gin (cmetadata jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS idx_ingestion_shards_claim

@@ -1,4 +1,4 @@
-"""PostgreSQL full-text retrieval constrained by the router's scope plan."""
+"""PostgreSQL full-text retrieval constrained by a catalog-scoped plan."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pydantic import Field
 
 from modules.common.base_module import BaseModule, ModuleConfigDTO, ModuleDefinition, ModuleInputDTO
 from modules.common.config import DEFAULT_RETRIEVAL_TOP_K
-from modules.query.llm_query_router import RetrievalPlanDTO, document_context_for_plan
+from modules.query.contracts import RetrievalPlanDTO, document_context_for_plan
 from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
 from modules.retrieval.ports import KeywordSearchPort
 
@@ -53,12 +53,12 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
         type="postgres_native_keyword_retriever",
         label="PostgreSQL Native Keyword Retriever",
         category="Logic",
-        description=("Router가 지정한 collection 집합 안에서만 GIN/tsvector 검색을 수행합니다."),
+        description=("Decomposer가 지정한 collection 안에서만 GIN/tsvector 검색을 수행합니다."),
         inputs=["retrieval_plan"],
         outputs=["bm25_result"],
         config_fields=["top_k"],
         raw_output=True,
-        version="3",
+        version="4",
     )
     input_model = PostgresNativeKeywordRetrieverInputDTO
     config_model = PostgresNativeKeywordRetrieverConfigDTO
@@ -129,7 +129,7 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
 
         ranked_items: List[Dict[str, Any]] = []
         for subquery_index in sorted(hits_by_subquery):
-            seen: set[Tuple[str, str]] = set()
+            seen: set[Tuple[str, str, str, str]] = set()
             rank = 0
             for score, index_id, metadata, document, query_text in sorted(
                 hits_by_subquery[subquery_index],
@@ -138,13 +138,11 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
                 company = str(metadata.get("company_name") or "")
                 sheet = str(metadata.get("sheet_name") or "")
                 coordinate = str(metadata.get("cell_coord") or "")
-                raw_cell_id = str(metadata.get("cell_id") or f"{sheet}:{coordinate}")
-                cell_id = (
-                    f"{company}:{raw_cell_id}"
-                    if company and not raw_cell_id.startswith(f"{company}:")
-                    else raw_cell_id
+                cell_id = str(
+                    metadata.get("cell_id")
+                    or (f"{company}:{sheet}:{coordinate}" if company else f"{sheet}:{coordinate}")
                 )
-                key = (index_id, cell_id)
+                key = (index_id, company, sheet, coordinate or cell_id)
                 if key in seen:
                     continue
                 seen.add(key)
@@ -154,6 +152,9 @@ class PostgresNativeKeywordRetrieverModule(BaseModule):
                         "rank": rank,
                         "index_id": index_id,
                         "cell_id": cell_id,
+                        "company_name": company or None,
+                        "sheet_name": sheet or None,
+                        "cell_coord": coordinate or None,
                         "score": score,
                         "text": document,
                         "matched_subquery": query_text,

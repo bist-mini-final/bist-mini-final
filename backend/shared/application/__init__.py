@@ -1,5 +1,6 @@
 """Cross-domain application contracts and coordination primitives."""
 
+from .cell_evidence import CellEvidenceDTO, GroundedAnswerDTO
 from .embeddings import EmbeddingEncoder
 from .observability import (
     ObservabilityContext,
@@ -13,7 +14,9 @@ from .state_stream_broker import StateStreamBroker
 from .workers import LeasedWorker, WorkerLeaseSpec, default_worker_id
 
 __all__ = [
+    "CellEvidenceDTO",
     "EmbeddingEncoder",
+    "GroundedAnswerDTO",
     "LeasedWorker",
     "ObservabilityContext",
     "SharedStateStream",

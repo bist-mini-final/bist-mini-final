@@ -1,7 +1,7 @@
 """HTTP API endpoints for discovering and inspecting registered RAG pipeline modules.
 
 Exposes metadata, execution contracts, input/config/output Pydantic DTO schemas,
-and rendered Markdown usage guides for all 19 pipeline modules managed in `modules/`.
+and rendered Markdown usage guides for all 17 pipeline modules managed in `modules/`.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class ModuleListResponse(BaseModel):
 
     modules: List[Dict[str, Any]] = Field(
         ...,
-        description="등록된 모든 19개 RAG 파이프라인 모듈의 정의 및 스키마 메타데이터 목록",
+        description="등록된 모든 17개 RAG 파이프라인 모듈의 정의 및 스키마 메타데이터 목록",
     )
 
 
@@ -149,7 +149,7 @@ def create_module_router(module_registry: ModuleRegistryPort) -> APIRouter:
         response_model=ModuleListResponse,
         summary="전체 파이프라인 모듈 계약 목록 조회",
         description=(
-            "`modules/` 디렉토리에 등록된 19개 RAG 파이프라인 모듈의 "
+            "`modules/` 디렉토리에 등록된 17개 RAG 파이프라인 모듈의 "
             "포트 계약, Input/Config/Output DTO 스키마, UI 팔레트 메타데이터를 일괄 조회합니다."
         ),
     )
@@ -162,7 +162,7 @@ def create_module_router(module_registry: ModuleRegistryPort) -> APIRouter:
         response_model=ModuleCategoriesResponse,
         summary="카테고리별 모듈 분류 목록 조회",
         description=(
-            "19개 파이프라인 모듈을 아키텍처 계층별"
+            "17개 파이프라인 모듈을 아키텍처 계층별"
             "(Query, Embedding, Retrieval, Reader, Structure, Storage)로 그룹화하여 조회합니다."
         ),
     )

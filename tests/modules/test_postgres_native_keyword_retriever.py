@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
 from modules.common.base_module import QueryContextDTO
-from modules.query.decomposer import SubqueryItem
-from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO
+from modules.query.contracts import RetrievalPlanDTO, RoutedSubqueryDTO, SubqueryItem
 from modules.retrieval.postgres_native_keyword_retriever import (
     PostgresNativeKeywordRetrieverInputDTO,
     PostgresNativeKeywordRetrieverModule,
@@ -16,7 +15,7 @@ from modules.retrieval.postgres_native_keyword_retriever import (
 from modules.storage.pgvector_data_scope import DataScopeDTO
 
 
-def test_keyword_retriever_uses_only_router_selected_collection() -> None:
+def test_keyword_retriever_uses_only_decomposer_selected_collection() -> None:
     store = MagicMock()
     store.keyword_search.return_value = [
         (
@@ -25,6 +24,7 @@ def test_keyword_retriever_uses_only_router_selected_collection() -> None:
                 "cell_id": "c1",
                 "company_name": "Example Corp",
                 "sheet_name": "Financials",
+                "cell_coord": "B2",
             },
             0.85,
             "idx-routed",
@@ -60,7 +60,9 @@ def test_keyword_retriever_uses_only_router_selected_collection() -> None:
     result = module.run(input_data)
 
     assert result["items"][0]["index_id"] == "idx-routed"
-    assert result["items"][0]["cell_id"] == "Example Corp:c1"
+    assert result["items"][0]["cell_id"] == "c1"
+    assert result["items"][0]["sheet_name"] == "Financials"
+    assert result["items"][0]["cell_coord"] == "B2"
     store.keyword_search.assert_called_once_with(
         collection_names=["idx-routed"],
         query_text="Revenue 2023",

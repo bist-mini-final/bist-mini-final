@@ -24,8 +24,6 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   pgvector_data_scope: { icon: 'Database', color: '#0f766e' },
   pgvector_retriever: { icon: 'Search', color: '#0f766e' },
   postgres_native_keyword_retriever: { icon: 'ListFilter', color: '#2563eb' },
-  semantic_query_matcher: { icon: 'Route', color: '#7c3aed' },
-  llm_query_router: { icon: 'Bot', color: '#c026d3' },
   rrf_fusion: { icon: 'Merge', color: '#059669' },
   pg_context_expander: { icon: 'Maximize2', color: '#d97706' },
   reader: { icon: 'Sparkles', color: '#e11d48' },
@@ -34,5 +32,4 @@ export const MODULE_PRESENTATION: Partial<Record<ModuleType, ModulePresentation>
   company_entity_extractor: { icon: 'Building2', color: '#7c3aed' },
   cell_text_serializer: { icon: 'Rows3', color: '#7c3aed' },
   sheet_metadata_persistence: { icon: 'TableProperties', color: '#d97706' },
-  qa_example_loader: { icon: 'MessageSquare', color: '#d97706' },
 };

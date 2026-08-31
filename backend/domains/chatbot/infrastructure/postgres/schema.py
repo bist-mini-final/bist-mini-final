@@ -18,10 +18,12 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     status VARCHAR(16) NOT NULL CHECK (status IN ('processing', 'completed', 'failed')),
     workflow_run_id VARCHAR(64),
     visualization JSONB,
+    evidence JSONB NOT NULL DEFAULT '[]',
     attachments JSONB NOT NULL DEFAULT '[]',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS visualization JSONB;
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]';
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_client ON chat_sessions(client_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at);

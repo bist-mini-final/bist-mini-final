@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { FileSpreadsheet } from 'lucide-react';
 import { VectorIndexList } from '../VectorIndexList';
 import type { VectorIndexInfo } from '../../types';
@@ -14,6 +14,8 @@ vi.mock('../../services/dataSourceApi', () => ({
 }));
 
 describe('VectorIndexList', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   beforeEach(() => {
     dataSourceApiMocks.updateIndexCompany.mockReset();
   });
@@ -165,6 +167,45 @@ describe('VectorIndexList', () => {
 
     expect(screen.getByText('completed.xlsx')).toBeInTheDocument();
     expect(screen.getByText('42개')).toBeInTheDocument();
+  });
+
+  it('renders one compact collection row on mobile', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 767px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    } as unknown as MediaQueryList)));
+    const index: VectorIndexInfo = {
+      index_id: 'mobile-index',
+      file_name: 'mobile-company.xlsx',
+      company_name: 'Mobile Company',
+      workbook_hash: 'mobile-hash',
+      model: 'text-embedding-3-large',
+      dimension: 3072,
+      document_count: 10944,
+      created_at: '2026-08-18T10:00:00Z',
+    };
+
+    render(
+      <VectorIndexList
+        indexes={[index]}
+        onDetailClick={vi.fn()}
+        onSearchClick={vi.fn()}
+        onDeleteClick={vi.fn()}
+        onCreateClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Mobile Company')).toBeInTheDocument();
+    expect(screen.getByText('10,944')).toBeInTheDocument();
+    expect(screen.queryByText('3072D')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '검색 테스트' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '컬렉션 상세' })).toBeInTheDocument();
   });
 
   it('renders every concurrently active ingestion pipeline', () => {

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 from backend.domains.data_sources.infrastructure.pgvector import PgVectorStore
 from modules.common.base_module import QueryContextDTO
 from modules.embedding.query_embedder import EmbeddingsDTO, RoutedEmbeddingDTO
-from modules.query.decomposer import SubqueryItem
+from modules.query.contracts import SubqueryItem
 from modules.retrieval.pgvector_retriever import (
     PgVectorRetrieverConfigDTO,
     PgVectorRetrieverInputDTO,
@@ -19,7 +19,11 @@ def test_dense_retrieval_searches_only_the_routed_collection() -> None:
     store = MagicMock()
     document = MagicMock()
     document.page_content = "Cell 1 content"
-    document.metadata = {"cell_id": "cell_1"}
+    document.metadata = {
+        "cell_id": "ExampleCorp:Income_Statement:B2",
+        "sheet_name": "Income_Statement",
+        "cell_coord": "B2",
+    }
     store.similarity_search_by_vector_with_score.return_value = [(document, 0.15)]
     scope = DataScopeDTO(
         index_id="idx-routed",
@@ -57,7 +61,9 @@ def test_dense_retrieval_searches_only_the_routed_collection() -> None:
     )
 
     assert result["items"][0]["index_id"] == "idx-routed"
-    assert result["items"][0]["cell_id"] == "cell_1"
+    assert result["items"][0]["cell_id"] == "ExampleCorp:Income_Statement:B2"
+    assert result["items"][0]["sheet_name"] == "Income_Statement"
+    assert result["items"][0]["cell_coord"] == "B2"
     store.similarity_search_by_vector_with_score.assert_called_once_with(
         collection_name="idx-routed",
         embedding=[0.1] * 1536,

@@ -32,10 +32,15 @@ flowchart TB
 - rendered KEDA worker spec은 queue/command/environment 계약과 일치합니다.
 - Alembic revision chain의 head는 하나이며 runtime schema와 migration schema 사이 drift가 없어야 합니다.
 - `/api/v1` OpenAPI에 정식 route가 노출되고 제거된 comparison legacy route는 나타나지 않습니다.
-- registry는 정확히 19개 module type을 노출합니다.
+- registry는 정확히 17개 module type을 노출합니다.
+- scope-aware Decomposer는 다중 scope의 미등록 collection ID를 거부하고, 서버가 고정한 단일 scope에서만 ID 오탈자를 유일한 catalog 항목으로 복구합니다.
+- Reader terminal LLM 출력은 strict `answer_markdown + evidence_ids` schema를 따르고, 반환 `CellEvidenceDTO[]`는 실제 값 후보 및 실행 근거 allowlist를 통과해야 합니다.
+- 챗봇 message의 `content`와 `evidence[]`는 독립 저장·API 필드이며 frontend는 Markdown 좌표 문자열을 근거 배지로 파싱하지 않습니다.
 - BI는 21개 metric ID와 evidence 계약을 지킵니다.
+- BI source metric exact-evidence는 collection/workbook/file lineage, catalog alias/exclusion, concrete value, FY/LTM 구분을 지키며 exact hit 시 generic RAG를 실행하지 않습니다.
 - Company Comparison은 source snapshot, evidence, rank, forecast assumption, exclusion, current head 무결성을 지킵니다.
 - frontend에는 `/company-comparison-v2`가 없고 정식 `/company-comparison`만 존재합니다.
+- 모바일 AppShell은 상단 앱바와 접근 가능한 메뉴 drawer를 제공하고 중복 하단 navigation을 렌더링하지 않습니다.
 - C901 최대 복잡도 10을 backend와 modules 전체에 적용합니다. 현재 migration budget은 비어 있으므로 새 hotspot은 즉시 실패합니다.
 - 20개 BP의 code/state/catalog, 모든 docs 상대 링크, 제외 기능·로컬 절대 경로 부재와 BP-501↔OpenAPI operation 집합이 일치해야 합니다.
 
@@ -96,6 +101,9 @@ npm run build
 - API 변경: route/DTO/OpenAPI contract/frontend client/BP-501 동시 수정
 - 문서 변경: BP metadata/catalog/relative link/OpenAPI table과 현재 기준선 정합성 검사 동시 통과
 - frontend route 변경: router/sidebar/deep link/route test/BP-601 동시 수정
+- frontend responsive shell 변경: AppShell/MobileAppBar/CSS/accessibility interaction test/BP-601 동시 수정
+- Reader evidence 변경: Pydantic schema/Reader allowlist/chat persistence/frontend DTO·renderer/BP-303·404·501·503·601 동시 수정
+- BI metric retrieval 변경: catalog/period policy/exact-evidence adapter/fallback RAG/BI snapshot regression/BP-303·403 동시 수정
 - comparison policy 변경: version 상향, golden calculation tests, BP-405 동시 수정
 - benchmark 목표와 실제 결과를 구분해 기록
 

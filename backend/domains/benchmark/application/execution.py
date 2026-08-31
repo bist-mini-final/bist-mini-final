@@ -39,7 +39,7 @@ def plan_signature(subqueries: Sequence[Any]) -> PlanSignature:
 _NUMBER = re.compile(r"(?<![A-Za-z0-9])[-+]?\(?\d[\d,]*(?:\.\d+)?\)?")
 PRE_RETRIEVAL_MODULE_TYPES = {
     "query_input",
-    "llm_query_router",
+    "pgvector_data_scope",
     "decomposer",
 }
 
@@ -131,21 +131,28 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
         output = state.output or {}
         if state.module_type == "decomposer":
             decomposer_output = state.output if isinstance(state.output, dict) else {}
-            raw_subqueries = decomposer_output.get("items")
+            raw_routes = decomposer_output.get("routes")
             decomposition = {
-                "source": "llm_decomposer",
+                "source": "scope_aware_decomposer",
                 "subqueries": [
-                    item.get("text") if isinstance(item, dict) else str(item)
-                    for item in raw_subqueries
+                    route.get("subquery", {}).get("text")
+                    if isinstance(route, dict)
+                    and isinstance(route.get("subquery"), dict)
+                    else str(route)
+                    for route in raw_routes
                 ]
-                if isinstance(raw_subqueries, list)
+                if isinstance(raw_routes, list)
                 else [],
             }
 
         if isinstance(output, dict):
             candidate = output.get("answer_json")
             if isinstance(candidate, dict):
-                answer = str(candidate.get("answer") or answer)
+                answer = str(
+                    candidate.get("answer_markdown")
+                    or candidate.get("answer")
+                    or answer
+                )
             match = output.get("semantic_match")
             if isinstance(match, dict):
                 metrics = match.get("metrics") or {}

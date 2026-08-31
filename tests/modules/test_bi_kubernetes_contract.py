@@ -108,6 +108,7 @@ class BiKubernetesContractTests(unittest.TestCase):
             "bi_answers",
         ):
             self.assertIn(f"CREATE TABLE IF NOT EXISTS {table}", BI_SCHEMA_SQL)
+        self.assertNotIn("bi_document_profiles", BI_SCHEMA_SQL)
 
     def test_bi_schema_bootstrap_has_a_stable_cross_process_lock_key(self) -> None:
         self.assertEqual(BI_SCHEMA_LOCK_KEY, "bist:bi-schema:v1")

@@ -1,7 +1,7 @@
 # [BP-303] Dense + Sparse + RRF 융합 & 셀 확장 회로
 > **Document Code:** `BP-303` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `modules/retrieval`, `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/postgres`, `backend/platform/pgvector`
-> **Current References:** [`modules/retrieval/pgvector_retriever.py`](../../../modules/retrieval/pgvector_retriever.py), [`modules/retrieval/postgres_native_keyword_retriever.py`](../../../modules/retrieval/postgres_native_keyword_retriever.py), [`modules/retrieval/rrf_fusion.py`](../../../modules/retrieval/rrf_fusion.py), [`modules/retrieval/context_expander.py`](../../../modules/retrieval/context_expander.py)
+> **Current References:** [`modules/retrieval/pgvector_retriever.py`](../../../modules/retrieval/pgvector_retriever.py), [`modules/retrieval/postgres_native_keyword_retriever.py`](../../../modules/retrieval/postgres_native_keyword_retriever.py), [`modules/retrieval/rrf_fusion.py`](../../../modules/retrieval/rrf_fusion.py), [`modules/retrieval/context_expander.py`](../../../modules/retrieval/context_expander.py), [`modules/reader/reader.py`](../../../modules/reader/reader.py), [`backend/shared/application/cell_evidence.py`](../../../backend/shared/application/cell_evidence.py)
 
 ---
 
@@ -13,11 +13,13 @@
 
 ```mermaid
 flowchart TD
-    QUERY["사용자 질의 (User Financial Query)"] --> SCOPE["PgVectorDataScopeModule (기업/시트/연도 필터 생성)"]
+    QUERY["QueryInputModule<br>(query_context)"] --> DECOMPOSE["Scope-aware DecomposerModule<br>(원자 질의 + collection 결합)"]
+    CATALOG["PgVectorDataScopeModule<br>(collection/company/ticker/sheet catalog)"] --> DECOMPOSE
+    DECOMPOSE -->|RetrievalPlanDTO| EMBED["Query Embedder"]
 
     subgraph ParallelRetrieval ["병렬 검색 계층 (Parallel Retrieval Layer)"]
-        SCOPE --> DENSE["1. PgVectorRetrieverModule<br>(3072d Cosine Similarity ANN)"]
-        SCOPE --> SPARSE["2. PostgresNativeKeywordRetrieverModule<br>(TSVector BM25 Full-Text Search)"]
+        EMBED --> DENSE["1. PgVectorRetrieverModule<br>(collection embedding 계약별 ANN)"]
+        DECOMPOSE --> SPARSE["2. PostgresNativeKeywordRetrieverModule<br>(TSVector Full-Text Search)"]
     end
 
     DENSE -->|Ranked Dense Candidates| RRF["3. RrfFusionModule<br>(Reciprocal Rank Fusion, k=60)"]
@@ -26,6 +28,10 @@ flowchart TD
     RRF -->|Top-K Fused Candidates| EXPAND["4. PgContextExpanderModule<br>(2D 그리드 셀 좌표 기반 Row/Table 확장)"]
     EXPAND --> READER["ReaderModule (LLM 수식 검증 및 답변 생성)"]
 ```
+
+Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로 보입니다. `PgVectorDataScopeModule`은 DB에서 catalog만 읽는 Source 모듈이고, Decomposer는 한 번의 구조화 LLM 호출로 질문 분해와 data scope 결합을 함께 수행합니다. 출력의 모든 `index_id`는 catalog membership 검증을 통과해야 하며 회사명과 시트명은 실제 저장 표기로 정규화됩니다. 따라서 존재하지 않는 기업을 먼저 분해한 뒤 다른 collection으로 우회하는 경로는 허용하지 않습니다. 다만 BI처럼 서버가 lineage를 단일 collection으로 이미 고정한 요청에서는 모델이 유일한 index ID를 오탈자 낸 경우 그 sole scope로만 복구하고 `repaired_scope_count`를 남깁니다. 둘 이상의 scope가 있으면 알 수 없는 ID를 계속 fail-closed 처리합니다.
+
+이 회로는 자유 질의와 BI exact lookup miss의 공통 fallback입니다. BI의 versioned metric catalog처럼 이미 지표·기간이 구조화된 요청은 BP-403의 metadata exact-evidence 조회를 먼저 실행합니다. 정확 값 셀이 있으면 불필요한 Decomposer·embedding·RRF 호출을 생략하고, 없을 때만 이 하이브리드 회로로 내려옵니다. BI 별칭·FY/LTM 판단은 BI bounded context가 소유하며 범용 retrieval module에 하드코딩하지 않습니다.
 
 ---
 
@@ -78,6 +84,7 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 
 * **표현 일관성과 파편화 방지**: 마크다운 표를 다시 조립하기보다 [BP-201]의 `header_with_value`와 원본 좌표 metadata를 유지해 dense/keyword/reader가 같은 cell 의미를 공유합니다. 토큰·정확도 효과는 benchmark에서 별도로 측정합니다.
 * **검색/Reader 경계 규칙**: `Cell Value: ?`는 값 미지정을 뜻하는 검색 와일드카드입니다. Query Decomposer가 만든 이 표기는 Query Embedder와 Dense 유사도 검색까지 그대로 유지하며, 검색 후보 좌표와 2D 확장에도 사용할 수 있습니다. 단, Reader 입력 경계에서는 `Cell Value`가 실제 값인 셀만 통과시킵니다. Reader의 `[Context Blocks]`, 검증 가능한 근거 목록, `lookup_cell_metadata` 도구 결과는 모두 이 공통 필터를 거쳐 재구성되며 `?`, `NA`, `N/A`, `NM`, `#PEND`는 모델에 전달하지 않습니다.
+* **Reader 근거 선택 규칙**: 값이 있는 Reader 후보 전체가 사용자 근거가 되는 것은 아닙니다. 각 후보에 서버가 `EVIDENCE-nnn` ID를 부여하고 LLM은 strict JSON Schema에 맞춰 `answer_markdown`과 실제 사용한 최소 `evidence_ids`만 반환합니다. backend는 ID를 후보 allowlist와 대조한 뒤 완전한 `CellEvidenceDTO[]`로 투영합니다. 본문에 시트·좌표 문자열이나 `근거` section을 합성하지 않으며, 선택 누락 시 검색 상위 셀을 자동 첨부하지 않습니다.
 
 ---
 
@@ -101,4 +108,5 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 - `Cell Value: ?` 후보는 retrieval recall에는 남기되 Reader input projection에서는 값 존재 여부를 공통 정책으로 강제합니다.
 - module의 legacy storage facade import는 제거됐고 Dense/keyword/context expansion은 data-source retrieval port를 통해 같은 sync/async 정규화 계약을 사용합니다.
 - 검색 기준선은 Dense + PostgreSQL keyword + RRF(`k=60`) + 2D context expansion입니다.
+- 구조화 BI metric 요청의 기준선은 catalog exact-evidence first, 본 문서의 하이브리드 검색 second입니다. exact 조회도 collection/workbook/file lineage와 실제 값 필터를 동일하게 강제합니다.
 - 검색 recall 단계의 `?`와 Reader evidence 단계의 실제 값 필터는 서로 다른 의도적 계약입니다. 어느 한쪽을 바꾸면 BP-201·BP-404와 검색/근거 회귀 테스트를 함께 갱신합니다.

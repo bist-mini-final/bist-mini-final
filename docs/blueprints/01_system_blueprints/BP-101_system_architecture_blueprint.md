@@ -123,7 +123,7 @@ classDiagram
 - pipeline module은 `PgVectorStore` SQL gateway가 아니라 retrieval/ingestion/catalog port에 의존합니다.
 - API 이벤트 루프에서 블로킹 DB·파일·CPU 작업을 직접 실행하지 않습니다.
 - 비교 계산은 실제 BI 관측값과 원본 셀 근거만 사용하며 synthetic fallback을 만들지 않습니다.
-- 현재 모듈 카탈로그는 `ModuleRegistry`에 등록된 19개 type이 단일 기준입니다.
+- 현재 모듈 카탈로그는 `ModuleRegistry`에 등록된 17개 type이 단일 기준입니다.
 
 정확한 현재 수치와 범위는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](../../CURRENT_IMPLEMENTATION_BASELINE.md)를 우선합니다.
 
@@ -138,7 +138,7 @@ BP-102의 목표 트리와 import gate가 활성화됐고 수평 storage facade�
 - 추적되는 backend Python 최상위 패키지는 `api`, `bootstrap`, `core`, `domains`, `entrypoints`, `platform`, `shared`뿐이며 `core`에는 설정만 남아 있습니다.
 - workflow, data sources, BI, company comparison, chatbot, benchmark, operations가 각각 vertical slice를 소유합니다.
 - ASGI·worker·관리 명령은 `entrypoints → bootstrap` 방향으로만 시작하며 domain concrete adapter를 직접 조립하지 않습니다.
-- OpenAPI 정식 namespace는 `/api/v1`, module registry는 19개 type, 제품 route는 새 채팅·플레이그라운드·데이터 소스·BI·기업 비교·작업 관제·설정으로 고정돼 있습니다.
+- OpenAPI 정식 namespace는 `/api/v1`, module registry는 20개 type, 제품 route는 새 채팅·플레이그라운드·데이터 소스·BI·기업 비교·작업 관제·설정으로 고정돼 있습니다.
 - 구조 회귀는 `tests/modules/test_architecture_contracts.py`, 공개 API 회귀는 OpenAPI 계약 테스트, 런타임 수치는 `CURRENT_IMPLEMENTATION_BASELINE.md`에서 검증합니다.
 
 새 bounded context, 외부 platform adapter, process entrypoint 또는 공개 workspace를 추가할 때 이 문서와 BP-102·BP-501·BP-601을 같은 변경에서 갱신해야 합니다.

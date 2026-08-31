@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, Optional, Protocol, Sequence
 
 from langchain_core.documents import Document
 
+from backend.domains.data_sources.domain.workbook_profiles import WorkbookProfile
 from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.shared.application.vector import PgVectorReplacePlan
 
@@ -58,4 +59,13 @@ class SourceFileRepositoryPort(Protocol):
     def save_sheets(self, file_id: str, sheets_info: list[Dict[str, Any]]) -> None: ...
 
 
-__all__ = ["IndexCompanyWriterPort", "SourceFileRepositoryPort", "VectorIngestionPort"]
+class WorkbookProfileRepositoryPort(Protocol):
+    def save(self, profile: WorkbookProfile, **values: Any) -> WorkbookProfile: ...
+
+
+__all__ = [
+    "IndexCompanyWriterPort",
+    "SourceFileRepositoryPort",
+    "VectorIngestionPort",
+    "WorkbookProfileRepositoryPort",
+]

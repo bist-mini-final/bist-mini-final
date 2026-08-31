@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MarkdownAnswer } from '../playground/components/MarkdownAnswer';
+import type { StructuredCellEvidence } from '../../shared/markdown/cellCitations';
 import { normalizeChatMarkdown } from './chatMarkdown';
 
 const evidenceApiMock = vi.hoisted(() => ({
@@ -11,6 +12,20 @@ const evidenceApiMock = vi.hoisted(() => ({
 vi.mock('../../shared/evidence/cellEvidenceApi', () => ({
   cellEvidenceApi: evidenceApiMock,
 }));
+
+const evidence: StructuredCellEvidence = {
+  evidence_id: 'EVIDENCE-001',
+  index_id: 'idx-ibm',
+  workbook_hash: 'hash-ibm',
+  file_name: 'ibm.xlsx',
+  company_name: 'IBM',
+  sheet_name: 'Balance_Sheet',
+  cell_coord: 'E50',
+  row_header: ['Total Assets'],
+  column_header: ['2024-12-31'],
+  cell_value: '151,880',
+  source_text: 'Company: IBM | Sheet: Balance_Sheet | Row Header: Total Assets | Column Header: 2024-12-31 | Cell Value: 151,880',
+};
 
 describe('normalizeChatMarkdown', () => {
   it('preserves an already valid financial table header', () => {
@@ -38,13 +53,10 @@ describe('normalizeChatMarkdown', () => {
     expect(screen.getByText('38.0%에서 48.0%').tagName).toBe('STRONG');
   });
 
-  it('collapses verbose cell evidence into a citation chip with hover details', () => {
-    const markdown = normalizeChatMarkdown([
-      '**근거**',
-      '- [Sheet: Balance_Sheet | Cell: E50] Company: IBM | Sheet: Balance_Sheet | Row Header: Total Assets | Column Header: 2024-12-31 | Cell Value: 151,880',
-    ].join('\n'));
+  it('renders structured evidence as a citation chip with hover details', () => {
+    const markdown = normalizeChatMarkdown('IBM의 총자산은 151,880입니다.');
 
-    const { container } = render(<MarkdownAnswer markdown={markdown} />);
+    const { container } = render(<MarkdownAnswer markdown={markdown} evidence={[evidence]} />);
     const chip = container.querySelector('.reader-citation');
 
     expect(chip).toHaveTextContent('Balance Sheet · E50');

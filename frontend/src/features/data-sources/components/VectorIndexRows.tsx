@@ -34,6 +34,7 @@ function formatDate(iso: string): string {
 }
 
 interface ActivePipelineRowProps {
+  readonly compact?: boolean;
   readonly pipeline: PipelineRunState;
   readonly deleting: boolean;
   readonly onView?: (run: PipelineRunState) => void;
@@ -41,6 +42,7 @@ interface ActivePipelineRowProps {
 }
 
 export function ActivePipelineRow({
+  compact = false,
   pipeline,
   deleting,
   onView,
@@ -49,9 +51,42 @@ export function ActivePipelineRow({
   const isPaused = pipeline.status === 'paused';
   const activeModule = pipeline.modules[pipeline.currentStageIndex];
 
+  if (compact) {
+    return (
+      <tr className={`ds-pipeline-table-row ds-pipeline-table-row--${isPaused ? 'paused' : 'active'}`}>
+        <td className="ds-mobile-list-cell" colSpan={9}>
+          <div className="ds-mobile-list-row">
+            <span
+              className={`ds-mobile-list-state ${isPaused ? 'is-paused' : 'is-running'}`}
+              aria-label={isPaused ? '중단됨' : pipeline.status === 'queued' ? '대기 중' : '인덱싱 중'}
+            >
+              {isPaused ? <Pause size={13} /> : <RefreshCw size={13} className="ds-spin" />}
+            </span>
+            <strong className="ds-mobile-list-title" title={pipeline.fileName}>{pipeline.fileName}</strong>
+            <span className="ds-mobile-list-meta">
+              {activeModule?.batchProgress
+                ? `${activeModule.batchProgress.completed}/${activeModule.batchProgress.total}`
+                : `${Math.round(pipeline.progressPercent)}%`}
+            </span>
+            <div className="ds-mobile-list-actions">
+              <IconButton variant="primary" size="sm" type="button" aria-label="진행상황 및 모듈 로그" onClick={() => onView?.(pipeline)}>
+                <Layers size={13} />
+              </IconButton>
+              {onDelete && (
+                <IconButton variant="danger" size="sm" type="button" aria-label="인덱싱 작업 삭제" onClick={() => onDelete(pipeline)} disabled={deleting}>
+                  {deleting ? <RefreshCw size={12} className="ds-spin" /> : <Trash2 size={12} />}
+                </IconButton>
+              )}
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr className={`ds-pipeline-table-row ds-pipeline-table-row--${isPaused ? 'paused' : 'active'}`}>
-      <td className="ds-id-cell ds-pipeline-table-row__status">
+      <td className="ds-id-cell ds-pipeline-table-row__status" data-label="상태">
         <span className="ds-inline-icon-label">
           {isPaused
             ? <Pause size={12} />
@@ -59,7 +94,7 @@ export function ActivePipelineRow({
           {isPaused ? '중단됨' : pipeline.status === 'queued' ? '대기 중' : '인덱싱 중'}
         </span>
       </td>
-      <td>
+      <td data-label="대상 데이터셋">
         <div className="ds-table-dataset-name">{pipeline.fileName}</div>
         <div className="ds-pipeline-table-row__description">
           {isPaused
@@ -69,26 +104,26 @@ export function ActivePipelineRow({
               : activeModule?.name || '파이프라인 실행 중...'}
         </div>
       </td>
-      <td>
+      <td data-label="기업명">
         <span className="ds-badge ds-badge--gray ds-inline-icon-label">
           {isPaused ? <Pause size={11} /> : <Sparkles size={11} />}
           {isPaused ? '재개 가능' : '자동 분석 중'}
         </span>
       </td>
-      <td><span className="ds-badge ds-badge--blue">{pipeline.model}</span></td>
-      <td className="ds-table-cell--muted">—</td>
-      <td className="ds-pipeline-table-row__progress">
+      <td data-label="임베딩 모델"><span className="ds-badge ds-badge--blue">{pipeline.model}</span></td>
+      <td className="ds-table-cell--muted" data-label="차원">—</td>
+      <td className="ds-pipeline-table-row__progress" data-label="진행률">
         {activeModule?.batchProgress
           ? `${activeModule.batchProgress.completed}/${activeModule.batchProgress.total} 배치`
           : `${Math.round(pipeline.progressPercent)}% (${pipeline.currentStageIndex + 1}/${pipeline.modules.length || 5}단계)`}
       </td>
-      <td>
+      <td data-label="스토리지">
         <span className={`ds-badge ds-pipeline-table-row__storage ${isPaused ? 'is-paused' : ''}`}>
           {isPaused ? '재개 대기' : pipeline.status === 'queued' ? '배치 큐 대기' : 'pgvector 적재 중'}
         </span>
       </td>
-      <td className="ds-table-cell--time">{Math.round(pipeline.elapsedSeconds)}초 경과</td>
-      <td className="ds-actions-col ds-text-right">
+      <td className="ds-table-cell--time" data-label="경과 시간">{Math.round(pipeline.elapsedSeconds)}초 경과</td>
+      <td className="ds-actions-col ds-text-right" data-label="작업">
         <div className="ds-actions-row">
           <Button
             variant="primary"
@@ -119,6 +154,7 @@ export function ActivePipelineRow({
 }
 
 interface FailedPipelineRowProps {
+  readonly compact?: boolean;
   readonly run: PipelineRunState;
   readonly deleting: boolean;
   readonly onViewLog?: (run: PipelineRunState) => void;
@@ -126,6 +162,7 @@ interface FailedPipelineRowProps {
 }
 
 export function FailedPipelineRow({
+  compact = false,
   run,
   deleting,
   onViewLog,
@@ -136,28 +173,52 @@ export function FailedPipelineRow({
     || run.modules[run.currentStageIndex]?.name
     || '알 수 없는 단계';
 
+  if (compact) {
+    return (
+      <tr className="ds-pipeline-table-row ds-pipeline-table-row--failed">
+        <td className="ds-mobile-list-cell" colSpan={9}>
+          <div className="ds-mobile-list-row">
+            <span className="ds-mobile-list-state is-failed" aria-label="인덱싱 실패"><AlertCircle size={13} /></span>
+            <strong className="ds-mobile-list-title" title={`${run.fileName} · ${run.error || failedStageLabel}`}>{run.fileName}</strong>
+            <span className="ds-mobile-list-meta is-failed">실패</span>
+            <div className="ds-mobile-list-actions">
+              <IconButton variant="danger" size="sm" type="button" aria-label="실패 로그 확인" onClick={() => onViewLog?.(run)}>
+                <Layers size={12} />
+              </IconButton>
+              {onDelete && (
+                <IconButton variant="danger" size="sm" type="button" aria-label="실패 작업 삭제" onClick={() => onDelete(run)} disabled={deleting}>
+                  {deleting ? <RefreshCw size={12} className="ds-spin" /> : <Trash2 size={12} />}
+                </IconButton>
+              )}
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr className="ds-pipeline-table-row ds-pipeline-table-row--failed">
-      <td className="ds-id-cell ds-pipeline-table-row__status">
+      <td className="ds-id-cell ds-pipeline-table-row__status" data-label="상태">
         <span className="ds-inline-icon-label"><AlertCircle size={12} />실패</span>
       </td>
-      <td>
+      <td data-label="대상 데이터셋">
         <div className="ds-table-dataset-name">{run.fileName}</div>
         <div className="ds-pipeline-table-row__error" title={run.error ?? undefined}>
           ⚠️ {run.error || '알 수 없는 오류'}
         </div>
       </td>
-      <td>
+      <td data-label="실패 단계">
         <span className="ds-badge ds-pipeline-table-row__failed-stage">
           실패 단계: {failedStageLabel.split('(')[0].trim()}
         </span>
       </td>
-      <td><span className="ds-badge ds-badge--blue">{run.model}</span></td>
-      <td className="ds-table-cell--muted">—</td>
-      <td className="ds-table-cell--muted">—</td>
-      <td className="ds-table-cell--muted">—</td>
-      <td className="ds-table-cell--time">{Math.round(run.elapsedSeconds || 0)}초 경과</td>
-      <td className="ds-actions-col ds-text-right">
+      <td data-label="임베딩 모델"><span className="ds-badge ds-badge--blue">{run.model}</span></td>
+      <td className="ds-table-cell--muted" data-label="차원">—</td>
+      <td className="ds-table-cell--muted" data-label="청크">—</td>
+      <td className="ds-table-cell--muted" data-label="스토리지">—</td>
+      <td className="ds-table-cell--time" data-label="경과 시간">{Math.round(run.elapsedSeconds || 0)}초 경과</td>
+      <td className="ds-actions-col ds-text-right" data-label="작업">
         <div className="ds-actions-row">
           <Button
             variant="danger"
@@ -188,6 +249,7 @@ export function FailedPipelineRow({
 }
 
 interface VectorIndexRowProps {
+  readonly compact?: boolean;
   readonly index: VectorIndexInfo;
   readonly editing: boolean;
   readonly editingName: string;
@@ -206,6 +268,7 @@ interface VectorIndexRowProps {
 }
 
 export function VectorIndexRow({
+  compact = false,
   index,
   editing,
   editingName,
@@ -235,16 +298,84 @@ export function VectorIndexRow({
     if (editing) companyInputRef.current?.focus();
   }, [editing]);
 
+  if (compact) {
+    return (
+      <tr
+        className={`ds-index-row${saving ? ' ds-index-row--updating' : ''}${deleting ? ' ds-index-row--deleting' : ''}`}
+        aria-busy={rowBusy || undefined}
+      >
+        <td className="ds-mobile-list-cell" colSpan={9}>
+          {deleting ? (
+            <div className="ds-mobile-list-row ds-mobile-list-row--busy" role="status" aria-live="polite">
+              <RefreshCw className="ds-spin" size={13} />
+              <strong className="ds-mobile-list-title">{companyDisplay || index.file_name || 'Dataset'}</strong>
+              <span className="ds-mobile-list-meta is-danger">삭제 중</span>
+            </div>
+          ) : editing ? (
+            <div className="ds-mobile-company-editor">
+              <input
+                type="text"
+                className="ds-company-inline-input"
+                value={editingName}
+                onChange={(event) => onEditingNameChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') onSave();
+                  else if (event.key === 'Escape') onCancelEdit();
+                }}
+                placeholder="기업명 입력..."
+                aria-label="기업명"
+                aria-invalid={Boolean(editError)}
+                title={editError || undefined}
+                disabled={saving}
+              />
+              <IconButton variant="primary" size="sm" aria-label="기업명 저장" type="button" onClick={onSave} disabled={saving} busy={saving}>
+                {saving ? <RefreshCw className="ds-spin" size={12} /> : <Check size={12} />}
+              </IconButton>
+              <IconButton variant="ghost" size="sm" aria-label="기업명 수정 취소" type="button" onClick={onCancelEdit} disabled={saving}>
+                <X size={12} />
+              </IconButton>
+            </div>
+          ) : (
+            <div className="ds-mobile-list-row">
+              <button
+                type="button"
+                className="ds-mobile-index-identity"
+                title={`${companyDisplay || '기업명 미지정'} · ${index.file_name || 'Dataset'} · 탭하여 기업명 수정`}
+                aria-label={`${companyDisplay || '미지정'} 기업명 수정`}
+                onClick={onStartEdit}
+                disabled={editLocked}
+              >
+                <Building2 size={14} />
+                <strong>{companyDisplay || index.file_name || '+ 기업명 입력'}</strong>
+              </button>
+              <span className="ds-mobile-list-meta" title="저장된 청크 수">{index.document_count.toLocaleString()}</span>
+              <div className="ds-mobile-list-actions">
+                {onPipelineLog && (
+                  <IconButton variant="ghost" size="sm" aria-label="모듈 로그" type="button" onClick={() => onPipelineLog(index)} disabled={saving}>
+                    <Cpu size={13} />
+                  </IconButton>
+                )}
+                <IconButton variant="primary" size="sm" aria-label="검색 테스트" type="button" onClick={() => onSearch(index)} disabled={saving}><Search size={13} /></IconButton>
+                <IconButton variant="ghost" size="sm" aria-label="컬렉션 상세" type="button" onClick={() => onDetail(index.index_id)} disabled={saving}><Eye size={13} /></IconButton>
+                <IconButton variant="danger" size="sm" aria-label="인덱스 삭제" type="button" onClick={() => onDelete(index.index_id)} disabled={editLocked || saving}><Trash2 size={13} /></IconButton>
+              </div>
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr
       className={`ds-index-row${saving ? ' ds-index-row--updating' : ''}${deleting ? ' ds-index-row--deleting' : ''}`}
       aria-busy={rowBusy || undefined}
     >
-      <td className="ds-font-mono ds-id-cell ds-table__nowrap">
+      <td className="ds-font-mono ds-id-cell ds-table__nowrap" data-label="컬렉션 ID">
         <span title={index.index_id}>{index.index_id.slice(0, 10)}...</span>
       </td>
-      <td className="ds-table-dataset-name ds-table__nowrap">{index.file_name || 'Dataset'}</td>
-      <td className="ds-table__nowrap">
+      <td className="ds-table-dataset-name ds-table__nowrap" data-label="대상 데이터셋">{index.file_name || 'Dataset'}</td>
+      <td className="ds-table__nowrap" data-label="기업명">
         <div className="ds-company-cell">
           {editing ? (
             <div className="ds-company-editor">
@@ -337,9 +468,9 @@ export function VectorIndexRow({
           )}
         </div>
       </td>
-      <td className="ds-table__nowrap"><span className="ds-model-badge" title={index.model}>{index.model}</span></td>
-      <td className="ds-table__nowrap"><span className="ds-dim-pill">{index.dimension}D</span></td>
-      <td className="ds-table__nowrap">
+      <td className="ds-table__nowrap" data-label="임베딩 모델"><span className="ds-model-badge" title={index.model}>{index.model}</span></td>
+      <td className="ds-table__nowrap" data-label="차원"><span className="ds-dim-pill">{index.dimension}D</span></td>
+      <td className="ds-table__nowrap" data-label="저장된 청크">
         <div className="ds-chunk-block">
           <div className="ds-chunk-primary"><Layers size={13} /><span>{index.document_count.toLocaleString()}개</span></div>
           {index.duration_seconds !== undefined && index.duration_seconds !== null && (
@@ -349,11 +480,11 @@ export function VectorIndexRow({
           )}
         </div>
       </td>
-      <td className="ds-table__nowrap">
+      <td className="ds-table__nowrap" data-label="스토리지">
         <span className="ds-badge ds-badge--green" title="PostgreSQL 16 pgvector HNSW">PostgreSQL + pgvector</span>
       </td>
-      <td className="ds-table__nowrap"><span className="ds-time-text"><Clock size={12} /> {formatDate(index.created_at)}</span></td>
-      <td className="ds-actions-col ds-text-right ds-table__nowrap">
+      <td className="ds-table__nowrap" data-label="생성일시"><span className="ds-time-text"><Clock size={12} /> {formatDate(index.created_at)}</span></td>
+      <td className="ds-actions-col ds-text-right ds-table__nowrap" data-label="작업">
         {deleting ? (
           <div className="ds-row-operation ds-row-operation--danger" role="status" aria-live="polite">
             <RefreshCw className="ds-spin" size={13} /><span>데이터 삭제 중...</span>

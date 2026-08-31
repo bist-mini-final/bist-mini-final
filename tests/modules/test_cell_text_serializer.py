@@ -213,6 +213,8 @@ def test_cell_text_serializer_keeps_title_region_out_of_row_header(tmp_path: Pat
 
     assert len(result["items"]) == 2
     for item in result["items"]:
+        assert item["cell_id"] == "B4"
+        assert item["sheet_name"] == "Income_Statement"
         assert item["row_header"] == ["Total Revenue"]
         assert item["text"].startswith("Company: IBM | Sheet: Income_Statement")
         assert "International Business Machines Corporation" not in item["text"]

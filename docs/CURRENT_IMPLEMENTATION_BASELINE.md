@@ -1,6 +1,6 @@
 # 현재 구현 기준선
 
-> **기준일:** 2026-08-31
+> **기준일:** 2026-09-01
 > **제품 버전:** 0.1.0
 > **공개 API:** `/api/v1`
 
@@ -13,6 +13,7 @@
 - 공개 REST namespace는 `/api/v1`이며 `/api`는 비노출 호환 alias다.
 - OpenAPI 정식 계약은 63개 path와 73개 HTTP operation이다. `/api`와 `/api/v1/chatbot` 호환 별칭은 schema에 포함하지 않는다.
 - frontend는 7개 정식 route를 제공하고 `/`는 새 채팅, `/bi`는 `/dashboard`로 연결한다.
+- 모바일 frontend shell은 고정 상단 앱바와 접근 가능한 sidebar drawer만 사용한다. 하단 navigation은 렌더링하지 않으며 shell 차원의 하단 고정 여백도 두지 않는다.
 
 ## 실행·저장 기준선
 
@@ -24,17 +25,21 @@
 
 ## RAG·분석 기준선
 
-- `ModuleRegistry`의 실행 가능 모듈은 19개다.
+- `ModuleRegistry`의 실행 가능 모듈은 17개다. 표준 RAG는 `Query Input`과 `PostgreSQL Data Scope`를 두 입력으로 받는 scope-aware Decomposer가 실제 collection별 `RetrievalPlanDTO`를 한 번에 만들며 별도 LLM Router나 Semantic Matcher를 사용하지 않는다.
 - 검색은 Dense pgvector, PostgreSQL keyword, RRF와 2D context expansion을 사용한다.
+- 셀 `cell_id`는 원본 Excel 좌표만 보존하고, collection/workbook·company·정확한 sheet 이름·좌표의 복합 키로 검색 후보와 근거를 식별한다. 시트 이름을 축약한 합성 ID는 생성하지 않는다.
 - `Cell Value: ?`는 검색 표현에는 유지하지만 Reader 입력에서는 실제 값이 있는 근거만 허용한다.
+- Reader는 strict `answer_markdown + evidence_ids` Pydantic 출력을 사용한다. 서버는 선택 ID를 실제 값 후보와 run evidence에 대조해 `CellEvidenceDTO[]`로 만들고, 챗봇은 본문과 근거 JSONB를 독립 저장한다. frontend는 Markdown 좌표 문자열을 파싱하지 않고 구조화 `evidence[]`만 배지·원본 셀 검증 UI로 투영한다.
 - BI는 21개 근거 기반 지표를 제공하며 Company Comparison은 실제 BI 관측값만 사용한다.
+- BI source metric은 catalog의 행 별칭·제외어와 FY/LTM 기간 metadata로 exact value cell을 먼저 조회한다. 정확 후보가 없을 때만 scope-aware Decomposer → Dense/keyword → RRF → 2D expansion을 실행한다. 같은 종료일의 FY/LTM 열에서 LTM 상위 header가 유실된 경우 동일 지표 행의 열 순서로 두 기간을 구분하며 특정 sheet 이름이나 열 문자를 고정하지 않는다.
 - 표 구조 감지는 외부 OpenAI vision provider를 사용한다.
 
 ## 데이터베이스 기준선
 
-- Alembic head는 `20260829_0005`다.
+- Alembic head는 `20260831_0007`이다.
 - 애플리케이션 테이블은 `alembic_version`을 제외하고 22개다.
 - BI와 Company Comparison snapshot은 불변 발행본과 current pointer를 분리한다.
+- `workbook_profiles`는 원본 workbook의 통화·배율·기간·시트 역할을 data sources 소유 공통 계약으로 저장하며 BI는 변환 adapter로 읽는다.
 - workflow와 child shard queue는 lease token, heartbeat, stale recovery를 사용한다.
 - BI materialization/question과 benchmark queue는 worker-id 조건부 갱신, heartbeat와 stale recovery를 사용하며 workflow의 advisory-lock/token 모델을 억지로 공유하지 않는다.
 
@@ -61,10 +66,10 @@
 
 ## 검증 기준선
 
-2026-08-31 로컬 전체 검증 결과:
+2026-09-01 로컬 전체 검증 결과:
 
-- Backend: 301 passed, 2 skipped
-- Frontend: 168 passed
+- Backend: 314 passed, 2 skipped
+- Frontend: 173 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Backend C901 migration budget: 0개(새 복잡도 hotspot 즉시 실패)
 - Kubernetes renderer: 6개 `ScaledJob`

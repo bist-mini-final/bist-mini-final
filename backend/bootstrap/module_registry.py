@@ -11,6 +11,9 @@ from backend.domains.data_sources.infrastructure.pgvector import (
     PgVectorStore,
 )
 from backend.domains.data_sources.infrastructure.postgres import PostgresSourceFileRepository
+from backend.domains.data_sources.infrastructure.postgres.workbook_profiles import (
+    PostgresWorkbookProfileRepository,
+)
 from backend.domains.data_sources.infrastructure.spreadsheets.sheet_renderer import (
     ExcelSheetRenderer,
 )
@@ -23,9 +26,7 @@ from modules.common.base_module import BaseModule
 from modules.embedding.cell_text_embedder import CellTextEmbedderModule
 from modules.embedding.query_embedder import EmbedderModule
 from modules.query.decomposer import DecomposerModule
-from modules.query.llm_query_router import LlmQueryRouterModule
 from modules.query.query_input import QueryInputModule
-from modules.query.semantic_query_matcher import SemanticQueryMatcherModule
 from modules.reader.reader import ReaderModule
 from modules.registry import BaseModuleRegistry
 from modules.retrieval.context_expander import PgContextExpanderModule
@@ -38,8 +39,8 @@ from modules.storage.company_entity_extractor import CompanyEntityExtractorModul
 from modules.storage.pgvector_data_scope import PgVectorDataScopeModule
 from modules.storage.pgvector_index_writer import PgVectorIndexWriterModule
 from modules.storage.processed_file_selector import ProcessedFileSelectorModule
-from modules.storage.qa_example_loader import QaExampleLoaderModule
 from modules.storage.sheet_metadata_persistence import SheetMetadataPersistenceModule
+from modules.storage.workbook_profile_persistence import WorkbookProfilePersistenceModule
 from modules.structure.cell_text_serializer import CellTextSerializerModule
 from modules.structure.luna_vlm_structure_detector import LunaVlmStructureDetectorModule
 
@@ -72,15 +73,6 @@ class ModuleRegistry(BaseModuleRegistry):
                 self._factory(
                     DecomposerModule,
                     completion_client=completion_client,
-                ),
-                self._factory(
-                    LlmQueryRouterModule,
-                    completion_client=completion_client,
-                ),
-                self._factory(
-                    SemanticQueryMatcherModule,
-                    encoder=embedding_encoder,
-                    artifact_store=embedding_artifact_store,
                 ),
                 self._factory(EmbedderModule, encoder=embedding_encoder),
             )
@@ -146,7 +138,11 @@ class ModuleRegistry(BaseModuleRegistry):
                     source_files=self.source_files,
                     catalog=workbook_catalog,
                 ),
-                self._factory(QaExampleLoaderModule),
+                self._factory(
+                    WorkbookProfilePersistenceModule,
+                    profiles=PostgresWorkbookProfileRepository(self.database_url),
+                    catalog=workbook_catalog,
+                ),
             )
         )
         self._register_domain_factories(

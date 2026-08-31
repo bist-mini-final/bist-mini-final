@@ -62,19 +62,19 @@ function ResourceTable({
               </tr>
             ) : resources.map((resource) => (
               <tr key={`${resource.kind}:${resource.namespace}:${resource.name}`}>
-                <td>
+                <td data-label="이름">
                   <strong>{resource.name}</strong>
                   <small>{resource.kind}</small>
                 </td>
-                <td>
+                <td data-label="상태">
                   <StatusBadge tone={resource.active ? 'info' : resource.failed ? 'danger' : 'neutral'}>
                     {resource.status}
                   </StatusBadge>
                 </td>
-                <td>{resource.active == null ? '-' : resource.active ? '예' : '아니요'}</td>
-                <td>{resource.succeeded ?? 0} / {resource.failed ?? 0}</td>
-                <td>{formattedTime(resource.created_at)}</td>
-                <td className="jobs-table__message">{resource.message ?? '-'}</td>
+                <td data-label="실행 중">{resource.active == null ? '-' : resource.active ? '예' : '아니요'}</td>
+                <td data-label="성공 / 실패">{resource.succeeded ?? 0} / {resource.failed ?? 0}</td>
+                <td data-label="생성 시각">{formattedTime(resource.created_at)}</td>
+                <td className="jobs-table__message" data-label="메시지">{resource.message ?? '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -102,12 +102,12 @@ function LeaseTable({ runs }: { runs: WorkflowLeaseSummary[] }) {
           <tbody>
             {runs.length === 0 ? <tr><td className="jobs-table__empty" colSpan={6}>현재 실행 중인 큐 작업이 없습니다.</td></tr> : runs.map((run) => (
               <tr key={run.run_id}>
-                <td><strong>{run.run_id}</strong><small>{run.workflow_id}</small></td>
-                <td>{run.queue_name}<small>priority {run.priority}</small></td>
-                <td><StatusBadge tone={run.lease_stale ? 'danger' : run.status === 'running' ? 'success' : 'neutral'}>{run.lease_stale ? 'Lease stale' : run.status}</StatusBadge>{run.cancel_requested ? <small>취소 요청됨</small> : null}</td>
-                <td>{run.worker_id ?? '-'}<small>{run.kubernetes_resource ?? 'K8s 미연결'}</small></td>
-                <td>{duration(run.heartbeat_age_seconds)} 경과<small>TTL {duration(run.lease_ttl_seconds)} · {formattedTime(run.heartbeat_at)}</small></td>
-                <td>{run.attempt_count}</td>
+                <td data-label="Run / Workflow"><strong>{run.run_id}</strong><small>{run.workflow_id}</small></td>
+                <td data-label="Queue">{run.queue_name}<small>priority {run.priority}</small></td>
+                <td data-label="상태"><StatusBadge tone={run.lease_stale ? 'danger' : run.status === 'running' ? 'success' : 'neutral'}>{run.lease_stale ? 'Lease stale' : run.status}</StatusBadge>{run.cancel_requested ? <small>취소 요청됨</small> : null}</td>
+                <td data-label="Worker / K8s">{run.worker_id ?? '-'}<small>{run.kubernetes_resource ?? 'K8s 미연결'}</small></td>
+                <td data-label="Heartbeat / TTL">{duration(run.heartbeat_age_seconds)} 경과<small>TTL {duration(run.lease_ttl_seconds)} · {formattedTime(run.heartbeat_at)}</small></td>
+                <td data-label="시도">{run.attempt_count}</td>
               </tr>
             ))}
           </tbody>

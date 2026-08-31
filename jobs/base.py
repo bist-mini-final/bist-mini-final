@@ -17,6 +17,7 @@ class JobNode:
     values: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    position: Tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)

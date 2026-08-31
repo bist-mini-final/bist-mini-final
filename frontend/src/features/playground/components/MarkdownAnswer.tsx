@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
+  citationFromEvidence,
   cellCitationLabel,
-  normalizeCellCitations,
-  parseCellCitationHref,
   type CellCitation,
+  type StructuredCellEvidence,
 } from '../../../shared/markdown/cellCitations';
 import { CellEvidenceModal } from '../../../shared/evidence/CellEvidenceModal';
 import { useCellEvidenceLauncher } from '../../../shared/evidence/CellEvidenceProvider';
@@ -14,6 +14,7 @@ import './MarkdownAnswer.css';
 
 interface MarkdownAnswerProps {
   markdown: string;
+  evidence?: readonly StructuredCellEvidence[];
 }
 
 export function normalizeMarkdownTables(markdown: string) {
@@ -128,7 +129,7 @@ function CellCitationChip({
   );
 }
 
-export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
+export function MarkdownAnswer({ markdown, evidence }: MarkdownAnswerProps) {
   const [selectedCitation, setSelectedCitation] = useState<CellCitation | null>(null);
   const launchGlobalEvidence = useCellEvidenceLauncher();
   const openEvidence = launchGlobalEvidence ?? setSelectedCitation;
@@ -137,17 +138,23 @@ export function MarkdownAnswer({ markdown }: MarkdownAnswerProps) {
       <div className="reader-markdown">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          components={{
-            a: ({ href, children }) => {
-              const citation = parseCellCitationHref(href);
-              return citation
-                ? <CellCitationChip citation={citation} onOpen={openEvidence} />
-                : <a href={href}>{children}</a>;
-            },
-          }}
         >
-          {normalizeCellCitations(normalizeMarkdownTables(markdown))}
+          {normalizeMarkdownTables(markdown)}
         </ReactMarkdown>
+        {evidence && evidence.length > 0 && (
+          <section className="reader-evidence" aria-label="답변 셀 근거">
+            <strong>근거</strong>
+            <div className="reader-evidence__items">
+              {evidence.map((item) => (
+                <CellCitationChip
+                  key={item.evidence_id}
+                  citation={citationFromEvidence(item)}
+                  onOpen={openEvidence}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
       {!launchGlobalEvidence && selectedCitation && (
         <CellEvidenceModal

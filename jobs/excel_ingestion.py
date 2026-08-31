@@ -12,7 +12,7 @@ EXCEL_INGESTION_JOB = DagJobDefinition(
         "인덱스 및 시트·기업 메타데이터를 영속화합니다."
     ),
     queue_name="workflow-core",
-    version="2",
+    version="3",
     template=True,
     nodes=(
         JobNode("source", "processed_file_selector"),
@@ -21,6 +21,7 @@ EXCEL_INGESTION_JOB = DagJobDefinition(
         JobNode("embed", "cell_text_embedder"),
         JobNode("write-index", "pgvector_index_writer"),
         JobNode("persist-sheets", "sheet_metadata_persistence"),
+        JobNode("persist-profile", "workbook_profile_persistence"),
         JobNode("persist-company", "company_entity_extractor"),
     ),
     edges=(
@@ -46,6 +47,20 @@ EXCEL_INGESTION_JOB = DagJobDefinition(
             "index-company",
             "write-index",
             "persist-company",
+            "index_output",
+            "index_input",
+        ),
+        JobEdge(
+            "structure-profile",
+            "structure",
+            "persist-profile",
+            "output",
+            "structure_input",
+        ),
+        JobEdge(
+            "index-profile",
+            "write-index",
+            "persist-profile",
             "index_output",
             "index_input",
         ),

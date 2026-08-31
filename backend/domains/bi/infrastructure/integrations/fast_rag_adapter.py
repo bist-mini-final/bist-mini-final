@@ -9,7 +9,11 @@ from backend.domains.bi.application.fast_rag_models import (
     RankedEvidenceCell,
     RetrievalIdentity,
 )
-from backend.domains.bi.application.fast_rag_ports import ModuleRegistryPort, RankedCellStorePort
+from backend.domains.bi.application.fast_rag_ports import (
+    BiMetricEvidencePort,
+    ModuleRegistryPort,
+    RankedCellStorePort,
+)
 from backend.domains.bi.application.profile_models import BiProfileRetrievalRequest
 from backend.domains.bi.application.rag_errors import RagPipelineContractError
 from backend.domains.bi.domain.extraction_models import (
@@ -19,11 +23,7 @@ from backend.domains.bi.domain.extraction_models import (
 )
 from modules.common.base_module import QueryContextDTO
 from modules.embedding.query_embedder import EmbeddingsDTO
-from modules.query.decomposer import SubqueriesDTO
-from modules.query.llm_query_router import (
-    LlmQueryRouterOutputDTO,
-    RetrievalPlanDTO,
-)
+from modules.query.contracts import RetrievalPlanDTO
 from modules.retrieval.context_expander import ContextDTO
 from modules.retrieval.pgvector_retriever import RankedSearchResultDTO
 from modules.retrieval.rrf_fusion import RetrievalDTO
@@ -36,24 +36,28 @@ class FastRagPipelineAdapter:
         registry: ModuleRegistryPort,
         cell_store: RankedCellStorePort,
         settings: FastRagPipelineSettings | None = None,
+        metric_evidence: BiMetricEvidencePort | None = None,
     ) -> None:
         self._registry = registry
         self._cell_store = cell_store
         self._settings = settings or FastRagPipelineSettings()
+        self._metric_evidence = metric_evidence
 
     def retrieve(
         self,
         request: BiRetrievalRequest | BiProfileRetrievalRequest,
     ) -> BiRetrievedContext:
         identity = self._identity(request)
+        exact_context = self._retrieve_exact_metric_context(request, identity)
+        if exact_context is not None:
+            return exact_context
         query_context = QueryContextDTO(
             question_id=self._question_id(identity.question),
             question_text=identity.question,
         )
-        subqueries = self._decompose(query_context)
         scope = self._data_scope(identity)
-        retrieval_plan = self._route(
-            subqueries,
+        retrieval_plan = self._decompose(
+            query_context,
             DataScopeCatalogDTO(collections=[scope]),
         )
         embeddings = self._embed(retrieval_plan)
@@ -101,6 +105,30 @@ class FastRagPipelineAdapter:
             ),
         )
 
+    def _retrieve_exact_metric_context(
+        self,
+        request: BiRetrievalRequest | BiProfileRetrievalRequest,
+        identity: RetrievalIdentity,
+    ) -> BiRetrievedContext | None:
+        if not isinstance(request, BiRetrievalRequest) or self._metric_evidence is None:
+            return None
+        cells = tuple(
+            self._metric_evidence.retrieve_metric_cells(
+                request.extraction,
+                limit=self._settings.exact_cell_limit,
+            )
+        )
+        if not cells:
+            return None
+        return BiRetrievedContext(
+            request_id=identity.request_id,
+            file_name=identity.file_name,
+            workbook_hash=identity.workbook_hash,
+            index_id=identity.index_id,
+            context_blocks=tuple(dict.fromkeys(cell.source_text for cell in cells)),
+            cells=cells,
+        )
+
     @staticmethod
     def _identity(
         request: BiRetrievalRequest | BiProfileRetrievalRequest,
@@ -131,33 +159,20 @@ class FastRagPipelineAdapter:
         digest = sha256(normalized.encode("utf-8")).hexdigest()[:16].upper()
         return f"QUERY-{digest}"
 
-    def _route(
-        self,
-        subqueries: SubqueriesDTO,
-        scope_catalog: DataScopeCatalogDTO,
-    ) -> RetrievalPlanDTO:
-        output = self._registry.execute(
-            "llm_query_router",
-            {
-                "query_input": subqueries.model_dump(mode="json"),
-                "scope_catalog": scope_catalog.model_dump(mode="json"),
-            },
-            {"model": self._settings.decomposer_model},
-        )
-        return LlmQueryRouterOutputDTO.model_validate(output)
-
     def _decompose(
         self,
         query_context: QueryContextDTO,
-    ) -> SubqueriesDTO:
+        scope_catalog: DataScopeCatalogDTO,
+    ) -> RetrievalPlanDTO:
         output = self._registry.execute(
             "decomposer",
             {
                 "query_context": query_context.model_dump(mode="json"),
+                "scope_catalog": scope_catalog.model_dump(mode="json"),
             },
             {"model": self._settings.decomposer_model},
         )
-        return SubqueriesDTO.model_validate(output)
+        return RetrievalPlanDTO.model_validate(output)
 
     def _embed(
         self,
@@ -195,6 +210,7 @@ class FastRagPipelineAdapter:
             dimension=dimension,
             document_count=int(metadata.get("document_count") or 0),
             company_name=str(metadata.get("company_name") or ""),
+            ticker=str(metadata.get("ticker") or ""),
             sheet_names=[str(name) for name in raw_sheet_names],
         )
 

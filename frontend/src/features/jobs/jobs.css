@@ -61,3 +61,63 @@
 .jobs-table th { background: var(--surface-muted); color: var(--text-muted); }
 .jobs-table td { border-color: var(--border-subtle); color: var(--text-secondary); }
 .jobs-table td strong { color: var(--text); }
+
+@media (max-width: 767px) {
+  .jobs-header { gap: 0.75rem; }
+  .jobs-header .ui-page-header__actions,
+  .jobs-header .ui-button { width: 100%; }
+  .jobs-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
+  .jobs-summary article { min-height: 4rem; padding: 0.65rem; }
+  .jobs-context { padding-inline: 0.15rem; }
+  .jobs-panel { overflow: visible; background: transparent; box-shadow: none; }
+  .jobs-panel__header {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 0.8rem;
+  }
+  .jobs-table-wrap { overflow: visible; }
+  .jobs-table,
+  .jobs-table tbody { display: block; width: 100%; }
+  .jobs-table thead { display: none; }
+  .jobs-table tbody {
+    display: grid;
+    gap: 0.6rem;
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: 0.6rem;
+    background: var(--surface-muted);
+  }
+  .jobs-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .jobs-table td {
+    display: flex;
+    min-width: 0;
+    min-height: 3.2rem;
+    flex-direction: column;
+    gap: 0.22rem;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.65rem;
+  }
+  .jobs-table td:nth-child(odd) { border-right: 1px solid var(--border-subtle); }
+  .jobs-table td::before {
+    color: var(--text-subtle);
+    content: attr(data-label);
+    font-size: 0.58rem;
+    font-weight: 700;
+  }
+  .jobs-table td strong { white-space: normal; overflow-wrap: anywhere; }
+  .jobs-table__empty { display: block !important; grid-column: 1 / -1; border: 0 !important; }
+  .jobs-table__empty::before { display: none; }
+}
+
+@media (max-width: 430px) {
+  .jobs-summary { grid-template-columns: minmax(0, 1fr); }
+}

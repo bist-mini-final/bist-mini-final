@@ -1,20 +1,34 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from backend.platform.openai.responses import OpenAIResponseResult
 from modules.common.base_module import DocumentContextDTO, QueryContextDTO
+from modules.reader.reader import ContextDTO as ContextDTOModel
 from modules.reader.reader import (
-    ContextDTO,
     LookupCellMetadataInput,
     ReaderConfigDTO,
     ReaderInputDTO,
     ReaderModule,
     safe_calculate_expression,
 )
+
+
+def ContextDTO(**data: Any) -> ContextDTOModel:
+    """Let Pydantic validate mapping-shaped fixtures without weakening production types."""
+    return ContextDTOModel.model_validate(data)
+
+
+def structured_answer(answer_markdown: str, evidence_ids: list[str]) -> str:
+    return json.dumps(
+        {"answer_markdown": answer_markdown, "evidence_ids": evidence_ids},
+        ensure_ascii=False,
+    )
 
 
 def test_safe_calculate_expression():
@@ -49,7 +63,10 @@ def test_reader_tool_calling_execution():
         ),
         OpenAIResponseResult(
             response_id="resp_lookup_answer",
-            content="삼성전자의 손익계산서 B10 셀의 정확한 영업이익은 65,670억원입니다. [Sheet: 손익계산서 | Cell: B10]",
+            content=structured_answer(
+                "삼성전자의 손익계산서 B10 셀의 정확한 영업이익은 65,670억원입니다.",
+                ["EVIDENCE-001"],
+            ),
             usage={"prompt_tokens": 150, "completion_tokens": 30},
             latency_seconds=0.15,
         ),
@@ -101,11 +118,13 @@ def test_reader_tool_calling_execution():
     )
 
     res = reader.execute(input_dto, config=ReaderConfigDTO())
-    ans = res["answer_json"]["answer"]
+    ans = res["answer_json"]["answer_markdown"]
     assert "65,670억원" in ans
-    assert "[Sheet: 손익계산서 | Cell: B10]" in ans
+    assert res["answer_json"]["evidence"][0]["cell_coord"] == "B10"
     assert mock_store.fetch_cells_by_metadata.called
     first_call, continuation = mock_llm.create_response.call_args_list
+    assert first_call.kwargs["text_format"]["name"] == "ReaderEvidenceSelectionDTO"
+    assert first_call.kwargs["text_format"]["strict"] is True
     function_tool = first_call.kwargs["tools"][0]
     assert function_tool["type"] == "function"
     assert function_tool["strict"] is True
@@ -134,7 +153,10 @@ def test_reader_math_tool_calling_execution():
         ),
         OpenAIResponseResult(
             response_id="resp_math_answer",
-            content="영업이익 증가율은 432.97% 입니다. [Sheet: 손익계산서 | Cell: E60, F60]",
+            content=structured_answer(
+                "영업이익 증가율은 432.97% 입니다.",
+                ["EVIDENCE-001", "EVIDENCE-002"],
+            ),
             usage={"prompt_tokens": 140, "completion_tokens": 25},
             latency_seconds=0.15,
         ),
@@ -159,13 +181,22 @@ def test_reader_math_tool_calling_execution():
                     "cell_coord": "E60",
                     "sheet_name": "손익계산서",
                     "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670억",
-                }
+                },
+                {
+                    "cell_coord": "F60",
+                    "sheet_name": "손익계산서",
+                    "source_text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2024 | Cell Value: 350000억",
+                },
             ],
         )
     )
 
     res = reader.execute(input_dto)
-    assert "432.97%" in res["answer_json"]["answer"]
+    assert "432.97%" in res["answer_json"]["answer_markdown"]
+    assert [item["cell_coord"] for item in res["answer_json"]["evidence"]] == [
+        "E60",
+        "F60",
+    ]
 
 
 def test_reader_native_async_response_path() -> None:
@@ -173,7 +204,7 @@ def test_reader_native_async_response_path() -> None:
     mock_llm.create_response_async = AsyncMock(
         return_value=OpenAIResponseResult(
             response_id="resp_async_reader",
-            content="비동기 답변입니다. [Sheet: 손익계산서 | Cell: B10]",
+            content=structured_answer("비동기 답변입니다.", ["EVIDENCE-001"]),
             usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
             latency_seconds=0.05,
         )
@@ -200,7 +231,7 @@ def test_reader_native_async_response_path() -> None:
 
     result = asyncio.run(reader.run_async(input_dto))
 
-    assert result["answer_json"]["answer"].startswith("비동기 답변")
+    assert result["answer_json"]["answer_markdown"].startswith("비동기 답변")
     mock_llm.create_response_async.assert_awaited_once()
 
 
@@ -223,7 +254,10 @@ def test_reader_native_async_cell_lookup_tool_path() -> None:
             ),
             OpenAIResponseResult(
                 response_id="resp_async_answer",
-                content="비동기 조회 결과는 70,000억원입니다. [Sheet: 손익계산서 | Cell: B10]",
+                content=structured_answer(
+                    "비동기 조회 결과는 70,000억원입니다.",
+                    ["EVIDENCE-001"],
+                ),
                 usage={"prompt_tokens": 20, "completion_tokens": 8},
                 latency_seconds=0.03,
             ),
@@ -266,7 +300,7 @@ def test_reader_native_async_cell_lookup_tool_path() -> None:
 
     result = asyncio.run(reader.run_async(input_dto))
 
-    assert "70,000억원" in result["answer_json"]["answer"]
+    assert "70,000억원" in result["answer_json"]["answer_markdown"]
     store.fetch_cells_by_metadata_async.assert_awaited_once()
     store.fetch_cells_by_metadata.assert_not_called()
 
@@ -286,7 +320,8 @@ def test_reader_rejects_numeric_answer_when_no_verifiable_cells_exist():
 
     result = reader.execute(input_dto)
 
-    assert result["answer_json"]["answer"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["answer_markdown"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["evidence"] == []
     assert not mock_llm.create_response.called
 
 
@@ -315,7 +350,8 @@ def test_reader_rejects_header_only_cells_as_evidence() -> None:
 
     result = reader.execute(input_dto)
 
-    assert result["answer_json"]["answer"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["answer_markdown"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["evidence"] == []
     assert not mock_llm.create_response.called
 
 
@@ -323,7 +359,10 @@ def test_reader_prompt_contains_only_value_bearing_cells() -> None:
     mock_llm = MagicMock()
     mock_llm.create_response.return_value = OpenAIResponseResult(
         response_id="resp-value-boundary",
-        content="IBM의 2024년 매출은 62,753입니다. [Sheet: Income_Statement | Cell: O23]",
+        content=structured_answer(
+            "IBM의 2024년 매출은 62,753입니다.",
+            ["EVIDENCE-001"],
+        ),
         usage={"prompt_tokens": 50, "completion_tokens": 15},
         latency_seconds=0.1,
     )
@@ -368,14 +407,21 @@ def test_reader_prompt_contains_only_value_bearing_cells() -> None:
     assert valid in prompt
     assert placeholder not in prompt
     assert "raw retrieval hint must not reach Reader" not in prompt
-    assert "62,753" in result["answer_json"]["answer"]
+    system_prompt = mock_llm.create_response.call_args.kwargs["instructions"]
+    assert "후보 전체를 선택하지 마십시오" in system_prompt
+    assert "출처는 오직 `evidence_ids` 배열" in system_prompt
+    assert "62,753" in result["answer_json"]["answer_markdown"]
+    assert [item["cell_coord"] for item in result["answer_json"]["evidence"]] == ["O23"]
 
 
 def test_reader_rejects_answer_with_an_unsupported_cell_citation():
     mock_llm = MagicMock()
     mock_llm.create_response.return_value = OpenAIResponseResult(
         response_id="resp_answer",
-        content="IBM 총자산은 151,880입니다. [Sheet: Balance Sheet | Cell: Z99]",
+        content=structured_answer(
+            "IBM 총자산은 151,880입니다.",
+            ["EVIDENCE-999"],
+        ),
         usage={"prompt_tokens": 100, "completion_tokens": 20},
         latency_seconds=0.1,
     )
@@ -399,14 +445,15 @@ def test_reader_rejects_answer_with_an_unsupported_cell_citation():
 
     result = reader.execute(input_dto)
 
-    assert result["answer_json"]["answer"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["answer_markdown"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["evidence"] == []
 
 
-def test_reader_appends_verified_evidence_when_model_omits_citations():
+def test_reader_rejects_answer_when_model_omits_selected_citations():
     mock_llm = MagicMock()
     mock_llm.create_response.return_value = OpenAIResponseResult(
         response_id="resp_answer",
-        content="IBM 총자산은 151,880입니다.",
+        content=structured_answer("IBM 총자산은 151,880입니다.", []),
         usage={"prompt_tokens": 100, "completion_tokens": 20},
         latency_seconds=0.1,
     )
@@ -430,5 +477,59 @@ def test_reader_appends_verified_evidence_when_model_omits_citations():
 
     result = reader.execute(input_dto)
 
-    assert "**근거**" in result["answer_json"]["answer"]
-    assert "[Sheet: Balance Sheet | Cell: E50]" in result["answer_json"]["answer"]
+    assert result["answer_json"]["answer_markdown"] == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert result["answer_json"]["evidence"] == []
+
+
+def test_reader_returns_only_model_selected_structured_evidence():
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_selected_evidence",
+        content=structured_answer(
+            "AmeSoft의 2024년 총매출(Total Revenue)은 **12,636**입니다.",
+            ["EVIDENCE-001"],
+        ),
+        usage={"prompt_tokens": 100, "completion_tokens": 20},
+        latency_seconds=0.1,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    sources = [
+        (
+            "O23",
+            "Company: AmeSoft | Sheet: Income Statement | Row Header: Total Revenue | "
+            "Column Header: FY2024 | Cell Value: 12,636",
+        ),
+        (
+            "E16",
+            "Company: AmeSoft | Sheet: Income Statement | Row Header: Revenue Growth | "
+            "Column Header: FY2021 | Cell Value: 9.1%",
+        ),
+        (
+            "F16",
+            "Company: AmeSoft | Sheet: Income Statement | Row Header: Revenue Growth | "
+            "Column Header: FY2022 | Cell Value: 10.2%",
+        ),
+    ]
+    result = reader.execute(
+        ReaderInputDTO(
+            context_json=ContextDTO(
+                query_context=QueryContextDTO(
+                    question_id="q-selected-evidence",
+                    question_text="AmeSoft 2024년 총매출은?",
+                ),
+                document_context=DocumentContextDTO(
+                    file_name="amesoft.xlsm",
+                    workbook_hash="hash-amesoft",
+                ),
+                cells=[
+                    {"cell_coord": coord, "sheet_name": "Income Statement", "source_text": source}
+                    for coord, source in sources
+                ],
+            )
+        )
+    )
+
+    answer = result["answer_json"]["answer_markdown"]
+    assert "Income Statement O23" not in answer
+    assert "**근거**" not in answer
+    assert [item["cell_coord"] for item in result["answer_json"]["evidence"]] == ["O23"]

@@ -18,7 +18,7 @@ flowchart TD
         SUGG["ChatSuggestionService (Dynamic Financial Prompts)"]
         ATTACH["ChatAttachmentService / LocalChatAttachmentStorage"]
         CONV["Conversation Policy (회사 식별 / 일반 질문 / RAG 라우팅)"]
-        GROUND["Grounding Policy (실행 근거 셀 검증 / 인용 보강)"]
+        GROUND["Grounding Policy (실행 근거 셀 검증 / CellEvidenceDTO allowlist)"]
         TABLE_REP["Inline Markdown Table Repair Engine"]
     end
 
@@ -50,15 +50,17 @@ flowchart TD
 * `POST /api/v1/chat/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
 * `GET /api/v1/chat/suggestions`: 동적 스마트 질문 추천
 * `POST /api/v1/chat/suggestions/refresh`: 추천 질문 재생성
-* `GET /api/v1/evidence/cells/resolve`: 답변 셀 인용 query를 원본 workbook·rendered sheet 좌표와 연결
+* `GET /api/v1/evidence/cells/resolve`: 구조화 셀 근거를 원본 workbook·rendered sheet 좌표와 연결
 
 ## 3. 대화 라우팅과 근거 안전성
 
 * 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 chatbot application의 결정적 routing policy가 조율합니다. 기업 수치·실적 조회만 workflow application port를 통해 `rag_query` 실행으로 보냅니다.
 * 검색 서브쿼리의 `Cell Value: ?`는 Dense 유사도 검색용 와일드카드이므로 검색 단계까지 보존합니다. Reader에는 실제 `Cell Value`가 확인된 셀만 전달하며, 원시 검색 힌트나 자리표시자 셀은 Context Blocks·근거·추가 DB 조회 결과에서 모두 제외합니다.
-* RAG 응답은 실행 결과의 `expand-context` 셀 또는 실행 로그에서 복구한 pgvector 셀과 대조합니다. 검증 가능한 셀이 없거나 응답의 셀 인용이 실행 근거와 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
-* 모델이 근거 셀을 사용했지만 인용 표기를 생략한 경우 `grounding.py`가 최대 6개의 `[Sheet: ... | Cell: ...]` 근거를 보강합니다.
-* 프런트엔드는 `chatMarkdown.ts`에서 접힌 GFM 표와 이스케이프 문자를 정규화하고, `shared/markdown/cellCitations.ts`에서 셀 인용과 상세 메타데이터를 분리합니다. 본문에는 `시트 · 셀` 배지만 노출하며 hover 또는 keyboard focus 시 기업, 행 항목, 열 항목, 셀 값 상세를 포털 툴팁으로 표시합니다. 같은 공용 Markdown 렌더러를 챗봇과 Playground Reader 노드가 사용합니다.
+* RAG 응답은 실행 결과의 `expand-context` 셀 또는 실행 로그에서 복구한 pgvector 셀과 대조합니다. 검증 가능한 셀이 없거나 구조화 근거의 collection/workbook/company/sheet/cell identity가 실행 근거와 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
+* `[검증 가능한 근거 셀]`은 LLM이 선택할 수 있는 후보일 뿐이며 자동 노출 목록이 아닙니다. Reader는 strict structured output `ReaderEvidenceSelectionDTO(answer_markdown, evidence_ids)`로 답변의 사실·수치·계산에 실제 사용한 최소 핵심 ID만 선택합니다. 계산 결과는 모든 피연산 셀 ID를 선택합니다.
+* Reader 후처리는 모델이 선택한 ID가 허용된 실제 값 셀인지 전부 검증한 뒤 `CellEvidenceDTO(evidence_id, index_id, workbook_hash, file_name, company_name, sheet_name, cell_coord, row_header, column_header, cell_value, source_text)`로 투영합니다. `answer_markdown`에는 좌표나 `근거` section을 넣지 않으며, 모델이 셀을 선택하지 않거나 허용 목록 밖 ID를 만들면 검색 후보를 임의로 보강하지 않고 답변을 차단합니다.
+* `grounding.py`는 Reader의 `CellEvidenceDTO[]` 전체를 실제 run evidence와 다시 대조합니다. 근거가 없는 답변에 실행 컨텍스트 앞 6개를 자동 첨부하지 않으며 검증된 DTO만 `chat_messages.evidence`에 저장합니다.
+* 프런트엔드는 `chatMarkdown.ts`에서 답변 본문의 접힌 GFM 표와 이스케이프 문자만 정규화합니다. 출처는 Markdown을 정규식 파싱하지 않고 API의 `evidence[]`를 `shared/markdown/cellCitations.ts`가 view model로 투영합니다. 본문 아래에는 `시트 · 셀` 배지만 노출하며 hover 또는 keyboard focus 시 기업, 행 항목, 열 항목, 셀 값을 표시합니다. 같은 공용 렌더러를 챗봇과 Playground Reader 노드가 사용합니다.
 * 셀 배지를 활성화하면 `CellEvidenceProvider`가 resolve API를 호출하고 `CellEvidenceModal`에서 서버가 생성한 원본 sheet PNG를 엽니다. 응답 cell bbox를 강조하며 확대·축소·화면 맞춤·근거 셀 이동과 pointer drag pan을 지원합니다. 인덱스와 workbook 근거 연결이 없으면 임의 이미지를 대체하지 않고 명시적 실패 상태를 표시합니다.
 
 ---
@@ -71,6 +73,7 @@ flowchart TD
 - bootstrap은 `ChatApiServices`에 conversation, suggestion, attachment 유스케이스를 조립하며 presentation은 concrete 저장소나 provider를 생성하지 않습니다.
 - 이전 feature/API 호환 경로는 제거됐고 애플리케이션 내부 import와 구조 계약 테스트는 canonical vertical slice만 사용합니다.
 - `/`는 별도 홈을 렌더링하지 않고 `/chatbot`으로 연결되며 AppShell의 `새 채팅`과 대화 이력이 모든 workspace에서 유지됩니다.
-- Reader 본문은 출처 상세 문자열을 반복 렌더링하지 않고 `Sheet · Cell` 배지를 노출합니다. hover는 요약, click은 셀 근거 modal을 열어 원본 sheet image와 bbox를 검증합니다.
+- Reader 본문과 근거는 `answer_markdown`과 `CellEvidenceDTO[]`의 독립 필드입니다. UI는 DTO에서 `Sheet · Cell` 배지를 만들고 hover는 요약, click은 셀 근거 modal을 열어 원본 sheet image와 bbox를 검증합니다.
+- 근거 배지는 retrieval/context 순서가 아니라 Reader가 답변 작성에 명시적으로 선택하고 backend allowlist 검증을 통과한 셀만 표시합니다.
 - 검색 단계에는 `Cell Value: ?` 후보를 유지하지만 Reader·tool·근거 projection에는 `resolved_cell_value`를 통과한 값만 전달합니다.
 - session/message/evidence DTO 또는 RAG routing policy를 바꾸면 BP-303·BP-501·BP-601과 backend/frontend schema tests를 함께 갱신합니다.

@@ -5,18 +5,28 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from pydantic import ValidationError
 
-def reader_answer(run: Any) -> str | None:
-    """Read the normalized answer text from a completed workflow run."""
+from backend.shared.application.cell_evidence import GroundedAnswerDTO
+
+
+def reader_answer(run: Any) -> GroundedAnswerDTO | None:
+    """Read and validate the Reader's structured answer projection."""
     output = run.nodes.get("read").output if run.nodes.get("read") else None
     if not isinstance(output, dict):
         return None
-    answer = (
-        output.get("answer_json", {}).get("answer")
-        if isinstance(output.get("answer_json"), dict)
-        else None
-    )
-    return answer if isinstance(answer, str) and answer.strip() else None
+    answer = output.get("answer_json")
+    if not isinstance(answer, dict):
+        return None
+    try:
+        return GroundedAnswerDTO.model_validate(
+            {
+                "answer_markdown": answer.get("answer_markdown"),
+                "evidence": answer.get("evidence") or [],
+            }
+        )
+    except ValidationError:
+        return None
 
 
 def repair_inline_markdown_tables(answer: str) -> str:

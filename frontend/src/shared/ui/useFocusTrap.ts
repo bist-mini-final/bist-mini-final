@@ -18,7 +18,7 @@ interface FocusTrapOptions {
   readonly initialFocusSelector?: string;
 }
 
-/** Shares keyboard focus containment between dialogs and mobile navigation. */
+/** Shares keyboard focus containment between dialogs and the mobile menu drawer. */
 export function useFocusTrap({
   active,
   containerRef,

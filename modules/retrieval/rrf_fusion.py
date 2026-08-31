@@ -11,14 +11,14 @@ Example:
         "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
         "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
         "items": [
-          {"rank": 1, "cell_id": "IS_C5", "score": 0.95, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
+          {"rank": 1, "sheet_name": "Income_Statement", "cell_id": "C5", "cell_coord": "C5", "score": 0.95, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
         ]
       },
       "bm25_result": {
         "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
         "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
         "items": [
-          {"rank": 1, "cell_id": "IS_C5", "score": 0.85, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
+          {"rank": 1, "sheet_name": "Income_Statement", "cell_id": "C5", "cell_coord": "C5", "score": 0.85, "text": "Company: 삼성전자 | ...", "matched_subquery": "..."}
         ]
       }
     }
@@ -32,7 +32,7 @@ Example:
       "items": [
         {
           "rank": 1,
-          "cell_id": "IS_C5",
+          "cell_id": "C5",
           "rrf_score": 0.03278,
           "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670",
           "matched_subquery": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: ?"
@@ -73,7 +73,8 @@ from modules.retrieval.pgvector_retriever import (
 
 logger = logging.getLogger(__name__)
 
-CandidateKey = Tuple[str, str, str]
+CellKey = Tuple[str, str, str, str]
+CandidateKey = Tuple[str, str, str, str, str]
 
 
 # ==============================================================================
@@ -84,7 +85,10 @@ class RrfCandidateDTO(ModuleDTO):
 
     rank: int = Field(ge=1, description="RRF 결합 순위")
     index_id: str = Field(min_length=1, description="후보가 속한 collection ID")
-    cell_id: str = Field(min_length=1, description="검색된 셀의 고유 ID")
+    cell_id: str = Field(min_length=1, description="원본 Excel 셀 좌표")
+    company_name: Optional[str] = Field(default=None, description="검색된 셀의 기업명")
+    sheet_name: Optional[str] = Field(default=None, description="원본 Excel 워크시트명")
+    cell_coord: Optional[str] = Field(default=None, description="원본 Excel 셀 좌표")
     rrf_score: float = Field(gt=0, description="Reciprocal Rank Fusion 점수")
     text: str = Field(description="검색된 셀의 직렬화 텍스트")
     matched_subquery: str = Field(description="해당 셀과 매칭된 서브쿼리")
@@ -150,11 +154,20 @@ class RrfFusionModule(BaseModule):
         outputs=["retrieval_json"],
         config_fields=["rrf_k", "top_k", "bm25_weight", "dense_weight"],
         raw_output=True,
-        version="4",
+        version="5",
     )
     input_model = RrfFusionInputDTO
     config_model = RrfFusionConfigDTO
     output_model = RetrievalDTO
+
+    @staticmethod
+    def _cell_key(candidate: RankedSearchCandidateDTO) -> CellKey:
+        return (
+            candidate.index_id,
+            candidate.company_name or "",
+            candidate.sheet_name or "",
+            candidate.cell_coord or candidate.cell_id,
+        )
 
     @staticmethod
     def _validate_contexts(
@@ -191,7 +204,7 @@ class RrfFusionModule(BaseModule):
                 continue
             ranks: Dict[CandidateKey, int] = {}
             for candidate in branch.items:
-                key = (candidate.matched_subquery, candidate.index_id, candidate.cell_id)
+                key = (candidate.matched_subquery, *RrfFusionModule._cell_key(candidate))
                 if key in ranks and ranks[key] <= candidate.rank:
                     continue
                 ranks[key] = candidate.rank
@@ -205,12 +218,18 @@ class RrfFusionModule(BaseModule):
     @staticmethod
     def _best_by_cell(
         fused: Dict[CandidateKey, tuple[float, RankedSearchCandidateDTO]],
-    ) -> Dict[Tuple[str, str], Tuple[float, RankedSearchCandidateDTO]]:
-        best: Dict[Tuple[str, str], Tuple[float, RankedSearchCandidateDTO]] = {}
-        for (_, index_id, cell_id), value in fused.items():
-            current = best.get((index_id, cell_id))
+    ) -> Dict[CellKey, Tuple[float, RankedSearchCandidateDTO]]:
+        best: Dict[CellKey, Tuple[float, RankedSearchCandidateDTO]] = {}
+        for candidate_key, value in fused.items():
+            cell_key: CellKey = (
+                candidate_key[1],
+                candidate_key[2],
+                candidate_key[3],
+                candidate_key[4],
+            )
+            current = best.get(cell_key)
             if current is None or value[0] > current[0]:
-                best[(index_id, cell_id)] = value
+                best[cell_key] = value
         return best
 
     def execute(
@@ -235,6 +254,9 @@ class RrfFusionModule(BaseModule):
                     "rank": rank,
                     "index_id": candidate.index_id,
                     "cell_id": candidate.cell_id,
+                    "company_name": candidate.company_name,
+                    "sheet_name": candidate.sheet_name,
+                    "cell_coord": candidate.cell_coord,
                     "rrf_score": round(score, 10),
                     "text": candidate.text,
                     "matched_subquery": candidate.matched_subquery,

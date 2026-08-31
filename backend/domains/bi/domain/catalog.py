@@ -5,11 +5,12 @@ from typing import Final, Mapping
 
 from .models import MetricId, ValueKind
 
-CATALOG_VERSION: Final = "2"
+CATALOG_VERSION: Final = "3"
 FORMULA_VERSION: Final = "3"
 SOURCE_QUESTION_TEMPLATE: Final = (
     "Find the exact reported value of '{metric_label}' for {period_label} in this financial document. "
     "Match equivalent metric names ({metric_aliases}), period labels, and date-formatted column headers across the entire workbook; prioritize relevant statements such as {statement_hint}, but do not require an exact sheet name. "
+    "Never substitute excluded metrics ({excluded_aliases}) even when they are nearby or numerically equal. "
     "Return the numerical value, currency, scale, and supporting cell_id from the same metric row and requested period. Do not calculate, forecast, or substitute a neighboring period."
 )
 
@@ -128,7 +129,15 @@ METRIC_CATALOG: Final[Mapping[MetricId, MetricDefinition]] = MappingProxyType(
             MetricId.SHORT_TERM_DEBT, "단기차입금", "Short-term Borrowings", "1년 이내 상환할 차입금", ValueKind.AMOUNT, _AUXILIARY,
             ("단기차입금",), ("Short-term Borrowings", "Short-Term Debt", "IQ_ST_DEBT"),
             ("Balance_Sheet", "Capital_Structure_Summary"), ("Short-term Borrowings", "Short-Term Debt"),
-            ("Current Portion of Long-Term Debt",), SignPolicy.AS_REPORTED, _SOURCE,
+            (
+                "Current Portion of Long-Term Debt",
+                "Current Portion of Long Term Debt",
+                "Total Debt Current",
+                "Finance Div. Debt Current",
+                "Finance Division Short Term Debt, Total",
+            ),
+            SignPolicy.AS_REPORTED,
+            _SOURCE,
         ),
         MetricId.CURRENT_PORTION_OF_LONG_TERM_DEBT: SourceMetricDefinition(
             MetricId.CURRENT_PORTION_OF_LONG_TERM_DEBT, "유동성 장기부채", "Current Portion of Long Term Debt", "1년 이내 만기가 도래하는 장기차입금", ValueKind.AMOUNT,

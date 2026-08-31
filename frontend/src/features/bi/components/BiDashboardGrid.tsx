@@ -89,8 +89,8 @@ export function BiDashboardGrid(props: BiDashboardGridProps) {
     compact: createBiGridLayout(props.cards, 'compact', props.isEditing),
   };
   const layoutKey = `${props.cards.map((card) => `${card.rowId}/${card.cardId}`).join(':')}:${layoutRevision}`;
-  const rowHeight = breakpoint === 'wide' ? 20 : breakpoint === 'medium' ? 22 : 24;
-  const margin: [number, number] = breakpoint === 'wide' ? [10, 10] : [12, 12];
+  const rowHeight = breakpoint === 'wide' ? 20 : breakpoint === 'medium' ? 22 : 18;
+  const margin: [number, number] = breakpoint === 'wide' ? [10, 10] : breakpoint === 'medium' ? [12, 12] : [8, 8];
 
   const updateDragPreview = (activeItem: LayoutItem | null, event: Event) => {
     const pointer = getPointerPosition(event);
@@ -150,7 +150,7 @@ export function BiDashboardGrid(props: BiDashboardGridProps) {
   const cardElements = orderedCards.map(({ card: layoutItem, gridItem }) => {
     const definition = getCardDefinition(layoutItem.cardId);
     const displaySize = breakpoint === 'compact'
-      ? layoutItem.size
+      ? (definition.allowedSizes.includes('S') ? 'S' : definition.defaultSize)
       : findNearestCardSize(layoutItem.cardId, gridItem.w, columns);
     const viewModel = buildCardViewModel({
       definition,
@@ -215,7 +215,7 @@ export function BiDashboardGrid(props: BiDashboardGridProps) {
             containerPadding={[0, 0]}
             compactor={verticalCompactor}
             dragConfig={{
-              enabled: props.isEditing,
+              enabled: props.isEditing && breakpoint !== 'compact',
               bounded: true,
               handle: '.bi-card__drag-handle',
               cancel: 'button:not(.bi-card__drag-handle), summary, details, a, [role="button"]',

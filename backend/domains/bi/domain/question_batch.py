@@ -74,6 +74,9 @@ def build_question_batch(plan: BiQuestionBatchPlan) -> BiQuestionBatch:
                                 metric_label=definition.label_en,
                                 metric_aliases=", ".join(definition.aliases_en),
                                 statement_hint=" or ".join(definition.statement_hints),
+                                excluded_aliases=(
+                                    ", ".join(definition.excluded_aliases) or "none"
+                                ),
                             ),
                             status=BiQuestionStatus.QUEUED,
                             attempt_count=0,

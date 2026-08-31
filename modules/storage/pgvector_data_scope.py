@@ -24,6 +24,7 @@ class DataScopeDTO(ModuleDTO):
     file_name: str = Field(min_length=1)
     workbook_hash: str = Field(min_length=1)
     company_name: str = ""
+    ticker: str = ""
     sheet_names: List[str] = Field(default_factory=list)
     model: str = Field(min_length=1)
     dimension: int = Field(gt=0)
@@ -31,7 +32,7 @@ class DataScopeDTO(ModuleDTO):
 
 
 class DataScopeCatalogDTO(ModuleDTO):
-    """All compact scopes that the router is allowed to select."""
+    """All compact scopes that query decomposition is allowed to select."""
 
     collections: List[DataScopeDTO] = Field(default_factory=list)
 
@@ -53,13 +54,13 @@ class PgVectorDataScopeModule(BaseModule):
         category="Source",
         description=(
             "DB의 collection·company·sheet·embedding 계약만 읽어 "
-            "LLM Query Router가 서브쿼리별 검색 범위를 자동 선택하게 합니다."
+            "Query Decomposer가 실제 데이터 범위 안에서 검색 계획을 만들게 합니다."
         ),
         inputs=[],
         outputs=["scope_catalog"],
         config_fields=[],
         cacheable=False,
-        version="1",
+        version="2",
     )
     input_model = PgVectorDataScopeInputDTO
     config_model = EmptyModuleConfigDTO

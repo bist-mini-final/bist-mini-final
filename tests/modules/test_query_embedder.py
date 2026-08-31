@@ -4,8 +4,7 @@ import asyncio
 
 from modules.common.base_module import QueryContextDTO
 from modules.embedding.query_embedder import EmbedderInputDTO, EmbedderModule
-from modules.query.decomposer import SubqueryItem
-from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO
+from modules.query.contracts import RetrievalPlanDTO, RoutedSubqueryDTO, SubqueryItem
 from modules.storage.pgvector_data_scope import DataScopeDTO
 
 

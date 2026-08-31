@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Database, RefreshCw, Sparkles } from 'lucide-react';
 import { Button } from '../../../shared/ui';
+import { VIEWPORT_QUERIES } from '../../../shared/responsive/breakpoints';
+import { useMediaQuery } from '../../../shared/responsive/useMediaQuery';
 import type { PipelineRunState } from '../pipelineTypes';
 import { dataSourceApi } from '../services/dataSourceApi';
 import type { VectorIndexInfo } from '../types';
@@ -52,6 +54,7 @@ export function VectorIndexList({
   onCreateClick,
   onPipelineLogClick,
 }: VectorIndexListProps) {
+  const isMobile = useMediaQuery(VIEWPORT_QUERIES.mobile);
   const [editingIndexId, setEditingIndexId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [savingCompanyIndexId, setSavingCompanyIndexId] = useState<string | null>(null);
@@ -156,6 +159,7 @@ export function VectorIndexList({
               {activePipelines.map((pipeline) => (
                 <ActivePipelineRow
                   key={pipeline.pipelineId}
+                  compact={isMobile}
                   pipeline={pipeline}
                   deleting={deletingPipelineId === pipeline.pipelineId}
                   onView={onViewPipeline}
@@ -165,6 +169,7 @@ export function VectorIndexList({
               {failedRuns.map((run) => (
                 <FailedPipelineRow
                   key={run.pipelineId}
+                  compact={isMobile}
                   run={run}
                   deleting={deletingPipelineId === run.pipelineId}
                   onViewLog={onViewFailedLog}
@@ -174,6 +179,7 @@ export function VectorIndexList({
               {visibleIndexes.map((index) => (
                 <VectorIndexRow
                   key={index.index_id}
+                  compact={isMobile}
                   index={index}
                   editing={editingIndexId === index.index_id}
                   editingName={editingName}

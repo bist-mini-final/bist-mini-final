@@ -15,6 +15,7 @@ import {
 import { getExecutionNodeState, NodeShell } from '../FlowNode/NodeShell';
 import { unwrapModuleOutput } from '../../adapters/moduleOutput';
 import { MarkdownAnswer, normalizeMarkdownTables } from '../MarkdownAnswer';
+import type { StructuredCellEvidence } from '../../../../shared/markdown/cellCitations';
 
 const MODEL_OPTIONS = [
   { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna · 효율 중심' },
@@ -25,6 +26,7 @@ const MODEL_OPTIONS = [
 interface ReaderExecutionOutput extends Record<string, unknown> {
   answer?: string;
   answer_markdown?: string;
+  evidence?: StructuredCellEvidence[];
   model?: string;
   latency_seconds?: number;
   estimated_cost_usd?: number;
@@ -63,7 +65,7 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
     data.executionOutput ?? data.output,
     'answer_json',
   ) ?? {};
-  const answerText = normalizeMarkdownTables(outputPayload.answer ?? outputPayload.answer_markdown ?? '');
+  const answerText = normalizeMarkdownTables(outputPayload.answer_markdown ?? outputPayload.answer ?? '');
   const latency = outputPayload.latency_seconds;
   const cost = outputPayload.estimated_cost_usd;
   const tokens = outputPayload.api_usage?.total_tokens;
@@ -166,7 +168,7 @@ export const ReaderNode = ({ id, data, selected }: ReaderNodeProps) => {
 
           {expanded && (
             <div className="max-h-72 overflow-y-auto rounded-lg border border-rose-100 bg-white p-3 text-xs text-slate-800 select-text">
-              <MarkdownAnswer markdown={answerText} />
+              <MarkdownAnswer markdown={answerText} evidence={outputPayload.evidence ?? []} />
             </div>
           )}
 

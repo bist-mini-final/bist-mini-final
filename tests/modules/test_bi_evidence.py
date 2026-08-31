@@ -131,6 +131,36 @@ def test_metric_reader_rebuilds_context_from_value_bearing_cells() -> None:
     ]
 
 
+def test_metric_reader_rejects_catalog_excluded_metric_rows() -> None:
+    request = REQUEST.model_copy(update={"metric_id": MetricId.SHORT_TERM_DEBT})
+    source_text = (
+        "Company: AmeSoft | Sheet: Balance_Sheet | "
+        "Row Header: Current Portion of Long Term Debt | "
+        "Column Header: 2022-12-31 | Cell Value: 83"
+    )
+    context = BiRetrievedContext(
+        request_id=request.request_id,
+        file_name=SOURCE.file_name,
+        workbook_hash=SOURCE.workbook_hash,
+        index_id=SOURCE.index_id,
+        context_blocks=(source_text,),
+        cells=(
+            BiContextCell(
+                cell_id="M56",
+                sheet_name="Balance_Sheet",
+                cell_coord="M56",
+                source_text=source_text,
+            ),
+        ),
+    )
+    completion = MagicMock()
+
+    result = BiMetricReader(completion, "test-model").read(request, context)
+
+    assert result == ReaderContractFailure(code="verifiable_evidence_missing")
+    completion.complete_structured.assert_not_called()
+
+
 class _Retriever:
     def retrieve(self, request: BiRetrievalRequest) -> BiRetrievedContext:
         return _context(
@@ -174,3 +204,40 @@ def test_extraction_rejects_available_result_backed_only_by_placeholder() -> Non
 
     assert result.observation.status is MetricStatus.INVALID
     assert result.observation.reason == "available_evidence_missing"
+
+
+def test_trusted_evidence_keeps_first_cell_when_raw_ids_collide() -> None:
+    first = (
+        "Company: AmeSoft | Sheet: Income_Statement | Row Header: Operating Income | "
+        "Column Header: 2024-12-31 | Cell Value: 1730"
+    )
+    second = (
+        "Company: AmeSoft | Sheet: Other | Row Header: Other Metric | "
+        "Column Header: 2024-12-31 | Cell Value: 99"
+    )
+    context = BiRetrievedContext(
+        request_id=REQUEST.request_id,
+        file_name=SOURCE.file_name,
+        workbook_hash=SOURCE.workbook_hash,
+        index_id=SOURCE.index_id,
+        context_blocks=(first, second),
+        cells=(
+            BiContextCell(
+                cell_id="O43",
+                sheet_name="Income_Statement",
+                cell_coord="O43",
+                source_text=first,
+            ),
+            BiContextCell(
+                cell_id="O43",
+                sheet_name="Other",
+                cell_coord="O43",
+                source_text=second,
+            ),
+        ),
+    )
+
+    evidence = BiMetricExtractionService._trusted_evidence(context, ("O43",))
+
+    assert evidence[0].sheet_name == "Income_Statement"
+    assert evidence[0].source_text == first

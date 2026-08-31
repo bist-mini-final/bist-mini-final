@@ -52,7 +52,7 @@ class ChatSessionRepository(SyncPostgresRepository):
                 if session is None:
                     return None
                 cursor.execute(
-                    """SELECT message_id, role, content, status, workflow_run_id, visualization, attachments, created_at
+                    """SELECT message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at
                     FROM chat_messages WHERE session_id = %s ORDER BY created_at ASC""",
                     (session_id,),
                 )
@@ -179,7 +179,7 @@ class ChatSessionRepository(SyncPostgresRepository):
                 cursor.execute(
                     """INSERT INTO chat_messages (message_id, session_id, role, content, status, workflow_run_id, visualization)
                     VALUES (%s, %s, 'assistant', '', 'processing', %s, %s)
-                    RETURNING message_id, role, content, status, workflow_run_id, visualization, attachments, created_at""",
+                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at""",
                     (
                         assistant_id,
                         session_id,
@@ -194,7 +194,7 @@ class ChatSessionRepository(SyncPostgresRepository):
                     (content[:80], session_id),
                 )
             connection.commit()
-        return {"assistant_message": assistant, "run_id": run_id}
+        return {"assistant_message": assistant, "run_id": run_id, "mode": "rag"}
 
     def create_direct_turn(
         self,
@@ -212,7 +212,7 @@ class ChatSessionRepository(SyncPostgresRepository):
                 )
                 cursor.execute(
                     """INSERT INTO chat_messages (message_id, session_id, role, content, status) VALUES (%s, %s, 'assistant', %s, 'completed')
-                    RETURNING message_id, role, content, status, workflow_run_id, visualization, attachments, created_at""",
+                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at""",
                     (assistant_id, session_id, answer),
                 )
                 assistant = self._message_payload(dict(cursor.fetchone()))
@@ -229,16 +229,23 @@ class ChatSessionRepository(SyncPostgresRepository):
         status: str,
         content: str,
         *,
+        evidence: list[dict[str, Any]] | None = None,
         suppress_visualization: bool = False,
     ) -> dict[str, Any] | None:
         with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
-                    """UPDATE chat_messages SET status = %s, content = %s,
+                    """UPDATE chat_messages SET status = %s, content = %s, evidence = %s,
                     visualization = CASE WHEN %s THEN NULL ELSE visualization END
                     WHERE workflow_run_id = %s
-                    RETURNING message_id, role, content, status, workflow_run_id, visualization, attachments, created_at""",
-                    (status, content, suppress_visualization, run_id),
+                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at""",
+                    (
+                        status,
+                        content,
+                        psycopg2.extras.Json(evidence or []),
+                        suppress_visualization,
+                        run_id,
+                    ),
                 )
                 row = cursor.fetchone()
             connection.commit()
@@ -273,6 +280,7 @@ class ChatSessionRepository(SyncPostgresRepository):
             "status": row["status"],
             "run_id": row["workflow_run_id"],
             "visualization": row.get("visualization"),
+            "evidence": row.get("evidence") or [],
             "attachments": row.get("attachments") or [],
             "created_at": row["created_at"].isoformat(),
         }

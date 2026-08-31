@@ -19,11 +19,11 @@
 
 | 도메인 | 테이블 | 역할 |
 | :--- | :--- | :--- |
-| Data/Vector | `source_files`, `sheets` | 업로드 원본과 시트 메타데이터 |
+| Data/Vector | `source_files`, `sheets`, `workbook_profiles` | 업로드 원본, 시트 구조와 workbook 공통 의미 프로필 |
 | Data/Vector | `langchain_pg_collection`, `langchain_pg_embedding` | collection과 3072d embedding/metadata |
 | Workflow | `workflow_runs`, `node_execution_logs` | durable run queue, lease/heartbeat, 노드 실행 이력 |
 | Ingestion | `ingestion_shards` | embedding/vector COPY child queue, lease, retry, usage |
-| BI | `bi_companies`, `bi_document_profiles` | 기업 current snapshot pointer와 문서 프로파일 |
+| BI | `bi_companies` | 기업 current snapshot pointer |
 | BI | `bi_materialization_jobs`, `bi_questions`, `bi_answers` | materialization/question durable 작업과 결과 |
 | BI | `bi_dashboard_snapshots` | 기업별 불변 BI dashboard payload |
 | Chat | `chat_sessions`, `chat_messages`, `chat_attachments`, `chat_suggested_questions` | 대화와 첨부·추천 질문 |
@@ -38,12 +38,12 @@
 ```mermaid
 erDiagram
     source_files ||--o{ sheets : contains
+    source_files ||--o{ workbook_profiles : derives
     langchain_pg_collection ||--o{ langchain_pg_embedding : contains
     workflow_runs ||--o{ node_execution_logs : records
 
     bi_companies ||--o{ bi_materialization_jobs : schedules
     bi_companies ||--o{ bi_dashboard_snapshots : publishes
-    bi_companies ||--o{ bi_document_profiles : profiles
     bi_materialization_jobs ||--o{ bi_questions : dispatches
     bi_questions ||--|| bi_answers : produces
 
@@ -56,6 +56,10 @@ erDiagram
 ```
 
 `bi_companies.current_snapshot_id`는 BI 전용 current dashboard를 가리킵니다. `domain_snapshot_heads`는 Company Comparison처럼 공통 저장 수명주기를 쓰는 도메인의 `(domain, scope_key)`별 current pointer입니다. 두 저장 모델을 같은 계산 도메인으로 해석하면 안 됩니다.
+
+`workbook_profiles`는 `(workbook_hash, index_id, profile_version)`별 JSON profile과 `ready|partial` 상태를 저장합니다. 원본 통화·배율·FY/LTM·시트 역할 및 좌표 근거는 data sources가 소유하며 BI는 adapter로 읽습니다. 셀별 `cmetadata`에는 이 전역 값을 반복 저장하지 않고 좌표·header·value·variant·lineage만 유지합니다.
+
+`chat_messages.evidence`는 assistant 답변 본문과 독립된 JSONB 배열이며 기본값은 `[]`입니다. 저장 전 chatbot application은 각 항목을 공유 `CellEvidenceDTO`로 검증하고 해당 RAG run이 실제로 확장한 collection/workbook/company/sheet/cell identity allowlist와 대조합니다. Markdown 인용 문자열은 근거의 canonical 저장 형식이 아닙니다.
 
 ---
 
@@ -115,6 +119,8 @@ domain_snapshot_heads(
 | `20260828_0003` | 재사용 가능한 `domain_snapshots`, `domain_snapshot_heads` |
 | `20260828_0004` | head가 같은 domain/scope snapshot만 참조하도록 복합 FK 강화 |
 | `20260829_0005` | 분산 Excel embedding/vector COPY용 `ingestion_shards` durable queue |
+| `20260831_0006` | BI 전용 profile cache를 폐기하고 data sources 소유 `workbook_profiles` 도입 |
+| `20260831_0007` | `chat_messages.evidence` 구조화 셀 근거 JSONB 추가 |
 
 새 배포는 애플리케이션 시작 전에 `alembic upgrade head`를 완료해야 합니다. 애플리케이션의 idempotent schema initializer는 개발·호환 안전망이지 migration을 대체하지 않습니다.
 
@@ -127,5 +133,5 @@ domain_snapshot_heads(
 - cross-domain foreign key는 aggregate 수명주기를 실제로 공유할 때만 허용하고 편의 join을 위해 repository 소유권을 섞지 않습니다.
 - production schema 변경은 Alembic만 수행하며 bootstrap schema composer는 개발·테스트 초기화와 drift 검증 보조 경로로만 관리합니다.
 - data sources, workflow, chatbot, BI와 benchmark schema/repository 소유권은 각 vertical slice에 있고 migration baseline은 domain schema fragment를 명시적으로 결합합니다. 수평 storage facade는 제거됐습니다.
-- 현재 선형 revision은 `20260827_0001`부터 `20260829_0005`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
+- 현재 선형 revision은 `20260827_0001`부터 `20260831_0007`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
 - table/constraint/index/queue column을 바꾸면 domain schema fragment, Alembic upgrade/downgrade, repository/model, BP-103/BP-501과 migration tests를 같은 변경에서 갱신합니다.

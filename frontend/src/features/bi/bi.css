@@ -746,13 +746,35 @@
 }
 .bi-dialog .bi-snapshot-candidate { display: grid; grid-template-columns: minmax(0, 1fr) auto 1.25rem; }
 .bi-dialog .bi-snapshot-candidate:disabled { cursor: wait; opacity: 0.72; }
+.bi-dialog .bi-snapshot-candidate[aria-selected='true'] {
+  border-color: var(--brand-300);
+  background: color-mix(in srgb, var(--brand-50) 78%, var(--surface));
+  color: var(--text);
+  box-shadow: inset 0.2rem 0 var(--brand-600), 0 0.35rem 0.9rem -0.75rem rgb(13 99 63 / 48%);
+}
 .bi-snapshot-candidate__identity { display: grid; min-inline-size: 0; gap: 0.2rem; }
 .bi-snapshot-candidate__identity strong,
 .bi-snapshot-candidate__identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bi-snapshot-candidate__identity strong { font-size: 0.76rem; }
 .bi-snapshot-candidate__identity small { color: var(--text-muted); font-size: 0.64rem; font-weight: 500; }
 .bi-snapshot-candidate__status { font-size: 0.62rem !important; }
-.bi-company-option[aria-selected='true'] .bi-snapshot-candidate__identity small { color: color-mix(in srgb, var(--surface) 76%, transparent); }
+.bi-dialog .bi-snapshot-candidate[aria-selected='true'] .bi-snapshot-candidate__identity strong { color: var(--brand-700); }
+.bi-dialog .bi-snapshot-candidate[aria-selected='true'] .bi-snapshot-candidate__identity small { color: var(--text-muted); }
+.bi-snapshot-candidate__selection {
+  display: grid;
+  inline-size: 1.2rem;
+  block-size: 1.2rem;
+  place-items: center;
+  overflow: visible !important;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: transparent !important;
+}
+.bi-dialog .bi-snapshot-candidate[aria-selected='true'] .bi-snapshot-candidate__selection {
+  border-color: var(--brand-600);
+  background: var(--brand-600);
+  color: var(--text-inverse) !important;
+}
 .bi-card-library, .bi-evidence-list { display: grid; gap: 0.5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
 .bi-card-library li, .bi-evidence-list li { display: flex; min-inline-size: 0; align-items: center; justify-content: space-between; gap: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; }
 .bi-card-library li > div, .bi-evidence-list li > div { display: grid; min-inline-size: 0; gap: 0.25rem; }
@@ -773,15 +795,7 @@
 
 @media (max-width: 900px) {
   .bi-page::before {
-    position: fixed;
-    z-index: 40;
-    inset: 0 0 auto;
-    block-size: 4rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-    background: color-mix(in srgb, var(--surface) 94%, transparent);
-    box-shadow: 0 0.35rem 1rem var(--bi-rail-shadow);
-    content: '';
-    backdrop-filter: blur(0.6rem);
+    display: none;
   }
   .bi-header { padding: 1rem; }
   .bi-page__workspace { gap: 0.75rem; margin-top: 0.75rem; }
@@ -791,8 +805,16 @@
 }
 
 @media (max-width: 767px) {
+  .bi-page { padding-bottom: 0.25rem; }
   .bi-header__metadata { grid-template-columns: minmax(0, 1fr); }
-  .bi-toolbar { align-items: stretch; flex-direction: column; }
+  .bi-toolbar {
+    position: sticky;
+    z-index: 6;
+    top: 0;
+    align-items: stretch;
+    flex-direction: column;
+    box-shadow: 0 0.5rem 1.2rem -1rem rgb(13 54 34 / 42%);
+  }
   .bi-toolbar__period { align-items: flex-start; flex-direction: column; }
   .bi-toolbar__actions { justify-content: flex-start; }
   .bi-company-selector { align-items: stretch; flex-direction: column; }
@@ -804,6 +826,7 @@
   .bi-card__actions { justify-content: flex-start; }
   .bi-card__deferred-note { text-align: left; }
   .bi-financial-scale-chart { grid-template-columns: minmax(7.5rem, 0.85fr) minmax(0, 1.15fr); }
+  .bi-card__drag-handle { display: none; }
 }
 
 @media (max-width: 420px) {
@@ -849,3 +872,30 @@
 .bi-card:hover { border-color: var(--brand-200); box-shadow: var(--shadow-card-hover); }
 .bi-dialog { border-radius: var(--radius-xl); box-shadow: var(--shadow-dialog); }
 .bi-dialog::backdrop { backdrop-filter: blur(4px); }
+
+@media (max-width: 767px) {
+  .bi-company-dialog {
+    inset: auto 0 0;
+    inline-size: 100%;
+    max-block-size: min(82dvh, 42rem);
+    transform: none;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  }
+  .bi-company-list { max-block-size: 52dvh; }
+  .bi-snapshot-manager-dialog {
+    position: fixed;
+    z-index: 55;
+    inset: auto 0 calc(4.3rem + env(safe-area-inset-bottom));
+    inline-size: 100%;
+    max-block-size: min(72dvh, 38rem);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: 1rem;
+    box-shadow: 0 -1.5rem 4rem -2rem rgb(10 30 20 / 55%);
+  }
+  .bi-dialog .bi-snapshot-candidate {
+    min-block-size: 3.5rem;
+    grid-template-columns: minmax(0, 1fr) auto 1.25rem;
+  }
+  .bi-dialog__actions .ui-button { flex: 1; }
+}

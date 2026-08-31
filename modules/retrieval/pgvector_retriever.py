@@ -28,7 +28,10 @@ class RankedSearchCandidateDTO(ModuleDTO):
 
     rank: int = Field(ge=1, description="유사도 순위 (1부터 시작)")
     index_id: str = Field(min_length=1, description="검색된 pgvector 컬렉션 ID")
-    cell_id: str = Field(min_length=1, description="고유 셀 식별자 (Sheet!Coord)")
+    cell_id: str = Field(min_length=1, description="원본 Excel 셀 좌표")
+    company_name: Optional[str] = Field(default=None, description="검색된 셀의 기업명")
+    sheet_name: Optional[str] = Field(default=None, description="원본 Excel 워크시트명")
+    cell_coord: Optional[str] = Field(default=None, description="원본 Excel 셀 좌표")
     score: float = Field(..., description="코사인 유사도 또는 벡터 거리 점수")
     text: str = Field(..., description="직렬화된 셀 텍스트 (Company, Sheet, Row, Col, Value)")
     matched_subquery: str = Field(..., description="매칭된 원본 서브쿼리 텍스트")
@@ -93,14 +96,14 @@ class PgVectorRetrieverModule(BaseModule):
         label="PostgreSQL pgvector Retriever",
         category="Logic",
         description=(
-            "Router가 서브쿼리별로 지정한 collection만 HNSW 검색하고 "
+            "Decomposer가 서브쿼리별로 지정한 collection만 HNSW 검색하고 "
             "company/sheet 조건을 SQL에 푸시다운합니다."
         ),
         inputs=["query_input"],
         outputs=["dense_result"],
         config_fields=["top_k"],
         raw_output=True,
-        version="3",
+        version="4",
     )
     input_model = PgVectorRetrieverInputDTO
     config_model = PgVectorRetrieverConfigDTO
@@ -157,6 +160,9 @@ class PgVectorRetrieverModule(BaseModule):
                     {
                         "index_id": item.collection.index_id,
                         "cell_id": str(persistent_id),
+                        "company_name": str(metadata.get("company_name") or "") or None,
+                        "sheet_name": str(metadata.get("sheet_name") or "") or None,
+                        "cell_coord": str(metadata.get("cell_coord") or "") or None,
                         "text": text,
                         "matched_subquery": query_text,
                     },
@@ -194,11 +200,19 @@ class PgVectorRetrieverModule(BaseModule):
         cfg: PgVectorRetrieverConfigDTO,
         search_results: List[Tuple[int, str, List[Tuple[float, Dict[str, Any]]]]],
     ) -> Dict[str, Any]:
-        best_by_subquery: Dict[int, Dict[Tuple[str, str], Tuple[float, Dict[str, Any]]]] = {}
+        best_by_subquery: Dict[
+            int,
+            Dict[Tuple[str, str, str, str], Tuple[float, Dict[str, Any]]],
+        ] = {}
         for subquery_index, _, hits in search_results:
             best = best_by_subquery.setdefault(subquery_index, {})
             for score, hit in hits:
-                key = (hit["index_id"], hit["cell_id"])
+                key = (
+                    hit["index_id"],
+                    hit["company_name"] or "",
+                    hit["sheet_name"] or "",
+                    hit["cell_coord"] or hit["cell_id"],
+                )
                 if key not in best or score > best[key][0]:
                     best[key] = (score, hit)
 
@@ -213,6 +227,9 @@ class PgVectorRetrieverModule(BaseModule):
                     "rank": rank,
                     "index_id": hit["index_id"],
                     "cell_id": hit["cell_id"],
+                    "company_name": hit["company_name"],
+                    "sheet_name": hit["sheet_name"],
+                    "cell_coord": hit["cell_coord"],
                     "score": round(score, 6),
                     "text": hit["text"],
                     "matched_subquery": hit["matched_subquery"],

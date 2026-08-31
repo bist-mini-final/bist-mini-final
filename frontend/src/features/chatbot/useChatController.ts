@@ -229,6 +229,7 @@ export function useChatController() {
         status: 'completed',
         run_id: null,
         visualization: null,
+        evidence: [],
         attachments: uploadedAttachment ? [uploadedAttachment] : [],
         created_at: new Date().toISOString(),
       };
@@ -296,6 +297,7 @@ export function useChatController() {
             status: 'failed',
             run_id: null,
             visualization: null,
+            evidence: [],
             attachments: [],
             created_at: new Date().toISOString(),
           }],
