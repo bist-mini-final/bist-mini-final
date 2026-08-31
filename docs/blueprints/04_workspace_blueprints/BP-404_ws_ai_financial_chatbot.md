@@ -48,6 +48,7 @@ flowchart TD
 * `POST /api/v1/chat/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
 * `GET /api/v1/chat/suggestions`: 동적 스마트 질문 추천
 * `POST /api/v1/chat/suggestions/refresh`: 추천 질문 재생성
+* `POST /api/v1/evidence/cells/resolve`: 답변 셀 인용을 원본 workbook·rendered sheet 좌표와 연결
 
 ## 3. 대화 라우팅과 근거 안전성
 
@@ -56,3 +57,4 @@ flowchart TD
 * RAG 응답은 실행 결과의 `expand-context` 셀 또는 실행 로그에서 복구한 pgvector 셀과 대조합니다. 검증 가능한 셀이 없거나 응답의 셀 인용이 실행 근거와 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
 * 모델이 근거 셀을 사용했지만 인용 표기를 생략한 경우 `grounding.py`가 최대 6개의 `[Sheet: ... | Cell: ...]` 근거를 보강합니다.
 * 프런트엔드는 `chatMarkdown.ts`에서 접힌 GFM 표와 이스케이프 문자를 정규화하고, `shared/markdown/cellCitations.ts`에서 셀 인용과 상세 메타데이터를 분리합니다. 본문에는 `시트 · 셀` 배지만 노출하며 hover 또는 keyboard focus 시 기업, 행 항목, 열 항목, 셀 값 상세를 포털 툴팁으로 표시합니다. 같은 공용 Markdown 렌더러를 챗봇과 Playground Reader 노드가 사용합니다.
+* 셀 배지를 활성화하면 `CellEvidenceProvider`가 resolve API를 호출하고 `CellEvidenceModal`에서 서버가 생성한 원본 sheet PNG를 엽니다. 응답 cell bbox를 강조하며 확대·축소·화면 맞춤·근거 셀 이동과 pointer drag pan을 지원합니다. 인덱스와 workbook 근거 연결이 없으면 임의 이미지를 대체하지 않고 명시적 실패 상태를 표시합니다.

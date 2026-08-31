@@ -44,7 +44,7 @@ flowchart TD
 
 ```text
 backend/
-├── api/                         # FastAPI presentation, DTO, SSE, error mapping
+├── api/                         # FastAPI presentation, focused controller, DTO, SSE, error mapping
 ├── bootstrap/                   # process lifecycle와 concrete dependency 조립
 ├── domains/
 │   ├── workflow/
@@ -64,13 +64,13 @@ backend/
 ├── shared/
 │   ├── domain/                  # ApplicationError 공통 계층
 │   └── infrastructure/          # DB base repository, correlation context
-├── features/                    # 기존 모델/adapter와 non-breaking compatibility facade
+├── features/                    # BI·benchmark·chat infrastructure와 계산 구현
 ├── providers/                   # OpenAI/Kubernetes 등 외부 시스템 adapter
 └── storage/                     # SQL facade, focused repository mixin, artifact 구현
 modules/                         # pin DTO를 가진 pipeline plugin units
 ```
 
-`backend/features`와 `backend/storage`는 공개 API·DB·저장 데이터 호환성을 보존하는 infrastructure 및 계산 구현을 포함합니다. 정식 route는 `backend/api`, 유스케이스는 `backend/domains`, 새 pgvector 소비 경계는 `backend/platform/pgvector`를 기준으로 합니다. SQL facade 내부도 `backend/storage/repositories`의 source-file, workflow-run, retrieval capability로 분리되어 있습니다.
+`backend/features`와 `backend/storage`는 공개 API·DB·저장 데이터 호환성을 보존하는 infrastructure 및 계산 구현을 포함합니다. 정식 route는 `backend/api`, 유스케이스는 `backend/domains`, 새 pgvector 소비 경계는 `backend/platform/pgvector`를 기준으로 합니다. Data Sources HTTP는 file/index/ingestion/database router와 controller로 나뉘며 route 함수는 HTTP 바인딩만 담당합니다. SQL facade 내부도 `backend/storage/repositories`의 source-file, workflow queue/state/history, pgvector catalog/write/retrieval capability로 분리되어 있습니다.
 
 ---
 
@@ -78,7 +78,7 @@ modules/                         # pin DTO를 가진 pipeline plugin units
 
 | 경계 | 책임 | 대표 구현 |
 | :--- | :--- | :--- |
-| Presentation | `/api/v1`, Pydantic 입력, status code, SSE, 표준 오류 envelope | `backend/api/*_routes.py`, `workflow_controller.py`, `exception_handlers.py` |
+| Presentation | `/api/v1`, Pydantic 입력, status code, SSE, 표준 오류 envelope | `backend/api/*_routes.py`, `workflow_controller.py`, `data_source_controller.py`, `data_source_ingestion_controller.py`, `exception_handlers.py` |
 | Domain | 프레임워크와 저장소에 독립적인 상태·오류·값 규칙 | `workflow/domain/state.py`, `workflow/domain/errors.py` |
 | Application | 유스케이스 orchestration과 요구 port | `GraphValidator`, `WorkflowInputAssembler`, `DataSourceFileService`, `BiApplicationService`, `CompanyComparisonService`, `ChatConversationService`, `BenchmarkApplicationService` |
 | Engine | DAG 실행, durable queue, worker lease와 retry/timeout policy | `WorkflowExecutor`, `WorkflowBatchRunner`, `WorkflowNodeRunner`, `KubernetesQueueDispatcher`, `LeasedWorker` |
@@ -91,9 +91,9 @@ modules/                         # pin DTO를 가진 pipeline plugin units
 ## 4. 저장소와 pgvector 경계
 
 - `SyncPostgresRepository`와 `AsyncPostgresRepository`가 connection/transaction 수명주기를 공개 메서드로 제공합니다. feature repository가 `DatabaseManager._raw_connection()`에 접근하지 않습니다.
-- `PgVectorCatalogRepository`, `PgVectorIngestionRepository`, `PgVectorRetrievalRepository`는 서로 다른 capability를 노출합니다.
+- `PgVectorCatalogRepository`, `PgVectorIngestionRepository`, `PgVectorRetrievalRepository`는 서로 다른 외부 capability를 노출합니다. 내부 facade도 `PgVectorCatalogMixin`, `PgVectorWriteMixin`, `PgVectorRetrievalMixin`으로 같은 책임 경계를 유지합니다.
 - pipeline module은 `backend.storage.pgvector_store`를 import하지 않고 module port에만 의존합니다.
-- `DatabaseManager`는 `SourceFileRepositoryMixin`과 `WorkflowRunRepositoryMixin`을 조합하고, `PgVectorStore`는 `PgVectorRetrievalMixin`을 조합하는 하위 호환 facade입니다. 외부 호출 경로는 유지하되 저장 책임별 파일 경계를 갖습니다.
+- `DatabaseManager`는 `SourceFileRepositoryMixin`과 `WorkflowRunRepositoryMixin`을 조합합니다. workflow facade는 다시 queue, state, history capability를 조합합니다. `PgVectorStore`는 catalog, write, retrieval mixin을 조합하는 하위 호환 facade입니다. 외부 호출 경로는 유지하되 저장 책임별 파일 경계를 갖습니다.
 - 동적 SQL 식별자는 driver의 SQL composition API를 사용하고 값은 parameter binding을 사용합니다.
 
 ---
@@ -122,6 +122,7 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - 동기 `RunStore`, 파일 해시·이동, openpyxl 파싱은 worker thread 또는 one-shot worker로 격리합니다.
 - DAG의 동일 위상 batch는 `TaskGroup`으로 병렬 실행하되 timeout/상태 병합 계약을 지킵니다.
 - PostgreSQL 상태를 먼저 확정하고 Redis는 변경 알림으로만 사용합니다.
+- `OpenAIResponsesClient`는 sync/async transport, 응답 파싱과 연결 종료를 소유하고 `BaseLLMModule`은 structured/text/agentic 호출의 usage·latency·tool round lifecycle을 공유합니다.
 
 ---
 
@@ -135,5 +136,6 @@ HTTP와 worker는 `ObservabilityContext`를 통해 `request_id`, `run_id`, `job_
 - 동일 수명주기의 one-shot worker는 `LeasedWorker` 상속.
 - BI와 Company Comparison 계산을 공통 base service로 합치지 않음. 공유 대상은 versioned snapshot 저장 수명주기와 infrastructure primitive뿐임.
 - 공개 API·DB schema·저장 데이터는 구조 리팩토링만으로 변경하지 않음.
+- 함수별 cyclomatic complexity는 10 이하를 기본으로 하며 현재 legacy C901 예외는 없음.
 
 이 규칙은 [`tests/modules/test_architecture_contracts.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_architecture_contracts.py)와 Ruff/Pyright로 검증합니다.

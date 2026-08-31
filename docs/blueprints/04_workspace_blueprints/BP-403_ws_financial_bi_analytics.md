@@ -29,7 +29,7 @@ flowchart LR
 
 ## 2. 21개 지표 계약
 
-현재 목록은 `backend/features/bi/models.py::MetricId`와 `catalog.py::METRIC_CATALOG`가 결정합니다.
+현재 목록은 `backend/domains/bi/domain/models.py::MetricId`와 `backend/domains/bi/domain/catalog.py::METRIC_CATALOG`가 결정합니다.
 
 | 종류 | 지표 |
 | :--- | :--- |

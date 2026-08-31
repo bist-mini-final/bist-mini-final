@@ -63,6 +63,8 @@ classDiagram
 
 정확한 Input·Config·Output JSON Schema는 실행 중인 API의 `GET /api/v1/modules`, `GET /api/v1/modules/{module_type}`, `GET /api/v1/modules/schemas`를 단일 계약으로 사용합니다. 문서에 DTO 필드를 중복 복사하지 않아 코드 변경과의 드리프트를 방지합니다.
 
+복잡한 module은 `execute()` 안에서 저장소·파일·provider 단계를 섞지 않습니다. 현재 구조 감지는 `PreparedSheet` 전처리 계약과 `SheetAnalysisBatch` 병렬 결과 계약으로 분리되고, 시트 메타데이터 저장은 대상 시트 결정 → workbook 차원 측정 → persistence record 조립 → 저장 순서를 독립 메서드로 유지합니다. 공통 상속은 `BaseModule`, `BaseLLMModule`, `BaseEmbeddingModule`처럼 실제 lifecycle과 불변식을 공유할 때만 사용합니다.
+
 ## 3. 제품 도메인 서비스와의 관계
 
 | 도메인 | 주요 서비스 | 모듈과의 관계 |
@@ -78,3 +80,4 @@ classDiagram
 2. 신규 제품 도메인 서비스를 모듈 개수에 포함하지 않습니다.
 3. 로컬 VLM과 Cross-Encoder reranker는 범위에서 제외합니다. 원격 vision 모듈과 Dense + keyword + RRF 경로가 현재 기준선입니다.
 4. 자동 스캔보다 명시적 factory 등록을 유지하여 provider·storage 의존성 주입과 등록 순서를 코드 리뷰 가능하게 보존합니다.
+5. `backend/cli/documentation/module_docs.py`가 Pydantic schema에서 예시와 Markdown을 생성하므로 생성 문서를 직접 수정하지 않습니다.

@@ -39,8 +39,10 @@
 
 - `backend/api`는 HTTP presentation과 오류 매핑만 소유한다.
 - `backend/domains/<domain>/application`은 유스케이스와 port를, `domain`은 순수 상태·오류 규칙을 소유한다. 현재 명시 도메인은 workflow, data sources, BI, chatbot, benchmark, company comparison이다.
-- `backend/platform/pgvector`와 `backend/shared/infrastructure/database`가 좁은 저장소 adapter 경계를 제공한다. `DatabaseManager`는 source-file/workflow-run repository capability를, `PgVectorStore`는 retrieval capability를 조합하는 하위 호환 facade다.
-- `backend/bootstrap`만 concrete adapter를 조립한다. 정식 HTTP 진입점은 `backend/api`, application 진입점은 `backend/domains`이며 `backend/features`는 남은 infrastructure·계산 구현만 보유한다.
+- `backend/platform/pgvector`와 `backend/shared/infrastructure/database`가 좁은 저장소 adapter 경계를 제공한다. `DatabaseManager`는 source-file과 workflow queue/state/history capability를, `PgVectorStore`는 catalog/write/retrieval capability를 조합하는 하위 호환 facade다.
+- `backend/bootstrap`만 concrete adapter를 조립한다. 정식 HTTP 진입점은 `backend/api`, application 진입점은 `backend/domains`이며 `backend/features`는 infrastructure·계산 구현만 보유한다. Data Sources presentation은 file/index/ingestion/database router와 focused controller로 분리되어 있다.
+- OpenAI Responses 호출은 provider가 transport와 응답 파싱을, `BaseLLMModule`이 structured/text/agentic module lifecycle과 usage 집계를 소유한다.
+- spreadsheet 구조 감지는 전처리된 시트 계약, 병렬 분석 batch, 범위 정규화 단계를 분리하며 renderer는 값 포맷·fill·border·text 배치를 독립 helper로 유지한다.
 - one-shot queue worker는 `LeasedWorker` template method를 상속해 claim, heartbeat, terminal transition을 공유한다. pause/cancel 같은 별도 상태 기계를 가진 worker는 공통 lease primitive만 재사용한다.
 - HTTP와 worker는 request/run/job/worker correlation context를 공유한다.
 
@@ -48,9 +50,10 @@
 
 2026-08-31 로컬 전체 검증 결과:
 
-- Backend: 224 passed, 2 skipped
+- Backend: 235 passed, 2 skipped
 - Frontend: 168 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
+- Backend C901 migration budget: 0개(새 복잡도 hotspot 즉시 실패)
 - Kubernetes renderer: 6개 `ScaledJob`
 
 테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다.
