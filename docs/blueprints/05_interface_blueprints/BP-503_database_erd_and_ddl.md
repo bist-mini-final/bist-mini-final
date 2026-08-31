@@ -1,7 +1,7 @@
 # [BP-503] PostgreSQL·pgvector 물리 스키마
-> **Document Code:** `BP-503` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-503` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/shared/application`, `backend/platform/postgres`, `backend/domains/*/infrastructure/postgres`, `migrations`
-> **Current References:** [`backend/domains/data_sources/infrastructure/postgres/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/postgres/), [`backend/domains/workflow/infrastructure/postgres/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/infrastructure/postgres/), [`backend/domains/chatbot/infrastructure/postgres/schema.py`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/postgres/schema.py), [`backend/domains/bi/infrastructure/postgres/database_schema.py`](file:///c:/Repos/bist-mini-final/backend/domains/bi/infrastructure/postgres/database_schema.py), [`backend/domains/benchmark/infrastructure/postgres/schema.py`](file:///c:/Repos/bist-mini-final/backend/domains/benchmark/infrastructure/postgres/schema.py), [`backend/platform/postgres/versioned_snapshots.py`](file:///c:/Repos/bist-mini-final/backend/platform/postgres/versioned_snapshots.py), [`migrations/versions/`](file:///c:/Repos/bist-mini-final/migrations/versions/)
+> **Current References:** [`backend/domains/data_sources/infrastructure/postgres/`](../../../backend/domains/data_sources/infrastructure/postgres), [`backend/domains/workflow/infrastructure/postgres/`](../../../backend/domains/workflow/infrastructure/postgres), [`backend/domains/chatbot/infrastructure/postgres/schema.py`](../../../backend/domains/chatbot/infrastructure/postgres/schema.py), [`backend/domains/bi/infrastructure/postgres/database_schema.py`](../../../backend/domains/bi/infrastructure/postgres/database_schema.py), [`backend/domains/benchmark/infrastructure/postgres/schema.py`](../../../backend/domains/benchmark/infrastructure/postgres/schema.py), [`backend/platform/postgres/versioned_snapshots.py`](../../../backend/platform/postgres/versioned_snapshots.py), [`migrations/versions/`](../../../migrations/versions)
 
 ---
 
@@ -123,7 +123,9 @@ domain_snapshot_heads(
 ## 7. 스키마 소유권과 구조 완료 조건
 
 - 각 table·constraint·mapping은 하나의 domain infrastructure가 소유하고 다른 domain은 공개 application port로만 접근합니다.
-- sync/async session과 transaction primitive는 shared infrastructure, driver/pool/codec은 platform PostgreSQL·pgvector adapter에 둡니다.
+- sync/async connection pool, transaction/repository primitive와 driver/codec은 `backend/platform/postgres`·`backend/platform/pgvector`에 둡니다. `shared/application`에는 concrete session이 아니라 필요한 protocol만 둡니다.
 - cross-domain foreign key는 aggregate 수명주기를 실제로 공유할 때만 허용하고 편의 join을 위해 repository 소유권을 섞지 않습니다.
-- production schema 변경은 Alembic만 수행하며 startup initializer는 제거 가능한 compatibility 경로로 관리합니다.
+- production schema 변경은 Alembic만 수행하며 bootstrap schema composer는 개발·테스트 초기화와 drift 검증 보조 경로로만 관리합니다.
 - data sources, workflow, chatbot, BI와 benchmark schema/repository 소유권은 각 vertical slice에 있고 migration baseline은 domain schema fragment를 명시적으로 결합합니다. 수평 storage facade는 제거됐습니다.
+- 현재 선형 revision은 `20260827_0001`부터 `20260829_0005`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
+- table/constraint/index/queue column을 바꾸면 domain schema fragment, Alembic upgrade/downgrade, repository/model, BP-103/BP-501과 migration tests를 같은 변경에서 갱신합니다.

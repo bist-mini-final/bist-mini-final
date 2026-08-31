@@ -1,7 +1,7 @@
 # [BP-402] Data Sources 워크스페이스
-> **Document Code:** `BP-402` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Vertical Slice Complete / Frontend Aligned
+> **Document Code:** `BP-402` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/domains/data_sources`, `backend/platform/pgvector`, `backend/platform/openai`, `frontend/src/features/data-sources`, `frontend/src/pages`
-> **Current References:** [`backend/domains/data_sources/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/), [`backend/bootstrap/application.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/application.py), [`frontend/src/features/data-sources/`](file:///c:/Repos/bist-mini-final/frontend/src/features/data-sources/), [`frontend/src/pages/DataSourcesPage.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx)
+> **Current References:** [`backend/domains/data_sources/`](../../../backend/domains/data_sources), [`backend/bootstrap/application.py`](../../../backend/bootstrap/application.py), [`frontend/src/features/data-sources/`](../../../frontend/src/features/data-sources), [`frontend/src/pages/DataSourcesPage.tsx`](../../../frontend/src/pages/DataSourcesPage.tsx)
 
 ---
 
@@ -23,6 +23,7 @@ Data Sources는 spreadsheet 원본 등록, preview/download, durable ingestion �
 | ingestion 등록·목록 | `POST/GET /api/v1/data-sources/ingestion-jobs` |
 | ingestion 상태·제어 | `GET/DELETE /ingestion-jobs/{run_id}`, `POST .../resume`, `POST .../cancel` |
 | index 목록·상세·삭제 | `GET /indexes`, `GET/DELETE /indexes/{index_id}` |
+| index 기업명 변경 | `PUT /indexes/{index_id}/company` |
 | index 검색 | `POST /indexes/{index_id}/search` |
 | DB probe | `GET /db-status`, `POST /db-connect` |
 
@@ -65,7 +66,7 @@ flowchart LR
 | `company_entity_extractor` | 기업 식별 정보 추출 |
 | `sheet_metadata_persistence` | sheet/profile 메타데이터 영속화 |
 
-전체 module pin 계약은 [`BP-302`](file:///c:/Repos/bist-mini-final/docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 따릅니다.
+전체 module pin 계약은 [`BP-302`](../03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 따릅니다.
 
 ---
 
@@ -97,4 +98,7 @@ flowchart LR
 - upload·preview·index REST/SSE는 presentation, workbook·PostgreSQL·pgvector adapter는 infrastructure가 소유합니다.
 - UI feature는 파일/collection/job state를 분리하고 모든 mutation에 busy·error·revalidation 상태를 제공합니다.
 - API controller, spreadsheet/artifact filesystem 구현, shard coordinator/repository/worker가 data sources vertical slice로 이동했고 route 내부 orchestration을 제거했습니다. 구조 계약 테스트는 application/presentation/worker의 legacy·역방향 import를 차단합니다.
-- 범용 pgvector connection/COPY facade의 `backend/platform/pgvector` 최종 이전은 데이터 소스가 아니라 platform migration 단계에서 완료합니다.
+- 범용 pgvector Binary COPY/오류 계약은 `backend/platform/pgvector`, collection/search/publish SQL은 data sources infrastructure로 분리됐습니다.
+- 기업명 변경·파일/index 삭제·ingestion 등록/취소/재개 mutation은 UI에서 busy, 중복 제출 방지, 성공 후 재조회와 오류 feedback을 제공합니다.
+- 원본 셀 검증은 `/api/v1/evidence/cells/resolve`와 sheet artifact API를 사용하며 답변 배지에서 sheet image·bbox로 추적할 수 있습니다.
+- ingestion DAG, shard 수, index metadata 또는 rename/delete 정책을 바꾸면 BP-201·BP-203·BP-503 및 API/UI contract를 함께 갱신합니다.

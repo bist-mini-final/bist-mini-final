@@ -1,7 +1,7 @@
 # [BP-501] REST API와 DTO 규격
-> **Document Code:** `BP-501` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-501` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/domains/*/presentation`, `backend/api/router.py`, `backend/api/middleware.py`, `backend/api/exception_handlers.py`, `backend/api/versioning.py`
-> **Current References:** [`backend/api/router.py`](file:///c:/Repos/bist-mini-final/backend/api/router.py), [`backend/api/openapi.py`](file:///c:/Repos/bist-mini-final/backend/api/openapi.py), [`backend/api/exception_handlers.py`](file:///c:/Repos/bist-mini-final/backend/api/exception_handlers.py), [`backend/domains/workflow/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/), [`backend/domains/data_sources/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/presentation/)
+> **Current References:** [`backend/api/router.py`](../../../backend/api/router.py), [`backend/api/openapi.py`](../../../backend/api/openapi.py), [`backend/api/exception_handlers.py`](../../../backend/api/exception_handlers.py), [`backend/domains/workflow/presentation/`](../../../backend/domains/workflow/presentation), [`backend/domains/data_sources/presentation/`](../../../backend/domains/data_sources/presentation)
 
 ---
 
@@ -24,6 +24,7 @@
 | GET | `/api/v1/bi/companies` | active BI 기업 목록 |
 | GET | `/api/v1/bi/materialization-candidates` | 스냅샷 생성 가능 기업과 `not_created\|source_changed\|failed` 사유 |
 | GET | `/api/v1/bi/companies/{company_id}/dashboard` | current BI dashboard snapshot |
+| DELETE | `/api/v1/bi/companies/{company_id}/dashboard` | 기업 BI snapshot 삭제 |
 | POST | `/api/v1/bi/materializations` | BI materialization job 등록 |
 | GET | `/api/v1/bi/materializations/{job_id}` | 작업 상태 |
 | GET | `/api/v1/bi/materializations/{job_id}/stream` | 작업 SSE |
@@ -88,7 +89,7 @@
 | GET | `/api/v1/data-sources/db-status` | 현재 DB probe |
 | POST | `/api/v1/data-sources/db-connect` | 지정 DB 연결 검사 |
 | GET | `/api/v1/spreadsheet-artifacts/{workbook_hash}/sheets/{sheet_name}` | render artifact |
-| POST | `/api/v1/evidence/cells/resolve` | 셀 인용을 workbook·sheet image·bbox 근거로 해석 |
+| GET | `/api/v1/evidence/cells/resolve` | 셀 인용 query를 workbook·sheet image·bbox 근거로 해석 |
 
 ### Benchmark, jobs, maintenance
 
@@ -138,8 +139,9 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - 새 정식 route는 `/api/v1` OpenAPI에 나타나야 하고 compatibility route는 `include_in_schema=False`여야 합니다.
 - frontend는 TypeScript type만 신뢰하지 않고 외부 JSON을 Zod로 runtime 검증합니다.
 - comparison snapshot은 source/evidence/assumption/rank link를 model validator로 검증합니다.
-- route 변경은 [`tests/modules/test_openapi_and_module_routes.py`](file:///c:/Repos/bist-mini-final/tests/modules/test_openapi_and_module_routes.py)와 frontend client tests를 함께 갱신합니다.
+- route 변경은 [`tests/modules/test_openapi_and_module_routes.py`](../../../tests/modules/test_openapi_and_module_routes.py)와 frontend client tests를 함께 갱신합니다.
 - route 함수는 request binding, application command/query 호출과 HTTP response projection만 담당하고 저장소·도메인 단계를 직접 조율하지 않습니다. 별도 HTTP controller가 필요하더라도 해당 domain presentation 내부에 두며 `backend/api`로 올리지 않습니다.
+- 현재 OpenAPI는 63개 정식 path와 73개 HTTP operation을 노출합니다. compatibility alias는 이 수와 schema에서 제외합니다.
 
 ---
 
@@ -148,4 +150,6 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - 각 domain presentation은 자신의 router, Pydantic schema, HTTP error mapping과 OpenAPI tag를 소유합니다.
 - `backend/api/router.py`는 domain router를 결합하고 middleware, exception handler와 versioning만 적용합니다.
 - application DTO와 HTTP DTO를 동일 객체로 강제하지 않으며 presentation mapping을 명시적으로 둡니다.
-- `backend/api`에서 도메인 route/controller/schema가 제거되고 OpenAPI snapshot이 동일 공개 계약을 유지할 때 구조 migration을 완료합니다.
+- `backend/api`에는 router composition, middleware, exception/error mapping, versioning, OpenAPI, SPA와 system probe만 남아 있고 도메인 route/controller/schema는 각 presentation에 있습니다.
+- API package allowlist와 OpenAPI contract test가 이 경계를 hard gate로 검증합니다.
+- method/path/status/error envelope를 바꾸면 해당 domain BP, frontend client/runtime schema, OpenAPI test와 이 문서를 같은 변경에서 갱신합니다.

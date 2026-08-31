@@ -1,13 +1,13 @@
 # [BP-202] 외부 Vision 기반 시트 구조 감지
-> **Document Code:** `BP-202` | **Contract State:** Target Architecture | **Capability State:** Operational via External Provider | **Structure State:** Partial Migration
+> **Document Code:** `BP-202` | **Contract State:** Target Architecture | **Capability State:** Operational via External Provider | **Structure State:** Complete
 > **Target Ownership:** `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/vision`, `backend/platform/openai`, `modules/structure`
-> **Current References:** [`modules/structure/luna_vlm_structure_detector.py`](file:///c:/Repos/bist-mini-final/modules/structure/luna_vlm_structure_detector.py), [`backend/domains/data_sources/infrastructure/spreadsheets/sheet_renderer.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/spreadsheets/sheet_renderer.py), [`backend/domains/data_sources/infrastructure/spreadsheets/cell_type_overlay.py`](file:///c:/Repos/bist-mini-final/backend/domains/data_sources/infrastructure/spreadsheets/cell_type_overlay.py)
+> **Current References:** [`modules/structure/luna_vlm_structure_detector.py`](../../../modules/structure/luna_vlm_structure_detector.py), [`backend/domains/data_sources/infrastructure/spreadsheets/sheet_renderer.py`](../../../backend/domains/data_sources/infrastructure/spreadsheets/sheet_renderer.py), [`backend/domains/data_sources/infrastructure/spreadsheets/cell_type_overlay.py`](../../../backend/domains/data_sources/infrastructure/spreadsheets/cell_type_overlay.py)
 
 ---
 
 ## 1. Provider 계약
 
-목표 module 계약은 provider 중립적인 `vision_structure_detector`입니다. application port는 prepared sheet와 구조화 결과만 알고, 실제 추론은 외부 OpenAI vision adapter에 위임합니다. model ID와 transport는 런타임 설정으로 결정되며 module contract에 provider 제품명을 고정하지 않습니다. 현재 공개된 compatibility module type은 저장된 workflow migration이 끝날 때까지 alias로만 유지할 수 있습니다.
+저장된 workflow의 공개 module type은 `luna_vlm_structure_detector`입니다. 이름은 호환 가능한 영속 식별자이며 로컬 모델을 뜻하지 않습니다. 실제 추론은 bootstrap이 주입한 외부 OpenAI vision client를 사용하고 model ID·transport는 런타임 설정으로 결정합니다. 새 provider를 추가하더라도 입력/출력 DTO와 저장된 module type을 임의로 바꾸지 않습니다.
 
 ---
 
@@ -60,4 +60,6 @@ Data Sources는 서버가 만든 spreadsheet preview와 감지 region을 조회�
 - `data_sources/infrastructure/vision`은 provider 응답을 도메인 구조 계약으로 변환합니다.
 - `platform/openai`는 인증, timeout, retry, transport와 provider 응답 파싱 primitive만 제공합니다.
 - `modules/structure`는 application port를 호출하는 DAG adapter이며 OpenAI client를 생성하지 않습니다.
-- provider 중립 port가 정착하고 compatibility module type 외에 provider 이름이 domain/application에 남지 않을 때 구조 migration을 완료합니다.
+- sheet renderer·workbook catalog·외부 vision client는 bootstrap에서 주입되고 module이 transport client를 생성하지 않습니다.
+- data sources domain/application에는 provider 제품별 분기가 없으며 OpenAI transport는 `backend/platform/openai`가 소유합니다.
+- `luna_vlm_structure_detector`는 저장된 workflow 호환성을 위한 공개 type이므로 rename은 alias·저장 데이터 migration·OpenAPI/Playground 갱신 없이 수행하지 않습니다.

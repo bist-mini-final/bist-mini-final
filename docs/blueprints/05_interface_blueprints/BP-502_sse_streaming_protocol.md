@@ -1,7 +1,7 @@
 # [BP-502] SSE 상태 스트리밍 규격
-> **Document Code:** `BP-502` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
-> **Target Ownership:** `backend/domains/*/presentation/sse.py`, `backend/shared/application`, `backend/platform/redis`
-> **Current References:** [`backend/domains/workflow/presentation/routes.py`](file:///c:/Repos/bist-mini-final/backend/domains/workflow/presentation/routes.py), [`backend/shared/application/state_stream.py`](file:///c:/Repos/bist-mini-final/backend/shared/application/state_stream.py), [`backend/shared/application/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/shared/application/state_stream_broker.py), [`backend/platform/redis/state_stream_broker.py`](file:///c:/Repos/bist-mini-final/backend/platform/redis/state_stream_broker.py)
+> **Document Code:** `BP-502` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
+> **Target Ownership:** `backend/domains/*/presentation`, `backend/shared/application`, `backend/platform/redis`
+> **Current References:** [`backend/domains/workflow/presentation/routes.py`](../../../backend/domains/workflow/presentation/routes.py), [`backend/shared/application/state_stream.py`](../../../backend/shared/application/state_stream.py), [`backend/shared/application/state_stream_broker.py`](../../../backend/shared/application/state_stream_broker.py), [`backend/platform/redis/state_stream_broker.py`](../../../backend/platform/redis/state_stream_broker.py)
 
 ---
 
@@ -75,7 +75,9 @@ Endpoint: `GET /api/v1/runs/{run_id}/stream`
 
 ## 6. 소유권과 구조 완료 조건
 
-- event envelope와 cursor/reconnect semantics는 shared application contract, domain별 projection은 해당 presentation의 `sse.py`가 소유합니다.
+- fan-out, polling과 broker hint lifecycle은 shared application contract, domain별 event projection은 해당 presentation이 소유합니다. 별도 `sse.py`가 필요하지 않은 작은 slice는 route module 안에 둘 수 있습니다.
 - Redis adapter는 hint publish/subscribe만 제공하며 domain state를 저장하거나 event payload를 진실 공급원으로 만들지 않습니다.
 - SSE endpoint는 application query로 현재 PostgreSQL snapshot을 읽고 hint 수신 시 재조회합니다.
 - 이전 `backend/core/state_stream*` 책임은 shared contract, Redis platform adapter와 domain presentation으로 분리됐습니다. 다중 Pod·Redis 장애 계약 테스트가 이 경계를 검증합니다.
+- frontend의 공통 SSE parser는 event/data framing만 처리하고 workflow/BI terminal 판정은 feature DTO가 수행합니다.
+- event 이름, terminal status, ping/polling 또는 Redis hint semantics를 바꾸면 producer·consumer·다중 Pod/fallback 테스트와 BP-401/BP-403을 함께 갱신합니다.

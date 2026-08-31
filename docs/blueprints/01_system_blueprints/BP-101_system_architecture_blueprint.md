@@ -1,7 +1,7 @@
 # [BP-101] 시스템 전체 배치도와 실행 토폴로지
-> **Document Code:** `BP-101` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Partial Migration
+> **Document Code:** `BP-101` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/entrypoints`, `backend/bootstrap`, `backend/domains`, `backend/platform`, `backend/shared`, `backend/api`, `modules`, `jobs`
-> **Current References:** [`backend/entrypoints/`](file:///c:/Repos/bist-mini-final/backend/entrypoints/), [`backend/bootstrap/application.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/application.py), [`backend/bootstrap/runtime.py`](file:///c:/Repos/bist-mini-final/backend/bootstrap/runtime.py), [`backend/domains/`](file:///c:/Repos/bist-mini-final/backend/domains/), [`backend/platform/`](file:///c:/Repos/bist-mini-final/backend/platform/)
+> **Current References:** [`backend/entrypoints/`](../../../backend/entrypoints), [`backend/bootstrap/application.py`](../../../backend/bootstrap/application.py), [`backend/bootstrap/runtime.py`](../../../backend/bootstrap/runtime.py), [`backend/domains/`](../../../backend/domains), [`backend/platform/`](../../../backend/platform)
 
 ---
 
@@ -97,7 +97,7 @@ classDiagram
     WorkerBootstrap --> ApplicationBootstrap
 ```
 
-`application.py`는 공유 resource, domain adapter와 use case를 조립합니다. `http.py`는 FastAPI 수명주기와 domain router 결합만 담당하고, `workers.py`는 동일 object graph에서 one-shot worker를 선택해 실행합니다. 세 진입점은 설정과 adapter factory를 공유하지만 HTTP·worker 수명주기를 서로 끌어오지 않습니다. 이전 container class는 제거됐고 명시적 bootstrap 조립 함수가 유일한 composition root입니다.
+`application.py`의 `ApplicationContainer`는 공유 resource, domain adapter와 use case를 책임별 하위 container로 조립합니다. `http.py`는 FastAPI 수명주기와 domain router 결합만 담당하고, `workers.py`는 동일 object graph에서 one-shot worker를 선택해 실행합니다. 세 진입점은 설정과 adapter factory를 공유하지만 HTTP·worker 수명주기를 서로 끌어오지 않습니다. 이전 `bootstrap/container.py` 호환 경로는 제거됐고 현재 bootstrap package가 유일한 composition root입니다.
 
 `backend/entrypoints`의 ASGI·CLI·worker 파일은 인자와 환경을 읽고 해당 bootstrap factory를 호출하는 얇은 process adapter입니다. 여기에는 repository 선택, route별 분기나 job policy를 두지 않습니다.
 
@@ -125,6 +125,20 @@ classDiagram
 - 비교 계산은 실제 BI 관측값과 원본 셀 근거만 사용하며 synthetic fallback을 만들지 않습니다.
 - 현재 모듈 카탈로그는 `ModuleRegistry`에 등록된 19개 type이 단일 기준입니다.
 
-정확한 현재 수치와 범위는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](file:///c:/Repos/bist-mini-final/docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 우선합니다.
+정확한 현재 수치와 범위는 [`CURRENT_IMPLEMENTATION_BASELINE.md`](../../CURRENT_IMPLEMENTATION_BASELINE.md)를 우선합니다.
 
 BP-102의 목표 트리와 import gate가 활성화됐고 수평 storage facade도 platform/domain infrastructure 경계로 분해됐습니다. 이후 구조 변경은 동일 gate를 통과해야 합니다.
+
+---
+
+## 6. 구현 정합성 판정
+
+2026-08-31 기준 이 배치도는 현재 구현과 일치합니다.
+
+- 추적되는 backend Python 최상위 패키지는 `api`, `bootstrap`, `core`, `domains`, `entrypoints`, `platform`, `shared`뿐이며 `core`에는 설정만 남아 있습니다.
+- workflow, data sources, BI, company comparison, chatbot, benchmark, operations가 각각 vertical slice를 소유합니다.
+- ASGI·worker·관리 명령은 `entrypoints → bootstrap` 방향으로만 시작하며 domain concrete adapter를 직접 조립하지 않습니다.
+- OpenAPI 정식 namespace는 `/api/v1`, module registry는 19개 type, 제품 route는 새 채팅·플레이그라운드·데이터 소스·BI·기업 비교·작업 관제·설정으로 고정돼 있습니다.
+- 구조 회귀는 `tests/modules/test_architecture_contracts.py`, 공개 API 회귀는 OpenAPI 계약 테스트, 런타임 수치는 `CURRENT_IMPLEMENTATION_BASELINE.md`에서 검증합니다.
+
+새 bounded context, 외부 platform adapter, process entrypoint 또는 공개 workspace를 추가할 때 이 문서와 BP-102·BP-501·BP-601을 같은 변경에서 갱신해야 합니다.

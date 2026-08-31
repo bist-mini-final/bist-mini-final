@@ -1,7 +1,7 @@
 # [BP-601] 프론트엔드 SPA 컴포넌트 배선도 & 접근성(a11y) 표준
-> **Document Code:** `BP-601` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Aligned
+> **Document Code:** `BP-601` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `frontend/src/app`, `frontend/src/pages`, `frontend/src/features`, `frontend/src/shared`
-> **Current References:** [`frontend/src/App.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/App.tsx), [`frontend/src/app/routes.ts`](file:///c:/Repos/bist-mini-final/frontend/src/app/routes.ts), [`frontend/src/features/`](file:///c:/Repos/bist-mini-final/frontend/src/features/)
+> **Current References:** [`frontend/src/App.tsx`](../../../frontend/src/App.tsx), [`frontend/src/app/routes.ts`](../../../frontend/src/app/routes.ts), [`frontend/src/features/`](../../../frontend/src/features)
 
 ---
 
@@ -40,19 +40,19 @@ graph TD
 | URL Path | 라우트 이름 | 렌더링 컴포넌트 | 워크스페이스 상태 |
 | :--- | :--- | :--- | :--- |
 | `/` | `Redirect` | `/chatbot` | 별도 홈 없이 새 채팅 워크스페이스로 이동 |
-| `/playground` | `Pipeline Playground` | [`PlaygroundPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/PlaygroundPage.tsx) | **[운영중]** React Flow 2D DAG 빌더 & 실행 |
-| `/data-sources` | `Data Sources` | [`DataSourcesPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/DataSourcesPage.tsx) | **[운영중]** 스프레드시트 뷰어 & pgvector 관리 |
-| `/dashboard` (`/bi` 호환 별칭) | `Financial BI` | [`BiPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 21개 근거 기반 지표 차트 |
-| `/chatbot` | `새 채팅` | [`ChatbotPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 전역 세션 이력 기반 대화형 챗봇 & 인라인 시각화 |
-| `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 버전형 비교 스냅샷 기반 순위, 실제/예측 추이, evidence 상태, 선택 기업·2개 기업 비교 및 BI 딥링크 |
-| `/jobs` | `Jobs` | [`JobsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/JobsPage.tsx) | **[운영중]** KEDA/Job/Pod와 PostgreSQL 큐·Lease 읽기 전용 상관 관제 |
-| `/settings` | `Settings` | [`SettingsPage`](file:///c:/Repos/bist-mini-final/frontend/src/pages/SettingsPage.tsx) | **[운영중]** 시스템·연결 설정 화면 |
+| `/playground` | `Pipeline Playground` | [`PlaygroundPage`](../../../frontend/src/pages/PlaygroundPage.tsx) | **[운영중]** React Flow 2D DAG 빌더 & 실행 |
+| `/data-sources` | `Data Sources` | [`DataSourcesPage`](../../../frontend/src/pages/DataSourcesPage.tsx) | **[운영중]** 스프레드시트 뷰어 & pgvector 관리 |
+| `/dashboard` (`/bi` 호환 별칭) | `Financial BI` | [`BiPage`](../../../frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 21개 근거 기반 지표 차트 |
+| `/chatbot` | `새 채팅` | [`ChatbotPage`](../../../frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 전역 세션 이력 기반 대화형 챗봇 & 인라인 시각화 |
+| `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](../../../frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 버전형 비교 스냅샷 기반 순위, 실제/예측 추이, evidence 상태, 선택 기업·2개 기업 비교 및 BI 딥링크 |
+| `/jobs` | `Jobs` | [`JobsPage`](../../../frontend/src/pages/JobsPage.tsx) | **[운영중]** KEDA/Job/Pod와 PostgreSQL 큐·Lease 읽기 전용 상관 관제 |
+| `/settings` | `Settings` | [`SettingsPage`](../../../frontend/src/pages/SettingsPage.tsx) | **[운영중]** 시스템·연결 설정 화면 |
 
 ---
 
 ## 3. 공용 UI 계층과 제어 크기 계약
 
-페이지의 일반 액션은 [`frontend/src/shared/ui/`](file:///c:/Repos/bist-mini-final/frontend/src/shared/ui/)의 공용 컴포넌트를 사용합니다.
+페이지의 일반 액션은 [`frontend/src/shared/ui/`](../../../frontend/src/shared/ui)의 공용 컴포넌트를 사용합니다.
 
 | 컴포넌트 | 책임 | 허용 변형 |
 | :--- | :--- | :--- |
@@ -94,4 +94,7 @@ graph TD
 - page는 고유 viewport와 중복 header/card/button CSS를 만들지 않고 공용 `PageShell`, layout primitive와 design token을 사용합니다.
 - feature 간 공유는 상대 feature 내부 파일 import가 아니라 명시적 public entrypoint 또는 shared primitive로 제한합니다.
 - API response는 feature 경계에서 runtime schema로 검증하고 server state와 local draft state를 분리합니다.
-- 접근성, typography, spacing, action size와 async feedback 계약이 모든 정식 route의 visual/interaction regression으로 고정될 때 `Structure State: Aligned`를 유지합니다.
+- route registry는 7개 정식 제품 route와 `/`·`/bi` alias를 단일 소스로 제공하고 AppShell이 Excel RAG 브랜드, 새 채팅, 기능 navigation, 대화 이력, 작업 관제/설정을 조립합니다.
+- 공용 `Button`, `IconButton`, `Dialog`, `StatusBadge`, page layout/token과 drag-pan primitive가 적용됐으며 일반 primary action은 단색 초록 계열만 사용합니다.
+- route/page viewport, 공용 action variant, typography/token 또는 modal interaction을 바꾸면 AppShell/router/shared UI와 visual·interaction tests 및 이 문서를 함께 갱신합니다.
+- 위 계약과 회귀 테스트가 유지되는 동안 `Structure State: Complete`로 판정합니다.

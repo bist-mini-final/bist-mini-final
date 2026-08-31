@@ -1,7 +1,7 @@
 # [BP-404] AI Financial Chatbot 워크스페이스 명세서
-> **Document Code:** `BP-404` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Backend Vertical Slice Complete / Frontend Aligned
+> **Document Code:** `BP-404` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
 > **Target Ownership:** `backend/domains/chatbot`, `backend/domains/workflow/application`, `backend/platform/openai`, `frontend/src/features/chatbot`
-> **Current References:** [`backend/domains/chatbot/domain/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/domain/), [`backend/domains/chatbot/application/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/application/), [`backend/domains/chatbot/infrastructure/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/infrastructure/), [`backend/domains/chatbot/presentation/`](file:///c:/Repos/bist-mini-final/backend/domains/chatbot/presentation/), [`frontend/src/features/chatbot/ChatbotView.tsx`](file:///c:/Repos/bist-mini-final/frontend/src/features/chatbot/ChatbotView.tsx)
+> **Current References:** [`backend/domains/chatbot/domain/`](../../../backend/domains/chatbot/domain), [`backend/domains/chatbot/application/`](../../../backend/domains/chatbot/application), [`backend/domains/chatbot/infrastructure/`](../../../backend/domains/chatbot/infrastructure), [`backend/domains/chatbot/presentation/`](../../../backend/domains/chatbot/presentation), [`frontend/src/features/chatbot/ChatbotView.tsx`](../../../frontend/src/features/chatbot/ChatbotView.tsx)
 
 ---
 
@@ -50,7 +50,7 @@ flowchart TD
 * `POST /api/v1/chat/sessions/{session_id}/attachments`: 엑셀/CSV 첨부파일 업로드
 * `GET /api/v1/chat/suggestions`: 동적 스마트 질문 추천
 * `POST /api/v1/chat/suggestions/refresh`: 추천 질문 재생성
-* `POST /api/v1/evidence/cells/resolve`: 답변 셀 인용을 원본 workbook·rendered sheet 좌표와 연결
+* `GET /api/v1/evidence/cells/resolve`: 답변 셀 인용 query를 원본 workbook·rendered sheet 좌표와 연결
 
 ## 3. 대화 라우팅과 근거 안전성
 
@@ -70,3 +70,7 @@ flowchart TD
 - OpenAI conversation transport는 platform, chat session·suggestion PostgreSQL repository와 로컬 attachment adapter는 chatbot infrastructure, REST DTO와 upload transport는 chatbot presentation에 둡니다.
 - bootstrap은 `ChatApiServices`에 conversation, suggestion, attachment 유스케이스를 조립하며 presentation은 concrete 저장소나 provider를 생성하지 않습니다.
 - 이전 feature/API 호환 경로는 제거됐고 애플리케이션 내부 import와 구조 계약 테스트는 canonical vertical slice만 사용합니다.
+- `/`는 별도 홈을 렌더링하지 않고 `/chatbot`으로 연결되며 AppShell의 `새 채팅`과 대화 이력이 모든 workspace에서 유지됩니다.
+- Reader 본문은 출처 상세 문자열을 반복 렌더링하지 않고 `Sheet · Cell` 배지를 노출합니다. hover는 요약, click은 셀 근거 modal을 열어 원본 sheet image와 bbox를 검증합니다.
+- 검색 단계에는 `Cell Value: ?` 후보를 유지하지만 Reader·tool·근거 projection에는 `resolved_cell_value`를 통과한 값만 전달합니다.
+- session/message/evidence DTO 또는 RAG routing policy를 바꾸면 BP-303·BP-501·BP-601과 backend/frontend schema tests를 함께 갱신합니다.
