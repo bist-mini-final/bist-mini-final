@@ -83,7 +83,6 @@ flowchart LR
 
 ## 6. 범위 제외
 
-- 로컬 VLM runtime
 - 사용자가 box를 drag해 수정하고 승인하는 annotation workflow
 - 브라우저에서 전체 workbook을 편집하는 virtualized spreadsheet editor
 

@@ -4,11 +4,9 @@
 
 ---
 
-## 1. 범위 결정
+## 1. Provider 계약
 
 `luna_vlm_structure_detector`라는 module type과 `LunaVlmStructureDetectorModule` 클래스 이름은 유지되지만 현재 추론은 `OpenAIResponsesClient`를 통해 외부 OpenAI vision model에 위임합니다. 실제 model ID는 런타임 설정으로 결정되며 문서에서 특정 Codex/ChatGPT 모델 이름으로 고정하지 않습니다.
-
-로컬·온디바이스 VLM, ONNX/vLLM 추론 서버, 에어갭 모델 배포는 구현하지 않습니다. 이 결정은 현재 제품 범위이며 로드맵 항목도 아닙니다.
 
 ---
 
