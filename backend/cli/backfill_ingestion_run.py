@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.bootstrap.container import ApplicationContainer
+from backend.bootstrap.application import ApplicationContainer
 from backend.engine.workflows.models import RunBatchState, RunNodeState, WorkflowRun
 from backend.storage.data_sources.ingestion_jobs import IngestionJobService
 
@@ -177,7 +178,7 @@ def backfill_ingestion_run(
     return services.run_store.save(run), True
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "기존 pgvector collection의 sheet/table metadata로 "
@@ -185,7 +186,7 @@ def main() -> int:
         )
     )
     parser.add_argument("index_id")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     container = ApplicationContainer.create()
     try:

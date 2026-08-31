@@ -40,7 +40,7 @@ from backend.features.bi.queued_materializer import (
     BiQueuedMaterializer,
     BiQueuedMaterializerServices,
 )
-from backend.providers.openai_responses import OpenAIResponsesClient
+from backend.platform.openai.responses import OpenAIResponsesClient
 
 if TYPE_CHECKING:
     from backend.engine.runtime.registry import ModuleRegistry

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import psycopg2.extras
 
-from backend.shared.infrastructure.database import (
+from backend.platform.postgres.repositories import (
     DatabaseUrlProvider,
     SyncPostgresRepository,
 )

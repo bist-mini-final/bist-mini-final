@@ -131,25 +131,26 @@ jobs/                            # 선언형 표준 Job 정의
 
 | 영역 | 현재 상태 | 목표 대비 차이 |
 | :--- | :--- | :--- |
-| `backend/bootstrap` | `container.py`, `lifecycle.py`, `bi.py`, `company_comparison.py` | HTTP·worker·application composition root가 목표 파일 단위로 분리되지 않음 |
-| `backend/shared` | 공통 error, repository base, observability만 존재 | identifiers, clock, application result/pagination/transaction/event 계약이 미구성되고 concrete 책임과 혼재함 |
+| `backend/entrypoints`, `backend/bootstrap` | ASGI·CLI·통합 worker 진입점과 `application.py`, `http.py`, `workers.py` 조립 경계 구현 | 도메인별 조립 함수가 아직 일부 legacy bootstrap/feature 구현을 감쌈 |
+| `backend/shared` | state stream, embedding port, lease worker, observability context를 application 계약으로 분리 | identifiers, clock, result/pagination/transaction/event 계약은 필요한 유스케이스 이동 시 도입 필요 |
 | `backend/domains` | workflow·BI 중심으로 domain/application 도입, chatbot 일부 infrastructure 도입 | 모든 도메인이 infrastructure/presentation/workers까지 일관된 vertical slice를 갖추지 않았고 application 일부가 `features`·`engine` 구체 구현을 직접 import함 |
 | `backend/api` | 도메인 route/controller/DTO를 직접 보유 | 최종 router 결합 전용 계층보다 책임이 넓음 |
-| `backend/platform` | pgvector와 data-source adapter만 존재 | PostgreSQL/OpenAI/Kubernetes/Redis/filesystem/telemetry adapter가 `storage`, `providers`, `engine`, `core`에 분산됨 |
+| `backend/platform` | PostgreSQL pool, pgvector, OpenAI, Redis broker, telemetry adapter를 canonical 경로로 이전 | Kubernetes/filesystem adapter와 도메인 고유 SQL의 vertical slice 이동 필요 |
 | 호환 수평 패키지 | `features`, `storage`, `providers`, `engine`, `core`, `contracts`, `cli`가 남아 있음 | 도메인·platform·shared·process adapter 경계로 책임 이전이 필요 |
-| 프로세스 진입점 | `backend/main.py`와 `backend/cli`가 별도 진입점 역할 | `entrypoints`의 얇은 ASGI/CLI/worker adapter와 bootstrap 조립 책임으로 분리 필요 |
+| 호환 진입 경로 | `backend/main.py`와 이전 provider/core/storage 경로는 re-export shim | 외부 호출 전환 후 shim 삭제 필요 |
 | `modules`, `jobs` | 원자 모듈과 선언형 Job 경계를 별도 루트로 유지 | 목표와 일치 |
 
 디렉터리 생성이나 일부 의존성 역전만을 근거로 완료 처리하지 않습니다. 호환 패키지의 책임 이전, domain presentation/infrastructure/workers 정착, 호환 import 제거가 끝나고 구조 계약 테스트가 목표 트리를 검증할 때만 `Structure State: Complete`로 전환합니다.
 
 ### 2.2 잔여 전환 순서
 
-1. 현재 허용 중인 `domains → features/engine/contracts` 직접 의존을 목록화하고 application port 또는 shared domain contract로 대체합니다.
-2. clock, identifier, result/pagination/transaction/event 계약을 `shared`에 만들고 PostgreSQL session/transaction 구현은 `platform/postgres`로 이전합니다.
-3. OpenAI, Kubernetes, Redis, PostgreSQL 기반 client를 `platform`으로 모으고 도메인 고유 adapter는 각 domain `infrastructure`로 이동합니다.
-4. workflow부터 presentation/infrastructure/workers vertical slice를 완성한 뒤 data sources, BI, company comparison, chatbot, benchmark 순서로 반복합니다.
-5. 도메인 route가 이동한 뒤 `backend/api`를 router 결합과 공통 HTTP 정책만 남도록 축소합니다.
-6. 호환 import 사용량을 0으로 만든 패키지부터 제거하고 목표 트리를 검사하는 구조 계약 테스트를 활성화합니다.
+1. 완료: ASGI·CLI·통합 worker 진입점, bootstrap 조립 파일과 PostgreSQL/OpenAI/Redis/telemetry canonical adapter 경계를 확립합니다.
+2. workflow부터 presentation/infrastructure/workers vertical slice를 완성하고 `domains → features/engine/contracts` 직접 의존을 application port 또는 shared contract로 대체합니다.
+3. data sources를 같은 방식으로 이동하면서 filesystem/Kubernetes adapter와 ingestion repository 소유권을 정리합니다.
+4. BI, company comparison, chatbot, benchmark, operations 순서로 vertical slice를 반복합니다.
+5. 실제 유스케이스가 요구하는 clock, identifier, result/pagination/transaction/event 계약만 `shared`에 추가하고 PostgreSQL 구현은 `platform/postgres`에 둡니다.
+6. 도메인 route가 이동한 뒤 `backend/api`를 router 결합과 공통 HTTP 정책만 남도록 축소합니다.
+7. 호환 import 사용량을 0으로 만든 패키지부터 제거하고 목표 트리를 검사하는 구조 계약 테스트를 단계적으로 강화합니다.
 
 ---
 

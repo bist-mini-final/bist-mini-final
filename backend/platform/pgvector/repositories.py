@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 from langchain_core.documents import Document
 
 from backend.contracts.vector import PgVectorReplacePlan
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.pgvector_store import PgVectorStore
 
 

@@ -27,7 +27,7 @@ from backend.domains.bi.domain.models import (
     MaterializationStatus,
     SnapshotId,
 )
-from backend.storage.connection_pool import (
+from backend.platform.postgres.pool import (
     get_pooled_async_connection,
     get_pooled_raw_connection,
 )

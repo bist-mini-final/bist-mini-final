@@ -63,7 +63,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field
 
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_embedder import (

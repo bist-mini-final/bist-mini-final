@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import openpyxl
 
-from backend.providers.openai_responses import OpenAIResponseResult
+from backend.platform.openai.responses import OpenAIResponseResult
 from backend.storage.spreadsheets.cell_visibility import WorksheetVisibility
 from backend.storage.spreadsheets.sheet_renderer import ExcelSheetRenderer
 from backend.storage.spreadsheets.table_geometry import compute_sheet_layout

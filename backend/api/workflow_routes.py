@@ -9,8 +9,6 @@ from fastapi import Path as FastPath
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from backend.core.state_stream import SharedStateStream
-from backend.core.state_stream_broker import StateStreamBroker
 from backend.domains.workflow.application.services import (
     WorkflowCommandService,
     WorkflowQueryService,
@@ -25,6 +23,8 @@ from backend.engine.workflows import (
     WorkflowSaveRequest,
     WorkflowStore,
 )
+from backend.shared.application.state_stream import SharedStateStream
+from backend.shared.application.state_stream_broker import StateStreamBroker
 
 from .workflow_controller import WorkflowHttpController
 

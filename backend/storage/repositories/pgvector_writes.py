@@ -12,7 +12,7 @@ import psycopg2.extras
 from langchain_core.documents import Document
 
 from backend.contracts.vector import PgVectorReplacePlan
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.embedding_artifacts import EmbeddingArtifactVectors
 from backend.storage.pgvector_binary_copy import copy_documents
 from backend.storage.pgvector_errors import PgVectorStoreError

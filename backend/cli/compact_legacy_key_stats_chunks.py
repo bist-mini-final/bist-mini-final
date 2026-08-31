@@ -13,6 +13,7 @@ indexes concurrently.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -259,7 +260,7 @@ def compact(*, apply: bool, rebuild_indexes: bool = True) -> int:
     return 0
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="기존 Key Stats title-region 청크를 재임베딩 없이 정리합니다"
     )
@@ -273,7 +274,7 @@ def main() -> int:
         action="store_true",
         help="삭제 후 collection-local HNSW 인덱스 재생성을 생략합니다",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     return compact(apply=args.apply, rebuild_indexes=not args.skip_reindex)
 
 

@@ -1,7 +1,7 @@
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.providers.openai_responses import OpenAIResponseResult
+from backend.platform.openai.responses import OpenAIResponseResult
 from modules.embedding.query_embedder import EmbedderInputDTO, EmbeddingsDTO
 from modules.query.decomposer import DecomposerInputDTO, SubqueriesDTO
 from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO

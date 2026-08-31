@@ -37,7 +37,7 @@ import logging
 from typing import Any
 
 from backend.core.settings import PGVECTOR_URL
-from backend.shared.infrastructure.database import SyncPostgresRepository
+from backend.platform.postgres.repositories import SyncPostgresRepository
 
 from .audit_schema import AUDIT_SCHEMA_SQL, SOURCE_FILE_AUDIT_SQL
 from .connection_pool import get_pooled_async_connection

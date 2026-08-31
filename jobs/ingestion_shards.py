@@ -12,9 +12,7 @@ INGESTION_EMBEDDING_SHARD_JOB = WorkerJobDefinition(
         "공유 float32 part artifact를 생성합니다."
     ),
     queue_name="ingestion-embedding",
-    worker_entrypoint=(
-        "backend.storage.data_sources.embedding_shard_worker_main:main"
-    ),
+    worker_kind="ingestion-embedding",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="ingestion-embedding",
         active_deadline_seconds=900,
@@ -38,7 +36,7 @@ INGESTION_VECTOR_SHARD_JOB = WorkerJobDefinition(
         "Binary COPY하고 재시도 시 동일 범위만 교체합니다."
     ),
     queue_name="ingestion-vector",
-    worker_entrypoint="backend.storage.data_sources.vector_shard_worker_main:main",
+    worker_kind="ingestion-vector",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="ingestion-vector",
         active_deadline_seconds=1800,

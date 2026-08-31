@@ -10,7 +10,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from backend.api.versioning import API_V1_PREFIX, LEGACY_API_PREFIX
-from backend.shared.infrastructure.observability import (
+from backend.shared.application.observability import (
     bind_observability_context,
     observability_log_extra,
 )

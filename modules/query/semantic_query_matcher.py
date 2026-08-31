@@ -53,8 +53,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from pydantic import Field
 
 from backend.core.settings import PROJECT_DIR
-from backend.providers.embeddings.ports import EmbeddingEncoder
-from backend.providers.openai_pricing import calculate_openai_cost
+from backend.platform.openai.pricing import calculate_openai_cost
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore
 from modules.common.base_embedder import (
     BaseModule,

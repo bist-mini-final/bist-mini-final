@@ -93,7 +93,7 @@ npm --prefix frontend ci
 터미널 1 — FastAPI 백엔드:
 
 ```bash
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+uv run uvicorn backend.entrypoints.asgi:app --host 0.0.0.0 --port 8765 --reload
 ```
 
 터미널 2 — React/Vite 프론트엔드:
@@ -281,7 +281,7 @@ Kubernetes 없이 큐 동작을 디버깅할 때 사용할 수 있습니다. 각
 
 ```bash
 # workflow-core 큐 1건
-uv run python -m backend.engine.worker.main
+uv run python -m backend.entrypoints.worker workflow
 
 # BI materialization 1건
 uv run python -m backend.features.bi.materialization_worker_main
@@ -337,7 +337,7 @@ uv --version
 Windows에서 이미 `.venv`가 준비되어 있다면 임시로 다음과 같이 실행할 수 있습니다.
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+.\.venv\Scripts\python.exe -m uvicorn backend.entrypoints.asgi:app --host 0.0.0.0 --port 8765 --reload
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 

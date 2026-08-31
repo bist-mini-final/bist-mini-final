@@ -4,8 +4,8 @@ from typing import Final
 import psycopg2
 
 from backend.core.settings import PGVECTOR_URL
+from backend.platform.postgres.pool import get_pooled_raw_connection
 from backend.storage.audit_schema import AUDIT_SCHEMA_SQL, BI_COMPANY_AUDIT_SQL
-from backend.storage.connection_pool import get_pooled_raw_connection
 
 BI_SCHEMA_SQL: Final = (
     """

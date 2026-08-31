@@ -45,7 +45,7 @@ from typing import Any, Dict, Optional
 from pydantic import Field
 
 from backend.core.settings import INGESTION_VECTOR_SHARD_SIZE, PROCESSED_DATA_DIR
-from backend.providers.embeddings.ports import EmbeddingEncoder
+from backend.shared.application.embeddings import EmbeddingEncoder
 from backend.storage.data_sources.shard_coordinator import IngestionShardCoordinator
 from backend.storage.db_manager import DatabaseManager
 from backend.storage.embedding_artifacts import EmbeddingArtifactStore

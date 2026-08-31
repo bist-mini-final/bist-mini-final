@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+from backend.bootstrap.application import RuntimeContainer
 from backend.bootstrap.bi import create_bi_materialization_runner
-from backend.bootstrap.container import RuntimeContainer
 from backend.domains.bi.domain.materialization_models import BiMaterializationOutcome
-from backend.engine.worker.base import (
+from backend.shared.application.workers import (
     LeasedWorker,
     WorkerLeaseSpec,
     default_worker_id,

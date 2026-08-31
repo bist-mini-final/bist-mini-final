@@ -8,18 +8,21 @@ import os
 import signal
 import socket
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from functools import lru_cache
 from typing import Generator, Optional
 
-from backend.bootstrap.container import RuntimeContainer
+from backend.bootstrap.application import RuntimeContainer
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
 from backend.engine.orchestration import compile_task_plan
 from backend.engine.runtime.services import WorkflowRuntimeServices
 from backend.engine.workflows.executor import DagExecutionCancelled
+from backend.shared.application.leases import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
 from backend.storage.db_manager import WorkflowRunAlreadyClaimed, WorkflowRunLease
-
-from .lease import LeaseHeartbeat, terminate_process_on_lease_loss
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +242,7 @@ def run_one(
             )
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--queue",
@@ -249,7 +252,7 @@ def main() -> int:
         "--worker-id",
         default=os.getenv("KUBERNETES_JOB_NAME") or socket.gethostname(),
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",

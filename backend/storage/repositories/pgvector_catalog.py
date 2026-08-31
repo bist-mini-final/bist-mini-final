@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Sequence
 from urllib.parse import urlparse
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import get_pooled_async_connection
+from backend.platform.postgres.pool import get_pooled_async_connection
 from backend.storage.pgvector_errors import PgVectorStoreError
 from modules.common.config import DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_MODEL
 

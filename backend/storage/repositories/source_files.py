@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import psycopg2.extras
 
-from backend.storage.connection_pool import get_pooled_async_connection
+from backend.platform.postgres.pool import get_pooled_async_connection
 
 from .base import DatabaseConnectionCapability
 

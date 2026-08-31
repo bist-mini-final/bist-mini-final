@@ -38,10 +38,12 @@
 ## 백엔드 구조 기준선
 
 - 목표 구조는 얇은 `entrypoints`, 단일 `bootstrap`, 도메인별 `domain/application/infrastructure/presentation/workers` vertical slice와 `platform` adapter 경계를 사용한다. 읽기 전용 작업 관제는 `operations` bounded context가 소유한다. 현재 구현은 이 목표로 이동 중인 과도기 구조이며 완료 상태가 아니다.
+- 1단계 process/platform 경계는 실제 코드로 전환됐다. ASGI·CLI·worker는 `backend/entrypoints`, 조립은 `backend/bootstrap/application.py`, `http.py`, `workers.py`가 소유하며 여섯 worker 사양은 `backend.entrypoints.worker` 하나로 진입한다.
 - `backend/api`는 아직 도메인 route와 controller를 함께 보유한다. 최종적으로는 router 결합, middleware, exception handler, versioning만 남기고 도메인 presentation을 각 `backend/domains/<domain>/presentation`으로 이동한다.
 - `backend/domains/<domain>/application`은 유스케이스와 port를, `domain`은 순수 상태·오류 규칙을 소유하는 것이 목표다. 현재 workflow와 BI는 비교적 분리돼 있지만 data sources, chatbot, benchmark, company comparison은 목표 하위 계층을 모두 갖추지 않았고 일부 application은 아직 `features`와 `engine` 구체 구현에 직접 의존한다.
-- 현재 `backend/platform/pgvector`와 `backend/shared/infrastructure/database`가 좁은 저장소 adapter 경계를 제공한다. 최종 구조에서는 transaction protocol은 `shared/application`, driver·pool·transaction 구현은 `platform/postgres`, 도메인 SQL·mapping은 각 domain infrastructure로 이동한다. `DatabaseManager`와 `PgVectorStore`는 이 이동 중 호출을 보존하는 하위 호환 facade다.
+- PostgreSQL pool과 범용 repository primitive는 `backend/platform/postgres`, OpenAI transport·Responses·embedding·pricing은 `backend/platform/openai`, Redis broker와 telemetry 구현은 각각 `backend/platform/redis`, `backend/platform/telemetry`가 소유한다. state stream, embedding port, lease worker와 observability context는 `backend/shared/application` 계약으로 분리됐다. 도메인 SQL·mapping은 아직 각 domain infrastructure로 이동해야 한다. `DatabaseManager`와 `PgVectorStore`는 이 이동 중 호출을 보존하는 하위 호환 facade다.
 - `backend/bootstrap`만 concrete adapter를 조립하는 것이 최종 규칙이다. 현재 `backend/features`, `backend/storage`, `backend/providers`, `backend/core`, `backend/contracts`, `backend/engine`은 호환성과 단계적 이전을 위해 남아 있으며 목표 디렉터리 구조의 최종 위치는 아니다.
+- 이전 `backend/main.py`, `bootstrap/container.py`, `providers/*`, `storage/connection_pool.py`, `core/state_stream*`, `core/telemetry.py`, `engine/worker/{base,lease}.py` 경로는 외부 호출 호환용 re-export만 남았다. 애플리케이션 내부 import는 새 canonical 경로만 사용하며 구조 계약 테스트가 회귀를 막는다.
 - OpenAI Responses 호출은 provider가 transport와 응답 파싱을, `BaseLLMModule`이 structured/text/agentic module lifecycle과 usage 집계를 소유한다.
 - spreadsheet 구조 감지는 전처리된 시트 계약, 병렬 분석 batch, 범위 정규화 단계를 분리하며 renderer는 값 포맷·fill·border·text 배치를 독립 helper로 유지한다.
 - one-shot queue worker는 `LeasedWorker` template method를 상속해 claim, heartbeat, terminal transition을 공유한다. pause/cancel 같은 별도 상태 기계를 가진 worker는 공통 lease primitive만 재사용한다.

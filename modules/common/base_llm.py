@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pydantic import BaseModel, Field
 
-from backend.providers.openai_pricing import calculate_openai_cost
+from backend.platform.openai.pricing import calculate_openai_cost
 from modules.common.base_module import (
     BaseModule,
     DocumentContextDTO,

@@ -4,7 +4,7 @@ import asyncio
 from uuid import uuid4
 
 from backend.core.settings import PGVECTOR_URL
-from backend.storage.connection_pool import (
+from backend.platform.postgres.pool import (
     close_async_pool,
     get_async_pool,
     get_pooled_async_connection,

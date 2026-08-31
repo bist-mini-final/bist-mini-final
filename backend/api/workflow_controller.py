@@ -10,7 +10,6 @@ from anyio import to_thread
 from fastapi import HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
-from backend.core.state_stream import SharedStateStream
 from backend.domains.workflow.application.services import (
     WorkflowCommandService,
     WorkflowQueryService,
@@ -24,6 +23,7 @@ from backend.engine.workflows import (
     WorkflowRun,
     WorkflowSaveRequest,
 )
+from backend.shared.application.state_stream import SharedStateStream
 
 
 def _queue_unavailable(error: RuntimeError, **context: str) -> HTTPException:

@@ -10,7 +10,7 @@ from backend.domains.bi.domain.question_records import (
     BiQuestionRecord,
     BiQuestionStatus,
 )
-from backend.storage.connection_pool import get_pooled_raw_connection
+from backend.platform.postgres.pool import get_pooled_raw_connection
 
 from .question_repository_queries import BiQuestionRepositoryError
 

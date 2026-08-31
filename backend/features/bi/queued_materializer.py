@@ -23,7 +23,7 @@ from backend.domains.bi.domain.models import (
 )
 from backend.domains.bi.domain.question_batch import BiQuestionBatchPlan
 from backend.domains.bi.domain.question_records import BiQuestionJobProgress
-from backend.providers.openai_responses import OpenAIResponsesError
+from backend.platform.openai.responses import OpenAIResponsesError
 from modules.common.exceptions import ModuleExecutionError
 
 from .materializer import BiDocumentProfilerPort, ClockPort

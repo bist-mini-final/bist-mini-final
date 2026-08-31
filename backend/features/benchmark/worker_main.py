@@ -4,19 +4,19 @@ import logging
 from datetime import UTC, datetime
 from time import sleep
 
-from backend.bootstrap.container import RuntimeContainer
+from backend.bootstrap.application import RuntimeContainer
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
 from backend.engine.orchestration.kubernetes import KubernetesQueueDispatcher
-from backend.engine.worker.base import default_worker_id
-from backend.engine.worker.lease import (
-    LeaseHeartbeat,
-    terminate_process_on_lease_loss,
-)
 from backend.engine.workflows import DagExecutionCancelled
 from backend.features.benchmark.service import (
     BenchmarkRequest,
     execute_benchmark_comparison,
 )
+from backend.shared.application.leases import (
+    LeaseHeartbeat,
+    terminate_process_on_lease_loss,
+)
+from backend.shared.application.workers import default_worker_id
 
 from .postgres_store import BenchmarkPostgresStore, ClaimedBenchmarkJob
 
