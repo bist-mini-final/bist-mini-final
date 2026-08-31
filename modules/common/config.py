@@ -20,29 +20,19 @@ DEFAULT_EXCHANGE_RATE_KRW_PER_USD: float = 1400.0
 # ==============================================================================
 DEFAULT_LLM_MODEL: str = "gpt-5.6-luna"
 DEFAULT_VLM_MODEL: str = DEFAULT_LLM_MODEL
-DEFAULT_ROUTER_MODEL: str = DEFAULT_LLM_MODEL
 DEFAULT_READER_MODEL: str = DEFAULT_LLM_MODEL
 DEFAULT_REFINER_MODEL: str = DEFAULT_LLM_MODEL
 DEFAULT_ENTITY_EXTRACTOR_MODEL: str = DEFAULT_LLM_MODEL
 
 # ==============================================================================
-# 3. Semantic Routing & Matching Defaults
-# ==============================================================================
-DEFAULT_SEMANTIC_THRESHOLD: float = 0.74
-DEFAULT_SEMANTIC_TOP_K: int = 5
-DEFAULT_SEMANTIC_VOTE_MARGIN: float = 0.05
-
-
-# ==============================================================================
-# 4. Retrieval & RRF Fusion Defaults
+# 3. Retrieval & RRF Fusion Defaults
 # ==============================================================================
 DEFAULT_RETRIEVAL_TOP_K: int = 100
 DEFAULT_RRF_K: int = 60
-DEFAULT_MIN_SCOPE_CONFIDENCE: float = 0.80
 
 
 # ==============================================================================
-# 5. Context Expansion Defaults (PostgreSQL DB On-Demand)
+# 4. Context Expansion Defaults (PostgreSQL DB On-Demand)
 # ==============================================================================
 DEFAULT_PG_CONTEXT_TOP_K: int = 100
 DEFAULT_PG_ADJACENT_RADIUS: int = 0
@@ -53,7 +43,7 @@ DEFAULT_CONTEXT_MAX_BLOCKS: int = DEFAULT_PG_MAX_BLOCKS
 
 
 # ==============================================================================
-# 6. Answer Refiner Defaults
+# 5. Answer Refiner Defaults
 # ==============================================================================
 DEFAULT_REFINER_MODE: str = "direct_cell"
 DEFAULT_REFINER_TOP_K: int = 20

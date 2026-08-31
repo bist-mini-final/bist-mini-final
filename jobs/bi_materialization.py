@@ -17,17 +17,16 @@ BI_METRIC_EXTRACTION_JOB = DagJobDefinition(
     job_id="bi_metric_extraction",
     name="BI 재무 메트릭 하이브리드 RAG 추출 파이프라인",
     description=(
-        "기업 재무제표 엑셀 원본으로부터 개별 지표·기간별 질문을 분해, 라우팅, "
+        "기업 재무제표 엑셀 원본으로부터 catalog 범위 안에서 질문을 분해하고 "
         "pgvector HNSW 밀집 검색과 PostgreSQL FTS 키워드 검색 융합, "
         "컨텍스트 확장 및 근거 기반 수치 정규화 추출 모듈 조합 파이프라인"
     ),
     queue_name="workflow-core",
-    version="1",
+    version="2",
     nodes=(
         JobNode("query", "query_input"),
-        JobNode("decompose", "decomposer"),
         JobNode("data-scope", "pgvector_data_scope"),
-        JobNode("route", "llm_query_router"),
+        JobNode("decompose", "decomposer"),
         JobNode("embed-query", "embedder"),
         JobNode("dense", "pgvector_retriever"),
         JobNode("keyword", "postgres_native_keyword_retriever"),
@@ -37,11 +36,28 @@ BI_METRIC_EXTRACTION_JOB = DagJobDefinition(
     ),
     edges=(
         JobEdge("query-decompose", "query", "decompose", "query_context", "query_context"),
-        JobEdge("decompose-route", "decompose", "route", "output", "query_input"),
-        JobEdge("scope-route", "data-scope", "route", "scope_catalog", "scope_catalog"),
-        JobEdge("route-embed", "route", "embed-query", "retrieval_plan", "retrieval_plan"),
+        JobEdge(
+            "scope-decompose",
+            "data-scope",
+            "decompose",
+            "scope_catalog",
+            "scope_catalog",
+        ),
+        JobEdge(
+            "decompose-embed",
+            "decompose",
+            "embed-query",
+            "retrieval_plan",
+            "retrieval_plan",
+        ),
         JobEdge("embed-dense", "embed-query", "dense", "query_embeddings", "query_input"),
-        JobEdge("route-keyword", "route", "keyword", "retrieval_plan", "retrieval_plan"),
+        JobEdge(
+            "decompose-keyword",
+            "decompose",
+            "keyword",
+            "retrieval_plan",
+            "retrieval_plan",
+        ),
         JobEdge("dense-fuse", "dense", "fuse", "dense_result", "dense_result"),
         JobEdge("keyword-fuse", "keyword", "fuse", "bm25_result", "bm25_result"),
         JobEdge("fuse-context", "fuse", "expand-context", "retrieval_json", "retrieval_json"),

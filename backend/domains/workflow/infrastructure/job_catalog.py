@@ -30,11 +30,12 @@ def workflow_from_job(
     for index, node in enumerate(job.nodes):
         column = index % 4
         row = index // 4
+        position = node.position or (80 + column * 420, 80 + row * 360)
         nodes.append(
             WorkflowNode(
                 id=node.node_id,
                 module_type=node.module_type,
-                position=CanvasPosition(x=80 + column * 420, y=80 + row * 360),
+                position=CanvasPosition(x=position[0], y=position[1]),
                 config=dict(node.config),
                 values=dict(node.values),
             )

@@ -379,8 +379,8 @@ class WorkflowRunStateRepositoryMixin(WorkflowDatabaseCapability):
                                'pgvector_index_writer',
                                'company_entity_extractor',
                                'sheet_metadata_persistence',
+                               'workbook_profile_persistence',
                                'query_input',
-                               'llm_query_router',
                                'decomposer',
                                'reader'
                            ) THEN output

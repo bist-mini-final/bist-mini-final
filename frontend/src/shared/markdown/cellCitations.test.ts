@@ -1,20 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeCellCitations,
-  parseCellCitationHref,
-} from './cellCitations';
+import { citationFromEvidence } from './cellCitations';
 
-describe('cell citation markdown', () => {
-  it('removes structured source details from the visible markdown and keeps them in metadata', () => {
-    const normalized = normalizeCellCitations(
-      '- [Sheet: Balance_Sheet | Cell: P74] Company: DHIN | Sheet: Balance_Sheet | Row Header: Total Liabilities | Column Header: 2025-12-31 | Cell Value: 9,015 | File Name: dhin.xlsx | Workbook Hash: abc123 | Index ID: idx_dhin',
-    );
-    const href = /\((https:\/\/citation\.local\/[^)]+)\)/.exec(normalized)?.[1];
-    const citation = parseCellCitationHref(href);
+describe('structured cell evidence projection', () => {
+  it('maps the backend evidence DTO to the evidence viewer citation contract', () => {
+    const citation = citationFromEvidence({
+      evidence_id: 'EVIDENCE-001',
+      index_id: 'idx_dhin',
+      workbook_hash: 'abc123',
+      file_name: 'dhin.xlsx',
+      company_name: 'DHIN',
+      sheet_name: 'Balance_Sheet',
+      cell_coord: 'P74',
+      row_header: ['Total Liabilities'],
+      column_header: ['2025-12-31'],
+      cell_value: '9,015',
+      source_text: 'Company: DHIN | Sheet: Balance_Sheet | Cell Value: 9,015',
+    });
 
-    expect(normalized).toMatch(/^- \[Balance Sheet · P74\]/);
-    expect(normalized).not.toContain('Row Header:');
-    expect(citation).toMatchObject({
+    expect(citation).toEqual({
       company: 'DHIN',
       sheet: 'Balance_Sheet',
       cell: 'P74',
@@ -24,14 +27,7 @@ describe('cell citation markdown', () => {
       fileName: 'dhin.xlsx',
       workbookHash: 'abc123',
       indexId: 'idx_dhin',
+      sourceText: 'Company: DHIN | Sheet: Balance_Sheet | Cell Value: 9,015',
     });
-  });
-
-  it('keeps ordinary text after an inline cell citation', () => {
-    const normalized = normalizeCellCitations(
-      '총자산은 10,081입니다. [Sheet: Balance_Sheet | Cell: O50] 이 값은 최신 기준입니다.',
-    );
-
-    expect(normalized).toContain('이 값은 최신 기준입니다.');
   });
 });

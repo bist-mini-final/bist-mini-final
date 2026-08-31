@@ -250,6 +250,7 @@ class PgVectorCatalogMixin(PgVectorConnectionCapability):
                     "file_name": str(metadata.get("file_name") or index_id),
                     "workbook_hash": str(metadata.get("workbook_hash") or index_id),
                     "company_name": str(metadata.get("company_name") or ""),
+                    "ticker": str(metadata.get("ticker") or ""),
                     "sheet_names": [
                         str(name) for name in (raw_sheet_names or []) if str(name).strip()
                     ],

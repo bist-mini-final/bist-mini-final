@@ -12,11 +12,17 @@ Financial BI는 한 기업의 검증된 재무 관측값·파생값·원본 셀 
 
 ```mermaid
 flowchart LR
-    INDEX[Indexed workbook] --> PROFILE[DocumentProfiler]
-    PROFILE --> PLAN[Metric question plan]
+    INDEX[Indexed workbook] --> PROFILE[(data sources WorkbookProfile)]
+    PROFILE --> ADAPTER[BI profile adapter]
+    ADAPTER --> PLAN[Metric question plan]
+    INDEX -. incomplete profile only .-> FALLBACK[Retrieval and LLM profiler]
+    FALLBACK --> ADAPTER
     PLAN --> QUEUE[BI question durable queue]
-    QUEUE --> RAG[Hybrid retrieval and metric reader]
-    RAG --> ANSWERS[(bi_questions and bi_answers)]
+    QUEUE --> EXACT{Catalog exact evidence}
+    EXACT -->|match| READER[Structured metric reader]
+    EXACT -->|no match| RAG[Hybrid retrieval and context expansion]
+    RAG --> READER
+    READER --> ANSWERS[(bi_questions and bi_answers)]
     ANSWERS --> BUILD[BiQuestionSnapshotMaterializer and calculator]
     BUILD --> SNAP[(bi_dashboard_snapshots)]
     SNAP --> API[GET /api/v1/bi/companies/{id}/dashboard]
@@ -27,6 +33,7 @@ flowchart LR
 - materialization과 metric question은 PostgreSQL queue와 KEDA one-shot worker에서 처리합니다.
 - 기업·스냅샷·작업 조회와 SSE 초기 로드는 async PostgreSQL pool을 사용합니다.
 - Redis는 materialization/question SSE의 변경 신호이며 PostgreSQL 상태가 source of truth입니다.
+- BI는 `workbook_profiles`를 직접 소유하지 않습니다. data sources 계약의 기간·통화·배율·시트 역할을 BI `BiDocumentProfile`로 변환하며, 원본 프로필이 불완전할 때만 기존 검색/LLM profiler를 보완 경로로 실행합니다.
 
 ## 2. 21개 지표 계약
 
@@ -48,6 +55,16 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 - `calculator.py`는 `Decimal`을 사용하고 `formulas.json`·`formula_dsl.py`의 허용된 산술식만 평가합니다.
 - 파생값은 입력 관측값의 `BiEvidence`를 합쳐 시트명·셀 좌표·원문을 보존합니다.
 - FY와 LTM은 `BiPeriod.kind`로 구분합니다. `calendar_periods.py`는 회계연도 종료일을 비교 가능한 달력 축으로 표현하지만 연간 값을 분기 실적으로 환산하지 않습니다.
+- profile의 통화·배율은 Reader가 명시 단위를 반환하지 못한 amount 관측값의 공통 계약으로 사용합니다. 원본에도 명시 근거가 없으면 null을 추정하지 않고 기존 `ambiguous` 규칙을 유지합니다.
+
+### 3.1 원천 지표 검색 순서
+
+1. `PostgresBiMetricEvidenceRetriever`는 현재 질문의 collection·workbook hash·file name lineage 안에서만 조회합니다.
+2. `METRIC_CATALOG`의 영문·한글 별칭, row header hint와 excluded alias를 정규화해 동일 지표 행을 찾습니다. `statement_hints`는 우선순위에만 사용하고 특정 sheet 이름을 필수 조건으로 고정하지 않습니다.
+3. 같은 좌표의 `header_only`와 `header_with_value` 중 실제 값 문서를 선택하며 `?`, `NA`, `N/A`, `NM`, `#PEND`, `NULL`은 Reader 근거에서 제외합니다.
+4. 명시적 LTM header가 있으면 `BiPeriod.kind`와 일치하는 좌표만 선택합니다. 일부 sheet에서 마지막 두 열이 동일 종료일이고 상위 LTM header가 유실된 경우, 같은 지표 행의 중복 종료일 중 왼쪽을 FY·오른쪽을 LTM으로 해석합니다. 열 문자나 특정 vendor sheet 이름은 사용하지 않습니다.
+5. 정확 후보가 있으면 scope-aware Decomposer·embedding·Dense/Sparse 검색을 생략하고 구조화 Metric Reader로 전달합니다. 정확 후보가 없을 때만 BP-303 하이브리드 RAG를 실행합니다.
+6. 정확 조회와 RAG 모두 값을 찾지 못하면 보조 지표를 다른 의미의 행으로 대체하지 않고 기존 missing/fallback 계산 정책을 따릅니다.
 
 ## 4. API와 사용자 제어
 
@@ -82,7 +99,9 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 
 - metric definition, evidence requirement와 snapshot publication policy는 BI domain/application이 소유합니다.
 - source lookup·snapshot repository·materialization adapter는 BI infrastructure, API/SSE DTO는 BI presentation, durable process는 BI workers에 둡니다.
+- metric exact-evidence 조회 port는 BI application이 정의하고 PostgreSQL 구현은 BI infrastructure가 소유합니다. 범용 RAG module이나 data sources 저장 계약에 BI metric 의미를 역류시키지 않습니다.
 - Company Comparison은 BI infrastructure를 import하지 않고 BI application의 snapshot reader port만 사용합니다.
+- Company Comparison은 공통 workbook profile을 직접 조회하지 않고, 해당 계약이 반영된 current BI snapshot만 소비합니다. 따라서 BI snapshot 생성만으로 비교 head를 자동 발행하지 않는 기존 갱신 경계는 유지됩니다.
 - 계산·application port·PostgreSQL/integration adapter·API/SSE·worker가 BI vertical slice로 이동했으며 이전 feature/API 호환 경로는 제거됐습니다.
 - 구조 계약 테스트는 BI domain/application/presentation/worker가 feature·storage·platform concrete 구현을 역참조하지 못하게 하며 21개 metric 및 snapshot 회귀 계약을 함께 검증합니다.
 - BI 스냅샷 추가/삭제/refresh/reset은 각각 별도 mutation이며 UI는 진행 상태와 실패를 이전 정상 snapshot과 구분합니다.

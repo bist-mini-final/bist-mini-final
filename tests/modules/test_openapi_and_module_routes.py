@@ -43,7 +43,7 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         expected_dtos = [
             "DecomposerInputDTO",
             "DecomposerConfigDTO",
-            "SubqueriesDTO",
+            "RetrievalPlanDTO",
             "QueryInputDTO",
             "QueryContextDTO",
             "CellTextEmbedderInputDTO",
@@ -51,6 +51,8 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
             "RankedSearchResultDTO",
             "ReaderInputDTO",
             "ReaderOutputDTO",
+            "CellEvidenceDTO",
+            "ChatMessageResponse",
         ]
         for dto_name in expected_dtos:
             self.assertIn(

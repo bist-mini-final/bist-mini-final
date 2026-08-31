@@ -49,6 +49,8 @@
 | GET | `/api/v1/chat/suggestions` | 추천 질문 |
 | POST | `/api/v1/chat/suggestions/refresh` | 추천 질문 갱신 |
 
+완료된 assistant message는 본문 `content`와 구조화 `evidence[]`를 분리해 반환합니다. `evidence[]`의 각 항목은 `evidence_id`, collection/workbook/file/company identity, `sheet_name`, `cell_coord`, 행·열 header path, 실제 `cell_value`, `source_text`를 가지며 서버 Pydantic 검증과 run evidence allowlist를 모두 통과해야 합니다. 클라이언트는 `content`에서 좌표 문자열을 파싱하지 않습니다.
+
 ### Workflow와 module
 
 | Method | Path | 역할 |
@@ -62,7 +64,7 @@
 | POST | `/api/v1/runs/{run_id}/resume` | 재개/재등록 |
 | POST | `/api/v1/runs/{run_id}/cancel` | 취소 요청 |
 | GET | `/api/v1/runs/{run_id}/stream` | run SSE |
-| GET | `/api/v1/modules` | 19개 등록 module 목록 |
+| GET | `/api/v1/modules` | 17개 등록 module 목록 |
 | GET | `/api/v1/modules/categories` | category별 catalog |
 | GET | `/api/v1/modules/schemas` | input/config/output JSON schema |
 | GET | `/api/v1/modules/{module_type}` | 단일 module 계약 |
@@ -89,7 +91,7 @@
 | GET | `/api/v1/data-sources/db-status` | 현재 DB probe |
 | POST | `/api/v1/data-sources/db-connect` | 지정 DB 연결 검사 |
 | GET | `/api/v1/spreadsheet-artifacts/{workbook_hash}/sheets/{sheet_name}` | render artifact |
-| GET | `/api/v1/evidence/cells/resolve` | 셀 인용 query를 workbook·sheet image·bbox 근거로 해석 |
+| GET | `/api/v1/evidence/cells/resolve` | 구조화 셀 근거를 workbook·sheet image·bbox로 해석 |
 
 ### Benchmark, jobs, maintenance
 

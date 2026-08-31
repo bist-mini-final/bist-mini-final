@@ -25,8 +25,6 @@ import { PgVectorIndexWriterNode } from './CustomNodes/PgVectorIndexWriterNode';
 import { QueryNode } from './CustomNodes/QueryNode';
 import { ReaderNode } from './CustomNodes/ReaderNode';
 import { RrfFusionNode } from './CustomNodes/RrfFusionNode';
-import { SemanticQueryMatcherNode } from './CustomNodes/SemanticQueryMatcherNode';
-import { LlmQueryRouterNode } from './CustomNodes/LlmQueryRouterNode';
 import { ModuleSettingsModal } from './ModuleSettings/ModuleSettingsModal';
 import type { usePipelineGraph } from '../hooks/usePipelineGraph';
 import type { ModuleDefinition, WorkflowRun } from '../types';
@@ -63,8 +61,6 @@ export function PipelineCanvas({
       pgvector_retriever: PgVectorRetrieverNode,
       postgres_native_keyword_retriever: GenericModuleNode,
       rrf_fusion: RrfFusionNode,
-      semantic_query_matcher: SemanticQueryMatcherNode,
-      llm_query_router: LlmQueryRouterNode,
       contextNode: ContextNode,
       readerNode: ReaderNode,
       processed_file_selector: ProcessedFileSelectorNode,

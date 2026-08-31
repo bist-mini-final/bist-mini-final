@@ -1,7 +1,7 @@
 import { ArrowUpDown, ChevronDown, RefreshCw, X } from 'lucide-react';
 import { AppLink } from '../../app/router';
 import { Button } from '../../shared/ui';
-import { formatAmount } from './analysis';
+import { formatAmount, formatCompositeScore } from './analysis';
 import {
   latestHistoricalPeriod,
   type DisplayDirection,
@@ -248,7 +248,7 @@ export function CompanyRankingTable({
                   <td className={`col-th-composite ${rankingMetric === 'composite' ? 'is-ranked' : ''}`}>
                     <div className="debt-grade-cell" title="성장성 35% + 수익성 35% + 안정성 30%">
                       <span className={`tier-round-pill pill-${company.tier.toLowerCase()}`}>{company.tier}</span>
-                      <strong>{company.compositeScore.toFixed(1)}</strong>
+                      <strong>{formatCompositeScore(company.compositeScore)}</strong>
                     </div>
                   </td>
                 </tr>
@@ -256,6 +256,43 @@ export function CompanyRankingTable({
             })}
           </tbody>
         </table>
+      </div>
+      <div className="league-mobile-ranking" aria-label={`${activeRankingLabel} 모바일 순위 목록`}>
+        {companies.map(({ company, rank }) => {
+          const isFocused = company.companyId === focusedCompanyId;
+          const isSelected = selectedCompanyIds.has(company.companyId);
+          return (
+            <article
+              key={company.companyId}
+              className={`league-mobile-company${isFocused ? ' is-selected' : ''}`}
+            >
+              <header className="league-mobile-company__header">
+                <span className="league-mobile-company__rank">{rank}</span>
+                <button
+                  type="button"
+                  className="league-mobile-company__identity"
+                  onClick={() => onFocusCompany(company.companyId)}
+                  aria-pressed={isFocused}
+                >
+                  <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={26} />
+                  <span className="league-mobile-company__name">{company.displayName}</span>
+                </button>
+                <span className="league-mobile-company__summary" title="종합 점수">
+                  <span className={`tier-round-pill pill-${company.tier.toLowerCase()}`}>{company.tier}</span>
+                  <strong>{formatCompositeScore(company.compositeScore)}</strong>
+                </span>
+                <label className="league-mobile-company__compare">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleCompany(company.companyId)}
+                  />
+                  비교
+                </label>
+              </header>
+            </article>
+          );
+        })}
       </div>
     </div>
   );

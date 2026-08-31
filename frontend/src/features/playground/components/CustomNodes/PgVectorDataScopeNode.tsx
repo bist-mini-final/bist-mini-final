@@ -37,10 +37,10 @@ export function PgVectorDataScopeNode({ data, selected }: NodeProps<Node<Data>>)
     >
       <div className="flex items-start gap-2 rounded-xl border border-teal-100 bg-teal-50/70 px-3 py-2.5 text-[10px] text-teal-900">
         <ScanSearch className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>collection·company·sheet·embedding 계약만 DB에서 자동 조회합니다. 사용자가 collection을 고르지 않습니다.</span>
+        <span>collection·company·ticker·sheet·embedding 계약만 DB에서 조회해 Decomposer에 제공합니다.</span>
       </div>
       {count !== null && (
-        <div className="text-[10px] font-semibold text-teal-800">라우팅 가능한 data scope: {count}개</div>
+        <div className="text-[10px] font-semibold text-teal-800">검색 가능한 data scope: {count}개</div>
       )}
     </NodeShell>
   );

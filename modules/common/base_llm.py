@@ -437,6 +437,61 @@ class BaseLLMModule(BaseModule):
             accumulator.record(res)
         return self._agentic_result(answer_text, accumulator, started_at)
 
+    def complete_agentic_structured(
+        self,
+        messages: List[Dict[str, Any]],
+        tools_map: Dict[str, Any],
+        response_model: Type[T],
+        model: str,
+        max_iterations: int = 5,
+        enable_tools: bool = True,
+    ) -> Tuple[T, ApiUsageDTO, float, float]:
+        """Run the tool loop and require the final answer to match a Pydantic schema."""
+        started_at = time.perf_counter()
+        openai_tools = self._openai_tools(tools_map, enable_tools)
+        accumulator = _UsageAccumulator(model)
+        answer_text = ""
+        instructions, input_items = self._response_prompt(messages)
+        previous_response_id: Optional[str] = None
+        text_format = self._structured_format(response_model)
+
+        for _ in range(max_iterations):
+            res = self.completion_client.create_response(
+                model=model,
+                instructions=instructions,
+                input_items=input_items,
+                text_format=text_format,
+                tools=openai_tools,
+                previous_response_id=previous_response_id,
+                store=True,
+            )
+            accumulator.record(res)
+            function_calls = getattr(res, "function_calls", ())
+            if not function_calls:
+                answer_text = res.content
+                break
+            input_items = self._sync_tool_outputs(function_calls, tools_map)
+            previous_response_id = res.response_id
+        else:
+            res = self.completion_client.create_response(
+                model=model,
+                instructions=instructions,
+                input_items=input_items,
+                text_format=text_format,
+                previous_response_id=previous_response_id,
+                store=True,
+            )
+            answer_text = res.content
+            accumulator.record(res)
+
+        parsed = response_model.model_validate_json(answer_text.strip())
+        _, usage, cost, latency = self._agentic_result(
+            answer_text,
+            accumulator,
+            started_at,
+        )
+        return parsed, usage, cost, latency
+
     async def complete_agentic_async(
         self,
         messages: List[Dict[str, Any]],
@@ -480,6 +535,61 @@ class BaseLLMModule(BaseModule):
             answer_text = res.content
             accumulator.record(res)
         return self._agentic_result(answer_text, accumulator, started_at)
+
+    async def complete_agentic_structured_async(
+        self,
+        messages: List[Dict[str, Any]],
+        tools_map: Dict[str, Any],
+        response_model: Type[T],
+        model: str,
+        max_iterations: int = 5,
+        enable_tools: bool = True,
+    ) -> Tuple[T, ApiUsageDTO, float, float]:
+        """Async tool loop whose terminal response is strict Pydantic JSON."""
+        started_at = time.perf_counter()
+        openai_tools = self._openai_tools(tools_map, enable_tools)
+        accumulator = _UsageAccumulator(model)
+        answer_text = ""
+        instructions, input_items = self._response_prompt(messages)
+        previous_response_id: Optional[str] = None
+        text_format = self._structured_format(response_model)
+
+        for _ in range(max_iterations):
+            res = await self.completion_client.create_response_async(
+                model=model,
+                instructions=instructions,
+                input_items=input_items,
+                text_format=text_format,
+                tools=openai_tools,
+                previous_response_id=previous_response_id,
+                store=True,
+            )
+            accumulator.record(res)
+            function_calls = getattr(res, "function_calls", ())
+            if not function_calls:
+                answer_text = res.content
+                break
+            input_items = await self._async_tool_outputs(function_calls, tools_map)
+            previous_response_id = res.response_id
+        else:
+            res = await self.completion_client.create_response_async(
+                model=model,
+                instructions=instructions,
+                input_items=input_items,
+                text_format=text_format,
+                previous_response_id=previous_response_id,
+                store=True,
+            )
+            answer_text = res.content
+            accumulator.record(res)
+
+        parsed = response_model.model_validate_json(answer_text.strip())
+        _, usage, cost, latency = self._agentic_result(
+            answer_text,
+            accumulator,
+            started_at,
+        )
+        return parsed, usage, cost, latency
 
 
 __all__ = [

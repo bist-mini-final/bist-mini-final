@@ -6,7 +6,7 @@
 
 ## 🧭 엔지니어링 문서 체계 및 청사진 구조
 
-`bist-mini-final`의 기술 문서는 시스템 아키텍처, 19개 파이프라인 모듈 핀아웃, 5개 제품 워크스페이스와 Jobs/Settings, 데이터베이스 DDL 및 프론트엔드 배선도를 **[엔지니어링 청사진 규격서 (Blueprints)]** 체계로 관리합니다. 2026-08-31 기준 BP-101~701의 구조 상태는 모두 `Complete`이며 현재 수치와 검증 결과는 기준선 문서가 단일 출처입니다.
+`bist-mini-final`의 기술 문서는 시스템 아키텍처, 17개 파이프라인 모듈 핀아웃, 5개 제품 워크스페이스와 Jobs/Settings, 데이터베이스 DDL 및 프론트엔드 배선도를 **[엔지니어링 청사진 규격서 (Blueprints)]** 체계로 관리합니다. 2026-08-31 기준 BP-101~701의 구조 상태는 모두 `Complete`이며 현재 수치와 검증 결과는 기준선 문서가 단일 출처입니다.
 
 > **문서 해석 기준:** [`blueprints/README.md`](blueprints/README.md)와 `BP-101~701`은 도달해야 할 To-Be 계약입니다. [`CURRENT_IMPLEMENTATION_BASELINE.md`](CURRENT_IMPLEMENTATION_BASELINE.md)는 현재 코드와 배포 상태만 기록합니다. 기능 가동 상태와 구조 migration 완료 상태를 혼동하지 않습니다.
 
@@ -19,10 +19,10 @@ flowchart TD
     subgraph BlueprintTrack ["📐 blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
         B1["01_system_blueprints/ (BP-101~104: modular backend, durable job, 3-Level 락, K8s)"]
         B2["02_data_engine_blueprints/ (BP-201~203: 2D 파서, 외부 Vision 구조 감지, Binary COPY)"]
-        B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 19개 모듈·BI 서비스, RRF 융합)"]
+        B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 17개 모듈·BI 서비스, RRF 융합)"]
         B4["04_workspace_blueprints/ (BP-401~405: 5대 워크스페이스 세부 명세)"]
         B5["05_interface_blueprints/ (BP-501~503: REST API, SSE, PostgreSQL DDL)"]
-        B6["06_frontend_blueprints/ (BP-601: React 18 결선도)"]
+        B6["06_frontend_blueprints/ (BP-601: React 18 결선도·반응형 shell)"]
         B7["07_validation_blueprints/ (BP-701: AST 계약 테스트 규격)"]
     end
 
@@ -43,7 +43,7 @@ flowchart TD
 | | [`BP-202`](blueprints/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) | 외부 OpenAI vision 기반 시트 구조 감지 및 결과 검증 |
 | | [`BP-203`](blueprints/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | PostgreSQL Native `Binary COPY` 3072d 고속 벌크 주입 |
 | **03. Pipeline** | [`BP-301`](blueprints/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | Kahn 위상정렬 DAG, durable queue 실행 및 FSM |
-| | [`BP-302`](blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md) | `ModuleRegistry` 기준 19개 원자적 파이프라인 모듈 계약 |
+| | [`BP-302`](blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md) | `ModuleRegistry` 기준 17개 원자적 파이프라인 모듈 계약 |
 | | [`BP-303`](blueprints/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | Dense(3072d) + Sparse(BM25) + RRF($k=60$) 융합 검색 |
 | **04. Workspaces** | [`BP-401`](blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md) | 모듈 카탈로그, DAG 실행 및 SSE 상태 스트림 |
 | | [`BP-402`](blueprints/04_workspace_blueprints/BP-402_ws_data_sources_management.md) | 스프레드시트 미리보기 및 영속 ingestion job 관리 |
@@ -53,5 +53,5 @@ flowchart TD
 | **05. Interface** | [`BP-501`](blueprints/05_interface_blueprints/BP-501_rest_api_specification.md) | FastAPI REST API 엔드포인트 & 표준 에러 엔벨로프 |
 | | [`BP-502`](blueprints/05_interface_blueprints/BP-502_sse_streaming_protocol.md) | Server-Sent Events(SSE) 실시간 스트리밍 프로토콜 |
 | | [`BP-503`](blueprints/05_interface_blueprints/BP-503_database_erd_and_ddl.md) | Alembic 관리 PostgreSQL·pgvector·버전형 도메인 스냅샷 ERD & DDL |
-| **06. Frontend** | [`BP-601`](blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | React 18 SPA 컴포넌트 배선도 & a11y 표준 모달 |
+| **06. Frontend** | [`BP-601`](blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md) | React 18 SPA 컴포넌트 배선도, 모바일 상단 앱바·drawer 및 a11y 표준 |
 | **07. Validation** | [`BP-701`](blueprints/07_validation_blueprints/BP-701_contract_testing_and_benchmarks.md) | AST 아키텍처 계약 검증 & 정량 벤치마크 하네스 |

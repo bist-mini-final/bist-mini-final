@@ -129,6 +129,8 @@ body,
 html {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -219,5 +221,36 @@ a:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --page-gutter: 0.75rem;
+    --page-top: 0.75rem;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: max(1rem, 16px);
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .ui-button,
+  .product-nav__item,
+  .dropdown-filter-pill {
+    min-height: 2.75rem;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-width: 1.1rem;
+    min-height: 1.1rem;
   }
 }

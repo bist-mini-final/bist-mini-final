@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime
 
 from backend.domains.bi.application.question_service import build_current_question_batch
 from backend.domains.bi.application.snapshot_projection import project_build_input
+from backend.domains.bi.domain.catalog import CATALOG_VERSION
 from backend.domains.bi.domain.current_periods import select_current_periods
 from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
@@ -103,7 +104,9 @@ def test_question_batch_excludes_future_and_undated_periods() -> None:
     batch = build_current_question_batch(plan)
 
     assert {question.period_id for question in batch.questions} == {PeriodId("fy-2025")}
-    assert {str(question.question_version) for question in batch.questions} == {"2"}
+    assert {str(question.question_version) for question in batch.questions} == {
+        CATALOG_VERSION
+    }
 
 
 def test_snapshot_projection_excludes_future_and_undated_periods() -> None:

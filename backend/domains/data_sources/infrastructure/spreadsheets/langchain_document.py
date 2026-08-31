@@ -28,9 +28,14 @@ def _cell_item_to_document(
 
     text = doc_dict.get("text", "")
     cell_id = doc_dict.get("cell_id", "")
+    sheet_name = doc_dict.get("sheet_name", "")
     prefix = index_id or workbook_hash
-    if prefix and cell_id:
+    if prefix and sheet_name and cell_id:
+        doc_id = f"{prefix}:{sheet_name}:{cell_id}#{index}"
+    elif prefix and cell_id:
         doc_id = f"{prefix}:{cell_id}#{index}"
+    elif sheet_name and cell_id:
+        doc_id = f"{sheet_name}:{cell_id}#{index}"
     elif cell_id:
         doc_id = f"{cell_id}#{index}"
     else:
@@ -42,7 +47,7 @@ def _cell_item_to_document(
         row_index, col_index = None, None
     metadata = {
         "cell_id": cell_id,
-        "sheet_name": doc_dict.get("sheet_name", ""),
+        "sheet_name": sheet_name,
         "cell_coord": cell_coord,
         "row_index": row_index,
         "col_index": col_index,

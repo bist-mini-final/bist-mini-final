@@ -3,7 +3,6 @@ import {
   ArrowUpRight,
   Bell,
   BookOpen,
-  Menu,
   MessageSquarePlus,
   PanelLeftClose,
   PanelLeftOpen,
@@ -18,6 +17,7 @@ import { useFocusTrap } from '../shared/ui/useFocusTrap';
 import type { AppRoute } from './routes';
 import { APP_ROUTES } from './routes';
 import { AppLink, navigateTo } from './router';
+import { MobileAppBar } from './MobileAppBar';
 
 interface AppShellProps {
   activeRoute?: AppRoute;
@@ -116,18 +116,16 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
   return (
     <CellEvidenceProvider>
       <div className="product-shell">
-        <IconButton
-          ref={mobileTriggerRef}
-          className="product-mobile-trigger"
-          variant="secondary"
-          type="button"
-          onClick={() => setIsMobileNavOpen(true)}
-          aria-label="메뉴 열기"
-          aria-controls="product-sidebar"
-          aria-expanded={isMobileNavOpen}
-        >
-          <Menu size={19} />
-        </IconButton>
+        <MobileAppBar
+          activeRoute={activeRoute}
+          menuButtonRef={mobileTriggerRef}
+          notificationOpen={isNotificationOpen}
+          onOpenMenu={() => {
+            setIsNotificationOpen(false);
+            setIsMobileNavOpen(true);
+          }}
+          onToggleNotification={() => setIsNotificationOpen((open) => !open)}
+        />
 
         <aside
           ref={sidebarRef}

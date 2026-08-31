@@ -8,6 +8,11 @@ export const SCORE_DIMENSIONS = [
 
 export type ScoreDimension = (typeof SCORE_DIMENSIONS)[number];
 
+/** Keep the displayed composite score precise enough to explain official ranks. */
+export function formatCompositeScore(value: number): string {
+  return value.toFixed(2);
+}
+
 export function formatAmount(value: number, company: ComparisonCompany): string {
   const currency = company.currency === 'USD'
     ? '$'

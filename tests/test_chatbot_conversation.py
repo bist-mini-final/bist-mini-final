@@ -41,7 +41,28 @@ def test_financial_term_question_with_data_request_uses_rag() -> None:
     assert needs_rag("영업이익 추이를 차트로 보여 주세요.", {"company_id": "company-1"})
 
 
-def test_rag_answer_without_citations_gets_verified_evidence_chips() -> None:
+def _structured_evidence(
+    *,
+    sheet_name: str = "Balance Sheet",
+    cell_coord: str = "E50",
+    index_id: str = "idx-ibm",
+) -> dict[str, object]:
+    return {
+        "evidence_id": "EVIDENCE-001",
+        "index_id": index_id,
+        "workbook_hash": "hash-ibm",
+        "file_name": "ibm.xlsx",
+        "company_name": "IBM",
+        "sheet_name": sheet_name,
+        "cell_coord": cell_coord,
+        "row_header": ["Total Assets"],
+        "column_header": ["2025"],
+        "cell_value": "151,880",
+        "source_text": "Total Assets: 151,880",
+    }
+
+
+def test_rag_answer_without_reader_selected_citations_is_blocked() -> None:
     run = SimpleNamespace(
         nodes={
             "expand-context": SimpleNamespace(
@@ -58,16 +79,84 @@ def test_rag_answer_without_citations_gets_verified_evidence_chips() -> None:
         }
     )
 
-    answer = finalize_grounded_answer("IBM 총자산은 151,880입니다.", run)
+    answer = finalize_grounded_answer("IBM 총자산은 151,880입니다.", [], run)
 
-    assert "**근거**" in answer
-    assert "[Sheet: Balance Sheet | Cell: E50]" in answer
+    assert answer.answer_markdown == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert answer.evidence == []
+
+
+def test_rag_answer_with_only_reader_selected_citations_is_preserved() -> None:
+    run = SimpleNamespace(
+        nodes={
+            "expand-context": SimpleNamespace(
+                output={
+                    "cells": [
+                        {
+                            "index_id": "idx-ibm",
+                            "workbook_hash": "hash-ibm",
+                            "company_name": "IBM",
+                            "sheet_name": "Balance Sheet",
+                            "cell_coord": "E50",
+                            "source_text": "Total Assets: 151,880",
+                        },
+                        {
+                            "sheet_name": "Balance Sheet",
+                            "cell_coord": "F50",
+                            "source_text": "Total Assets: 160,000",
+                        },
+                    ]
+                }
+            )
+        }
+    )
+    answer = finalize_grounded_answer(
+        "IBM 총자산은 151,880입니다.",
+        [_structured_evidence()],
+        run,
+    )
+
+    assert answer.answer_markdown == "IBM 총자산은 151,880입니다."
+    assert [item.cell_coord for item in answer.evidence] == ["E50"]
+
+
+def test_rag_answer_with_same_coordinate_but_wrong_index_is_blocked() -> None:
+    run = SimpleNamespace(
+        nodes={
+            "expand-context": SimpleNamespace(
+                output={
+                    "cells": [
+                        {
+                            "index_id": "idx-ibm",
+                            "workbook_hash": "hash-ibm",
+                            "company_name": "IBM",
+                            "sheet_name": "Balance Sheet",
+                            "cell_coord": "E50",
+                            "source_text": "Total Assets: 151,880",
+                        }
+                    ]
+                }
+            )
+        }
+    )
+
+    answer = finalize_grounded_answer(
+        "IBM 총자산은 151,880입니다.",
+        [_structured_evidence(index_id="idx-other")],
+        run,
+    )
+
+    assert answer.answer_markdown == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert answer.evidence == []
 
 
 def test_rag_answer_without_concrete_cells_is_blocked() -> None:
     run = SimpleNamespace(nodes={"expand-context": SimpleNamespace(output={"cells": []})})
 
-    assert (
-        finalize_grounded_answer("IBM 총자산은 151,880입니다.", run)
-        == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    answer = finalize_grounded_answer(
+        "IBM 총자산은 151,880입니다.",
+        [_structured_evidence()],
+        run,
     )
+
+    assert answer.answer_markdown == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert answer.evidence == []

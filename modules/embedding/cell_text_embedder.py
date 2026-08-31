@@ -12,7 +12,7 @@ Example:
       "company_name": "삼성전자",
       "items": [
         {
-          "cell_id": "삼성전자:IS:C5",
+          "cell_id": "C5",
           "sheet_name": "손익계산서",
           "cell_coord": "C5",
           "row_header": ["영업이익"],
@@ -36,7 +36,7 @@ Example:
       "dimension": 3072,
       "items": [
         {
-          "cell_id": "삼성전자:IS:C5",
+          "cell_id": "C5",
           "sheet_name": "손익계산서",
           "cell_coord": "C5",
           "row_header": ["영업이익"],

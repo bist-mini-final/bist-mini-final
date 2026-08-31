@@ -123,27 +123,12 @@ CREATE TABLE IF NOT EXISTS bi_answers (
     )
 );
 
-CREATE TABLE IF NOT EXISTS bi_document_profiles (
-    company_id VARCHAR(128) NOT NULL,
-    workbook_hash CHAR(64) NOT NULL CHECK (workbook_hash ~ '^[a-f0-9]{64}$'),
-    index_id VARCHAR(128) NOT NULL,
-    profile_version VARCHAR(128) NOT NULL,
-    profile_payload JSONB NOT NULL CHECK (
-        jsonb_typeof(profile_payload) = 'object'
-    ),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (company_id, workbook_hash, index_id, profile_version)
-);
-
 CREATE INDEX IF NOT EXISTS idx_bi_questions_job
     ON bi_questions(materialization_job_id);
 CREATE INDEX IF NOT EXISTS idx_bi_questions_company_source
     ON bi_questions(company_id, workbook_hash, index_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bi_questions_status
     ON bi_questions(status, created_at);
-CREATE INDEX IF NOT EXISTS idx_bi_document_profiles_source
-    ON bi_document_profiles(company_id, workbook_hash, index_id);
 CREATE INDEX IF NOT EXISTS idx_bi_materialization_queue
     ON bi_materialization_jobs(status, available_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_bi_materialization_company

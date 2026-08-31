@@ -101,7 +101,7 @@ function ChatMessageItem({
           <MessageProgress progress={progress} />
         ) : message.role === 'assistant' ? (
           <Suspense fallback={<span className="chatbot-content-loading">답변 표시 준비 중...</span>}>
-            <DeferredChatAnswer markdown={message.content} />
+            <DeferredChatAnswer markdown={message.content} evidence={message.evidence} />
           </Suspense>
         ) : (
           <>

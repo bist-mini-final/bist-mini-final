@@ -1,5 +1,6 @@
 import type { BiCardId } from '../bi/types';
 import type { WorkflowRun } from '../playground/types';
+import type { StructuredCellEvidence } from '../../shared/markdown/cellCitations';
 
 export interface ChatVisualization {
   readonly company_id: string;
@@ -21,6 +22,7 @@ export interface ChatMessage {
   readonly status: 'processing' | 'completed' | 'failed';
   readonly run_id: string | null;
   readonly visualization: ChatVisualization | null;
+  readonly evidence: readonly StructuredCellEvidence[];
   readonly attachments: ChatAttachment[];
   readonly created_at: string;
 }

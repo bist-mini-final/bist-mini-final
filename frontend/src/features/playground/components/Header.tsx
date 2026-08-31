@@ -118,6 +118,8 @@ export function Header({
               <ChevronDown className="workflow-selector__chevron h-3 w-3" aria-hidden="true" />
             </div>
             <Button
+              className="app-header__create-button"
+              variant="ghost"
               size="sm"
               onClick={onOpenWorkflowCreator}
               title="편집 가능한 새 워크플로 만들기"

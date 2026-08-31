@@ -100,5 +100,10 @@ describe('CompanyAnalysisPanel', () => {
     expect(screen.getByText('선택 기업 비교')).toBeInTheDocument();
     expect(screen.getByText('A AmeSoft')).toBeInTheDocument();
     expect(screen.getByText('B Nexora Labs')).toBeInTheDocument();
+    expect(screen.getByText('종합점수 구성 비교')).toBeInTheDocument();
+    expect(screen.getByText('공통 0~100점 기준')).toBeInTheDocument();
+    expect(screen.getAllByText('A +8.0점')).toHaveLength(3);
+    expect(screen.getByLabelText('A AmeSoft, 성장성 92.0점, CAGR 9.2%')).toBeInTheDocument();
+    expect(screen.getByLabelText('B Nexora Labs, 안정성 80.0점, 부채 45.0% · 순부채/매출 0.1%')).toBeInTheDocument();
   });
 });

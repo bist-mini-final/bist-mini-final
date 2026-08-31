@@ -48,6 +48,9 @@ flowchart LR
     COPY_J --> STAGE["private staging collection"]
     STAGE --> FINAL["count 검증 + HNSW + atomic publish"]
     FINAL --> INDEX["langchain_pg_embedding"]
+    STRUCTURE --> PROFILE["통화·배율·기간·시트 역할 추출"]
+    FINAL --> PROFILE
+    PROFILE --> PROFILE_DB[("workbook_profiles")]
 ```
 
 `auto_ingest=true` 업로드는 원본 저장 후 ingestion 작업도 등록합니다. `auto_ingest=false`이면 사용자가 이후 `POST /ingestion-jobs`로 등록할 수 있습니다. 실행 상태는 durable workflow store를 통해 목록·단일 run·index 기준으로 조회합니다.
@@ -64,7 +67,8 @@ flowchart LR
 | `cell_text_embedder` | cell text를 embedding artifact로 변환 |
 | `pgvector_index_writer` | artifact를 PostgreSQL/pgvector에 Binary COPY |
 | `company_entity_extractor` | 기업 식별 정보 추출 |
-| `sheet_metadata_persistence` | sheet/profile 메타데이터 영속화 |
+| `sheet_metadata_persistence` | sheet 크기·감지 구조 메타데이터 영속화 |
+| `workbook_profile_persistence` | 원본 workbook의 통화·배율·실제 FY/LTM·시트 역할 공통 프로필 영속화 |
 
 전체 module pin 계약은 [`BP-302`](../03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md)를 따릅니다.
 
@@ -78,6 +82,7 @@ flowchart LR
 - HNSW는 shard별로 만들지 않고 전체 row count 검증 뒤 finalizer가 한 번 생성합니다. 기존 검색 컬렉션은 atomic publish 시점까지 유지합니다.
 - workbook 파싱·해시·파일 이동은 API 이벤트 루프 밖 worker thread 또는 one-shot worker에서 수행합니다.
 - upload metadata와 상태 조회는 native async PostgreSQL 경계를 우선합니다.
+- workbook profile은 embedding chunk 수와 무관한 원본 파일 파생 데이터입니다. 기존 index도 원본 hash가 일치하면 재임베딩 없이 on-demand resolver가 생성·교체할 수 있습니다.
 - 원본·index 삭제는 연결된 데이터 범위를 명시적으로 식별하고 감사 가능한 결과를 반환해야 합니다.
 - 처리량/메모리/지연의 숫자는 측정 결과가 있는 경우에만 성능 문서에 기록합니다.
 

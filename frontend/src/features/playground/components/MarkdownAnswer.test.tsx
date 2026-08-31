@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { cellEvidenceApi } from '../../../shared/evidence/cellEvidenceApi';
 import { CellEvidenceProvider } from '../../../shared/evidence/CellEvidenceProvider';
+import type { StructuredCellEvidence } from '../../../shared/markdown/cellCitations';
 import { MarkdownAnswer, normalizeMarkdownTables } from './MarkdownAnswer';
 
 vi.mock('../../../shared/evidence/cellEvidenceApi', () => ({
@@ -10,6 +11,20 @@ vi.mock('../../../shared/evidence/cellEvidenceApi', () => ({
     imageUrl: vi.fn(() => '/evidence/sheet.png'),
   },
 }));
+
+const evidence: StructuredCellEvidence = {
+  evidence_id: 'EVIDENCE-001',
+  index_id: 'idx-ibm',
+  workbook_hash: 'hash-ibm',
+  file_name: 'ibm.xlsx',
+  company_name: 'IBM',
+  sheet_name: 'Income_Statement',
+  cell_coord: 'E16',
+  row_header: ['Total Revenue'],
+  column_header: ['FY2024'],
+  cell_value: '62,753',
+  source_text: 'Company: IBM | Sheet: Income_Statement | Row Header: Total Revenue | Column Header: FY2024 | Cell Value: 62,753',
+};
 
 describe('MarkdownAnswer', () => {
   it('renders emphasis, lists, and GFM tables as semantic HTML', () => {
@@ -22,10 +37,11 @@ describe('MarkdownAnswer', () => {
     expect(container.querySelector('table')).toBeInTheDocument();
   });
 
-  it('opens the shared evidence dialog from a parsed cell citation chip', () => {
+  it('opens the shared evidence dialog from structured cell evidence', () => {
     render(
       <MarkdownAnswer
-        markdown="근거: [Sheet: Income_Statement | Cell: E16]"
+        markdown="IBM의 2024년 매출은 62,753입니다."
+        evidence={[evidence]}
       />,
     );
 
@@ -38,7 +54,7 @@ describe('MarkdownAnswer', () => {
   it('uses the app-level evidence host when rendered inside the provider', async () => {
     render(
       <CellEvidenceProvider>
-        <MarkdownAnswer markdown="근거: [Sheet: Income_Statement | Cell: E16]" />
+        <MarkdownAnswer markdown="IBM의 2024년 매출은 62,753입니다." evidence={[evidence]} />
       </CellEvidenceProvider>,
     );
 

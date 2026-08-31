@@ -7,7 +7,7 @@
 
 ## 1. 제품 책임
 
-Pipeline Playground는 backend가 노출하는 19개 module contract로 DAG를 편집·저장하고 durable 실행을 등록한 뒤 REST/SSE로 상태를 관찰하는 워크스페이스입니다. frontend가 별도 module 목록이나 pin schema를 소유하지 않습니다.
+Pipeline Playground는 backend가 노출하는 17개 module contract로 DAG를 편집·저장하고 durable 실행을 등록한 뒤 REST/SSE로 상태를 관찰하는 워크스페이스입니다. frontend가 별도 module 목록이나 pin schema를 소유하지 않습니다.
 
 ---
 
@@ -38,6 +38,7 @@ flowchart LR
 4. 실행 요청은 저장된 workflow revision과 runtime inputs, cache 정책을 묶어 durable run을 생성합니다.
 5. UI는 브라우저 새로고침 후에도 `GET /runs`와 `GET /runs/{id}`로 실행을 복구합니다.
 6. SSE 연결이 끊겨도 실행 자체는 계속되며 REST 상태가 최종 기준입니다.
+7. 표준 Job의 초기 canvas 좌표는 portable `JobNode.position`이 단일 기준입니다. `rag_query`는 Query Input과 PostgreSQL Data Scope를 좌측 상·하단의 독립 source로 배치하고 중앙 Scope-aware Decomposer에서 합류시켜, query edge가 Data Scope 노드를 관통하거나 두 모듈이 직렬 연결된 것처럼 보이지 않게 합니다. 좌표가 없는 Job은 catalog의 기본 grid 배치를 사용합니다.
 
 ---
 

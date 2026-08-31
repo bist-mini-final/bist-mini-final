@@ -10,7 +10,18 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from backend.domains.chatbot.application import ChatApiServices, ChatSuggestionService
 from backend.domains.chatbot.domain import UnsupportedChatAttachmentError
 
-from .schemas import CreateMessageRequest, CreateSessionRequest, RenameSessionRequest
+from .schemas import (
+    ChatAttachmentResponse,
+    ChatMessageCreatedResponse,
+    ChatRunSyncResponse,
+    ChatSessionListResponse,
+    ChatSessionResponse,
+    ChatSuggestionListResponse,
+    CreateMessageRequest,
+    CreateSessionRequest,
+    DeleteSessionResponse,
+    RenameSessionRequest,
+)
 
 _UPLOAD_READ_LIMIT = 20 * 1024 * 1024 + 1
 
@@ -18,11 +29,11 @@ _UPLOAD_READ_LIMIT = 20 * 1024 * 1024 + 1
 def _create_suggestion_router(service: ChatSuggestionService) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/suggestions")
+    @router.get("/suggestions", response_model=ChatSuggestionListResponse)
     def list_suggestions() -> dict[str, list[str]]:
         return {"questions": service.refresh_if_due()}
 
-    @router.post("/suggestions/refresh")
+    @router.post("/suggestions/refresh", response_model=ChatSuggestionListResponse)
     def refresh_suggestions() -> dict[str, list[str]]:
         return {"questions": service.refresh_if_due(force=True)}
 
@@ -37,35 +48,39 @@ def create_chat_router(
     router = APIRouter(prefix=prefix, tags=["Chat"])
     conversations = services.conversations
 
-    @router.get("/sessions")
+    @router.get("/sessions", response_model=ChatSessionListResponse)
     def list_sessions(client_id: str = Query(min_length=12, max_length=128)) -> dict[str, Any]:
         return conversations.list_sessions(client_id)
 
     router.include_router(_create_suggestion_router(services.suggestions))
 
-    @router.post("/sessions", status_code=201)
+    @router.post("/sessions", status_code=201, response_model=ChatSessionResponse)
     def create_session(request: CreateSessionRequest) -> dict[str, Any]:
         return conversations.create_session(request.client_id)
 
-    @router.get("/sessions/{session_id}")
+    @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
     def get_session(
         session_id: str,
         client_id: str = Query(min_length=12, max_length=128),
     ) -> dict[str, Any]:
         return conversations.require_session(session_id, client_id)
 
-    @router.patch("/sessions/{session_id}")
+    @router.patch("/sessions/{session_id}", response_model=ChatSessionResponse)
     def rename_session(session_id: str, request: RenameSessionRequest) -> dict[str, Any]:
         return conversations.rename_session(session_id, request.client_id, request.title)
 
-    @router.delete("/sessions/{session_id}")
+    @router.delete("/sessions/{session_id}", response_model=DeleteSessionResponse)
     def delete_session(
         session_id: str,
         client_id: str = Query(min_length=12, max_length=128),
     ) -> dict[str, str]:
         return conversations.delete_session(session_id, client_id)
 
-    @router.post("/sessions/{session_id}/attachments", status_code=201)
+    @router.post(
+        "/sessions/{session_id}/attachments",
+        status_code=201,
+        response_model=ChatAttachmentResponse,
+    )
     async def upload_attachment(
         session_id: str,
         client_id: str = Form(min_length=12, max_length=128),
@@ -97,7 +112,11 @@ def create_chat_router(
             )
         )
 
-    @router.post("/sessions/{session_id}/messages", status_code=202)
+    @router.post(
+        "/sessions/{session_id}/messages",
+        status_code=202,
+        response_model=ChatMessageCreatedResponse,
+    )
     def create_message(session_id: str, request: CreateMessageRequest) -> dict[str, Any]:
         return conversations.create_message(
             session_id,
@@ -106,7 +125,7 @@ def create_chat_router(
             request.attachment_id,
         )
 
-    @router.get("/runs/{run_id}")
+    @router.get("/runs/{run_id}", response_model=ChatRunSyncResponse)
     def sync_run(
         run_id: str,
         client_id: str = Query(min_length=12, max_length=128),

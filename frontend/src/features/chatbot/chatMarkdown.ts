@@ -1,5 +1,3 @@
-import { normalizeCellCitations } from '../../shared/markdown/cellCitations';
-
 function repairInlineTable(markdown: string) {
   const normalized = markdown.replace(/\\+\|/g, '|');
   return normalized.split('\n').map((line) => repairInlineTableLine(line)).join('\n');
@@ -58,5 +56,5 @@ export function normalizeChatMarkdown(markdown: string) {
     .replace(/(\d{4})~~(\d{4})/g, '$1–$2')
     .replace(/\\([*_`[\].~])/g, '$1')
     .replace(/(\*\*[^*\n]+?\*\*)(?=[가-힣])/g, '$1 ');
-  return normalizeCellCitations(normalized);
+  return normalized;
 }

@@ -4,12 +4,13 @@ import logging
 import re
 from typing import Any, Protocol
 
+from pydantic import ValidationError
+
+from backend.shared.application.cell_evidence import CellEvidenceDTO, GroundedAnswerDTO
+
 logger = logging.getLogger(__name__)
 
 INSUFFICIENT_EVIDENCE_ANSWER = "확인 가능한 근거가 부족해 답변할 수 없습니다."
-_CELL_CITATION_PATTERN = re.compile(
-    r"\[Sheet:\s*(?P<sheet>[^\]|]+?)\s*\|\s*Cell:\s*(?P<coord>[A-Za-z]{1,3}[1-9][0-9]{0,6})\]"
-)
 
 
 class ExecutionLogStorePort(Protocol):
@@ -28,7 +29,7 @@ class EvidenceCellStorePort(Protocol):
     ) -> list[dict[str, Any]]: ...
 
 
-def _run_evidence_cells(run: Any) -> list[tuple[str, str, str]]:
+def _run_evidence_cells(run: Any) -> list[dict[str, str]]:
     """Return only source cells that the completed RAG run actually produced."""
     node = run.nodes.get("expand-context") if getattr(run, "nodes", None) else None
     output = node.output if node else None
@@ -36,19 +37,27 @@ def _run_evidence_cells(run: Any) -> list[tuple[str, str, str]]:
     cells = context.get("cells") if isinstance(context, dict) else None
     if not isinstance(cells, list):
         return []
-    evidence: list[tuple[str, str, str]] = []
-    seen: set[tuple[str, str]] = set()
+    evidence: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
     for cell in cells:
         if not isinstance(cell, dict):
             continue
         sheet = str(cell.get("sheet_name") or "").strip()
         coord = str(cell.get("cell_coord") or "").strip().upper()
-        source = str(cell.get("source_text") or "").strip()
-        key = (sheet, coord)
+        index_id = str(cell.get("index_id") or "").strip()
+        key = (index_id, sheet, coord)
         if not sheet or not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", coord) or key in seen:
             continue
         seen.add(key)
-        evidence.append((sheet, coord, source))
+        evidence.append(
+            {
+                "index_id": index_id,
+                "workbook_hash": str(cell.get("workbook_hash") or "").strip(),
+                "company_name": str(cell.get("company_name") or "").strip(),
+                "sheet_name": sheet,
+                "cell_coord": coord,
+            }
+        )
     return evidence
 
 
@@ -56,7 +65,7 @@ def _recover_evidence_cells(
     run: Any,
     database: ExecutionLogStorePort | None,
     cell_store: EvidenceCellStorePort | None,
-) -> list[tuple[str, str, str]]:
+) -> list[dict[str, str]]:
     """Recover source cells when a Kubernetes worker externalized context output."""
     if database is None or cell_store is None:
         return []
@@ -83,42 +92,66 @@ def _recover_evidence_cells(
         logger.exception("Failed to recover chat evidence cells for run %s", getattr(run, "id", ""))
         return []
     return [
-        (
-            str(record["sheet_name"]),
-            str(record["cell_coord"]).upper(),
-            str(record.get("source_text") or ""),
-        )
+        {
+            "index_id": str(record.get("index_id") or "").strip(),
+            "workbook_hash": str(record.get("workbook_hash") or "").strip(),
+            "company_name": str(record.get("company_name") or "").strip(),
+            "sheet_name": str(record["sheet_name"]),
+            "cell_coord": str(record["cell_coord"]).upper(),
+        }
         for record in records
         if record.get("sheet_name")
         and re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", str(record.get("cell_coord") or "").upper())
     ]
 
 
+def _matches_run_evidence(selected: CellEvidenceDTO, actual: dict[str, str]) -> bool:
+    if (
+        selected.sheet_name.casefold() != actual["sheet_name"].casefold()
+        or selected.cell_coord != actual["cell_coord"]
+    ):
+        return False
+    selected_identity = {
+        "index_id": selected.index_id or "",
+        "workbook_hash": selected.workbook_hash,
+        "company_name": selected.company_name or "",
+    }
+    return all(
+        not actual[field]
+        or actual[field].casefold() == selected_identity[field].casefold()
+        for field in selected_identity
+    )
+
+
 def finalize_grounded_answer(
-    answer: str | None,
+    answer_markdown: str | None,
+    selected_evidence: list[dict[str, Any]] | None,
     run: Any,
     database: ExecutionLogStorePort | None = None,
     cell_store: EvidenceCellStorePort | None = None,
-) -> str:
-    """Block unsupported RAG answers and attach source cells as chat citations."""
-    if not answer or answer.strip() == INSUFFICIENT_EVIDENCE_ANSWER:
-        return INSUFFICIENT_EVIDENCE_ANSWER
+) -> GroundedAnswerDTO:
+    """Validate Reader-selected evidence DTOs against cells produced by this run."""
+    insufficient = GroundedAnswerDTO(
+        answer_markdown=INSUFFICIENT_EVIDENCE_ANSWER,
+        evidence=[],
+    )
+    if (
+        not answer_markdown
+        or answer_markdown.strip() == INSUFFICIENT_EVIDENCE_ANSWER
+        or not selected_evidence
+    ):
+        return insufficient
+    try:
+        selected = [CellEvidenceDTO.model_validate(item) for item in selected_evidence]
+    except ValidationError:
+        logger.warning("Reader returned an invalid structured evidence payload")
+        return insufficient
     evidence = _run_evidence_cells(run) or _recover_evidence_cells(run, database, cell_store)
     if not evidence:
-        return INSUFFICIENT_EVIDENCE_ANSWER
-    allowed = {(sheet.casefold(), coord) for sheet, coord, _ in evidence}
-    citations = list(_CELL_CITATION_PATTERN.finditer(answer))
-    if citations and not any(
-        (match.group("sheet").strip().casefold(), match.group("coord").upper()) in allowed
-        for match in citations
-    ):
-        return INSUFFICIENT_EVIDENCE_ANSWER
-    if not citations:
-        sources = "\n".join(
-            f"- [Sheet: {sheet} | Cell: {coord}] {source}" for sheet, coord, source in evidence[:6]
-        )
-        return f"{answer.rstrip()}\n\n**근거**\n{sources}"
-    return answer
+        return insufficient
+    if not all(any(_matches_run_evidence(item, actual) for actual in evidence) for item in selected):
+        return insufficient
+    return GroundedAnswerDTO(answer_markdown=answer_markdown, evidence=selected)
 
 
 __all__ = [

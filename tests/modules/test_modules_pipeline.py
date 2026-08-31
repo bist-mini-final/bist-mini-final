@@ -1,10 +1,11 @@
+import json
 from typing import Any, cast
 from unittest.mock import MagicMock
 
 from backend.platform.openai.responses import OpenAIResponseResult
 from modules.embedding.query_embedder import EmbedderInputDTO, EmbeddingsDTO
-from modules.query.decomposer import DecomposerInputDTO, SubqueriesDTO
-from modules.query.llm_query_router import RetrievalPlanDTO, RoutedSubqueryDTO
+from modules.query.contracts import RetrievalPlanDTO
+from modules.query.decomposer import DecomposerInputDTO
 from modules.query.query_input import QueryInputDTO
 from modules.retrieval.context_expander import DocumentContextDTO
 from modules.retrieval.pgvector_retriever import (
@@ -13,14 +14,14 @@ from modules.retrieval.pgvector_retriever import (
     RankedSearchResultDTO,
 )
 from modules.retrieval.rrf_fusion import RrfFusionInputDTO
-from modules.storage.pgvector_data_scope import DataScopeDTO
+from modules.storage.pgvector_data_scope import DataScopeCatalogDTO, DataScopeDTO
 from tests.modules.registry_factory import create_test_registry
 
 
-def test_clean_19_modules_registration():
+def test_clean_17_modules_registration():
     registry = create_test_registry()
     defs = registry.definitions()
-    assert len(defs) == 19
+    assert len(defs) == 17
 
 
 def test_end_to_end_query_reader_pipeline():
@@ -31,24 +32,6 @@ def test_end_to_end_query_reader_pipeline():
     res_qi = qi.run(QueryInputDTO(query="삼성전자 2023년 대비 2024년 영업이익 증가율은?"))
     assert "query_context" in res_qi
 
-    # 2. Decomposer (BaseLLMModule)
-    mock_llm = MagicMock()
-    mock_llm.create_response.return_value = OpenAIResponseResult(
-        response_id="resp_pipeline_decomposer",
-        content='{"items": [{"company": "삼성전자", "sheet": "손익계산서", "row_header": "영업이익", "column_header": "2023", "cell_value": "?"}, {"company": "삼성전자", "sheet": "손익계산서", "row_header": "영업이익", "column_header": "2024", "cell_value": "?"}]}',
-        usage={"prompt_tokens": 15, "completion_tokens": 35},
-        latency_seconds=0.1,
-    )
-    dec = cast(Any, registry.get("decomposer"))
-    dec.completion_client = mock_llm
-    res_dec = dec.run(DecomposerInputDTO(query_context=res_qi["query_context"]))
-    assert len(res_dec["items"]) == 2
-
-    # 3. Embedder
-    mock_encoder = MagicMock()
-    mock_encoder.encode.return_value = [[0.1] * 3072, [0.2] * 3072]
-    embedder = cast(Any, registry.get("embedder"))
-    embedder.encoder = mock_encoder
     data_scope = DataScopeDTO(
         index_id="samsung_2023",
         file_name="samsung.xlsx",
@@ -59,18 +42,31 @@ def test_end_to_end_query_reader_pipeline():
         company_name="삼성전자",
         sheet_names=["손익계산서"],
     )
-    subqueries = SubqueriesDTO.model_validate(res_dec)
-    retrieval_plan = RetrievalPlanDTO(
-        query_context=subqueries.query_context,
-        routes=[
-            RoutedSubqueryDTO(
-                subquery_index=index,
-                subquery=subquery,
-                collections=[data_scope],
-            )
-            for index, subquery in enumerate(subqueries.items)
-        ],
+
+    # 2. Scope-aware Decomposer (BaseLLMModule)
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp_pipeline_decomposer",
+        content='{"items": [{"company": "삼성전자", "sheet": "손익계산서", "row_header": "영업이익", "column_header": "2023", "cell_value": "?", "index_ids": ["samsung_2023"]}, {"company": "삼성전자", "sheet": "손익계산서", "row_header": "영업이익", "column_header": "2024", "cell_value": "?", "index_ids": ["samsung_2023"]}], "unresolved_companies": []}',
+        usage={"prompt_tokens": 15, "completion_tokens": 35},
+        latency_seconds=0.1,
     )
+    dec = cast(Any, registry.get("decomposer"))
+    dec.completion_client = mock_llm
+    res_dec = dec.run(
+        DecomposerInputDTO(
+            query_context=res_qi["query_context"],
+            scope_catalog=DataScopeCatalogDTO(collections=[data_scope]),
+        )
+    )
+    retrieval_plan = RetrievalPlanDTO.model_validate(res_dec)
+    assert len(retrieval_plan.routes) == 2
+
+    # 3. Embedder
+    mock_encoder = MagicMock()
+    mock_encoder.encode.return_value = [[0.1] * 3072, [0.2] * 3072]
+    embedder = cast(Any, registry.get("embedder"))
+    embedder.encoder = mock_encoder
     mock_encoder.encode_for_model.return_value = [
         [0.1] * 3072,
         [0.2] * 3072,
@@ -143,7 +139,16 @@ def test_end_to_end_query_reader_pipeline():
     mock_reader_llm = MagicMock()
     mock_reader_llm.create_response.return_value = OpenAIResponseResult(
         response_id="resp_pipeline_reader",
-        content="삼성전자의 2023년 영업이익은 6조 5,670억원이며, 2024년 영업이익은 35조원입니다. 2023년 대비 2024년 영업이익 증가율은 432.97% 증가하였습니다. [Sheet: 손익계산서 | Cell: E60, F60]",
+        content=json.dumps(
+            {
+                "answer_markdown": (
+                    "삼성전자의 2023년 영업이익은 6조 5,670억원이며, 2024년 영업이익은 "
+                    "35조원입니다. 2023년 대비 2024년 영업이익 증가율은 432.97% 증가하였습니다."
+                ),
+                "evidence_ids": ["EVIDENCE-001", "EVIDENCE-002"],
+            },
+            ensure_ascii=False,
+        ),
         usage={"prompt_tokens": 80, "completion_tokens": 40},
         latency_seconds=0.2,
     )
@@ -151,4 +156,8 @@ def test_end_to_end_query_reader_pipeline():
     reader.completion_client = mock_reader_llm
     reader.pgvector_store = mock_store
     res_reader = reader.run({"context_json": res_ctx})
-    assert "432.97%" in res_reader["answer_json"]["answer"]
+    assert "432.97%" in res_reader["answer_json"]["answer_markdown"]
+    assert [item["cell_coord"] for item in res_reader["answer_json"]["evidence"]] == [
+        "E60",
+        "F60",
+    ]

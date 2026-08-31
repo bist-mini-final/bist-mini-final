@@ -174,7 +174,9 @@ function SnapshotManagerDialog({ onMaterialized, onClose }: SnapshotManagerDialo
               >
                 {REASON_LABELS[candidate.reason]}
               </StatusBadge>
-              {isSelected ? <Check size={17} aria-hidden="true" /> : null}
+              <span className="bi-snapshot-candidate__selection" aria-hidden="true">
+                {isSelected ? <Check size={14} /> : null}
+              </span>
             </Button>
           );
         })}

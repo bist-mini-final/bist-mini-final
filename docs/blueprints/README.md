@@ -26,10 +26,10 @@
 | :--- | :--- | :--- |
 | System | BP-101~104 | target backend allowlist, entrypoint/bootstrap 경계, durable lease, 6개 KEDA worker spec |
 | Data Engine | BP-201~203 | structured-cell v6, 외부 vision, shard artifact + Binary COPY + atomic publish |
-| Pipeline | BP-301~303 | workflow vertical slice, 19개 registry type, Dense+keyword+RRF+2D expansion |
+| Pipeline | BP-301~303 | workflow vertical slice, 17개 registry type, Dense+keyword+RRF+2D expansion |
 | Workspace | BP-401~405 | 5개 제품 workspace와 독립 BI/comparison snapshot, 근거 검증 UI |
 | Interface | BP-501~503 | OpenAPI 63 paths/73 operations, PostgreSQL source-of-truth SSE, Alembic 0005/22 tables |
-| Frontend | BP-601 | 7개 route, 공용 shell/UI/token/dialog, 셀 근거 drag-pan modal |
+| Frontend | BP-601 | 7개 route, 공용 shell/UI/token/dialog, 모바일 상단 앱바+drawer, 셀 근거 drag-pan modal |
 | Validation | BP-701 | architecture/OpenAPI/schema/K8s renderer/backend/frontend 회귀 gate |
 
 ## 2. 목표 설계 원칙

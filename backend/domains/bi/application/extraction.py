@@ -8,6 +8,7 @@ from backend.domains.bi.domain.catalog import (
     SourceMetricDefinition,
 )
 from backend.domains.bi.domain.extraction_models import (
+    BiContextCell,
     BiMetricExtractionRequest,
     BiMetricExtractionResult,
     BiMetricExtractionStatusError,
@@ -77,6 +78,9 @@ class BiMetricExtractionService:
         question = definition.question_template.format(
             period_label=request.period_label,
             metric_label=definition.label_en,
+            metric_aliases=", ".join(definition.aliases_en),
+            statement_hint=" or ".join(definition.statement_hints),
+            excluded_aliases=", ".join(definition.excluded_aliases) or "none",
         )
         return self.extract_question(request, question)
 
@@ -205,7 +209,12 @@ class BiMetricExtractionService:
         context: BiRetrievedContext,
         evidence_cell_ids: tuple[str, ...],
     ) -> tuple[BiEvidence, ...]:
-        cells_by_id = {cell.cell_id: cell for cell in context.cells if is_verifiable_cell(cell)}
+        cells_by_id: dict[str, BiContextCell] = {}
+        for cell in context.cells:
+            if is_verifiable_cell(cell):
+                # Retrieval order is significant: deterministic metric evidence is
+                # placed before generic RAG context and must win an ID collision.
+                cells_by_id.setdefault(cell.cell_id, cell)
         unique_ids = tuple(
             cell_id for cell_id in dict.fromkeys(evidence_cell_ids) if cell_id in cells_by_id
         )

@@ -6,6 +6,7 @@ interface BiToolbarProps<Period extends string> {
   readonly selectedPeriod: Period;
   readonly onPeriodChange: (period: Period) => void;
   readonly isEditing: boolean;
+  readonly allowLayoutEditing?: boolean;
   readonly onEditingChange: (isEditing: boolean) => void;
   readonly visibleCardCount: number;
   readonly hiddenCardCount: number;
@@ -18,6 +19,7 @@ export function BiToolbar<Period extends string>({
   selectedPeriod,
   onPeriodChange,
   isEditing,
+  allowLayoutEditing = true,
   onEditingChange,
   visibleCardCount,
   hiddenCardCount,
@@ -45,16 +47,18 @@ export function BiToolbar<Period extends string>({
       </div>
 
       <div className="bi-toolbar__actions">
-        <Button
-          variant="primary"
-          size="sm"
-          type="button"
-          aria-pressed={isEditing}
-          onClick={() => onEditingChange(!isEditing)}
-        >
-          {isEditing ? <Check size={16} aria-hidden="true" /> : <Pencil size={16} aria-hidden="true" />}
-          {isEditing ? '완료' : '배치 편집'}
-        </Button>
+        {allowLayoutEditing ? (
+          <Button
+            variant="primary"
+            size="sm"
+            type="button"
+            aria-pressed={isEditing}
+            onClick={() => onEditingChange(!isEditing)}
+          >
+            {isEditing ? <Check size={16} aria-hidden="true" /> : <Pencil size={16} aria-hidden="true" />}
+            {isEditing ? '완료' : '배치 편집'}
+          </Button>
+        ) : null}
         <Button
           size="sm"
           type="button"

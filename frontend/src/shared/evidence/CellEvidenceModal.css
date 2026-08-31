@@ -337,8 +337,30 @@
 
 @media (max-width: 760px) {
   .cell-evidence-overlay { padding: 0; }
-  .cell-evidence-modal { width: 100vw; height: 100vh; min-height: 0; border-radius: 0; }
+  .cell-evidence-modal { width: 100vw; height: 100dvh; max-height: 100dvh; min-height: 0; border: 0; border-radius: 0; }
+  .cell-evidence-modal .ui-dialog__header {
+    padding: calc(0.8rem + env(safe-area-inset-top)) 0.8rem 0.75rem;
+  }
+  .cell-evidence-modal .ui-dialog__eyebrow,
+  .cell-evidence-modal .ui-dialog__header p,
+  .cell-evidence-modal__mark { display: none; }
   .cell-evidence-modal__body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .cell-evidence-details { max-height: 14rem; border-right: 0; border-bottom: 1px solid var(--border); }
+  .cell-evidence-details {
+    max-height: 10rem;
+    gap: 0.45rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0.65rem;
+  }
+  .cell-evidence-details dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cell-evidence-details dl > div { min-width: 0; padding: 0.45rem 0.2rem; }
+  .cell-evidence-details__note { display: none; }
+  .cell-evidence-toolbar { align-items: stretch; flex-direction: column; gap: 0.45rem; padding: 0.55rem 0.65rem; }
+  .cell-evidence-toolbar__actions { width: 100%; justify-content: space-between; }
+  .cell-evidence-toolbar__actions button { min-width: 2.75rem; min-height: 2.75rem; }
   .cell-evidence-toolbar__actions button span { display: none; }
+  .cell-evidence-toolbar__actions output { flex: 1; }
+  .cell-evidence-canvas { margin: 0.8rem; }
 }

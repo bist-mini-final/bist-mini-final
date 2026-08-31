@@ -18,8 +18,7 @@ from modules.common.base_embedder import (
 )
 from modules.common.base_module import ModuleConfigDTO
 from modules.common.config import DEFAULT_QUERY_EMBEDDING_BATCH_SIZE
-from modules.query.decomposer import SubqueryItem
-from modules.query.llm_query_router import RetrievalPlanDTO
+from modules.query.contracts import RetrievalPlanDTO, SubqueryItem
 from modules.storage.pgvector_data_scope import DataScopeDTO
 
 
@@ -56,7 +55,7 @@ class EmbedderModule(BaseEmbeddingModule):
         label="Query Embedder",
         category="Logic",
         description=(
-            "Router가 선택한 collection의 모델·차원별로 서브쿼리를 묶어 "
+            "Decomposer가 선택한 collection의 모델·차원별로 서브쿼리를 묶어 "
             "중복 호출 없이 임베딩합니다."
         ),
         inputs=["retrieval_plan"],

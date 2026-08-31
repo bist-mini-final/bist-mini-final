@@ -7,6 +7,7 @@ from backend.domains.bi.application.document_profiler import BiDocumentProfiler
 from backend.domains.bi.application.extraction import BiMetricExtractionService
 from backend.domains.bi.application.materializer import SystemClock
 from backend.domains.bi.application.metric_reader import BiMetricReader
+from backend.domains.bi.application.profile_persistence import PersistedBiDocumentProfiler
 from backend.domains.bi.application.question_publishing import (
     BiPublishingQuestionService,
     BiQuestionPublicationFailureReporter,
@@ -28,9 +29,11 @@ from backend.domains.bi.infrastructure.integrations.question_pipeline import (
 from backend.domains.bi.infrastructure.integrations.structured_completion import (
     BiStructuredCompletionAdapter,
 )
-from backend.domains.bi.infrastructure.postgres.profile_repository import (
-    PersistedBiDocumentProfiler,
-    PostgresBiDocumentProfileRepository,
+from backend.domains.bi.infrastructure.integrations.workbook_profiles import (
+    WorkbookBiProfileRepository,
+)
+from backend.domains.bi.infrastructure.postgres.metric_evidence import (
+    PostgresBiMetricEvidenceRetriever,
 )
 from backend.domains.bi.infrastructure.postgres.profile_sheet_catalog import (
     PostgresBiProfileEvidenceRetriever,
@@ -50,6 +53,15 @@ from backend.domains.bi.workers.question_batch import (
     BiQuestionBatchWorker,
     SystemBiQuestionBatchWorkerClock,
 )
+from backend.domains.data_sources.infrastructure.postgres.workbook_profiles import (
+    PostgresWorkbookProfileRepository,
+)
+from backend.domains.data_sources.infrastructure.spreadsheets.workbook_profile_extractor import (
+    WORKBOOK_PROFILE_VERSION,
+)
+from backend.domains.data_sources.infrastructure.workbook_profile_resolver import (
+    StoredWorkbookProfileResolver,
+)
 from backend.platform.openai.responses import OpenAIResponsesClient
 
 if TYPE_CHECKING:
@@ -57,6 +69,14 @@ if TYPE_CHECKING:
 
 
 BI_READER_MODEL: Final = "gpt-5.6-luna"
+
+
+def _create_bi_profiles(registry: ModuleRegistry) -> WorkbookBiProfileRepository:
+    return WorkbookBiProfileRepository(
+        profiles=PostgresWorkbookProfileRepository(registry.database_url),
+        resolver=StoredWorkbookProfileResolver(registry.database_url),
+        profile_version=WORKBOOK_PROFILE_VERSION,
+    )
 
 
 def create_bi_services(
@@ -80,7 +100,7 @@ def create_bi_materialization_runner(
     clock = SystemClock()
     store = PostgresBiStore(registry.database_url)
     completion = BiStructuredCompletionAdapter(completion_client)
-    profiles = PostgresBiDocumentProfileRepository()
+    profiles = _create_bi_profiles(registry)
     profiler = PersistedBiDocumentProfiler(
         BiDocumentProfiler(
             PostgresBiProfileEvidenceRetriever(),
@@ -106,12 +126,16 @@ def create_bi_question_pipeline(
     completion_client: OpenAIResponsesClient,
 ) -> BiQuestionPipeline:
     pgvector_store = registry.pgvector_store
-    retriever = FastRagPipelineAdapter(registry, pgvector_store)
+    retriever = FastRagPipelineAdapter(
+        registry,
+        pgvector_store,
+        metric_evidence=PostgresBiMetricEvidenceRetriever(registry.database_url),
+    )
     completion = BiStructuredCompletionAdapter(completion_client)
     extractor = BiMetricExtractionService(
         retriever,
         BiMetricReader(completion, BI_READER_MODEL),
-        PostgresBiDocumentProfileRepository(),
+        _create_bi_profiles(registry),
     )
     return BiQuestionPipeline(
         extractor,
@@ -145,7 +169,7 @@ def create_bi_question_worker(
             answers=PostgresBiQuestionSnapshotRepository(),
             store=store,
             clock=SystemClock(),
-            profiles=PostgresBiDocumentProfileRepository(),
+            profiles=_create_bi_profiles(registry),
         )
     )
     return BiQuestionWorker(
@@ -184,7 +208,7 @@ def create_bi_question_batch_worker(
             answers=PostgresBiQuestionSnapshotRepository(),
             store=store,
             clock=SystemClock(),
-            profiles=PostgresBiDocumentProfileRepository(),
+            profiles=_create_bi_profiles(registry),
         )
     )
     publishing_service = BiPublishingQuestionService(

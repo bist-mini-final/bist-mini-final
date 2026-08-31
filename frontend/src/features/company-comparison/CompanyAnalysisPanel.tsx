@@ -2,6 +2,7 @@ import { CompanyLogoBadge } from './CompanyLogoBadge';
 import { ComparisonTrendChart, FinancialTrendChart } from './CompanyComparisonCharts';
 import {
   formatAmount,
+  formatCompositeScore,
   indexedSeries,
   percentChange,
   SCORE_DIMENSIONS,
@@ -11,6 +12,27 @@ import {
 import type { CompanyComparisonController } from './useCompanyComparisonController';
 import type { CompanyComparisonSnapshot } from './types';
 import './CompanyAnalysisPanel.css';
+
+function scoreBasisLabel(key: (typeof SCORE_DIMENSIONS)[number]['key']): string {
+  if (key === 'growthScore') return '매출 CAGR';
+  if (key === 'profitabilityScore') return '영업이익률';
+  return '부채비율 + 순부채/매출';
+}
+
+function scoreInputLabel(
+  key: (typeof SCORE_DIMENSIONS)[number]['key'],
+  company: CompanyComparisonSnapshot['companies'][number],
+): string {
+  if (key === 'growthScore') return `CAGR ${company.revenueCagr.toFixed(1)}%`;
+  if (key === 'profitabilityScore') return `영업이익률 ${company.operatingMargin.toFixed(1)}%`;
+  return `부채 ${company.liabilitiesToAssets.toFixed(1)}% · 순부채/매출 ${company.netDebtToRevenue.toFixed(1)}%`;
+}
+
+function scoreDifferenceLabel(first: number, second: number): string {
+  const difference = first - second;
+  if (Math.abs(difference) < 0.05) return '동점';
+  return `${difference > 0 ? 'A' : 'B'} +${Math.abs(difference).toFixed(1)}점`;
+}
 
 type AnalysisController = Pick<
   CompanyComparisonController,
@@ -67,7 +89,7 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
                 <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={25} />
                 <div>
                   <strong title={company.displayName}>{company.displayName}</strong>
-                  <span>종합 {officialRankByCompanyId.get(company.companyId)}위 · {company.tier}등급 · {company.compositeScore.toFixed(1)}점</span>
+                  <span>종합 {officialRankByCompanyId.get(company.companyId)}위 · {company.tier}등급 · {formatCompositeScore(company.compositeScore)}점</span>
                 </div>
               </div>
             ))}
@@ -89,9 +111,13 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
                 const bWins = metric.lower ? metric.b < metric.a : metric.b > metric.a;
                 return (
                   <div className="comparison-metric-row" key={metric.label}>
-                    <strong className={aWins ? 'is-winner-a' : ''}>{metric.a.toFixed(1)}{metric.suffix}</strong>
+                    <strong className={aWins ? 'is-winner-a' : ''}>
+                      {metric.label === '종합점수' ? formatCompositeScore(metric.a) : metric.a.toFixed(1)}{metric.suffix}
+                    </strong>
                     <span>{metric.label}</span>
-                    <strong className={bWins ? 'is-winner-b' : ''}>{metric.b.toFixed(1)}{metric.suffix}</strong>
+                    <strong className={bWins ? 'is-winner-b' : ''}>
+                      {metric.label === '종합점수' ? formatCompositeScore(metric.b) : metric.b.toFixed(1)}{metric.suffix}
+                    </strong>
                   </div>
                 );
               })}
@@ -100,8 +126,8 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
 
           <div className="analysis-section-block">
             <div className="analysis-section-title">
-              <strong>평가축별 우위</strong>
-              <span>종합점수 계산 기준</span>
+              <strong>종합점수 구성 비교</strong>
+              <span>공통 0~100점 기준</span>
             </div>
             <div className="comparison-score-list">
               {SCORE_DIMENSIONS.map((dimension) => {
@@ -109,11 +135,40 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
                 const bScore = comparisonCompanies[1][dimension.key];
                 return (
                   <div className="comparison-score-row" key={dimension.key}>
-                    <span>{dimension.label} <small>{Math.round(dimension.weight * 100)}%</small></span>
-                    <div className="comparison-score-values">
-                      <strong className={aScore > bScore ? 'is-winner-a' : ''}>A {aScore.toFixed(1)}</strong>
-                      <i aria-hidden="true"><b style={{ width: `${aScore}%` }} /><b style={{ width: `${bScore}%` }} /></i>
-                      <strong className={bScore > aScore ? 'is-winner-b' : ''}>B {bScore.toFixed(1)}</strong>
+                    <div className="comparison-score-heading">
+                      <div>
+                        <strong>{dimension.label}</strong>
+                        <small>{scoreBasisLabel(dimension.key)}</small>
+                      </div>
+                      <span>{scoreDifferenceLabel(aScore, bScore)}</span>
+                      <b>가중치 {Math.round(dimension.weight * 100)}%</b>
+                    </div>
+                    <div className="comparison-score-axis-labels" aria-hidden="true">
+                      <span>0</span>
+                      <span>50</span>
+                      <span>100</span>
+                    </div>
+                    {comparisonCompanies.map((company, index) => {
+                      const score = company[dimension.key];
+                      const companyKey = index === 0 ? 'A' : 'B';
+                      return (
+                        <div
+                          className={`comparison-score-lane is-${companyKey.toLowerCase()}`}
+                          key={company.companyId}
+                          aria-label={`${companyKey} ${company.displayName}, ${dimension.label} ${score.toFixed(1)}점, ${scoreInputLabel(dimension.key, company)}`}
+                        >
+                          <span>{companyKey}</span>
+                          <div className="comparison-score-track" aria-hidden="true">
+                            <b style={{ width: `${score}%` }} />
+                            <i style={{ left: `${score}%` }} />
+                          </div>
+                          <strong>{score.toFixed(1)}</strong>
+                          <small>{scoreInputLabel(dimension.key, company)}</small>
+                        </div>
+                      );
+                    })}
+                    <div className="comparison-score-formula">
+                      반영 점수 A {(aScore * dimension.weight).toFixed(1)} · B {(bScore * dimension.weight).toFixed(1)}
                     </div>
                   </div>
                 );
@@ -148,7 +203,7 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
             </div>
             <div className="analysis-total-score">
               <span className={`tier-round-pill pill-${analysisCompany.tier.toLowerCase()}`}>{analysisCompany.tier}</span>
-              <strong>{analysisCompany.compositeScore.toFixed(1)}</strong>
+              <strong>{formatCompositeScore(analysisCompany.compositeScore)}</strong>
               <small>종합점수</small>
             </div>
           </div>

@@ -13,6 +13,7 @@ class FastRagPipelineSettings(BiContractModel):
     rrf_k: int = Field(default=60, gt=0, le=1_000)
     fused_top_k: int = Field(default=100, gt=0, le=1_000)
     context_cell_limit: int = Field(default=100, gt=0, le=1_000)
+    exact_cell_limit: int = Field(default=8, gt=0, le=100)
 
 
 class RankedEvidenceCell(BiContractModel):

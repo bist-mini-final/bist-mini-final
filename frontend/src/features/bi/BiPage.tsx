@@ -19,6 +19,8 @@ import { useSelectedBiCompany } from './hooks/useSelectedBiCompany';
 import { buildCardViewModel } from './selectors/cardViewModel';
 import { BiApiRequestError, deleteBiDashboard } from './services/api';
 import type { BiCardId, PeriodRange } from './types';
+import { VIEWPORT_QUERIES } from '../../shared/responsive/breakpoints';
+import { useMediaQuery } from '../../shared/responsive/useMediaQuery';
 import 'react-grid-layout/css/styles.css';
 import './bi.css';
 import './bi-reference.css';
@@ -26,6 +28,7 @@ import './bi-reference.css';
 const PERIOD_OPTIONS = ['최근 3개', '최근 5개', '전체'] as const satisfies readonly PeriodRange[];
 
 export function BiPage() {
+  const isMobile = useMediaQuery(VIEWPORT_QUERIES.mobile);
   const companiesController = useBiCompanies();
   const companiesState = companiesController.state;
   const availableCompanies = companiesState.status === 'ready' ? companiesState.companies : [];
@@ -45,6 +48,9 @@ export function BiPage() {
   const dashboardState = dashboardController.state;
 
   useEffect(() => () => snapshotDeleteControllerRef.current?.abort(), []);
+  useEffect(() => {
+    if (isMobile) setIsEditing(false);
+  }, [isMobile]);
 
   if (companiesState.status === 'loading') {
     return <BiDataState tone="loading" title="BI 데이터를 불러오는 중입니다" message="등록된 기업 목록을 확인하고 있습니다." />;
@@ -174,6 +180,7 @@ export function BiPage() {
               selectedPeriod={selectedPeriod}
               onPeriodChange={setSelectedPeriod}
               isEditing={isEditing}
+              allowLayoutEditing={!isMobile}
               onEditingChange={setIsEditing}
               visibleCardCount={layout.cards.length}
               hiddenCardCount={layout.hiddenCardIds.length}
@@ -185,7 +192,7 @@ export function BiPage() {
               dashboard={dashboard}
               cards={layout.cards}
               periodRange={selectedPeriod}
-              isEditing={isEditing}
+              isEditing={isEditing && !isMobile}
               canMoveCard={layout.canMoveCard}
               onMoveCard={layout.moveCard}
               onReplaceCards={layout.replaceCards}

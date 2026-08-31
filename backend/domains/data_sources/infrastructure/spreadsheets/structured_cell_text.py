@@ -10,7 +10,7 @@ UNKNOWN_FIELD = "?"
 UNRESOLVED_CELL_VALUES: Final = frozenset(
     {"", "?", "-", "na", "n/a", "nm", "#pend", "none", "null"}
 )
-SERIALIZATION_VERSION = "structured-cell-v6-company-scoped"
+SERIALIZATION_VERSION = "structured-cell-v7-exact-sheet-identity"
 SHEET_NAME_ALIASES: Dict[str, str] = {}
 SHEET_CODE_MAP: Dict[str, str] = {}
 PERIOD_PATTERN = re.compile(
@@ -26,12 +26,6 @@ CELL_VALUE_PATTERN = re.compile(
 def canonical_sheet_name(sheet_name: str) -> str:
     """Return cleanly stripped sheet name without arbitrary alias overriding."""
     return str(sheet_name).strip()
-
-
-def sheet_code(sheet_name: str) -> str:
-    """Generate a clean alphanumeric prefix code for the sheet."""
-    clean = re.sub(r"[^A-Za-z0-9]", "", str(sheet_name).strip())
-    return clean or str(sheet_name).strip()
 
 
 def format_cell_value(value: Any) -> Optional[str]:

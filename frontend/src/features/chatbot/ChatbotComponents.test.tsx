@@ -61,6 +61,7 @@ describe('ChatMessages', () => {
       status: 'processing',
       run_id: 'run-1',
       visualization: null,
+      evidence: [],
       attachments: [],
       created_at: '2026-08-30T00:00:00Z',
     };

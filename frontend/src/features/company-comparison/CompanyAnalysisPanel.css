@@ -281,34 +281,134 @@
 .comparison-metric-row > strong:last-child { text-align: right; }
 .is-winner-a { color: var(--bm-primary-dark) !important; }
 .is-winner-b { color: var(--bm-secondary-dark) !important; }
-.comparison-score-row > span {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 3px;
-  color: #52625a;
-  font-size: 9px;
-  font-weight: 700;
+.comparison-score-row {
+  padding: 8px 9px;
+  border: 1px solid #e4ebe7;
+  border-radius: 8px;
+  background: #fbfcfb;
 }
-.comparison-score-row > span small { color: #84928b; }
-.comparison-score-values {
+.comparison-score-heading {
   display: grid;
-  grid-template-columns: 48px minmax(80px, 1fr) 48px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 6px;
 }
-.comparison-score-values > strong { color: #65766d; font-size: 8.5px; }
-.comparison-score-values > strong:last-child { text-align: right; }
-.comparison-score-values > i {
-  display: grid;
-  gap: 2px;
+.comparison-score-heading > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
 }
-.comparison-score-values > i > b {
-  display: block;
-  height: 4px;
+.comparison-score-heading > div > strong {
+  color: #24372d;
+  font-size: 10px;
+  font-weight: 850;
+}
+.comparison-score-heading > div > small {
+  overflow: hidden;
+  color: #7a8a82;
+  font-size: 8px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comparison-score-heading > span,
+.comparison-score-heading > b {
+  padding: 2px 5px;
   border-radius: 999px;
-  background: var(--bm-primary);
+  font-size: 7.5px;
+  font-weight: 800;
+  white-space: nowrap;
 }
-.comparison-score-values > i > b:last-child { justify-self: end; background: var(--bm-secondary); }
+.comparison-score-heading > span {
+  background: #eef3f0;
+  color: #52625a;
+}
+.comparison-score-heading > b {
+  background: var(--bm-primary-light);
+  color: var(--bm-primary-dark);
+}
+.comparison-score-axis-labels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 6px 153px 2px 21px;
+  color: #8a9891;
+  font-size: 7px;
+  line-height: 1;
+}
+.comparison-score-axis-labels > span:nth-child(2) { text-align: center; }
+.comparison-score-axis-labels > span:last-child { text-align: right; }
+.comparison-score-lane {
+  display: grid;
+  grid-template-columns: 16px minmax(80px, 1fr) 31px 112px;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+}
+.comparison-score-lane > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  background: var(--bm-primary);
+  color: #fff;
+  font-size: 7px;
+  font-weight: 900;
+}
+.comparison-score-lane.is-b > span { background: var(--bm-secondary); }
+.comparison-score-track {
+  position: relative;
+  height: 5px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 0.5px), #cad5cf calc(50% - 0.5px), #cad5cf calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    #e9efec;
+}
+.comparison-score-track > b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--bm-primary) 72%, white);
+}
+.comparison-score-lane.is-b .comparison-score-track > b {
+  background: color-mix(in srgb, var(--bm-secondary) 72%, white);
+}
+.comparison-score-track > i {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--bm-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bm-primary) 55%, transparent);
+  transform: translate(-50%, -50%);
+}
+.comparison-score-lane.is-b .comparison-score-track > i {
+  background: var(--bm-secondary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bm-secondary) 55%, transparent);
+}
+.comparison-score-lane > strong {
+  color: #31473b;
+  font-size: 8.5px;
+  text-align: right;
+}
+.comparison-score-lane > small {
+  overflow: hidden;
+  color: #74847b;
+  font-size: 7.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comparison-score-formula {
+  margin: 4px 0 0 21px;
+  color: #84928b;
+  font-size: 7.5px;
+  text-align: right;
+}
 .comparison-trend-legend {
   display: flex;
   min-width: 0;

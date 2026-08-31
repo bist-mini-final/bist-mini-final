@@ -220,6 +220,70 @@ def test_context_expander_restores_values_hidden_by_header_only_variants() -> No
     assert "Cell Value: ?" not in result["cells"][0]["source_text"]
 
 
+def test_context_expander_uses_exact_sheet_metadata_instead_of_lossy_cell_id_prefix() -> None:
+    store = MagicMock()
+
+    def fetch_rows_cells(**kwargs):
+        if kwargs["sheet_name"] != "Cash_Flow":
+            return {}
+        return {
+            42: [
+                {
+                    "col_index": 12,
+                    "cell_id": "VeltrixSystems:Cash_Flow:L42",
+                    "cell_coord": "L42",
+                    "sheet_name": "Cash_Flow",
+                    "cell_value": "1200",
+                    "row_header": ["Cash from Ops."],
+                    "column_header": ["2021-12-31"],
+                    "company_name": "Veltrix Systems",
+                }
+            ]
+        }
+
+    store.fetch_rows_cells.side_effect = fetch_rows_cells
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(question_id="q-cash", question_text="현금흐름"),
+        document_context=DocumentContextDTO(
+            file_name="veltrix.xlsx",
+            workbook_hash="hash-cash",
+            index_id="idx-cash",
+            company_name="Veltrix Systems",
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="idx-cash",
+                cell_id="CashFlow:L42",
+                sheet_name="Cash_Flow",
+                cell_coord="L42",
+                rrf_score=0.9,
+                text=(
+                    "Company: Veltrix Systems | Sheet: Cash_Flow | "
+                    "Row Header: Cash from Ops. | Column Header: 2021-12-31 | "
+                    "Cell Value: ?"
+                ),
+                matched_subquery="Cash from Ops.",
+            )
+        ],
+    )
+
+    result = PgContextExpanderModule(store).run(
+        PgContextExpanderInputDTO(retrieval_json=retrieval)
+    )
+
+    assert result["cells"][0]["sheet_name"] == "Cash_Flow"
+    assert result["cells"][0]["cell_coord"] == "L42"
+    assert any("Cell Value: 1200" in item for item in result["items"])
+    store.fetch_rows_cells.assert_called_once_with(
+        collection_name="idx-cash",
+        workbook_hash=None,
+        sheet_name="Cash_Flow",
+        row_indices=[42],
+        limit_per_row=100,
+    )
+
+
 def test_context_expander_canonicalizes_legacy_company_and_title_headers() -> None:
     store = MagicMock()
     store.fetch_rows_cells.return_value = {
@@ -227,6 +291,9 @@ def test_context_expander_canonicalizes_legacy_company_and_title_headers() -> No
             {
                 "col_index": 15,
                 "cell_id": "IS Cell O23",
+                "index_id": "ibm-index",
+                "workbook_hash": "hash-ibm",
+                "file_name": "ibm.xlsx",
                 "cell_coord": "O23",
                 "sheet_name": "Income_Statement",
                 "cell_value": "62753",
@@ -284,10 +351,16 @@ def test_context_expander_canonicalizes_legacy_company_and_title_headers() -> No
     assert result["cells"] == [
         {
             "cell_id": "IS Cell O23",
+            "index_id": "ibm-index",
+            "workbook_hash": "hash-ibm",
+            "file_name": "ibm.xlsx",
+            "company_name": "IBM",
             "sheet_name": "Income_Statement",
             "cell_coord": "O23",
             "source_text": expected,
             "cell_value": "62753",
+            "row_header": ["Total Revenue"],
+            "column_header": ["2024-12-31"],
         }
     ]
 

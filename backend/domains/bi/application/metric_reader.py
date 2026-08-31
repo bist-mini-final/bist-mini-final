@@ -1,10 +1,12 @@
 """Structured completion adapter and metric reader for BI."""
 
 import json
+import re
 from typing import Protocol, TypeAlias, assert_never, cast
 
 from pydantic import ValidationError
 
+from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
 from backend.domains.bi.domain.extraction_models import (
     BiMetricExtractionRequest,
     BiMetricReaderResponse,
@@ -16,6 +18,30 @@ from backend.domains.bi.domain.extraction_models import (
 from .evidence import verifiable_cells
 
 JsonValue: TypeAlias = str | int | float | bool | list["JsonValue"] | dict[str, "JsonValue"] | None
+_ROW_HEADER = re.compile(r"(?:^|\|)\s*Row Header:\s*(.*?)\s*\|\s*Column Header:", re.I)
+_NORMALIZED_HEADER = re.compile(r"[^0-9a-z\uac00-\ud7a3]+")
+
+
+def _normalize_header(value: str) -> str:
+    return _NORMALIZED_HEADER.sub("", value.casefold())
+
+
+def _is_excluded_metric_cell(
+    request: BiMetricExtractionRequest,
+    cell_source_text: str,
+) -> bool:
+    definition = METRIC_CATALOG.get(request.metric_id)
+    if not isinstance(definition, SourceMetricDefinition) or not definition.excluded_aliases:
+        return False
+    match = _ROW_HEADER.search(cell_source_text)
+    if match is None:
+        return False
+    row_header = _normalize_header(match.group(1))
+    return any(
+        row_header.endswith(excluded)
+        for alias in definition.excluded_aliases
+        if (excluded := _normalize_header(alias))
+    )
 
 
 def _strict_json_schema_value(value: JsonValue) -> JsonValue:
@@ -77,7 +103,11 @@ class BiMetricReader:
         Returns:
             MetricReaderResult: The validated extraction result, or a reader contract failure when the response payload is invalid.
         """
-        allowed_cells = verifiable_cells(context.cells)
+        allowed_cells = tuple(
+            cell
+            for cell in verifiable_cells(context.cells)
+            if not _is_excluded_metric_cell(request, cell.source_text)
+        )
         if not allowed_cells:
             return ReaderContractFailure(code="verifiable_evidence_missing")
 

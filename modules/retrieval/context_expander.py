@@ -11,7 +11,7 @@ Example:
         "query_context": {"question_id": "q-001", "question_text": "삼성전자 영업이익"},
         "document_context": {"file_name": "samsung_2023.xlsx", "workbook_hash": "a1b2c3d4..."},
         "items": [
-          {"rank": 1, "cell_id": "삼성전자:손익계산서:C5", "score": 0.032, "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670", "matched_subquery": "..."}
+          {"rank": 1, "company_name": "삼성전자", "sheet_name": "손익계산서", "cell_id": "C5", "cell_coord": "C5", "score": 0.032, "text": "Company: 삼성전자 | Sheet: 손익계산서 | Row Header: 영업이익 | Column Header: 2023 | Cell Value: 65670", "matched_subquery": "..."}
         ]
       }
     }
@@ -120,6 +120,22 @@ def _canonical_source_text(
 # ==============================================================================
 # 2. DTOs & Item Models
 # ==============================================================================
+class ContextCellDTO(ModuleDTO):
+    """Typed source cell candidate that Reader enriches into CellEvidenceDTO."""
+
+    cell_id: Optional[str] = None
+    index_id: Optional[str] = None
+    workbook_hash: Optional[str] = None
+    file_name: Optional[str] = None
+    company_name: Optional[str] = None
+    sheet_name: str = Field(min_length=1)
+    cell_coord: str = Field(pattern=r"^[A-Za-z]{1,3}[1-9][0-9]{0,6}$")
+    source_text: str = Field(min_length=1)
+    cell_value: Optional[str] = None
+    row_header: List[str] = Field(default_factory=list)
+    column_header: List[str] = Field(default_factory=list)
+
+
 class ContextDTO(ModuleDTO):
     """Structured context output carrying full-row timeseries documents."""
 
@@ -131,7 +147,7 @@ class ContextDTO(ModuleDTO):
         default_factory=list,
         description="Reader가 그대로 사용할 시트·행 단위 실제 셀 컨텍스트 블록 목록",
     )
-    cells: List[Dict[str, Any]] = Field(
+    cells: List[ContextCellDTO] = Field(
         default_factory=list,
         description="Reader 및 다운스트림에서 증거로 사용할 수 있는 확장 셀들의 메타데이터 목록",
     )
@@ -216,10 +232,29 @@ def _parse_cell_id_coords(
     """Parse candidate identity into company, sheet, row, and column."""
     company, sheet, coord = _cell_identity_parts(cell_id)
 
-    if not sheet:
-        sheet = _infer_sheet(cell_id, text)
+    # The structured document carries the exact Excel worksheet title.  A
+    # historical cell-id prefix may be a lossy code such as ``CashFlow`` for
+    # ``Cash_Flow``, so never let that code override the source metadata.
+    inferred_sheet = _infer_sheet(cell_id, text)
+    if inferred_sheet:
+        sheet = inferred_sheet
     row_index, column_index = _coordinate_indexes(coord)
     return company, sheet, row_index, column_index
+
+
+def _candidate_coords(candidate: Any) -> Tuple[str, Optional[int], Optional[int]]:
+    """Resolve a retrieval candidate through explicit metadata before legacy parsing."""
+
+    _, parsed_sheet, parsed_row, parsed_column = _parse_cell_id_coords(
+        candidate.cell_id,
+        candidate.text,
+    )
+    sheet = str(getattr(candidate, "sheet_name", None) or parsed_sheet).strip()
+    coordinate = str(getattr(candidate, "cell_coord", None) or "").strip()
+    if not coordinate:
+        return sheet, parsed_row, parsed_column
+    row_index, column_index = _coordinate_indexes(coordinate)
+    return sheet, row_index, column_index
 
 
 @dataclass
@@ -261,7 +296,7 @@ class PgContextExpanderModule(BaseModule):
         outputs=["context_json"],
         config_fields=["top_k", "max_blocks"],
         raw_output=True,
-        version="3",
+        version="4",
     )
     input_model = PgContextExpanderInputDTO
     config_model = PgContextExpanderConfigDTO
@@ -278,10 +313,7 @@ class PgContextExpanderModule(BaseModule):
     ) -> Dict[Tuple[str, str], Set[int]]:
         target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
         for candidate in retrieval_items:
-            _, sheet, row_index, _ = _parse_cell_id_coords(
-                candidate.cell_id,
-                candidate.text,
-            )
+            sheet, row_index, _ = _candidate_coords(candidate)
             if candidate.index_id and sheet and row_index is not None:
                 scope_key = (candidate.index_id, sheet)
                 if cfg.adjacent_radius and cfg.adjacent_radius > 0:
@@ -302,9 +334,11 @@ class PgContextExpanderModule(BaseModule):
         accumulator = _ContextAccumulator()
         for candidate in retrieval_items:
             text = candidate.text.strip()
-            _, sheet, _, _ = _parse_cell_id_coords(candidate.cell_id, candidate.text)
-            coordinate_match = re.search(r"([A-Za-z]+)(\d+)", candidate.cell_id)
-            coordinate = coordinate_match.group(0) if coordinate_match else ""
+            sheet, _, _ = _candidate_coords(candidate)
+            coordinate = str(getattr(candidate, "cell_coord", None) or "").strip()
+            if not coordinate:
+                coordinate_match = re.search(r"([A-Za-z]+)(\d+)", candidate.cell_id)
+                coordinate = coordinate_match.group(0) if coordinate_match else ""
             canonical = _canonical_source_text(
                 {"source_text": text},
                 fallback_company=fallback_company,
@@ -318,6 +352,8 @@ class PgContextExpanderModule(BaseModule):
                 accumulator.fallbacks.append(
                     {
                         "cell_id": candidate.cell_id,
+                        "index_id": candidate.index_id,
+                        "company_name": fallback_company or None,
                         "sheet_name": sheet,
                         "cell_coord": coordinate,
                         "source_text": canonical,
@@ -337,12 +373,19 @@ class PgContextExpanderModule(BaseModule):
         sheet_name = str(cell.get("sheet_name") or fallback_sheet)
         if not (raw_text and actual_value and coordinate and sheet_name):
             return None
+        canonical_fields = _structured_fields(raw_text)
         return {
             "cell_id": cell.get("cell_id") or f"{sheet_name} Cell {coordinate}",
+            "index_id": cell.get("index_id"),
+            "workbook_hash": cell.get("workbook_hash"),
+            "file_name": cell.get("file_name"),
+            "company_name": canonical_fields.get("company") or cell.get("company_name"),
             "sheet_name": sheet_name,
             "cell_coord": coordinate,
             "source_text": raw_text,
             "cell_value": actual_value,
+            "row_header": _header_list(canonical_fields.get("row header")),
+            "column_header": _header_list(canonical_fields.get("column header")),
         }
 
     @classmethod
@@ -493,6 +536,7 @@ class PgContextExpanderModule(BaseModule):
 # 5. Exports
 # ==============================================================================
 __all__ = [
+    "ContextCellDTO",
     "ContextDTO",
     "DocumentContextDTO",
     "PgContextExpanderConfigDTO",
