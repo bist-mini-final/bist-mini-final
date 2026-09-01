@@ -5,6 +5,7 @@ import { chatApi } from './chatApi';
 import type {
   ChatDialogState,
   ChatMessage,
+  PendingChatTurn,
   ChatProgressStep,
   ChatSession,
 } from './types';
@@ -78,6 +79,7 @@ export function useChatController() {
   const [isRunning, setIsRunning] = useState(false);
   const [requestError, setRequestError] = useState('');
   const [progress, setProgress] = useState<ChatProgressStep[]>([]);
+  const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [dialog, setDialog] = useState<ChatDialogState>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [isDialogBusy, setIsDialogBusy] = useState(false);
@@ -136,6 +138,7 @@ export function useChatController() {
     setAttachment(null);
     setRequestError('');
     setProgress([]);
+    setPendingTurn(null);
   };
 
   const closeDialog = () => {
@@ -203,7 +206,18 @@ export function useChatController() {
     setDraft('');
     setRequestError('');
     setIsRunning(true);
-    setProgress([{ id: 'analysis', label: '질문을 분석하고 있습니다', state: 'active' }]);
+    setPendingTurn({
+      content,
+      attachmentName: attachment?.name ?? null,
+      createdAt: new Date().toISOString(),
+    });
+    setProgress([{
+      id: 'submitting',
+      label: attachment
+        ? '질문과 첨부 파일을 전달하고 있습니다'
+        : '질문을 전달하고 있습니다',
+      state: 'active',
+    }]);
     const controller = new AbortController();
     aborter.current = controller;
 
@@ -232,10 +246,12 @@ export function useChatController() {
         evidence: [],
         attachments: uploadedAttachment ? [uploadedAttachment] : [],
         created_at: new Date().toISOString(),
+        completed_at: null,
       };
       setActive((current) => current
         ? { ...current, messages: [...(current.messages ?? []), localUser] }
         : { ...session, messages: [localUser] });
+      setPendingTurn(null);
 
       const started = await chatApi.send(
         session.id,
@@ -244,11 +260,12 @@ export function useChatController() {
         uploadedAttachment?.id,
         controller.signal,
       );
+      setProgress([{ id: 'analysis', label: '질문을 분석하고 있습니다', state: 'active' }]);
       setActive((current) => current && ({
         ...current,
         messages: [
           ...(current.messages ?? []).filter((message) => message.id !== localUser.id),
-          { ...localUser, id: `user-${started.run_id}` },
+          started.user_message,
           started.assistant_message,
         ],
       }));
@@ -300,6 +317,7 @@ export function useChatController() {
             evidence: [],
             attachments: [],
             created_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
           }],
         }));
       }
@@ -308,6 +326,7 @@ export function useChatController() {
       activeRunId.current = null;
       setIsRunning(false);
       setProgress([]);
+      setPendingTurn(null);
     }
   };
 
@@ -341,6 +360,7 @@ export function useChatController() {
     isRunning,
     requestError,
     progress,
+    pendingTurn,
     dialog,
     dialogError,
     isDialogBusy,

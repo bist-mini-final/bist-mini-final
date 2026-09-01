@@ -15,6 +15,7 @@ export function ChatbotView() {
           <ChatMessages
             messages={chat.messages}
             progress={chat.progress}
+            pendingTurn={chat.pendingTurn}
             examples={chat.examples}
             isRunning={chat.isRunning}
             isRefreshingSuggestions={chat.isRefreshingSuggestions}

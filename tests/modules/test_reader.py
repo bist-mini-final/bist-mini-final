@@ -533,3 +533,107 @@ def test_reader_returns_only_model_selected_structured_evidence():
     assert "Income Statement O23" not in answer
     assert "**근거**" not in answer
     assert [item["cell_coord"] for item in result["answer_json"]["evidence"]] == ["O23"]
+
+
+def test_reader_preserves_verified_ids_when_model_also_returns_unsupported_ids() -> None:
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-mixed-evidence-ids",
+        content=structured_answer(
+            "Nexora Labs의 총자산은 10,283이고 총부채는 3,496입니다.",
+            ["evidence_1", "EVIDENCE-002", "EVIDENCE-999"],
+        ),
+        usage={"prompt_tokens": 100, "completion_tokens": 20},
+        latency_seconds=0.1,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    result = reader.execute(
+        ReaderInputDTO(
+            context_json=ContextDTO(
+                query_context=QueryContextDTO(
+                    question_id="q-mixed-evidence-ids",
+                    question_text="Nexora Labs의 총자산과 총부채는?",
+                ),
+                document_context=DocumentContextDTO(
+                    index_id="idx-nexora",
+                    file_name="nexora.xlsx",
+                    workbook_hash="hash-nexora",
+                    company_name="Nexora Labs",
+                    sheet_names=["Balance_Sheet"],
+                ),
+                cells=[
+                    {
+                        "index_id": "idx-nexora",
+                        "cell_coord": "Q50",
+                        "cell_value": "10282.93",
+                        "sheet_name": "Balance_Sheet",
+                        "company_name": "Nexora Labs",
+                        "source_text": (
+                            "Company: Nexora Labs | Sheet: Balance_Sheet | "
+                            "Row Header: Total Assets | Column Header: 2025-12-31 | "
+                            "Cell Value: 10282.93"
+                        ),
+                    },
+                    {
+                        "index_id": "idx-nexora",
+                        "cell_coord": "Q74",
+                        "cell_value": "3496.20",
+                        "sheet_name": "Balance_Sheet",
+                        "company_name": "Nexora Labs",
+                        "source_text": (
+                            "Company: Nexora Labs | Sheet: Balance_Sheet | "
+                            "Row Header: Total Liabilities | Column Header: 2025-12-31 | "
+                            "Cell Value: 3496.20"
+                        ),
+                    },
+                ],
+            )
+        )
+    )
+
+    assert "총자산" in result["answer_json"]["answer_markdown"]
+    assert [item["evidence_id"] for item in result["answer_json"]["evidence"]] == [
+        "EVIDENCE-001",
+        "EVIDENCE-002",
+    ]
+
+
+def test_reader_still_rejects_when_every_selected_id_is_unsupported() -> None:
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-unsupported-evidence-ids",
+        content=structured_answer("근거 없는 답변", ["EVIDENCE-999"]),
+        usage={},
+        latency_seconds=0.1,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    result = reader.execute(
+        ReaderInputDTO(
+            context_json=ContextDTO(
+                query_context=QueryContextDTO(
+                    question_id="q-unsupported-evidence-ids",
+                    question_text="Nexora Labs의 총자산은?",
+                ),
+                document_context=DocumentContextDTO(
+                    file_name="nexora.xlsx",
+                    workbook_hash="hash-nexora",
+                ),
+                cells=[
+                    {
+                        "cell_coord": "Q50",
+                        "sheet_name": "Balance_Sheet",
+                        "source_text": (
+                            "Company: Nexora Labs | Sheet: Balance_Sheet | "
+                            "Row Header: Total Assets | Column Header: 2025-12-31 | "
+                            "Cell Value: 10282.93"
+                        ),
+                    }
+                ],
+            )
+        )
+    )
+
+    assert result["answer_json"]["answer_markdown"] == (
+        "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    )
+    assert result["answer_json"]["evidence"] == []

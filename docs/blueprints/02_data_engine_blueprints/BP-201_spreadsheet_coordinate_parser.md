@@ -78,5 +78,5 @@ flowchart LR
 - 이전 `backend/storage/spreadsheets` 구현은 data sources infrastructure로 이동했고 수평 storage package는 제거됐습니다.
 - workbook catalog와 renderer는 bootstrap에서 생성해 module에 주입합니다. module은 경로·provider·DB client를 자체 생성하지 않으며 저장 capability는 좁은 port로 받습니다.
 - `structured-cell-v7-exact-sheet-identity`, 좌표 전용 `cell_id`, `header_only`/`header_with_value`, header hierarchy 조합 생성과 unresolved-value 필터가 현재 직렬화 계약입니다.
-- `WorkbookProfile`은 `data_sources/domain/workbook_profiles.py`, 원본 추출은 `workbook_profile_extractor.py`, 저장은 `workbook_profiles`가 소유합니다. 이미 인덱싱된 파일은 동일 원본 hash를 확인한 뒤 on-demand resolver로 재임베딩 없이 프로필을 보완합니다.
+- `WorkbookProfile`은 `data_sources/domain/workbook_profiles.py`, 원본 추출은 `workbook_profile_extractor.py`, 저장은 `workbook_profiles`가 소유합니다. 이미 인덱싱된 파일은 동일 원본 hash를 확인한 뒤 on-demand resolver로 재임베딩 없이 프로필을 보완할 수 있습니다. BI 신규 materialization은 resolver의 강제 재생성 모드로 저장 프로필을 건너뛰고 원본에서 다시 계산한 결과를 교체 저장합니다.
 - variant, serialization version, unresolved marker 또는 좌표 metadata를 바꾸면 기존 collection 호환성·재적재 전략·BP-303 Reader 경계를 함께 검토합니다.

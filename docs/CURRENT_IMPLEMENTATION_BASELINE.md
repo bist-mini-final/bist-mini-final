@@ -30,13 +30,15 @@
 - 셀 `cell_id`는 원본 Excel 좌표만 보존하고, collection/workbook·company·정확한 sheet 이름·좌표의 복합 키로 검색 후보와 근거를 식별한다. 시트 이름을 축약한 합성 ID는 생성하지 않는다.
 - `Cell Value: ?`는 검색 표현에는 유지하지만 Reader 입력에서는 실제 값이 있는 근거만 허용한다.
 - Reader는 strict `answer_markdown + evidence_ids` Pydantic 출력을 사용한다. 서버는 선택 ID를 실제 값 후보와 run evidence에 대조해 `CellEvidenceDTO[]`로 만들고, 챗봇은 본문과 근거 JSONB를 독립 저장한다. frontend는 Markdown 좌표 문자열을 파싱하지 않고 구조화 `evidence[]`만 배지·원본 셀 검증 UI로 투영한다.
+- 챗봇의 첨부+적재 기업 질문은 검증된 RAG 답변과 첨부 전체 평탄화 컨텍스트를 dual-source Reader에서 결합한다. 각 메시지는 DB `created_at`을 사용하고 비동기 assistant 응답은 별도 `completed_at`을 저장·표시한다.
 - BI는 21개 근거 기반 지표를 제공하며 Company Comparison은 실제 BI 관측값만 사용한다.
+- 신규 BI materialization은 기존 `workbook_profiles`를 재사용하지 않고 원본 hash 검증 후 workbook 프로필을 강제 재산출·교체한다. 새 프로필이 불완전할 때만 검색/LLM profiler가 누락 필드를 보완하며 과거 저장 프로필의 기간을 병합하지 않는다.
 - BI source metric은 catalog의 행 별칭·제외어와 FY/LTM 기간 metadata로 exact value cell을 먼저 조회한다. 정확 후보가 없을 때만 scope-aware Decomposer → Dense/keyword → RRF → 2D expansion을 실행한다. 같은 종료일의 FY/LTM 열에서 LTM 상위 header가 유실된 경우 동일 지표 행의 열 순서로 두 기간을 구분하며 특정 sheet 이름이나 열 문자를 고정하지 않는다.
 - 표 구조 감지는 외부 OpenAI vision provider를 사용한다.
 
 ## 데이터베이스 기준선
 
-- Alembic head는 `20260831_0007`이다.
+- Alembic head는 `20260901_0008`이다.
 - 애플리케이션 테이블은 `alembic_version`을 제외하고 22개다.
 - BI와 Company Comparison snapshot은 불변 발행본과 current pointer를 분리한다.
 - `workbook_profiles`는 원본 workbook의 통화·배율·기간·시트 역할을 data sources 소유 공통 계약으로 저장하며 BI는 변환 adapter로 읽는다.

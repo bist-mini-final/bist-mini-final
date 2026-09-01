@@ -79,6 +79,10 @@ BI_MATERIALIZATION_JOB = WorkerJobDefinition(
     worker_kind="bi-materialization",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="bi-materialization",
+        # Fresh BI materialization profiles the original workbook and must not
+        # fall back to an LLM profile merely because the batch Pod cannot see
+        # the shared source-file volume.
+        mount_data_volume=True,
         pending_query="""
             SELECT COUNT(*) FROM bi_materialization_jobs
             WHERE (status = 'queued' AND available_at <= NOW())
@@ -102,6 +106,9 @@ BI_QUESTION_JOB = WorkerJobDefinition(
     worker_kind="bi-question",
     kubernetes=KubernetesWorkerPolicy(
         deployment_name="bi-question",
+        # Question extraction normally reads the persisted workbook profile,
+        # but its profile-repair path also needs the original workbook.
+        mount_data_volume=True,
         # batch_size=16 x 최대 90초/질문 + 여유 = 2700 초
         active_deadline_seconds=2700,
         pending_query="""

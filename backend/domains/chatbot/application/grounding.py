@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 INSUFFICIENT_EVIDENCE_ANSWER = "확인 가능한 근거가 부족해 답변할 수 없습니다."
 
 
-class ExecutionLogStorePort(Protocol):
-    def get_node_execution_logs(self, run_id: str) -> list[dict[str, Any]]: ...
+class RunNodeStorePort(Protocol):
+    def load_node(self, run_id: str, node_id: str) -> Any: ...
 
 
 def _context_evidence_cells(output: Any) -> list[dict[str, str]]:
@@ -53,23 +53,19 @@ def _run_evidence_cells(run: Any) -> list[dict[str, str]]:
     return _context_evidence_cells(node.output if node else None)
 
 
-def _logged_context_evidence_cells(
+def _persisted_context_evidence_cells(
     run: Any,
-    database: ExecutionLogStorePort | None,
+    run_nodes: RunNodeStorePort | None,
 ) -> list[dict[str, str]]:
-    """Read the exact context-expansion output omitted from compact chat summaries."""
-    if database is None:
+    """Hydrate the exact context-expansion artifact omitted from run summaries."""
+    if run_nodes is None:
         return []
     try:
-        logs = database.get_node_execution_logs(run.id)
-        expanded = next(
-            (log for log in reversed(logs) if log["node_id"] == "expand-context"),
-            None,
-        )
-        return _context_evidence_cells(expanded.get("output") if expanded else None)
+        expanded = run_nodes.load_node(run.id, "expand-context")
+        return _context_evidence_cells(expanded.output)
     except Exception:
         logger.exception(
-            "Failed to read expanded chat context for run %s",
+            "Failed to hydrate expanded chat context for run %s",
             getattr(run, "id", ""),
         )
         return []
@@ -97,7 +93,7 @@ def finalize_grounded_answer(
     answer_markdown: str | None,
     selected_evidence: list[dict[str, Any]] | None,
     run: Any,
-    database: ExecutionLogStorePort | None = None,
+    run_nodes: RunNodeStorePort | None = None,
 ) -> GroundedAnswerDTO:
     """Validate Reader-selected evidence DTOs against cells produced by this run."""
     insufficient = GroundedAnswerDTO(
@@ -115,7 +111,7 @@ def finalize_grounded_answer(
     except ValidationError:
         logger.warning("Reader returned an invalid structured evidence payload")
         return insufficient
-    evidence = _run_evidence_cells(run) or _logged_context_evidence_cells(run, database)
+    evidence = _run_evidence_cells(run) or _persisted_context_evidence_cells(run, run_nodes)
     if not evidence:
         return insufficient
     if not all(any(_matches_run_evidence(item, actual) for actual in evidence) for item in selected):
@@ -124,7 +120,7 @@ def finalize_grounded_answer(
 
 
 __all__ = [
-    "ExecutionLogStorePort",
     "INSUFFICIENT_EVIDENCE_ANSWER",
+    "RunNodeStorePort",
     "finalize_grounded_answer",
 ]

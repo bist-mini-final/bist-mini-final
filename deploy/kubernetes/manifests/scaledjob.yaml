@@ -5,6 +5,7 @@ metadata:
   namespace: bist-batch
   annotations:
     bist.ai/connection-hash: __CONNECTION_HASH__
+    bist.ai/image-revision: __IMAGE_REVISION__
   labels:
     app.kubernetes.io/name: __APP_NAME__
     app.kubernetes.io/part-of: bist-mini
@@ -15,7 +16,8 @@ spec:
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
   rollout:
-    strategy: gradual
+    # A release must not mix old and new worker code in one durable queue.
+    strategy: immediate
   scalingStrategy:
     strategy: accurate
     pendingPodConditions:
@@ -29,6 +31,8 @@ spec:
     ttlSecondsAfterFinished: 600
     template:
       metadata:
+        annotations:
+          bist.ai/image-revision: __IMAGE_REVISION__
         labels:
           app.kubernetes.io/name: __APP_NAME__
           app.kubernetes.io/part-of: bist-mini

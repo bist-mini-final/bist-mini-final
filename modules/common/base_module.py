@@ -66,6 +66,14 @@ class QueryContextDTO(ModuleDTO):
         min_length=1,
         description="검색·컨텍스트·답변이 참조하는 사용자의 원문 질문",
     )
+    external_context_sources: List[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description=(
+            "pgvector catalog 밖에서 답변 결합 단계에 제공되는 첨부 원천 이름. "
+            "이 원천의 기업은 catalog retrieval 대상으로 강제하지 않습니다."
+        ),
+    )
 
 
 class DocumentContextDTO(ModuleDTO):

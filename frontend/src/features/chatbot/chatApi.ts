@@ -65,6 +65,7 @@ export const chatApi = {
     signal?: AbortSignal,
   ) {
     return requestJson<{
+      user_message: ChatMessage;
       assistant_message: ChatMessage;
       run_id: string | null;
       mode: 'direct' | 'rag';

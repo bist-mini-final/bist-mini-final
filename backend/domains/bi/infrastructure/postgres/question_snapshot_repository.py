@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from backend.core.settings import PGVECTOR_URL
 from backend.domains.bi.application.errors import BiQuestionSnapshotRepositoryError
+from backend.domains.bi.domain.catalog import CATALOG_VERSION
 from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
 from backend.domains.bi.domain.models import JobId
 from backend.domains.bi.domain.question_records import BiAnswerOutcome, BiQuestionStatus
@@ -30,10 +31,12 @@ class PostgresBiQuestionSnapshotRepository:
                         "FROM bi_questions q "
                         "JOIN bi_answers a ON a.question_id = q.question_id "
                         "WHERE q.materialization_job_id = %s "
+                        "AND q.question_version = %s "
                         "AND q.status = %s AND a.outcome = %s "
                         "ORDER BY q.metric_id, q.period_id, a.created_at DESC",
                         (
                             job_id,
+                            CATALOG_VERSION,
                             BiQuestionStatus.COMPLETED.value,
                             BiAnswerOutcome.COMPLETED.value,
                         ),

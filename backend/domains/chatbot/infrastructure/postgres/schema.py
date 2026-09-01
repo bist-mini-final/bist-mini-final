@@ -20,11 +20,15 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     visualization JSONB,
     evidence JSONB NOT NULL DEFAULT '[]',
     attachments JSONB NOT NULL DEFAULT '[]',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
 );
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS visualization JSONB;
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+UPDATE chat_messages SET completed_at = created_at
+    WHERE role = 'assistant' AND status IN ('completed', 'failed') AND completed_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_client ON chat_sessions(client_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_messages_run

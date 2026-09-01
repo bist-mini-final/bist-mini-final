@@ -58,6 +58,17 @@ COMPANY_SOURCE_ROWS_QUERY: Final = (
     "AND NULLIF(BTRIM(cmetadata->>'file_name'), '') IS NOT NULL "
     "AND (cmetadata->>'workbook_hash') ~ '^[a-f0-9]{64}$'"
 )
+PUBLISH_COMPANY_SQL: Final = (
+    "UPDATE bi_companies SET display_name = %s, "
+    "current_snapshot_id = %s, updated_at = %s "
+    "WHERE company_id = %s "
+    "AND is_deleted = FALSE "
+    "AND (current_snapshot_id IS NULL OR NOT EXISTS ("
+    "SELECT 1 FROM bi_dashboard_snapshots current_snapshot "
+    "WHERE current_snapshot.snapshot_id = bi_companies.current_snapshot_id "
+    "AND current_snapshot.generated_at > %s"
+    "))"
+)
 
 
 class PostgresBiStore:
@@ -272,11 +283,7 @@ class PostgresBiStore:
                         ),
                     )
                     cursor.execute(
-                        "UPDATE bi_companies SET display_name = %s, "
-                        "current_snapshot_id = %s, updated_at = %s "
-                        "WHERE company_id = %s "
-                        "AND is_deleted = FALSE "
-                        "AND (updated_at IS NULL OR updated_at <= %s)",
+                        PUBLISH_COMPANY_SQL,
                         (
                             snapshot.company.display_name,
                             snapshot.snapshot.snapshot_id,

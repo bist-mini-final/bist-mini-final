@@ -19,6 +19,7 @@ flowchart TD
         ATTACH["ChatAttachmentService / LocalChatAttachmentStorage"]
         CONV["Conversation Policy (회사 식별 / 일반 질문 / RAG 라우팅)"]
         GROUND["Grounding Policy (실행 근거 셀 검증 / CellEvidenceDTO allowlist)"]
+        COMBINE["Dual-source Comparison Reader (검증 RAG + 첨부 원문)"]
         TABLE_REP["Inline Markdown Table Repair Engine"]
     end
 
@@ -30,6 +31,9 @@ flowchart TD
     ROUTER --> TABLE_REP
     ROUTER <-->|RAG Execution| PIPELINE["RAG Pipeline Job / FastRagAdapter"]
     PIPELINE --> GROUND
+    ATTACH --> COMBINE
+    GROUND --> COMBINE
+    COMBINE --> ROUTER
     GROUND --> ROUTER
     PIPELINE <--> PG[("PostgreSQL 16 (pgvector + FTS)")]
 ```
@@ -56,7 +60,8 @@ flowchart TD
 ## 3. 대화 라우팅과 근거 안전성
 
 * 금융 용어의 일반 정의, 최근 질문 확인, 등록 회사명 확인은 chatbot application의 결정적 routing policy가 조율합니다. 기업 수치·실적 조회만 workflow application port를 통해 `rag_query` 실행으로 보냅니다.
-* 세션 첨부파일 질문은 RAG collection 검색과 분리된 직접 Reader 경로입니다. infrastructure adapter는 숨김 시트를 제외한 visible worksheet의 모든 비어 있지 않은 행을 시트 구분자와 함께 평탄화하고, application은 질문 키워드 기반 행 축약이나 대표 행 fallback을 적용하지 않은 저장 컨텍스트 전체를 Reader에 전달합니다. 입력 폭주 방지를 위한 단일 전역 상한은 240,000자이며 시트별 임의 절단은 사용하지 않습니다.
+* 첨부 파일만 묻는 질문은 직접 Reader 경로를 사용합니다. 첨부와 적재 기업 수치를 함께 요구하면 첨부 존재만으로 조기 반환하지 않고 `rag_query`를 실행합니다. 이때 Query Context의 `external_context_sources`에는 첨부 파일명만 구조화해 전달하고, Decomposer는 catalog에 존재하는 기업만 검색 route로 만들며 catalog 밖 기업은 첨부 원천 담당으로 분류합니다. 따라서 첨부 기업에 가짜 collection을 부여하거나 적재 기업으로 대체하지 않습니다. 첨부가 없는 일반 질문의 미등록 기업은 계속 fail-closed 처리합니다. RAG Reader의 검증 완료 답변·`CellEvidenceDTO[]`와 첨부 파일 전체 평탄화 컨텍스트를 별도 dual-source Reader가 결합합니다. 적재 기업 셀 근거는 구조화 배지로 유지하고 첨부 사실에는 파일명 기반 `첨부 근거`만 표시하며, 어느 한쪽 값이 없으면 다른 지표로 대체하지 않습니다.
+* attachment infrastructure adapter는 숨김 시트를 제외한 visible worksheet의 모든 비어 있지 않은 행을 시트 구분자와 함께 평탄화하고, application은 질문 키워드 기반 행 축약이나 대표 행 fallback을 적용하지 않은 저장 컨텍스트 전체를 Reader에 전달합니다. 입력 폭주 방지를 위한 단일 전역 상한은 240,000자이며 시트별 임의 절단은 사용하지 않습니다.
 * 검색 서브쿼리의 `Cell Value: ?`는 Dense 유사도 검색용 와일드카드이므로 검색 단계까지 보존합니다. Reader에는 실제 `Cell Value`가 확인된 셀만 전달하며, 원시 검색 힌트나 자리표시자 셀은 Context Blocks·근거·추가 DB 조회 결과에서 모두 제외합니다.
 * RAG 응답은 Reader에 실제 전달된 `expand-context` 셀과만 대조합니다. compact run summary가 node output을 생략한 챗봇 경로에서는 durable `expand-context` 실행 로그를 읽습니다. `fuse` 검색 결과나 pgvector를 다시 조회해 컨텍스트를 추정하는 fallback은 사용하지 않습니다. 검증 가능한 확장 셀이 없거나 구조화 근거의 collection/workbook/company/sheet/cell identity가 정확히 일치하지 않으면 답변과 인라인 시각화를 노출하지 않습니다.
 * `[검증 가능한 근거 셀]`은 LLM이 선택할 수 있는 후보일 뿐이며 자동 노출 목록이 아닙니다. Reader는 strict structured output `ReaderEvidenceSelectionDTO(answer_markdown, evidence_ids)`로 답변의 사실·수치·계산에 실제 사용한 최소 핵심 ID만 선택합니다. 계산 결과는 모든 피연산 셀 ID를 선택합니다.
@@ -64,6 +69,7 @@ flowchart TD
 * `grounding.py`는 Reader의 `CellEvidenceDTO[]` 전체를 실제 run evidence와 다시 대조합니다. 근거가 없는 답변에 실행 컨텍스트 앞 6개를 자동 첨부하지 않으며 검증된 DTO만 `chat_messages.evidence`에 저장합니다.
 * 프런트엔드는 `chatMarkdown.ts`에서 답변 본문의 접힌 GFM 표와 이스케이프 문자만 정규화합니다. 출처는 Markdown을 정규식 파싱하지 않고 API의 `evidence[]`를 `shared/markdown/cellCitations.ts`가 view model로 투영합니다. 셀 DTO는 보존하되 workbook·company·sheet identity가 같은 항목을 `시트 · N개 셀` 배지 하나로 묶습니다. hover 또는 keyboard focus에는 기업, 시트, 참조 좌표 목록과 원본 파일만 요약하며 같은 공용 렌더러를 챗봇과 Playground Reader 노드가 사용합니다.
 * 시트 배지를 활성화하면 `CellEvidenceProvider`가 batch resolve API를 한 번 호출하고 `CellEvidenceModal`에서 서버가 생성한 원본 sheet PNG를 엽니다. 검증된 모든 cell bbox를 반투명 빨간 경계 상자로 동시에 표시하며 확대·축소·화면 맞춤·전체 근거 영역 이동과 pointer drag pan을 지원합니다. 인덱스와 workbook 근거 연결이 없으면 임의 이미지를 대체하지 않고 명시적 실패 상태를 표시합니다.
+* `chat_messages.created_at`은 사용자 전송 및 assistant placeholder 생성 시각, `completed_at`은 assistant 응답이 completed/failed로 확정된 시각입니다. 완료 전이는 같은 값으로 `chat_sessions.updated_at`도 갱신해 세션 목록의 최근 활동 순서를 맞춥니다. 메시지 생성 응답은 DB에서 반환한 `user_message`와 `assistant_message`를 함께 제공하며 frontend는 브라우저 임시 시각을 DB 시각으로 즉시 교체합니다. 완료된 assistant 버블은 `completed_at`, 사용자·처리 중 버블은 `created_at`을 표시합니다.
 
 ---
 

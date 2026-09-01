@@ -64,12 +64,14 @@ describe('ChatMessages', () => {
       evidence: [],
       attachments: [],
       created_at: '2026-08-30T00:00:00Z',
+      completed_at: null,
     };
 
     const { rerender } = render(
       <ChatMessages
         messages={[]}
         progress={[]}
+        pendingTurn={null}
         examples={['추천 질문']}
         isRunning
         isRefreshingSuggestions={false}
@@ -84,6 +86,7 @@ describe('ChatMessages', () => {
       <ChatMessages
         messages={[processing]}
         progress={[{ id: 'search', label: '관련 재무 문서를 검색하고 있습니다', state: 'active' }]}
+        pendingTurn={null}
         examples={[]}
         isRunning
         isRefreshingSuggestions={false}
@@ -95,6 +98,66 @@ describe('ChatMessages', () => {
     expect(screen.getByText('관련 재무 문서를 검색하고 있습니다')).toBeInTheDocument();
     expect(screen.getByText('관련 재무 문서를 검색하고 있습니다').closest('.chatbot-messages'))
       .toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('관련 재무 문서를 검색하고 있습니다')
+      .closest('.chatbot-message')?.querySelector('time'))
+      .toHaveAttribute('datetime', '2026-08-30T00:00:00Z');
+  });
+
+  it('shows the submitted question and delivery state before the backend acknowledges it', () => {
+    render(
+      <ChatMessages
+        messages={[]}
+        progress={[{ id: 'submitting', label: '질문과 첨부 파일을 전달하고 있습니다', state: 'active' }]}
+        pendingTurn={{
+          content: '첨부 파일과 Nexora를 비교해줘',
+          attachmentName: 'comparison.xlsx',
+          createdAt: '2026-08-30T00:00:00Z',
+        }}
+        examples={['추천 질문']}
+        isRunning
+        isRefreshingSuggestions={false}
+        requestError=""
+        onAskExample={vi.fn()}
+        onRefreshSuggestions={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('첨부 파일과 Nexora를 비교해줘')).toBeInTheDocument();
+    expect(screen.getByText('comparison.xlsx')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('질문과 첨부 파일을 전달하고 있습니다');
+    expect(screen.queryByText('새 재무 질문을 시작하세요')).not.toBeInTheDocument();
+  });
+
+  it('uses the assistant completion timestamp after the response arrives', () => {
+    const completed: ChatMessage = {
+      id: 'assistant-completed',
+      role: 'assistant',
+      content: '완료된 답변',
+      status: 'completed',
+      run_id: 'run-completed',
+      visualization: null,
+      evidence: [],
+      attachments: [],
+      created_at: '2026-08-30T00:00:00Z',
+      completed_at: '2026-08-30T00:02:00Z',
+    };
+
+    const { container } = render(
+      <ChatMessages
+        messages={[completed]}
+        progress={[]}
+        pendingTurn={null}
+        examples={[]}
+        isRunning={false}
+        isRefreshingSuggestions={false}
+        requestError=""
+        onAskExample={vi.fn()}
+        onRefreshSuggestions={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.chatbot-message time'))
+      .toHaveAttribute('datetime', '2026-08-30T00:02:00Z');
   });
 });
 
@@ -114,6 +177,10 @@ describe('ChatSessionSidebar', () => {
     );
 
     expect(screen.getByText('대화 이력')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'IBM 재무 분석 제목 편집' }))
+      .toHaveClass('chatbot-session__action', 'is-edit');
+    expect(screen.getByRole('button', { name: 'IBM 재무 분석 삭제' }))
+      .toHaveClass('chatbot-session__action', 'is-delete');
     fireEvent.click(screen.getByRole('button', { name: 'IBM 재무 분석' }));
     expect(onSelectSession).toHaveBeenCalledWith(SESSION.id);
   });

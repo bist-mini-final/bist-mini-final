@@ -247,7 +247,6 @@ class DomainServicesContainer:
                     workflow_dispatcher=execution.workflow_dispatcher,
                     completion_client=runtime.completion_client,
                     bi_catalog=bi_services.store,
-                    execution_logs=runtime.services.workflow_runs,
                 ),
                 suggestions=chat_suggestions,
                 attachments=ChatAttachmentService(

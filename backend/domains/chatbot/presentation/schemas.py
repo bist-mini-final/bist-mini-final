@@ -44,6 +44,7 @@ class ChatMessageResponse(BaseModel):
     evidence: list[CellEvidenceDTO] = Field(default_factory=list)
     attachments: list[ChatAttachmentResponse] = Field(default_factory=list)
     created_at: datetime
+    completed_at: datetime | None = None
 
 
 class ChatSessionResponse(BaseModel):
@@ -59,6 +60,7 @@ class ChatSessionListResponse(BaseModel):
 
 
 class ChatMessageCreatedResponse(BaseModel):
+    user_message: ChatMessageResponse
     assistant_message: ChatMessageResponse
     run_id: str | None
     mode: Literal["direct", "rag"]

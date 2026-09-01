@@ -678,6 +678,8 @@ def test_kubernetes_specs_are_projected_from_worker_jobs() -> None:
     assert "workflow-worker" in by_name
     assert by_name["ingestion-embedding"].max_replica_count == 4
     assert by_name["ingestion-vector"].max_replica_count == 2
+    assert by_name["bi-materialization"].mount_data_volume is True
+    assert by_name["bi-question"].mount_data_volume is True
     for job in ALL_JOBS:
         if not isinstance(job, WorkerJobDefinition):
             continue
@@ -709,6 +711,37 @@ def test_kubernetes_tooling_uses_the_locked_project_python() -> None:
     script = (PROJECT_ROOT / "deploy" / "kubernetes" / "local.sh").read_text(encoding="utf-8")
     assert 'PROJECT_PYTHON="${PROJECT_ROOT}/.venv/bin/python"' in script
     assert "python3" not in script
+
+
+def test_kubernetes_worker_releases_do_not_mix_mutable_image_revisions() -> None:
+    manifest = (
+        PROJECT_ROOT / "deploy" / "kubernetes" / "manifests" / "scaledjob.yaml"
+    ).read_text(encoding="utf-8")
+    renderer = (
+        PROJECT_ROOT / "deploy" / "kubernetes" / "scripts" / "render.py"
+    ).read_text(encoding="utf-8")
+    script = (PROJECT_ROOT / "deploy" / "kubernetes" / "local.sh").read_text(
+        encoding="utf-8"
+    )
+    helm = (
+        PROJECT_ROOT / "deploy" / "helm" / "bist" / "templates" / "scaledjobs.yaml"
+    ).read_text(encoding="utf-8")
+    assert "strategy: immediate" in manifest
+    assert manifest.count("bist.ai/image-revision: __IMAGE_REVISION__") == 2
+    assert 'parser.add_argument("--image-revision", required=True)' in renderer
+    assert '--image-revision "${worker_revision}"' in script
+    assert "strategy: immediate" in helm
+    assert helm.count("bist.ai/image-revision:") == 2
+
+
+def test_bi_workers_do_not_run_schema_ddl_during_keda_scale_out() -> None:
+    workers = (PROJECT_ROOT / "backend" / "bootstrap" / "workers.py").read_text(
+        encoding="utf-8"
+    )
+    assert "ensure_bi_schema" not in workers
+    bi_branch = workers.split('if kind in {"bi-materialization", "bi-question"}:', 1)[1]
+    bi_branch = bi_branch.split('if kind == "benchmark":', 1)[0]
+    assert "initialize_schema=False" in bi_branch
 
 
 def test_execution_views_share_the_streaming_core() -> None:

@@ -107,6 +107,10 @@ _EVIDENCE_SECTION_HEADING_PATTERN = re.compile(
     r"^\s*(?:#{1,6}\s*)?(?:\*\*)?근거(?:\*\*)?\s*:?\s*$",
     re.IGNORECASE,
 )
+_EVIDENCE_ID_PATTERN = re.compile(
+    r"^(?:EVIDENCE[\s_-]*)?0*(?P<number>[1-9][0-9]{0,5})$",
+    re.IGNORECASE,
+)
 
 
 def _structured_source_fields(source_text: str) -> dict[str, str]:
@@ -205,6 +209,14 @@ def _render_evidence_candidates(cells: list[CellEvidenceDTO]) -> str:
         )
         for cell in cells
     )
+
+
+def _canonical_evidence_id(value: Any) -> str | None:
+    """Accept harmless LLM formatting variations without widening the allowlist."""
+    match = _EVIDENCE_ID_PATTERN.fullmatch(str(value or "").strip())
+    if match is None:
+        return None
+    return f"EVIDENCE-{int(match.group('number')):03d}"
 
 
 def _answer_body_without_citations(answer: str) -> str:
@@ -651,7 +663,7 @@ class ReaderModule(BaseLLMModule):
             "enable_tools",
             "max_tool_iterations",
         ],
-        version="8",
+        version="9",
     )
     input_model = ReaderInputDTO
     config_model = ReaderConfigDTO
@@ -750,11 +762,23 @@ class ReaderModule(BaseLLMModule):
         evidence_cells: list[CellEvidenceDTO],
     ) -> tuple[str, list[CellEvidenceDTO]]:
         allowed = {cell.evidence_id: cell for cell in evidence_cells}
-        selected_ids = list(dict.fromkeys(selection.evidence_ids))
-        if not selected_ids or any(evidence_id not in allowed for evidence_id in selected_ids):
+        selected_ids: list[str] = []
+        rejected_ids: list[str] = []
+        for raw_id in selection.evidence_ids:
+            canonical_id = _canonical_evidence_id(raw_id)
+            if canonical_id is None or canonical_id not in allowed:
+                rejected_ids.append(str(raw_id))
+                continue
+            if canonical_id not in selected_ids:
+                selected_ids.append(canonical_id)
+
+        if rejected_ids:
             logger.warning(
-                "Reader answer rejected because it did not select only supported evidence IDs"
+                "Reader ignored unsupported evidence IDs while preserving verified selections: %s",
+                rejected_ids,
             )
+        if not selected_ids:
+            logger.warning("Reader answer rejected because it selected no supported evidence IDs")
             return _INSUFFICIENT_EVIDENCE_ANSWER, []
         body = _answer_body_without_citations(selection.answer_markdown)
         if not body or body == _INSUFFICIENT_EVIDENCE_ANSWER:

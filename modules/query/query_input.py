@@ -56,6 +56,14 @@ class QueryInputDTO(ModuleInputDTO):
         max_length=1000,
         description="검색할 사용자의 자연어 질문 (공백 제외 1~1000자)",
     )
+    external_context_sources: list[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description=(
+            "최종 답변 결합 단계에서 별도로 제공되는 첨부 파일 원천. "
+            "catalog 검색 범위를 넓히지는 않습니다."
+        ),
+    )
 
     @field_validator("query")
     @classmethod
@@ -97,7 +105,7 @@ class QueryInputModule(BaseModule):
         outputs=["query_context"],
         config_fields=[],
         cacheable=False,
-        version="3",
+        version="4",
     )
     input_model = QueryInputDTO
     config_model = EmptyModuleConfigDTO
@@ -116,6 +124,7 @@ class QueryInputModule(BaseModule):
             "query_context": QueryContextDTO(
                 question_id=question_id_for(query_text),
                 question_text=query_text,
+                external_context_sources=input_data.external_context_sources,
             ).model_dump(mode="json")
         }
 

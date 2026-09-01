@@ -41,9 +41,13 @@ Rules:
 6. Use '?' only when a field truly cannot be inferred. Cell Value is normally '?'
    because retrieval is expected to discover the value.
 7. If a company in the question does not match the catalog, do not substitute a
-   similar company. Add the unmatched name to unresolved_companies instead.
+   similar company. When external_context_sources is empty, add the unmatched
+   name to unresolved_companies. When external_context_sources is not empty,
+   treat the unmatched company as attachment-owned: add it to
+   external_context_companies and continue decomposing every catalog company.
 8. A subquery may select multiple collections only when they belong to the same
    requested company and the answer genuinely spans those workbooks.
+9. Never create a retrieval item or index_id for an attachment-owned company.
 """
 
 
@@ -62,6 +66,7 @@ class ScopedSubquerySelection(BaseModel):
 class DecomposedSubqueriesResponse(BaseModel):
     items: List[ScopedSubquerySelection] = Field(default_factory=list)
     unresolved_companies: List[str] = Field(default_factory=list)
+    external_context_companies: List[str] = Field(default_factory=list)
 
 
 class DecomposerInputDTO(ModuleInputDTO):
@@ -96,7 +101,7 @@ class DecomposerModule(BaseLLMModule):
             "user_prompt_template",
         ],
         raw_output=True,
-        version="10",
+        version="11",
     )
     input_model = DecomposerInputDTO
     config_model = DecomposerConfigDTO
@@ -143,6 +148,49 @@ class DecomposerModule(BaseLLMModule):
             )
         return normalized in aliases
 
+    @classmethod
+    def _scopes_for_company(
+        cls,
+        requested_company: str,
+        scopes: List[DataScopeDTO],
+    ) -> List[DataScopeDTO]:
+        """Resolve a company name to catalog scopes without crossing companies."""
+
+        normalized = cls._normalize_reference(requested_company)
+        if not normalized or requested_company == UNKNOWN_FIELD:
+            return []
+
+        exact_matches = [
+            scope for scope in scopes if cls._company_matches_scopes(requested_company, [scope])
+        ]
+        if exact_matches:
+            return exact_matches
+
+        # A user or model can omit a legal-name suffix (for example, "Nexora"
+        # versus "Nexora Labs"). Prefix repair is accepted only when every
+        # matched scope belongs to one canonical company, so it cannot broaden
+        # retrieval to a similarly named company.
+        partial_matches: List[DataScopeDTO] = []
+        for scope in scopes:
+            base_name = scope.company_name.split("(", 1)[0].strip()
+            aliases = {
+                cls._normalize_reference(alias)
+                for alias in (scope.company_name, base_name, scope.ticker)
+                if alias.strip()
+            }
+            if any(
+                len(alias) >= 4
+                and len(normalized) >= 4
+                and (alias.startswith(normalized) or normalized.startswith(alias))
+                for alias in aliases
+            ):
+                partial_matches.append(scope)
+
+        companies = {
+            cls._normalize_reference(scope.company_name) for scope in partial_matches
+        }
+        return partial_matches if len(companies) == 1 else []
+
     @staticmethod
     def _resolve_index_ids(
         requested_ids: List[str],
@@ -180,6 +228,9 @@ class DecomposerModule(BaseLLMModule):
             {
                 "question": input_data.query_context.question_text,
                 "data_scope_catalog": catalog_payload,
+                "external_context_sources": (
+                    input_data.query_context.external_context_sources
+                ),
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -212,7 +263,8 @@ class DecomposerModule(BaseLLMModule):
         cost_usd: float,
         latency_seconds: float,
     ) -> Dict[str, Any]:
-        if parsed.unresolved_companies:
+        external_sources = input_data.query_context.external_context_sources
+        if parsed.unresolved_companies and not external_sources:
             available = ", ".join(
                 scope.company_name or scope.file_name
                 for scope in input_data.scope_catalog.collections
@@ -223,6 +275,16 @@ class DecomposerModule(BaseLLMModule):
                 + f". 현재 검색 가능 기업: {available}"
             )
 
+        external_companies = list(dict.fromkeys(parsed.external_context_companies))
+        if external_sources:
+            # Older or less capable models can still place attachment-owned
+            # names in unresolved_companies. The server accepts those names as
+            # external only for an explicitly attachment-bound run; it never
+            # grants them a collection or broadens pgvector access.
+            external_companies = list(
+                dict.fromkeys([*external_companies, *parsed.unresolved_companies])
+            )
+
         catalog_by_id = {
             scope.index_id: scope for scope in input_data.scope_catalog.collections
         }
@@ -230,10 +292,36 @@ class DecomposerModule(BaseLLMModule):
         seen: set[tuple[str, tuple[str, ...]]] = set()
         repaired_scope_count = 0
         for selection in parsed.items:
-            unique_ids, repaired = cls._resolve_index_ids(
-                selection.index_ids,
-                catalog_by_id,
+            requested_ids = list(dict.fromkeys(index_id.strip() for index_id in selection.index_ids))
+            company_scopes = cls._scopes_for_company(
+                selection.company,
+                input_data.scope_catalog.collections,
             )
+            nonempty_unknown_ids = [
+                index_id
+                for index_id in requested_ids
+                if index_id and index_id not in catalog_by_id
+            ]
+
+            if not company_scopes and external_sources:
+                # Attachment-owned companies never receive a pgvector scope.
+                # Models occasionally emit a placeholder/empty index despite
+                # the prompt; discard that route and keep it in external
+                # context instead of widening catalog access.
+                if selection.company != UNKNOWN_FIELD:
+                    external_companies = list(
+                        dict.fromkeys([*external_companies, selection.company])
+                    )
+                continue
+
+            if "" in requested_ids and company_scopes and not nonempty_unknown_ids:
+                unique_ids = list(dict.fromkeys(scope.index_id for scope in company_scopes))
+                repaired = True
+            else:
+                unique_ids, repaired = cls._resolve_index_ids(
+                    requested_ids,
+                    catalog_by_id,
+                )
             repaired_scope_count += int(repaired)
             selected_ids = unique_ids[: cfg.max_collections_per_subquery]
             scopes = [catalog_by_id[index_id] for index_id in selected_ids]
@@ -287,6 +375,8 @@ class DecomposerModule(BaseLLMModule):
                 "catalog_size": len(catalog_by_id),
                 "route_count": len(routes),
                 "repaired_scope_count": repaired_scope_count,
+                "external_context_sources": external_sources,
+                "external_context_companies": external_companies,
             },
         }
 

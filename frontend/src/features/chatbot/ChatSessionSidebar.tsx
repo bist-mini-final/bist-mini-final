@@ -51,6 +51,7 @@ export function ChatSessionSidebar({
             <IconButton
               size="sm"
               variant="ghost"
+              className="chatbot-session__action is-edit"
               aria-label={`${session.title} 제목 편집`}
               onClick={() => onRenameSession(session)}
               disabled={disabled}
@@ -60,6 +61,7 @@ export function ChatSessionSidebar({
             <IconButton
               size="sm"
               variant="ghost"
+              className="chatbot-session__action is-delete"
               aria-label={`${session.title} 삭제`}
               onClick={() => onDeleteSession(session)}
               disabled={disabled}
