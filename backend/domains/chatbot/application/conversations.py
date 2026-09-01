@@ -11,6 +11,7 @@ from backend.domains.chatbot.domain import (
     needs_rag,
 )
 from backend.domains.workflow.domain.models import WorkflowExecutionRequest
+from backend.shared.application.workbook_identity import workbook_file_identity
 from backend.shared.domain import ResourceNotFoundError, RetryableInfrastructureError
 from modules.common.config import DEFAULT_READER_MODEL
 
@@ -270,6 +271,11 @@ class ChatConversationService:
         query_input: dict[str, Any] = {"query": query}
         if attachment is not None:
             query_input["external_context_sources"] = [str(attachment["file_name"])]
+            identity = workbook_file_identity(str(attachment["file_name"]))
+            if identity is not None:
+                query_input["query"] += (
+                    f"\n\n[첨부 파일명 기준 대상 기업: {identity.company_name}]"
+                )
         run = self._workflow_executor.create_run(
             workflow,
             WorkflowExecutionRequest(inputs={"query": query_input}),
@@ -412,10 +418,19 @@ class ChatConversationService:
         source_name = str(attachment["file_name"])
         citation_name = source_name.replace("[", "(").replace("]", ")")
         evidence = str(attachment["extracted_text"])
+        identity = workbook_file_identity(source_name)
+        identity_instruction = (
+            f"첨부 파일명 기준 대상 기업은 '{identity.company_name}'입니다. "
+            "워크북 내부에 남은 다른 회사명·티커는 템플릿 잔존값으로 취급하고 기업 식별에 "
+            "사용하지 마십시오. 파일명에 티커가 없으므로 티커를 추측하지 마십시오. "
+            if identity is not None
+            else ""
+        )
         result = self._completion_client.create_response(
             model=DEFAULT_READER_MODEL,
             instructions=(
                 "당신은 업로드된 파일을 근거로 답하는 금융 분석 도우미입니다. "
+                f"{identity_instruction}"
                 "아래 첨부 파일 내용에 있는 정보만 사실로 사용하고, 파일에 없는 내용은 모른다고 말하십시오. "
                 "핵심 근거가 되는 문장 또는 표의 값 뒤에는 반드시 "
                 f"[{citation_name}: 첨부 근거] 형식의 출처를 붙이십시오. "
@@ -424,7 +439,11 @@ class ChatConversationService:
             input_items=[
                 {
                     "role": "user",
-                    "content": f"질문: {question}\n\n[첨부 파일: {source_name}]\n{evidence}",
+                    "content": (
+                        f"질문: {question}\n\n"
+                        f"[첨부 파일명 기준 기업: {identity.company_name if identity else '미확정'}]\n"
+                        f"[첨부 파일: {source_name}]\n{evidence}"
+                    ),
                 }
             ],
             max_output_tokens=1_600,
@@ -441,10 +460,19 @@ class ChatConversationService:
         source_name = str(attachment["file_name"])
         citation_name = source_name.replace("[", "(").replace("]", ")")
         evidence = str(attachment["extracted_text"])
+        identity = workbook_file_identity(source_name)
+        identity_instruction = (
+            f"첨부 파일명 기준 대상 기업은 '{identity.company_name}'입니다. "
+            "첨부 원문에 다른 회사명이나 티커가 남아 있어도 템플릿 잔존값이므로 기업 식별에 "
+            "사용하거나 불일치 경고를 만들지 마십시오. 파일명에 없는 티커는 추측하지 마십시오. "
+            if identity is not None
+            else ""
+        )
         result = self._completion_client.create_response(
             model=DEFAULT_READER_MODEL,
             instructions=(
                 "당신은 서로 독립적인 두 검증 원천을 결합하는 금융 비교 분석가입니다. "
+                f"{identity_instruction}"
                 "'적재 기업 RAG 결과'는 서버가 셀 근거를 검증한 결과이므로 숫자와 기업명을 바꾸거나 "
                 "추측하지 마십시오. '첨부 파일 원문'은 업로드 파일에서 평탄화한 전체 컨텍스트입니다. "
                 "질문이 요구한 항목과 기간만 두 원천에서 찾아 같은 기준으로 비교하십시오. "
@@ -460,6 +488,7 @@ class ChatConversationService:
                     "content": (
                         f"질문:\n{question}\n\n"
                         f"[적재 기업 RAG 결과]\n{rag_answer}\n\n"
+                        f"[첨부 파일명 기준 기업: {identity.company_name if identity else '미확정'}]\n"
                         f"[첨부 파일: {source_name}]\n{evidence}"
                     ),
                 }

@@ -47,6 +47,7 @@ from pydantic import BaseModel, Field, model_validator
 from backend.domains.data_sources.infrastructure.spreadsheets.workbook_catalog import (
     WorkbookCatalog,
 )
+from backend.shared.application.workbook_identity import workbook_file_identity
 from modules.common.base_llm import (
     BaseLLMModule,
     ModuleConfigDTO,
@@ -154,7 +155,7 @@ class CompanyEntityExtractorModule(BaseLLMModule):
         outputs=["company_output", "output"],
         config_fields=["model", "allow_heuristic_fallback"],
         raw_output=True,
-        version="4",
+        version="5",
     )
     input_model = CompanyEntityExtractorInputDTO
     config_model = CompanyEntityExtractorConfigDTO
@@ -210,18 +211,28 @@ class CompanyEntityExtractorModule(BaseLLMModule):
         cfg = config or CompanyEntityExtractorConfigDTO()
         file_name = input_data.file_name or "unknown.xlsx"
         fallback = self._heuristic(file_name)
+        file_identity = workbook_file_identity(file_name)
         target_index_id = input_data.index_id or (
             input_data.index_input.index_id if input_data.index_input else None
         )
 
-        try:
-            workbook_path = self.catalog.resolve(file_name)
-            sampled_lines = self._sample_workbook(workbook_path, input_data.sheet_names)
-        except Exception as error:
-            logger.warning("기업 엔티티 셀 샘플링 실패: %s", error)
+        if file_identity is not None:
             sampled_lines = []
+        else:
+            try:
+                workbook_path = self.catalog.resolve(file_name)
+                sampled_lines = self._sample_workbook(workbook_path, input_data.sheet_names)
+            except Exception as error:
+                logger.warning("기업 엔티티 셀 샘플링 실패: %s", error)
+                sampled_lines = []
 
-        if not sampled_lines:
+        if file_identity is not None:
+            company_name = file_identity.company_name
+            ticker = file_identity.ticker
+            display_name = company_name
+            confidence = "high"
+            source = "filename"
+        elif not sampled_lines:
             company_name = fallback["company_name"]
             ticker = fallback["ticker"]
             display_name = fallback["display_name"]

@@ -88,9 +88,11 @@ class InMemoryChatRepository:
 class RecordingCompletionClient:
     def __init__(self) -> None:
         self.input_items: list[dict[str, Any]] = []
+        self.instructions = ""
 
     def create_response(self, **kwargs: Any) -> SimpleNamespace:
         self.input_items = kwargs["input_items"]
+        self.instructions = str(kwargs.get("instructions") or "")
         return SimpleNamespace(content="첨부 파일 분석 결과")
 
 
@@ -220,6 +222,9 @@ def test_attachment_and_stored_company_request_runs_rag_with_attachment_binding(
     assert executor.request.inputs["query"]["external_context_sources"] == [
         "SPG_Company_KeyStats_10_orbixa_networks.xlsm"
     ]
+    assert "첨부 파일명 기준 대상 기업: Orbixa Networks" in executor.request.inputs[
+        "query"
+    ]["query"]
     assert repository.created_turn is not None
     assert repository.created_turn["attachments"] == [
         {
@@ -255,6 +260,33 @@ def test_combined_reader_receives_rag_answer_and_complete_attachment_context() -
     assert "Nexora Labs 매출은 120입니다." in prompt
     assert extracted_text in prompt
     assert tail_evidence in prompt
+
+
+def test_combined_reader_uses_standard_filename_identity_over_stale_template_text() -> None:
+    attachment = {
+        "attachment_id": "attachment-00000001",
+        "file_name": "SPG_Company_KeyStats_09_meridian_logic.xlsm",
+        "content_type": "application/vnd.ms-excel.sheet.macroEnabled.12",
+        "file_size": 10_000,
+        "extracted_text": (
+            "[시트: Key Stats]\nColdplay Entertainment & Media Inc. | "
+            "NYSE:CDPL | Total Assets | 12694"
+        ),
+    }
+    completion = RecordingCompletionClient()
+    conversations = service(InMemoryChatRepository(attachment=attachment), completion)
+
+    conversations._combined_attachment_rag_answer(
+        "AmeSoft와 Meridian의 총자산을 비교해줘",
+        "AmeSoft 총자산은 12,024입니다.",
+        attachment,
+    )
+
+    prompt = str(completion.input_items[0]["content"])
+    assert "첨부 파일명 기준 기업: Meridian Logic" in prompt
+    assert "Meridian Logic" in completion.instructions
+    assert "템플릿 잔존값" in completion.instructions
+    assert "티커는 추측하지 마십시오" in completion.instructions
 
 
 def test_completed_summary_without_reader_output_keeps_chat_turn_processing() -> None:

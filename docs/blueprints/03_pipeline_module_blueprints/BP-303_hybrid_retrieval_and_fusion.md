@@ -84,7 +84,7 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 
 * **표현 일관성과 파편화 방지**: 마크다운 표를 다시 조립하기보다 [BP-201]의 `header_with_value`와 원본 좌표 metadata를 유지해 dense/keyword/reader가 같은 cell 의미를 공유합니다. 토큰·정확도 효과는 benchmark에서 별도로 측정합니다.
 * **검색/Reader 경계 규칙**: `Cell Value: ?`는 값 미지정을 뜻하는 검색 와일드카드입니다. Query Decomposer가 만든 이 표기는 Query Embedder와 Dense 유사도 검색까지 그대로 유지하며, 검색 후보 좌표와 2D 확장에도 사용할 수 있습니다. 단, Reader 입력 경계에서는 `Cell Value`가 실제 값인 셀만 통과시킵니다. Reader의 `[Context Blocks]`, 검증 가능한 근거 목록, `lookup_cell_metadata` 도구 결과는 모두 이 공통 필터를 거쳐 재구성되며 `?`, `NA`, `N/A`, `NM`, `#PEND`는 모델에 전달하지 않습니다.
-* **Reader 근거 선택 규칙**: 값이 있는 Reader 후보 전체가 사용자 근거가 되는 것은 아닙니다. 각 후보에 서버가 `EVIDENCE-nnn` ID를 부여하고 LLM은 strict JSON Schema에 맞춰 `answer_markdown`과 실제 사용한 최소 `evidence_ids`만 반환합니다. backend는 ID를 후보 allowlist와 대조한 뒤 완전한 `CellEvidenceDTO[]`로 투영합니다. 본문에 시트·좌표 문자열이나 `근거` section을 합성하지 않으며, 선택 누락 시 검색 상위 셀을 자동 첨부하지 않습니다.
+* **Reader 근거 선택 규칙**: 값이 있는 Reader 후보 전체가 사용자 근거가 되는 것은 아닙니다. 각 후보에 서버가 `EVIDENCE-nnn` ID를 부여하고 LLM은 strict JSON Schema에 맞춰 `answer_markdown`과 실제 사용한 최소 `evidence_ids`만 반환합니다. backend는 ID를 전체 후보 allowlist와 대조한 뒤 완전한 `CellEvidenceDTO[]`로 투영합니다. 선택 누락 시 기간 기준 압축 재시도나 검색 상위 셀 자동 첨부를 하지 않으며 답변을 차단합니다. 첨부+RAG 2단계 질의에서는 첫 Reader의 책임을 적재 원천 부분 답변으로 명시하되 원 질문과 검색된 전체 실제 값 후보는 그대로 유지합니다. 본문에는 시트·좌표 문자열이나 `근거` section을 합성하지 않습니다.
 
 ---
 
