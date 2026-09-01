@@ -29,8 +29,8 @@
 - 검색은 Dense pgvector, PostgreSQL keyword, RRF와 2D context expansion을 사용한다.
 - 셀 `cell_id`는 원본 Excel 좌표만 보존하고, collection/workbook·company·정확한 sheet 이름·좌표의 복합 키로 검색 후보와 근거를 식별한다. 시트 이름을 축약한 합성 ID는 생성하지 않는다.
 - `Cell Value: ?`는 검색 표현에는 유지하지만 Reader 입력에서는 실제 값이 있는 근거만 허용한다.
-- Reader는 strict `answer_markdown + evidence_ids` Pydantic 출력을 사용한다. 서버는 선택 ID를 실제 값 후보와 run evidence에 대조해 `CellEvidenceDTO[]`로 만들고, 챗봇은 본문과 근거 JSONB를 독립 저장한다. frontend는 Markdown 좌표 문자열을 파싱하지 않고 구조화 `evidence[]`만 배지·원본 셀 검증 UI로 투영한다.
-- 챗봇의 첨부+적재 기업 질문은 검증된 RAG 답변과 첨부 전체 평탄화 컨텍스트를 dual-source Reader에서 결합한다. 각 메시지는 DB `created_at`을 사용하고 비동기 assistant 응답은 별도 `completed_at`을 저장·표시한다.
+- Reader는 strict `answer_markdown + evidence_ids` Pydantic 출력을 한 번 수행한다. 후보를 기간 기준으로 축소하거나 누락 근거를 자동 보강하지 않으며, 서버는 선택 ID를 전체 실제 값 후보와 run evidence에 대조해 `CellEvidenceDTO[]`로 만든다. 챗봇은 본문과 근거 JSONB를 독립 저장하고 frontend는 Markdown 좌표 문자열을 파싱하지 않고 구조화 `evidence[]`만 배지·원본 셀 검증 UI로 투영한다.
+- 챗봇의 첨부+적재 기업 질문에서 첫 RAG Reader는 전체 원 질문과 전체 검색 셀을 유지하되 적재 원천 담당 기업의 부분 답변만 근거와 함께 생성한다. 후속 dual-source Reader가 그 검증 답변과 첨부 전체 평탄화 컨텍스트를 결합해 최종 비교한다. `SPG_Company_KeyStats_NN_<company>` 표준 파일은 파일명의 company slug를 기업 identity로 사용하고 workbook 내부의 다른 회사명·티커 템플릿 잔재는 무시하며, 파일명에 없는 ticker를 추측하지 않는다. 각 메시지는 DB `created_at`을 사용하고 비동기 assistant 응답은 별도 `completed_at`을 저장·표시한다.
 - BI는 21개 근거 기반 지표를 제공하며 Company Comparison은 실제 BI 관측값만 사용한다.
 - 신규 BI materialization은 기존 `workbook_profiles`를 재사용하지 않고 원본 hash 검증 후 workbook 프로필을 강제 재산출·교체한다. 새 프로필이 불완전할 때만 검색/LLM profiler가 누락 필드를 보완하며 과거 저장 프로필의 기간을 병합하지 않는다.
 - BI source metric은 catalog의 행 별칭·제외어와 FY/LTM 기간 metadata로 exact value cell을 먼저 조회한다. 정확 후보가 없을 때만 scope-aware Decomposer → Dense/keyword → RRF → 2D expansion을 실행한다. 같은 종료일의 FY/LTM 열에서 LTM 상위 header가 유실된 경우 동일 지표 행의 열 순서로 두 기간을 구분하며 특정 sheet 이름이나 열 문자를 고정하지 않는다.

@@ -45,6 +45,34 @@ def test_company_entity_extractor_standalone():
     assert validated.display_name == "삼성전자 (005930)"
 
 
+def test_standard_key_stats_filename_overrides_stale_workbook_identity() -> None:
+    mock_llm = MagicMock()
+    mock_pgvector = MagicMock()
+    extractor = CompanyEntityExtractorModule(
+        completion_client=mock_llm,
+        pgvector_store=mock_pgvector,
+        catalog=MagicMock(),
+    )
+    sample_workbook = MagicMock(return_value=["Coldplay Entertainment | NYSE:CDPL"])
+    cast(Any, extractor)._sample_workbook = sample_workbook
+
+    result = CompanyEntityExtractorOutputDTO.model_validate(
+        extractor.execute(
+            CompanyEntityExtractorInputDTO(
+                file_name="SPG_Company_KeyStats_09_meridian_logic.xlsm",
+                workbook_hash="hash-meridian",
+                index_id="idx_meridian",
+            )
+        )
+    )
+
+    assert result.company_name == "Meridian Logic"
+    assert result.ticker == ""
+    assert result.source == "filename"
+    sample_workbook.assert_not_called()
+    mock_llm.create_response.assert_not_called()
+
+
 def test_company_metadata_persistence_failure_is_not_silenced():
     module = CompanyEntityExtractorModule(
         catalog=MagicMock(),

@@ -66,7 +66,7 @@ flowchart LR
 | `cell_text_serializer` | 2D 좌표와 header 문맥을 검색 텍스트로 직렬화 |
 | `cell_text_embedder` | cell text를 embedding artifact로 변환 |
 | `pgvector_index_writer` | artifact를 PostgreSQL/pgvector에 Binary COPY |
-| `company_entity_extractor` | 기업 식별 정보 추출 |
+| `company_entity_extractor` | 기업 식별 정보 추출. `SPG_Company_KeyStats_NN_<company>` 표준 파일은 파일명 slug를 authoritative company identity로 사용하고 ticker는 명시값이 없으면 비워 둠 |
 | `sheet_metadata_persistence` | sheet 크기·감지 구조 메타데이터 영속화 |
 | `workbook_profile_persistence` | 원본 workbook의 통화·배율·실제 FY/LTM·시트 역할 공통 프로필 영속화 |
 
@@ -83,6 +83,7 @@ flowchart LR
 - workbook 파싱·해시·파일 이동은 API 이벤트 루프 밖 worker thread 또는 one-shot worker에서 수행합니다.
 - upload metadata와 상태 조회는 native async PostgreSQL 경계를 우선합니다.
 - workbook profile은 embedding chunk 수와 무관한 원본 파일 파생 데이터입니다. 기존 index도 원본 hash가 일치하면 재임베딩 없이 on-demand resolver가 생성·교체할 수 있습니다.
+- 표준 KeyStats 파일명의 company slug와 workbook 내부 template identity가 충돌하면 파일명을 우선합니다. 파일명에 ticker가 없으므로 기존 template ticker를 승계하거나 slug에서 ticker를 추측하지 않습니다. 표준 규칙에 맞지 않는 일반 workbook만 셀 샘플 기반 추출을 사용합니다.
 - 원본·index 삭제는 연결된 데이터 범위를 명시적으로 식별하고 감사 가능한 결과를 반환해야 합니다.
 - 처리량/메모리/지연의 숫자는 측정 결과가 있는 경우에만 성능 문서에 기록합니다.
 

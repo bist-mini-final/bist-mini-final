@@ -414,6 +414,78 @@ def test_reader_prompt_contains_only_value_bearing_cells() -> None:
     assert [item["cell_coord"] for item in result["answer_json"]["evidence"]] == ["O23"]
 
 
+def test_reader_scopes_hybrid_question_to_stored_source_without_dropping_cells() -> None:
+    mock_llm = MagicMock()
+    mock_llm.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-stored-source-partial",
+        content=structured_answer(
+            "AmeSoft의 최신 총자산은 12,024이고 총부채는 4,519입니다.",
+            ["EVIDENCE-002", "EVIDENCE-004"],
+        ),
+        usage={"prompt_tokens": 140, "completion_tokens": 20},
+        latency_seconds=0.05,
+    )
+    reader = ReaderModule(completion_client=mock_llm, pgvector_store=MagicMock())
+    cells = [
+        ("O50", "Total Assets", "FY2024", "11000"),
+        ("P50", "Total Assets", "FY2025", "12024"),
+        ("O74", "Total Liabilities", "FY2024", "4100"),
+        ("P74", "Total Liabilities", "FY2025", "4519"),
+    ]
+
+    result = reader.execute(
+        ReaderInputDTO(
+            context_json=ContextDTO(
+                query_context=QueryContextDTO(
+                    question_id="q-hybrid-source-scope",
+                    question_text=(
+                        "AmeSoft와 Meridian Logic의 최신 총자산과 총부채를 비교해줘"
+                    ),
+                    external_context_sources=[
+                        "SPG_Company_KeyStats_09_meridian_logic.xlsm"
+                    ],
+                ),
+                document_context=DocumentContextDTO(
+                    file_name="amesoft.xlsx",
+                    workbook_hash="hash-amesoft",
+                    company_name="AmeSoft",
+                    sheet_names=["Balance_Sheet"],
+                ),
+                cells=[
+                    {
+                        "cell_coord": coord,
+                        "sheet_name": "Balance_Sheet",
+                        "source_text": (
+                            f"Company: AmeSoft | Sheet: Balance_Sheet | Row Header: {row} | "
+                            f"Column Header: {period} | Cell Value: {value}"
+                        ),
+                    }
+                    for coord, row, period, value in cells
+                ],
+            )
+        )
+    )
+
+    assert result["answer_json"]["answer_markdown"].endswith("총부채는 4,519입니다.")
+    assert [item["cell_coord"] for item in result["answer_json"]["evidence"]] == [
+        "P50",
+        "P74",
+    ]
+    assert mock_llm.create_response.call_count == 1
+    request = mock_llm.create_response.call_args.kwargs
+    prompt = request["input_items"][0]["content"]
+    instructions = request["instructions"]
+    assert "AmeSoft와 Meridian Logic" in prompt
+    assert "현재 Reader 책임" in prompt
+    assert "적재 RAG 원천(AmeSoft)" in prompt
+    assert "후속 결합 Reader" in prompt
+    assert "FY2024" in prompt
+    assert "FY2025" in prompt
+    assert "EVIDENCE-001" in prompt
+    assert "EVIDENCE-004" in prompt
+    assert "전체 질문을 근거 부족으로 판단하지 마십시오" in instructions
+
+
 def test_reader_rejects_answer_with_an_unsupported_cell_citation():
     mock_llm = MagicMock()
     mock_llm.create_response.return_value = OpenAIResponseResult(
