@@ -36,6 +36,8 @@ flowchart TB
 - scope-aware Decomposer는 다중 scope의 미등록 collection ID를 거부하고, 서버가 고정한 단일 scope에서만 ID 오탈자를 유일한 catalog 항목으로 복구합니다.
 - Reader terminal LLM 출력은 strict `answer_markdown + evidence_ids` schema를 따르고, 반환 `CellEvidenceDTO[]`는 실제 값 후보 및 실행 근거 allowlist를 통과해야 합니다.
 - 챗봇 message의 `content`와 `evidence[]`는 독립 저장·API 필드이며 frontend는 Markdown 좌표 문자열을 근거 배지로 파싱하지 않습니다.
+- compact 챗봇 run은 durable `expand-context` 로그의 전체 셀로만 Reader 근거를 검증합니다. `fuse` 결과·top-N·pgvector 재조회로 근거를 재구성하지 않으며 Reader가 선택한 sheet/cell과 collection/workbook/company identity를 정확히 대조합니다.
+- frontend는 같은 workbook·company·sheet의 셀 근거를 시트 배지 하나로 묶되 다른 workbook을 합치지 않고, modal에서 resolve된 bbox 수만큼 빨간 경계 상자를 렌더링합니다.
 - BI는 21개 metric ID와 evidence 계약을 지킵니다.
 - BI source metric exact-evidence는 collection/workbook/file lineage, catalog alias/exclusion, concrete value, FY/LTM 구분을 지키며 exact hit 시 generic RAG를 실행하지 않습니다.
 - Company Comparison은 source snapshot, evidence, rank, forecast assumption, exclusion, current head 무결성을 지킵니다.

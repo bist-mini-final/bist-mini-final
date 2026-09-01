@@ -11,7 +11,7 @@
 - Pipeline Playground, Data Sources, Financial BI, AI Financial Chatbot, Company Comparison, Jobs, Settings를 제공한다.
 - Financial BI와 Company Comparison은 독립 제품 도메인이다. 비교 도메인은 검증된 BI 스냅샷을 입력으로 읽지만 전용 API, DTO, 정책과 스냅샷 수명주기를 유지한다.
 - 공개 REST namespace는 `/api/v1`이며 `/api`는 비노출 호환 alias다.
-- OpenAPI 정식 계약은 63개 path와 73개 HTTP operation이다. `/api`와 `/api/v1/chatbot` 호환 별칭은 schema에 포함하지 않는다.
+- OpenAPI 정식 계약은 64개 path와 74개 HTTP operation이다. `/api`와 `/api/v1/chatbot` 호환 별칭은 schema에 포함하지 않는다.
 - frontend는 7개 정식 route를 제공하고 `/`는 새 채팅, `/bi`는 `/dashboard`로 연결한다.
 - 모바일 frontend shell은 고정 상단 앱바와 접근 가능한 sidebar drawer만 사용한다. 하단 navigation은 렌더링하지 않으며 shell 차원의 하단 고정 여백도 두지 않는다.
 

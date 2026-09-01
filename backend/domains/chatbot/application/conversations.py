@@ -20,10 +20,8 @@ from .answer_formatting import (
     visualization_card_id,
     with_company_intro,
 )
-from .attachments import compact_evidence
 from .grounding import (
     INSUFFICIENT_EVIDENCE_ANSWER,
-    EvidenceCellStorePort,
     ExecutionLogStorePort,
     finalize_grounded_answer,
 )
@@ -135,7 +133,6 @@ class ChatConversationService:
         completion_client: CompletionClientPort,
         bi_catalog: BiCompanyCatalogPort,
         execution_logs: ExecutionLogStorePort,
-        evidence_cells: EvidenceCellStorePort,
     ) -> None:
         self._repository = repository
         self._workflow_store = workflow_store
@@ -145,7 +142,6 @@ class ChatConversationService:
         self._completion_client = completion_client
         self._bi_catalog = bi_catalog
         self._execution_logs = execution_logs
-        self._evidence_cells = evidence_cells
 
     def list_sessions(self, client_id: str) -> dict[str, Any]:
         return {"sessions": self._repository.list_sessions(client_id)}
@@ -304,7 +300,6 @@ class ChatConversationService:
             else None,
             run,
             self._execution_logs,
-            self._evidence_cells,
         )
         answer = format_user_facing_answer(grounded.answer_markdown)
         if answer != INSUFFICIENT_EVIDENCE_ANSWER:
@@ -393,7 +388,7 @@ class ChatConversationService:
     def _attachment_answer(self, question: str, attachment: dict[str, Any]) -> str:
         source_name = str(attachment["file_name"])
         citation_name = source_name.replace("[", "(").replace("]", ")")
-        evidence = compact_evidence(question, str(attachment["extracted_text"]))
+        evidence = str(attachment["extracted_text"])
         result = self._completion_client.create_response(
             model=DEFAULT_READER_MODEL,
             instructions=(

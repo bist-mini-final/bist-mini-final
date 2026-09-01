@@ -29,7 +29,6 @@ from backend.domains.bi.domain.models import (
     UnavailableObservation,
 )
 from backend.domains.bi.infrastructure.integrations.fast_rag_adapter import FastRagPipelineAdapter
-from backend.domains.chatbot.application import compact_evidence
 from backend.domains.chatbot.infrastructure.filesystem import extract_text
 
 
@@ -45,23 +44,6 @@ def test_ranked_cell_aliases_cover_financial_sheet_abbreviations() -> None:
     assert "Income_Statement Cell E16" in keys
     assert "Income_Statement:E16" in keys
     assert "IS Cell E16" in keys
-
-
-def test_chat_evidence_keeps_sheet_line_near_question_match() -> None:
-    extracted = "\n".join(
-        (
-            "[시트: Income_Statement]",
-            "FY2024 | Revenue | 100",
-            "FY2025 | Revenue | 120",
-            "[시트: Balance_Sheet]",
-            "FY2025 | Total Assets | 500",
-        )
-    )
-
-    compacted = compact_evidence("2025년 매출 알려줘", extracted)
-
-    assert "[시트: Income_Statement]" in compacted
-    assert "FY2025 | Revenue | 120" in compacted
 
 
 def test_workbook_text_extraction_skips_hidden_vendor_sheets() -> None:
@@ -81,6 +63,24 @@ def test_workbook_text_extraction_skips_hidden_vendor_sheets() -> None:
 
     assert "Revenue | 120" in extracted
     assert "binary-like-payload" not in extracted
+
+
+def test_workbook_text_extraction_keeps_rows_after_previous_per_sheet_limit() -> None:
+    workbook = Workbook()
+    worksheet = workbook.active
+    assert worksheet is not None
+    worksheet.title = "Key_Stats"
+    for index in range(500):
+        worksheet.append([f"Filler metric {index}", "x" * 20])
+    worksheet.append(["Total Enterprise Value (TEV)", 35_532])
+    content = BytesIO()
+    workbook.save(content)
+    workbook.close()
+
+    extracted = extract_text("financials.xlsx", content.getvalue())
+
+    assert len(extracted) > 6_000
+    assert "Total Enterprise Value (TEV) | 35532" in extracted
 
 
 def test_snapshot_builder_projects_source_failures_into_a_partial_snapshot() -> None:

@@ -92,6 +92,7 @@
 | POST | `/api/v1/data-sources/db-connect` | 지정 DB 연결 검사 |
 | GET | `/api/v1/spreadsheet-artifacts/{workbook_hash}/sheets/{sheet_name}` | render artifact |
 | GET | `/api/v1/evidence/cells/resolve` | 구조화 셀 근거를 workbook·sheet image·bbox로 해석 |
+| POST | `/api/v1/evidence/cells/resolve-batch` | 한 답변의 셀 근거를 단일 index catalog snapshot으로 일괄 해석 |
 
 ### Benchmark, jobs, maintenance
 
@@ -143,7 +144,7 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - comparison snapshot은 source/evidence/assumption/rank link를 model validator로 검증합니다.
 - route 변경은 [`tests/modules/test_openapi_and_module_routes.py`](../../../tests/modules/test_openapi_and_module_routes.py)와 frontend client tests를 함께 갱신합니다.
 - route 함수는 request binding, application command/query 호출과 HTTP response projection만 담당하고 저장소·도메인 단계를 직접 조율하지 않습니다. 별도 HTTP controller가 필요하더라도 해당 domain presentation 내부에 두며 `backend/api`로 올리지 않습니다.
-- 현재 OpenAPI는 63개 정식 path와 73개 HTTP operation을 노출합니다. compatibility alias는 이 수와 schema에서 제외합니다.
+- 현재 OpenAPI는 64개 정식 path와 74개 HTTP operation을 노출합니다. compatibility alias는 이 수와 schema에서 제외합니다.
 
 ---
 

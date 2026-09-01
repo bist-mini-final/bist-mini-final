@@ -6,6 +6,7 @@ import { cellEvidenceApi, type CellEvidence } from './cellEvidenceApi';
 vi.mock('./cellEvidenceApi', () => ({
   cellEvidenceApi: {
     resolve: vi.fn(),
+    resolveMany: vi.fn(),
     imageUrl: vi.fn(() => '/evidence/sheet.png'),
   },
 }));
@@ -35,6 +36,7 @@ describe('CellEvidenceModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(cellEvidenceApi.resolve).mockReset().mockResolvedValue(evidence);
+    vi.mocked(cellEvidenceApi.resolveMany).mockReset().mockResolvedValue([evidence]);
     vi.mocked(cellEvidenceApi.imageUrl).mockReset().mockReturnValue('/evidence/sheet.png');
   });
 
@@ -42,14 +44,18 @@ describe('CellEvidenceModal', () => {
     const onClose = vi.fn();
     render(
       <CellEvidenceModal
-        citation={{ sheet: 'Income Statement', cell: 'E16', company: 'IBM' }}
+        group={{
+          key: 'ibm:income',
+          sheet: 'Income Statement',
+          citations: [{ sheet: 'Income Statement', cell: 'E16', company: 'IBM' }],
+        }}
         onClose={onClose}
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: /셀 원본 근거 검증/ }))
+    expect(screen.getByRole('dialog', { name: /시트 원본 근거 검증/ }))
       .toHaveAttribute('aria-modal', 'true');
-    expect(await screen.findByText('$62,753M')).toBeInTheDocument();
+    expect(await screen.findByText('E16')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: '근거 검증 닫기' })).toHaveFocus());
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -57,13 +63,17 @@ describe('CellEvidenceModal', () => {
   });
 
   it('shows a terminal error state and can retry resolution', async () => {
-    vi.mocked(cellEvidenceApi.resolve)
+    vi.mocked(cellEvidenceApi.resolveMany)
       .mockRejectedValueOnce(new Error('인덱스에서 셀을 찾지 못했습니다.'))
-      .mockResolvedValueOnce(evidence);
+      .mockResolvedValueOnce([evidence]);
 
     render(
       <CellEvidenceModal
-        citation={{ sheet: 'Income Statement', cell: 'E16', company: 'Coldplay' }}
+        group={{
+          key: 'coldplay:income',
+          sheet: 'Income Statement',
+          citations: [{ sheet: 'Income Statement', cell: 'E16', company: 'Coldplay' }],
+        }}
         onClose={vi.fn()}
       />,
     );
@@ -73,30 +83,40 @@ describe('CellEvidenceModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
 
-    expect(await screen.findByText('$62,753M')).toBeInTheDocument();
-    expect(cellEvidenceApi.resolve).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText('E16')).toBeInTheDocument();
+    expect(cellEvidenceApi.resolveMany).toHaveBeenCalledTimes(2);
   });
 
   it('pans a rendered source sheet by dragging the viewport', async () => {
-    vi.mocked(cellEvidenceApi.resolve).mockResolvedValue({
+    vi.mocked(cellEvidenceApi.resolveMany).mockImplementation(async (citations) => citations.map((citation) => ({
       ...evidence,
+      cell_coord: citation.cell,
       image: {
         rendered_available: true,
         typed_available: true,
         image_width: 1600,
         image_height: 1000,
-        cell_bbox_px: [400, 180, 510, 205],
+        cell_bbox_px: citation.cell === 'E16' ? [400, 180, 510, 205] : [520, 180, 630, 205],
         unavailable_reason: null,
       },
-    });
+    })));
 
     render(
       <CellEvidenceModal
-        citation={{ sheet: 'Income Statement', cell: 'E16', company: 'IBM' }}
+        group={{
+          key: 'ibm:income',
+          sheet: 'Income Statement',
+          citations: [
+            { sheet: 'Income Statement', cell: 'E16', company: 'IBM' },
+            { sheet: 'Income Statement', cell: 'F16', company: 'IBM' },
+          ],
+        }}
         onClose={vi.fn()}
       />,
     );
     await screen.findByAltText('Income Statement 원본 시트');
+    expect(document.querySelectorAll('.cell-evidence-highlight')).toHaveLength(2);
+    expect(screen.getByText('2개 셀')).toBeInTheDocument();
     const viewport = screen.getByRole('region', { name: '원본 시트 캔버스 · 드래그하여 이동' });
     viewport.scrollLeft = 200;
     viewport.scrollTop = 150;

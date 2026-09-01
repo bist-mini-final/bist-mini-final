@@ -160,3 +160,62 @@ def test_rag_answer_without_concrete_cells_is_blocked() -> None:
 
     assert answer.answer_markdown == "확인 가능한 근거가 부족해 답변할 수 없습니다."
     assert answer.evidence == []
+
+
+def test_compacted_chat_run_validates_reader_evidence_against_expanded_context_log() -> None:
+    expanded_cells = [
+        {
+            "index_id": "idx-ibm",
+            "workbook_hash": "hash-ibm",
+            "company_name": "IBM",
+            "sheet_name": "Balance Sheet",
+            "cell_coord": f"E{row}",
+        }
+        for row in range(10, 50)
+    ]
+    run = SimpleNamespace(id="run-1", nodes={"expand-context": SimpleNamespace(output=None)})
+    logs = SimpleNamespace(
+        get_node_execution_logs=lambda _run_id: [
+            {"node_id": "expand-context", "output": {"cells": expanded_cells}}
+        ]
+    )
+
+    answer = finalize_grounded_answer(
+        "IBM 총자산은 151,880입니다.",
+        [_structured_evidence(cell_coord="E49")],
+        run,
+        database=logs,
+    )
+
+    assert answer.answer_markdown == "IBM 총자산은 151,880입니다."
+    assert [item.cell_coord for item in answer.evidence] == ["E49"]
+
+
+def test_compacted_chat_run_never_reconstructs_reader_grounding_from_fusion() -> None:
+    run = SimpleNamespace(id="run-legacy", nodes={"expand-context": SimpleNamespace(output=None)})
+    logs = SimpleNamespace(
+        get_node_execution_logs=lambda _run_id: [
+            {
+                "node_id": "fuse",
+                "output": {
+                    "items": [
+                        {
+                            "cell_id": "Balance Sheet:E50",
+                            "sheet_name": "Balance Sheet",
+                            "cell_coord": "E50",
+                        }
+                    ]
+                },
+            }
+        ]
+    )
+
+    answer = finalize_grounded_answer(
+        "IBM 총자산은 151,880입니다.",
+        [_structured_evidence()],
+        run,
+        database=logs,
+    )
+
+    assert answer.answer_markdown == "확인 가능한 근거가 부족해 답변할 수 없습니다."
+    assert answer.evidence == []

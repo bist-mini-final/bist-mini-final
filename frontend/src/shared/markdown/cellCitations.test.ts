@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citationFromEvidence } from './cellCitations';
+import { citationFromEvidence, groupCellCitations, sheetCitationLabel } from './cellCitations';
 
 describe('structured cell evidence projection', () => {
   it('maps the backend evidence DTO to the evidence viewer citation contract', () => {
@@ -29,5 +29,20 @@ describe('structured cell evidence projection', () => {
       indexId: 'idx_dhin',
       sourceText: 'Company: DHIN | Sheet: Balance_Sheet | Cell Value: 9,015',
     });
+  });
+});
+
+describe('sheet citation grouping', () => {
+  it('groups cells by workbook and sheet while removing duplicate coordinates', () => {
+    const groups = groupCellCitations([
+      { sheet: 'Income_Statement', cell: 'e16', workbookHash: 'hash-a', company: 'IBM' },
+      { sheet: 'Income_Statement', cell: 'E16', workbookHash: 'hash-a', company: 'IBM' },
+      { sheet: 'Income_Statement', cell: 'F16', workbookHash: 'hash-a', company: 'IBM' },
+      { sheet: 'Income_Statement', cell: 'E16', workbookHash: 'hash-b', company: 'Nexora' },
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.citations.map((citation) => citation.cell)).toEqual(['E16', 'F16']);
+    expect(sheetCitationLabel(groups[0]!)).toBe('Income Statement · 2개 셀');
   });
 });

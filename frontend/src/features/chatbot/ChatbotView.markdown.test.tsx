@@ -6,6 +6,7 @@ import { normalizeChatMarkdown } from './chatMarkdown';
 
 const evidenceApiMock = vi.hoisted(() => ({
   resolve: vi.fn(() => new Promise(() => undefined)),
+  resolveMany: vi.fn(() => new Promise(() => undefined)),
   imageUrl: vi.fn(() => '/evidence.png'),
 }));
 
@@ -59,20 +60,19 @@ describe('normalizeChatMarkdown', () => {
     const { container } = render(<MarkdownAnswer markdown={markdown} evidence={[evidence]} />);
     const chip = container.querySelector('.reader-citation');
 
-    expect(chip).toHaveTextContent('Balance Sheet · E50');
+    expect(chip).toHaveTextContent('Balance Sheet · 1개 셀');
     expect(container).not.toHaveTextContent('Row Header: Total Assets');
 
     fireEvent.mouseEnter(chip!);
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip).toHaveTextContent('IBM');
-    expect(tooltip).toHaveTextContent('Total Assets');
-    expect(tooltip).toHaveTextContent('2024-12-31');
-    expect(tooltip).toHaveTextContent('151,880');
+    expect(tooltip).toHaveTextContent('E50');
+    expect(tooltip).toHaveTextContent('ibm.xlsx');
 
     fireEvent.click(chip!);
-    expect(screen.getByRole('dialog', { name: '셀 원본 근거 검증' })).toBeInTheDocument();
-    expect(evidenceApiMock.resolve).toHaveBeenCalledWith(
-      expect.objectContaining({ company: 'IBM', sheet: 'Balance_Sheet', cell: 'E50' }),
+    expect(screen.getByRole('dialog', { name: '시트 원본 근거 검증' })).toBeInTheDocument();
+    expect(evidenceApiMock.resolveMany).toHaveBeenCalledWith(
+      [expect.objectContaining({ company: 'IBM', sheet: 'Balance_Sheet', cell: 'E50' })],
       expect.any(AbortSignal),
     );
   });

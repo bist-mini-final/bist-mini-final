@@ -41,6 +41,15 @@ class CellArtifactLocatorPort(Protocol):
         cell_coord: str,
     ) -> dict[str, Any]: ...
 
+    def locate_many(
+        self,
+        *,
+        file_name: str,
+        workbook_hash: str,
+        sheet_name: str,
+        cell_coords: list[str],
+    ) -> dict[str, dict[str, Any]]: ...
+
 
 @dataclass(frozen=True)
 class CellEvidenceQuery:
@@ -130,9 +139,37 @@ class CellEvidenceService:
         self._artifacts = artifacts
 
     def resolve(self, query: CellEvidenceQuery) -> dict[str, Any]:
+        return self._resolve(query, self._indexes.list_indexes())
+
+    def resolve_many(self, queries: list[CellEvidenceQuery]) -> list[dict[str, Any]]:
+        """Resolve a single answer's sheet evidence without reloading the index catalog per cell."""
+        indexes = self._indexes.list_indexes()
+        resolved = [self._resolve(query, indexes, locate_image=False) for query in queries]
+        artifact_groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+        for item in resolved:
+            key = (item["file_name"], item["workbook_hash"], item["sheet_name"])
+            artifact_groups.setdefault(key, []).append(item)
+        for (file_name, workbook_hash, sheet_name), items in artifact_groups.items():
+            images = self._artifacts.locate_many(
+                file_name=file_name,
+                workbook_hash=workbook_hash,
+                sheet_name=sheet_name,
+                cell_coords=[item["cell_coord"] for item in items],
+            )
+            for item in items:
+                item["image"] = images[item["cell_coord"].upper()]
+        return resolved
+
+    def _resolve(
+        self,
+        query: CellEvidenceQuery,
+        available_indexes: list[dict[str, Any]],
+        *,
+        locate_image: bool = True,
+    ) -> dict[str, Any]:
         normalized_sheet = query.sheet_name.strip()
         normalized_coord = query.cell_coord.strip().upper()
-        indexes = _matching_indexes(self._indexes.list_indexes(), query)
+        indexes = _matching_indexes(available_indexes, query)
         matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
         for index in indexes:
             collection_id = str(index.get("index_id") or "").strip()
@@ -171,7 +208,7 @@ class CellEvidenceService:
             cell.get("workbook_hash") or index.get("workbook_hash") or ""
         ).strip()
         file_name = str(cell.get("file_name") or index.get("file_name") or "").strip()
-        return {
+        result = {
             "company_name": str(
                 cell.get("company_name") or index.get("company_name") or query.company_name
             ).strip(),
@@ -184,13 +221,15 @@ class CellEvidenceService:
             "row_header": cell.get("row_header") or [],
             "column_header": cell.get("column_header") or [],
             "source_text": str(cell.get("source_text") or ""),
-            "image": self._artifacts.locate(
+        }
+        if locate_image:
+            result["image"] = self._artifacts.locate(
                 file_name=file_name,
                 workbook_hash=workbook_hash,
                 sheet_name=normalized_sheet,
                 cell_coord=normalized_coord,
-            ),
-        }
+            )
+        return result
 
     @staticmethod
     def _prefer_exact_value_and_company(

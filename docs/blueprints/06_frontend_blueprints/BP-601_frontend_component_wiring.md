@@ -102,9 +102,11 @@ graph TD
 - 삭제·이름 변경·생성처럼 서버 mutation이 있는 동작은 `busy` 동안 중복 제출과 닫기를 막고 버튼 label 또는 spinner로 처리 중 상태를 보여줍니다.
 - API 실패는 dialog 내부 `role="alert"` 또는 페이지 error state로 표시하며 브라우저 `alert`/`prompt`에 의존하지 않습니다.
 
-## 7. 셀 근거 검증 viewport
+## 7. 시트 단위 근거 검증 viewport
 
-`CellEvidenceProvider`는 구조화 셀 배지의 활성화를 전역에서 받아 lazy-loaded `CellEvidenceModal`을 엽니다. 배지 입력은 Reader가 선택하고 backend가 실제 값 allowlist로 검증한 `CellEvidenceDTO[]`만 허용합니다. `MarkdownAnswer`는 `answer_markdown` 본문을 렌더링한 뒤 별도 `evidence` prop을 배지로 투영하며 Markdown 좌표 문자열, 컨텍스트 전체 또는 자유 형식 좌표를 파싱해 임의로 뱃지화하지 않습니다. modal은 resolve API가 반환한 sheet image와 cell bbox를 연결하고 확대·축소·화면 맞춤·근거 셀 이동을 제공합니다. 큰 sheet canvas는 공용 `useDragPan` pointer hook으로 이동하며 button·link·form control 위의 drag는 시작하지 않습니다.
+`CellEvidenceProvider`는 구조화 근거 배지의 활성화를 전역에서 받아 lazy-loaded `CellEvidenceModal`을 엽니다. 입력은 Reader가 선택하고 backend가 실제 값 allowlist로 검증한 `CellEvidenceDTO[]`만 허용합니다. `MarkdownAnswer`는 cell-level DTO를 잃지 않은 채 index/workbook/file/company/sheet identity로 그룹화해 시트당 `Sheet · N개 셀` 배지 하나를 렌더링합니다. Markdown 좌표 문자열, 컨텍스트 전체 또는 자유 형식 좌표를 파싱해 임의로 뱃지화하지 않습니다.
+
+modal은 batch resolve API로 그룹의 모든 좌표를 한 번에 검증한 뒤 한 sheet image 위에 모든 cell bbox를 반투명 빨간 경계 상자로 표시합니다. sidebar는 참조 좌표 목록과 연결 성공 개수를 제공하고 viewport는 확대·축소·화면 맞춤·전체 근거 영역 이동을 제공합니다. 큰 sheet canvas는 공용 `useDragPan` pointer hook으로 이동하며 button·link·form control 위의 drag는 시작하지 않습니다. 같은 이름의 시트라도 workbook identity가 다르면 절대 한 배지로 합치지 않습니다.
 
 ---
 
