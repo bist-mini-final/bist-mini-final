@@ -1,0 +1,25 @@
+{
+  "summary": {
+    "generated_at": "2026-09-01T16:58:02.958Z",
+    "method": "Stored 105-case regression reclassified after excluding every corrected evaluation-set case; node outputs fetched from local PostgreSQL-backed run logs.",
+    "clean_cases": 63,
+    "clean_runs": 126,
+    "correct_runs": 126,
+    "failed_runs": 0,
+    "error_runs": 0,
+    "by_category": {},
+    "by_workflow": {
+      "bi_metric_extraction": {
+        "runs": 63,
+        "correct": 63,
+        "failed": 0
+      },
+      "rag_query": {
+        "runs": 63,
+        "correct": 63,
+        "failed": 0
+      }
+    }
+  },
+  "failures": []
+}

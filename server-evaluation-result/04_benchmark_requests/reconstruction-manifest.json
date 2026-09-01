@@ -1,0 +1,40 @@
+{
+  "source": "서버_실측평가_전달패키지.md",
+  "sourceSha256": "04a6bd0eaeadae43e3b3758f8164819e127152e38b0f489e12a1c92f90b4ad81",
+  "generatedAt": "2026-09-01T08:49:20.949Z",
+  "workflowIds": [
+    "bi_metric_extraction",
+    "rag_query"
+  ],
+  "caveats": [
+    "Requests were reconstructed from the Markdown transfer package because the canonical evaluation JSON files were not supplied.",
+    "Expected numbers and qualitative terms were mechanically extracted and require reviewer approval before paid execution.",
+    "Expected plans were intentionally omitted because the transfer package requires manual gold metric/period review.",
+    "A/B request metadata is stored separately so non-contract review fields are not sent to the API."
+  ],
+  "datasets": {
+    "benchmark-request-1-included-86.json": {
+      "cases": 86,
+      "requestSha256": "31b547ff43c5d17ce0812497e1dde38eb97f80e7b39eed4f62032722d167fb8f",
+      "casesWithoutExpectedNumbers": [
+        "F1-Q015"
+      ],
+      "casesWithoutExpectedSheets": []
+    },
+    "benchmark-request-2a-87.json": {
+      "cases": 87,
+      "requestSha256": "b7b9e3b155478c012f63204ce11d06b3f270bf3041f04d0d9dd074cf84586e0a",
+      "casesWithoutExpectedNumbers": [],
+      "casesWithoutExpectedSheets": []
+    },
+    "benchmark-request-2b-36.json": {
+      "cases": 36,
+      "requestSha256": "79979b496777ed48e2ccd515401910510665094a5eb2dfeb8986405044c4593e",
+      "casesWithoutExpectedNumbers": [
+        "F2B-U5-03",
+        "F2B-U5-06"
+      ],
+      "casesWithoutExpectedSheets": []
+    }
+  }
+}

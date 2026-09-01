@@ -334,59 +334,61 @@
 .ds-company-inline-form {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  background: #ffffff;
-  padding: 0.1rem 0.2rem;
-  border-radius: 6px;
+  gap: 0.2rem;
+  background: transparent;
+  padding: 0;
 }
 
 .ds-company-inline-input {
-  padding: 0.22rem 0.5rem;
+  height: 2rem;
+  padding: 0 0.55rem;
   font-size: 0.75rem;
-  border: 1.5px solid #0f766e;
-  border-radius: 4px;
+  border: 1px solid var(--brand-500);
+  border-radius: 0.5rem;
   outline: none;
   width: 170px;
   font-weight: 600;
   color: #0f172a;
-  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-500) 12%, transparent);
 }
 
-.ds-company-inline-save {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #10b981;
-  background: #10b981;
-  color: #ffffff;
-  border-radius: 4px;
-  padding: 0.25rem 0.4rem;
-  cursor: pointer;
-  font-size: 0.7rem;
-  transition: all 120ms ease;
+.ds-company-inline-save.ui-button,
+.ds-company-inline-cancel.ui-button {
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border-radius: 0.5rem;
+  box-shadow: none;
 }
 
-.ds-company-inline-save:hover {
-  background: #059669;
+.ds-company-inline-save.ui-button {
+  border-color: var(--brand-200);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
-.ds-company-inline-cancel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #64748b;
-  border-radius: 4px;
-  padding: 0.25rem 0.4rem;
-  cursor: pointer;
-  font-size: 0.7rem;
-  transition: all 120ms ease;
+.ds-company-inline-save.ui-button:hover:not(:disabled, [aria-disabled='true']) {
+  border-color: var(--brand-300);
+  background: var(--brand-100);
+  color: var(--brand-800);
+  box-shadow: none;
+  transform: none;
 }
 
-.ds-company-inline-cancel:hover {
-  background: #e2e8f0;
-  color: #1e293b;
+.ds-company-inline-cancel.ui-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.ds-company-inline-cancel.ui-button:hover:not(:disabled, [aria-disabled='true']) {
+  border-color: transparent;
+  background: var(--surface-muted);
+  color: var(--text);
+  box-shadow: none;
+  transform: none;
 }
 
 .ds-chunk-block {

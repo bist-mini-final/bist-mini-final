@@ -310,21 +310,36 @@ class PgContextExpanderModule(BaseModule):
     def _target_rows(
         retrieval_items: List[Any],
         cfg: PgContextExpanderConfigDTO,
-    ) -> Dict[Tuple[str, str], Set[int]]:
-        target_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
+    ) -> Dict[Tuple[str, str], List[int]]:
+        """Return target rows in retrieval-rank order.
+
+        RRF already expresses semantic relevance through candidate order.  A
+        set followed by numeric sorting used to discard that signal and made
+        earlier worksheet rows appear before better matches.  Reader then saw
+        ``Revenue`` before the higher-ranked ``Total Revenue`` row.  Keep an
+        insertion-ordered list per document scope while deduplicating rows.
+        """
+
+        target_rows_by_scope: Dict[Tuple[str, str], List[int]] = defaultdict(list)
+        seen_rows_by_scope: Dict[Tuple[str, str], Set[int]] = defaultdict(set)
         for candidate in retrieval_items:
             sheet, row_index, _ = _candidate_coords(candidate)
             if candidate.index_id and sheet and row_index is not None:
                 scope_key = (candidate.index_id, sheet)
                 if cfg.adjacent_radius and cfg.adjacent_radius > 0:
-                    for row in range(
-                        max(1, row_index - cfg.adjacent_radius),
-                        row_index + cfg.adjacent_radius + 1,
-                    ):
-                        target_rows_by_scope[scope_key].add(row)
+                    candidate_rows = [row_index]
+                    for distance in range(1, cfg.adjacent_radius + 1):
+                        if row_index - distance >= 1:
+                            candidate_rows.append(row_index - distance)
+                        candidate_rows.append(row_index + distance)
                 else:
-                    target_rows_by_scope[scope_key].add(row_index)
-        return target_rows_by_scope
+                    candidate_rows = [row_index]
+                for row in candidate_rows:
+                    if row in seen_rows_by_scope[scope_key]:
+                        continue
+                    seen_rows_by_scope[scope_key].add(row)
+                    target_rows_by_scope[scope_key].append(row)
+        return dict(target_rows_by_scope)
 
     @staticmethod
     def _seed_context(
@@ -428,7 +443,7 @@ class PgContextExpanderModule(BaseModule):
     def _expand_targets(
         self,
         accumulator: _ContextAccumulator,
-        targets: Dict[Tuple[str, str], Set[int]],
+        targets: Dict[Tuple[str, str], List[int]],
         *,
         prefetched_rows: Optional[Dict[Tuple[str, str], Dict[int, List[Dict[str, Any]]]]],
         fallback_company: str,
@@ -442,11 +457,11 @@ class PgContextExpanderModule(BaseModule):
                     collection_name=collection_name,
                     workbook_hash=None,
                     sheet_name=sheet,
-                    row_indices=sorted(row_indices),
+                    row_indices=row_indices,
                     limit_per_row=100,
                 )
             )
-            for row_index in sorted(row_indices):
+            for row_index in row_indices:
                 if self._consume_rows(
                     accumulator,
                     rows_by_index.get(row_index, []),
@@ -521,7 +536,7 @@ class PgContextExpanderModule(BaseModule):
                         collection_name=collection_name,
                         workbook_hash=None,
                         sheet_name=sheet,
-                        row_indices=sorted(row_indices),
+                        row_indices=row_indices,
                         limit_per_row=100,
                     ),
                     name=f"context-rows:{collection_name}:{sheet}",

@@ -1,0 +1,19 @@
+{
+  "measured_at_kst": "2026-09-01T23:23:34+09:00",
+  "target": "http://127.0.0.1:8080",
+  "anonymous_indexes_status": 401,
+  "login_status": 200,
+  "session_cookie": {
+    "http_only": true,
+    "same_site_strict": true,
+    "secure": false,
+    "secure_reason": "local k3d HTTP profile; production Helm profile requires HTTPS and Secure cookie"
+  },
+  "authenticated_indexes_status": 200,
+  "tenant_mismatch_status": 403,
+  "external_openapi_status": 404,
+  "logout_status": 200,
+  "after_logout_status": 401,
+  "credential_values_recorded": false,
+  "result": "pass_except_public_tls"
+}

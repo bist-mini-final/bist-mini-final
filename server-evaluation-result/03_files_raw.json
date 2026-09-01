@@ -1,0 +1,335 @@
+{
+  "files": [
+    {
+      "file_name": "SPG_Company_KeyStats_01_amesoft.xlsm",
+      "size_bytes": 287472,
+      "updated_at": "2026-09-01T12:29:35.469983+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "fd13ff9c08049b963a97f89ab6d0d1de70e52178c6ce73841cd57256b4088493",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_01_amesoft_rank_recalibrated.xlsx",
+      "size_bytes": 196081,
+      "updated_at": "2026-09-01T16:33:35.810725+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow",
+        "Recalibration_Audit"
+      ],
+      "workbook_hash": "d6ac31e91cde9bdd8b590c78a32899ccfd8366a7c72bdea3ff615b8f72c180f6",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_02_nexora_labs.xlsm",
+      "size_bytes": 287826,
+      "updated_at": "2026-09-01T01:10:26.442637+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "dbba6aa581d028cfc2cffd1a9daf9211b7731588f8b30d9634f1bc255c12c7eb",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_02_nexora_labs_rank_recalibrated.xlsx",
+      "size_bytes": 197382,
+      "updated_at": "2026-09-01T09:25:20.564114+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow",
+        "Recalibration_Audit"
+      ],
+      "workbook_hash": "2ebd77554aad36951685d7db0fb7450396114d6db7a8c667632f393da390c8f2",
+      "associated_index_ids": [
+        "idx_2ca54d6f8dade6ba1d2a22295c56a045991b283e9c2c1635250d052c846ad9c2"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_03_veltrix_systems.xlsm",
+      "size_bytes": 287639,
+      "updated_at": "2026-09-01T01:10:38.751336+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "671d9d66113194449ab55444872426534311768d9b4d3ba8e521ff33193544b5",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_03_veltrix_systems_rank_recalibrated.xlsx",
+      "size_bytes": 197550,
+      "updated_at": "2026-09-01T09:26:24.349292+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow",
+        "Recalibration_Audit"
+      ],
+      "workbook_hash": "fc2a27585e8feb7c2bf409ca42c43f8a7cc4b80f28f77844a49de7e169ec700d",
+      "associated_index_ids": [
+        "idx_8adcd687353b2b6af5b8a9574d8ce38a3498178ea3fabf646246adedbcad0c2a"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_04_lumena_ai.xlsm",
+      "size_bytes": 287406,
+      "updated_at": "2026-09-01T11:13:40.739894+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "9e3fc5669b0532fcd1f8613490c9428beac40f08f1672e276cce74c70ad5e9ea",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_04_lumena_ai_rank_recalibrated.xlsx",
+      "size_bytes": 197079,
+      "updated_at": "2026-09-01T16:34:06.84587+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow",
+        "Recalibration_Audit"
+      ],
+      "workbook_hash": "2da6df838a795263ecbec241a1b1dec5270e7de7cf9b432425bd8739e8af8f4a",
+      "associated_index_ids": [
+        "idx_70717e23dd4dedf2a9378b4a74c53cea4fbfbc4caed0d54a64181f2be3bba309"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_05_corevia_tech.xlsm",
+      "size_bytes": 287221,
+      "updated_at": "2026-09-01T12:30:10.271871+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "9411cea247656ee1276eee6b77056a65057d00f773826412b6fdf3a617431f2f",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_05_corevia_tech_rank_recalibrated.xlsx",
+      "size_bytes": 196615,
+      "updated_at": "2026-09-01T16:39:25.75764+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow",
+        "Recalibration_Audit"
+      ],
+      "workbook_hash": "4c8fb2f52d2d96d6f45d24e335d897c6f37cc3b3a2771aca4724597db4bba093",
+      "associated_index_ids": [
+        "idx_93f8a9f9c484420335e62765313b40a3cc3b16b035571eb4266298bdf28d3de5"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_06_altiven.xlsm",
+      "size_bytes": 287562,
+      "updated_at": "2026-09-01T14:15:59.062206+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "ab151171d5fdf6190b8c1d99b4d2d1f119bd01a8a56f8755484e1522fe708fb1",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_07_serenex_systems.xlsm",
+      "size_bytes": 287146,
+      "updated_at": "2026-09-01T15:59:08.465949+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "02c55d6cf96dbef5247fa4af956e11a6c21b408ca25f85914fa63fdfa42cc69a",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_08_bluepeak_digital.xlsm",
+      "size_bytes": 287708,
+      "updated_at": "2026-09-01T16:06:26.151467+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "d5b2c99db81f7c864947fdb58d2e20d4adae1a9d6c07bbb57b3d3084721651db",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_09_meridian_logic.xlsm",
+      "size_bytes": 287232,
+      "updated_at": "2026-09-01T16:10:40.19933+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "4f45c12839e299e95a1884740a511929fe6be1226b40a01fbe6d81bf8eeb7105",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_10_orbixa_networks.xlsm",
+      "size_bytes": 287212,
+      "updated_at": "2026-09-01T16:11:36.996687+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "069883e7fa649b57d932e3e52252497a29d1af663c51894bdd560ac7aa69b1bb",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_11_primeforge.xlsm",
+      "size_bytes": 287030,
+      "updated_at": "2026-09-01T16:14:21.435866+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "6da48a652a449fc9b0534c0ce4cebae81834f8f7f96196b541bc960cc86962c6",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_12_solvanta.xlsm",
+      "size_bytes": 287343,
+      "updated_at": "2026-09-01T16:17:33.400894+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "935fc4a11d872274395267028b65f4354a540f524f8e9791a3a85882bf1c168e",
+      "associated_index_ids": []
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_Bistelligence_AI_DX_Growth.xlsm",
+      "size_bytes": 292410,
+      "updated_at": "2026-09-01T16:50:01.92513+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "4551fa2967cf7f53862f022d7fccf4aa042f0eb202dfff42fbafc1ffb7ad1099",
+      "associated_index_ids": [
+        "idx_18f651c9b4b694402fb61a06e19b683098ef7327355e47becf37773268365f57"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_Coldplay_AI_DX_Stable.xlsm",
+      "size_bytes": 292134,
+      "updated_at": "2026-09-01T16:50:29.073045+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "3ce130f2a9f3e9e9fdfb96c20401372f778fac65d2c739b303d820918509ee9b",
+      "associated_index_ids": [
+        "idx_b0080a9295ab442fc0f75875d0e82af3a03b626e5d31309096b512b231710f14"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_DH_Innovation_AI_DX_Decline.xlsm",
+      "size_bytes": 292114,
+      "updated_at": "2026-09-01T17:17:18.725671+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "9321c6f4bc86b225a9e6bb13477ac866ced9eed5e7698a9d7c1abf317cfe4ccd",
+      "associated_index_ids": [
+        "idx_e93e0338f0aeac9fb42f87d004e5718925d0261230bcae96399a44af65188eca"
+      ]
+    },
+    {
+      "file_name": "SPG_Company_KeyStats_v3.xlsm",
+      "size_bytes": 281685,
+      "updated_at": "2026-09-01T16:33:11.466909+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "Key_Stats",
+        "Income_Statement",
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "workbook_hash": "67bad6e2b849f473f2f504ad08eb98a81b4f5ae04d150ffa6ef2b7bf160bdc00",
+      "associated_index_ids": [
+        "idx_36c300a24a70bfac4f0546815306027443ada765fbc99898e369dced1caaa8d3"
+      ]
+    },
+    {
+      "file_name": "가상기업_재무_인력_v1.xlsx",
+      "size_bytes": 8222,
+      "updated_at": "2026-09-01T14:21:11.528474+09:00",
+      "file_type": "excel",
+      "sheet_names": [
+        "연간재무",
+        "분기재무",
+        "인력현황"
+      ],
+      "workbook_hash": "7fd7ab6f4f94bab40d88246ef3edd9a336eb7b85e35e8c79d7c34d941068382c",
+      "associated_index_ids": [
+        "idx_f50b7c7b12eb94ad2b2212f4baf3b751a00740b88aa697c1705c6b760e82c7e8"
+      ]
+    }
+  ],
+  "total": 22
+}

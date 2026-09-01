@@ -128,6 +128,7 @@ def test_application_code_uses_canonical_stage_one_boundaries() -> None:
 def test_api_package_contains_only_common_http_composition() -> None:
     allowed = {
         "__init__.py",
+        "auth.py",
         "error_mapping.py",
         "exception_handlers.py",
         "middleware.py",
@@ -209,9 +210,7 @@ def test_backend_python_sources_use_the_target_top_level_packages() -> None:
         if len(path.relative_to(PROJECT_ROOT / "backend").parts) > 1
     }
     assert actual == allowed
-    core_files = {
-        path.name for path in _python_files("backend/core")
-    }
+    core_files = {path.name for path in _python_files("backend/core")}
     assert core_files == {"__init__.py", "settings.py"}
 
 
@@ -311,9 +310,7 @@ def test_data_sources_vertical_slice_has_no_legacy_or_inverted_dependencies() ->
         for path in _python_files(root):
             for imported, line in _imported_modules(path):
                 if imported.startswith(forbidden):
-                    violations.append(
-                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
-                    )
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"data sources layer inversion: {violations}"
 
 
@@ -363,9 +360,7 @@ def test_bi_vertical_slice_has_no_legacy_or_inverted_dependencies() -> None:
         for path in _python_files(root):
             for imported, line in _imported_modules(path):
                 if imported.startswith(forbidden):
-                    violations.append(
-                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
-                    )
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"BI layer inversion: {violations}"
 
 
@@ -406,9 +401,7 @@ def test_company_comparison_vertical_slice_has_no_inverted_dependencies() -> Non
         for path in _python_files(root):
             for imported, line in _imported_modules(path):
                 if imported.startswith(forbidden):
-                    violations.append(
-                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
-                    )
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"company comparison layer inversion: {violations}"
 
 
@@ -449,9 +442,7 @@ def test_chatbot_vertical_slice_has_no_inverted_dependencies() -> None:
         for path in _python_files(root):
             for imported, line in _imported_modules(path):
                 if imported.startswith(forbidden):
-                    violations.append(
-                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
-                    )
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"chatbot layer inversion: {violations}"
 
 
@@ -502,9 +493,7 @@ def test_benchmark_vertical_slice_has_no_inverted_dependencies() -> None:
         for path in _python_files(root):
             for imported, line in _imported_modules(path):
                 if imported.startswith(forbidden):
-                    violations.append(
-                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
-                    )
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"benchmark layer inversion: {violations}"
 
 
@@ -545,9 +534,7 @@ def test_operations_vertical_slice_has_no_inverted_dependencies() -> None:
         for path in _python_files(root):
             for imported, line in _imported_modules(path):
                 if imported.startswith(forbidden):
-                    violations.append(
-                        f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}"
-                    )
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"operations layer inversion: {violations}"
 
 
@@ -555,9 +542,7 @@ def test_process_entrypoints_only_import_bootstrap() -> None:
     violations: list[str] = []
     for path in _python_files("backend/entrypoints"):
         for imported, line in _imported_modules(path):
-            if imported.startswith("backend.") and not imported.startswith(
-                "backend.bootstrap"
-            ):
+            if imported.startswith("backend.") and not imported.startswith("backend.bootstrap"):
                 violations.append(f"{path.relative_to(PROJECT_ROOT)}:{line} -> {imported}")
     assert not violations, f"entrypoint bypassed bootstrap: {violations}"
 
@@ -714,18 +699,16 @@ def test_kubernetes_tooling_uses_the_locked_project_python() -> None:
 
 
 def test_kubernetes_worker_releases_do_not_mix_mutable_image_revisions() -> None:
-    manifest = (
-        PROJECT_ROOT / "deploy" / "kubernetes" / "manifests" / "scaledjob.yaml"
-    ).read_text(encoding="utf-8")
-    renderer = (
-        PROJECT_ROOT / "deploy" / "kubernetes" / "scripts" / "render.py"
-    ).read_text(encoding="utf-8")
-    script = (PROJECT_ROOT / "deploy" / "kubernetes" / "local.sh").read_text(
+    manifest = (PROJECT_ROOT / "deploy" / "kubernetes" / "manifests" / "scaledjob.yaml").read_text(
         encoding="utf-8"
     )
-    helm = (
-        PROJECT_ROOT / "deploy" / "helm" / "bist" / "templates" / "scaledjobs.yaml"
-    ).read_text(encoding="utf-8")
+    renderer = (PROJECT_ROOT / "deploy" / "kubernetes" / "scripts" / "render.py").read_text(
+        encoding="utf-8"
+    )
+    script = (PROJECT_ROOT / "deploy" / "kubernetes" / "local.sh").read_text(encoding="utf-8")
+    helm = (PROJECT_ROOT / "deploy" / "helm" / "bist" / "templates" / "scaledjobs.yaml").read_text(
+        encoding="utf-8"
+    )
     assert "strategy: immediate" in manifest
     assert manifest.count("bist.ai/image-revision: __IMAGE_REVISION__") == 2
     assert 'parser.add_argument("--image-revision", required=True)' in renderer
@@ -734,14 +717,139 @@ def test_kubernetes_worker_releases_do_not_mix_mutable_image_revisions() -> None
     assert helm.count("bist.ai/image-revision:") == 2
 
 
-def test_bi_workers_do_not_run_schema_ddl_during_keda_scale_out() -> None:
-    workers = (PROJECT_ROOT / "backend" / "bootstrap" / "workers.py").read_text(
+def test_local_images_are_revision_tagged_and_embed_oci_provenance() -> None:
+    script = (PROJECT_ROOT / "deploy/kubernetes/local.sh").read_text(encoding="utf-8")
+    dockerfiles = [
+        (PROJECT_ROOT / "deploy/docker/Dockerfile.backend").read_text(encoding="utf-8"),
+        (PROJECT_ROOT / "deploy/docker/Dockerfile.worker").read_text(encoding="utf-8"),
+        (PROJECT_ROOT / "deploy/docker/Dockerfile.frontend").read_text(encoding="utf-8"),
+    ]
+
+    assert 'DEFAULT_IMAGE_TAG="${SOURCE_REVISION:0:12}"' in script
+    assert 'DEFAULT_IMAGE_TAG="${DEFAULT_IMAGE_TAG}-dirty-${DIRTY_FINGERPRINT}"' in script
+    assert "UNTRACKED_SOURCE_FILES" in script
+    assert "bist-backend:${DEFAULT_IMAGE_TAG}" in script
+    assert '--build-arg VCS_REF="${SOURCE_REVISION}"' in script
+    for dockerfile in dockerfiles:
+        assert 'org.opencontainers.image.revision="${VCS_REF}"' in dockerfile
+        assert 'io.bist.source-dirty="${SOURCE_DIRTY}"' in dockerfile
+
+
+def test_docker_context_excludes_evaluation_evidence() -> None:
+    dockerignore = (PROJECT_ROOT / ".dockerignore").read_text(encoding="utf-8")
+
+    assert "server-evaluation-result" in dockerignore.splitlines()
+
+
+def test_schema_migration_image_is_rendered_before_immutable_job_creation() -> None:
+    script = (PROJECT_ROOT / "deploy/kubernetes/local.sh").read_text(encoding="utf-8")
+
+    assert 'kubectl set image -f "${DEPLOY_DIR}/manifests/05-migrations.yaml"' in script
+    assert 'migrate="${BACKEND_IMAGE}" --local -o yaml | kubectl apply -f -' in script
+    assert "kubectl set image job/bist-schema-migrate" not in script
+
+
+def test_api_documentation_is_not_exposed_through_the_public_frontend() -> None:
+    deployment = (PROJECT_ROOT / "deploy/kubernetes/manifests/02-backend.yaml").read_text(
         encoding="utf-8"
     )
+    ingress = (PROJECT_ROOT / "deploy/kubernetes/manifests/04-ingress.yaml").read_text(
+        encoding="utf-8"
+    )
+    helm_ingress = (PROJECT_ROOT / "deploy/helm/bist/templates/ingress.yaml").read_text(
+        encoding="utf-8"
+    )
+    helm_values = (PROJECT_ROOT / "deploy/helm/bist/values.yaml").read_text(encoding="utf-8")
+    nginx = (PROJECT_ROOT / "deploy/docker/nginx.conf").read_text(encoding="utf-8")
+    vite = (PROJECT_ROOT / "frontend/vite.config.ts").read_text(encoding="utf-8")
+
+    assert "name: APP_ENV\n              value: production" in deployment
+    assert 'name: EXPOSE_API_DOCS\n              value: "false"' in deployment
+    for public_router in (ingress, helm_ingress, vite):
+        assert "/docs" not in public_router
+        assert "/redoc" not in public_router
+        assert "/openapi.json" not in public_router
+    assert "limit-rps" in ingress
+    assert 'nginx.ingress.kubernetes.io/proxy-body-size: "501m"' in ingress
+    assert 'nginx.ingress.kubernetes.io/proxy-request-buffering: "off"' in ingress
+    assert 'nginx.ingress.kubernetes.io/proxy-body-size: "501m"' in helm_values
+    assert 'nginx.ingress.kubernetes.io/proxy-request-buffering: "off"' in helm_values
+    assert "openapi\\.json" in nginx
+    assert "return 404" in nginx
+
+
+def test_production_http_plane_requires_auth_secret_and_tls_redirect() -> None:
+    deployment = (PROJECT_ROOT / "deploy/kubernetes/manifests/02-backend.yaml").read_text(
+        encoding="utf-8"
+    )
+    helm_backend = (PROJECT_ROOT / "deploy/helm/bist/templates/backend.yaml").read_text(
+        encoding="utf-8"
+    )
+    helm_values = (PROJECT_ROOT / "deploy/helm/bist/values.yaml").read_text(
+        encoding="utf-8"
+    )
+    local_script = (PROJECT_ROOT / "deploy/kubernetes/local.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "name: bist-auth-env" in deployment
+    assert "name: {{ .Values.application.authSecret }}" in helm_backend
+    assert 'nginx.ingress.kubernetes.io/ssl-redirect: "true"' in helm_values
+    assert "password_hash" in local_script
+    assert "AUTH_SESSION_SECRET" in local_script
+    assert "AUTH_ENABLED=true" in local_script
+
+
+def test_backend_rollout_drains_terminating_pods_without_unavailability() -> None:
+    manifest = (PROJECT_ROOT / "deploy/kubernetes/manifests/02-backend.yaml").read_text(
+        encoding="utf-8"
+    )
+    helm = (PROJECT_ROOT / "deploy/helm/bist/templates/backend.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    for deployment in (manifest, helm):
+        assert "maxUnavailable: 0" in deployment
+        assert "maxSurge: 1" in deployment
+        assert "minReadySeconds: 5" in deployment
+        assert "terminationGracePeriodSeconds: 30" in deployment
+        assert 'command: ["/bin/sh", "-c", "sleep 5"]' in deployment
+
+
+def test_local_ingress_reports_rate_limits_as_retryable_client_errors() -> None:
+    script = (PROJECT_ROOT / "deploy/kubernetes/local.sh").read_text(encoding="utf-8")
+
+    assert "controller.config.limit-req-status-code=429" in script
+    assert "controller.config.limit-conn-status-code=429" in script
+
+
+def test_bi_workers_do_not_run_schema_ddl_during_keda_scale_out() -> None:
+    workers = (PROJECT_ROOT / "backend" / "bootstrap" / "workers.py").read_text(encoding="utf-8")
     assert "ensure_bi_schema" not in workers
     bi_branch = workers.split('if kind in {"bi-materialization", "bi-question"}:', 1)[1]
     bi_branch = bi_branch.split('if kind == "benchmark":', 1)[0]
     assert "initialize_schema=False" in bi_branch
+
+
+def test_benchmark_workers_do_not_run_schema_ddl_during_keda_scale_out() -> None:
+    workers = (PROJECT_ROOT / "backend" / "bootstrap" / "workers.py").read_text(encoding="utf-8")
+    benchmark_branch = workers.split('if kind == "benchmark":', 1)[1]
+    benchmark_branch = benchmark_branch.split("return worker()", 1)[0]
+    assert "initialize_schema=False" in benchmark_branch
+
+
+def test_local_capacity_models_parent_and_child_worker_pair() -> None:
+    capacity = (PROJECT_ROOT / "deploy/kubernetes/scripts/capacity.py").read_text(
+        encoding="utf-8"
+    )
+    script = (PROJECT_ROOT / "deploy/kubernetes/local.sh").read_text(encoding="utf-8")
+
+    assert 'default=2.0' in capacity
+    assert 'default=4.0' in capacity
+    assert "cpu_per_queue_slot" in capacity
+    assert "memory_gib_per_queue_slot" in capacity
+    assert "KUBERNETES_CAPACITY_CPU_PER_SLOT" in script
+    assert "KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT" in script
 
 
 def test_execution_views_share_the_streaming_core() -> None:

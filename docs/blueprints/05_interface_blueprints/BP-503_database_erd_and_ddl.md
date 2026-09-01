@@ -124,6 +124,7 @@ domain_snapshot_heads(
 | `20260831_0006` | BI 전용 profile cache를 폐기하고 data sources 소유 `workbook_profiles` 도입 |
 | `20260831_0007` | `chat_messages.evidence` 구조화 셀 근거 JSONB 추가 |
 | `20260901_0008` | assistant 응답 완료 시각 `chat_messages.completed_at` 추가 및 기존 완료 메시지 backfill |
+| `20260901_0009` | benchmark job 생성·상태 전이·삭제를 질문/답변 원문 없이 append-only `audit_logs`에 기록 |
 
 새 배포는 애플리케이션 시작 전에 `alembic upgrade head`를 완료해야 합니다. 애플리케이션의 idempotent schema initializer는 개발·호환 안전망이지 migration을 대체하지 않습니다.
 
@@ -136,5 +137,5 @@ domain_snapshot_heads(
 - cross-domain foreign key는 aggregate 수명주기를 실제로 공유할 때만 허용하고 편의 join을 위해 repository 소유권을 섞지 않습니다.
 - production schema 변경은 Alembic만 수행하며 bootstrap schema composer는 개발·테스트 초기화와 drift 검증 보조 경로로만 관리합니다.
 - data sources, workflow, chatbot, BI와 benchmark schema/repository 소유권은 각 vertical slice에 있고 migration baseline은 domain schema fragment를 명시적으로 결합합니다. 수평 storage facade는 제거됐습니다.
-- 현재 선형 revision은 `20260827_0001`부터 `20260901_0008`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
+- 현재 선형 revision은 `20260827_0001`부터 `20260901_0009`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
 - table/constraint/index/queue column을 바꾸면 domain schema fragment, Alembic upgrade/downgrade, repository/model, BP-103/BP-501과 migration tests를 같은 변경에서 갱신합니다.

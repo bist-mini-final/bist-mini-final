@@ -9,9 +9,35 @@ if [[ -n "${APPDATA:-}" ]]; then
 fi
 CLUSTER_NAME="${K3D_CLUSTER_NAME:-bist-local}"
 NAMESPACE="bist-batch"
-WORKER_IMAGE="${KUBERNETES_WORKER_IMAGE:-bist-workflow-worker:local}"
-BACKEND_IMAGE="${KUBERNETES_BACKEND_IMAGE:-bist-backend:local}"
-FRONTEND_IMAGE="${KUBERNETES_FRONTEND_IMAGE:-bist-frontend:local}"
+SOURCE_REVISION="${SOURCE_REVISION:-$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)}"
+SOURCE_DIRTY="false"
+mapfile -t UNTRACKED_SOURCE_FILES < <(
+  git -C "${PROJECT_ROOT}" ls-files --others --exclude-standard \
+    | grep -Ev '^(server-evaluation-result|tmp)/' \
+    || true
+)
+if ! git -C "${PROJECT_ROOT}" diff --quiet --ignore-submodules -- \
+  || ! git -C "${PROJECT_ROOT}" diff --cached --quiet --ignore-submodules -- \
+  || [[ "${#UNTRACKED_SOURCE_FILES[@]}" -gt 0 ]]; then
+  SOURCE_DIRTY="true"
+fi
+DEFAULT_IMAGE_TAG="${SOURCE_REVISION:0:12}"
+if [[ "${SOURCE_DIRTY}" == "true" ]]; then
+  DIRTY_FINGERPRINT="$({
+    git -C "${PROJECT_ROOT}" diff --binary HEAD -- . \
+      ':(exclude)server-evaluation-result/**' \
+      ':(exclude)tmp/**'
+    for source_file in "${UNTRACKED_SOURCE_FILES[@]}"; do
+      printf '%s\n' "${source_file}"
+      sha256sum "${PROJECT_ROOT}/${source_file}"
+    done
+  } | sha256sum | cut -c1-12)"
+  DEFAULT_IMAGE_TAG="${DEFAULT_IMAGE_TAG}-dirty-${DIRTY_FINGERPRINT}"
+fi
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+WORKER_IMAGE="${KUBERNETES_WORKER_IMAGE:-bist-workflow-worker:${DEFAULT_IMAGE_TAG}}"
+BACKEND_IMAGE="${KUBERNETES_BACKEND_IMAGE:-bist-backend:${DEFAULT_IMAGE_TAG}}"
+FRONTEND_IMAGE="${KUBERNETES_FRONTEND_IMAGE:-bist-frontend:${DEFAULT_IMAGE_TAG}}"
 IMPORT_IMAGES="${K3D_IMPORT_IMAGES:-true}"
 KEDA_VERSION="${KEDA_VERSION:-2.20.2}"
 ACTION="${1:-all}"
@@ -358,6 +384,8 @@ install_ingress_controller() {
     --namespace ingress-nginx \
     --create-namespace \
     --set controller.service.type=LoadBalancer \
+    --set-string controller.config.limit-req-status-code=429 \
+    --set-string controller.config.limit-conn-status-code=429 \
     --wait \
     --timeout 5m
   kubectl wait --for=condition=Available deployment/ingress-nginx-controller \
@@ -374,6 +402,9 @@ import_image() {
 build_worker() {
   DOCKER_BUILDKIT=1 docker build \
     --target runtime \
+    --build-arg VCS_REF="${SOURCE_REVISION}" \
+    --build-arg BUILD_DATE="${BUILD_DATE}" \
+    --build-arg SOURCE_DIRTY="${SOURCE_DIRTY}" \
     -f "${PROJECT_ROOT}/deploy/docker/Dockerfile.worker" \
     -t "${WORKER_IMAGE}" \
     "${PROJECT_ROOT}"
@@ -382,6 +413,9 @@ build_worker() {
 
 build_backend() {
   DOCKER_BUILDKIT=1 docker build \
+    --build-arg VCS_REF="${SOURCE_REVISION}" \
+    --build-arg BUILD_DATE="${BUILD_DATE}" \
+    --build-arg SOURCE_DIRTY="${SOURCE_DIRTY}" \
     -f "${PROJECT_ROOT}/deploy/docker/Dockerfile.backend" \
     -t "${BACKEND_IMAGE}" \
     "${PROJECT_ROOT}"
@@ -391,6 +425,9 @@ build_backend() {
 build_frontend() {
   DOCKER_BUILDKIT=1 docker build \
     --target runtime \
+    --build-arg VCS_REF="${SOURCE_REVISION}" \
+    --build-arg BUILD_DATE="${BUILD_DATE}" \
+    --build-arg SOURCE_DIRTY="${SOURCE_DIRTY}" \
     -f "${PROJECT_ROOT}/deploy/docker/Dockerfile.frontend" \
     -t "${FRONTEND_IMAGE}" \
     "${PROJECT_ROOT}"
@@ -423,8 +460,80 @@ print(urlunsplit((parts.scheme, f"{userinfo}bist-pgvector.bist-batch.svc.cluster
 PY
 }
 
+ensure_auth_secret() {
+  local admin_password password_hash users_json session_secret
+  if kubectl get secret bist-auth-env -n "${NAMESPACE}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  admin_password="${BIST_ADMIN_PASSWORD:-$("${PROJECT_PYTHON}" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(18))
+PY
+)}"
+  password_hash="$("${PROJECT_PYTHON}" - "${admin_password}" <<'PY'
+import base64
+import hashlib
+import os
+import sys
+
+salt = os.urandom(18)
+digest = hashlib.pbkdf2_hmac("sha256", sys.argv[1].encode(), salt, 310_000)
+encode = lambda value: base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+print(f"pbkdf2_sha256$310000${encode(salt)}${encode(digest)}")
+PY
+)"
+  users_json="$("${PROJECT_PYTHON}" - "${password_hash}" <<'PY'
+import json
+import sys
+print(json.dumps([{
+    "username": "admin",
+    "password_hash": sys.argv[1],
+    "role": "admin",
+    "tenant_id": "default",
+}], separators=(",", ":")))
+PY
+)"
+  session_secret="$("${PROJECT_PYTHON}" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+)"
+
+  kubectl -n "${NAMESPACE}" create secret generic bist-auth-env \
+    --from-literal=AUTH_ENABLED=true \
+    --from-literal=AUTH_USERS_JSON="${users_json}" \
+    --from-literal=AUTH_SESSION_SECRET="${session_secret}" \
+    --from-literal=AUTH_SESSION_TTL_SECONDS=28800 \
+    --from-literal=AUTH_COOKIE_SECURE="${BIST_AUTH_COOKIE_SECURE:-false}"
+  kubectl -n "${NAMESPACE}" create secret generic bist-auth-bootstrap \
+    --from-literal=ADMIN_USERNAME=admin \
+    --from-literal=ADMIN_PASSWORD="${admin_password}"
+  echo "🔐 관리자 계정이 생성되었습니다. './deploy/kubernetes/local.sh credentials'로 확인하세요."
+}
+
+show_credentials() {
+  if ! kubectl get secret bist-auth-bootstrap -n "${NAMESPACE}" >/dev/null 2>&1; then
+    echo "❌ 초기 관리자 자격 증명 Secret이 없습니다." >&2
+    return 1
+  fi
+  "${PROJECT_PYTHON}" - <<'PY'
+import base64
+import json
+import subprocess
+
+payload = json.loads(subprocess.check_output([
+    "kubectl", "get", "secret", "bist-auth-bootstrap",
+    "-n", "bist-batch", "-o", "json",
+], text=True))
+data = payload["data"]
+print("username:", base64.b64decode(data["ADMIN_USERNAME"]).decode())
+print("password:", base64.b64decode(data["ADMIN_PASSWORD"]).decode())
+PY
+}
+
 apply_workload() {
-  local pg_url openai_key openai_base cluster_pg_url connection_hash worker_revision previous_connection_hash scaledjob_existed max_jobs configured_max_jobs database_endpoint
+  local pg_url openai_key openai_base cluster_pg_url connection_hash worker_revision previous_connection_hash scaledjob_existed max_jobs configured_max_jobs database_endpoint capacity_cpu_per_slot capacity_memory_per_slot
   pg_url="$(database_url)"
   openai_key="$(config_value OPENAI_API_KEY '')"
   openai_base="$(config_value OPENAI_BASE_URL https://api.openai.com/v1)"
@@ -453,9 +562,14 @@ PY
       -o jsonpath='{.metadata.annotations.bist\.ai/connection-hash}')"
   fi
   configured_max_jobs="$(env_value KUBERNETES_MAX_JOBS)"
-  max_jobs="${KUBERNETES_MAX_JOBS:-${configured_max_jobs:-$("${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/capacity.py")}}"
+  capacity_cpu_per_slot="${KUBERNETES_CAPACITY_CPU_PER_SLOT:-2}"
+  capacity_memory_per_slot="${KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT:-4}"
+  max_jobs="${KUBERNETES_MAX_JOBS:-${configured_max_jobs:-$("${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/capacity.py" \
+    --cpu-per-job "${capacity_cpu_per_slot}" \
+    --memory-per-job-gib "${capacity_memory_per_slot}")}}"
 
   kubectl apply -f "${DEPLOY_DIR}/manifests/00-namespace.yaml"
+  ensure_auth_secret
   if database_is_local; then
     database_endpoint="$(docker inspect bist-pgvector \
       --format "{{(index .NetworkSettings.Networks \"k3d-${CLUSTER_NAME}\").IPAddress}}")"
@@ -498,9 +612,10 @@ PY
 
 run_schema_migration() {
   kubectl delete job bist-schema-migrate -n "${NAMESPACE}" --ignore-not-found
-  kubectl apply -f "${DEPLOY_DIR}/manifests/05-migrations.yaml"
-  kubectl set image job/bist-schema-migrate migrate="${BACKEND_IMAGE}" \
-    -n "${NAMESPACE}"
+  # Job pod templates are immutable after creation. Render the release image
+  # into the suspended manifest first, then create and resume the Job.
+  kubectl set image -f "${DEPLOY_DIR}/manifests/05-migrations.yaml" \
+    migrate="${BACKEND_IMAGE}" --local -o yaml | kubectl apply -f -
   kubectl patch job bist-schema-migrate -n "${NAMESPACE}" --type merge \
     -p '{"spec":{"suspend":false}}'
   if ! kubectl wait --for=condition=complete job/bist-schema-migrate \
@@ -523,9 +638,8 @@ apply_application() {
     -n "${NAMESPACE}"
   kubectl set image deployment/frontend-ui frontend="${FRONTEND_IMAGE}" \
     -n "${NAMESPACE}"
-  # Local images intentionally keep a stable :local tag. Restarting creates
-  # a new Pod after k3d imports the freshly built image without relying on a
-  # mutable-tag pull from a remote registry.
+  # A rollout restart also refreshes config-only changes. Image tags remain
+  # Git-revision based and therefore never rely on mutable-tag pull behavior.
   kubectl rollout restart deployment/backend-api -n "${NAMESPACE}"
   kubectl rollout restart deployment/frontend-ui -n "${NAMESPACE}"
   kubectl rollout status deployment/backend-api -n "${NAMESPACE}" --timeout=240s
@@ -536,7 +650,10 @@ apply_application() {
 
 show_status() {
   kubectl config use-context "k3d-${CLUSTER_NAME}" >/dev/null 2>&1 || true
-  "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/capacity.py" --details
+  "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/capacity.py" \
+    --cpu-per-job "${KUBERNETES_CAPACITY_CPU_PER_SLOT:-2}" \
+    --memory-per-job-gib "${KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT:-4}" \
+    --details
   k3d cluster list
   kubectl get pods -n keda 2>/dev/null || true
   kubectl get deployments,services,ingress -n "${NAMESPACE}" 2>/dev/null || true
@@ -608,6 +725,10 @@ case "${ACTION}" in
   status)
     show_status
     ;;
+  credentials)
+    kubectl config use-context "k3d-${CLUSTER_NAME}" >/dev/null 2>&1 || true
+    show_credentials
+    ;;
   logs)
     if [[ -z "$(kubectl get pods -n "${NAMESPACE}" \
       -l app.kubernetes.io/name=workflow-worker -o name 2>/dev/null)" ]]; then
@@ -640,7 +761,7 @@ case "${ACTION}" in
     k3d cluster delete "${CLUSTER_NAME}" || true
     ;;
   *)
-    echo "사용법: $0 {setup-tools|check|cluster|build|deploy|all|recreate|restart|status|logs|logs-api|logs-ingestion|down|destroy}" >&2
+    echo "사용법: $0 {setup-tools|check|cluster|build|deploy|all|recreate|restart|status|credentials|logs|logs-api|logs-ingestion|down|destroy}" >&2
     exit 2
     ;;
 esac

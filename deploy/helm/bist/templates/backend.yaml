@@ -6,6 +6,12 @@ metadata:
     {{- include "bist.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.backend.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  minReadySeconds: 5
   selector:
     matchLabels:
       {{- include "bist.selectorLabels" . | nindent 6 }}
@@ -17,10 +23,14 @@ spec:
         app.kubernetes.io/component: backend
     spec:
       serviceAccountName: {{ include "bist.fullname" . }}-backend
+      terminationGracePeriodSeconds: 30
       containers:
         - name: backend
           image: {{ include "bist.image" .Values.images.backend | quote }}
           imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.application.authSecret }}
           ports:
             - name: http
               containerPort: 8765
@@ -46,6 +56,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: APP_ENV
+              value: production
+            - name: EXPOSE_API_DOCS
+              value: "false"
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           readinessProbe:
@@ -54,12 +68,18 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /livez
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
           {{- if or .Values.storage.existingClaim .Values.storage.hostPath }}
           volumeMounts:
             - name: bist-data

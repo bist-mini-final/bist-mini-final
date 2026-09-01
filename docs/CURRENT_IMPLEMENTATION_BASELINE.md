@@ -11,7 +11,7 @@
 - Pipeline Playground, Data Sources, Financial BI, AI Financial Chatbot, Company Comparison, Jobs, Settings를 제공한다.
 - Financial BI와 Company Comparison은 독립 제품 도메인이다. 비교 도메인은 검증된 BI 스냅샷을 입력으로 읽지만 전용 API, DTO, 정책과 스냅샷 수명주기를 유지한다.
 - 공개 REST namespace는 `/api/v1`이며 `/api`는 비노출 호환 alias다.
-- OpenAPI 정식 계약은 64개 path와 74개 HTTP operation이다. `/api`와 `/api/v1/chatbot` 호환 별칭은 schema에 포함하지 않는다.
+- OpenAPI 정식 계약은 67개 path와 77개 HTTP operation이다. `/api`와 `/api/v1/chatbot` 호환 별칭은 schema에 포함하지 않는다.
 - frontend는 7개 정식 route를 제공하고 `/`는 새 채팅, `/bi`는 `/dashboard`로 연결한다.
 - 모바일 frontend shell은 고정 상단 앱바와 접근 가능한 sidebar drawer만 사용한다. 하단 navigation은 렌더링하지 않으며 shell 차원의 하단 고정 여백도 두지 않는다.
 
@@ -38,7 +38,7 @@
 
 ## 데이터베이스 기준선
 
-- Alembic head는 `20260901_0008`이다.
+- Alembic head는 `20260901_0009`다. 이 revision은 질문·답변 원문을 복제하지 않고 benchmark job의 안전한 lifecycle 상태만 append-only audit log에 남긴다.
 - 애플리케이션 테이블은 `alembic_version`을 제외하고 22개다.
 - BI와 Company Comparison snapshot은 불변 발행본과 current pointer를 분리한다.
 - `workbook_profiles`는 원본 workbook의 통화·배율·기간·시트 역할을 data sources 소유 공통 계약으로 저장하며 BI는 변환 adapter로 읽는다.
@@ -55,6 +55,7 @@
 - BI는 `domain/application/infrastructure/presentation/workers` vertical slice로 이전됐다. 저장소/provider 오류는 application 계약에서 번역하고 worker는 bootstrap을 생성하지 않고 주입된 runner/store만 실행한다. 이전 `features/bi`와 API 호환 경로는 제거됐다.
 - company comparison은 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. BI application facade는 comparison infrastructure adapter 뒤에 있고, 공통 snapshot protocol/PostgreSQL 구현은 각각 `shared/application`, `platform/postgres`가 소유한다. 이전 root/API 호환 경로는 제거됐다.
 - chatbot은 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. bootstrap이 `ChatApiServices`를 조립하고 presentation은 application facade만 받으며, 대화 정책·grounding·attachment·세션 저장의 이전 feature/API 경로는 제거됐다.
+- 공유·운영 HTTP 경계는 서명 HttpOnly 세션, PBKDF2 계정 검증, viewer/operator/admin 권한, principal tenant 검증을 적용합니다. 인증 환경의 Chat 소유권은 요청 body/query의 `client_id`가 아니라 principal 파생 ID를 사용합니다.
 - benchmark는 `domain/application/infrastructure/presentation/workers` vertical slice로 이전됐다. 요청·평가 모델, 실행·채점 유스케이스, benchmark-set filesystem source, PostgreSQL queue, HTTP DTO와 주입형 worker가 분리됐으며 이전 feature/API 경로는 제거됐다.
 - operations는 `domain/application/infrastructure/presentation` vertical slice로 이전됐다. workload·lease projection 모델, read-only query service, Kubernetes in-cluster/kubectl adapter와 `/jobs` presentation이 분리됐으며 이전 feature/provider/API 경로는 제거됐다.
 - PostgreSQL pool과 범용 repository primitive는 `backend/platform/postgres`, pgvector Binary COPY와 오류 계약은 `backend/platform/pgvector`, OpenAI transport·Responses·embedding·pricing은 `backend/platform/openai`, Redis broker와 telemetry 구현은 각각 `backend/platform/redis`, `backend/platform/telemetry`가 소유한다. state stream, embedding port, lease worker와 observability context는 `backend/shared/application` 계약으로 분리됐다. collection catalog/retrieval/publish SQL gateway는 `data_sources/infrastructure/pgvector`로 이동했고 module은 좁은 port만 받는다.
@@ -70,8 +71,8 @@
 
 2026-09-01 로컬 전체 검증 결과:
 
-- Backend: 314 passed, 2 skipped
-- Frontend: 173 passed
+- Backend: 379 passed, 2 skipped
+- Frontend: 181 passed
 - Ruff, Pyright, TypeScript typecheck, production build 통과
 - Backend C901 migration budget: 0개(새 복잡도 hotspot 즉시 실패)
 - Kubernetes renderer: 6개 `ScaledJob`

@@ -9,3 +9,5 @@ storage:
 
 ingress:
   host: ""
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"

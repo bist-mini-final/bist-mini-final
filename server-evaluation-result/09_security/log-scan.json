@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-09-01T11:37:54.802Z",
+  "policy": "Only aggregate marker counts are retained; sampled log bodies are not written.",
+  "scans": {
+    "backend": {
+      "sampledLines": 84,
+      "counts": {
+        "openAiProjectKey": 0,
+        "databaseUrlWithCredentials": 0,
+        "openAiAssignment": 0,
+        "pgvectorAssignment": 0,
+        "answerBody": 0,
+        "questionBody": 0,
+        "spreadsheetCellValue": 0
+      }
+    },
+    "workflowWorkers": {
+      "sampledLines": 0,
+      "counts": {
+        "openAiProjectKey": 0,
+        "databaseUrlWithCredentials": 0,
+        "openAiAssignment": 0,
+        "pgvectorAssignment": 0,
+        "answerBody": 0,
+        "questionBody": 0,
+        "spreadsheetCellValue": 0
+      }
+    },
+    "benchmarkWorkers": {
+      "sampledLines": 0,
+      "counts": {
+        "openAiProjectKey": 0,
+        "databaseUrlWithCredentials": 0,
+        "openAiAssignment": 0,
+        "pgvectorAssignment": 0,
+        "answerBody": 0,
+        "questionBody": 0,
+        "spreadsheetCellValue": 0
+      }
+    }
+  }
+}

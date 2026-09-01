@@ -1,0 +1,296 @@
+{
+  "generatedAt": "2026-09-01T12:34:29.256Z",
+  "baseUrl": "http://127.0.0.1:8765",
+  "workflowId": "rag_query",
+  "cacheMode": "off",
+  "client": {
+    "runtime": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "questions": [
+    "기업 A의 2025년 전체 매출은 얼마야?",
+    "Coldplay의 2025년 영업활동 현금흐름은 얼마야?",
+    "DH Innovation의 2025년 총유동자산은 얼마야?",
+    "IBM의 2025년 총자산과 총부채를 알려줘."
+  ],
+  "stages": [
+    {
+      "concurrency": 1,
+      "startedAt": "2026-09-01T12:34:29.256Z",
+      "completedAt": "2026-09-01T12:34:49.120Z",
+      "wallSeconds": 19.864,
+      "completed": 1,
+      "failed": 0,
+      "throughputPerMinute": 3.021,
+      "p50Seconds": 19.724,
+      "p95Seconds": 19.724,
+      "p99Seconds": 19.724,
+      "tokens": 48975,
+      "costUsd": 0.009755,
+      "runs": [
+        {
+          "id": "run-87d302c53bf748b0936f5b64fad9a4fe",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 139.53209999999999,
+          "status": "completed",
+          "wallSeconds": 19.724,
+          "nodeLatencySeconds": 14.088,
+          "totalTokens": 48975,
+          "costUsd": 0.009755,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "concurrency": 3,
+      "startedAt": "2026-09-01T12:34:49.121Z",
+      "completedAt": "2026-09-01T12:35:06.860Z",
+      "wallSeconds": 17.739,
+      "completed": 3,
+      "failed": 0,
+      "throughputPerMinute": 10.147,
+      "p50Seconds": 15.212,
+      "p95Seconds": 17.571,
+      "p99Seconds": 17.571,
+      "tokens": 122779,
+      "costUsd": 0.018908,
+      "runs": [
+        {
+          "id": "run-7ebaeba8a1e14fac9884a33e37892174",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 140.37840000000142,
+          "status": "completed",
+          "wallSeconds": 12.056,
+          "nodeLatencySeconds": 6.424,
+          "totalTokens": 50172,
+          "costUsd": 0.009692,
+          "errors": []
+        },
+        {
+          "id": "run-ec39f0b63ac34c8da467bdf871847839",
+          "question": "Coldplay의 2025년 영업활동 현금흐름은 얼마야?",
+          "submittedMs": 133.54279999999926,
+          "status": "completed",
+          "wallSeconds": 17.571,
+          "nodeLatencySeconds": 12.199,
+          "totalTokens": 32262,
+          "costUsd": 0.001178,
+          "errors": []
+        },
+        {
+          "id": "run-b2e86f6c0978461b90a8e2c4d950141d",
+          "question": "DH Innovation의 2025년 총유동자산은 얼마야?",
+          "submittedMs": 166.89450000000215,
+          "status": "completed",
+          "wallSeconds": 15.212,
+          "nodeLatencySeconds": 5.656,
+          "totalTokens": 40345,
+          "costUsd": 0.008038,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "concurrency": 5,
+      "startedAt": "2026-09-01T12:35:06.860Z",
+      "completedAt": "2026-09-01T12:35:36.070Z",
+      "wallSeconds": 29.21,
+      "completed": 5,
+      "failed": 0,
+      "throughputPerMinute": 10.27,
+      "p50Seconds": 20.372,
+      "p95Seconds": 28.994,
+      "p99Seconds": 28.994,
+      "tokens": 215879,
+      "costUsd": 0.012937,
+      "runs": [
+        {
+          "id": "run-a8c1ca7f3ba14619a4baf75fedabe642",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 163.04930000000604,
+          "status": "completed",
+          "wallSeconds": 20.372,
+          "nodeLatencySeconds": 13.764,
+          "totalTokens": 50166,
+          "costUsd": 0.001206,
+          "errors": []
+        },
+        {
+          "id": "run-909054bb5b1f4429a320c272c7b46045",
+          "question": "Coldplay의 2025년 영업활동 현금흐름은 얼마야?",
+          "submittedMs": 167.35639999999694,
+          "status": "completed",
+          "wallSeconds": 12.493,
+          "nodeLatencySeconds": 6.309,
+          "totalTokens": 32253,
+          "costUsd": 0.000852,
+          "errors": []
+        },
+        {
+          "id": "run-3225e8c0a42e4635b20223b411376cb8",
+          "question": "DH Innovation의 2025년 총유동자산은 얼마야?",
+          "submittedMs": 166.2966000000015,
+          "status": "completed",
+          "wallSeconds": 13.263,
+          "nodeLatencySeconds": 5.574,
+          "totalTokens": 40345,
+          "costUsd": 0.001012,
+          "errors": []
+        },
+        {
+          "id": "run-8e073ac2d55640929cd24179c08d8bf9",
+          "question": "IBM의 2025년 총자산과 총부채를 알려줘.",
+          "submittedMs": 215.07739999999467,
+          "status": "completed",
+          "wallSeconds": 28.994,
+          "nodeLatencySeconds": 7.312,
+          "totalTokens": 42952,
+          "costUsd": 0.008665,
+          "errors": []
+        },
+        {
+          "id": "run-5e1d6c05b35b474ab40512f2968c10eb",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 194.90059999999357,
+          "status": "completed",
+          "wallSeconds": 28.034,
+          "nodeLatencySeconds": 6.435,
+          "totalTokens": 50163,
+          "costUsd": 0.001202,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "concurrency": 10,
+      "startedAt": "2026-09-01T12:35:36.070Z",
+      "completedAt": "2026-09-01T12:36:39.006Z",
+      "wallSeconds": 62.938,
+      "completed": 10,
+      "failed": 0,
+      "throughputPerMinute": 9.533,
+      "p50Seconds": 30.927,
+      "p95Seconds": 62.124,
+      "p99Seconds": 62.124,
+      "tokens": 414569,
+      "costUsd": 0.010681,
+      "runs": [
+        {
+          "id": "run-9fcf78344b7f4c3a975a429a236304f8",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 727.3473000000085,
+          "status": "completed",
+          "wallSeconds": 15.494,
+          "nodeLatencySeconds": 6.829,
+          "totalTokens": 48978,
+          "costUsd": 0.001177,
+          "errors": []
+        },
+        {
+          "id": "run-ed15b0c9bb26417a9711bbdac7a5c564",
+          "question": "Coldplay의 2025년 영업활동 현금흐름은 얼마야?",
+          "submittedMs": 798.6444000000047,
+          "status": "completed",
+          "wallSeconds": 53.649,
+          "nodeLatencySeconds": 15.87,
+          "totalTokens": 33684,
+          "costUsd": 0.000917,
+          "errors": []
+        },
+        {
+          "id": "run-2c81938567a94e46b4619d78e599a925",
+          "question": "DH Innovation의 2025년 총유동자산은 얼마야?",
+          "submittedMs": 724.4379999999946,
+          "status": "completed",
+          "wallSeconds": 24.121,
+          "nodeLatencySeconds": 14.932,
+          "totalTokens": 40345,
+          "costUsd": 0.001012,
+          "errors": []
+        },
+        {
+          "id": "run-969618a601b44e61b976e808eb93e6c0",
+          "question": "IBM의 2025년 총자산과 총부채를 알려줘.",
+          "submittedMs": 727.7571000000025,
+          "status": "completed",
+          "wallSeconds": 30.927,
+          "nodeLatencySeconds": 6.88,
+          "totalTokens": 42988,
+          "costUsd": 0.001237,
+          "errors": []
+        },
+        {
+          "id": "run-87ade777bd6247a59b8aca7f7199239b",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 799.9863000000041,
+          "status": "completed",
+          "wallSeconds": 38.476,
+          "nodeLatencySeconds": 6.404,
+          "totalTokens": 48982,
+          "costUsd": 0.001182,
+          "errors": []
+        },
+        {
+          "id": "run-894d945de0d14758b419783287104d92",
+          "question": "Coldplay의 2025년 영업활동 현금흐름은 얼마야?",
+          "submittedMs": 801.9947000000102,
+          "status": "completed",
+          "wallSeconds": 46.772,
+          "nodeLatencySeconds": 6.131,
+          "totalTokens": 33660,
+          "costUsd": 0.000888,
+          "errors": []
+        },
+        {
+          "id": "run-82ed0efb1db84ba3acce0439ab5f1612",
+          "question": "DH Innovation의 2025년 총유동자산은 얼마야?",
+          "submittedMs": 796.1987000000081,
+          "status": "completed",
+          "wallSeconds": 29.899,
+          "nodeLatencySeconds": 6.081,
+          "totalTokens": 40350,
+          "costUsd": 0.001018,
+          "errors": []
+        },
+        {
+          "id": "run-1016fedd550e44e386bff04511cab6d4",
+          "question": "IBM의 2025년 총자산과 총부채를 알려줘.",
+          "submittedMs": 716.6826000000001,
+          "status": "completed",
+          "wallSeconds": 14.195,
+          "nodeLatencySeconds": 8.571,
+          "totalTokens": 42935,
+          "costUsd": 0.001174,
+          "errors": []
+        },
+        {
+          "id": "run-d5756c45bdc04c19abe483c5f7ec2c98",
+          "question": "기업 A의 2025년 전체 매출은 얼마야?",
+          "submittedMs": 811.8293000000122,
+          "status": "completed",
+          "wallSeconds": 62.124,
+          "nodeLatencySeconds": 6.596,
+          "totalTokens": 48982,
+          "costUsd": 0.001182,
+          "errors": []
+        },
+        {
+          "id": "run-5b1524ae8f6047b1aa8d26a049109196",
+          "question": "Coldplay의 2025년 영업활동 현금흐름은 얼마야?",
+          "submittedMs": 802.5803000000014,
+          "status": "completed",
+          "wallSeconds": 53.297,
+          "nodeLatencySeconds": 5.772,
+          "totalTokens": 33665,
+          "costUsd": 0.000894,
+          "errors": []
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "The client and k3d cluster share one Windows host, so WAN latency is excluded.",
+    "Each concurrency level uses one finite burst rather than a sustained soak to bound paid LLM usage."
+  ]
+}

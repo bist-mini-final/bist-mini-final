@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded-read-api-smoke",
+  "baseUrl": "http://127.0.0.1:8080",
+  "client": {
+    "runtime": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "paths": [
+    "/healthz",
+    "/api/v1/workflows",
+    "/api/v1/data-sources/indexes"
+  ],
+  "stages": [
+    {
+      "concurrency": 1,
+      "configuredDurationSeconds": 15,
+      "actualDurationSeconds": 15.007,
+      "startedAt": "2026-09-01T08:34:11.656Z",
+      "completedAt": "2026-09-01T08:34:26.664Z",
+      "requests": 587,
+      "errors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 39.116,
+      "p50Ms": 18.623,
+      "p95Ms": 53.813,
+      "p99Ms": 69.357,
+      "byPath": {
+        "/healthz": {
+          "requests": 196,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 11.195,
+          "p95Ms": 22.465,
+          "p99Ms": 31.931
+        },
+        "/api/v1/workflows": {
+          "requests": 196,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 15.725,
+          "p95Ms": 26.662,
+          "p99Ms": 33.977
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 195,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 47.203,
+          "p95Ms": 62.365,
+          "p99Ms": 76.053
+        }
+      },
+      "errorSamples": []
+    },
+    {
+      "concurrency": 10,
+      "configuredDurationSeconds": 15,
+      "actualDurationSeconds": 15.186,
+      "startedAt": "2026-09-01T08:34:26.664Z",
+      "completedAt": "2026-09-01T08:34:41.852Z",
+      "requests": 1461,
+      "errors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 96.206,
+      "p50Ms": 35.991,
+      "p95Ms": 338.002,
+      "p99Ms": 451.67,
+      "byPath": {
+        "/healthz": {
+          "requests": 487,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 18.865,
+          "p95Ms": 50.242,
+          "p99Ms": 76.511
+        },
+        "/api/v1/workflows": {
+          "requests": 487,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 29.84,
+          "p95Ms": 76.5,
+          "p99Ms": 157.088
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 487,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 242.049,
+          "p95Ms": 421.233,
+          "p99Ms": 580.132
+        }
+      },
+      "errorSamples": []
+    },
+    {
+      "concurrency": 25,
+      "configuredDurationSeconds": 15,
+      "actualDurationSeconds": 15.36,
+      "startedAt": "2026-09-01T08:34:41.852Z",
+      "completedAt": "2026-09-01T08:34:57.215Z",
+      "requests": 1301,
+      "errors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 84.7,
+      "p50Ms": 51.569,
+      "p95Ms": 1018.783,
+      "p99Ms": 1220.595,
+      "byPath": {
+        "/healthz": {
+          "requests": 434,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 23.904,
+          "p95Ms": 78.834,
+          "p99Ms": 127.224
+        },
+        "/api/v1/workflows": {
+          "requests": 434,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 38.107,
+          "p95Ms": 123.938,
+          "p99Ms": 195.12
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 433,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 777.559,
+          "p95Ms": 1175.653,
+          "p99Ms": 1294.131
+        }
+      },
+      "errorSamples": []
+    },
+    {
+      "concurrency": 50,
+      "configuredDurationSeconds": 15,
+      "actualDurationSeconds": 15.725,
+      "startedAt": "2026-09-01T08:34:57.215Z",
+      "completedAt": "2026-09-01T08:35:12.943Z",
+      "requests": 1328,
+      "errors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 84.453,
+      "p50Ms": 196.52,
+      "p95Ms": 1784.529,
+      "p99Ms": 2091.408,
+      "byPath": {
+        "/healthz": {
+          "requests": 443,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 125.491,
+          "p95Ms": 375.982,
+          "p99Ms": 493.909
+        },
+        "/api/v1/workflows": {
+          "requests": 443,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 147.455,
+          "p95Ms": 413.682,
+          "p99Ms": 729.76
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 442,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 1395.312,
+          "p95Ms": 2038.986,
+          "p99Ms": 2180.426
+        }
+      },
+      "errorSamples": []
+    }
+  ],
+  "limitations": [
+    "Each stage is shorter than the requested five-minute production protocol.",
+    "The client runs on the same host as the k3d cluster, so WAN latency is excluded.",
+    "Only idempotent health and catalog reads are exercised; no LLM or ingestion writes are issued."
+  ]
+}

@@ -1,0 +1,1535 @@
+{
+  "workflow_ids": [
+    "bi_metric_extraction",
+    "rag_query"
+  ],
+  "cases": [
+    {
+      "id": "F1-Q002",
+      "question": "IBM의 기준일 종가와 발행주식수는?",
+      "expected_numbers": [
+        289.89,
+        934735206
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q003",
+      "question": "2025년 LTM 기준 IBM의 총매출액, 매출총이익, 영업이익은?",
+      "expected_numbers": [
+        67535,
+        39297,
+        11757
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q009",
+      "question": "IBM의 최근 회계연도(FY0) 매출액은 얼마인가?",
+      "expected_numbers": [
+        67535
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q010",
+      "question": "IBM의 LTM 기준 EBITDA 마진은 몇 %인가?",
+      "expected_numbers": [
+        24.84
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q019",
+      "question": "IBM의 LTM 시가총액은 얼마인가?",
+      "expected_numbers": [
+        270970.4
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q020",
+      "question": "IBM의 LTM TEV는 얼마인가?",
+      "expected_numbers": [
+        321253.4
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q021",
+      "question": "IBM의 LTM 매출은 얼마인가?",
+      "expected_numbers": [
+        67535
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q022",
+      "question": "IBM의 LTM EBITDA는 얼마인가?",
+      "expected_numbers": [
+        16778
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q023",
+      "question": "IBM의 LTM 순이익은 얼마인가?",
+      "expected_numbers": [
+        10593
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q024",
+      "question": "IBM의 LTM 총자산은 얼마인가?",
+      "expected_numbers": [
+        151880
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q025",
+      "question": "IBM의 LTM 장기부채는 얼마인가?",
+      "expected_numbers": [
+        54836
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q026",
+      "question": "IBM의 LTM 영업현금흐름은 얼마인가?",
+      "expected_numbers": [
+        13193
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q027",
+      "question": "IBM의 LTM CAPEX는 얼마인가?",
+      "expected_numbers": [
+        -1617
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q037",
+      "question": "IBM의 FY0 매출과 LTM 매출을 알려줘.",
+      "expected_numbers": [
+        67535
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q038",
+      "question": "IBM의 최근 3년 매출 추세를 알려줘.",
+      "expected_numbers": [
+        61860,
+        62753,
+        67535
+      ],
+      "expected_terms": [
+        "증가"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q039",
+      "question": "IBM의 최근 3년 EBITDA 추세를 알려줘.",
+      "expected_numbers": [
+        12739,
+        12886,
+        16778
+      ],
+      "expected_terms": [
+        "증가"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q040",
+      "question": "IBM의 최근 3년 순이익 추세를 알려줘.",
+      "expected_numbers": [
+        7502,
+        6023,
+        10593
+      ],
+      "expected_terms": [
+        "감소"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q041",
+      "question": "IBM의 최근 3년 총자산 변화를 알려줘.",
+      "expected_numbers": [
+        135241,
+        137175,
+        151880
+      ],
+      "expected_terms": [
+        "증가"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q042",
+      "question": "IBM의 최근 3년 장기부채가 증가했는지 알려줘.",
+      "expected_numbers": [
+        49742,
+        49081,
+        54836
+      ],
+      "expected_terms": [
+        "증가",
+        "감소"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q043",
+      "question": "IBM의 최근 3년 영업현금흐름 추세를 알려줘.",
+      "expected_numbers": [
+        13931,
+        13445,
+        13193
+      ],
+      "expected_terms": [
+        "감소"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q044",
+      "question": "IBM의 최근 매출은 얼마야?",
+      "expected_numbers": [
+        67535
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q046",
+      "question": "IBM의 자본구조와 밸류에이션 멀티플을 함께 정리해줘.",
+      "expected_numbers": [
+        14417,
+        64607,
+        32648,
+        20.09,
+        35.43
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q053",
+      "question": "IBM의 LTM 매출, EBITDA, 순이익을 알려줘.",
+      "expected_numbers": [
+        67535,
+        16778,
+        10593
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q054",
+      "question": "IBM의 LTM 총자산과 총부채를 알려줘.",
+      "expected_numbers": [
+        151880,
+        119139
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q055",
+      "question": "IBM의 현금성 자산과 장기부채를 알려줘.",
+      "expected_numbers": [
+        14417,
+        54836
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q056",
+      "question": "IBM의 영업현금흐름과 CAPEX를 알려줘.",
+      "expected_numbers": [
+        13193,
+        -1617
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q057",
+      "question": "IBM의 영업·투자·재무 현금흐름을 알려줘.",
+      "expected_numbers": [
+        13193,
+        -10302,
+        -3829
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F1-Q058",
+      "question": "IBM의 매출과 영업현금흐름을 알려줘.",
+      "expected_numbers": [
+        67535,
+        13193
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-01",
+      "question": "2025년 IBM 현금·단기투자자산 수치는 얼마야?",
+      "expected_numbers": [
+        14417
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-02",
+      "question": "2024년 기준 IBM의 매입채무 변동을 알려줄래?",
+      "expected_numbers": [
+        -13
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-03",
+      "question": "IBM은 2025년에 매출채권을 얼마로 기록했어?",
+      "expected_numbers": [
+        8112
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-04",
+      "question": "IBM의 2025년 현금 순변동은 얼마인가?",
+      "expected_numbers": [
+        -520
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-05",
+      "question": "IBM의 2024년 감가상각누계액은 얼마인가?",
+      "expected_numbers": [
+        -11959
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-06",
+      "question": "IBM은 2025년에 기본주당순이익을 얼마로 기록했어?",
+      "expected_numbers": [
+        11.36
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-07",
+      "question": "IBM은 2025년에 장기이연법인세자산을 얼마로 기록했어?",
+      "expected_numbers": [
+        8610
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-08",
+      "question": "IBM은 2025년에 현금 인수지출을 얼마로 기록했어?",
+      "expected_numbers": [
+        -8294
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-09",
+      "question": "IBM의 2025년 보통주자본총계는 얼마인가?",
+      "expected_numbers": [
+        32648
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-10",
+      "question": "2025년 기준 IBM의 가중평균 기본주식수를 알려줄래?",
+      "expected_numbers": [
+        932300000
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-11",
+      "question": "2025년 기준 IBM의 미지급비용을 알려줄래?",
+      "expected_numbers": [
+        8230
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-12",
+      "question": "IBM은 2023년에 유효세율을 얼마로 기록했어?",
+      "expected_numbers": [
+        13.53
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-13",
+      "question": "IBM의 2025년 영업권은 얼마인가?",
+      "expected_numbers": [
+        67717
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-14",
+      "question": "2024년 IBM 현금 이자지급액 수치는 얼마야?",
+      "expected_numbers": [
+        1978
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-15",
+      "question": "2024년 IBM 환율 관련 손익 수치는 얼마야?",
+      "expected_numbers": [
+        20
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-16",
+      "question": "IBM의 2024년 광고비는 얼마인가?",
+      "expected_numbers": [
+        1173
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-17",
+      "question": "IBM의 2025년 보통주자본은 얼마인가?",
+      "expected_numbers": [
+        63318
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-18",
+      "question": "2024년 기준 IBM의 유동성 장기부채를 알려줄래?",
+      "expected_numbers": [
+        4861
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-19",
+      "question": "2025년 기준 IBM의 특이항목 포함 세전이익을 알려줄래?",
+      "expected_numbers": [
+        10329
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-20",
+      "question": "2024년 IBM 정규직 직원 수 수치는 얼마야?",
+      "expected_numbers": [
+        270300
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-21",
+      "question": "2025년 IBM 금융부문 매출 수치는 얼마야?",
+      "expected_numbers": [
+        737
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-22",
+      "question": "IBM의 2025년 계속영업이익은 얼마인가?",
+      "expected_numbers": [
+        10571
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-23",
+      "question": "2025년 기준 IBM의 자본적지출을 알려줄래?",
+      "expected_numbers": [
+        -1617
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-24",
+      "question": "2025년 IBM 현금 및 현금성자산 수치는 얼마야?",
+      "expected_numbers": [
+        13587
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O1-25",
+      "question": "IBM은 기준일에 시가총액을 얼마로 기록했어?",
+      "expected_numbers": [
+        270970.4
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-26",
+      "question": "2024년과 2025년 IBM 기타비유동자산을 비교해줘?",
+      "expected_numbers": [
+        7588,
+        7545
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-27",
+      "question": "IBM의 감가상각비는 2024년에서 2025년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        3998,
+        5021
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-28",
+      "question": "IBM의 자산 처분손익은 2023년에서 2024년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        45,
+        605
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-29",
+      "question": "IBM의 총자산은 2024년에서 2025년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        137175,
+        151880
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-30",
+      "question": "2024년과 2025년 IBM 재무활동현금흐름을 비교해줘?",
+      "expected_numbers": [
+        -7079,
+        -3829
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-31",
+      "question": "2024년과 2025년 IBM 총주식보상비용을 비교해줘?",
+      "expected_numbers": [
+        1311,
+        1715
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-32",
+      "question": "IBM의 주당배당금은 2024년에서 2025년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        6.67,
+        6.71
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-33",
+      "question": "IBM의 장기투자자산은 2024년에서 2025년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        1691,
+        2112
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-34",
+      "question": "2023년과 2024년 IBM 보통주 발행액을 비교해줘?",
+      "expected_numbers": [
+        414,
+        745
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-35",
+      "question": "2024년과 2025년 IBM 매출원가를 비교해줘?",
+      "expected_numbers": [
+        26832,
+        28238
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-36",
+      "question": "IBM의 기타비유동부채는 2024년에서 2025년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        10232,
+        9809
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-37",
+      "question": "2024년과 2025년 IBM 중단영업이익을 비교해줘?",
+      "expected_numbers": [
+        8,
+        22
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-38",
+      "question": "IBM의 가중평균 희석주식수는 2024년에서 2025년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        937161224,
+        948700000
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-39",
+      "question": "IBM의 현금 법인세지급액은 2023년에서 2024년 사이에 어떻게 변했어?",
+      "expected_numbers": [
+        1564,
+        1723
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O2-40",
+      "question": "2024년과 2025년 IBM 기타유동자산을 비교해줘?",
+      "expected_numbers": [
+        1562,
+        1084
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-41",
+      "question": "IBM 총부채는 매출채권 변동과 비교하면 얼마야?",
+      "expected_numbers": [
+        119139,
+        -374
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-42",
+      "question": "IBM 총유동자산은 사업 매각대금과 비교하면 얼마야?",
+      "expected_numbers": [
+        36944,
+        -1
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-43",
+      "question": "IBM의 특이항목 제외 세전이익과 총자본화를 같이 알려줘?",
+      "expected_numbers": [
+        10329,
+        97348
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-44",
+      "question": "IBM의 법적 합의 비용과 순유형자산을 같이 알려줘?",
+      "expected_numbers": [
+        -56,
+        9028
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-45",
+      "question": "IBM 매입채무는 유형자산 취득원가와 비교하면 얼마야?",
+      "expected_numbers": [
+        4756,
+        20888
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-46",
+      "question": "IBM 기타무형자산은 주식보상비용과 비교하면 얼마야?",
+      "expected_numbers": [
+        11391,
+        1715
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-47",
+      "question": "IBM의 법인세비용과 이자·투자수익을 같이 알려줘?",
+      "expected_numbers": [
+        -242,
+        747
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-48",
+      "question": "IBM의 기타 매출과 총무형자산을 같이 알려줘?",
+      "expected_numbers": [
+        63,
+        79108
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-49",
+      "question": "IBM 총직원 수는 순운전자본과 비교하면 얼마야?",
+      "expected_numbers": [
+        270300,
+        -8907
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-50",
+      "question": "IBM의 투자자산 처분손익과 이자비용을 같이 알려줘?",
+      "expected_numbers": [
+        20,
+        -1935
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-51",
+      "question": "IBM 장기차입금은 순차입부채와 비교하면 얼마야?",
+      "expected_numbers": [
+        54836,
+        50190
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-52",
+      "question": "IBM 재고자산은 자사주 매입액과 비교하면 얼마야?",
+      "expected_numbers": [
+        1220,
+        -651
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-53",
+      "question": "IBM의 EBITA와 연금·퇴직급여부채를 같이 알려줘?",
+      "expected_numbers": [
+        11757,
+        9018
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O3-54",
+      "question": "IBM의 배당성향과 희석주당순이익을 같이 알려줘?",
+      "expected_numbers": [
+        59.05,
+        11.16
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O5-77",
+      "question": "IBM의 연금·퇴직급여부채와 비유동 선수수익 중 어느 쪽이 더 커?",
+      "expected_numbers": [
+        9018,
+        4271
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O5-78",
+      "question": "IBM의 기타 매출과 유형자산 취득원가 중 어느 쪽이 더 커?",
+      "expected_numbers": [
+        63,
+        20888
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O5-79",
+      "question": "IBM의 영업활동현금흐름과 현금·단기투자자산 중 어느 쪽이 더 커?",
+      "expected_numbers": [
+        13193,
+        14417
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Cash_Flow",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O5-80",
+      "question": "IBM의 총유동자산과 미지급비용 중 어느 쪽이 더 커?",
+      "expected_numbers": [
+        36944,
+        8230
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O5-81",
+      "question": "IBM의 특이항목 제외 세전이익과 기타비유동부채 중 어느 쪽이 더 커?",
+      "expected_numbers": [
+        10329,
+        9809
+      ],
+      "expected_terms": [],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Income_Statement",
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O6-82",
+      "question": "IBM의 2026년 추정치 EBIT 마진 전망치는 얼마야?",
+      "expected_numbers": [
+        20.47
+      ],
+      "expected_terms": [
+        "추정"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O6-83",
+      "question": "2026년 추정치 IBM 특이항목 제외 희석주당순이익 추정값을 알려줄래?",
+      "expected_numbers": [
+        12.41
+      ],
+      "expected_terms": [
+        "추정"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O6-84",
+      "question": "2026년 추정치 IBM 총매출 추정값을 알려줄래?",
+      "expected_numbers": [
+        71183.3
+      ],
+      "expected_terms": [
+        "추정"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O6-85",
+      "question": "IBM의 2026년 추정치 매출총이익률 전망치는 얼마야?",
+      "expected_numbers": [
+        60.13
+      ],
+      "expected_terms": [
+        "추정"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O6-86",
+      "question": "2026년 추정치 IBM EBITDA 마진 추정값을 알려줄래?",
+      "expected_numbers": [
+        28.13
+      ],
+      "expected_terms": [
+        "추정"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2A-O6-87",
+      "question": "IBM의 2026년 추정치 순이익률 전망치는 얼마야?",
+      "expected_numbers": [
+        16.69
+      ],
+      "expected_terms": [
+        "추정"
+      ],
+      "expected_target": "IBM",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U2-01",
+      "question": "기업 A는 최근 3년 동안 매출이 꾸준히 성장한 회사야?",
+      "expected_numbers": [
+        14600,
+        16200,
+        18000
+      ],
+      "expected_terms": [
+        "증가"
+      ],
+      "expected_target": "기업 A",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U2-02",
+      "question": "기업 A의 현금창출력도 최근 계속 좋아지고 있어?",
+      "expected_numbers": [
+        2088,
+        2430,
+        2844
+      ],
+      "expected_terms": [
+        "개선"
+      ],
+      "expected_target": "기업 A",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U2-03",
+      "question": "Coldplay는 재고 부담이 최근 줄어드는 추세야?",
+      "expected_numbers": [
+        448,
+        445,
+        443
+      ],
+      "expected_terms": [
+        "감소"
+      ],
+      "expected_target": "Coldplay",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U2-04",
+      "question": "Coldplay가 영업으로 벌어들이는 현금은 안정적으로 늘고 있어?",
+      "expected_numbers": [
+        2042,
+        2120,
+        2213
+      ],
+      "expected_terms": [
+        "증가"
+      ],
+      "expected_target": "Coldplay",
+      "expected_sheets": [
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U2-05",
+      "question": "DH Innovation은 차입금을 조금 줄였는데도 실제 빚 부담이 커지고 있어?",
+      "expected_numbers": [
+        4409,
+        4347,
+        4340,
+        3820,
+        3878,
+        3968
+      ],
+      "expected_terms": [
+        "증가",
+        "감소"
+      ],
+      "expected_target": "DH Innovation",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U2-06",
+      "question": "DH Innovation의 매출 하락은 최근에도 계속 이어지고 있어?",
+      "expected_numbers": [
+        15100,
+        13800,
+        12400
+      ],
+      "expected_terms": [
+        "감소"
+      ],
+      "expected_target": "DH Innovation",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U3-02",
+      "question": "Coldplay는 자산에서 부채를 전부 빼면 얼마나 남아?",
+      "expected_numbers": [
+        13505,
+        6675,
+        6830
+      ],
+      "expected_terms": [],
+      "expected_target": "Coldplay",
+      "expected_sheets": [
+        "Balance_Sheet"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U3-04",
+      "question": "DH Innovation은 매출총이익을 내고도 영업에서는 적자인 거야?",
+      "expected_numbers": [
+        2976,
+        -372
+      ],
+      "expected_terms": [],
+      "expected_target": "DH Innovation",
+      "expected_sheets": [
+        "Income_Statement"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U5-02",
+      "question": "Coldplay의 영업현금 증가가 재고 감소 덕분이라고 단정해도 돼?",
+      "expected_numbers": [
+        448,
+        445,
+        443,
+        2042,
+        2120,
+        2213
+      ],
+      "expected_terms": [
+        "증가",
+        "감소",
+        "단정할 수는 없음"
+      ],
+      "expected_target": "Coldplay",
+      "expected_sheets": [
+        "Balance_Sheet",
+        "Cash_Flow"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U6-01",
+      "question": "기업 A의 성장세가 내년에도 이어질까?",
+      "expected_numbers": [
+        18000,
+        20160,
+        12,
+        11.11
+      ],
+      "expected_terms": [
+        "증가",
+        "예상"
+      ],
+      "expected_target": "기업 A",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U6-05",
+      "question": "DH Innovation은 내년에 영업적자에서 벗어날 수 있을까?",
+      "expected_numbers": [
+        -3,
+        -4,
+        -2
+      ],
+      "expected_terms": [
+        "적자",
+        "개선",
+        "악화",
+        "예상"
+      ],
+      "expected_target": "DH Innovation",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    },
+    {
+      "id": "F2B-U6-06",
+      "question": "DH Innovation은 전망 기간 안에 순이익 흑자로 돌아설 것으로 예상돼?",
+      "expected_numbers": [
+        -5.06,
+        -4.5,
+        -3.5,
+        -2.5
+      ],
+      "expected_terms": [
+        "적자",
+        "개선",
+        "예상"
+      ],
+      "expected_target": "DH Innovation",
+      "expected_sheets": [
+        "Key_Stats"
+      ],
+      "expected_abstain": false
+    }
+  ],
+  "use_cache": false,
+  "cache_mode": "off",
+  "execution_scope": "full"
+}

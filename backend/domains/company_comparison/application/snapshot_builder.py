@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -309,7 +310,22 @@ class CompanyComparisonSnapshotBuilder:
 
     @staticmethod
     def source_fingerprint(snapshots: tuple[BiDashboardSnapshot, ...]) -> str:
-        source = "|".join(sorted(str(snapshot.snapshot.snapshot_id) for snapshot in snapshots))
+        ordered = sorted(
+            snapshots,
+            key=lambda item: (
+                item.company.display_name.casefold(),
+                str(item.company.company_id),
+            ),
+        )[:MAX_COMPANIES]
+        source = "\x1e".join(
+            json.dumps(
+                snapshot.model_dump(mode="json"),
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            for snapshot in ordered
+        )
         return sha256(source.encode("utf-8")).hexdigest()
 
     def build(

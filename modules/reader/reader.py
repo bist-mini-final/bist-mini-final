@@ -576,6 +576,12 @@ READER_SYSTEM_PROMPT = """당신은 주어진 재무제표 및 비즈니스 데�
 
 수치나 특정 항목을 언급할 때는 반드시 아래 `[검증 가능한 근거 셀]`에서 실제 사용한 evidence ID를 구조화 출력의 `evidence_ids`에 선택하십시오. 선택할 근거가 없으면 수치·추세·비교 결과를 답하지 마십시오.
 
+[완전성 규칙]
+- 원 질문의 기업·지표·기간·비교 항목을 먼저 빠짐없이 분해하고, 확인 가능한 각 요청 항목을 모두 답하십시오. 일부 항목만 답하고 완료한 것처럼 쓰지 마십시오.
+- 비교·추세·비율·증감·차이·회계 항등식은 결과값만 쓰지 말고 근거가 된 각 원본값과 계산 결과를 함께 제시하십시오.
+- 계산에 사용한 모든 피연산 셀을 `evidence_ids`에 포함하십시오. 필요한 원본 셀이 현재 후보에 없으면 `lookup_cell_metadata`로 조회하고, 그래도 없을 때만 해당 항목의 근거 부족을 명시하십시오.
+- 실제 기간과 추정 기간을 섞지 말고 `실적`과 `추정`을 답변에서 명시적으로 구분하십시오.
+
 [서식 규칙]
 - 연도·분기별 수치가 3개 이상이면 반드시 GitHub Flavored Markdown 표를 사용하십시오. 첫 행은 `| 연도 | 항목 |`, 둘째 행은 `|---|---|` 형식이어야 합니다.
 - 탭으로 열을 맞추거나 ASCII 막대(████), 코드 블록으로 표·차트를 만들지 마십시오.
@@ -636,6 +642,13 @@ class ReaderConfigDTO(ModuleConfigDTO):
         description="LangChain BaseTool 도구 호출(DB 셀 조회 및 정밀 수학 계산) 활성화 여부",
     )
     max_tool_iterations: int = Field(default=5, ge=1, le=10, description="최대 도구 호출 반복 횟수")
+    retry_invalid_grounding: bool = Field(
+        default=True,
+        description=(
+            "본문을 생성했지만 유효한 evidence_id를 하나도 선택하지 않은 경우 "
+            "동일한 전체 질문·전체 근거 후보로 구조화 출력을 한 번 교정"
+        ),
+    )
 
 
 class ReaderEvidenceSelectionDTO(ModuleDTO):
@@ -689,6 +702,7 @@ class ReaderModule(BaseLLMModule):
             "user_prompt_template",
             "enable_tools",
             "max_tool_iterations",
+            "retry_invalid_grounding",
         ],
         version="11",
     )
@@ -828,6 +842,61 @@ class ReaderModule(BaseLLMModule):
             return _INSUFFICIENT_EVIDENCE_ANSWER, []
         return body, [allowed[evidence_id] for evidence_id in selected_ids]
 
+    @staticmethod
+    def _needs_grounding_retry(
+        selection: ReaderEvidenceSelectionDTO,
+        evidence_cells: list[CellEvidenceDTO],
+    ) -> bool:
+        """Retry only a substantive answer whose evidence IDs fail the allowlist.
+
+        The retry keeps the original question and complete candidate list.  It
+        never compresses context or guesses evidence server-side.
+        """
+
+        body = _answer_body_without_citations(selection.answer_markdown)
+        if not body or body == _INSUFFICIENT_EVIDENCE_ANSWER:
+            return False
+        allowed = {cell.evidence_id for cell in evidence_cells}
+        return not any(
+            (canonical := _canonical_evidence_id(raw_id)) is not None
+            and canonical in allowed
+            for raw_id in selection.evidence_ids
+        )
+
+    @staticmethod
+    def _grounding_retry_messages(
+        messages: List[Dict[str, Any]],
+        selection: ReaderEvidenceSelectionDTO,
+    ) -> List[Dict[str, Any]]:
+        return [
+            *messages,
+            {"role": "assistant", "content": selection.model_dump_json()},
+            {
+                "role": "user",
+                "content": (
+                    "이전 구조화 답변은 본문을 생성했지만 허용된 evidence_id를 "
+                    "선택하지 않아 검증할 수 없습니다. 위의 원 질문과 전체 근거 "
+                    "후보를 그대로 다시 사용하십시오. 컨텍스트를 축약하거나 새 "
+                    "사실을 추가하지 말고, 본문에서 실제 사용한 후보의 정확한 "
+                    "evidence_id를 선택한 구조화 결과를 다시 반환하십시오. 직접 "
+                    "뒷받침할 후보가 정말 없다면 근거 부족 문구와 빈 배열을 "
+                    "반환하십시오."
+                ),
+            },
+        ]
+
+    @staticmethod
+    def _merge_usage(first: ApiUsageDTO, second: ApiUsageDTO) -> ApiUsageDTO:
+        return ApiUsageDTO(
+            prompt_tokens=(first.prompt_tokens or 0) + (second.prompt_tokens or 0),
+            completion_tokens=(first.completion_tokens or 0)
+            + (second.completion_tokens or 0),
+            cached_tokens=(first.cached_tokens or 0) + (second.cached_tokens or 0),
+            reasoning_tokens=(first.reasoning_tokens or 0)
+            + (second.reasoning_tokens or 0),
+            total_tokens=(first.total_tokens or 0) + (second.total_tokens or 0),
+        )
+
     def execute(
         self,
         input_data: ReaderInputDTO,
@@ -857,6 +926,23 @@ class ReaderModule(BaseLLMModule):
             max_iterations=cfg.max_tool_iterations,
             enable_tools=cfg.enable_tools,
         )
+        if cfg.retry_invalid_grounding and self._needs_grounding_retry(
+            selection, evidence_cells
+        ):
+            retry_selection, retry_usage, retry_cost, retry_latency = (
+                self.complete_agentic_structured(
+                    messages=self._grounding_retry_messages(messages, selection),
+                    tools_map=tools_map,
+                    response_model=ReaderEvidenceSelectionDTO,
+                    model=cfg.model,
+                    max_iterations=cfg.max_tool_iterations,
+                    enable_tools=cfg.enable_tools,
+                )
+            )
+            selection = retry_selection
+            api_usage = self._merge_usage(api_usage, retry_usage)
+            total_cost += retry_cost
+            latency += retry_latency
         answer_markdown, evidence = self._ground_answer(selection, evidence_cells)
         return self._output(
             cfg,
@@ -896,6 +982,23 @@ class ReaderModule(BaseLLMModule):
             max_iterations=cfg.max_tool_iterations,
             enable_tools=cfg.enable_tools,
         )
+        if cfg.retry_invalid_grounding and self._needs_grounding_retry(
+            selection, evidence_cells
+        ):
+            retry_selection, retry_usage, retry_cost, retry_latency = (
+                await self.complete_agentic_structured_async(
+                    messages=self._grounding_retry_messages(messages, selection),
+                    tools_map=tools_map,
+                    response_model=ReaderEvidenceSelectionDTO,
+                    model=cfg.model,
+                    max_iterations=cfg.max_tool_iterations,
+                    enable_tools=cfg.enable_tools,
+                )
+            )
+            selection = retry_selection
+            api_usage = self._merge_usage(api_usage, retry_usage)
+            total_cost += retry_cost
+            latency += retry_latency
         answer_markdown, evidence = self._ground_answer(selection, evidence_cells)
         return self._output(
             cfg,

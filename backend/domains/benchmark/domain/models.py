@@ -31,7 +31,7 @@ class BenchmarkCase(BaseModel):
 
 
 class BenchmarkRequest(BaseModel):
-    workflow_ids: list[str] = Field(min_length=2, max_length=12)
+    workflow_ids: list[str] = Field(min_length=1, max_length=12)
     cases: list[BenchmarkCase] = Field(min_length=1, max_length=200)
     use_cache: bool = False
     cache_mode: Literal["off", "all", "index_only"] = "off"

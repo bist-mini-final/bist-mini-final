@@ -39,6 +39,7 @@ export function versionedApiEndpoint(endpoint: string): string {
 }
 
 export const httpClient = ky.create({
+  credentials: 'same-origin',
   retry: 0,
   timeout: 15_000,
   throwHttpErrors: false,

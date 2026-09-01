@@ -29,7 +29,8 @@ describe('AppShell sidebar navigation', () => {
     expect(within(primaryNavigation).queryByRole('link', { name: '작업 관제' }))
       .not.toBeInTheDocument();
     expect(within(systemNavigation).getAllByRole('link').map((link) => link.textContent))
-      .toEqual(['작업 관제', '설정', 'API 문서']);
+      .toEqual(['작업 관제', '설정']);
+    expect(screen.queryByRole('link', { name: 'API 문서' })).not.toBeInTheDocument();
   });
 
   it('wraps document routes in the shared page viewport', () => {

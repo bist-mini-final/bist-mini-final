@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from anyio import to_thread
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from backend.domains.chatbot.application import ChatApiServices, ChatSuggestionService
 from backend.domains.chatbot.domain import UnsupportedChatAttachmentError
@@ -24,6 +24,14 @@ from .schemas import (
 )
 
 _UPLOAD_READ_LIMIT = 20 * 1024 * 1024 + 1
+
+
+def _authenticated_client_id(request: Request, fallback: str) -> str:
+    """Use middleware-owned identity without coupling the domain to the API shell."""
+
+    principal = getattr(request.state, "auth_principal", None)
+    client_id = getattr(principal, "client_id", None)
+    return client_id if isinstance(client_id, str) and client_id else fallback
 
 
 def _create_suggestion_router(service: ChatSuggestionService) -> APIRouter:
@@ -49,32 +57,53 @@ def create_chat_router(
     conversations = services.conversations
 
     @router.get("/sessions", response_model=ChatSessionListResponse)
-    def list_sessions(client_id: str = Query(min_length=12, max_length=128)) -> dict[str, Any]:
-        return conversations.list_sessions(client_id)
+    def list_sessions(
+        request: Request,
+        client_id: str = Query(min_length=12, max_length=128),
+    ) -> dict[str, Any]:
+        return conversations.list_sessions(_authenticated_client_id(request, client_id))
 
     router.include_router(_create_suggestion_router(services.suggestions))
 
     @router.post("/sessions", status_code=201, response_model=ChatSessionResponse)
-    def create_session(request: CreateSessionRequest) -> dict[str, Any]:
-        return conversations.create_session(request.client_id)
+    def create_session(payload: CreateSessionRequest, request: Request) -> dict[str, Any]:
+        return conversations.create_session(
+            _authenticated_client_id(request, payload.client_id)
+        )
 
     @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
     def get_session(
         session_id: str,
+        request: Request,
         client_id: str = Query(min_length=12, max_length=128),
     ) -> dict[str, Any]:
-        return conversations.require_session(session_id, client_id)
+        return conversations.require_session(
+            session_id,
+            _authenticated_client_id(request, client_id),
+        )
 
     @router.patch("/sessions/{session_id}", response_model=ChatSessionResponse)
-    def rename_session(session_id: str, request: RenameSessionRequest) -> dict[str, Any]:
-        return conversations.rename_session(session_id, request.client_id, request.title)
+    def rename_session(
+        session_id: str,
+        payload: RenameSessionRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        return conversations.rename_session(
+            session_id,
+            _authenticated_client_id(request, payload.client_id),
+            payload.title,
+        )
 
     @router.delete("/sessions/{session_id}", response_model=DeleteSessionResponse)
     def delete_session(
         session_id: str,
+        request: Request,
         client_id: str = Query(min_length=12, max_length=128),
     ) -> dict[str, str]:
-        return conversations.delete_session(session_id, client_id)
+        return conversations.delete_session(
+            session_id,
+            _authenticated_client_id(request, client_id),
+        )
 
     @router.post(
         "/sessions/{session_id}/attachments",
@@ -83,9 +112,11 @@ def create_chat_router(
     )
     async def upload_attachment(
         session_id: str,
+        request: Request,
         client_id: str = Form(min_length=12, max_length=128),
         file: UploadFile = File(...),
     ) -> dict[str, Any]:
+        client_id = _authenticated_client_id(request, client_id)
         await to_thread.run_sync(conversations.require_session, session_id, client_id)
         try:
             content = await file.read(_UPLOAD_READ_LIMIT)
@@ -117,20 +148,28 @@ def create_chat_router(
         status_code=202,
         response_model=ChatMessageCreatedResponse,
     )
-    def create_message(session_id: str, request: CreateMessageRequest) -> dict[str, Any]:
+    def create_message(
+        session_id: str,
+        payload: CreateMessageRequest,
+        request: Request,
+    ) -> dict[str, Any]:
         return conversations.create_message(
             session_id,
-            request.client_id,
-            request.content,
-            request.attachment_id,
+            _authenticated_client_id(request, payload.client_id),
+            payload.content,
+            payload.attachment_id,
         )
 
     @router.get("/runs/{run_id}", response_model=ChatRunSyncResponse)
     def sync_run(
         run_id: str,
+        request: Request,
         client_id: str = Query(min_length=12, max_length=128),
     ) -> dict[str, Any]:
-        return conversations.sync_run(run_id, client_id)
+        return conversations.sync_run(
+            run_id,
+            _authenticated_client_id(request, client_id),
+        )
 
     return router
 

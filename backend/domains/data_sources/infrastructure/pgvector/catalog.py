@@ -162,13 +162,20 @@ class PgVectorCatalogMixin(PgVectorConnectionCapability):
 
                 cur.execute(
                     """
-                    SELECT c.name, c.cmetadata, COALESCE(e.chunk_count, 0) AS chunk_count
-                    FROM langchain_pg_collection c
-                    LEFT JOIN (
-                        SELECT collection_id, COUNT(*) AS chunk_count
-                        FROM langchain_pg_embedding
-                        GROUP BY collection_id
-                    ) e ON c.uuid = e.collection_id;
+                    SELECT
+                        collection.name,
+                        collection.cmetadata,
+                        CASE
+                            WHEN collection.cmetadata->>'document_count' ~ '^\\d+$'
+                                THEN (collection.cmetadata->>'document_count')::bigint
+                            ELSE (
+                                SELECT COUNT(*)
+                                FROM langchain_pg_embedding AS embedding
+                                WHERE embedding.collection_id = collection.uuid
+                            )
+                        END AS chunk_count
+                    FROM langchain_pg_collection AS collection
+                    ORDER BY collection.name;
                     """
                 )
                 rows = cur.fetchall()

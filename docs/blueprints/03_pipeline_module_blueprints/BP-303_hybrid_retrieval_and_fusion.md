@@ -29,7 +29,9 @@ flowchart TD
     EXPAND --> READER["ReaderModule (LLM 수식 검증 및 답변 생성)"]
 ```
 
-Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로 보입니다. `PgVectorDataScopeModule`은 DB에서 catalog만 읽는 Source 모듈이고, Decomposer는 한 번의 구조화 LLM 호출로 질문 분해와 data scope 결합을 함께 수행합니다. 출력의 모든 `index_id`는 catalog membership 검증을 통과해야 하며 회사명과 시트명은 실제 저장 표기로 정규화됩니다. 따라서 존재하지 않는 기업을 먼저 분해한 뒤 다른 collection으로 우회하는 경로는 허용하지 않습니다. Chatbot의 첨부+RAG 혼합 실행만 Query Context의 `external_context_sources`를 채울 수 있습니다. 이 경우 catalog 밖 기업은 attachment-owned 이름으로 기록하고 retrieval item을 만들지 않으며, catalog에 존재하는 기업의 route만 계속 실행합니다. 이 예외는 collection access를 넓히지 않고 첨부가 없는 실행에는 적용되지 않습니다. 다만 BI처럼 서버가 lineage를 단일 collection으로 이미 고정한 요청에서는 모델이 유일한 index ID를 오탈자 낸 경우 그 sole scope로만 복구하고 `repaired_scope_count`를 남깁니다. 둘 이상의 scope가 있으면 알 수 없는 ID를 계속 fail-closed 처리합니다.
+Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로 보입니다. `PgVectorDataScopeModule`은 DB에서 catalog만 읽는 Source 모듈이고, Decomposer는 한 번의 구조화 LLM 호출로 질문 분해와 data scope 결합을 함께 수행합니다. 출력의 모든 `index_id`는 catalog membership 검증을 통과해야 하며 회사명과 시트명은 실제 저장 표기로 정규화됩니다. 따라서 존재하지 않는 기업을 먼저 분해한 뒤 다른 collection으로 우회하는 경로는 허용하지 않습니다. Chatbot의 첨부+RAG 혼합 실행만 Query Context의 `external_context_sources`를 채울 수 있습니다. 이 경우 catalog 밖 기업은 attachment-owned 이름으로 기록하고 retrieval item을 만들지 않으며, catalog에 존재하는 기업의 route만 계속 실행합니다. 이 예외는 collection access를 넓히지 않고 첨부가 없는 실행에는 적용되지 않습니다. 서버가 정확히 하나의 catalog 기업으로 해석한 selection에서 모델이 반환한 ID가 전부 미등록이면 해당 기업의 scope로만 복구하고 `repaired_scope_count`를 남깁니다. 알려진 ID와 미등록 ID가 섞였거나 기업명이 catalog에 없거나 여러 기업으로 모호하면 계속 fail-closed 처리합니다. 반대로 모델이 catalog에 실제 존재하는 기업을 `unresolved_companies`에도 중복 표기한 false negative는 서버 catalog 해석을 우선합니다. 빈 item 응답이면서 실제 미등록 기업이 없는 경우에만 한 번 재분해하며 두 시도의 토큰·비용·지연과 `decomposition_attempts`를 합산합니다.
+
+추정·전망·미래 마진/EPS 질문은 선택 기업에 `Key_Stats`가 존재하면 그 시트를 우선하고, 역사적 실적은 명시적으로 Key Stats를 요청하지 않는 한 각 재무제표 시트에 둡니다. 비교·추세·비율·회계 항등식은 모든 피연산 지표·기간을 원자 item으로 분해하며 필요한 최소 시트만 선택합니다. `세 회사` 같은 집합 표현은 현재 질문에 구성 기업이 명시되지 않으면 catalog 전체로 임의 확장하지 않습니다.
 
 이 회로는 자유 질의와 BI exact lookup miss의 공통 fallback입니다. BI의 versioned metric catalog처럼 이미 지표·기간이 구조화된 요청은 BP-403의 metadata exact-evidence 조회를 먼저 실행합니다. 정확 값 셀이 있으면 불필요한 Decomposer·embedding·RRF 호출을 생략하고, 없을 때만 이 하이브리드 회로로 내려옵니다. BI 별칭·FY/LTM 판단은 BI bounded context가 소유하며 범용 retrieval module에 하드코딩하지 않습니다.
 
@@ -84,7 +86,7 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 
 * **표현 일관성과 파편화 방지**: 마크다운 표를 다시 조립하기보다 [BP-201]의 `header_with_value`와 원본 좌표 metadata를 유지해 dense/keyword/reader가 같은 cell 의미를 공유합니다. 토큰·정확도 효과는 benchmark에서 별도로 측정합니다.
 * **검색/Reader 경계 규칙**: `Cell Value: ?`는 값 미지정을 뜻하는 검색 와일드카드입니다. Query Decomposer가 만든 이 표기는 Query Embedder와 Dense 유사도 검색까지 그대로 유지하며, 검색 후보 좌표와 2D 확장에도 사용할 수 있습니다. 단, Reader 입력 경계에서는 `Cell Value`가 실제 값인 셀만 통과시킵니다. Reader의 `[Context Blocks]`, 검증 가능한 근거 목록, `lookup_cell_metadata` 도구 결과는 모두 이 공통 필터를 거쳐 재구성되며 `?`, `NA`, `N/A`, `NM`, `#PEND`는 모델에 전달하지 않습니다.
-* **Reader 근거 선택 규칙**: 값이 있는 Reader 후보 전체가 사용자 근거가 되는 것은 아닙니다. 각 후보에 서버가 `EVIDENCE-nnn` ID를 부여하고 LLM은 strict JSON Schema에 맞춰 `answer_markdown`과 실제 사용한 최소 `evidence_ids`만 반환합니다. backend는 ID를 전체 후보 allowlist와 대조한 뒤 완전한 `CellEvidenceDTO[]`로 투영합니다. 선택 누락 시 기간 기준 압축 재시도나 검색 상위 셀 자동 첨부를 하지 않으며 답변을 차단합니다. 첨부+RAG 2단계 질의에서는 첫 Reader의 책임을 적재 원천 부분 답변으로 명시하되 원 질문과 검색된 전체 실제 값 후보는 그대로 유지합니다. 본문에는 시트·좌표 문자열이나 `근거` section을 합성하지 않습니다.
+* **Reader 근거 선택 규칙**: 값이 있는 Reader 후보 전체가 사용자 근거가 되는 것은 아닙니다. 각 후보에 서버가 `EVIDENCE-nnn` ID를 부여하고 LLM은 strict JSON Schema에 맞춰 `answer_markdown`과 실제 사용한 최소 `evidence_ids`만 반환합니다. backend는 ID를 전체 후보 allowlist와 대조한 뒤 완전한 `CellEvidenceDTO[]`로 투영합니다. 비교·추세·비율·증감·차이·회계 항등식은 결과뿐 아니라 각 원본값을 답변하고 모든 피연산 셀 ID를 선택해야 하며, 실제와 추정 기간을 명시적으로 구분합니다. 본문은 생성했으나 allowlist의 유효 ID를 하나도 선택하지 않은 경우에만 원 질문과 전체 후보를 그대로 둔 구조화 선택을 한 번 재시도합니다. 기간 기준 압축, 검색 상위 셀 자동 첨부, 서버측 근거 추측은 하지 않으며 재시도에도 유효 ID가 없으면 답변을 차단합니다. 첨부+RAG 2단계 질의에서는 첫 Reader의 책임을 적재 원천 부분 답변으로 명시하되 원 질문과 검색된 전체 실제 값 후보는 그대로 유지합니다. 본문에는 시트·좌표 문자열이나 `근거` section을 합성하지 않습니다.
 
 ---
 

@@ -164,7 +164,13 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
         finally:
             runtime.close()
     if kind == "benchmark":
-        runtime = RuntimeContainer.create(require_database=True)
+        # Schema ownership belongs to the migration Job. Benchmark workers can
+        # scale out together, and concurrent runtime DDL (especially trigger
+        # replacement) can deadlock with queue claims and audit inserts.
+        runtime = RuntimeContainer.create(
+            initialize_schema=False,
+            require_database=True,
+        )
         try:
             services = runtime.services
             return worker(

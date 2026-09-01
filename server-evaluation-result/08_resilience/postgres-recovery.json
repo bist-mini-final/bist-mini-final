@@ -1,0 +1,12 @@
+{
+  "executed_at": "2026-09-01T23:07:00+09:00",
+  "target": "local persistent bist-pgvector container",
+  "method": "docker stop/start; volume preserved",
+  "before_ready_status": 200,
+  "during_outage_ready_status": 503,
+  "database_health_after_start": "healthy",
+  "after_recovery_ready_status": 200,
+  "data_reset": false,
+  "model_calls": 0,
+  "result": "pass"
+}
