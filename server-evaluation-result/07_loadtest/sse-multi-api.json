@@ -1,0 +1,458 @@
+{
+  "generatedAt": "2026-09-01T12:38:00.441Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "runId": "run-20ff1aedf0f341209962dd35e51c5d9a",
+  "question": "IBM의 2025년 총자산은 얼마야?",
+  "subscribers": 4,
+  "finalStatus": "completed",
+  "totalTokens": 41293,
+  "costUsd": 0.00132811,
+  "allTerminal": true,
+  "duplicateTerminalEvents": 0,
+  "results": [
+    {
+      "subscriberId": 1,
+      "durationSeconds": 14.017,
+      "events": [
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "run_started"
+        },
+        {
+          "at": "2026-09-01T12:37:46.597Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.598Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.598Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.601Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.601Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.601Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:52.126Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.127Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.128Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.306Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.306Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.306Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.832Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.832Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.833Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.833Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.852Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.870Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:58.347Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:58.348Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:38:00.417Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:38:00.417Z",
+          "event": "run_finished"
+        }
+      ],
+      "terminalEvent": "run_finished"
+    },
+    {
+      "subscriberId": 2,
+      "durationSeconds": 14.016,
+      "events": [
+        {
+          "at": "2026-09-01T12:37:46.598Z",
+          "event": "run_started"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.600Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.601Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.601Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.601Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.602Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.602Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:52.126Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.127Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.128Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.306Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.306Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.306Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.832Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.832Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.833Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.833Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.852Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.870Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:58.347Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:58.348Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:38:00.416Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:38:00.417Z",
+          "event": "run_finished"
+        }
+      ],
+      "terminalEvent": "run_finished"
+    },
+    {
+      "subscriberId": 3,
+      "durationSeconds": 14.001,
+      "events": [
+        {
+          "at": "2026-09-01T12:37:46.592Z",
+          "event": "run_started"
+        },
+        {
+          "at": "2026-09-01T12:37:46.594Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:52.120Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.120Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.120Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.302Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.303Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.303Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.817Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.817Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.818Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.818Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.862Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.862Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:58.333Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:58.333Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:38:00.401Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:38:00.402Z",
+          "event": "run_finished"
+        }
+      ],
+      "terminalEvent": "run_finished"
+    },
+    {
+      "subscriberId": 4,
+      "durationSeconds": 14.001,
+      "events": [
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "run_started"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:46.596Z",
+          "event": "node_progress"
+        },
+        {
+          "at": "2026-09-01T12:37:52.120Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.120Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:52.120Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.303Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.303Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.303Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.817Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.818Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.818Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.818Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:57.862Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:57.862Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:37:58.333Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:37:58.333Z",
+          "event": "node_started"
+        },
+        {
+          "at": "2026-09-01T12:38:00.401Z",
+          "event": "node_completed"
+        },
+        {
+          "at": "2026-09-01T12:38:00.403Z",
+          "event": "run_finished"
+        }
+      ],
+      "terminalEvent": "run_finished"
+    }
+  ]
+}

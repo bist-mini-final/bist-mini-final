@@ -97,6 +97,150 @@ def test_decomposer_builds_catalog_scoped_plan_and_canonicalizes_aliases() -> No
     client.create_response_async.assert_awaited_once()
 
 
+def test_decomposer_preserves_total_revenue_meaning_for_explicit_korean_query() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-revenue-alias",
+        content=(
+            '{"items":[{"company":"AmeSoft","sheet":"Income Statement",'
+            '"row_header":"Revenue","column_header":"FY2024","cell_value":"?",'
+            '"index_ids":["idx-amesoft"]}],"unresolved_companies":[]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+    input_data = DecomposerInputDTO(
+        query_context=QueryContextDTO(
+            question_id="q-total-revenue",
+            question_text="AmeSoft의 2024년 총매출액을 알려줘",
+        ),
+        scope_catalog=DataScopeCatalogDTO(
+            collections=[
+                _scope("idx-amesoft", "AmeSoft", "AME", "Income_Statement"),
+            ]
+        ),
+    )
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(input_data))
+
+    assert plan.routes[0].subquery.row_header == "Total Revenue"
+
+
+def test_decomposer_keeps_bare_korean_revenue_narrow() -> None:
+    assert (
+        DecomposerModule._canonical_row_header(
+            "AmeSoft의 2024년 매출액을 알려줘",
+            "Revenue",
+        )
+        == "Revenue"
+    )
+
+
+def test_decomposer_keeps_qualified_revenue_metric() -> None:
+    assert (
+        DecomposerModule._canonical_row_header(
+            "AmeSoft의 서비스 부문 매출을 알려줘",
+            "Revenue",
+        )
+        == "Revenue"
+    )
+
+
+@pytest.mark.parametrize(
+    ("question", "model_row_header", "expected"),
+    [
+        (
+            "AmeSoft의 2024년 총부채(Total Liabilities)를 알려줘",
+            "Total Debt",
+            "Total Liabilities",
+        ),
+        (
+            "AmeSoft의 2024년 총차입금(Total Debt)을 알려줘",
+            "Total Liabilities",
+            "Total Debt",
+        ),
+    ],
+)
+def test_decomposer_preserves_explicit_liability_and_debt_distinction(
+    question: str,
+    model_row_header: str,
+    expected: str,
+) -> None:
+    assert DecomposerModule._canonical_row_header(question, model_row_header) == expected
+
+
+def test_decomposer_uses_explicit_sheet_as_single_route_hard_constraint() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-explicit-cash-flow",
+        content=(
+            '{"items":[{"company":"AmeSoft","sheet":"Balance Sheet",'
+            '"row_header":"Capital Expenditures","column_header":"FY2024",'
+            '"cell_value":"?","index_ids":["idx-amesoft"]}],'
+            '"unresolved_companies":[]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+    input_data = DecomposerInputDTO(
+        query_context=QueryContextDTO(
+            question_id="q-explicit-cash-flow",
+            question_text="AmeSoft의 현금흐름표상 2024년 자본지출을 알려줘",
+        ),
+        scope_catalog=DataScopeCatalogDTO(
+            collections=[
+                _scope("idx-amesoft", "AmeSoft", "AME", "Cash_Flow"),
+            ]
+        ),
+    )
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(input_data))
+
+    assert plan.routes[0].subquery.sheet == "Cash_Flow"
+
+
+def test_decomposer_does_not_apply_one_sheet_phrase_to_every_multi_route_item() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-mixed-sheet-operands",
+        content=(
+            '{"items":['
+            '{"company":"AmeSoft","sheet":"Cash Flow",'
+            '"row_header":"Change in Accounts Receivable",'
+            '"column_header":"FY2024","cell_value":"?",'
+            '"index_ids":["idx-amesoft-cf"]},'
+            '{"company":"AmeSoft","sheet":"Balance Sheet",'
+            '"row_header":"Total Liabilities","column_header":"FY2025",'
+            '"cell_value":"?","index_ids":["idx-amesoft-bs"]}'
+            '],"unresolved_companies":[]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+    input_data = DecomposerInputDTO(
+        query_context=QueryContextDTO(
+            question_id="q-mixed-sheet-operands",
+            question_text=(
+                "AmeSoft의 2024년 현금흐름표상 매출채권 변동과 "
+                "2025년 총부채를 알려줘"
+            ),
+        ),
+        scope_catalog=DataScopeCatalogDTO(
+            collections=[
+                _scope("idx-amesoft-cf", "AmeSoft", "AME", "Cash_Flow"),
+                _scope("idx-amesoft-bs", "AmeSoft", "AME", "Balance_Sheet"),
+            ]
+        ),
+    )
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(input_data))
+
+    assert [route.subquery.sheet for route in plan.routes] == [
+        "Cash_Flow",
+        "Balance_Sheet",
+    ]
+
+
 def test_decomposer_rejects_collection_not_present_in_catalog() -> None:
     client = MagicMock()
     client.create_response.return_value = OpenAIResponseResult(
@@ -142,6 +286,76 @@ def test_decomposer_repairs_unknown_id_when_server_fixed_one_scope() -> None:
 
     assert plan.selected_index_ids == ["idx-amesoft"]
     assert plan.metrics["repaired_scope_count"] == 1
+
+
+def test_decomposer_repairs_all_unknown_ids_to_exact_company_in_multi_catalog() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-company-scoped-repair",
+        content=(
+            '{"items":[{"company":"AmeSoft","sheet":"Income Statement",'
+            '"row_header":"Total Revenue","column_header":"FY2024","cell_value":"?",'
+            '"index_ids":["idx-amesoftidx-hyundai"]}],"unresolved_companies":[]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(_input()))
+
+    assert plan.selected_index_ids == ["idx-amesoft"]
+    assert plan.metrics["repaired_scope_count"] == 1
+
+
+def test_decomposer_ignores_false_unresolved_company_present_in_catalog() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-false-unresolved",
+        content=(
+            '{"items":[{"company":"AmeSoft","sheet":"Income Statement",'
+            '"row_header":"Total Revenue","column_header":"FY2024","cell_value":"?",'
+            '"index_ids":["idx-amesoft"]}],"unresolved_companies":["AmeSoft"]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(_input()))
+
+    assert plan.selected_index_ids == ["idx-amesoft"]
+    assert plan.metrics["decomposition_attempts"] == 1
+
+
+def test_decomposer_retries_empty_plan_once_and_aggregates_metrics() -> None:
+    client = MagicMock()
+    client.create_response.side_effect = [
+        OpenAIResponseResult(
+            response_id="resp-empty",
+            content='{"items":[],"unresolved_companies":[]}',
+            usage={"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12},
+            latency_seconds=0.1,
+        ),
+        OpenAIResponseResult(
+            response_id="resp-retry",
+            content=(
+                '{"items":[{"company":"AmeSoft","sheet":"Income Statement",'
+                '"row_header":"Total Revenue","column_header":"FY2024",'
+                '"cell_value":"?","index_ids":["idx-amesoft"]}],'
+                '"unresolved_companies":[]}'
+            ),
+            usage={"prompt_tokens": 20, "completion_tokens": 5, "total_tokens": 25},
+            latency_seconds=0.2,
+        ),
+    ]
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(_input()))
+
+    assert plan.selected_index_ids == ["idx-amesoft"]
+    assert plan.metrics["decomposition_attempts"] == 2
+    assert plan.metrics["api_usage"]["prompt_tokens"] == 30
+    assert plan.metrics["api_usage"]["completion_tokens"] == 7
+    assert plan.metrics["latency_seconds"] == 0.3
+    assert client.create_response.call_count == 2
 
 
 def test_decomposer_reports_unresolved_company_without_substitution() -> None:

@@ -1,0 +1,505 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-api-five-minute-stages",
+  "baseUrl": "http://127.0.0.1:8080",
+  "client": {
+    "runtime": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "paths": [
+    "/healthz",
+    "/api/v1/workflows",
+    "/api/v1/data-sources/indexes"
+  ],
+  "stages": [
+    {
+      "concurrency": 1,
+      "configuredDurationSeconds": 300,
+      "actualDurationSeconds": 300.026,
+      "startedAt": "2026-09-01T12:51:26.182Z",
+      "completedAt": "2026-09-01T12:56:26.210Z",
+      "requests": 6592,
+      "errors": 0,
+      "errorRate": 0,
+      "statusCounts": {
+        "200": 6592
+      },
+      "requestsPerSecond": 21.971,
+      "p50Ms": 17.391,
+      "p95Ms": 42.648,
+      "p99Ms": 46.096,
+      "byPath": {
+        "/healthz": {
+          "requests": 2198,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 5.011,
+          "p95Ms": 18.09,
+          "p99Ms": 19.021
+        },
+        "/api/v1/workflows": {
+          "requests": 2197,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 11.467,
+          "p95Ms": 25.001,
+          "p99Ms": 26.617
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 2197,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 30.191,
+          "p95Ms": 45.136,
+          "p99Ms": 48.909
+        }
+      },
+      "errorSamples": []
+    },
+    {
+      "concurrency": 10,
+      "configuredDurationSeconds": 300,
+      "actualDurationSeconds": 300.05,
+      "startedAt": "2026-09-01T12:56:36.233Z",
+      "completedAt": "2026-09-01T13:01:36.371Z",
+      "requests": 85582,
+      "errors": 48053,
+      "errorRate": 0.5614848916828306,
+      "statusCounts": {
+        "200": 37529,
+        "429": 48053
+      },
+      "requestsPerSecond": 285.226,
+      "p50Ms": 6.405,
+      "p95Ms": 25.867,
+      "p99Ms": 41.121,
+      "byPath": {
+        "/healthz": {
+          "requests": 28528,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 5.908,
+          "p95Ms": 18.098,
+          "p99Ms": 19.377
+        },
+        "/api/v1/workflows": {
+          "requests": 28527,
+          "errors": 23891,
+          "errorRate": 0.837487292740211,
+          "p50Ms": 6.801,
+          "p95Ms": 19.631,
+          "p99Ms": 25.433
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 28527,
+          "errors": 24162,
+          "errorRate": 0.8469870648858976,
+          "p50Ms": 6.768,
+          "p95Ms": 35.737,
+          "p99Ms": 44.168
+        }
+      },
+      "errorSamples": [
+        {
+          "workerId": 1,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 7,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 4,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 2,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 8,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 1,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 8,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 2,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 7,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 0,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 1,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 4,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 2,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 9,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 7,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 6,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 4,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 2,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 8,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 5,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        }
+      ]
+    },
+    {
+      "concurrency": 25,
+      "configuredDurationSeconds": 300,
+      "actualDurationSeconds": 300.033,
+      "startedAt": "2026-09-01T13:01:46.411Z",
+      "completedAt": "2026-09-01T13:06:46.697Z",
+      "requests": 213207,
+      "errors": 133137,
+      "errorRate": 0.6244494786756533,
+      "statusCounts": {
+        "200": 80070,
+        "429": 133137
+      },
+      "requestsPerSecond": 710.611,
+      "p50Ms": 7.732,
+      "p95Ms": 21.282,
+      "p99Ms": 33.396,
+      "byPath": {
+        "/healthz": {
+          "requests": 71069,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 7.467,
+          "p95Ms": 20.24,
+          "p99Ms": 22.437
+        },
+        "/api/v1/workflows": {
+          "requests": 71069,
+          "errors": 66403,
+          "errorRate": 0.9343454952229523,
+          "p50Ms": 7.863,
+          "p95Ms": 20.885,
+          "p99Ms": 25.031
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 71069,
+          "errors": 66734,
+          "errorRate": 0.9390029408040074,
+          "p50Ms": 7.878,
+          "p95Ms": 28.08,
+          "p99Ms": 42.479
+        }
+      },
+      "errorSamples": [
+        {
+          "workerId": 8,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 5,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 10,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 2,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 7,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 1,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 13,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 22,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 14,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 17,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 20,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 23,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 19,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 16,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 4,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 15,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 24,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 5,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 0,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 7,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        }
+      ]
+    },
+    {
+      "concurrency": 50,
+      "configuredDurationSeconds": 300,
+      "actualDurationSeconds": 300.05,
+      "startedAt": "2026-09-01T13:06:56.774Z",
+      "completedAt": "2026-09-01T13:11:57.298Z",
+      "requests": 398559,
+      "errors": 256704,
+      "errorRate": 0.6440802992781496,
+      "statusCounts": {
+        "200": 141855,
+        "429": 256704
+      },
+      "requestsPerSecond": 1328.307,
+      "p50Ms": 10.28,
+      "p95Ms": 27.197,
+      "p99Ms": 34.247,
+      "byPath": {
+        "/healthz": {
+          "requests": 132853,
+          "errors": 0,
+          "errorRate": 0,
+          "p50Ms": 10.138,
+          "p95Ms": 26.443,
+          "p99Ms": 30.038
+        },
+        "/api/v1/workflows": {
+          "requests": 132853,
+          "errors": 128327,
+          "errorRate": 0.9659322710063002,
+          "p50Ms": 10.333,
+          "p95Ms": 26.84,
+          "p99Ms": 30.869
+        },
+        "/api/v1/data-sources/indexes": {
+          "requests": 132853,
+          "errors": 128377,
+          "errorRate": 0.9663086268281484,
+          "p50Ms": 10.365,
+          "p95Ms": 28.493,
+          "p99Ms": 44.42
+        }
+      },
+      "errorSamples": [
+        {
+          "workerId": 5,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 10,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 4,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 1,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 7,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 8,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 11,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 13,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 16,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 17,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 14,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 29,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 32,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 25,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 20,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 23,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 31,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 26,
+          "path": "/api/v1/data-sources/indexes",
+          "status": 429
+        },
+        {
+          "workerId": 19,
+          "path": "/api/v1/workflows",
+          "status": 429
+        },
+        {
+          "workerId": 43,
+          "path": "/api/v1/workflows",
+          "status": 429
+        }
+      ]
+    }
+  ],
+  "warmupSecondsPerStage": 10,
+  "thinkTimeMs": 20,
+  "limitations": [
+    "The client runs on the same host as the k3d cluster, so WAN latency is excluded.",
+    "Only idempotent health and catalog reads are exercised; no LLM or ingestion writes are issued."
+  ]
+}

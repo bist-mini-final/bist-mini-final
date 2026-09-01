@@ -122,6 +122,7 @@ class GlobalExceptionHandlerTests(unittest.TestCase):
 
     def test_healthz_and_probes(self) -> None:
         from backend.entrypoints.asgi import create_app
+
         prod_app = create_app()
         client = TestClient(prod_app)
 
@@ -130,6 +131,9 @@ class GlobalExceptionHandlerTests(unittest.TestCase):
         self.assertEqual(health.json()["status"], "healthy")
         self.assertIn("X-Process-Time", health.headers)
         self.assertIn("X-Request-ID", health.headers)
+        self.assertEqual(health.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(health.headers["X-Frame-Options"], "DENY")
+        self.assertIn("frame-ancestors 'none'", health.headers["Content-Security-Policy"])
 
         live = client.get("/livez")
         self.assertEqual(live.status_code, 200)

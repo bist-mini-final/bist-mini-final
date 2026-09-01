@@ -21,8 +21,9 @@ def test_alembic_has_linear_snapshot_revision_chain() -> None:
     workbook_profiles = scripts.get_revision("20260831_0006")
     chat_message_evidence = scripts.get_revision("20260831_0007")
     chat_message_completion_time = scripts.get_revision("20260901_0008")
+    benchmark_audit = scripts.get_revision("20260901_0009")
 
-    assert heads == ["20260901_0008"]
+    assert heads == ["20260901_0009"]
     assert baseline is not None
     assert baseline.down_revision is None
     assert soft_delete is not None
@@ -39,6 +40,8 @@ def test_alembic_has_linear_snapshot_revision_chain() -> None:
     assert chat_message_evidence.down_revision == "20260831_0006"
     assert chat_message_completion_time is not None
     assert chat_message_completion_time.down_revision == "20260831_0007"
+    assert benchmark_audit is not None
+    assert benchmark_audit.down_revision == "20260901_0008"
 
 
 def test_ci_applies_migrations_before_backend_tests() -> None:

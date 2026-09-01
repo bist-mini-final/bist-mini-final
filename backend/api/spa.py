@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.core.settings import DIST_DIR
@@ -29,7 +29,10 @@ def register_spa(application: FastAPI) -> None:
         index_path = DIST_DIR / "index.html"
         if index_path.exists():
             return FileResponse(index_path, media_type="text/html")
-        return RedirectResponse(url="/redoc")
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Frontend assets are not available."},
+        )
 
     @application.get("/", include_in_schema=False)
     def serve_index() -> Response:

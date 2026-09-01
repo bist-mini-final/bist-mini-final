@@ -84,6 +84,8 @@ graph TD
 
 `AppShell`은 화면 크기에 따라 표현만 바꾸고 route·세션·알림 상태의 단일 소유권을 유지합니다.
 
+`AuthProvider`는 애플리케이션보다 먼저 `/api/v1/auth/session`을 확인합니다. 인증이 활성화된 환경에서는 성공 전까지 Chat provider와 기능별 API hook을 mount하지 않아 익명 요청 폭주를 막고, 로그인 화면과 재시도 상태를 단일 경계에서 제공합니다. 세션 쿠키는 JavaScript가 읽지 않는 HttpOnly 방식이며 모든 API transport는 same-origin credential 정책을 사용합니다. `AppShell`의 로그아웃은 이 provider만 호출합니다.
+
 | 범위 | 탐색 표면 | 본문 배치 계약 |
 | :--- | :--- | :--- |
 | `> 900px` | 고정·접기 가능한 좌측 sidebar | 문서형 route는 공용 viewport, Playground는 full-bleed canvas |

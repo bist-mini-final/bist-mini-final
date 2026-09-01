@@ -3,6 +3,7 @@ import { AppShell } from './app/AppShell';
 import { findRoute } from './app/routes';
 import { navigateTo, usePathname } from './app/router';
 import { ChatWorkspaceProvider } from './features/chatbot/ChatWorkspaceProvider';
+import { AuthProvider } from './features/auth/AuthProvider';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 function AppContent() {
@@ -35,9 +36,11 @@ function AppContent() {
 
 function App() {
   return (
-    <ChatWorkspaceProvider>
-      <AppContent />
-    </ChatWorkspaceProvider>
+    <AuthProvider>
+      <ChatWorkspaceProvider>
+        <AppContent />
+      </ChatWorkspaceProvider>
+    </AuthProvider>
   );
 }
 

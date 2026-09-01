@@ -64,7 +64,7 @@ classDiagram
 
 복잡한 module은 `execute()` 안에서 저장소·파일·provider 단계를 섞지 않습니다. 현재 구조 감지는 `PreparedSheet` 전처리 계약과 `SheetAnalysisBatch` 병렬 결과 계약으로 분리되고, 시트 메타데이터 저장은 대상 시트 결정 → workbook 차원 측정 → persistence record 조립 → 저장 순서를 독립 메서드로 유지합니다. 공통 상속은 `BaseModule`, `BaseLLMModule`, `BaseEmbeddingModule`처럼 실제 lifecycle과 불변식을 공유할 때만 사용합니다.
 
-표준 질의 DAG에서 `decomposer`는 `query_context`와 `scope_catalog` 두 입력을 필수로 받습니다. 별도 LLM Router는 두 번의 LLM 호출과 중간 계약 드리프트를 만들기 때문에 사용하지 않습니다. Decomposer는 catalog에 존재하는 `index_id`만 선택하고 회사명·시트명을 실제 catalog 표기로 정규화한 뒤 `RetrievalPlanDTO`를 Dense와 keyword 경로에 동시에 전달합니다. 검색 대상에 없는 기업은 유사 기업으로 치환하지 않고 명시적인 실행 오류로 반환합니다.
+표준 질의 DAG에서 `decomposer`는 `query_context`와 `scope_catalog` 두 입력을 필수로 받습니다. 별도 LLM Router는 두 번의 LLM 호출과 중간 계약 드리프트를 만들기 때문에 사용하지 않습니다. Decomposer는 catalog에 존재하는 `index_id`만 선택하고 회사명·시트명을 실제 catalog 표기로 정규화한 뒤 `RetrievalPlanDTO`를 Dense와 keyword 경로에 동시에 전달합니다. 검색 대상에 없는 기업은 유사 기업으로 치환하지 않고 명시적인 실행 오류로 반환합니다. 정확한 canonical 기업에 한정된 전부-미등록 ID는 서버 scope로 교정할 수 있지만 알려진/미등록 ID 혼합, 기업 불일치, 구성원이 명시되지 않은 집합 표현은 fail-closed 처리합니다. 추정·전망은 `Key_Stats` 우선, 계산·비교는 모든 피연산 item과 최소 필요 시트라는 공통 분해 규칙을 따릅니다. 원 질문의 `총매출/매출`, `총부채/총차입금` 구분은 LLM 출력보다 우선하는 의미 계약이며, 단일 atomic query에서 현금흐름표·손익계산서·재무상태표·Key Stats를 명시하면 해당 source sheet를 hard constraint로 적용합니다. 여러 피연산자 route에는 문장 전체의 sheet 표현을 일괄 덮어쓰지 않습니다.
 
 ## 3. 제품 도메인 서비스와의 관계
 

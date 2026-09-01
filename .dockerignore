@@ -14,6 +14,7 @@ frontend/.env
 frontend/.env.*
 dist
 outputs
+server-evaluation-result
 tmp
 data
 tests

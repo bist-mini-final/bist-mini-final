@@ -1,5 +1,14 @@
 FROM python:3.11-slim AS base
 
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+ARG SOURCE_DIRTY=false
+
+LABEL org.opencontainers.image.title="Excel RAG backend" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      io.bist.source-dirty="${SOURCE_DIRTY}"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

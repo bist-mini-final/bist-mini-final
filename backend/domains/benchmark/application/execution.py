@@ -159,9 +159,17 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
                 usage = metrics.get("api_usage") or {}
                 scopes = match.get("items") or []
                 first_scope = scopes[0] if scopes and isinstance(scopes[0], dict) else {}
+                targets = list(
+                    dict.fromkeys(
+                        str(scope.get("company_name"))
+                        for scope in scopes
+                        if isinstance(scope, dict) and scope.get("company_name")
+                    )
+                )
                 router = {
                     "kind": str(metrics.get("kind") or "unknown"),
                     "target": first_scope.get("company_name"),
+                    "targets": targets,
                     "sheets": list(
                         dict.fromkeys(
                             sheet
@@ -186,9 +194,19 @@ def _run_metrics(run: Any) -> Dict[str, Any]:
                     if first_collections and isinstance(first_collections[0], dict)
                     else {}
                 )
+                targets = list(
+                    dict.fromkeys(
+                        str(collection.get("company_name"))
+                        for route in routes
+                        if isinstance(route, dict)
+                        for collection in route.get("collections", [])
+                        if isinstance(collection, dict) and collection.get("company_name")
+                    )
+                )
                 router = {
                     "kind": str(metrics.get("kind") or "unknown"),
                     "target": first_collection.get("company_name"),
+                    "targets": targets,
                     "sheets": list(
                         dict.fromkeys(
                             str(route.get("subquery", {}).get("sheet"))
@@ -298,7 +316,28 @@ def _route_score(case: BenchmarkCase, router: Optional[Dict[str, Any]]) -> Optio
             "sheets_correct": abstained,
             "expected_abstain": True,
         }
-    target_correct = case.expected_target is None or router.get("target") == case.expected_target
+    expected_targets = {
+        target.strip()
+        for target in str(case.expected_target or "").split(";")
+        if target.strip()
+    }
+    actual_targets = {
+        str(target).strip()
+        for target in (router.get("targets") or [router.get("target")])
+        if str(target or "").strip()
+    }
+    target_recall = (
+        len(expected_targets & actual_targets) / len(expected_targets)
+        if expected_targets
+        else 1.0
+    )
+    target_precision = (
+        len(expected_targets & actual_targets) / len(actual_targets)
+        if actual_targets
+        else (1.0 if not expected_targets else 0.0)
+    )
+    target_exact = case.expected_target is None or actual_targets == expected_targets
+    target_correct = target_exact
     expected_sheets = {sheet.casefold() for sheet in case.expected_sheets or []}
     actual_sheets = {str(sheet).casefold() for sheet in router.get("sheets", [])}
     sheets_recall = (
@@ -313,6 +352,9 @@ def _route_score(case: BenchmarkCase, router: Optional[Dict[str, Any]]) -> Optio
     return {
         "correct": target_correct and sheets_exact,
         "target_correct": target_correct,
+        "targets_exact": target_exact,
+        "target_precision": target_precision,
+        "target_recall": target_recall,
         "sheets_correct": sheets_exact,
         "sheets_exact": sheets_exact,
         "sheet_precision": sheets_precision,

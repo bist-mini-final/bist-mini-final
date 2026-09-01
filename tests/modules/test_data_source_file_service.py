@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+from io import BytesIO
 from pathlib import Path
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 
 from backend.domains.data_sources.application import (
     DataSourceFileService,
     DataSourceFileTooLarge,
+    DataSourceFileTypeUnsupported,
     UploadSourceFileCommand,
 )
 from backend.domains.data_sources.infrastructure.filesystem import LocalSourceFileStorage
@@ -97,11 +100,20 @@ def _service(tmp_path: Path) -> tuple[DataSourceFileService, FakeMetadata, FakeV
     )
 
 
+def _workbook_bytes() -> bytes:
+    payload = BytesIO()
+    with ZipFile(payload, "w", compression=ZIP_DEFLATED) as workbook:
+        workbook.writestr("[Content_Types].xml", "<Types />")
+        workbook.writestr("xl/workbook.xml", "<workbook />")
+    return payload.getvalue()
+
+
 def test_upload_persists_metadata_and_submits_ingestion(tmp_path: Path) -> None:
     service, metadata, _ = _service(tmp_path)
+    workbook_payload = _workbook_bytes()
 
     async def chunks():
-        yield b"workbook"
+        yield workbook_payload
 
     result = asyncio.run(
         service.upload(
@@ -115,7 +127,7 @@ def test_upload_persists_metadata_and_submits_ingestion(tmp_path: Path) -> None:
         )
     )
 
-    assert (tmp_path / "sample.xlsx").read_bytes() == b"workbook"
+    assert (tmp_path / "sample.xlsx").read_bytes() == workbook_payload
     assert metadata.saved is not None
     assert result["ingestion_job"]["batch_size"] == 32
 
@@ -145,6 +157,49 @@ def test_upload_rejects_oversized_stream_without_partial_file(
                 chunks(),
             )
         )
+    assert not list(tmp_path.iterdir())
+
+
+def test_upload_rejects_unsupported_extension_before_writing(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path)
+
+    async def chunks():
+        yield b"not-a-workbook"
+
+    with pytest.raises(DataSourceFileTypeUnsupported):
+        asyncio.run(
+            service.upload(
+                UploadSourceFileCommand(
+                    file_name="payload.exe",
+                    auto_ingest=False,
+                    model="embedding-model",
+                    batch_size=32,
+                ),
+                chunks(),
+            )
+        )
+    assert not list(tmp_path.iterdir())
+
+
+def test_upload_rejects_spoofed_excel_extension_and_removes_file(tmp_path: Path) -> None:
+    service, metadata, _ = _service(tmp_path)
+
+    async def chunks():
+        yield b"not-a-zip-workbook"
+
+    with pytest.raises(DataSourceFileTypeUnsupported):
+        asyncio.run(
+            service.upload(
+                UploadSourceFileCommand(
+                    file_name="payload.xlsx",
+                    auto_ingest=False,
+                    model="embedding-model",
+                    batch_size=32,
+                ),
+                chunks(),
+            )
+        )
+    assert metadata.saved is None
     assert not list(tmp_path.iterdir())
 
 

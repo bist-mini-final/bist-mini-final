@@ -1,0 +1,106 @@
+{
+  "generatedAt": "2026-09-01T11:03:34.856Z",
+  "status": "conditional",
+  "source": "Reconstructed request review files; canonical JSONs and their declared SHA-256 values were not supplied.",
+  "summaries": [
+    {
+      "dataset": "1-included-86",
+      "cases": 86,
+      "expectedCount": 86,
+      "duplicateIds": [],
+      "planGoldCases": 0
+    },
+    {
+      "dataset": "2a-87",
+      "cases": 87,
+      "expectedCount": 87,
+      "duplicateIds": [],
+      "planGoldCases": 0
+    },
+    {
+      "dataset": "2b-36",
+      "cases": 36,
+      "expectedCount": 36,
+      "duplicateIds": [],
+      "planGoldCases": 0
+    }
+  ],
+  "findings": [
+    {
+      "severity": "error",
+      "dataset": "2b-36",
+      "caseId": "F2B-U3-05",
+      "type": "implicit_group_scope",
+      "question": "세 회사 중 매출이 가장 큰 회사가 EBITDA 수익성도 가장 좋아?",
+      "detail": "The standalone case refers to three companies without naming the group members; a 9-company catalog cannot resolve this safely."
+    },
+    {
+      "severity": "warning",
+      "dataset": "2b-36",
+      "caseId": "F2B-U3-05",
+      "type": "implicit_expected_targets",
+      "question": "세 회사 중 매출이 가장 큰 회사가 EBITDA 수익성도 가장 좋아?",
+      "expectedTargets": [
+        "기업 A",
+        "Coldplay"
+      ],
+      "targetsAbsentFromQuestion": [
+        "기업 A",
+        "Coldplay"
+      ]
+    },
+    {
+      "severity": "error",
+      "dataset": "2b-36",
+      "caseId": "F2B-U3-06",
+      "type": "implicit_group_scope",
+      "question": "세 회사 중 가진 현금성 자산에 비해 차입금이 가장 부담스러운 곳은 어디야?",
+      "detail": "The standalone case refers to three companies without naming the group members; a 9-company catalog cannot resolve this safely."
+    },
+    {
+      "severity": "warning",
+      "dataset": "2b-36",
+      "caseId": "F2B-U4-06",
+      "type": "implicit_expected_targets",
+      "question": "현재 EBITDA로 순차입금을 갚는다고 보면 어느 회사가 가장 오래 걸릴까?",
+      "expectedTargets": [
+        "기업 A",
+        "Coldplay"
+      ],
+      "targetsAbsentFromQuestion": [
+        "기업 A",
+        "Coldplay"
+      ]
+    },
+    {
+      "severity": "error",
+      "dataset": "2b-36",
+      "caseId": "F2B-U5-06",
+      "type": "implicit_group_scope",
+      "question": "세 회사 중 재무적으로 가장 안정적인 회사와 가장 우려되는 회사는 어디야?",
+      "detail": "The standalone case refers to three companies without naming the group members; a 9-company catalog cannot resolve this safely."
+    },
+    {
+      "severity": "warning",
+      "dataset": "2b-36",
+      "caseId": "F2B-U5-06",
+      "type": "implicit_expected_targets",
+      "question": "세 회사 중 재무적으로 가장 안정적인 회사와 가장 우려되는 회사는 어디야?",
+      "expectedTargets": [
+        "기업 A",
+        "Coldplay",
+        "DH Innovation"
+      ],
+      "targetsAbsentFromQuestion": [
+        "기업 A",
+        "Coldplay",
+        "DH Innovation"
+      ]
+    }
+  ],
+  "policy": [
+    "Do not broaden retrieval from an unresolved group phrase to all catalog companies.",
+    "Preserve affected baseline rows in the denominator and classify them as evaluation-set scope defects.",
+    "Do not call a post-hoc rerun a holdout result after prompts or routing rules have been changed."
+  ]
+}

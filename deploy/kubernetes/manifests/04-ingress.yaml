@@ -4,7 +4,16 @@ metadata:
   name: bist-mini-ingress
   namespace: bist-batch
   annotations:
-    ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    # The application streams and enforces an exact 500 MiB workbook limit.
+    # Leave a small multipart envelope allowance at the proxy boundary.
+    nginx.ingress.kubernetes.io/proxy-body-size: "501m"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: nginx
   rules:
@@ -12,48 +21,6 @@ spec:
         paths:
           - path: /api
             pathType: Prefix
-            backend:
-              service:
-                name: backend-api
-                port:
-                  number: 8765
-          - path: /docs
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-api
-                port:
-                  number: 8765
-          - path: /redoc
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-api
-                port:
-                  number: 8765
-          - path: /openapi.json
-            pathType: Exact
-            backend:
-              service:
-                name: backend-api
-                port:
-                  number: 8765
-          - path: /healthz
-            pathType: Exact
-            backend:
-              service:
-                name: backend-api
-                port:
-                  number: 8765
-          - path: /livez
-            pathType: Exact
-            backend:
-              service:
-                name: backend-api
-                port:
-                  number: 8765
-          - path: /readyz
-            pathType: Exact
             backend:
               service:
                 name: backend-api

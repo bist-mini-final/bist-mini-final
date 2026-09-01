@@ -1,0 +1,312 @@
+{
+  "generatedAt": "2026-09-01T12:51:01.709Z",
+  "localBase": "http://127.0.0.1:8080",
+  "externalHttp": "http://kosa165.iptime.org:54000",
+  "externalHttps": "https://kosa165.iptime.org:54000",
+  "endpoints": {
+    "/": {
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 39.73,
+      "headers": {
+        "accept-ranges": "bytes",
+        "connection": "keep-alive",
+        "content-length": "1036",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "etag": "\"6a96a56c-40c\"",
+        "last-modified": "Tue, 01 Sep 2026 10:14:04 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<!DOCTYPE html>\r\n<html lang=\"ko\" class=\"h-full bg-slate-50 antialiased\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\r\n  <meta name=\"theme-color\" content=\"#107c41\">\r\n  <meta nam"
+    },
+    "/docs": {
+      "ok": true,
+      "status": 404,
+      "elapsedMs": 5.65,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    },
+    "/redoc": {
+      "ok": true,
+      "status": 404,
+      "elapsedMs": 9.79,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    },
+    "/openapi.json": {
+      "ok": true,
+      "status": 404,
+      "elapsedMs": 3.4,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    },
+    "/readyz": {
+      "ok": true,
+      "status": 404,
+      "elapsedMs": 14.54,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    },
+    "/api/v1/workflows": {
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 18.34,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "11284",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "4.88ms",
+        "x-request-id": "3ab3631f892fc11f5a3d1fce6218fdae"
+      },
+      "bodyPreview": "{\"workflows\":[{\"schema_version\":2,\"id\":\"excel_ingestion\",\"name\":\"엑셀 스프레드시트 구조화 및 pgvector 인덱싱\",\"updated_at\":\"2026-08-23T00:00:00+00:00\",\"graph\":{\"nodes\":[{\"id\":\"source\",\"module_type\":\"processed_file_selector\",\"position\":{\"x\":80.0,\"y\":80.0},"
+    },
+    "/api/v1/data-sources/indexes": {
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 42.52,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "4972",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "24.47ms",
+        "x-request-id": "062e91e5428a6bf3c304f8819233351f"
+      },
+      "bodyPreview": "{\"indexes\":[{\"index_id\":\"idx_18f651c9b4b694402fb61a06e19b683098ef7327355e47becf37773268365f57\",\"file_name\":\"SPG_Company_KeyStats_Bistelligence_AI_DX_Growth.xlsm\",\"workbook_hash\":\"4551fa2967cf7f53862f022d7fccf4aa042f0eb202dfff42fbafc1ffb7ad1"
+    }
+  },
+  "cors": {
+    "denied": {
+      "ok": true,
+      "status": 400,
+      "elapsedMs": 3.34,
+      "headers": {
+        "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "access-control-max-age": "600",
+        "connection": "keep-alive",
+        "content-length": "22",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "text/plain; charset=utf-8",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "0.22ms",
+        "x-request-id": "bff95e4b524d82b36be76b8e6242fc4d"
+      },
+      "bodyPreview": "Disallowed CORS origin"
+    },
+    "allowedDevelopmentOrigin": {
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 2.44,
+      "headers": {
+        "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "access-control-allow-origin": "http://localhost:5173",
+        "access-control-max-age": "600",
+        "connection": "keep-alive",
+        "content-length": "2",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "text/plain; charset=utf-8",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "0.13ms",
+        "x-request-id": "7a9eedf55fbf965b4d1e9a24e3f24bfc"
+      },
+      "bodyPreview": "OK"
+    }
+  },
+  "uploads": {
+    "unsupportedExtension": {
+      "ok": true,
+      "status": 422,
+      "elapsedMs": 19.05,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "178",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "3.06ms",
+        "x-request-id": "9ca34c080041c03b1e2dcb59d67d8a9e"
+      },
+      "bodyPreview": "{\"detail\":{\"code\":\"DATA_SOURCE_FILE_TYPE_UNSUPPORTED\",\"message\":\"데이터 소스는 .xlsx 또는 .xlsm 파일만 업로드할 수 있습니다.\",\"retryable\":false,\"context\":{}}}"
+    },
+    "invalidOpenXmlSignature": {
+      "ok": true,
+      "status": 422,
+      "elapsedMs": 31.78,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "180",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "14.62ms",
+        "x-request-id": "f7149533e07d602a07f5f674fe173ce0"
+      },
+      "bodyPreview": "{\"detail\":{\"code\":\"DATA_SOURCE_FILE_TYPE_UNSUPPORTED\",\"message\":\"파일 확장자와 내용이 일치하는 Open XML Excel 파일이 아닙니다.\",\"retryable\":false,\"context\":{}}}"
+    },
+    "invalidOpenXmlOverProxyDefault": {
+      "ok": true,
+      "status": 422,
+      "elapsedMs": 59.18,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "180",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "53.02ms",
+        "x-request-id": "add172c1458460c671c9e15d60c2a25a"
+      },
+      "bodyPreview": "{\"detail\":{\"code\":\"DATA_SOURCE_FILE_TYPE_UNSUPPORTED\",\"message\":\"파일 확장자와 내용이 일치하는 Open XML Excel 파일이 아닙니다.\",\"retryable\":false,\"context\":{}}}"
+    }
+  },
+  "rateLimitBurst": {
+    "requests": 240,
+    "statusCounts": {
+      "200": 50,
+      "429": 190
+    },
+    "p95Ms": 401.07
+  },
+  "external": {
+    "httpRoot": {
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 24.35,
+      "headers": {
+        "accept-ranges": "bytes",
+        "connection": "keep-alive",
+        "content-length": "1036",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "etag": "\"6a96a56c-40c\"",
+        "last-modified": "Tue, 01 Sep 2026 10:14:04 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<!DOCTYPE html>\r\n<html lang=\"ko\" class=\"h-full bg-slate-50 antialiased\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\r\n  <meta name=\"theme-color\" content=\"#107c41\">\r\n  <meta nam"
+    },
+    "httpDocs": {
+      "ok": true,
+      "status": 404,
+      "elapsedMs": 6.62,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "146",
+        "content-security-policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:",
+        "content-type": "text/html",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "bodyPreview": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+    },
+    "httpWorkflows": {
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 27.47,
+      "headers": {
+        "connection": "keep-alive",
+        "content-length": "11284",
+        "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "date": "Tue, 01 Sep 2026 12:51:01 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-process-time": "5.42ms",
+        "x-request-id": "8138e80e8d7d73183275a983082f5144"
+      },
+      "bodyPreview": "{\"workflows\":[{\"schema_version\":2,\"id\":\"excel_ingestion\",\"name\":\"엑셀 스프레드시트 구조화 및 pgvector 인덱싱\",\"updated_at\":\"2026-08-23T00:00:00+00:00\",\"graph\":{\"nodes\":[{\"id\":\"source\",\"module_type\":\"processed_file_selector\",\"position\":{\"x\":80.0,\"y\":80.0},"
+    },
+    "httpsRoot": {
+      "ok": false,
+      "status": 0,
+      "elapsedMs": 10.5,
+      "error": "TypeError: fetch failed"
+    }
+  }
+}

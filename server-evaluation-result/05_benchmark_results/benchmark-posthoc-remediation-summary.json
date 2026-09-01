@@ -1,0 +1,153 @@
+{
+  "generated_at": "2026-09-01T12:34:17.677Z",
+  "source_base_url": "http://127.0.0.1:8765",
+  "holdout": false,
+  "note": "Post-hoc remediation rerun; must not replace the original Holdout result.",
+  "expected_runs": 160,
+  "baseline": {
+    "overall": {
+      "runs": 160,
+      "cases": 80,
+      "answer_accuracy": 0.25,
+      "route_accuracy": 0.6741573033707865,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.6741573033707865,
+      "evidence_cases": 138,
+      "evidence_hit_at_k": 0.384058,
+      "evidence_recall_at_k": 0.339021,
+      "citation_coverage": 0.243939,
+      "errors": 71,
+      "error_rate": 0.44375,
+      "latency_seconds": {
+        "average": 8.160425,
+        "p50": 7.43,
+        "p95": 26.657,
+        "p99": 46.934
+      },
+      "average_tokens": 15557.18125,
+      "total_cost_usd": 0.220975,
+      "evidence_errors": 0
+    },
+    "by_workflow": {
+      "bi_metric_extraction": {
+        "runs": 80,
+        "cases": 80,
+        "answer_accuracy": 0.25,
+        "route_accuracy": 0.7,
+        "plan_accuracy": null,
+        "sheet_exact_accuracy": 0.7,
+        "evidence_cases": 69,
+        "evidence_hit_at_k": 0.449275,
+        "evidence_recall_at_k": 0.403469,
+        "citation_coverage": 0.273781,
+        "errors": 30,
+        "error_rate": 0.375,
+        "latency_seconds": {
+          "average": 9.416038,
+          "p50": 8.523,
+          "p95": 25.182,
+          "p99": 50.501
+        },
+        "average_tokens": 19104.8375,
+        "total_cost_usd": 0.123017,
+        "evidence_errors": 0
+      },
+      "rag_query": {
+        "runs": 80,
+        "cases": 80,
+        "answer_accuracy": 0.25,
+        "route_accuracy": 0.6410256410256411,
+        "plan_accuracy": null,
+        "sheet_exact_accuracy": 0.6410256410256411,
+        "evidence_cases": 69,
+        "evidence_hit_at_k": 0.318841,
+        "evidence_recall_at_k": 0.274572,
+        "citation_coverage": 0.214097,
+        "errors": 41,
+        "error_rate": 0.5125,
+        "latency_seconds": {
+          "average": 6.904812,
+          "p50": 0.169,
+          "p95": 26.657,
+          "p99": 46.934
+        },
+        "average_tokens": 12009.525,
+        "total_cost_usd": 0.097958,
+        "evidence_errors": 0
+      }
+    }
+  },
+  "remediated": {
+    "overall": {
+      "runs": 160,
+      "cases": 80,
+      "answer_accuracy": 0.4,
+      "route_accuracy": 0.6830985915492958,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.7253521126760564,
+      "evidence_cases": 138,
+      "evidence_hit_at_k": 0.673913,
+      "evidence_recall_at_k": 0.617391,
+      "citation_coverage": 0.43442,
+      "errors": 18,
+      "error_rate": 0.1125,
+      "latency_seconds": {
+        "average": 12.488044,
+        "p50": 9.736,
+        "p95": 28.967,
+        "p99": 49.734
+      },
+      "average_tokens": 23655.525,
+      "total_cost_usd": 0.316738,
+      "evidence_errors": 0
+    },
+    "by_workflow": {
+      "bi_metric_extraction": {
+        "runs": 80,
+        "cases": 80,
+        "answer_accuracy": 0.4,
+        "route_accuracy": 0.7205882352941176,
+        "plan_accuracy": null,
+        "sheet_exact_accuracy": 0.7647058823529411,
+        "evidence_cases": 69,
+        "evidence_hit_at_k": 0.652174,
+        "evidence_recall_at_k": 0.607488,
+        "citation_coverage": 0.390097,
+        "errors": 12,
+        "error_rate": 0.15,
+        "latency_seconds": {
+          "average": 11.875713,
+          "p50": 10.25,
+          "p95": 27.17,
+          "p99": 43.824
+        },
+        "average_tokens": 28313.875,
+        "total_cost_usd": 0.167705,
+        "evidence_errors": 0
+      },
+      "rag_query": {
+        "runs": 80,
+        "cases": 80,
+        "answer_accuracy": 0.4,
+        "route_accuracy": 0.6486486486486487,
+        "plan_accuracy": null,
+        "sheet_exact_accuracy": 0.6891891891891891,
+        "evidence_cases": 69,
+        "evidence_hit_at_k": 0.695652,
+        "evidence_recall_at_k": 0.627295,
+        "citation_coverage": 0.478744,
+        "errors": 6,
+        "error_rate": 0.075,
+        "latency_seconds": {
+          "average": 13.100375,
+          "p50": 9.474,
+          "p95": 29.724,
+          "p99": 78.343
+        },
+        "average_tokens": 18997.175,
+        "total_cost_usd": 0.149033,
+        "evidence_errors": 0
+      }
+    }
+  }
+}

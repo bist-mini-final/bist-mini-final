@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive a safe local Job concurrency from Docker Desktop capacity."""
+"""Derive safe end-to-end queue concurrency from Docker Desktop capacity."""
 
 from __future__ import annotations
 
@@ -60,11 +60,17 @@ def recommended_concurrency(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cpu-per-job", type=positive_float, default=0.5)
+    parser.add_argument(
+        "--cpu-per-job",
+        type=positive_float,
+        default=2.0,
+        help="CPU reserved by one complete queue slot (parent + child Pod)",
+    )
     parser.add_argument(
         "--memory-per-job-gib",
         type=positive_float,
-        default=0.8,
+        default=4.0,
+        help="GiB reserved by one complete queue slot (parent + child Pod)",
     )
     parser.add_argument("--reserve-cpu", type=non_negative_float, default=1.0)
     parser.add_argument(
@@ -91,6 +97,10 @@ def main() -> int:
                 {
                     "docker_cpus": cpus,
                     "docker_memory_gib": round(memory_gib, 2),
+                    "cpu_per_queue_slot": args.cpu_per_job,
+                    "memory_gib_per_queue_slot": args.memory_per_job_gib,
+                    "reserve_cpu": args.reserve_cpu,
+                    "reserve_memory_gib": args.reserve_memory_gib,
                     "recommended_max_jobs": concurrency,
                 }
             )

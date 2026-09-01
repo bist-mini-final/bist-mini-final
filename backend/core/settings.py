@@ -86,3 +86,8 @@ DEV_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
+APP_ENV = os.getenv("APP_ENV", "development").strip().casefold()
+EXPOSE_API_DOCS = _boolean_environment(
+    "EXPOSE_API_DOCS",
+    APP_ENV not in {"production", "prod"},
+)

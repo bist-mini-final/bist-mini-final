@@ -1,0 +1,1913 @@
+[
+  {
+    "id": "F1-Q001",
+    "question": "IBM의 LTM 기준 시가총액과 TEV는 각각 얼마인가?",
+    "expected_numbers": [
+      270970.4,
+      321253.4,
+      50283
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "KS Cell E60, E69",
+      "expected_answer": "IBM의 시가총액은 약 270,970.4백만 달러, 총기업가치(TEV)는 약 321,253.4백만 달러입니다. TEV가 시가총액보다 약 50,283.0백만 달러 높습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q002",
+    "question": "IBM의 기준일 종가와 발행주식수는?",
+    "expected_numbers": [
+      289.89,
+      934735206
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "KS Cell E57, E58, E64",
+      "expected_answer": "IBM의 종가는 289.89달러, 발행주식수는 934,735,206주입니다. 시장가격 기준일은 2026-02-06입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q003",
+    "question": "2025년 LTM 기준 IBM의 총매출액, 매출총이익, 영업이익은?",
+    "expected_numbers": [
+      67535,
+      39297,
+      11757
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "IS Cell Q23, Q29, Q43",
+      "expected_answer": "IBM의 LTM 총매출액은 67,535백만 달러, 매출총이익은 39,297백만 달러, 영업이익은 11,757백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q004",
+    "question": "2024-12-31 기준 희석 EPS와 DPS는 얼마인가?",
+    "expected_numbers": [
+      6.429,
+      6.67
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "IS Cell O86, O93",
+      "expected_answer": "IBM의 2024년 희석주당순이익은 6.429달러, 주당배당금은 6.67달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q005",
+    "question": "2025년 기준 현금 및 단기투자자산 총액은?",
+    "expected_numbers": [
+      14417
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "BS Cell P19",
+      "expected_answer": "IBM의 2025년 현금 및 단기투자자산 총액은 14,417백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q006",
+    "question": "2025년 기준 총자산과 총부채는 얼마인가?",
+    "expected_numbers": [
+      151880,
+      119139
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "BS Cell P50, P74",
+      "expected_answer": "IBM의 2025년 총자산은 151,880백만 달러, 총부채는 119,139백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q007",
+    "question": "2025년 영업활동 현금흐름과 자본지출은?",
+    "expected_numbers": [
+      13193,
+      -1617
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "CF Cell P42, P44",
+      "expected_answer": "IBM의 2025년 영업활동 현금흐름은 13,193백만 달러, 자본지출은 -1,617백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q008",
+    "question": "2025년 집행된 총 배당금 규모는?",
+    "expected_numbers": [
+      -6255
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "CF Cell P70",
+      "expected_answer": "IBM이 2025년에 지급한 총 배당금은 -6,255백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q009",
+    "question": "IBM의 최근 회계연도(FY0) 매출액은 얼마인가?",
+    "expected_numbers": [
+      67535
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "KS Cell I33",
+      "expected_answer": "IBM의 최근 회계연도(FY0) 매출액은 67,535백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q010",
+    "question": "IBM의 LTM 기준 EBITDA 마진은 몇 %인가?",
+    "expected_numbers": [
+      24.84
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "KS Cell J40",
+      "expected_answer": "IBM의 LTM EBITDA 마진은 약 24.84%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q011",
+    "question": "IBM의 부채비율(Debt/Equity)은 얼마인가?",
+    "expected_numbers": [
+      197.33
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "RAT"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "RAT Cell J52",
+      "expected_answer": "IBM의 LTM 총부채 대비 자기자본 비율은 약 197.33%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q012",
+    "question": "IBM의 최근 분기 시가총액은?",
+    "expected_numbers": [
+      270970.4
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "CAP"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "CAP Cell J16, J11",
+      "expected_answer": "IBM의 최근 분기 기준 시가총액은 약 270,970.4백만 달러이며, 해당 분기 종료일은 2025-12-31입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q013",
+    "question": "Bank of America의 최대주주(1위 Holder)는 누구인가?",
+    "expected_numbers": [
+      1,
+      8.94,
+      680233587
+    ],
+    "expected_terms": [],
+    "expected_target": "Bank of America",
+    "expected_sheets": [
+      "DO"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "DO Cell B6:F6",
+      "expected_answer": "Bank of America의 1위 주주는 Berkshire Hathaway Inc.이며, 지분율은 8.94%, 보유주식수는 680,233,587주입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q014",
+    "question": "BAC의 기관투자자 지분율은?",
+    "expected_numbers": [
+      65.81
+    ],
+    "expected_terms": [],
+    "expected_target": "Bank of America",
+    "expected_sheets": [
+      "SUM"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "SUM Cell C48",
+      "expected_answer": "Bank of America의 기관투자자 지분율은 65.81%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q015",
+    "question": "BAC의 CEO는 누구인가?",
+    "expected_numbers": [],
+    "expected_terms": [
+      "Brian Thomas Moynihan"
+    ],
+    "expected_target": "Bank of America",
+    "expected_sheets": [
+      "SUM"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "SUM Cell B23:C23",
+      "expected_answer": "Bank of America의 CEO는 Brian Thomas Moynihan입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q019",
+    "question": "IBM의 LTM 시가총액은 얼마인가?",
+    "expected_numbers": [
+      270970.4
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "KS Cell E60",
+      "expected_answer": "IBM의 시가총액은 약 270,970.4백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q020",
+    "question": "IBM의 LTM TEV는 얼마인가?",
+    "expected_numbers": [
+      321253.4
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "KS Cell E69",
+      "expected_answer": "IBM의 총기업가치(TEV)는 약 321,253.4백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q021",
+    "question": "IBM의 LTM 매출은 얼마인가?",
+    "expected_numbers": [
+      67535
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "IS Cell Q23",
+      "expected_answer": "IBM의 LTM 매출은 67,535백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q022",
+    "question": "IBM의 LTM EBITDA는 얼마인가?",
+    "expected_numbers": [
+      16778
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "IS Cell Q101",
+      "expected_answer": "IBM의 LTM EBITDA는 16,778백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q023",
+    "question": "IBM의 LTM 순이익은 얼마인가?",
+    "expected_numbers": [
+      10593
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "IS Cell Q71",
+      "expected_answer": "IBM의 LTM 순이익은 10,593백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q024",
+    "question": "IBM의 LTM 총자산은 얼마인가?",
+    "expected_numbers": [
+      151880
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "BS Cell Q50",
+      "expected_answer": "IBM의 LTM 총자산은 151,880백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q025",
+    "question": "IBM의 LTM 장기부채는 얼마인가?",
+    "expected_numbers": [
+      54836
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "BS Cell Q66",
+      "expected_answer": "IBM의 LTM 장기부채는 54,836백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q026",
+    "question": "IBM의 LTM 영업현금흐름은 얼마인가?",
+    "expected_numbers": [
+      13193
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "CF Cell Q42",
+      "expected_answer": "IBM의 LTM 영업현금흐름은 13,193백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q027",
+    "question": "IBM의 LTM CAPEX는 얼마인가?",
+    "expected_numbers": [
+      -1617
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 1: 단일 지표 조회",
+      "reference": "CF Cell Q44",
+      "expected_answer": "IBM의 LTM CAPEX는 -1,617백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q028",
+    "question": "2021년부터 2025년까지 IBM의 매출액 CAGR 및 연도별 YoY는?",
+    "expected_numbers": [
+      57351,
+      60530,
+      5.54,
+      61860,
+      2.2,
+      62753,
+      1.44,
+      67535,
+      7.62,
+      2021,
+      4.17
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell L23:P23",
+      "expected_answer": "IBM의 매출은 2021년 57,351백만 달러, 2022년 60,530백만 달러(+5.54%), 2023년 61,860백만 달러(+2.20%), 2024년 62,753백만 달러(+1.44%), 2025년 67,535백만 달러(+7.62%)입니다. 2021\\~2025년 CAGR은 약 4.17%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q029",
+    "question": "최근 4년간 Gross Margin, EBITDA Margin, EBIT Margin의 변화 추이는?",
+    "expected_numbers": [
+      2022,
+      54,
+      55.45,
+      56.65,
+      58.19,
+      17.8,
+      20.59,
+      20.53,
+      24.84,
+      12.43,
+      16.01,
+      15.6,
+      17.41
+    ],
+    "expected_terms": [
+      "개선"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "KS Cell F37:I37, F40:I40, F43:I43",
+      "expected_answer": "2022\\~2025년 Gross Margin은 54.00%→55.45%→56.65%→58.19%, EBITDA Margin은 17.80%→20.59%→20.53%→24.84%, EBIT Margin은 12.43%→16.01%→15.60%→17.41%입니다. 세 지표 모두 전체적으로 개선됐습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q030",
+    "question": "최근 5년간 장기부채와 단기부채의 변동 경향은?",
+    "expected_numbers": [
+      44854,
+      46025,
+      49742,
+      49081,
+      54836,
+      7761,
+      5634,
+      7246,
+      5857,
+      7224
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "BS Cell L66:P66, L131:P131",
+      "expected_answer": "장기부채는 2021년 44,854, 2022년 46,025, 2023년 49,742, 2024년 49,081, 2025년 54,836백만 달러로 전반적으로 증가했습니다. 단기부채는 같은 기간 7,761→5,634→7,246→5,857→7,224백만 달러로 등락했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q033",
+    "question": "2024년 대비 2025년 매출과 영업이익은 얼마나 증가했나?",
+    "expected_numbers": [
+      62753,
+      67535,
+      4782,
+      7.62,
+      9788,
+      11757,
+      1969,
+      20.12
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell O23:P23, O43:P43",
+      "expected_answer": "매출은 62,753백만 달러에서 67,535백만 달러로 4,782백만 달러(+7.62%) 증가했습니다. 영업이익은 9,788백만 달러에서 11,757백만 달러로 1,969백만 달러(+20.12%) 증가했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q034",
+    "question": "2024년과 2025년 Total Assets 및 Total Liabilities를 비교해줘.",
+    "expected_numbers": [
+      137175,
+      151880,
+      14705,
+      10.72,
+      109782,
+      119139,
+      9357,
+      8.52
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "BS Cell O50:P50, O74:P74",
+      "expected_answer": "총자산은 137,175백만 달러에서 151,880백만 달러로 14,705백만 달러(+10.72%) 증가했습니다. 총부채는 109,782백만 달러에서 119,139백만 달러로 9,357백만 달러(+8.52%) 증가했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q035",
+    "question": "2024년 대비 2025년 영업현금흐름과 CapEx는 어떻게 변했나?",
+    "expected_numbers": [
+      13445,
+      13193,
+      252,
+      -1.87,
+      -1048,
+      -1617,
+      569,
+      54.29
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "CF Cell O42:P42, O44:P44",
+      "expected_answer": "영업현금흐름은 13,445백만 달러에서 13,193백만 달러로 252백만 달러(-1.87%) 감소했습니다. CapEx는 -1,048백만 달러에서 -1,617백만 달러로 현금 유출 규모가 569백만 달러(+54.29%) 확대됐습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q036",
+    "question": "2024년 대비 2025년 Diluted EPS와 DPS를 비교해줘.",
+    "expected_numbers": [
+      6.429,
+      11.163,
+      4.734,
+      73.64,
+      6.67,
+      6.71,
+      0.04,
+      0.6
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell O86:P86, O93:P93",
+      "expected_answer": "희석 EPS는 6.429달러에서 11.163달러로 4.734달러(+73.64%) 증가했습니다. DPS는 6.67달러에서 6.71달러로 0.04달러(+0.60%) 증가했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q037",
+    "question": "IBM의 FY0 매출과 LTM 매출을 알려줘.",
+    "expected_numbers": [
+      67535
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell P23:Q23",
+      "expected_answer": "IBM의 FY0 매출과 LTM 매출은 모두 67,535백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q038",
+    "question": "IBM의 최근 3년 매출 추세를 알려줘.",
+    "expected_numbers": [
+      61860,
+      62753,
+      67535
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell N23:P23",
+      "expected_answer": "IBM의 매출은 2023년 61,860백만 달러, 2024년 62,753백만 달러, 2025년 67,535백만 달러로 증가했습니다. 특히 2025년 증가 폭이 확대됐습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q039",
+    "question": "IBM의 최근 3년 EBITDA 추세를 알려줘.",
+    "expected_numbers": [
+      12739,
+      12886,
+      16778
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell N101:P101",
+      "expected_answer": "EBITDA는 2023년 12,739백만 달러, 2024년 12,886백만 달러, 2025년 16,778백만 달러입니다. 2024년까지 정체됐으나 2025년에 크게 증가했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q040",
+    "question": "IBM의 최근 3년 순이익 추세를 알려줘.",
+    "expected_numbers": [
+      7502,
+      6023,
+      10593
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell N71:P71",
+      "expected_answer": "순이익은 2023년 7,502백만 달러, 2024년 6,023백만 달러, 2025년 10,593백만 달러입니다. 2024년에 감소한 뒤 2025년에 큰 폭으로 반등했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q041",
+    "question": "IBM의 최근 3년 총자산 변화를 알려줘.",
+    "expected_numbers": [
+      135241,
+      137175,
+      151880
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "BS Cell N50:P50",
+      "expected_answer": "총자산은 2023년 135,241백만 달러, 2024년 137,175백만 달러, 2025년 151,880백만 달러로 지속 증가했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q042",
+    "question": "IBM의 최근 3년 장기부채가 증가했는지 알려줘.",
+    "expected_numbers": [
+      49742,
+      49081,
+      54836
+    ],
+    "expected_terms": [
+      "증가",
+      "감소"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "BS Cell N66:P66",
+      "expected_answer": "장기부채는 2023년 49,742백만 달러, 2024년 49,081백만 달러, 2025년 54,836백만 달러입니다. 2024년에 소폭 감소했지만 2025년에 증가해 3년 기준으로는 확대됐습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q043",
+    "question": "IBM의 최근 3년 영업현금흐름 추세를 알려줘.",
+    "expected_numbers": [
+      13931,
+      13445,
+      13193
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "CF Cell N42:P42",
+      "expected_answer": "영업현금흐름은 2023년 13,931백만 달러, 2024년 13,445백만 달러, 2025년 13,193백만 달러로 완만하게 감소했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q044",
+    "question": "IBM의 최근 매출은 얼마야?",
+    "expected_numbers": [
+      67535
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 2: 기간 및 추세 분석",
+      "reference": "IS Cell P23, P13",
+      "expected_answer": "기본 기간 정책상 최근 실적은 FY0인 2025년으로 해석하며, IBM의 매출은 67,535백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q045",
+    "question": "IBM의 매출 성장률과 EBITDA 마진 추이를 같이 보여줘.",
+    "expected_numbers": [
+      2021,
+      3.94,
+      5.54,
+      2.2,
+      1.44,
+      7.62,
+      19.72,
+      17.8,
+      20.59,
+      20.53,
+      24.84
+    ],
+    "expected_terms": [
+      "개선"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "KS Cell E34:J34, E40:J40",
+      "expected_answer": "IBM의 매출 성장률은 2021\\~2025년 3.94%, 5.54%, 2.20%, 1.44%, 7.62%였고, EBITDA 마진은 19.72%, 17.80%, 20.59%, 20.53%, 24.84%였습니다. 2025년에 성장률과 마진이 함께 개선됐습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q046",
+    "question": "IBM의 자본구조와 밸류에이션 멀티플을 함께 정리해줘.",
+    "expected_numbers": [
+      14417,
+      64607,
+      32648,
+      20.09,
+      35.43
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "KS Cell E65:E66, E71, E112, E114",
+      "expected_answer": "IBM의 현금 및 단기투자자산은 14,417백만 달러, 총부채는 64,607백만 달러, 보통주 자기자본은 32,648백만 달러입니다. LTM TEV/EBITDA는 약 20.09배, P/E는 약 35.43배입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q053",
+    "question": "IBM의 LTM 매출, EBITDA, 순이익을 알려줘.",
+    "expected_numbers": [
+      67535,
+      16778,
+      10593
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "IS Cell Q23, Q101, Q71",
+      "expected_answer": "IBM의 LTM 매출은 67,535백만 달러, EBITDA는 16,778백만 달러, 순이익은 10,593백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q054",
+    "question": "IBM의 LTM 총자산과 총부채를 알려줘.",
+    "expected_numbers": [
+      151880,
+      119139
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "BS Cell Q50, Q74",
+      "expected_answer": "IBM의 LTM 총자산은 151,880백만 달러, 총부채는 119,139백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q055",
+    "question": "IBM의 현금성 자산과 장기부채를 알려줘.",
+    "expected_numbers": [
+      14417,
+      54836
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "BS Cell Q19, Q66",
+      "expected_answer": "IBM의 현금 및 단기투자자산은 14,417백만 달러, 장기부채는 54,836백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q056",
+    "question": "IBM의 영업현금흐름과 CAPEX를 알려줘.",
+    "expected_numbers": [
+      13193,
+      -1617
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "CF Cell Q42, Q44",
+      "expected_answer": "IBM의 LTM 영업현금흐름은 13,193백만 달러, CAPEX는 -1,617백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q057",
+    "question": "IBM의 영업·투자·재무 현금흐름을 알려줘.",
+    "expected_numbers": [
+      13193,
+      -10302,
+      -3829
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "CF Cell Q42, Q53, Q74",
+      "expected_answer": "IBM의 LTM 영업현금흐름은 13,193백만 달러, 투자현금흐름은 -10,302백만 달러, 재무현금흐름은 -3,829백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q058",
+    "question": "IBM의 매출과 영업현금흐름을 알려줘.",
+    "expected_numbers": [
+      67535,
+      13193
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "IS Cell Q23, CF Cell Q42",
+      "expected_answer": "IBM의 LTM 매출은 67,535백만 달러, 영업현금흐름은 13,193백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q059",
+    "question": "IBM의 TEV와 시가총액 중 무엇이 더 커?",
+    "expected_numbers": [
+      270970.4,
+      321253.4,
+      50283
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "KS Cell E60, E69",
+      "expected_answer": "TEV가 더 큽니다. IBM의 시가총액은 270,970.4백만 달러, TEV는 321,253.4백만 달러로 TEV가 약 50,283.0백만 달러 높습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q060",
+    "question": "IBM의 EBITDA와 영업현금흐름을 비교해줘.",
+    "expected_numbers": [
+      16778,
+      13193,
+      3585
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "IS Cell Q101, CF Cell Q42",
+      "expected_answer": "IBM의 LTM EBITDA는 16,778백만 달러, 영업현금흐름은 13,193백만 달러입니다. EBITDA가 3,585백만 달러 더 큽니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q061",
+    "question": "IBM의 총부채와 보통주 자본을 비교해줘.",
+    "expected_numbers": [
+      119139,
+      32648,
+      86491
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "BS Cell Q74, Q88",
+      "expected_answer": "IBM의 총부채는 119,139백만 달러, 보통주 자본은 32,648백만 달러입니다. 총부채가 86,491백만 달러 더 큽니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q062",
+    "question": "IBM의 순이익과 영업현금흐름을 비교해줘.",
+    "expected_numbers": [
+      10593,
+      13193,
+      2600
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "IS Cell Q71, CF Cell Q42",
+      "expected_answer": "IBM의 LTM 순이익은 10,593백만 달러, 영업현금흐름은 13,193백만 달러입니다. 영업현금흐름이 2,600백만 달러 더 큽니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q063",
+    "question": "IBM의 현금성 자산과 장기부채를 비교해줘.",
+    "expected_numbers": [
+      14417,
+      54836,
+      40419
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "BS Cell Q19, Q66",
+      "expected_answer": "현금성 자산은 14,417백만 달러, 장기부채는 54,836백만 달러입니다. 장기부채가 40,419백만 달러 더 큽니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q064",
+    "question": "IBM의 매출과 TEV를 비교해줘.",
+    "expected_numbers": [
+      67535,
+      321253.4,
+      4.76
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement",
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 3: 복수 지표 조회 및 비교",
+      "reference": "IS Cell Q23, KS Cell E69",
+      "expected_answer": "IBM의 LTM 매출은 67,535백만 달러, TEV는 321,253.4백만 달러입니다. TEV는 매출의 약 4.76배입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q065",
+    "question": "IBM의 2025년 ROE와 ROA는 얼마인가?",
+    "expected_numbers": [
+      32.45,
+      6.97
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement",
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell P71, BS Cell P88, P50",
+      "expected_answer": "2025년 단순 기말잔액 기준 ROE는 32.45%, ROA는 6.97%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q066",
+    "question": "2025년 Cash Conversion Ratio는?",
+    "expected_numbers": [
+      13193,
+      10593,
+      1.25
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell P71, CF Cell P42",
+      "expected_answer": "영업현금흐름 13,193백만 달러를 순이익 10,593백만 달러로 나눈 Cash Conversion Ratio는 약 1.25배입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q067",
+    "question": "Key Stats의 TEV가 총부채 및 현금 수치와 정합성을 이루는가?",
+    "expected_numbers": [
+      270970.4,
+      64607,
+      14417,
+      93,
+      321253.4
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "KS Cell E60, E65:E69",
+      "expected_answer": "시가총액 270,970.4 + 총부채 64,607 - 현금 14,417 + 소수주주지분 93 = 321,253.4백만 달러로, 표시된 TEV와 일치합니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q068",
+    "question": "IBM의 Net Debt/EBITDA와 유동비율은 얼마인가?",
+    "expected_numbers": [
+      50190,
+      2.99,
+      0.96
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet",
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "BS Cell P130, P19, P34, P64, IS Cell P101",
+      "expected_answer": "순부채는 50,190백만 달러이며 Net Debt/EBITDA는 약 2.99배입니다. 유동비율은 약 0.96배입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q069",
+    "question": "FCF 대비 배당 및 자사주 매입 집행 비중은?",
+    "expected_numbers": [
+      11576,
+      6255,
+      54.03
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "CF Cell P42, P44, P63, P70",
+      "expected_answer": "단순 FCF는 11,576백만 달러이며 배당금은 6,255백만 달러로 FCF의 약 54.03%입니다. 자사주 매입 값은 `NA`이므로 배당과 자사주 매입을 합친 전체 Payout Ratio는 확정할 수 없습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q070",
+    "question": "DSO 및 DIO의 추이는?",
+    "expected_numbers": [
+      2021,
+      45.98,
+      42.24,
+      45.55,
+      42.09,
+      43.84,
+      23.76,
+      20.65,
+      15.59,
+      17.53,
+      15.77
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet",
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "BS Cell L21:P21, L26:P26, IS Cell L23:P23, L25:P25",
+      "expected_answer": "기말잔액 단순 방식의 DSO는 2021\\~2025년 약 45.98일, 42.24일, 45.55일, 42.09일, 43.84일입니다. DIO는 약 23.76일, 20.65일, 15.59일, 17.53일, 15.77일로 전반적으로 감소했습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q071",
+    "question": "IBM의 LTM 순부채성 금액을 TEV와 Market Cap 차이로 계산하면?",
+    "expected_numbers": [
+      50283
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "KS Cell E60, E69",
+      "expected_answer": "TEV에서 시가총액을 차감한 순부채성 금액은 50,283.0백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q072",
+    "question": "2025년 매출총이익률과 영업이익률은?",
+    "expected_numbers": [
+      58.19,
+      17.41
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell P23, P29, P43",
+      "expected_answer": "2025년 매출총이익률은 58.19%, 영업이익률은 17.41%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q073",
+    "question": "2025년 단순 잉여현금흐름은?",
+    "expected_numbers": [
+      13193,
+      -1617,
+      11576
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "CF Cell P42, P44",
+      "expected_answer": "영업현금흐름 13,193 + CAPEX -1,617 = 11,576백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q074",
+    "question": "2025년 총자산 대비 총부채 비율은?",
+    "expected_numbers": [
+      119139,
+      151880,
+      78.44
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "BS Cell P50, P74",
+      "expected_answer": "총부채 119,139를 총자산 151,880으로 나눈 비율은 약 78.44%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q075",
+    "question": "IBM의 TEV가 시가총액보다 얼마나 큰가?",
+    "expected_numbers": [
+      50283
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "KS Cell E60, E69",
+      "expected_answer": "IBM의 TEV는 시가총액보다 50,283.0백만 달러 큽니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q076",
+    "question": "FY-1 대비 FY0 매출 성장률은?",
+    "expected_numbers": [
+      62753,
+      67535,
+      7.62
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell O23, P23",
+      "expected_answer": "매출은 62,753백만 달러에서 67,535백만 달러로 증가해 성장률은 약 7.62%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q077",
+    "question": "최근 순이익 성장률은?",
+    "expected_numbers": [
+      6023,
+      10593,
+      75.88
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell O71, P71",
+      "expected_answer": "순이익은 6,023백만 달러에서 10,593백만 달러로 증가해 성장률은 약 75.88%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q078",
+    "question": "IBM의 LTM 매출총이익률을 계산해줘.",
+    "expected_numbers": [
+      39297,
+      67535,
+      100,
+      58.19
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell Q29, Q23",
+      "expected_answer": "39,297 ÷ 67,535 × 100 = 약 58.19%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q079",
+    "question": "IBM의 LTM 영업이익률은?",
+    "expected_numbers": [
+      11757,
+      67535,
+      100,
+      17.41
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell Q43, Q23",
+      "expected_answer": "11,757 ÷ 67,535 × 100 = 약 17.41%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q080",
+    "question": "IBM의 LTM 순이익률을 계산해줘.",
+    "expected_numbers": [
+      10593,
+      67535,
+      100,
+      15.69
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell Q71, Q23",
+      "expected_answer": "10,593 ÷ 67,535 × 100 = 약 15.69%입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q081",
+    "question": "IBM의 LTM 유동비율은?",
+    "expected_numbers": [
+      36944,
+      38658,
+      0.96
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "BS Cell Q34, Q64",
+      "expected_answer": "유동자산 36,944를 유동부채 38,658로 나눈 유동비율은 약 0.96배입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q082",
+    "question": "영업현금흐름과 CAPEX로 FCF를 계산해줘.",
+    "expected_numbers": [
+      13193,
+      -1617,
+      11576
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "CF Cell Q42, Q44",
+      "expected_answer": "13,193 + (-1,617) = 11,576백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q083",
+    "question": "종가와 발행주식수로 시가총액을 계산해줘.",
+    "expected_numbers": [
+      289.89,
+      934735206,
+      1000000,
+      270970.4
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "KS Cell E57:E60",
+      "expected_answer": "289.89달러 × 934,735,206주 ÷ 1,000,000 = 약 270,970.4백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q084",
+    "question": "IBM의 TEV는 LTM 매출의 몇 배야?",
+    "expected_numbers": [
+      321253.4,
+      67535,
+      4.76
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats",
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "KS Cell E69, IS Cell Q23",
+      "expected_answer": "321,253.4 ÷ 67,535 = 약 4.76배입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q085",
+    "question": "IBM의 최근 3년 평균 매출은 얼마야?",
+    "expected_numbers": [
+      2023,
+      64049.3
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "IS Cell N23:P23",
+      "expected_answer": "2023\\~2025년 매출의 산술평균은 약 64,049.3백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q086",
+    "question": "장기부채가 현금성 자산보다 얼마나 큰가?",
+    "expected_numbers": [
+      40419
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 4: 재무 계산",
+      "reference": "BS Cell Q66, Q19",
+      "expected_answer": "장기부채는 현금성 자산보다 40,419백만 달러 큽니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q087",
+    "question": "2022년 순이익이 급감했음에도 영업현금흐름이 유지된 원인은?",
+    "expected_numbers": [
+      1639,
+      10435,
+      4154,
+      987,
+      3168
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 5: 심층 추론 및 원인 분석",
+      "reference": "CF Cell M15:M42",
+      "expected_answer": "2022년 순이익은 1,639백만 달러였지만 영업현금흐름은 10,435백만 달러였습니다. 감가상각 및 상각비 4,154백만 달러, 주식보상비용 987백만 달러, 기타 영업조정 3,168백만 달러 등 비현금·조정 항목이 순이익에 가산된 영향이 컸습니다. 다만 운전자본 변동은 일부 현금흐름을 감소시켰습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q088",
+    "question": "총부채가 크게 변동한 배경은 차입금 발행인가, M&A/투자 지출 때문인가?",
+    "expected_numbers": [
+      58396,
+      64607,
+      -8294,
+      2873
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Balance_Sheet",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 5: 심층 추론 및 원인 분석",
+      "reference": "BS Cell L130:P130, CF Cell L46:P46, L57:P57, L60:P60",
+      "expected_answer": "총부채는 2024년 58,396백만 달러에서 2025년 64,607백만 달러로 증가했습니다. 같은 해 현금 인수지출은 -8,294백만 달러, 총부채 발행은 2,873백만 달러였습니다. 따라서 대규모 인수지출과 부채 증가가 동시에 나타났지만, 제공된 셀만으로 부채 증가가 전적으로 M&A 때문이라고 단정할 수는 없습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q089",
+    "question": "IBM이 영업현금흐름을 초과하는 주주환원을 집행했는가?",
+    "expected_numbers": [
+      13193,
+      7872
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow",
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 5: 심층 추론 및 원인 분석",
+      "reference": "CF Cell P42, P44, P63, P70, BS Cell O19:P19, O130:P130",
+      "expected_answer": "2025년 영업현금흐름은 13,193백만 달러, CAPEX와 배당금의 현금 유출 합계는 7,872백만 달러입니다. 확인 가능한 범위에서는 영업현금흐름을 초과하지 않았습니다. 자사주 매입 값은 `NA`이므로 전체 주주환원 규모는 확정할 수 없습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q090",
+    "question": "CapEx와 PP&E 증가 및 이후 매출 성장 간에 시차가 존재하는가?",
+    "expected_numbers": [
+      2021,
+      2062,
+      1346,
+      1245,
+      1048,
+      1617,
+      8916,
+      8212,
+      8721,
+      8929,
+      9028,
+      57351,
+      60530,
+      61860,
+      62753,
+      67535
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow",
+      "Balance_Sheet",
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 5: 심층 추론 및 원인 분석",
+      "reference": "CF Cell L44:P44, BS Cell L38:P38, IS Cell L23:P23",
+      "expected_answer": "2021\\~2025년 CAPEX는 2,062→1,346→1,245→1,048→1,617백만 달러였고, 순유형자산은 8,916→8,212→8,721→8,929→9,028백만 달러, 매출은 57,351→60,530→61,860→62,753→67,535백만 달러였습니다. 2025년에 CAPEX와 매출이 함께 증가했지만, 이 자료만으로 명확한 시차나 인과관계를 확정하기는 어렵습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q091",
+    "question": "현재 TEV/EBITDA 멀티플이 IBM의 수익성과 성장 전망 대비 적정한가?",
+    "expected_numbers": [
+      20.09,
+      24.84,
+      2026,
+      28.13,
+      29.3,
+      29.39
+    ],
+    "expected_terms": [
+      "개선",
+      "추정"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 5: 심층 추론 및 원인 분석",
+      "reference": "KS Cell E112, I40, N33:P33, N40:P40",
+      "expected_answer": "IBM의 LTM TEV/EBITDA는 약 20.09배, LTM EBITDA 마진은 24.84%입니다. 추정 EBITDA 마진은 2026\\~2028년 28.13%, 29.30%, 29.39%로 개선 전망입니다. 성장과 마진 개선은 높은 멀티플을 일부 뒷받침할 수 있지만, 피어 멀티플과 할인율 정보가 없어 적정 여부를 확정할 수는 없습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q101",
+    "question": "2025년 Actual과 2026\\~2028년 매출 및 EPS 성장 전망은?",
+    "expected_numbers": [
+      67535,
+      11.14,
+      71183.3,
+      74255.1,
+      78520.5,
+      12.414,
+      13.417,
+      14.746
+    ],
+    "expected_terms": [
+      "증가",
+      "추정"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 6: 지표 전망 및 예측",
+      "reference": "KS Cell I33, I51, N33:P33, N51:P51",
+      "expected_answer": "2025년 실제 매출은 67,535백만 달러, 희석 EPS는 11.14달러입니다. 매출 추정치는 2026년 71,183.3, 2027년 74,255.1, 2028년 78,520.5백만 달러이며, EPS 추정치는 12.414, 13.417, 14.746달러입니다. 매출과 EPS 모두 증가 전망입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q102",
+    "question": "FY2025 대비 NTM/FY2026\\~2028 TEV/EBITDA 멀티플 변화 전망은?",
+    "expected_numbers": [
+      20.09,
+      2028
+    ],
+    "expected_terms": [],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 6: 지표 전망 및 예측",
+      "reference": "KS Cell E112:J112",
+      "expected_answer": "FY2025와 LTM TEV/EBITDA는 약 20.09배입니다. NTM 및 FY2026\\~2028 값은 원본에서 `NA`이므로 멀티플 변화 전망은 현재 정답셋에서 산출할 수 없습니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q103",
+    "question": "최근 매출 성장 추세가 유지되면 2026년 Total Revenue는?",
+    "expected_numbers": [
+      2021,
+      4.17,
+      70351.9
+    ],
+    "expected_terms": [
+      "추정"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 6: 지표 전망 및 예측",
+      "reference": "IS Cell L23:P23",
+      "expected_answer": "2021\\~2025년 매출 CAGR 약 4.17%가 유지된다고 가정하면 2026년 매출은 약 70,351.9백만 달러로 추정됩니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q104",
+    "question": "현재 영업이익률이 유지될 때 2026년 Operating Income은?",
+    "expected_numbers": [
+      70351.9,
+      17.41,
+      12247.4
+    ],
+    "expected_terms": [
+      "추정"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 6: 지표 전망 및 예측",
+      "reference": "IS Cell P23, P43, L23:P23",
+      "expected_answer": "2026년 추정 매출 70,351.9백만 달러에 2025년 영업이익률 17.41%가 유지된다고 가정하면 영업이익은 약 12,247.4백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q105",
+    "question": "영업현금흐름이 5% 증가하고 CapEx가 동일하면 2026년 FCF는?",
+    "expected_numbers": [
+      5,
+      13852.7,
+      -1617,
+      12235.7
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 6: 지표 전망 및 예측",
+      "reference": "CF Cell P42, P44",
+      "expected_answer": "영업현금흐름이 5% 증가해 13,852.7백만 달러가 되고 CAPEX가 -1,617백만 달러로 동일하면 2026년 FCF는 약 12,235.7백만 달러입니다.",
+      "source_status": "포함"
+    }
+  },
+  {
+    "id": "F1-Q106",
+    "question": "현재 TEV/Revenue 배수를 유지할 경우 2026년 예상 TEV는?",
+    "expected_numbers": [
+      4.76,
+      70351.9,
+      334653
+    ],
+    "expected_terms": [
+      "추정",
+      "예상"
+    ],
+    "expected_target": "IBM",
+    "expected_sheets": [
+      "Key_Stats",
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "유형 6: 지표 전망 및 예측",
+      "reference": "KS Cell E69, IS Cell Q23, L23:P23",
+      "expected_answer": "현재 TEV/Revenue 약 4.76배와 2026년 추정 매출 70,351.9백만 달러를 적용하면 예상 TEV는 약 334,653.0백만 달러입니다.",
+      "source_status": "포함"
+    }
+  }
+]

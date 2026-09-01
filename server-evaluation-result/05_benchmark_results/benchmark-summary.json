@@ -1,0 +1,163 @@
+{
+  "generated_at": "2026-09-01T12:11:00.674Z",
+  "source_base_url": "http://127.0.0.1:8765",
+  "method": {
+    "evidence_hit_at_k": "At least one audited gold cell exists in expand-context output.",
+    "evidence_recall_at_k": "Audited gold cells found in expand-context / audited gold cells.",
+    "citation_coverage": "Audited gold cells selected by Reader / audited gold cells.",
+    "limitations": "Derived/manual and unparsed gold cases remain subject to human review; empty qualitative columns are intentionally not inferred."
+  },
+  "by_dataset": {
+    "1-included-86": {
+      "runs": 172,
+      "cases": 86,
+      "answer_accuracy": 0.29069767441860467,
+      "route_accuracy": 0.5503875968992248,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.5658914728682171,
+      "evidence_cases": 162,
+      "evidence_hit_at_k": 0.469136,
+      "evidence_recall_at_k": 0.429233,
+      "citation_coverage": 0.216564,
+      "errors": 43,
+      "error_rate": 0.25,
+      "latency_seconds": {
+        "average": 14.349483,
+        "p50": 8.174,
+        "p95": 43.614,
+        "p99": 174.842
+      },
+      "average_tokens": 19983.366279,
+      "average_cost_usd": 0.002153,
+      "total_cost_usd": 0.370385,
+      "cache_hits": 0
+    },
+    "2a-87": {
+      "runs": 174,
+      "cases": 87,
+      "answer_accuracy": 0.5747126436781609,
+      "route_accuracy": 0.75,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.75,
+      "evidence_cases": 174,
+      "evidence_hit_at_k": 0.706897,
+      "evidence_recall_at_k": 0.678161,
+      "citation_coverage": 0.62931,
+      "errors": 26,
+      "error_rate": 0.14942528735632185,
+      "latency_seconds": {
+        "average": 8.817879,
+        "p50": 7.398,
+        "p95": 23.081,
+        "p99": 31.592
+      },
+      "average_tokens": 22666.908046,
+      "average_cost_usd": 0.001628,
+      "total_cost_usd": 0.283186,
+      "cache_hits": 0
+    },
+    "2b-36": {
+      "runs": 72,
+      "cases": 36,
+      "answer_accuracy": 0.4305555555555556,
+      "route_accuracy": 0.696969696969697,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.696969696969697,
+      "evidence_cases": 56,
+      "evidence_hit_at_k": 0.696429,
+      "evidence_recall_at_k": 0.594372,
+      "citation_coverage": 0.431494,
+      "errors": 6,
+      "error_rate": 0.08333333333333333,
+      "latency_seconds": {
+        "average": 11.773847,
+        "p50": 9.269,
+        "p95": 29.426,
+        "p99": 46.934
+      },
+      "average_tokens": 28359.277778,
+      "average_cost_usd": 0.002402,
+      "total_cost_usd": 0.172922,
+      "cache_hits": 0
+    }
+  },
+  "by_workflow": {
+    "bi_metric_extraction": {
+      "runs": 209,
+      "cases": 209,
+      "answer_accuracy": 0.44019138755980863,
+      "route_accuracy": 0.6610169491525424,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.6666666666666666,
+      "evidence_cases": 196,
+      "evidence_hit_at_k": 0.622449,
+      "evidence_recall_at_k": 0.583024,
+      "citation_coverage": 0.448295,
+      "errors": 32,
+      "error_rate": 0.15311004784688995,
+      "latency_seconds": {
+        "average": 12.200522,
+        "p50": 8.929,
+        "p95": 36.776,
+        "p99": 51.982
+      },
+      "average_tokens": 25212.37799,
+      "average_cost_usd": 0.002177,
+      "total_cost_usd": 0.454973,
+      "cache_hits": 0
+    },
+    "rag_query": {
+      "runs": 209,
+      "cases": 209,
+      "answer_accuracy": 0.4258373205741627,
+      "route_accuracy": 0.6686746987951807,
+      "plan_accuracy": null,
+      "sheet_exact_accuracy": 0.6746987951807228,
+      "evidence_cases": 196,
+      "evidence_hit_at_k": 0.591837,
+      "evidence_recall_at_k": 0.543611,
+      "citation_coverage": 0.412658,
+      "errors": 43,
+      "error_rate": 0.20574162679425836,
+      "latency_seconds": {
+        "average": 11.005885,
+        "p50": 7.726,
+        "p95": 31.138,
+        "p99": 46.934
+      },
+      "average_tokens": 19873.980861,
+      "average_cost_usd": 0.001778,
+      "total_cost_usd": 0.37152,
+      "cache_hits": 0
+    }
+  },
+  "second_generation_total": {
+    "runs": 246,
+    "cases": 123,
+    "answer_accuracy": 0.532520325203252,
+    "route_accuracy": 0.7336448598130841,
+    "plan_accuracy": null,
+    "sheet_exact_accuracy": 0.7336448598130841,
+    "evidence_cases": 230,
+    "evidence_hit_at_k": 0.704348,
+    "evidence_recall_at_k": 0.65776,
+    "citation_coverage": 0.581146,
+    "errors": 32,
+    "error_rate": 0.13008130081300814,
+    "latency_seconds": {
+      "average": 9.683041,
+      "p50": 8.046,
+      "p95": 25.087,
+      "p99": 42.465
+    },
+    "average_tokens": 24332.96748,
+    "average_cost_usd": 0.001854,
+    "total_cost_usd": 0.456108,
+    "cache_hits": 0
+  },
+  "automated_decisions": {
+    "fail_automated": 251,
+    "pass_automated": 141,
+    "manual_required": 26
+  }
+}

@@ -5,7 +5,10 @@ from typing import Any, cast
 
 import pytest
 
-from backend.domains.benchmark.application.execution import execute_benchmark_comparison
+from backend.domains.benchmark.application.execution import (
+    _route_score,
+    execute_benchmark_comparison,
+)
 from backend.domains.benchmark.application.service import (
     BenchmarkApplicationService,
     BenchmarkQueueUnavailableError,
@@ -76,6 +79,15 @@ def test_start_job_rejects_missing_durable_queue_before_validation() -> None:
         service.start_job(request)
 
 
+def test_benchmark_request_accepts_a_single_workflow() -> None:
+    request = BenchmarkRequest(
+        workflow_ids=["rag_query"],
+        cases=[BenchmarkCase(id="case-1", question="test")],
+    )
+
+    assert request.workflow_ids == ["rag_query"]
+
+
 def test_cancel_job_cancels_the_active_workflow_run() -> None:
     execution = WorkflowExecution()
     service = application(
@@ -130,3 +142,52 @@ def test_benchmark_execution_preserves_failed_rows_and_progress_contract() -> No
         "started",
         "completed",
     ]
+
+
+def test_route_score_compares_multi_company_targets_as_sets() -> None:
+    case = BenchmarkCase(
+        id="multi-company",
+        question="A와 B를 비교해줘",
+        expected_target="Company A; Company B",
+        expected_sheets=["Key_Stats"],
+    )
+
+    score = _route_score(
+        case,
+        {
+            "target": "Company A",
+            "targets": ["Company B", "Company A"],
+            "sheets": ["Key_Stats"],
+            "matched": True,
+        },
+    )
+
+    assert score is not None
+    assert score["correct"] is True
+    assert score["target_correct"] is True
+    assert score["target_precision"] == 1.0
+    assert score["target_recall"] == 1.0
+
+
+def test_route_score_rejects_cross_company_scope_broadening() -> None:
+    case = BenchmarkCase(
+        id="single-company",
+        question="A의 매출을 알려줘",
+        expected_target="Company A",
+        expected_sheets=["Income_Statement"],
+    )
+
+    score = _route_score(
+        case,
+        {
+            "target": "Company A",
+            "targets": ["Company A", "Company B"],
+            "sheets": ["Income_Statement"],
+            "matched": True,
+        },
+    )
+
+    assert score is not None
+    assert score["correct"] is False
+    assert score["target_precision"] == 0.5
+    assert score["target_recall"] == 1.0

@@ -61,3 +61,22 @@ def test_specialized_worker_rejects_undeclared_arguments() -> None:
         with pytest.raises(ValueError, match="추가 인자"):
             run_worker("benchmark", ("--unexpected",))
     worker.assert_not_called()
+
+
+def test_benchmark_worker_does_not_initialize_schema() -> None:
+    worker = Mock(return_value=0)
+    runtime = Mock()
+    with (
+        patch("backend.bootstrap.workers._load_worker", return_value=worker),
+        patch(
+            "backend.bootstrap.workers.RuntimeContainer.create",
+            return_value=runtime,
+        ) as create_runtime,
+    ):
+        assert run_worker("benchmark") == 0
+
+    create_runtime.assert_called_once_with(
+        initialize_schema=False,
+        require_database=True,
+    )
+    runtime.close.assert_called_once_with()

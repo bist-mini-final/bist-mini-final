@@ -9,6 +9,15 @@ from backend.domains.chatbot.domain import (
 )
 
 
+class FakeRunNodeStore:
+    def __init__(self, output: object) -> None:
+        self.output = output
+
+    def load_node(self, run_id: str, node_id: str) -> SimpleNamespace:
+        del run_id, node_id
+        return SimpleNamespace(output=self.output)
+
+
 def test_bistelligence_korean_alias_is_a_registered_company_alias() -> None:
     aliases = company_aliases("Bistelligence Inc. (NASDAQ: BSTL)")
 
@@ -174,11 +183,7 @@ def test_compacted_chat_run_validates_reader_evidence_against_expanded_context_l
         for row in range(10, 50)
     ]
     run = SimpleNamespace(id="run-1", nodes={"expand-context": SimpleNamespace(output=None)})
-    logs = SimpleNamespace(
-        load_node=lambda _run_id, _node_id: SimpleNamespace(
-            output={"cells": expanded_cells}
-        )
-    )
+    logs = FakeRunNodeStore({"cells": expanded_cells})
 
     answer = finalize_grounded_answer(
         "IBM 총자산은 151,880입니다.",
@@ -193,9 +198,7 @@ def test_compacted_chat_run_validates_reader_evidence_against_expanded_context_l
 
 def test_compacted_chat_run_never_reconstructs_reader_grounding_from_fusion() -> None:
     run = SimpleNamespace(id="run-legacy", nodes={"expand-context": SimpleNamespace(output=None)})
-    logs = SimpleNamespace(
-        load_node=lambda _run_id, _node_id: SimpleNamespace(output=None)
-    )
+    logs = FakeRunNodeStore(None)
 
     answer = finalize_grounded_answer(
         "IBM 총자산은 151,880입니다.",

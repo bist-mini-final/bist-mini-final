@@ -107,15 +107,15 @@ npm --prefix frontend run dev
 | 서비스 | 주소 |
 | --- | --- |
 | 웹 UI | <http://localhost:5173> |
-| Swagger UI | <http://localhost:8765/docs> |
-| ReDoc | <http://localhost:8765/redoc> |
-| OpenAPI JSON | <http://localhost:8765/openapi.json> |
+| Swagger UI (개발 전용) | <http://localhost:8765/docs> |
+| ReDoc (개발 전용) | <http://localhost:8765/redoc> |
+| OpenAPI JSON (개발 전용) | <http://localhost:8765/openapi.json> |
 | 상태 확인 | <http://localhost:8765/healthz> |
 | Liveness | <http://localhost:8765/livez> |
 | 준비 상태 | <http://localhost:8765/readyz> |
 | Kubernetes 작업 관제 | <http://localhost:5173/jobs> |
 
-프론트엔드 개발 서버는 `/api`, `/docs`, `/redoc`, `/openapi.json` 요청을 `http://localhost:8765`로 프록시합니다. 정식 API 경로는 `/api/v1`이며 기존 `/api` 경로도 호환용으로 유지됩니다.
+프론트엔드 개발 서버는 `/api`만 `http://localhost:8765`로 프록시합니다. API 명세는 프론트엔드와 외부 Ingress를 경유하지 않고 개발 환경의 백엔드 포트에서만 확인합니다. 정식 API 경로는 `/api/v1`이며 기존 `/api` 경로도 호환용으로 유지됩니다.
 
 ### 2.5 기동 확인
 
@@ -146,16 +146,25 @@ curl http://localhost:8765/readyz
 | `DATABASE_URL` | 없음 | 설정하면 `PGVECTOR_URL`보다 우선하는 PostgreSQL 접속 문자열 |
 | `PGVECTOR_URL` | `postgresql://postgres:postgres@localhost:5432/rag_flow` | PostgreSQL/pgvector 및 큐 저장소 주소 |
 | `REDIS_URL` | 없음 | 설정 시 API Pod 간 SSE 상태 변경 알림용 Redis Pub/Sub 주소. 상태 원본은 계속 PostgreSQL이며 Redis 장애 시 0.5초 폴링으로 안전하게 대체 |
+| `APP_ENV` | `development` | `production` 또는 `prod`이면 API 명세 비공개가 기본값 |
+| `EXPOSE_API_DOCS` | 개발 `true`, 운영 `false` | Swagger, ReDoc, OpenAPI JSON 공개 여부. 운영 배포에서는 명시적으로 `false` 사용 |
+| `AUTH_ENABLED` | `false` | 서명 세션 인증과 API RBAC 활성화. 공유·운영 배포에서는 반드시 `true` |
+| `AUTH_USERS_JSON` | 없음 | `username`, PBKDF2 `password_hash`, `role`, `tenant_id`를 가진 사용자 배열. 평문 비밀번호를 저장하지 않음 |
+| `AUTH_SESSION_SECRET` | 없음 | 세션 서명용 32자 이상 비밀값. 운영 Secret에서 주입하고 정기 교체 |
+| `AUTH_SESSION_TTL_SECONDS` | `28800` | 로그인 세션 유효 시간(300~86400초) |
+| `AUTH_COOKIE_SECURE` | 운영 `true` | HTTPS에서만 세션 쿠키 전송. HTTP 전용 로컬 k3d는 `false` |
 | `USE_PGVECTOR` | `true` | `true`, `1`, `yes`일 때 pgvector 사용 |
 | `DB_POOL_MIN_SIZE` | `2` | 백엔드 프로세스의 최소 DB 연결 수 |
 | `DB_POOL_MAX_SIZE` | 템플릿 `10`, 미설정 시 `50` | 백엔드 프로세스의 최대 DB 연결 수 |
 | `KUBERNETES_WORKFLOW_QUEUE` | `workflow-core` | 기본 워크플로 큐 이름 |
 | `KUBERNETES_DATABASE_URL` | 없음 | Kubernetes 배포에만 사용할 PostgreSQL 접속 문자열. 지정하면 `DATABASE_URL`, `PGVECTOR_URL`보다 우선 |
-| `KUBERNETES_BACKEND_IMAGE` | `bist-backend:local` | 배포할 API 이미지. 레지스트리 태그를 지정할 수 있음 |
-| `KUBERNETES_WORKER_IMAGE` | `bist-workflow-worker:local` | 배포할 KEDA 워커 이미지 |
-| `KUBERNETES_FRONTEND_IMAGE` | `bist-frontend:local` | 배포할 UI 이미지 |
+| `KUBERNETES_BACKEND_IMAGE` | `bist-backend:<git-sha>` | 배포할 API 이미지. 작업 트리가 더러우면 추적·신규 소스의 내용 지문을 포함한 `-dirty-<hash>`가 붙음 |
+| `KUBERNETES_WORKER_IMAGE` | `bist-workflow-worker:<git-sha>` | 배포할 KEDA 워커 이미지 |
+| `KUBERNETES_FRONTEND_IMAGE` | `bist-frontend:<git-sha>` | 배포할 UI 이미지 |
 | `K3D_IMPORT_IMAGES` | `true` | `true`면 로컬 빌드 이미지를 k3d에 import. 원격 레지스트리 배포 시 `false` |
-| `KUBERNETES_MAX_JOBS` | 자동 계산 | k3d/KEDA 최대 병렬 Job 수. 빈 값이면 Docker 자원으로 계산 |
+| `KUBERNETES_MAX_JOBS` | 자동 계산 | k3d/KEDA 최대 병렬 queue slot 수. 빈 값이면 Docker 자원과 parent/child Pod 쌍의 총 request로 계산 |
+| `KUBERNETES_CAPACITY_CPU_PER_SLOT` | `2` | 자동 계산에서 queue slot 하나(benchmark/ingestion parent와 workflow child)의 합산 CPU request |
+| `KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT` | `4` | 자동 계산에서 queue slot 하나의 합산 메모리 request(GiB) |
 | `KUBERNETES_JOB_CPU_REQUEST` | `1000m` | 워커 CPU request |
 | `KUBERNETES_JOB_MEMORY_REQUEST` | `2Gi` | 워커 메모리 request |
 | `KUBERNETES_JOB_CPU_LIMIT` | `2` | 워커 CPU limit |
@@ -212,7 +221,14 @@ Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
 ```bash
 ./deploy/kubernetes/local.sh all
 ./deploy/kubernetes/local.sh status
+./deploy/kubernetes/local.sh credentials
 ```
+
+첫 배포는 `bist-auth-env`에 PBKDF2 비밀번호 해시와 세션 서명 키를 생성하고,
+초기 관리자 자격 증명은 별도 `bist-auth-bootstrap` Secret에 보관합니다.
+`credentials` 명령으로 확인한 뒤 공유 환경에서는 bootstrap Secret을 삭제하고
+조직의 Secret 관리자와 계정 수명주기 정책으로 교체하세요. HTTP 로컬 배포 외에는
+`AUTH_COOKIE_SECURE=true`와 유효한 TLS 인증서가 필수입니다.
 
 `all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 `uv.lock`에 고정된 CPU 애플리케이션 의존성만 설치합니다.
 
@@ -264,7 +280,7 @@ New-NetFirewallRule -DisplayName "Excel RAG k3d Ingress HTTP 8080" `
 
 일반 HTTP 원격 origin은 브라우저의 secure context가 아니므로 `crypto.randomUUID()`가 제공되지 않을 수 있습니다. 프론트의 client-side 식별자는 공통 UUID 유틸에서 `crypto.getRandomValues()` 기반 폴백을 사용합니다. 이는 브라우저 호환 조치일 뿐 전송 구간을 암호화하지 않으므로, 공개 서비스의 HTTPS 요구사항을 대체하지 않습니다.
 
-> **보안 경계:** 8443은 예약 포트일 뿐 TLS 인증서가 자동 구성되는 것은 아닙니다. 인증·인가가 없는 개발 배포를 인터넷에 그대로 공개하면 제3자가 데이터 조회, 파일 업로드, Job 실행 및 유료 모델 호출을 수행할 수 있습니다. 외부 공개 시에는 VPN 또는 공유기 source-IP 제한을 우선 사용하고, 공개 서비스라면 TLS reverse proxy와 인증 계층을 먼저 구성합니다.
+> **보안 경계:** 운영 API는 `APP_ENV=production`, `EXPOSE_API_DOCS=false`로 기동하며 Ingress/Nginx도 `/docs`, `/redoc`, `/openapi.json`과 내부 probe 경로를 외부에 라우팅하지 않습니다. 공유 k3d 배포는 PBKDF2 계정, 서명 HttpOnly 세션, viewer/operator/admin RBAC와 단일 tenant 경계를 자동 활성화합니다. API에는 보안 응답 헤더를, Ingress에는 연결·요청 속도 제한과 표준 `429` 응답을 적용합니다. Excel 업로드는 buffering 없이 application으로 전달되고 `.xlsx`/`.xlsm` Open XML 구조와 500 MiB 상한을 검증합니다. 8443은 예약 포트일 뿐 TLS 인증서가 자동 구성되는 것은 아닙니다. 인터넷 공개 전에는 유효 인증서, 외부 443 forwarding, `AUTH_COOKIE_SECURE=true`, HTTP→HTTPS redirect를 함께 구성하세요.
 
 원격 레지스트리로 배포할 때는 이미지를 별도로 `docker push`한 후, import를 끄고 불변 태그를 지정합니다.
 

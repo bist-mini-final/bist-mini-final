@@ -32,9 +32,12 @@ flowchart TB
 - rendered KEDA worker spec은 queue/command/environment 계약과 일치합니다.
 - Alembic revision chain의 head는 하나이며 runtime schema와 migration schema 사이 drift가 없어야 합니다.
 - `/api/v1` OpenAPI에 정식 route가 노출되고 제거된 comparison legacy route는 나타나지 않습니다.
+- 운영 composition에서는 `/docs`, `/redoc`, `/openapi.json`이 404이고 frontend/Ingress가 해당 경로를 backend로 전달하지 않아야 합니다.
+- API/SPA 응답의 보안 헤더, Ingress rate limit과 `429` 정책, 500 MiB 업로드 전달 계약, Git SHA image tag와 OCI provenance label을 architecture/HTTP 계약 테스트로 고정합니다.
+- 인증 contract는 익명 `401`, PBKDF2 credential 검증, Secure/HttpOnly/SameSite cookie, viewer/operator/admin method 권한, tenant header 위반 `403`, 변조·만료 token 거부와 principal 기반 Chat 소유권을 단위·배포 실측으로 검증합니다.
 - registry는 정확히 17개 module type을 노출합니다.
-- scope-aware Decomposer는 다중 scope의 미등록 collection ID를 거부하고, 서버가 고정한 단일 scope에서만 ID 오탈자를 유일한 catalog 항목으로 복구합니다.
-- Reader terminal LLM 출력은 strict `answer_markdown + evidence_ids` schema를 따르고, 반환 `CellEvidenceDTO[]`는 실제 값 후보 및 실행 근거 allowlist를 통과해야 합니다.
+- scope-aware Decomposer는 알려진/미등록 collection ID 혼합과 기업 불일치를 거부합니다. selection의 기업이 catalog에서 정확히 하나의 canonical 기업으로 해석되고 반환 ID가 전부 미등록인 경우에만 그 기업 scope로 복구하며, catalog에 실제 존재하는 기업을 모델이 unresolved로 중복 표기한 false negative와 빈 plan 1회 재시도·비용 합산을 회귀 검증합니다. 명시적 `총매출/매출`, `총부채/총차입금`, source sheet 보존과 multi-route 비전파도 별도 회귀시험으로 고정합니다.
+- Reader terminal LLM 출력은 strict `answer_markdown + evidence_ids` schema를 따르고, 반환 `CellEvidenceDTO[]`는 실제 값 후보 및 실행 근거 allowlist를 통과해야 합니다. 본문만 생성하고 ID를 누락한 경우 원 질문·전체 후보 동일성, 단 1회 재시도, usage 합산, 근거 부족 응답의 무재시도를 검증합니다.
 - 챗봇 message의 `content`와 `evidence[]`는 독립 저장·API 필드이며 frontend는 Markdown 좌표 문자열을 근거 배지로 파싱하지 않습니다.
 - compact 챗봇 run은 durable `expand-context` 로그의 전체 셀로만 Reader 근거를 검증합니다. `fuse` 결과·top-N·pgvector 재조회로 근거를 재구성하지 않으며 Reader가 선택한 sheet/cell과 collection/workbook/company identity를 정확히 대조합니다.
 - frontend는 같은 workbook·company·sheet의 셀 근거를 시트 배지 하나로 묶되 다른 workbook을 합치지 않고, modal에서 resolve된 bbox 수만큼 빨간 경계 상자를 렌더링합니다.
@@ -74,6 +77,8 @@ CI의 PostgreSQL/pgvector·Redis service 환경에서는 다음 경로를 검증
 - 서로 다른 state stream 인스턴스 간 Redis change hint 후 DB 재조회
 - BI materialization/question의 native async API
 - benchmark queue와 case result persistence
+- 다기업 benchmark route는 첫 collection 하나가 아니라 `targets[]` 집합의 exact/precision/recall로 채점하며 `expected_target`의 세미콜론 표기를 호환 입력으로 해석합니다. 현재 질문에 구성원이 없는 `세 회사` 같은 집합 문항은 catalog 전체로 확장하지 않고 평가셋 범위 결함으로 별도 기록합니다.
+- Holdout 관찰 뒤 prompt·routing·Reader를 바꾼 재실행은 기존 Holdout을 덮어쓰지 않고 `post-hoc remediation`으로 분리합니다.
 - Alembic upgrade와 KEDA ScaledJob renderer
 
 외부 OpenAI 호출과 실제 Kubernetes cluster 배포는 비용·credential·환경 의존성이 있으므로 기본 결정론적 CI와 분리합니다.

@@ -377,6 +377,48 @@ async def test_current_or_refresh_automatically_adds_a_new_bi_snapshot() -> None
 
 
 @pytest.mark.anyio
+async def test_current_or_refresh_detects_updated_payload_with_same_bi_snapshot_id() -> None:
+    incomplete = _snapshot(
+        "company-c",
+        "Gamma",
+        growth=Decimal("0.07"),
+        margin=Decimal("0.15"),
+        include_assets=False,
+    )
+    source = FakeSource(
+        (
+            _snapshot("company-a", "Alpha", growth=Decimal("0.10"), margin=Decimal("0.20")),
+            _snapshot("company-b", "Beta", growth=Decimal("0.04"), margin=Decimal("0.12")),
+            incomplete,
+        )
+    )
+    repository = MemorySnapshotRepository()
+    service = CompanyComparisonService(source, repository)
+
+    first = await service.refresh()
+    assert {item.display_name for item in first.exclusions} == {"Gamma"}
+
+    complete = _snapshot(
+        "company-c",
+        "Gamma",
+        growth=Decimal("0.07"),
+        margin=Decimal("0.15"),
+    ).model_copy(update={"snapshot": incomplete.snapshot})
+    source.items[complete.company.company_id] = complete
+
+    refreshed = await service.current_or_refresh()
+
+    assert refreshed is not None
+    assert {company.display_name for company in refreshed.companies} == {
+        "Alpha",
+        "Beta",
+        "Gamma",
+    }
+    assert refreshed.exclusions == ()
+    assert repository.publish_count == 2
+
+
+@pytest.mark.anyio
 async def test_current_or_refresh_keeps_last_snapshot_during_source_gap() -> None:
     source = FakeSource(
         (

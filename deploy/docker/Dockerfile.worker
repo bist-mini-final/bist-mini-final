@@ -40,3 +40,12 @@ USER appuser
 ENTRYPOINT ["python", "-m", "backend.entrypoints.worker"]
 
 FROM base AS runtime
+
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+ARG SOURCE_DIRTY=false
+
+LABEL org.opencontainers.image.title="Excel RAG workflow worker" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      io.bist.source-dirty="${SOURCE_DIRTY}"

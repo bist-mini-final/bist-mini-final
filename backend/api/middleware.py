@@ -17,6 +17,36 @@ from backend.shared.application.observability import (
 
 logger = logging.getLogger("backend.api.middleware")
 
+_API_CSP = "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Apply browser hardening headers without assuming TLS termination."""
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=()",
+        )
+        path = request.url.path
+        if path.startswith("/api/") or path in {"/healthz", "/livez", "/readyz"}:
+            response.headers.setdefault("Content-Security-Policy", _API_CSP)
+        forwarded_proto = request.headers.get("X-Forwarded-Proto", "")
+        if request.url.scheme == "https" or forwarded_proto.casefold() == "https":
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        return response
+
 
 class RequestObservabilityMiddleware(BaseHTTPMiddleware):
     """Attach request correlation and server processing-time headers."""
@@ -52,10 +82,10 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
             and path != API_V1_PREFIX
             and not path.startswith(f"{API_V1_PREFIX}/")
         ):
-            successor = f"{API_V1_PREFIX}{path[len(LEGACY_API_PREFIX):]}"
+            successor = f"{API_V1_PREFIX}{path[len(LEGACY_API_PREFIX) :]}"
             response.headers["Deprecation"] = "true"
             response.headers["Link"] = f'<{successor}>; rel="successor-version"'
         return response
 
 
-__all__ = ["RequestObservabilityMiddleware"]
+__all__ = ["RequestObservabilityMiddleware", "SecurityHeadersMiddleware"]

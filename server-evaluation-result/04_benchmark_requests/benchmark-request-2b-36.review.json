@@ -1,0 +1,789 @@
+[
+  {
+    "id": "F2B-U1-01",
+    "question": "기업 A가 최근 결산에서 올린 전체 매출은 얼마 정도야?",
+    "expected_numbers": [
+      18000
+    ],
+    "expected_terms": [],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "단일 지표 조회",
+      "reference": "전체 매출 → Total Revenue",
+      "expected_answer": "IS P23, 18,000"
+    }
+  },
+  {
+    "id": "F2B-U1-02",
+    "question": "기업 A는 2025년에 영업으로 현금을 얼마나 벌어들였어?",
+    "expected_numbers": [
+      2844
+    ],
+    "expected_terms": [],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "단일 지표 조회",
+      "reference": "영업으로 번 현금 → Cash from Operations",
+      "expected_answer": "CF P42, 2,844"
+    }
+  },
+  {
+    "id": "F2B-U1-03",
+    "question": "Coldplay가 최근 기준으로 안고 있는 차입금은 전부 얼마야?",
+    "expected_numbers": [
+      2124
+    ],
+    "expected_terms": [],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "단일 지표 조회",
+      "reference": "차입금 전체 → Total Debt",
+      "expected_answer": "BS P130, 2,124"
+    }
+  },
+  {
+    "id": "F2B-U1-04",
+    "question": "Coldplay는 2025년에 본업으로 얼마의 이익을 남겼어?",
+    "expected_numbers": [
+      1805
+    ],
+    "expected_terms": [],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "단일 지표 조회",
+      "reference": "본업 이익 → Operating Income / EBIT",
+      "expected_answer": "IS P43, 1,805"
+    }
+  },
+  {
+    "id": "F2B-U1-05",
+    "question": "DH Innovation이 1년 안에 현금화할 수 있는 자산을 다 합치면 얼마야?",
+    "expected_numbers": [
+      5270
+    ],
+    "expected_terms": [],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "단일 지표 조회",
+      "reference": "1년 내 현금화 자산 → Total Current Assets",
+      "expected_answer": "BS P34, 5,270"
+    }
+  },
+  {
+    "id": "F2B-U1-06",
+    "question": "DH Innovation은 2025년에 최종적으로 이익을 냈어, 손실을 냈어?",
+    "expected_numbers": [
+      -628,
+      628
+    ],
+    "expected_terms": [
+      "손실"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "단일 지표 조회",
+      "reference": "최종 이익 → Net Income to Company",
+      "expected_answer": "IS P71, -628. 즉 628 손실"
+    }
+  },
+  {
+    "id": "F2B-U2-01",
+    "question": "기업 A는 최근 3년 동안 매출이 꾸준히 성장한 회사야?",
+    "expected_numbers": [
+      14600,
+      16200,
+      18000
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "기간 및 추세 분석",
+      "reference": "IS N23:P23",
+      "expected_answer": "14,600→16,200→18,000으로 2년 연속 증가. 꾸준히 성장했다고 볼 수 있음"
+    }
+  },
+  {
+    "id": "F2B-U2-02",
+    "question": "기업 A의 현금창출력도 최근 계속 좋아지고 있어?",
+    "expected_numbers": [
+      2088,
+      2430,
+      2844
+    ],
+    "expected_terms": [
+      "개선"
+    ],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "기간 및 추세 분석",
+      "reference": "CF N42:P42",
+      "expected_answer": "2,088→2,430→2,844로 지속 개선"
+    }
+  },
+  {
+    "id": "F2B-U2-03",
+    "question": "Coldplay는 재고 부담이 최근 줄어드는 추세야?",
+    "expected_numbers": [
+      448,
+      445,
+      443
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "기간 및 추세 분석",
+      "reference": "BS N26:P26",
+      "expected_answer": "448→445→443으로 완만하게 감소"
+    }
+  },
+  {
+    "id": "F2B-U2-04",
+    "question": "Coldplay가 영업으로 벌어들이는 현금은 안정적으로 늘고 있어?",
+    "expected_numbers": [
+      2042,
+      2120,
+      2213
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "기간 및 추세 분석",
+      "reference": "CF N42:P42",
+      "expected_answer": "2,042→2,120→2,213으로 완만하고 안정적으로 증가"
+    }
+  },
+  {
+    "id": "F2B-U2-05",
+    "question": "DH Innovation은 차입금을 조금 줄였는데도 실제 빚 부담이 커지고 있어?",
+    "expected_numbers": [
+      4409,
+      4347,
+      4340,
+      3820,
+      3878,
+      3968
+    ],
+    "expected_terms": [
+      "증가",
+      "감소"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "기간 및 추세 분석",
+      "reference": "BS N130:P130, N133:P133",
+      "expected_answer": "총차입금은 4,409→4,347→4,340으로 소폭 감소했지만 순차입금은 3,820→3,878→3,968로 증가. 현금 감소 때문에 실질 부담은 커짐"
+    }
+  },
+  {
+    "id": "F2B-U2-06",
+    "question": "DH Innovation의 매출 하락은 최근에도 계속 이어지고 있어?",
+    "expected_numbers": [
+      15100,
+      13800,
+      12400
+    ],
+    "expected_terms": [
+      "감소"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "기간 및 추세 분석",
+      "reference": "IS N23:P23",
+      "expected_answer": "15,100→13,800→12,400으로 2년 연속 감소"
+    }
+  },
+  {
+    "id": "F2B-U3-01",
+    "question": "기업 A는 지금 가진 현금성 자산으로 차입금을 전부 갚고도 남아?",
+    "expected_numbers": [
+      3060,
+      1260,
+      1800
+    ],
+    "expected_terms": [
+      "순현금"
+    ],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "복수 지표 조회 및 비교",
+      "reference": "BS P19, P130",
+      "expected_answer": "현금·단기투자자산 3,060, 차입금 1,260. 전부 갚고 1,800이 남는 순현금 상태"
+    }
+  },
+  {
+    "id": "F2B-U3-02",
+    "question": "Coldplay는 자산에서 부채를 전부 빼면 얼마나 남아?",
+    "expected_numbers": [
+      13505,
+      6675,
+      6830
+    ],
+    "expected_terms": [],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "복수 지표 조회 및 비교",
+      "reference": "BS P50, P74, P88",
+      "expected_answer": "13,505-6,675=6,830. 총자본 P88과 일치"
+    }
+  },
+  {
+    "id": "F2B-U3-03",
+    "question": "Coldplay가 2025년에 영업으로 번 현금만으로 투자활동 전체를 감당했어?",
+    "expected_numbers": [
+      2213,
+      1148,
+      1065
+    ],
+    "expected_terms": [],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "복수 지표 조회 및 비교",
+      "reference": "CF P42, P53",
+      "expected_answer": "CFO 2,213이 투자활동 순유출 1,148보다 커서 감당 가능. 투자 후 1,065가 남음"
+    }
+  },
+  {
+    "id": "F2B-U3-04",
+    "question": "DH Innovation은 매출총이익을 내고도 영업에서는 적자인 거야?",
+    "expected_numbers": [
+      2976,
+      -372
+    ],
+    "expected_terms": [],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "복수 지표 조회 및 비교",
+      "reference": "IS P29, P43",
+      "expected_answer": "매출총이익 2,976은 양수지만 영업이익은 -372이므로 맞음"
+    }
+  },
+  {
+    "id": "F2B-U3-05",
+    "question": "세 회사 중 매출이 가장 큰 회사가 EBITDA 수익성도 가장 좋아?",
+    "expected_numbers": [
+      18000,
+      20,
+      17700,
+      15.4,
+      12400,
+      3.5
+    ],
+    "expected_terms": [],
+    "expected_target": "기업 A; Coldplay",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "복수 지표 조회 및 비교",
+      "reference": "각 사 KS I33, I40",
+      "expected_answer": "기업 A가 매출 18,000으로 최대이며 EBITDA 마진도 20.0%로 최고. Coldplay 17,700·15.40%, DH 12,400·3.50%"
+    }
+  },
+  {
+    "id": "F2B-U3-06",
+    "question": "세 회사 중 가진 현금성 자산에 비해 차입금이 가장 부담스러운 곳은 어디야?",
+    "expected_numbers": [
+      372,
+      4340,
+      3968
+    ],
+    "expected_terms": [],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "복수 지표 조회 및 비교",
+      "reference": "각 사 BS P19, P130, P133",
+      "expected_answer": "DH Innovation. 현금성 자산 372, 차입금 4,340, 순차입금 3,968로 격차가 가장 큼"
+    }
+  },
+  {
+    "id": "F2B-U4-01",
+    "question": "기업 A는 매출 100달러당 EBITDA를 얼마나 남겨?",
+    "expected_numbers": [
+      20
+    ],
+    "expected_terms": [],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "재무 계산",
+      "reference": "IS P101÷P23 = 3,600÷18,000",
+      "expected_answer": "20.0달러, EBITDA 마진 20.0%"
+    }
+  },
+  {
+    "id": "F2B-U4-02",
+    "question": "기업 A가 2025년에 영업으로 번 현금에서 설비투자까지 하고 나면 얼마가 남아?",
+    "expected_numbers": [
+      1458
+    ],
+    "expected_terms": [],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "재무 계산",
+      "reference": "CF P42+P44 = 2,844+(-1,386)",
+      "expected_answer": "1,458. Levered FCF P85와 일치"
+    }
+  },
+  {
+    "id": "F2B-U4-03",
+    "question": "Coldplay의 차입금에서 현금성 자산을 빼면 실제 부담은 얼마야?",
+    "expected_numbers": [
+      -354,
+      354
+    ],
+    "expected_terms": [
+      "순현금"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "재무 계산",
+      "reference": "BS P130-P19 = 2,124-2,478",
+      "expected_answer": "-354. 순차입금이 음수이므로 354의 순현금 상태"
+    }
+  },
+  {
+    "id": "F2B-U4-04",
+    "question": "Coldplay 매출은 2024년보다 2025년에 얼마나 늘었어?",
+    "expected_numbers": [
+      600,
+      3.51
+    ],
+    "expected_terms": [
+      "증가"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "재무 계산",
+      "reference": "(17,700-17,100)÷17,100",
+      "expected_answer": "600 증가, 약 3.51% 증가"
+    }
+  },
+  {
+    "id": "F2B-U4-05",
+    "question": "DH Innovation은 단기 자산으로 단기 부채를 몇 배 정도 감당할 수 있어?",
+    "expected_numbers": [
+      1.29
+    ],
+    "expected_terms": [],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Balance_Sheet"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "재무 계산",
+      "reference": "BS P34÷P64 = 5,270÷4,092",
+      "expected_answer": "약 1.29배"
+    }
+  },
+  {
+    "id": "F2B-U4-06",
+    "question": "현재 EBITDA로 순차입금을 갚는다고 보면 어느 회사가 가장 오래 걸릴까?",
+    "expected_numbers": [
+      -0.5,
+      -0.13,
+      9.14
+    ],
+    "expected_terms": [
+      "순현금"
+    ],
+    "expected_target": "기업 A; Coldplay",
+    "expected_sheets": [
+      "Balance_Sheet",
+      "Income_Statement"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "재무 계산",
+      "reference": "Net Debt÷EBITDA",
+      "expected_answer": "기업 A -0.50배, Coldplay -0.13배, DH 9.14배. DH가 가장 오래 걸리며 앞의 두 회사는 순현금 상태"
+    }
+  },
+  {
+    "id": "F2B-U5-01",
+    "question": "기업 A는 영업현금을 많이 벌었는데 왜 현금 증가액은 313에 그쳤어?",
+    "expected_numbers": [
+      2844,
+      1763,
+      768,
+      313
+    ],
+    "expected_terms": [
+      "순현금",
+      "증가"
+    ],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "심층 추론 및 원인 분석",
+      "reference": "CF P42, P53, P74, P78",
+      "expected_answer": "CFO 2,844에서 투자활동 1,763과 자금조달 768의 순유출이 발생해 순현금 증가가 313으로 제한됨"
+    }
+  },
+  {
+    "id": "F2B-U5-02",
+    "question": "Coldplay의 영업현금 증가가 재고 감소 덕분이라고 단정해도 돼?",
+    "expected_numbers": [
+      448,
+      445,
+      443,
+      2042,
+      2120,
+      2213
+    ],
+    "expected_terms": [
+      "증가",
+      "감소",
+      "단정할 수는 없음"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Balance_Sheet",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "심층 추론 및 원인 분석",
+      "reference": "BS N:P26, CF N:P42",
+      "expected_answer": "재고 448→445→443 감소와 CFO 2,042→2,120→2,213 증가가 함께 나타나지만, 이 수치만으로 재고 감소가 직접 원인이라고 단정할 수는 없음"
+    }
+  },
+  {
+    "id": "F2B-U5-03",
+    "question": "Coldplay의 최근 실적은 안정적인 질적 개선으로 볼 수 있어?",
+    "expected_numbers": [],
+    "expected_terms": [
+      "증가",
+      "감소",
+      "개선"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Income_Statement",
+      "Balance_Sheet",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "심층 추론 및 원인 분석",
+      "reference": "IS N:P23·101, BS N:P26, CF N:P42·85",
+      "expected_answer": "매출·EBITDA·CFO·FCF가 모두 완만하게 증가하고 재고는 감소해 질적 개선으로 볼 근거가 충분함. 다만 성장 속도는 낮은 안정형임"
+    }
+  },
+  {
+    "id": "F2B-U5-04",
+    "question": "DH Innovation은 잠깐 실적이 안 좋은 거야, 아니면 상태가 계속 나빠지고 있는 거야?",
+    "expected_numbers": [
+      15100,
+      12400,
+      151,
+      -372,
+      3820,
+      3968,
+      393,
+      62
+    ],
+    "expected_terms": [
+      "악화"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Income_Statement",
+      "Balance_Sheet",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "심층 추론 및 원인 분석",
+      "reference": "IS N:P23·43, BS N:P133, CF N:P42",
+      "expected_answer": "매출 15,100→12,400, EBIT 151→-372, 순차입금 3,820→3,968, CFO 393→62가 동시에 악화돼 단기 변동보다 구조적 악화에 가까움"
+    }
+  },
+  {
+    "id": "F2B-U5-05",
+    "question": "DH Innovation이 현재 차입금을 감당하기 부담스러운 수준이라고 봐도 돼?",
+    "expected_numbers": [
+      372,
+      4340,
+      3968,
+      434,
+      62,
+      1066,
+      1.29
+    ],
+    "expected_terms": [
+      "단정할 수는 없음",
+      "지급불능을 단정할 수는 없음"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Balance_Sheet",
+      "Income_Statement",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "심층 추론 및 원인 분석",
+      "reference": "BS P19·P88·P130·P133, IS P101, CF P42",
+      "expected_answer": "현금성 자산 372 대비 차입금 4,340, 순차입금 3,968, EBITDA 434, CFO 62로 부담이 매우 큼. 자본 1,066과 유동비율 약 1.29배는 양수이므로 지급불능을 단정할 수는 없음"
+    }
+  },
+  {
+    "id": "F2B-U5-06",
+    "question": "세 회사 중 재무적으로 가장 안정적인 회사와 가장 우려되는 회사는 어디야?",
+    "expected_numbers": [],
+    "expected_terms": [
+      "순현금"
+    ],
+    "expected_target": "기업 A; Coldplay; DH Innovation",
+    "expected_sheets": [
+      "Key_Stats",
+      "Balance_Sheet",
+      "Cash_Flow"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "심층 추론 및 원인 분석",
+      "reference": "각 사 KS I33:I49, BS P19·P130·P133, CF P42·P85",
+      "expected_answer": "가장 안정적인 곳은 기업 A, 가장 우려되는 곳은 DH Innovation. Coldplay는 성장률은 낮지만 순현금과 양의 FCF를 보유한 중간 위치"
+    }
+  },
+  {
+    "id": "F2B-U6-01",
+    "question": "기업 A의 성장세가 내년에도 이어질까?",
+    "expected_numbers": [
+      18000,
+      20160,
+      12,
+      11.11
+    ],
+    "expected_terms": [
+      "증가",
+      "예상"
+    ],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "지표 전망 및 예측",
+      "reference": "2025 KS I33·I34, 2026E KS N33·N34",
+      "expected_answer": "매출 18,000→20,160으로 12% 증가 예상. 2025년 성장률 11.11%보다 소폭 빨라짐"
+    }
+  },
+  {
+    "id": "F2B-U6-02",
+    "question": "내년에도 기업 A의 영업수익성이 더 좋아질 것으로 보고 있어?",
+    "expected_numbers": [
+      14.5,
+      15.5,
+      1
+    ],
+    "expected_terms": [
+      "개선",
+      "예상"
+    ],
+    "expected_target": "기업 A",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "지표 전망 및 예측",
+      "reference": "2025 KS I43, 2026E KS N43",
+      "expected_answer": "EBIT 마진 14.5%→15.5%로 1.0%p 개선 예상"
+    }
+  },
+  {
+    "id": "F2B-U6-03",
+    "question": "Coldplay 내년 매출은 올해보다 얼마나 더 나올 것으로 예상돼?",
+    "expected_numbers": [
+      17700,
+      18408,
+      708,
+      4
+    ],
+    "expected_terms": [
+      "증가",
+      "예상"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "지표 전망 및 예측",
+      "reference": "2025 KS I33, 2026E KS N33·N34",
+      "expected_answer": "17,700→18,408. 708 증가, 4.0% 성장 예상"
+    }
+  },
+  {
+    "id": "F2B-U6-04",
+    "question": "Coldplay 주당이익은 내년에 얼마나 좋아질 것으로 보여?",
+    "expected_numbers": [
+      1.309,
+      1.325,
+      0.016,
+      1.25
+    ],
+    "expected_terms": [
+      "증가",
+      "예상"
+    ],
+    "expected_target": "Coldplay",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "지표 전망 및 예측",
+      "reference": "2025 KS I51, 2026E KS N51",
+      "expected_answer": "약 1.309달러→1.325달러. 약 0.016달러, 약 1.25% 증가 예상"
+    }
+  },
+  {
+    "id": "F2B-U6-05",
+    "question": "DH Innovation은 내년에 영업적자에서 벗어날 수 있을까?",
+    "expected_numbers": [
+      -3,
+      -4,
+      -2
+    ],
+    "expected_terms": [
+      "적자",
+      "개선",
+      "악화",
+      "예상"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "지표 전망 및 예측",
+      "reference": "2025 KS I43, 2026E~2028E KS N:P43",
+      "expected_answer": "EBIT 마진이 -3.0%에서 2026년 -4.0%로 악화된 뒤 -3.0%, -2.0%로 개선되지만 2028년까지 영업적자 예상"
+    }
+  },
+  {
+    "id": "F2B-U6-06",
+    "question": "DH Innovation은 전망 기간 안에 순이익 흑자로 돌아설 것으로 예상돼?",
+    "expected_numbers": [
+      -5.06,
+      -4.5,
+      -3.5,
+      -2.5
+    ],
+    "expected_terms": [
+      "적자",
+      "개선",
+      "예상"
+    ],
+    "expected_target": "DH Innovation",
+    "expected_sheets": [
+      "Key_Stats"
+    ],
+    "expected_abstain": false,
+    "_review": {
+      "category": "지표 전망 및 예측",
+      "reference": "2025 KS I49, 2026E~2028E KS N:P49",
+      "expected_answer": "순이익률 -5.06%에서 -4.5%, -3.5%, -2.5%로 개선되지만 2028년까지 적자 예상"
+    }
+  }
+]

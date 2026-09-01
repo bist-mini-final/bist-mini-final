@@ -1,0 +1,29 @@
+{
+  "generatedAt": "2026-09-01T12:37:10.473Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "applicationFileLimitBytes": 524288000,
+  "cases": [
+    {
+      "size": 524288000,
+      "status": 422,
+      "uploadedBytes": 524288227,
+      "curlSeconds": 9.282468,
+      "wallSeconds": 9.327,
+      "bodyPreview": "{\"detail\":{\"code\":\"DATA_SOURCE_FILE_TYPE_UNSUPPORTED\",\"message\":\"파일 확장자와 내용이 일치하는 Open XML Excel 파일이 아닙니다.\",\"retryable\":false,\"context\":{}}}",
+      "stderr": ""
+    },
+    {
+      "size": 524288001,
+      "status": 413,
+      "uploadedBytes": 524288228,
+      "curlSeconds": 8.817988,
+      "wallSeconds": 8.872,
+      "bodyPreview": "{\"detail\":{\"code\":\"DATA_SOURCE_FILE_TOO_LARGE\",\"message\":\"파일 크기는 500MB를 초과할 수 없습니다.\",\"retryable\":false,\"context\":{}}}",
+      "stderr": ""
+    }
+  ],
+  "expected": {
+    "exactLimit": "Application accepts the byte count, then rejects the zero-filled body as invalid OpenXML (422).",
+    "overLimit": "Application rejects the file-size boundary (413) without creating an ingestion job."
+  }
+}

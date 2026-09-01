@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from modules.common.base_llm import (
+    ApiUsageDTO,
     BaseLLMModule,
     ModuleConfigDTO,
     ModuleDefinition,
@@ -48,6 +49,26 @@ Rules:
 8. A subquery may select multiple collections only when they belong to the same
    requested company and the answer genuinely spans those workbooks.
 9. Never create a retrieval item or index_id for an attachment-owned company.
+10. For forward estimates, forecasts, outlooks, or future margin/EPS questions,
+    prefer the exact Key_Stats sheet when that sheet exists in the selected
+    company's catalog. Historical actual statements remain on their statement
+    sheets unless the question explicitly asks for a Key Stats value.
+11. Emit one atomic item for every operand needed by a comparison, trend,
+    accounting identity, ratio, or derived calculation. Select only the minimum
+    exact sheets required by those operands; do not add a merely related sheet.
+12. Generic group phrases such as "the three companies" are not company names.
+    Do not guess which catalog companies they mean when the current question
+    does not name the members explicitly.
+13. unresolved_companies may contain only literal company identities named in
+    the current question. Never place a metric, account label, transaction,
+    period, or generic group phrase in unresolved_companies.
+14. Preserve the distinction between workbook metrics. Explicit 총매출 or
+    Total Revenue means Total Revenue. Bare 매출 or 매출액 means Revenue unless
+    the user explicitly asks for the consolidated total.
+15. Preserve explicit source wording. 현금흐름표/Cash Flow Statement,
+    손익계산서/Income Statement, 재무상태표/Balance Sheet, and Key Stats in the
+    question are hard sheet constraints, not suggestions. Distinguish
+    총부채/Total Liabilities from 총차입금/Total Debt.
 """
 
 
@@ -130,6 +151,83 @@ class DecomposerModule(BaseLLMModule):
         return UNKNOWN_FIELD
 
     @classmethod
+    def _canonical_row_header(cls, question: str, requested_row_header: str) -> str:
+        """Preserve explicit metric distinctions that models often collapse.
+
+        Spreadsheet workbooks commonly contain both ``Revenue`` and
+        ``Total Revenue``. Bare ``매출``/``매출액`` must not be silently widened
+        because the workbook defines them as different FEATUREs. The same is
+        true for accounting liabilities versus interest-bearing debt. Repairs
+        fire only when the original question states the exact distinction.
+        """
+
+        normalized_row = cls._normalize_reference(requested_row_header)
+        normalized_question = cls._normalize_reference(question)
+        if normalized_row == "revenue":
+            asks_for_total_revenue = any(
+                token in normalized_question for token in ("총매출", "totalrevenue")
+            )
+            qualified_revenue = any(
+                token in normalized_question
+                for token in (
+                    "부문",
+                    "세그먼트",
+                    "제품",
+                    "서비스",
+                    "구독",
+                    "광고",
+                    "segment",
+                    "product",
+                    "service",
+                    "subscription",
+                    "advertising",
+                )
+            )
+            return (
+                "Total Revenue"
+                if asks_for_total_revenue and not qualified_revenue
+                else requested_row_header
+            )
+
+        debt_aliases = {"debt", "totaldebt", "totalliabilities", "liabilities"}
+        if normalized_row in debt_aliases:
+            if any(
+                token in normalized_question
+                for token in ("총부채", "부채총계", "totalliabilities")
+            ):
+                return "Total Liabilities"
+            if any(
+                token in normalized_question
+                for token in ("총차입금", "차입금전부", "totaldebt")
+            ):
+                return "Total Debt"
+        return requested_row_header
+
+    @classmethod
+    def _explicit_sheet_from_question(
+        cls,
+        question: str,
+        scopes: List[DataScopeDTO],
+    ) -> str:
+        """Resolve only a sheet name stated explicitly by the user."""
+
+        normalized_question = cls._normalize_reference(question)
+        hints = (
+            (("현금흐름표", "cashflowstatement", "cashflow"), "Cash_Flow"),
+            (("손익계산서", "incomestatement"), "Income_Statement"),
+            (("재무상태표", "대차대조표", "balancesheet"), "Balance_Sheet"),
+            (("keystats", "핵심재무지표"), "Key_Stats"),
+        )
+        matches = [
+            canonical
+            for tokens, canonical in hints
+            if any(token in normalized_question for token in tokens)
+        ]
+        if len(matches) != 1:
+            return UNKNOWN_FIELD
+        return cls._canonical_sheet(matches[0], scopes)
+
+    @classmethod
     def _company_matches_scopes(
         cls,
         requested_company: str,
@@ -186,9 +284,7 @@ class DecomposerModule(BaseLLMModule):
             ):
                 partial_matches.append(scope)
 
-        companies = {
-            cls._normalize_reference(scope.company_name) for scope in partial_matches
-        }
+        companies = {cls._normalize_reference(scope.company_name) for scope in partial_matches}
         return partial_matches if len(companies) == 1 else []
 
     @staticmethod
@@ -206,8 +302,7 @@ class DecomposerModule(BaseLLMModule):
             # access; multi-scope workflows still fail closed below.
             return [next(iter(catalog_by_id))], True
         raise ModuleExecutionError(
-            "Decomposer가 catalog에 없는 collection을 반환했습니다: "
-            + ", ".join(unknown_ids)
+            "Decomposer가 catalog에 없는 collection을 반환했습니다: " + ", ".join(unknown_ids)
         )
 
     @staticmethod
@@ -228,9 +323,7 @@ class DecomposerModule(BaseLLMModule):
             {
                 "question": input_data.query_context.question_text,
                 "data_scope_catalog": catalog_payload,
-                "external_context_sources": (
-                    input_data.query_context.external_context_sources
-                ),
+                "external_context_sources": (input_data.query_context.external_context_sources),
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -253,6 +346,140 @@ class DecomposerModule(BaseLLMModule):
             prompt += "\n\nCatalog context:\n" + catalog_prompt
         return prompt
 
+    @staticmethod
+    def _external_companies(
+        parsed: DecomposedSubqueriesResponse,
+        external_sources: List[str],
+    ) -> List[str]:
+        companies = list(dict.fromkeys(parsed.external_context_companies))
+        if not external_sources:
+            return companies
+        # Older or less capable models can still place attachment-owned names
+        # in unresolved_companies. Attachment binding is the only condition
+        # that permits those names to remain outside the pgvector catalog.
+        return list(dict.fromkeys([*companies, *parsed.unresolved_companies]))
+
+    @classmethod
+    def _selection_scopes(
+        cls,
+        selection: ScopedSubquerySelection,
+        catalog_by_id: Dict[str, DataScopeDTO],
+        all_scopes: List[DataScopeDTO],
+    ) -> tuple[List[DataScopeDTO], bool]:
+        requested_ids = list(dict.fromkeys(index_id.strip() for index_id in selection.index_ids))
+        company_scopes = cls._scopes_for_company(selection.company, all_scopes)
+        nonempty_unknown_ids = [
+            index_id for index_id in requested_ids if index_id and index_id not in catalog_by_id
+        ]
+        if "" in requested_ids and company_scopes and not nonempty_unknown_ids:
+            return company_scopes, True
+        known_ids = [index_id for index_id in requested_ids if index_id in catalog_by_id]
+        if nonempty_unknown_ids and not known_ids and company_scopes:
+            # The model occasionally copies or concatenates an index id even
+            # though it selected an exact catalog company. Repairing *all*
+            # unknown ids to that company's server-owned scopes cannot cross a
+            # company boundary. Mixed known/unknown selections still fail
+            # closed in ``_resolve_index_ids`` below.
+            return company_scopes, True
+        resolved, repaired = cls._resolve_index_ids(requested_ids, catalog_by_id)
+        return [catalog_by_id[index_id] for index_id in resolved], repaired
+
+    @classmethod
+    def _truly_unresolved_companies(
+        cls,
+        parsed: DecomposedSubqueriesResponse,
+        catalog: List[DataScopeDTO],
+    ) -> List[str]:
+        """Discard model-side false negatives that the server resolves exactly."""
+
+        return [
+            company
+            for company in dict.fromkeys(parsed.unresolved_companies)
+            if not cls._scopes_for_company(company, catalog)
+        ]
+
+    @staticmethod
+    def _merge_usage(first: ApiUsageDTO, second: ApiUsageDTO) -> ApiUsageDTO:
+        return ApiUsageDTO(
+            prompt_tokens=(first.prompt_tokens or 0) + (second.prompt_tokens or 0),
+            completion_tokens=(first.completion_tokens or 0)
+            + (second.completion_tokens or 0),
+            cached_tokens=(first.cached_tokens or 0) + (second.cached_tokens or 0),
+            reasoning_tokens=(first.reasoning_tokens or 0)
+            + (second.reasoning_tokens or 0),
+            total_tokens=(first.total_tokens or 0) + (second.total_tokens or 0),
+        )
+
+    @classmethod
+    def _needs_empty_plan_retry(
+        cls,
+        input_data: DecomposerInputDTO,
+        parsed: DecomposedSubqueriesResponse,
+    ) -> bool:
+        return (
+            not parsed.items
+            and not input_data.query_context.external_context_sources
+            and not cls._truly_unresolved_companies(
+                parsed,
+                input_data.scope_catalog.collections,
+            )
+        )
+
+    @staticmethod
+    def _retry_prompt(prompt: str) -> str:
+        return (
+            prompt
+            + "\n\nYour previous response produced no usable catalog route even though "
+            "the question can be resolved against the supplied catalog. Re-read the "
+            "original question, select only exact index_id values from the catalog, "
+            "and return every required atomic item. Do not report a catalog company "
+            "as unresolved."
+        )
+
+    @classmethod
+    def _routed_subquery(
+        cls,
+        selection: ScopedSubquerySelection,
+        scopes: List[DataScopeDTO],
+        route_index: int,
+        question: str,
+        allow_question_sheet_override: bool = True,
+    ) -> RoutedSubqueryDTO:
+        if not cls._company_matches_scopes(selection.company, scopes):
+            raise ModuleExecutionError(
+                "Decomposer의 기업명과 선택 collection의 catalog 기업이 일치하지 않습니다: "
+                f"{selection.company}"
+            )
+        company_names = list(
+            dict.fromkeys(scope.company_name for scope in scopes if scope.company_name)
+        )
+        if len(company_names) > 1:
+            raise ModuleExecutionError(
+                "하나의 서브쿼리가 여러 기업 collection을 선택했습니다: " + ", ".join(company_names)
+            )
+        explicit_sheet = (
+            cls._explicit_sheet_from_question(question, scopes)
+            if allow_question_sheet_override
+            else UNKNOWN_FIELD
+        )
+        subquery = SubqueryItem(
+            company=company_names[0] if company_names else selection.company,
+            sheet=(
+                explicit_sheet
+                if explicit_sheet != UNKNOWN_FIELD
+                else cls._canonical_sheet(selection.sheet, scopes)
+            ),
+            row_header=cls._canonical_row_header(question, selection.row_header),
+            column_header=selection.column_header,
+            cell_value=selection.cell_value,
+        )
+        return RoutedSubqueryDTO(
+            subquery_index=route_index,
+            subquery=subquery,
+            collections=scopes,
+            reason=selection.reason,
+        )
+
     @classmethod
     def _output(
         cls,
@@ -262,47 +489,35 @@ class DecomposerModule(BaseLLMModule):
         usage: Any,
         cost_usd: float,
         latency_seconds: float,
+        decomposition_attempts: int = 1,
     ) -> Dict[str, Any]:
         external_sources = input_data.query_context.external_context_sources
-        if parsed.unresolved_companies and not external_sources:
+        unresolved_companies = cls._truly_unresolved_companies(
+            parsed,
+            input_data.scope_catalog.collections,
+        )
+        if unresolved_companies and not external_sources:
             available = ", ".join(
                 scope.company_name or scope.file_name
                 for scope in input_data.scope_catalog.collections
             )
             raise ModuleExecutionError(
                 "검색 catalog에서 기업을 찾지 못했습니다: "
-                + ", ".join(parsed.unresolved_companies)
+                + ", ".join(unresolved_companies)
                 + f". 현재 검색 가능 기업: {available}"
             )
 
-        external_companies = list(dict.fromkeys(parsed.external_context_companies))
-        if external_sources:
-            # Older or less capable models can still place attachment-owned
-            # names in unresolved_companies. The server accepts those names as
-            # external only for an explicitly attachment-bound run; it never
-            # grants them a collection or broadens pgvector access.
-            external_companies = list(
-                dict.fromkeys([*external_companies, *parsed.unresolved_companies])
-            )
+        external_companies = cls._external_companies(parsed, external_sources)
 
-        catalog_by_id = {
-            scope.index_id: scope for scope in input_data.scope_catalog.collections
-        }
+        catalog_by_id = {scope.index_id: scope for scope in input_data.scope_catalog.collections}
         routes: List[Dict[str, Any]] = []
         seen: set[tuple[str, tuple[str, ...]]] = set()
         repaired_scope_count = 0
         for selection in parsed.items:
-            requested_ids = list(dict.fromkeys(index_id.strip() for index_id in selection.index_ids))
             company_scopes = cls._scopes_for_company(
                 selection.company,
                 input_data.scope_catalog.collections,
             )
-            nonempty_unknown_ids = [
-                index_id
-                for index_id in requested_ids
-                if index_id and index_id not in catalog_by_id
-            ]
-
             if not company_scopes and external_sources:
                 # Attachment-owned companies never receive a pgvector scope.
                 # Models occasionally emit a placeholder/empty index despite
@@ -314,50 +529,28 @@ class DecomposerModule(BaseLLMModule):
                     )
                 continue
 
-            if "" in requested_ids and company_scopes and not nonempty_unknown_ids:
-                unique_ids = list(dict.fromkeys(scope.index_id for scope in company_scopes))
-                repaired = True
-            else:
-                unique_ids, repaired = cls._resolve_index_ids(
-                    requested_ids,
-                    catalog_by_id,
-                )
+            scopes, repaired = cls._selection_scopes(
+                selection,
+                catalog_by_id,
+                input_data.scope_catalog.collections,
+            )
             repaired_scope_count += int(repaired)
-            selected_ids = unique_ids[: cfg.max_collections_per_subquery]
-            scopes = [catalog_by_id[index_id] for index_id in selected_ids]
-            if not cls._company_matches_scopes(selection.company, scopes):
-                raise ModuleExecutionError(
-                    "Decomposer의 기업명과 선택 collection의 catalog 기업이 일치하지 않습니다: "
-                    f"{selection.company}"
-                )
-            company_names = list(
-                dict.fromkeys(scope.company_name for scope in scopes if scope.company_name)
+            selected_scopes = scopes[: cfg.max_collections_per_subquery]
+            route = cls._routed_subquery(
+                selection,
+                selected_scopes,
+                len(routes),
+                input_data.query_context.question_text,
+                allow_question_sheet_override=len(parsed.items) == 1,
             )
-            if len(company_names) > 1:
-                raise ModuleExecutionError(
-                    "하나의 서브쿼리가 여러 기업 collection을 선택했습니다: "
-                    + ", ".join(company_names)
-                )
-            subquery = SubqueryItem(
-                company=company_names[0] if company_names else selection.company,
-                sheet=cls._canonical_sheet(selection.sheet, scopes),
-                row_header=selection.row_header,
-                column_header=selection.column_header,
-                cell_value=selection.cell_value,
+            identity = (
+                route.subquery.to_serialized_query(),
+                tuple(scope.index_id for scope in selected_scopes),
             )
-            serialized = subquery.to_serialized_query()
-            identity = (serialized, tuple(selected_ids))
             if identity in seen:
                 continue
             seen.add(identity)
-            routes.append(
-                RoutedSubqueryDTO(
-                    subquery_index=len(routes),
-                    subquery=subquery,
-                    collections=scopes,
-                    reason=selection.reason,
-                ).model_dump(mode="json")
-            )
+            routes.append(route.model_dump(mode="json"))
 
         if not routes:
             raise ModuleExecutionError(
@@ -377,6 +570,7 @@ class DecomposerModule(BaseLLMModule):
                 "repaired_scope_count": repaired_scope_count,
                 "external_context_sources": external_sources,
                 "external_context_companies": external_companies,
+                "decomposition_attempts": decomposition_attempts,
             },
         }
 
@@ -395,6 +589,19 @@ class DecomposerModule(BaseLLMModule):
             model=cfg.model,
             system_prompt=cfg.system_prompt or LUNA_SYSTEM_PROMPT,
         )
+        decomposition_attempts = 1
+        if self._needs_empty_plan_retry(input_data, parsed):
+            retry_parsed, retry_usage, retry_cost, retry_latency = self.complete_structured(
+                messages_or_prompt=self._retry_prompt(prompt),
+                response_model=DecomposedSubqueriesResponse,
+                model=cfg.model,
+                system_prompt=cfg.system_prompt or LUNA_SYSTEM_PROMPT,
+            )
+            parsed = retry_parsed
+            usage = self._merge_usage(usage, retry_usage)
+            cost_usd += retry_cost
+            latency_seconds += retry_latency
+            decomposition_attempts = 2
         return self._output(
             input_data,
             cfg,
@@ -402,6 +609,7 @@ class DecomposerModule(BaseLLMModule):
             usage,
             cost_usd,
             latency_seconds,
+            decomposition_attempts,
         )
 
     async def execute_async(
@@ -419,6 +627,21 @@ class DecomposerModule(BaseLLMModule):
             model=cfg.model,
             system_prompt=cfg.system_prompt or LUNA_SYSTEM_PROMPT,
         )
+        decomposition_attempts = 1
+        if self._needs_empty_plan_retry(input_data, parsed):
+            retry_parsed, retry_usage, retry_cost, retry_latency = (
+                await self.complete_structured_async(
+                    messages_or_prompt=self._retry_prompt(prompt),
+                    response_model=DecomposedSubqueriesResponse,
+                    model=cfg.model,
+                    system_prompt=cfg.system_prompt or LUNA_SYSTEM_PROMPT,
+                )
+            )
+            parsed = retry_parsed
+            usage = self._merge_usage(usage, retry_usage)
+            cost_usd += retry_cost
+            latency_seconds += retry_latency
+            decomposition_attempts = 2
         return self._output(
             input_data,
             cfg,
@@ -426,6 +649,7 @@ class DecomposerModule(BaseLLMModule):
             usage,
             cost_usd,
             latency_seconds,
+            decomposition_attempts,
         )
 
 

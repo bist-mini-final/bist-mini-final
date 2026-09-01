@@ -284,6 +284,87 @@ def test_context_expander_uses_exact_sheet_metadata_instead_of_lossy_cell_id_pre
     )
 
 
+def test_context_expander_preserves_retrieval_rank_before_worksheet_row_order() -> None:
+    store = MagicMock()
+    store.fetch_rows_cells.return_value = {
+        16: [
+            {
+                "col_index": 16,
+                "cell_coord": "P16",
+                "sheet_name": "Income_Statement",
+                "cell_value": "66735",
+                "row_header": ["Revenue"],
+                "column_header": ["2025-12-31"],
+            }
+        ],
+        23: [
+            {
+                "col_index": 16,
+                "cell_coord": "P23",
+                "sheet_name": "Income_Statement",
+                "cell_value": "67535",
+                "row_header": ["Total Revenue"],
+                "column_header": ["2025-12-31"],
+            }
+        ],
+    }
+    retrieval = RetrievalDTO(
+        query_context=QueryContextDTO(
+            question_id="q-ranked",
+            question_text="IBM의 최근 회계연도 총매출은?",
+        ),
+        document_context=DocumentContextDTO(
+            file_name="ibm.xlsx",
+            workbook_hash="hash-ibm",
+            index_id="idx-ibm",
+            company_name="IBM",
+        ),
+        items=[
+            RrfCandidateDTO(
+                rank=1,
+                index_id="idx-ibm",
+                cell_id="Income_Statement:P23",
+                sheet_name="Income_Statement",
+                cell_coord="P23",
+                rrf_score=0.9,
+                text=(
+                    "Company: IBM | Sheet: Income_Statement | "
+                    "Row Header: Total Revenue | Column Header: 2025-12-31 | "
+                    "Cell Value: ?"
+                ),
+                matched_subquery="Total Revenue FY2025",
+            ),
+            RrfCandidateDTO(
+                rank=2,
+                index_id="idx-ibm",
+                cell_id="Income_Statement:P16",
+                sheet_name="Income_Statement",
+                cell_coord="P16",
+                rrf_score=0.8,
+                text=(
+                    "Company: IBM | Sheet: Income_Statement | "
+                    "Row Header: Revenue | Column Header: 2025-12-31 | "
+                    "Cell Value: ?"
+                ),
+                matched_subquery="Total Revenue FY2025",
+            ),
+        ],
+    )
+
+    result = PgContextExpanderModule(store).run(
+        PgContextExpanderInputDTO(retrieval_json=retrieval)
+    )
+
+    assert [cell["cell_coord"] for cell in result["cells"]] == ["P23", "P16"]
+    store.fetch_rows_cells.assert_called_once_with(
+        collection_name="idx-ibm",
+        workbook_hash=None,
+        sheet_name="Income_Statement",
+        row_indices=[23, 16],
+        limit_per_row=100,
+    )
+
+
 def test_context_expander_canonicalizes_legacy_company_and_title_headers() -> None:
     store = MagicMock()
     store.fetch_rows_cells.return_value = {

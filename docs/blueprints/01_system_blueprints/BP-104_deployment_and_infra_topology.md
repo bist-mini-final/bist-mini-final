@@ -23,7 +23,7 @@ graph TB
         end
 
         subgraph BackendGroup ["Backend API & Admin Pods (FastAPI)"]
-            BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/v1/*)<br>• OpenAPI & ReDoc (/docs, /redoc)<br>• Job snapshot API (/api/v1/jobs)"]
+            BE["bist-backend (Replicas: 2)<br>• REST API Core (/api/v1/*)<br>• 운영 API 명세 비공개<br>• Job snapshot API (/api/v1/jobs)"]
         end
 
         REDIS["bist-redis<br>Pub/Sub state-change relay"]
@@ -44,7 +44,6 @@ graph TB
 
     INGRESS -->|/ -> User Frontend UI| FE
     INGRESS -->|/api/* -> Core API| BE
-    INGRESS -->|/docs, /redoc -> API Specs| BE
 
     BE -->|기본: 외부 DB 연결| PG_EXTERNAL
     BE -->|SSE state-change signal| REDIS
@@ -109,7 +108,10 @@ Compose는 PostgreSQL/pgvector 개발 DB만 관리하며 API/UI/worker 전체의
 - 외부 DDNS 접속은 공유기 TCP `외부 8080 → Kubernetes host 고정 LAN IP:8080` 한 개로 구성합니다. Host IP는 DHCP 예약으로 고정합니다. React SPA와 `/api/*`가 같은 Ingress를 사용하므로 `5173`, `5183`, backend `8765`를 외부에 공개하지 않습니다.
 - 외부 접속 전 관리자 권한으로 Windows Private profile의 TCP 8080 inbound rule을 등록하고 DDNS 공인 IP, 이중 NAT·CGNAT를 확인합니다. 외부 80을 내부 8080으로 전달하면 URL의 포트 표기를 생략할 수 있습니다.
 - 검증 순서는 host `localhost:8080` → 같은 LAN의 `고정-IP:8080` → 모바일 데이터의 DDNS URL입니다. 같은 LAN의 DDNS 접속만 실패하면 공유기의 NAT loopback 미지원일 수 있으므로 외부망 결과로 판정합니다.
-- 8443 매핑만으로 TLS가 활성화되지는 않습니다. 인증·인가가 없는 개발 배포는 VPN/source-IP 제한 뒤에서만 사용하며, 공개 서비스는 TLS reverse proxy와 인증 계층을 선행합니다.
+- 운영 Pod는 `APP_ENV=production`, `EXPOSE_API_DOCS=false`를 주입합니다. Ingress와 frontend Nginx 모두 `/docs`, `/redoc`, `/openapi.json`, `/healthz`, `/livez`, `/readyz`를 외부 라우팅하지 않으며, API 명세는 개발 백엔드 포트에서만 확인합니다.
+- frontend Nginx와 API middleware는 CSP, frame 차단, MIME sniffing 차단, referrer/권한 정책 헤더를 제공합니다. Ingress는 클라이언트별 동시 연결과 초당 요청 수를 제한하고 NGINX 제한 응답을 `429`로 통일합니다.
+- Excel 업로드는 application에서 정확히 500 MiB를 상한으로 스트리밍 검증합니다. Ingress는 multipart envelope를 고려해 `501m`, request buffering off, 1시간 read/send timeout을 사용하므로 기본 1 MiB proxy 제한이 application 계약을 가로막지 않습니다.
+- 8443 매핑만으로 TLS가 활성화되지는 않습니다. 로컬 k3d는 서명 세션 인증·RBAC을 활성화하되 HTTP 검증을 위해 Secure cookie만 끕니다. 공개 서비스는 유효 인증서가 연결된 TLS reverse proxy, `AUTH_COOKIE_SECURE=true`, HTTP→HTTPS redirect를 함께 적용합니다.
 
 ---
 
@@ -137,11 +139,13 @@ Compose는 PostgreSQL/pgvector 개발 DB만 관리하며 API/UI/worker 전체의
 
 ## 3. KEDA ScaledJob 이벤트 기반 자동 확장 메커니즘 (KEDA ScaledJob Specs)
 
-PostgreSQL 대기열 테이블의 미처리 작업 수에 따라 워커 Pod를 0개에서 동적으로 스케일아웃합니다. 현재 `workflow-worker`, `ingestion-embedding`, `ingestion-vector`, `bi-materialization`, `bi-question`, `benchmark`의 여섯 ScaledJob을 사용하며, 각 트리거의 PostgreSQL 접속 문자열은 워커 환경 변수와 분리된 `TriggerAuthentication`에서 읽습니다. 전역 `KUBERNETES_MAX_JOBS`보다 phase별 안전 한도가 우선하며 embedding은 최대 4, vector COPY는 최대 2입니다.
+PostgreSQL 대기열 테이블의 미처리 작업 수에 따라 워커 Pod를 0개에서 동적으로 스케일아웃합니다. 현재 `workflow-worker`, `ingestion-embedding`, `ingestion-vector`, `bi-materialization`, `bi-question`, `benchmark`의 여섯 ScaledJob을 사용하며, 각 트리거의 PostgreSQL 접속 문자열은 워커 환경 변수와 분리된 `TriggerAuthentication`에서 읽습니다. 전역 `KUBERNETES_MAX_JOBS`보다 phase별 안전 한도가 우선하며 embedding은 최대 4, vector COPY는 최대 2입니다. 자동 상한은 단일 Pod가 아니라 실제 end-to-end queue slot을 기준으로 산출합니다. 벤치마크나 ingestion parent가 workflow/phase child Pod를 추가로 생성하므로 기본 slot은 CPU 2코어·메모리 4GiB를 예약하며, 배포 request를 바꾸면 `KUBERNETES_CAPACITY_CPU_PER_SLOT`과 `KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT`도 함께 맞춥니다.
 
 `bi-materialization`은 새 스냅샷마다 원본 워크북에서 기간·통화·배율 프로필을 다시 계산하고, `bi-question`은 저장 프로필 보완 경로를 수행할 수 있으므로 두 ScaledJob 모두 backend와 동일한 공유 데이터 볼륨을 `/app/data`에 마운트해야 합니다. 이 마운트가 빠지면 원본 워크북 조회가 실패해 LLM 프로필 fallback으로 내려가며 기간 축소나 `amount_unit_ambiguous`가 발생할 수 있으므로, 로컬 선언형 Job registry와 Helm `workerJobs[].mountData` 계약에서 모두 `true`로 고정합니다.
 
-워커 release는 `bist.ai/image-revision`을 ScaledJob과 Pod template에 함께 기록하고 `rollout.strategy=immediate`를 사용합니다. 로컬 `:local` 태그는 Docker image ID를 revision으로 렌더링하고, Helm 운영 배포는 불변 image tag/digest를 전제로 image reference 해시를 기록합니다. 따라서 한 durable queue에 구형·신형 워커가 동시에 남아 서로 다른 BI catalog/formula 규칙으로 같은 스냅샷을 발행하지 않습니다. BI 질문 발행기는 저장된 `question_version`도 현재 catalog version과 대조하여 교차 버전 답변을 거부합니다.
+워커 release는 `bist.ai/image-revision`을 ScaledJob과 Pod template에 함께 기록하고 `rollout.strategy=immediate`를 사용합니다. `local.sh`가 만드는 세 이미지는 Git SHA 기반 불변 태그를 기본으로 사용하며 작업 트리가 더러우면 보고서·임시 파일을 제외한 추적 변경과 신규 소스의 내용 지문을 붙인 `-dirty-<hash>` 태그를 사용합니다. 같은 commit의 서로 다른 dirty 상태가 동일한 mutable tag를 공유하지 않습니다. Docker OCI label에는 revision, build date, dirty 여부를 기록합니다. Helm 운영 배포는 불변 image tag/digest를 전제로 image reference 해시를 기록합니다. 따라서 한 durable queue에 구형·신형 워커가 동시에 남아 서로 다른 BI catalog/formula 규칙으로 같은 스냅샷을 발행하지 않습니다. BI 질문 발행기는 저장된 `question_version`도 현재 catalog version과 대조하여 교차 버전 답변을 거부합니다.
+
+API Deployment는 `maxUnavailable=0`, `maxSurge=1`, `minReadySeconds=5`를 사용합니다. 종료 Pod는 EndpointSlice 전파와 기존 연결 drain을 위해 `preStop`에서 5초 대기하고 전체 종료 유예는 30초입니다. 운영에서 무중단 rolling update를 요구하면 replica를 2개 이상 사용하며, 단일 replica 로컬 기본값에서도 surge Pod가 준비된 뒤 기존 Pod를 내립니다.
 
 DB DDL은 migration Job만 소유합니다. KEDA one-shot BI Pod는 `initialize_schema=False`로 기동하고 런타임 `CREATE/ALTER`를 수행하지 않습니다. 동시 scale-out 시 여러 워커가 PostgreSQL system catalog를 갱신해 시작 단계에서 deadlock을 일으키는 것을 방지하기 위한 배포 불변식입니다.
 
@@ -219,7 +223,7 @@ sequenceDiagram
 1. **구현됨 — KEDA/Job/Pod 상태 모니터링**: 이름, 상태, Ready, 성공/실패 수, 생성 시각, condition 메시지 표시.
 2. **구현됨 — 최소 권한**: `pods`, `jobs`, `scaledjobs`의 `get/list/watch`만 허용하며 Secret, 로그, 생성·수정·삭제 권한은 부여하지 않음.
 3. **구현됨 — Lease/큐 상세 관제**: `workflow_runs`의 작업 ID, 큐, priority, 재시도 횟수, 하트비트 경과, 잔여 TTL, stale 여부와 Kubernetes Job/Pod 이름의 상관관계를 표시합니다. lease token 원문은 노출하지 않습니다.
-4. **범위 제외 — 로그 및 운영 명령**: 인증·감사·RBAC 정책이 확정되기 전까지 로그 스트리밍과 취소/회복 명령은 제공하지 않음. 이는 미완료 리팩토링이 아니라 보안 정책 경계임.
+4. **운영 제어 경계**: 사용자 인증과 coarse RBAC은 구현됐지만, 원격 로그 스트리밍은 민감정보 마스킹·보존·감사 정책이 추가로 필요한 별도 운영 기능이므로 제공하지 않습니다. 기존 취소/재개 API는 operator 이상, 삭제는 admin만 허용합니다.
 
 ---
 
@@ -235,7 +239,9 @@ sequenceDiagram
 | `KUBERNETES_WORKFLOW_QUEUE`| `workflow-core` | KEDA 및 워커가 소비하는 기본 대기열 명칭 |
 | `INGESTION_SHARDS_ENABLED` | `false` (K8s template은 `true`) | Excel embedding/COPY child Job fan-out 활성화 |
 | `INGESTION_VECTOR_SHARD_SIZE` | `4096` | vector COPY Job 한 개의 문서 범위 |
-| `KUBERNETES_MAX_JOBS` | *(자동 감지)* | 최대 동시 스케일링 워커 Pod 수 |
+| `KUBERNETES_MAX_JOBS` | *(자동 감지)* | 최대 동시 end-to-end queue slot 수. 명시값은 운영자 책임으로 자동 안전 상한을 대체 |
+| `KUBERNETES_CAPACITY_CPU_PER_SLOT` | `2` | 자동 상한 계산용 parent/child Pod 합산 CPU request |
+| `KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT` | `4` | 자동 상한 계산용 parent/child Pod 합산 메모리 request(GiB) |
 | `KUBERNETES_JOB_CPU_REQUEST` | `1000m` | 워커 Pod CPU 요청량 (최소 1 코어) |
 | `KUBERNETES_JOB_MEMORY_REQUEST`| `2Gi` | 워커 Pod RAM 요청량 (최소 2GB, spreadsheet 이미지 렌더링 대비) |
 | `DB_POOL_MIN_SIZE` / `MAX_SIZE`| `2` / `10` | FastAPI 프로세스당 커넥션 풀 크기 (워커는 1/4 크기 사용) |
@@ -248,6 +254,8 @@ sequenceDiagram
 2. **구현됨 — KEDA Trigger 인증 Secret 분리**: `bist-keda-postgresql` Secret의 `PGVECTOR_URL`을 `bist-postgresql` TriggerAuthentication이 참조합니다. DB URL은 ScaledJob metadata와 로그에 직접 넣지 않습니다.
 3. **구현됨 — 다중 Pod SSE 알림**: `bist-redis`와 `REDIS_URL`이 Pub/Sub 변경 신호를 전달합니다. PostgreSQL 재조회와 0.5초 폴링 fallback으로 Pub/Sub 유실·장애가 상태 정합성을 손상시키지 않습니다.
 4. **범위 결정 — 읽기 전용 운영 관제**: 큐/Lease 상관관계까지 제공하며 로그 스트리밍과 인증·감사가 수반되는 작업 제어는 별도 운영 제품·정책이 확정될 때까지 추가하지 않습니다.
+5. **구현됨 — 인증 Secret 분리**: API는 `bist-auth-env`의 PBKDF2 사용자 해시와 세션 서명 키를 사용합니다. 로컬 최초 자격 증명은 별도 bootstrap Secret에서 확인하며 운영에서는 조직 Secret manager로 교체합니다.
+6. **구현됨 — 운영 TLS 기본값**: Helm 운영 values는 SSL redirect를 기본 활성화하고, 로컬 k3d override만 HTTP 검증을 위해 끕니다. 실제 공인 인증서 Secret과 DNS/라우터 443 연결은 배포 환경 소유자가 제공합니다.
 
 ---
 

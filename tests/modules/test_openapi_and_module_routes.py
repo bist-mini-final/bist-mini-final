@@ -33,6 +33,13 @@ class OpenApiAndModuleRoutesTests(unittest.TestCase):
         self.assertIn("5. 기업 비교 분석", group_names)
         self.assertIn("6. RAG 벤치마크 평가", group_names)
 
+    def test_production_app_can_disable_interactive_api_documentation(self) -> None:
+        production_client = TestClient(create_app(expose_api_docs=False))
+
+        self.assertEqual(production_client.get("/docs").status_code, 404)
+        self.assertEqual(production_client.get("/redoc").status_code, 404)
+        self.assertEqual(production_client.get("/openapi.json").status_code, 404)
+
     def test_openapi_schemas_contain_external_module_dtos(self) -> None:
         """Verify that components.schemas contains Pydantic DTOs from modules/."""
         response = self.client.get("/openapi.json")

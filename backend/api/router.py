@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from backend.api.auth import SessionAuthenticator, create_auth_router
 from backend.bootstrap.application import ApplicationContainer
 from backend.domains.benchmark.presentation import create_benchmark_router
 from backend.domains.bi.presentation.routes import create_bi_router
@@ -18,6 +19,7 @@ from backend.shared.application.state_stream_broker import StateStreamBroker
 def create_api_router(
     container: ApplicationContainer,
     *,
+    authenticator: SessionAuthenticator,
     state_stream_broker: StateStreamBroker | None = None,
 ) -> APIRouter:
     """
@@ -25,6 +27,7 @@ def create_api_router(
     """
 
     router = APIRouter()
+    router.include_router(create_auth_router(authenticator))
     runtime = container.runtime
     services = runtime.services
     domain = container.domain

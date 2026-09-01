@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  ArrowUpRight,
   Bell,
-  BookOpen,
+  LogOut,
   MessageSquarePlus,
   PanelLeftClose,
   PanelLeftOpen,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { ChatSessionSidebar } from '../features/chatbot/ChatSessionSidebar';
+import { useAuth } from '../features/auth/AuthProvider';
 import { useChatWorkspace } from '../features/chatbot/ChatWorkspaceProvider';
 import { CellEvidenceProvider } from '../shared/evidence/CellEvidenceProvider';
 import { ConfirmDialog, IconButton, PromptDialog } from '../shared/ui';
@@ -36,6 +36,7 @@ function preloadRoute(route: AppRoute): void {
 
 export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
   const chat = useChatWorkspace();
+  const auth = useAuth();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const mobileTriggerRef = useRef<HTMLButtonElement>(null);
@@ -270,18 +271,17 @@ export function AppShell({ activeRoute, pathname, children }: AppShellProps) {
             );
           })}
 
-          <a
-            className="product-sidebar__docs"
-            href="/redoc"
-            target="_blank"
-            rel="noreferrer"
-            title="API 문서 (ReDoc)"
-            aria-label="API 문서"
-          >
-            <BookOpen size={17} aria-hidden="true" />
-            <span className="product-sidebar__docs-label">API 문서</span>
-            <ArrowUpRight className="product-sidebar__docs-arrow" size={14} aria-hidden="true" />
-          </a>
+          {auth.enabled && (
+            <button
+              type="button"
+              className="product-nav__item"
+              onClick={() => { void auth.logout(); }}
+              title="로그아웃"
+            >
+              <LogOut size={18} strokeWidth={1.9} aria-hidden="true" />
+              <span className="product-nav__label">로그아웃</span>
+            </button>
+          )}
 
         </nav>
         </aside>

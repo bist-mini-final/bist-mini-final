@@ -1,7 +1,7 @@
 # [BP-501] REST API와 DTO 규격
 > **Document Code:** `BP-501` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
-> **Target Ownership:** `backend/domains/*/presentation`, `backend/api/router.py`, `backend/api/middleware.py`, `backend/api/exception_handlers.py`, `backend/api/versioning.py`
-> **Current References:** [`backend/api/router.py`](../../../backend/api/router.py), [`backend/api/openapi.py`](../../../backend/api/openapi.py), [`backend/api/exception_handlers.py`](../../../backend/api/exception_handlers.py), [`backend/domains/workflow/presentation/`](../../../backend/domains/workflow/presentation), [`backend/domains/data_sources/presentation/`](../../../backend/domains/data_sources/presentation)
+> **Target Ownership:** `backend/domains/*/presentation`, `backend/api/auth.py`, `backend/api/router.py`, `backend/api/middleware.py`, `backend/api/exception_handlers.py`, `backend/api/versioning.py`
+> **Current References:** [`backend/api/auth.py`](../../../backend/api/auth.py), [`backend/api/router.py`](../../../backend/api/router.py), [`backend/api/openapi.py`](../../../backend/api/openapi.py), [`backend/api/exception_handlers.py`](../../../backend/api/exception_handlers.py), [`backend/domains/workflow/presentation/`](../../../backend/domains/workflow/presentation), [`backend/domains/data_sources/presentation/`](../../../backend/domains/data_sources/presentation)
 
 ---
 
@@ -12,10 +12,26 @@
 - chatbot 정식 경로는 `/api/v1/chat`; `/api/v1/chatbot`은 문서 호환 alias입니다.
 - OpenAPI, frontend client, 새 문서는 정식 경로만 사용합니다.
 - health probe `/healthz`, `/livez`, `/readyz`는 version namespace 밖에 있습니다.
+- Swagger/ReDoc/OpenAPI JSON은 개발 백엔드에서만 제공하며 운영 Pod는 `APP_ENV=production`, `EXPOSE_API_DOCS=false`로 비활성화합니다. Frontend/Vite/Ingress는 API 명세 경로를 프록시하지 않습니다.
+- API 응답은 MIME sniffing·frame embedding 차단, referrer/permissions 정책과 API 전용 CSP를 포함합니다. 외부 트래픽 속도 제한은 Ingress가 담당하며 초과 응답은 `429`입니다.
+- 데이터소스 업로드는 `.xlsx`/`.xlsm`, Open XML 필수 엔트리, 500 MiB application 상한을 검증합니다. Ingress는 multipart envelope만 추가 허용하고 request buffering을 끈 채 application 스트림으로 전달합니다.
+- 공유·운영 환경은 `AUTH_ENABLED=true`를 사용합니다. 로그인 성공 시 HMAC 서명·만료가 적용된 `HttpOnly`, `SameSite=Strict` 세션 쿠키를 발급하며 HTTPS에서는 `Secure`를 강제합니다.
+- API 권한은 `viewer < operator < admin`입니다. 조회는 viewer, POST/PUT/PATCH는 operator, DELETE는 admin 이상만 허용합니다. 인증 principal의 tenant와 다른 `X-Tenant-ID`는 `403`으로 차단합니다.
+- Chat의 외부 `client_id`는 인증 비활성 개발 호환값일 뿐입니다. 인증 환경에서는 principal로부터 계산한 안정적인 client identity가 이를 대체해 세션 소유권 위조를 막습니다.
 
 ---
 
 ## 2. 공개 endpoint 계약
+
+### Authentication
+
+| Method | Path | 역할 |
+| :--- | :--- | :--- |
+| POST | `/api/v1/auth/login` | PBKDF2 검증 후 서명 세션 쿠키 발급 |
+| GET | `/api/v1/auth/session` | 인증 활성 여부와 현재 principal·role·tenant 조회 |
+| POST | `/api/v1/auth/logout` | 서버 설정과 동일한 속성으로 세션 쿠키 제거 |
+
+로그인과 세션 확인은 인증 전 접근할 수 있고, 로그아웃은 유효 세션이 필요합니다. 비밀번호는 API 응답·로그·사용자 설정 JSON에 평문으로 남기지 않으며 `AUTH_USERS_JSON`은 PBKDF2 해시만 보유합니다.
 
 ### BI와 Company Comparison
 
@@ -144,7 +160,7 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - comparison snapshot은 source/evidence/assumption/rank link를 model validator로 검증합니다.
 - route 변경은 [`tests/modules/test_openapi_and_module_routes.py`](../../../tests/modules/test_openapi_and_module_routes.py)와 frontend client tests를 함께 갱신합니다.
 - route 함수는 request binding, application command/query 호출과 HTTP response projection만 담당하고 저장소·도메인 단계를 직접 조율하지 않습니다. 별도 HTTP controller가 필요하더라도 해당 domain presentation 내부에 두며 `backend/api`로 올리지 않습니다.
-- 현재 OpenAPI는 64개 정식 path와 74개 HTTP operation을 노출합니다. compatibility alias는 이 수와 schema에서 제외합니다.
+- OpenAPI 정식 path/operation 수는 contract test가 실제 application schema와 이 문서의 표를 일치시켜 검증합니다. compatibility alias는 schema에서 제외합니다.
 
 ---
 
@@ -153,6 +169,6 @@ Router는 `HTTPException`에 `code`, `message`, `retryable`, 선택적 `context`
 - 각 domain presentation은 자신의 router, Pydantic schema, HTTP error mapping과 OpenAPI tag를 소유합니다.
 - `backend/api/router.py`는 domain router를 결합하고 middleware, exception handler와 versioning만 적용합니다.
 - application DTO와 HTTP DTO를 동일 객체로 강제하지 않으며 presentation mapping을 명시적으로 둡니다.
-- `backend/api`에는 router composition, middleware, exception/error mapping, versioning, OpenAPI, SPA와 system probe만 남아 있고 도메인 route/controller/schema는 각 presentation에 있습니다.
+- `backend/api`에는 인증 경계, router composition, middleware, exception/error mapping, versioning, OpenAPI, SPA와 system probe만 남아 있고 도메인 route/controller/schema는 각 presentation에 있습니다.
 - API package allowlist와 OpenAPI contract test가 이 경계를 hard gate로 검증합니다.
 - method/path/status/error envelope를 바꾸면 해당 domain BP, frontend client/runtime schema, OpenAPI test와 이 문서를 같은 변경에서 갱신합니다.

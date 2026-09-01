@@ -4,6 +4,7 @@ from .files import (
     DataSourceFileNotFound,
     DataSourceFileService,
     DataSourceFileTooLarge,
+    DataSourceFileTypeUnsupported,
     DataSourceFileWriteError,
     UploadSourceFileCommand,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "DataSourceFileNotFound",
     "DataSourceFileService",
     "DataSourceFileTooLarge",
+    "DataSourceFileTypeUnsupported",
     "DataSourceFileWriteError",
     "CellEvidenceQuery",
     "CellEvidenceService",

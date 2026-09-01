@@ -14,6 +14,7 @@ from backend.bootstrap.application import ApplicationContainer
 logger = logging.getLogger("backend.api.openapi")
 
 OPENAPI_TAGS = [
+    {"name": "Authentication", "description": "서명 세션 로그인과 현재 사용자 확인"},
     {"name": "시스템 헬스 & 프로브", "description": "Kubernetes 프로브 및 상태 진단"},
     {"name": "Kubernetes 작업 관제", "description": "ScaledJob, Job, Pod 읽기 전용 상태"},
     {"name": "데이터 소스 관리", "description": "스프레드시트와 pgvector 인덱스 관리"},
@@ -77,6 +78,24 @@ def custom_openapi_schema(
     ]
 
     schemas = schema.setdefault("components", {}).setdefault("schemas", {})
+    security_schemes = schema["components"].setdefault("securitySchemes", {})
+    security_schemes["sessionCookie"] = {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "bist_session",
+        "description": "로그인 API가 발급하는 HttpOnly 서명 세션 쿠키",
+    }
+    schema["security"] = [{"sessionCookie": []}]
+    for public_path in (
+        "/healthz",
+        "/livez",
+        "/readyz",
+        "/api/v1/auth/login",
+        "/api/v1/auth/session",
+    ):
+        for operation in schema.get("paths", {}).get(public_path, {}).values():
+            if isinstance(operation, dict):
+                operation["security"] = []
     try:
         modules = container.runtime.services.module_registry.list_modules()
         for module in modules:

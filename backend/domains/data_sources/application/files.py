@@ -7,11 +7,13 @@ from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+from zipfile import BadZipFile, ZipFile
 
 from anyio import to_thread
 
 from backend.shared.domain import (
     ApplicationInternalError,
+    ApplicationValidationError,
     PayloadTooLargeError,
     ResourceNotFoundError,
 )
@@ -34,6 +36,10 @@ class DataSourceFileNotFound(ResourceNotFoundError):
 
 class DataSourceFileWriteError(ApplicationInternalError):
     code = "DATA_SOURCE_FILE_WRITE_FAILED"
+
+
+class DataSourceFileTypeUnsupported(ApplicationValidationError):
+    code = "DATA_SOURCE_FILE_TYPE_UNSUPPORTED"
 
 
 class SourceFileMetadataPort(Protocol):
@@ -106,6 +112,11 @@ class DataSourceFileService:
         command: UploadSourceFileCommand,
         chunks: AsyncIterable[bytes],
     ) -> dict[str, Any]:
+        suffix = Path(command.file_name).suffix.casefold()
+        if suffix not in WORKBOOK_SUFFIXES:
+            raise DataSourceFileTypeUnsupported(
+                "데이터 소스는 .xlsx 또는 .xlsm 파일만 업로드할 수 있습니다."
+            )
         try:
             stored = await self._storage.save(
                 command.file_name,
@@ -113,9 +124,7 @@ class DataSourceFileService:
                 max_size_bytes=MAX_UPLOAD_SIZE_BYTES,
             )
         except SourceFileStorageLimitExceeded as error:
-            raise DataSourceFileTooLarge(
-                "파일 크기는 500MB를 초과할 수 없습니다."
-            ) from error
+            raise DataSourceFileTooLarge("파일 크기는 500MB를 초과할 수 없습니다.") from error
         except Exception as error:
             raise DataSourceFileWriteError(f"파일 저장 실패: {error}") from error
 
@@ -123,6 +132,19 @@ class DataSourceFileService:
         destination = stored.path
         size_bytes = stored.size_bytes
         file_hash = stored.sha256
+
+        valid_workbook = await to_thread.run_sync(
+            self._is_openxml_workbook,
+            destination,
+        )
+        if not valid_workbook:
+            try:
+                self._storage.delete(safe_filename, hash_suffixes=())
+            except Exception:
+                logger.exception("유효하지 않은 업로드 파일 정리 실패: %s", safe_filename)
+            raise DataSourceFileTypeUnsupported(
+                "파일 확장자와 내용이 일치하는 Open XML Excel 파일이 아닙니다."
+            )
 
         if await self._metadata.is_connected_async():
             try:
@@ -144,9 +166,9 @@ class DataSourceFileService:
             try:
                 ingestion_job = await to_thread.run_sync(
                     lambda: self._ingestion.submit(
-                    file_name=safe_filename,
-                    model=command.model,
-                    batch_size=command.batch_size,
+                        file_name=safe_filename,
+                        model=command.model,
+                        batch_size=command.batch_size,
                     )
                 )
             except Exception as error:
@@ -156,9 +178,7 @@ class DataSourceFileService:
         uploaded = await to_thread.run_sync(
             lambda: self._inspector.file_info(
                 destination,
-                workbook_hash=(
-                    file_hash if suffix in HASHED_FILE_SUFFIXES else None
-                ),
+                workbook_hash=(file_hash if suffix in HASHED_FILE_SUFFIXES else None),
             )
         )
         return {
@@ -167,6 +187,16 @@ class DataSourceFileService:
             "ingestion_job": ingestion_job,
             "error": ingestion_error,
         }
+
+    @staticmethod
+    def _is_openxml_workbook(path: Path) -> bool:
+        try:
+            with ZipFile(path) as workbook:
+                workbook.getinfo("[Content_Types].xml")
+                workbook.getinfo("xl/workbook.xml")
+        except (BadZipFile, KeyError, OSError):
+            return False
+        return True
 
     def delete(
         self,
@@ -191,9 +221,7 @@ class DataSourceFileService:
         deleted_indexes = 0
         if workbook_hash and self._vector_indexes.is_connected():
             try:
-                deleted_indexes = self._vector_indexes.delete_by_workbook_hash(
-                    workbook_hash
-                )
+                deleted_indexes = self._vector_indexes.delete_by_workbook_hash(workbook_hash)
             except Exception as error:
                 logger.warning(
                     "연관 벡터 인덱스 정리 실패 (파일은 삭제됨): %s",
@@ -226,6 +254,7 @@ __all__ = [
     "DataSourceFileNotFound",
     "DataSourceFileService",
     "DataSourceFileTooLarge",
+    "DataSourceFileTypeUnsupported",
     "DataSourceFileWriteError",
     "UploadSourceFileCommand",
 ]
