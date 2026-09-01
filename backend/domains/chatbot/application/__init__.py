@@ -2,7 +2,6 @@ from .attachments import (
     ChatAttachmentService,
     ChatAttachmentStoragePort,
     StoredChatAttachment,
-    compact_evidence,
 )
 from .conversations import (
     ChatConversationService,
@@ -24,5 +23,4 @@ __all__ = [
     "ChatUnavailableError",
     "BiCompanyCatalogPort",
     "StoredChatAttachment",
-    "compact_evidence",
 ]

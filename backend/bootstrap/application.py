@@ -248,7 +248,6 @@ class DomainServicesContainer:
                     completion_client=runtime.completion_client,
                     bi_catalog=bi_services.store,
                     execution_logs=runtime.services.workflow_runs,
-                    evidence_cells=runtime.services.pgvector_store,
                 ),
                 suggestions=chat_suggestions,
                 attachments=ChatAttachmentService(

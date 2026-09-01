@@ -8,6 +8,7 @@ import { MarkdownAnswer, normalizeMarkdownTables } from './MarkdownAnswer';
 vi.mock('../../../shared/evidence/cellEvidenceApi', () => ({
   cellEvidenceApi: {
     resolve: vi.fn(() => new Promise(() => undefined)),
+    resolveMany: vi.fn(() => new Promise(() => undefined)),
     imageUrl: vi.fn(() => '/evidence/sheet.png'),
   },
 }));
@@ -45,10 +46,10 @@ describe('MarkdownAnswer', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Income Statement · E16' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Income Statement · 1개 셀' }));
 
-    expect(screen.getByRole('dialog', { name: /셀 원본 근거 검증/ })).toBeInTheDocument();
-    expect(cellEvidenceApi.resolve).toHaveBeenCalledOnce();
+    expect(screen.getByRole('dialog', { name: /시트 원본 근거 검증/ })).toBeInTheDocument();
+    expect(cellEvidenceApi.resolveMany).toHaveBeenCalledOnce();
   });
 
   it('uses the app-level evidence host when rendered inside the provider', async () => {
@@ -58,9 +59,21 @@ describe('MarkdownAnswer', () => {
       </CellEvidenceProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Income Statement · E16' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Income Statement · 1개 셀' }));
 
-    expect(await screen.findByRole('dialog', { name: /셀 원본 근거 검증/ })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /시트 원본 근거 검증/ })).toBeInTheDocument();
+  });
+
+  it('groups multiple cell citations from one sheet into one badge', () => {
+    render(
+      <MarkdownAnswer
+        markdown="IBM의 매출과 영업이익입니다."
+        evidence={[evidence, { ...evidence, evidence_id: 'EVIDENCE-002', cell_coord: 'F16' }]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Income Statement · 2개 셀' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 });
 

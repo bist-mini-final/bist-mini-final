@@ -4,8 +4,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   citationFromEvidence,
-  cellCitationLabel,
-  type CellCitation,
+  groupCellCitations,
+  sheetCitationLabel,
+  type SheetCitationGroup,
   type StructuredCellEvidence,
 } from '../../../shared/markdown/cellCitations';
 import { CellEvidenceModal } from '../../../shared/evidence/CellEvidenceModal';
@@ -49,25 +50,23 @@ interface TooltipPosition {
   readonly placement: 'above' | 'below';
 }
 
-function CellCitationChip({
-  citation,
+function SheetCitationChip({
+  group,
   onOpen,
 }: {
-  readonly citation: CellCitation;
-  readonly onOpen: (citation: CellCitation) => void;
+  readonly group: SheetCitationGroup;
+  readonly onOpen: (group: SheetCitationGroup) => void;
 }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const tooltipId = useId();
   const [position, setPosition] = useState<TooltipPosition | null>(null);
-  const label = cellCitationLabel(citation);
+  const label = sheetCitationLabel(group);
+  const first = group.citations[0];
   const details = [
-    ['기업', citation.company],
-    ['시트', citation.sheet],
-    ['셀', citation.cell],
-    ['행 항목', citation.rowHeader],
-    ['열 항목', citation.columnHeader],
-    ['셀 값', citation.cellValue],
-    ['원본 파일', citation.fileName],
+    ['기업', first?.company],
+    ['시트', group.sheet],
+    ['참조 셀', group.citations.map((citation) => citation.cell).join(', ')],
+    ['원본 파일', first?.fileName],
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
 
   const showTooltip = () => {
@@ -80,7 +79,7 @@ function CellCitationChip({
   };
   const openEvidence = () => {
     setPosition(null);
-    onOpen(citation);
+    onOpen(group);
   };
 
   return (
@@ -112,7 +111,7 @@ function CellCitationChip({
           data-placement={position.placement}
           style={{ left: position.left, top: position.top }}
         >
-          <strong>{label} 셀 출처</strong>
+          <strong>{group.sheet.replace(/_/g, ' ')} 시트 출처</strong>
           <dl>
             {details.map(([term, value]) => (
               <div key={term} className="reader-citation-tooltip__row">
@@ -121,7 +120,7 @@ function CellCitationChip({
               </div>
             ))}
           </dl>
-          <p>클릭하여 원본 시트 이미지에서 이 셀을 검증할 수 있습니다.</p>
+          <p>클릭하여 원본 시트 이미지에서 참조한 셀 전체를 검증할 수 있습니다.</p>
         </aside>,
         document.body,
       )}
@@ -130,9 +129,10 @@ function CellCitationChip({
 }
 
 export function MarkdownAnswer({ markdown, evidence }: MarkdownAnswerProps) {
-  const [selectedCitation, setSelectedCitation] = useState<CellCitation | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<SheetCitationGroup | null>(null);
   const launchGlobalEvidence = useCellEvidenceLauncher();
-  const openEvidence = launchGlobalEvidence ?? setSelectedCitation;
+  const openEvidence = launchGlobalEvidence ?? setSelectedGroup;
+  const evidenceGroups = groupCellCitations((evidence ?? []).map(citationFromEvidence));
   return (
     <>
       <div className="reader-markdown">
@@ -145,10 +145,10 @@ export function MarkdownAnswer({ markdown, evidence }: MarkdownAnswerProps) {
           <section className="reader-evidence" aria-label="답변 셀 근거">
             <strong>근거</strong>
             <div className="reader-evidence__items">
-              {evidence.map((item) => (
-                <CellCitationChip
-                  key={item.evidence_id}
-                  citation={citationFromEvidence(item)}
+              {evidenceGroups.map((group) => (
+                <SheetCitationChip
+                  key={group.key}
+                  group={group}
                   onOpen={openEvidence}
                 />
               ))}
@@ -156,10 +156,10 @@ export function MarkdownAnswer({ markdown, evidence }: MarkdownAnswerProps) {
           </section>
         )}
       </div>
-      {!launchGlobalEvidence && selectedCitation && (
+      {!launchGlobalEvidence && selectedGroup && (
         <CellEvidenceModal
-          citation={selectedCitation}
-          onClose={() => setSelectedCitation(null)}
+          group={selectedGroup}
+          onClose={() => setSelectedGroup(null)}
         />
       )}
     </>

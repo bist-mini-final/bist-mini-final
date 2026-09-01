@@ -38,6 +38,27 @@ export const cellEvidenceApi = {
     return requestJson<CellEvidence>(`/api/evidence/cells/resolve?${query}`, { signal });
   },
 
+  resolveMany(citations: readonly CellCitation[], signal?: AbortSignal) {
+    return requestJson<{ readonly items: readonly CellEvidence[] }>(
+      '/api/evidence/cells/resolve-batch',
+      {
+        method: 'post',
+        signal,
+        json: {
+          items: citations.map((citation) => ({
+            sheet_name: citation.sheet,
+            cell_coord: citation.cell,
+            company_name: citation.company ?? '',
+            workbook_hash: citation.workbookHash ?? '',
+            index_id: citation.indexId ?? '',
+            file_name: citation.fileName ?? '',
+            cell_value: citation.cellValue ?? '',
+          })),
+        },
+      },
+    ).then((response) => response.items);
+  },
+
   imageUrl(evidence: CellEvidence) {
     return versionedApiEndpoint(
       `/api/spreadsheet-artifacts/${encodeURIComponent(evidence.workbook_hash)}`

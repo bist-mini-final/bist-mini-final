@@ -105,5 +105,5 @@ flowchart LR
 - API controller, spreadsheet/artifact filesystem 구현, shard coordinator/repository/worker가 data sources vertical slice로 이동했고 route 내부 orchestration을 제거했습니다. 구조 계약 테스트는 application/presentation/worker의 legacy·역방향 import를 차단합니다.
 - 범용 pgvector Binary COPY/오류 계약은 `backend/platform/pgvector`, collection/search/publish SQL은 data sources infrastructure로 분리됐습니다.
 - 기업명 변경·파일/index 삭제·ingestion 등록/취소/재개 mutation은 UI에서 busy, 중복 제출 방지, 성공 후 재조회와 오류 feedback을 제공합니다.
-- 원본 셀 검증은 `/api/v1/evidence/cells/resolve`와 sheet artifact API를 사용하며 답변 배지에서 sheet image·bbox로 추적할 수 있습니다.
+- 원본 셀 검증은 단건 `/api/v1/evidence/cells/resolve`, 답변 시트 단위 `/api/v1/evidence/cells/resolve-batch`와 sheet artifact API를 사용하며 선택된 모든 cell bbox를 한 sheet image에서 추적할 수 있습니다.
 - ingestion DAG, shard 수, index metadata 또는 rename/delete 정책을 바꾸면 BP-201·BP-203·BP-503 및 API/UI contract를 함께 갱신합니다.

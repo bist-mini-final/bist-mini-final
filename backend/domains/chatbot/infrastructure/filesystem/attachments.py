@@ -20,8 +20,7 @@ from backend.domains.chatbot.domain.errors import (
 )
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-MAX_EXTRACTED_CHARS = 60_000
-MAX_SHEET_EXTRACTED_CHARS = 6_000
+MAX_EXTRACTED_CHARS = 240_000
 SUPPORTED_SUFFIXES = frozenset({".txt", ".md", ".csv", ".json", ".xlsx", ".xlsm"})
 
 
@@ -31,7 +30,7 @@ def _limit(text: str) -> str:
         return normalized
     return (
         normalized[:MAX_EXTRACTED_CHARS]
-        + "\n\n[첨부 파일 내용이 길어 처음 60,000자만 사용했습니다.]"
+        + f"\n\n[첨부 파일 내용이 길어 처음 {MAX_EXTRACTED_CHARS:,}자만 사용했습니다.]"
     )
 
 
@@ -99,9 +98,6 @@ def _worksheet_lines(worksheet) -> list[str]:
         values = [str(value).strip() for value in row if value is not None and str(value).strip()]
         if values:
             lines.append(" | ".join(values))
-        if sum(len(line) + 1 for line in lines) > MAX_SHEET_EXTRACTED_CHARS:
-            lines.append("[이 시트는 처음 6,000자만 사용했습니다.]")
-            break
     return lines
 
 

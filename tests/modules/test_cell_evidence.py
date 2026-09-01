@@ -21,8 +21,10 @@ class FakePgVectorStore:
     def __init__(self, *, file_name: str, workbook_hash: str) -> None:
         self.file_name = file_name
         self.workbook_hash = workbook_hash
+        self.list_calls = 0
 
     def list_indexes(self) -> list[dict[str, Any]]:
+        self.list_calls += 1
         return [
             {
                 "index_id": "idx_amesoft",
@@ -157,3 +159,45 @@ def test_cell_evidence_route_accepts_persisted_full_company_alias(tmp_path: Path
 
     assert response.status_code == 200
     assert response.json()["company_name"] == "AmeSoft"
+
+
+def test_cell_evidence_batch_reuses_one_index_catalog_snapshot(tmp_path: Path) -> None:
+    processed_dir = tmp_path / "source_files"
+    artifact_dir = tmp_path / "artifacts"
+    processed_dir.mkdir()
+    file_name, workbook_hash = _write_workbook(processed_dir)
+    rendered_dir = artifact_dir / workbook_hash[:16] / "rendered"
+    rendered_dir.mkdir(parents=True)
+    Image.new("RGB", (800, 600), "white").save(rendered_dir / "Income_Statement.png")
+    store = FakePgVectorStore(file_name=file_name, workbook_hash=workbook_hash)
+    app = FastAPI()
+    app.include_router(
+        create_cell_evidence_router(
+            CellEvidenceService(
+                store,  # type: ignore[arg-type]
+                LocalCellArtifactLocator(processed_dir, artifact_dir),
+            )
+        )
+    )
+
+    response = TestClient(app).post(
+        "/evidence/cells/resolve-batch",
+        json={
+            "items": [
+                {
+                    "company_name": "AmeSoft",
+                    "sheet_name": "Income_Statement",
+                    "cell_coord": "E16",
+                },
+                {
+                    "company_name": "AmeSoft",
+                    "sheet_name": "Income_Statement",
+                    "cell_coord": "E16",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()["items"]) == 2
+    assert store.list_calls == 1
