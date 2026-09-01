@@ -61,6 +61,8 @@ erDiagram
 
 `chat_messages.evidence`는 assistant 답변 본문과 독립된 JSONB 배열이며 기본값은 `[]`입니다. 저장 전 chatbot application은 각 항목을 공유 `CellEvidenceDTO`로 검증하고 해당 RAG run이 실제로 확장한 collection/workbook/company/sheet/cell identity allowlist와 대조합니다. Markdown 인용 문자열은 근거의 canonical 저장 형식이 아닙니다.
 
+`chat_messages.created_at`은 message row 생성 시각입니다. 비동기 RAG assistant는 processing row가 먼저 만들어지므로 실제 응답 도착 시각을 `completed_at`에 별도로 저장합니다. completed/failed 전이는 status·content·evidence·`completed_at=NOW()`를 같은 update로 확정하고 동일 시각으로 `chat_sessions.updated_at`을 갱신합니다.
+
 ---
 
 ## 4. 버전형 도메인 스냅샷 계약
@@ -121,6 +123,7 @@ domain_snapshot_heads(
 | `20260829_0005` | 분산 Excel embedding/vector COPY용 `ingestion_shards` durable queue |
 | `20260831_0006` | BI 전용 profile cache를 폐기하고 data sources 소유 `workbook_profiles` 도입 |
 | `20260831_0007` | `chat_messages.evidence` 구조화 셀 근거 JSONB 추가 |
+| `20260901_0008` | assistant 응답 완료 시각 `chat_messages.completed_at` 추가 및 기존 완료 메시지 backfill |
 
 새 배포는 애플리케이션 시작 전에 `alembic upgrade head`를 완료해야 합니다. 애플리케이션의 idempotent schema initializer는 개발·호환 안전망이지 migration을 대체하지 않습니다.
 
@@ -133,5 +136,5 @@ domain_snapshot_heads(
 - cross-domain foreign key는 aggregate 수명주기를 실제로 공유할 때만 허용하고 편의 join을 위해 repository 소유권을 섞지 않습니다.
 - production schema 변경은 Alembic만 수행하며 bootstrap schema composer는 개발·테스트 초기화와 drift 검증 보조 경로로만 관리합니다.
 - data sources, workflow, chatbot, BI와 benchmark schema/repository 소유권은 각 vertical slice에 있고 migration baseline은 domain schema fragment를 명시적으로 결합합니다. 수평 storage facade는 제거됐습니다.
-- 현재 선형 revision은 `20260827_0001`부터 `20260831_0007`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
+- 현재 선형 revision은 `20260827_0001`부터 `20260901_0008`까지이며 application table은 `alembic_version`을 제외하고 22개입니다. 이 수치는 baseline schema 검증과 함께 갱신합니다.
 - table/constraint/index/queue column을 바꾸면 domain schema fragment, Alembic upgrade/downgrade, repository/model, BP-103/BP-501과 migration tests를 같은 변경에서 갱신합니다.

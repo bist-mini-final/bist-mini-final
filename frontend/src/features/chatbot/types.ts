@@ -25,6 +25,7 @@ export interface ChatMessage {
   readonly evidence: readonly StructuredCellEvidence[];
   readonly attachments: ChatAttachment[];
   readonly created_at: string;
+  readonly completed_at: string | null;
 }
 
 export interface ChatSession {
@@ -44,6 +45,12 @@ export interface ChatProgressStep {
   readonly id: string;
   readonly label: string;
   readonly state: 'active' | 'completed';
+}
+
+export interface PendingChatTurn {
+  readonly content: string;
+  readonly attachmentName: string | null;
+  readonly createdAt: string;
 }
 
 export type ChatDialogState =

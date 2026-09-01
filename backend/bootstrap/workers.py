@@ -16,7 +16,6 @@ from backend.bootstrap.bi import (
 )
 from backend.core.settings import KUBERNETES_WORKFLOW_QUEUE
 from backend.domains.benchmark.infrastructure.postgres import BenchmarkPostgresStore
-from backend.domains.bi.infrastructure.postgres.database_schema import ensure_bi_schema
 from backend.domains.bi.infrastructure.postgres.store import PostgresBiStore
 from backend.domains.bi.workers.question_batch import (
     DEFAULT_BATCH_SIZE,
@@ -130,11 +129,16 @@ def run_worker(kind: str, argv: Sequence[str] = ()) -> int:
             ),
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
         )
-        runtime = RuntimeContainer.create(require_database=True)
+        # Schema ownership belongs to the migration Job. KEDA may start many
+        # short-lived BI Pods at once, so runtime DDL here can deadlock inside
+        # PostgreSQL system catalogs before any queue item is claimed.
+        runtime = RuntimeContainer.create(
+            initialize_schema=False,
+            require_database=True,
+        )
         try:
             registry = runtime.services.module_registry
             database_url = registry.database_url
-            ensure_bi_schema(database_url)
             if kind == "bi-materialization":
                 return worker(
                     store=PostgresBiStore(database_url),

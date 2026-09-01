@@ -139,6 +139,12 @@ Compose는 PostgreSQL/pgvector 개발 DB만 관리하며 API/UI/worker 전체의
 
 PostgreSQL 대기열 테이블의 미처리 작업 수에 따라 워커 Pod를 0개에서 동적으로 스케일아웃합니다. 현재 `workflow-worker`, `ingestion-embedding`, `ingestion-vector`, `bi-materialization`, `bi-question`, `benchmark`의 여섯 ScaledJob을 사용하며, 각 트리거의 PostgreSQL 접속 문자열은 워커 환경 변수와 분리된 `TriggerAuthentication`에서 읽습니다. 전역 `KUBERNETES_MAX_JOBS`보다 phase별 안전 한도가 우선하며 embedding은 최대 4, vector COPY는 최대 2입니다.
 
+`bi-materialization`은 새 스냅샷마다 원본 워크북에서 기간·통화·배율 프로필을 다시 계산하고, `bi-question`은 저장 프로필 보완 경로를 수행할 수 있으므로 두 ScaledJob 모두 backend와 동일한 공유 데이터 볼륨을 `/app/data`에 마운트해야 합니다. 이 마운트가 빠지면 원본 워크북 조회가 실패해 LLM 프로필 fallback으로 내려가며 기간 축소나 `amount_unit_ambiguous`가 발생할 수 있으므로, 로컬 선언형 Job registry와 Helm `workerJobs[].mountData` 계약에서 모두 `true`로 고정합니다.
+
+워커 release는 `bist.ai/image-revision`을 ScaledJob과 Pod template에 함께 기록하고 `rollout.strategy=immediate`를 사용합니다. 로컬 `:local` 태그는 Docker image ID를 revision으로 렌더링하고, Helm 운영 배포는 불변 image tag/digest를 전제로 image reference 해시를 기록합니다. 따라서 한 durable queue에 구형·신형 워커가 동시에 남아 서로 다른 BI catalog/formula 규칙으로 같은 스냅샷을 발행하지 않습니다. BI 질문 발행기는 저장된 `question_version`도 현재 catalog version과 대조하여 교차 버전 답변을 거부합니다.
+
+DB DDL은 migration Job만 소유합니다. KEDA one-shot BI Pod는 `initialize_schema=False`로 기동하고 런타임 `CREATE/ALTER`를 수행하지 않습니다. 동시 scale-out 시 여러 워커가 PostgreSQL system catalog를 갱신해 시작 단계에서 deadlock을 일으키는 것을 방지하기 위한 배포 불변식입니다.
+
 ### 목표 worker entrypoint가 반영된 ScaledJob 규격
 ```yaml
 apiVersion: keda.sh/v1alpha1

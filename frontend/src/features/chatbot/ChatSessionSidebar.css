@@ -78,12 +78,15 @@
   opacity: 1;
 }
 
-.chatbot-session__actions .ui-button:hover:not(:disabled) {
-  background: var(--brand-100);
+.chatbot-session__action.ui-button:hover:not(:disabled, [aria-disabled='true']) {
+  border-color: transparent;
+  background: transparent;
+}
+
+.chatbot-session__action.is-edit:hover:not(:disabled, [aria-disabled='true']) {
   color: var(--brand-700);
 }
 
-.chatbot-session__actions .ui-button:last-child:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-danger) 10%, var(--surface));
+.chatbot-session__action.is-delete:hover:not(:disabled, [aria-disabled='true']) {
   color: var(--color-danger);
 }

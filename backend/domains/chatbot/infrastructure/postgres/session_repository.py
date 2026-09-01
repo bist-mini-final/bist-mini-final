@@ -52,8 +52,11 @@ class ChatSessionRepository(SyncPostgresRepository):
                 if session is None:
                     return None
                 cursor.execute(
-                    """SELECT message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at
-                    FROM chat_messages WHERE session_id = %s ORDER BY created_at ASC""",
+                    """SELECT message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at, completed_at
+                    FROM chat_messages WHERE session_id = %s
+                    ORDER BY created_at ASC,
+                        CASE role WHEN 'user' THEN 0 ELSE 1 END,
+                        message_id ASC""",
                     (session_id,),
                 )
                 result = self._session_payload(dict(session))
@@ -160,6 +163,25 @@ class ChatSessionRepository(SyncPostgresRepository):
                 row = cursor.fetchone()
         return dict(row) if row else None
 
+    def get_attachment_for_run(self, run_id: str) -> dict[str, Any] | None:
+        with self.connection() as connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute(
+                    """SELECT session_id, attachments FROM chat_messages
+                    WHERE workflow_run_id = %s""",
+                    (run_id,),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            return None
+        attachments = row.get("attachments") or []
+        if not attachments or not isinstance(attachments[0], dict):
+            return None
+        attachment_id = attachments[0].get("id")
+        if not attachment_id:
+            return None
+        return self.get_attachment(str(row["session_id"]), str(attachment_id))
+
     def create_turn(
         self,
         session_id: str,
@@ -173,18 +195,22 @@ class ChatSessionRepository(SyncPostgresRepository):
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """INSERT INTO chat_messages (message_id, session_id, role, content, status, attachments)
-                    VALUES (%s, %s, 'user', %s, 'completed', %s)""",
+                    VALUES (%s, %s, 'user', %s, 'completed', %s)
+                    RETURNING message_id, session_id, role, content, status, workflow_run_id,
+                        visualization, evidence, attachments, created_at, completed_at""",
                     (user_id, session_id, content, psycopg2.extras.Json(attachments or [])),
                 )
+                user = self._message_payload(dict(cursor.fetchone()))
                 cursor.execute(
-                    """INSERT INTO chat_messages (message_id, session_id, role, content, status, workflow_run_id, visualization)
-                    VALUES (%s, %s, 'assistant', '', 'processing', %s, %s)
-                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at""",
+                    """INSERT INTO chat_messages (message_id, session_id, role, content, status, workflow_run_id, visualization, attachments)
+                    VALUES (%s, %s, 'assistant', '', 'processing', %s, %s, %s)
+                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at, completed_at""",
                     (
                         assistant_id,
                         session_id,
                         run_id,
                         psycopg2.extras.Json(visualization) if visualization else None,
+                        psycopg2.extras.Json(attachments or []),
                     ),
                 )
                 assistant = self._message_payload(dict(cursor.fetchone()))
@@ -194,7 +220,12 @@ class ChatSessionRepository(SyncPostgresRepository):
                     (content[:80], session_id),
                 )
             connection.commit()
-        return {"assistant_message": assistant, "run_id": run_id, "mode": "rag"}
+        return {
+            "user_message": user,
+            "assistant_message": assistant,
+            "run_id": run_id,
+            "mode": "rag",
+        }
 
     def create_direct_turn(
         self,
@@ -207,12 +238,16 @@ class ChatSessionRepository(SyncPostgresRepository):
         with self.connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
-                    "INSERT INTO chat_messages (message_id, session_id, role, content, status, attachments) VALUES (%s, %s, 'user', %s, 'completed', %s)",
+                    """INSERT INTO chat_messages (message_id, session_id, role, content, status, attachments)
+                    VALUES (%s, %s, 'user', %s, 'completed', %s)
+                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at, completed_at""",
                     (user_id, session_id, content, psycopg2.extras.Json(attachments or [])),
                 )
+                user = self._message_payload(dict(cursor.fetchone()))
                 cursor.execute(
-                    """INSERT INTO chat_messages (message_id, session_id, role, content, status) VALUES (%s, %s, 'assistant', %s, 'completed')
-                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at""",
+                    """INSERT INTO chat_messages (message_id, session_id, role, content, status, completed_at)
+                    VALUES (%s, %s, 'assistant', %s, 'completed', NOW())
+                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at, completed_at""",
                     (assistant_id, session_id, answer),
                 )
                 assistant = self._message_payload(dict(cursor.fetchone()))
@@ -221,7 +256,12 @@ class ChatSessionRepository(SyncPostgresRepository):
                     (content[:80], session_id),
                 )
             connection.commit()
-        return {"assistant_message": assistant, "run_id": None, "mode": "direct"}
+        return {
+            "user_message": user,
+            "assistant_message": assistant,
+            "run_id": None,
+            "mode": "direct",
+        }
 
     def complete_turn(
         self,
@@ -236,9 +276,11 @@ class ChatSessionRepository(SyncPostgresRepository):
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(
                     """UPDATE chat_messages SET status = %s, content = %s, evidence = %s,
+                    completed_at = NOW(),
                     visualization = CASE WHEN %s THEN NULL ELSE visualization END
                     WHERE workflow_run_id = %s
-                    RETURNING message_id, role, content, status, workflow_run_id, visualization, evidence, attachments, created_at""",
+                    RETURNING message_id, session_id, role, content, status, workflow_run_id,
+                        visualization, evidence, attachments, created_at, completed_at""",
                     (
                         status,
                         content,
@@ -248,6 +290,11 @@ class ChatSessionRepository(SyncPostgresRepository):
                     ),
                 )
                 row = cursor.fetchone()
+                if row is not None:
+                    cursor.execute(
+                        "UPDATE chat_sessions SET updated_at = %s WHERE session_id = %s",
+                        (row["completed_at"], row["session_id"]),
+                    )
             connection.commit()
         return self._message_payload(dict(row)) if row else None
 
@@ -283,4 +330,9 @@ class ChatSessionRepository(SyncPostgresRepository):
             "evidence": row.get("evidence") or [],
             "attachments": row.get("attachments") or [],
             "created_at": row["created_at"].isoformat(),
+            "completed_at": (
+                row["completed_at"].isoformat()
+                if row.get("completed_at") is not None
+                else None
+            ),
         }

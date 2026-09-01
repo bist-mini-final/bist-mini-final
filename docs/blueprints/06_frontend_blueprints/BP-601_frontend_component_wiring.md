@@ -47,7 +47,7 @@ graph TD
 | `/playground` | `Pipeline Playground` | [`PlaygroundPage`](../../../frontend/src/pages/PlaygroundPage.tsx) | **[운영중]** React Flow 2D DAG 빌더 & 실행 |
 | `/data-sources` | `Data Sources` | [`DataSourcesPage`](../../../frontend/src/pages/DataSourcesPage.tsx) | **[운영중]** 스프레드시트 뷰어 & pgvector 관리 |
 | `/dashboard` (`/bi` 호환 별칭) | `Financial BI` | [`BiPage`](../../../frontend/src/pages/BiPage.tsx) | **[운영중]** 재무제표 프로파일러 & 21개 근거 기반 지표 차트 |
-| `/chatbot` | `새 채팅` | [`ChatbotPage`](../../../frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 전역 세션 이력 기반 대화형 챗봇 & 인라인 시각화 |
+| `/chatbot` | `새 채팅` | [`ChatbotPage`](../../../frontend/src/pages/ChatbotPage.tsx) | **[운영중]** 전역 세션 이력, DB 기준 메시지 생성·응답 완료 시각, 첨부+RAG 결합 답변 & 인라인 시각화 |
 | `/company-comparison` | `Company Comparison` | [`CompanyComparisonPage`](../../../frontend/src/pages/CompanyComparisonPage.tsx) | **[운영중]** 버전형 비교 스냅샷 기반 순위, 실제/예측 추이, evidence 상태, 선택 기업·2개 기업 비교 및 BI 딥링크 |
 | `/jobs` | `Jobs` | [`JobsPage`](../../../frontend/src/pages/JobsPage.tsx) | **[운영중]** KEDA/Job/Pod와 PostgreSQL 큐·Lease 읽기 전용 상관 관제 |
 | `/settings` | `Settings` | [`SettingsPage`](../../../frontend/src/pages/SettingsPage.tsx) | **[운영중]** 시스템·연결 설정 화면 |

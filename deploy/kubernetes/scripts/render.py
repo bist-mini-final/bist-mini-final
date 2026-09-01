@@ -47,6 +47,7 @@ def render_scaled_job(
     spec: KubernetesWorkerSpec,
     *,
     image: str,
+    image_revision: str,
     connection_hash: str,
     max_replicas: int,
     cpu_request: str,
@@ -69,6 +70,7 @@ def render_scaled_job(
             min(max_replicas, spec.max_replica_count or max_replicas)
         ),
         "__IMAGE__": image,
+        "__IMAGE_REVISION__": image_revision,
         "__CONNECTION_HASH__": connection_hash,
         "__CPU_REQUEST__": cpu_request,
         "__MEMORY_REQUEST__": memory_request,
@@ -88,6 +90,7 @@ def main() -> int:
     parser.add_argument("--max-replicas", type=int, required=True)
     parser.add_argument("--image", default="bist-workflow-worker:local")
     parser.add_argument("--connection-hash", required=True)
+    parser.add_argument("--image-revision", required=True)
     parser.add_argument("--cpu-request", default="1000m")
     parser.add_argument("--memory-request", default="2Gi")
     parser.add_argument("--cpu-limit", default="2")
@@ -99,6 +102,8 @@ def main() -> int:
         parser.error("image contains unsupported characters")
     if not re.fullmatch(r"[a-f0-9]{64}", args.connection_hash):
         parser.error("connection-hash must be a SHA-256 hex digest")
+    if not re.fullmatch(r"[a-f0-9]{64}", args.image_revision):
+        parser.error("image-revision must be a SHA-256 hex digest")
 
     template_path = Path(__file__).resolve().parent.parent / "manifests" / "scaledjob.yaml"
     template = template_path.read_text(encoding="utf-8")
@@ -108,6 +113,7 @@ def main() -> int:
             template,
             spec,
             image=args.image,
+            image_revision=args.image_revision,
             connection_hash=args.connection_hash,
             max_replicas=args.max_replicas,
             cpu_request=args.cpu_request,

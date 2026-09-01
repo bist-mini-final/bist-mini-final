@@ -157,6 +157,73 @@ def test_decomposer_reports_unresolved_company_without_substitution() -> None:
         DecomposerModule(client).run(_input())
 
 
+def test_decomposer_keeps_catalog_routes_when_attachment_owns_unmatched_company() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-external-company",
+        content=(
+            '{"items":[{"company":"AmeSoft","sheet":"Income Statement",'
+            '"row_header":"Total Revenue","column_header":"FY2024",'
+            '"cell_value":"?","index_ids":["idx-amesoft"]}],'
+            '"unresolved_companies":["Orbixa"],"external_context_companies":[]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+    input_data = _input().model_copy(deep=True)
+    input_data.query_context.question_text = (
+        "AmeSoft와 Orbixa의 2024년 매출을 비교해줘"
+    )
+    input_data.query_context.external_context_sources = ["orbixa.xlsx"]
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(input_data))
+
+    assert plan.selected_index_ids == ["idx-amesoft"]
+    assert plan.metrics["external_context_sources"] == ["orbixa.xlsx"]
+    assert plan.metrics["external_context_companies"] == ["Orbixa"]
+    prompt = client.create_response.call_args.kwargs["input_items"]
+    assert "orbixa.xlsx" in str(prompt)
+
+
+def test_decomposer_repairs_blank_catalog_id_and_skips_attachment_route() -> None:
+    client = MagicMock()
+    client.create_response.return_value = OpenAIResponseResult(
+        response_id="resp-mixed-blank-index",
+        content=(
+            '{"items":['
+            '{"company":"Nexora Labs","sheet":"Income Statement",'
+            '"row_header":"Total Revenue","column_header":"Latest",'
+            '"cell_value":"?","index_ids":[""]},'
+            '{"company":"Meridian Logic","sheet":"Income Statement",'
+            '"row_header":"Total Revenue","column_header":"Latest",'
+            '"cell_value":"?","index_ids":[""]}'
+            '],"unresolved_companies":[],"external_context_companies":[]}'
+        ),
+        usage={},
+        latency_seconds=0,
+    )
+    input_data = DecomposerInputDTO(
+        query_context=QueryContextDTO(
+            question_id="q-mixed",
+            question_text="Nexora와 Meridian의 최근 매출을 비교해줘",
+            external_context_sources=["SPG_Company_KeyStats_09_meridian_logic.xlsm"],
+        ),
+        scope_catalog=DataScopeCatalogDTO(
+            collections=[
+                _scope("idx-nexora", "Nexora Labs", "NXR", "Income Statement"),
+                _scope("idx-amesoft", "AmeSoft", "AME", "Income Statement"),
+            ]
+        ),
+    )
+
+    plan = RetrievalPlanDTO.model_validate(DecomposerModule(client).run(input_data))
+
+    assert plan.selected_index_ids == ["idx-nexora"]
+    assert plan.routes[0].subquery.company == "Nexora Labs"
+    assert plan.metrics["repaired_scope_count"] == 1
+    assert plan.metrics["external_context_companies"] == ["Meridian Logic"]
+
+
 def test_decomposer_rejects_hallucinated_company_bound_to_valid_scope() -> None:
     client = MagicMock()
     client.create_response.return_value = OpenAIResponseResult(

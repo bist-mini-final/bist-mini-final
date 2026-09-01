@@ -108,7 +108,8 @@ workerJobs:
     module: backend.entrypoints.worker
     args: ["bi-materialization"]
     activeDeadlineSeconds: 21600
-    mountData: false
+    # BI profiling reads the original workbook from the shared data volume.
+    mountData: true
     query: |-
       SELECT COUNT(*) FROM bi_materialization_jobs
       WHERE (status = 'queued' AND available_at <= NOW())
@@ -149,7 +150,8 @@ workerJobs:
     module: backend.entrypoints.worker
     args: ["bi-question"]
     activeDeadlineSeconds: 2700
-    mountData: false
+    # Profile repair during extraction also requires workbook access.
+    mountData: true
     query: |-
       SELECT COUNT(*) FROM bi_questions
       WHERE status = 'queued'

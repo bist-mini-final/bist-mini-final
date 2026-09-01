@@ -1,9 +1,12 @@
 {{- range $job := .Values.workerJobs }}
+{{- $imageRevision := include "bist.image" $.Values.images.worker | sha256sum }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledJob
 metadata:
   name: {{ $job.name }}
+  annotations:
+    bist.ai/image-revision: {{ $imageRevision | quote }}
   labels:
     {{- include "bist.labels" $ | nindent 4 }}
     app.kubernetes.io/name: {{ $job.appName }}
@@ -14,7 +17,7 @@ spec:
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
   rollout:
-    strategy: gradual
+    strategy: immediate
   scalingStrategy:
     strategy: accurate
     pendingPodConditions: [Ready, PodScheduled]
@@ -26,6 +29,8 @@ spec:
     ttlSecondsAfterFinished: 600
     template:
       metadata:
+        annotations:
+          bist.ai/image-revision: {{ $imageRevision | quote }}
         labels:
           {{- include "bist.selectorLabels" $ | nindent 10 }}
           app.kubernetes.io/name: {{ $job.appName }}

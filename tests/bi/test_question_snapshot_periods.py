@@ -1,11 +1,15 @@
 from datetime import UTC, date, datetime
 
+import pytest
+
 from backend.domains.bi.application.question_snapshot import (
+    BiQuestionSnapshotDataError,
     BiQuestionSnapshotMaterializer,
     BiQuestionSnapshotMaterializerServices,
 )
 from backend.domains.bi.application.queued_materializer import BiQueuedMaterializer
 from backend.domains.bi.application.snapshot_builder import BiSnapshotBuilder
+from backend.domains.bi.domain.catalog import CATALOG_VERSION
 from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
     BiSnapshotBuildInput,
@@ -169,7 +173,7 @@ def test_refresh_snapshot_keeps_only_current_dashboard_periods() -> None:
         index_id=request.source.index_id,
         metric_id=MetricId.REVENUE,
         period_id=latest_ltm.period_id,
-        question_version=QuestionVersion("2"),
+        question_version=QuestionVersion(CATALOG_VERSION),
         question_text="test question",
         status=BiQuestionStatus.FAILED,
         attempt_count=1,
@@ -221,7 +225,7 @@ def test_refresh_snapshot_applies_persisted_document_units() -> None:
         index_id=request.source.index_id,
         metric_id=MetricId.REVENUE,
         period_id=fiscal_period.period_id,
-        question_version=QuestionVersion("2"),
+        question_version=QuestionVersion(CATALOG_VERSION),
         question_text="test question",
         status=BiQuestionStatus.FAILED,
         attempt_count=1,
@@ -246,3 +250,46 @@ def test_refresh_snapshot_applies_persisted_document_units() -> None:
     assert result is not None
     assert result.metrics[MetricId.REVENUE].currency == "USD"
     assert result.metrics[MetricId.REVENUE].scale is AmountScale.MILLIONS
+
+
+def test_refresh_snapshot_rejects_questions_from_an_old_catalog() -> None:
+    fiscal_period = period("fy-2025", 2025, PeriodKind.FY)
+    request = materialization()
+    profile = BiDocumentProfile(periods=(fiscal_period,))
+    base = BiSnapshotBuilder().build(
+        BiSnapshotBuildInput(
+            request=request,
+            job_id=JobId("job-base"),
+            profile=profile,
+            extracted=BiQueuedMaterializer._pending_results(profile),
+            generated_at=AS_OF,
+        )
+    )
+    question = BiQuestionRecord(
+        question_id=QuestionId("question-old-catalog"),
+        materialization_job_id=REFRESH_JOB_ID,
+        company_id=request.company_id,
+        workbook_hash=request.source.workbook_hash,
+        index_id=request.source.index_id,
+        metric_id=MetricId.REVENUE,
+        period_id=fiscal_period.period_id,
+        question_version=QuestionVersion("legacy"),
+        question_text="test question",
+        status=BiQuestionStatus.FAILED,
+        attempt_count=1,
+        created_at=AS_OF,
+        updated_at=AS_OF,
+        started_at=AS_OF,
+        completed_at=AS_OF,
+    )
+    materializer = BiQuestionSnapshotMaterializer(
+        BiQuestionSnapshotMaterializerServices(
+            questions=QuestionStore(question),
+            answers=AnswerStore(),
+            store=SnapshotStore(base),
+            clock=FixedClock(),
+        )
+    )
+
+    with pytest.raises(BiQuestionSnapshotDataError, match="catalog version"):
+        materializer.materialize_if_terminal(REFRESH_JOB_ID)

@@ -28,3 +28,16 @@ def test_query_input_dto_validation():
 
     with pytest.raises(ValidationError):
         QueryInputDTO(query="   ")
+
+
+def test_query_input_carries_external_attachment_sources() -> None:
+    result = QueryInputModule().execute(
+        QueryInputDTO(
+            query="Nexora Labs와 Orbixa를 비교해줘",
+            external_context_sources=["SPG_Company_KeyStats_10_orbixa_networks.xlsm"],
+        )
+    )
+
+    assert result["query_context"]["external_context_sources"] == [
+        "SPG_Company_KeyStats_10_orbixa_networks.xlsm"
+    ]

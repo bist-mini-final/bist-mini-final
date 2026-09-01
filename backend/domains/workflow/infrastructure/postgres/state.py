@@ -300,8 +300,19 @@ class WorkflowRunStateRepositoryMixin(WorkflowDatabaseCapability):
 
         status = row[3]
         node_statuses = {str(node.get("status")) for node in nodes.values() if node.get("status")}
+        graph = row[5] or {}
+        graph_nodes = graph.get("nodes") if isinstance(graph, dict) else None
+        expected_node_ids = {
+            str(node.get("id"))
+            for node in graph_nodes or []
+            if isinstance(node, dict) and node.get("id")
+        }
+        has_complete_node_set = bool(expected_node_ids) and expected_node_ids <= set(nodes)
         if status in ("queued", "running") and node_statuses:
-            if node_statuses <= {"succeeded", "skipped"}:
+            # Workers persist node rows incrementally.  A partial prefix of succeeded
+            # nodes must never make polling clients observe a completed workflow before
+            # the sink node (for example Reader) has written its output.
+            if has_complete_node_set and node_statuses <= {"succeeded", "skipped"}:
                 status = "completed"
             elif "failed" in node_statuses:
                 status = "failed"
@@ -311,7 +322,7 @@ class WorkflowRunStateRepositoryMixin(WorkflowDatabaseCapability):
             "workflow_updated_at": row[2] or "",
             "status": status,
             "schema_version": row[4],
-            "graph": row[5] or {},
+            "graph": graph,
             "runtime_inputs": row[6] or {},
             "use_cache": bool(row[7]),
             "orchestration": row[8] or {},

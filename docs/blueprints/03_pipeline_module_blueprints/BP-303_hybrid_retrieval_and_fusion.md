@@ -29,7 +29,7 @@ flowchart TD
     EXPAND --> READER["ReaderModule (LLM 수식 검증 및 답변 생성)"]
 ```
 
-Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로 보입니다. `PgVectorDataScopeModule`은 DB에서 catalog만 읽는 Source 모듈이고, Decomposer는 한 번의 구조화 LLM 호출로 질문 분해와 data scope 결합을 함께 수행합니다. 출력의 모든 `index_id`는 catalog membership 검증을 통과해야 하며 회사명과 시트명은 실제 저장 표기로 정규화됩니다. 따라서 존재하지 않는 기업을 먼저 분해한 뒤 다른 collection으로 우회하는 경로는 허용하지 않습니다. 다만 BI처럼 서버가 lineage를 단일 collection으로 이미 고정한 요청에서는 모델이 유일한 index ID를 오탈자 낸 경우 그 sole scope로만 복구하고 `repaired_scope_count`를 남깁니다. 둘 이상의 scope가 있으면 알 수 없는 ID를 계속 fail-closed 처리합니다.
+Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로 보입니다. `PgVectorDataScopeModule`은 DB에서 catalog만 읽는 Source 모듈이고, Decomposer는 한 번의 구조화 LLM 호출로 질문 분해와 data scope 결합을 함께 수행합니다. 출력의 모든 `index_id`는 catalog membership 검증을 통과해야 하며 회사명과 시트명은 실제 저장 표기로 정규화됩니다. 따라서 존재하지 않는 기업을 먼저 분해한 뒤 다른 collection으로 우회하는 경로는 허용하지 않습니다. Chatbot의 첨부+RAG 혼합 실행만 Query Context의 `external_context_sources`를 채울 수 있습니다. 이 경우 catalog 밖 기업은 attachment-owned 이름으로 기록하고 retrieval item을 만들지 않으며, catalog에 존재하는 기업의 route만 계속 실행합니다. 이 예외는 collection access를 넓히지 않고 첨부가 없는 실행에는 적용되지 않습니다. 다만 BI처럼 서버가 lineage를 단일 collection으로 이미 고정한 요청에서는 모델이 유일한 index ID를 오탈자 낸 경우 그 sole scope로만 복구하고 `repaired_scope_count`를 남깁니다. 둘 이상의 scope가 있으면 알 수 없는 ID를 계속 fail-closed 처리합니다.
 
 이 회로는 자유 질의와 BI exact lookup miss의 공통 fallback입니다. BI의 versioned metric catalog처럼 이미 지표·기간이 구조화된 요청은 BP-403의 metadata exact-evidence 조회를 먼저 실행합니다. 정확 값 셀이 있으면 불필요한 Decomposer·embedding·RRF 호출을 생략하고, 없을 때만 이 하이브리드 회로로 내려옵니다. BI 별칭·FY/LTM 판단은 BI bounded context가 소유하며 범용 retrieval module에 하드코딩하지 않습니다.
 

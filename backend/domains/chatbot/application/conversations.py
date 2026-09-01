@@ -22,7 +22,6 @@ from .answer_formatting import (
 )
 from .grounding import (
     INSUFFICIENT_EVIDENCE_ANSWER,
-    ExecutionLogStorePort,
     finalize_grounded_answer,
 )
 from .ports import BiCompanyCatalogPort
@@ -76,6 +75,7 @@ class ChatSessionRepositoryPort(Protocol):
         extracted_text: str,
     ) -> dict[str, Any]: ...
     def get_attachment(self, session_id: str, attachment_id: str) -> dict[str, Any] | None: ...
+    def get_attachment_for_run(self, run_id: str) -> dict[str, Any] | None: ...
     def create_turn(
         self,
         session_id: str,
@@ -118,6 +118,8 @@ class WorkflowDispatcherPort(Protocol):
 class RunStorePort(Protocol):
     def load_summary(self, run_id: str) -> Any: ...
 
+    def load_node(self, run_id: str, node_id: str) -> Any: ...
+
 
 class ChatConversationService:
     """Coordinate session persistence, direct answers, and RAG-backed turns."""
@@ -132,7 +134,6 @@ class ChatConversationService:
         workflow_dispatcher: WorkflowDispatcherPort,
         completion_client: CompletionClientPort,
         bi_catalog: BiCompanyCatalogPort,
-        execution_logs: ExecutionLogStorePort,
     ) -> None:
         self._repository = repository
         self._workflow_store = workflow_store
@@ -141,7 +142,6 @@ class ChatConversationService:
         self._workflow_dispatcher = workflow_dispatcher
         self._completion_client = completion_client
         self._bi_catalog = bi_catalog
-        self._execution_logs = execution_logs
 
     def list_sessions(self, client_id: str) -> dict[str, Any]:
         return {"sessions": self._repository.list_sessions(client_id)}
@@ -214,11 +214,20 @@ class ChatConversationService:
         )
         if attachment_id and attachment is None:
             raise ChatNotFoundError("첨부 파일을 찾을 수 없습니다")
-        if attachment:
-            return self._create_attachment_turn(session_id, content, attachment)
 
         recent_messages = self._repository.recent_user_messages(session_id, limit=3)
         company = self._conversation_company(content, session_id)
+        visualization = self._visualization_for(content)
+        if attachment and needs_rag(content, visualization):
+            return self._create_rag_turn(
+                session_id,
+                content,
+                company,
+                visualization,
+                attachment=attachment,
+            )
+        if attachment:
+            return self._create_attachment_turn(session_id, content, attachment)
         if is_recent_question_request(content) and recent_messages:
             return self._repository.create_direct_turn(
                 session_id,
@@ -228,7 +237,6 @@ class ChatConversationService:
         identity_answer = company_identity_answer(company, content) if company else None
         if identity_answer:
             return self._repository.create_direct_turn(session_id, content, identity_answer)
-        visualization = self._visualization_for(content)
         if not needs_rag(content, visualization):
             answer = self._direct_answer(content, company=company, recent_messages=recent_messages)
             return self._repository.create_direct_turn(session_id, content, answer)
@@ -240,14 +248,7 @@ class ChatConversationService:
         content: str,
         attachment: dict[str, Any],
     ) -> dict[str, Any]:
-        metadata = [
-            {
-                "id": attachment["attachment_id"],
-                "name": attachment["file_name"],
-                "content_type": attachment["content_type"],
-                "size": attachment["file_size"],
-            }
-        ]
+        metadata = self._attachment_metadata(attachment)
         return self._repository.create_direct_turn(
             session_id,
             content,
@@ -261,15 +262,26 @@ class ChatConversationService:
         content: str,
         company: str | None,
         visualization: dict[str, str] | None,
+        *,
+        attachment: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         workflow = self._workflow_store.load("rag_query")
         query = content if company is None else f"{content}\n\n[대화 문맥의 대상 기업: {company}]"
+        query_input: dict[str, Any] = {"query": query}
+        if attachment is not None:
+            query_input["external_context_sources"] = [str(attachment["file_name"])]
         run = self._workflow_executor.create_run(
             workflow,
-            WorkflowExecutionRequest(inputs={"query": {"query": query}}),
+            WorkflowExecutionRequest(inputs={"query": query_input}),
         )
         self._workflow_dispatcher.submit(run.id)
-        return self._repository.create_turn(session_id, content, run.id, visualization)
+        return self._repository.create_turn(
+            session_id,
+            content,
+            run.id,
+            visualization,
+            self._attachment_metadata(attachment) if attachment else None,
+        )
 
     def sync_run(self, run_id: str, client_id: str) -> dict[str, Any]:
         if not self._repository.owns_run(run_id, client_id):
@@ -287,22 +299,33 @@ class ChatConversationService:
         return {"run": run, "message": message}
 
     def _complete_successful_run(self, run_id: str, run: Any) -> dict[str, Any] | None:
+        reader_result = reader_answer(run)
+        if reader_result is None:
+            # A summary can be observed while node rows are still being committed.
+            # Keep the chat turn in processing state until the Reader contract exists.
+            return None
         session_id = self._repository.session_id_for_run(run_id)
         recent_questions = (
             self._repository.recent_user_messages(session_id, limit=1) if session_id else []
         )
         company = self._conversation_company("", session_id) if session_id else None
-        reader_result = reader_answer(run)
+        attachment = self._repository.get_attachment_for_run(run_id)
         grounded = finalize_grounded_answer(
-            reader_result.answer_markdown if reader_result else None,
-            [item.model_dump(mode="json") for item in reader_result.evidence]
-            if reader_result
-            else None,
+            reader_result.answer_markdown,
+            [item.model_dump(mode="json") for item in reader_result.evidence],
             run,
-            self._execution_logs,
+            self._run_store,
         )
         answer = format_user_facing_answer(grounded.answer_markdown)
-        if answer != INSUFFICIENT_EVIDENCE_ANSWER:
+        if attachment is not None:
+            answer = format_user_facing_answer(
+                self._combined_attachment_rag_answer(
+                    recent_questions[0] if recent_questions else "",
+                    answer,
+                    attachment,
+                )
+            )
+        elif answer != INSUFFICIENT_EVIDENCE_ANSWER:
             answer = with_company_intro(
                 answer,
                 company,
@@ -408,6 +431,54 @@ class ChatConversationService:
             max_retries=0,
         )
         return result.content
+
+    def _combined_attachment_rag_answer(
+        self,
+        question: str,
+        rag_answer: str,
+        attachment: dict[str, Any],
+    ) -> str:
+        source_name = str(attachment["file_name"])
+        citation_name = source_name.replace("[", "(").replace("]", ")")
+        evidence = str(attachment["extracted_text"])
+        result = self._completion_client.create_response(
+            model=DEFAULT_READER_MODEL,
+            instructions=(
+                "당신은 서로 독립적인 두 검증 원천을 결합하는 금융 비교 분석가입니다. "
+                "'적재 기업 RAG 결과'는 서버가 셀 근거를 검증한 결과이므로 숫자와 기업명을 바꾸거나 "
+                "추측하지 마십시오. '첨부 파일 원문'은 업로드 파일에서 평탄화한 전체 컨텍스트입니다. "
+                "질문이 요구한 항목과 기간만 두 원천에서 찾아 같은 기준으로 비교하십시오. "
+                "한쪽 값이 없으면 다른 항목으로 대체하지 말고 어느 원천에 무엇이 없는지 명시하십시오. "
+                "첨부 파일의 사실·수치 뒤에는 반드시 "
+                f"[{citation_name}: 첨부 근거]를 붙이십시오. "
+                "적재 기업의 셀 출처는 서버가 별도 구조화 배지로 표시하므로 좌표나 가짜 출처를 본문에 "
+                "만들지 마십시오. 1,200자 이내의 마크다운 표 또는 목록으로 답하십시오."
+            ),
+            input_items=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"질문:\n{question}\n\n"
+                        f"[적재 기업 RAG 결과]\n{rag_answer}\n\n"
+                        f"[첨부 파일: {source_name}]\n{evidence}"
+                    ),
+                }
+            ],
+            max_output_tokens=2_400,
+            max_retries=0,
+        )
+        return result.content
+
+    @staticmethod
+    def _attachment_metadata(attachment: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": attachment["attachment_id"],
+                "name": attachment["file_name"],
+                "content_type": attachment["content_type"],
+                "size": attachment["file_size"],
+            }
+        ]
 
 
 __all__ = [

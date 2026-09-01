@@ -199,7 +199,7 @@ export function CompanyRankingTable({
                   </td>
                   <td className="col-th-company">
                     <div className="company-cell-flex">
-                      <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={22} />
+                      <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={27} />
                       <AppLink
                         to={`/dashboard?companyId=${encodeURIComponent(company.companyId)}`}
                         className="company-name-text"
@@ -274,7 +274,7 @@ export function CompanyRankingTable({
                   onClick={() => onFocusCompany(company.companyId)}
                   aria-pressed={isFocused}
                 >
-                  <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={26} />
+                  <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={32} />
                   <span className="league-mobile-company__name">{company.displayName}</span>
                 </button>
                 <span className="league-mobile-company__summary" title="종합 점수">

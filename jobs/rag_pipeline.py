@@ -24,7 +24,7 @@ RAG_QUERY_JOB = DagJobDefinition(
         "RRF 융합, 컨텍스트 확장 및 근거 기반 답변 생성 파이프라인"
     ),
     queue_name="workflow-core",
-    version="9",
+    version="11",
     template=True,
     nodes=(
         JobNode("query", "query_input", position=(80, 80)),

@@ -49,7 +49,7 @@
 | GET | `/api/v1/chat/suggestions` | 추천 질문 |
 | POST | `/api/v1/chat/suggestions/refresh` | 추천 질문 갱신 |
 
-완료된 assistant message는 본문 `content`와 구조화 `evidence[]`를 분리해 반환합니다. `evidence[]`의 각 항목은 `evidence_id`, collection/workbook/file/company identity, `sheet_name`, `cell_coord`, 행·열 header path, 실제 `cell_value`, `source_text`를 가지며 서버 Pydantic 검증과 run evidence allowlist를 모두 통과해야 합니다. 클라이언트는 `content`에서 좌표 문자열을 파싱하지 않습니다.
+메시지 생성 응답은 DB에 저장된 `user_message`, `assistant_message`, `run_id`, `mode`를 반환합니다. 각 메시지는 생성 시각 `created_at`과 assistant 완료 시각 `completed_at|null`을 가지며 완료된 assistant의 표시 기준은 `completed_at`입니다. 완료된 assistant message는 본문 `content`와 구조화 `evidence[]`를 분리해 반환합니다. `evidence[]`의 각 항목은 `evidence_id`, collection/workbook/file/company identity, `sheet_name`, `cell_coord`, 행·열 header path, 실제 `cell_value`, `source_text`를 가지며 서버 Pydantic 검증과 run evidence allowlist를 모두 통과해야 합니다. 클라이언트는 `content`에서 좌표 문자열을 파싱하지 않습니다.
 
 ### Workflow와 module
 

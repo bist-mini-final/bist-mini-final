@@ -23,6 +23,7 @@ from backend.domains.bi.infrastructure.postgres.database_schema import (
     BI_SCHEMA_SQL,
     ensure_bi_schema,
 )
+from backend.domains.bi.infrastructure.postgres.store import PUBLISH_COMPANY_SQL
 from backend.domains.bi.presentation.routes import create_bi_router
 from jobs import BI_MATERIALIZATION_JOB, BI_QUESTION_JOB
 
@@ -98,6 +99,15 @@ class BiKubernetesContractTests(unittest.TestCase):
             module_name, function_name = entrypoint.split(":", 1)
             function = getattr(importlib.import_module(module_name), function_name)
             self.assertTrue(callable(function))
+
+    def test_bi_workers_mount_the_shared_workbook_volume(self) -> None:
+        self.assertTrue(BI_MATERIALIZATION_JOB.kubernetes.mount_data_volume)
+        self.assertTrue(BI_QUESTION_JOB.kubernetes.mount_data_volume)
+
+    def test_snapshot_publication_orders_against_the_current_snapshot(self) -> None:
+        self.assertIn("current_snapshot_id IS NULL", PUBLISH_COMPANY_SQL)
+        self.assertIn("current_snapshot.generated_at > %s", PUBLISH_COMPANY_SQL)
+        self.assertNotIn("updated_at <= %s", PUBLISH_COMPANY_SQL)
 
     def test_bi_schema_contains_all_durable_control_plane_tables(self) -> None:
         for table in (

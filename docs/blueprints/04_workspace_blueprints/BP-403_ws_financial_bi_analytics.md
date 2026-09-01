@@ -12,10 +12,11 @@ Financial BI는 한 기업의 검증된 재무 관측값·파생값·원본 셀 
 
 ```mermaid
 flowchart LR
-    INDEX[Indexed workbook] --> PROFILE[(data sources WorkbookProfile)]
+    SOURCE[Original workbook] -->|force rebuild for new snapshot| PROFILE[(data sources WorkbookProfile)]
+    INDEX[Indexed workbook] --> SOURCE
     PROFILE --> ADAPTER[BI profile adapter]
     ADAPTER --> PLAN[Metric question plan]
-    INDEX -. incomplete profile only .-> FALLBACK[Retrieval and LLM profiler]
+    INDEX -. freshly rebuilt profile incomplete only .-> FALLBACK[Retrieval and LLM profiler]
     FALLBACK --> ADAPTER
     PLAN --> QUEUE[BI question durable queue]
     QUEUE --> EXACT{Catalog exact evidence}
@@ -33,7 +34,9 @@ flowchart LR
 - materialization과 metric question은 PostgreSQL queue와 KEDA one-shot worker에서 처리합니다.
 - 기업·스냅샷·작업 조회와 SSE 초기 로드는 async PostgreSQL pool을 사용합니다.
 - Redis는 materialization/question SSE의 변경 신호이며 PostgreSQL 상태가 source of truth입니다.
-- BI는 `workbook_profiles`를 직접 소유하지 않습니다. data sources 계약의 기간·통화·배율·시트 역할을 BI `BiDocumentProfile`로 변환하며, 원본 프로필이 불완전할 때만 기존 검색/LLM profiler를 보완 경로로 실행합니다.
+- BI는 `workbook_profiles`를 직접 소유하지 않습니다. data sources 계약의 기간·통화·배율·시트 역할을 BI `BiDocumentProfile`로 변환합니다.
+- **신규 BI materialization은 저장된 `workbook_profiles`를 입력 캐시로 사용하지 않습니다.** 원본 hash를 검증한 뒤 resolver를 `force=True`로 실행해 원본 workbook에서 프로필을 다시 계산하고 같은 lineage의 프로필 레코드를 교체합니다. 일반 조회·Reader 단위 보완은 저장된 최신 프로필을 읽을 수 있습니다.
+- 새 결정론 프로필에 기간은 있으나 통화·배율이 불완전할 때만 검색/LLM profiler가 누락 필드를 보완합니다. 이때 기간 집합은 방금 원본에서 계산한 값이 우선하며, 과거 저장 프로필과 병합하지 않습니다. 원본 resolver 자체가 실패한 경우에도 검색/LLM 결과를 새 프로필로 교체하고 과거 값은 되살리지 않습니다.
 
 ## 2. 21개 지표 계약
 
@@ -83,6 +86,8 @@ ROE, ROA, 유동비율, 당좌비율과 총자산회전율은 현재 `MetricId`�
 | `GET` | `/api/v1/bi/question-jobs/{job_id}/stream` | 질문 배치 SSE |
 
 프런트는 `CompanySelector`, `SnapshotManager`, `useSelectedBiCompany`, `BiDashboardGrid`, 지표별 차트, `EvidenceDialog`, reset/layout dialog를 조합합니다. 대시보드 기업 목록 필터는 유지하며, 사용자는 `기업 스냅샷 추가`에서 후보를 명시적으로 선택해야 유료 materialization 작업을 시작합니다. 작업 완료 후 기업 목록을 다시 조회해 새 스냅샷을 자동 선택합니다. `/bi`는 `/dashboard`의 호환 alias입니다.
+
+`materializations`는 원본 workbook 프로필부터 새로 만드는 생성 경계입니다. 반면 `refresh`는 현재 snapshot의 검증 관측값으로 파생값만 재계산하고, `reset`은 현재 snapshot 기간에 대한 지표 질문을 다시 실행합니다. 저장 프로필을 무시한 완전 재생성이 필요하면 기존 snapshot을 삭제한 뒤 materialization을 새로 등록합니다.
 
 ## 5. Company Comparison 연계 규칙
 

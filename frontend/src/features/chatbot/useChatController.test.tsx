@@ -96,4 +96,26 @@ describe('useChatController', () => {
     });
     expect(result.current.active?.id).toBe('second');
   });
+
+  it('exposes the pending question before a new session is acknowledged', async () => {
+    chatApiMock.create.mockReturnValue(new Promise(() => undefined));
+
+    const { result } = renderHook(() => useChatController());
+    await waitFor(() => expect(chatApiMock.list).toHaveBeenCalledOnce());
+
+    act(() => {
+      void result.current.ask('Nexora의 매출 추이를 알려줘');
+    });
+
+    expect(result.current.isRunning).toBe(true);
+    expect(result.current.pendingTurn).toMatchObject({
+      content: 'Nexora의 매출 추이를 알려줘',
+      attachmentName: null,
+    });
+    expect(result.current.progress).toEqual([{
+      id: 'submitting',
+      label: '질문을 전달하고 있습니다',
+      state: 'active',
+    }]);
+  });
 });

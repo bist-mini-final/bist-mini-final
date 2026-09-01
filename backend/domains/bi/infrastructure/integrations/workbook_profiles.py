@@ -55,6 +55,7 @@ class WorkbookProfileResolverPort(Protocol):
         file_name: str,
         workbook_hash: str,
         index_id: str,
+        force: bool = False,
     ) -> WorkbookProfile: ...
 
 
@@ -78,6 +79,29 @@ class WorkbookBiProfileRepository:
             return None
         return self._to_bi(profile)
 
+    def rebuild(
+        self,
+        request: BiMaterializationRequest,
+    ) -> BiDocumentProfile | None:
+        """Recompute a profile from the original workbook, ignoring storage."""
+        if self._resolver is None:
+            return None
+        source = request.source
+        try:
+            profile = self._resolver.resolve(
+                file_name=source.file_name,
+                workbook_hash=source.workbook_hash,
+                index_id=str(source.index_id),
+                force=True,
+            )
+        except Exception:
+            logger.warning(
+                "원본 워크북 프로필 재생성에 실패해 BI 검색 fallback을 사용합니다",
+                exc_info=True,
+            )
+            return None
+        return self._to_bi(profile)
+
     def get_for_source(
         self,
         source: BiMaterializationSource,
@@ -91,8 +115,10 @@ class WorkbookBiProfileRepository:
         profile: BiDocumentProfile,
         saved_at: datetime,
     ) -> BiDocumentProfile:
-        existing = self._get_common(request.source)
-        common = self._merge_profile(request.source, profile, existing)
+        # This is the fresh retrieval/LLM fallback for a new snapshot.  Never
+        # merge an older persisted profile into it: doing so can resurrect a
+        # stale or truncated period set.
+        common = self._from_bi_profile(request.source, profile)
         try:
             stored = self._profiles.save(common, saved_at=saved_at)
         except Exception as error:
@@ -162,15 +188,12 @@ class WorkbookBiProfileRepository:
             ),
         )
 
-    def _merge_profile(
+    def _from_bi_profile(
         self,
         source: BiMaterializationSource,
         bi_profile: BiDocumentProfile,
-        existing: WorkbookProfile | None,
     ) -> WorkbookProfile:
-        evidence: dict[str, WorkbookProfileEvidence] = (
-            {item.evidence_id: item for item in existing.evidence} if existing else {}
-        )
+        evidence: dict[str, WorkbookProfileEvidence] = {}
         for item in bi_profile.evidence:
             evidence_id = "wpe-" + sha256(item.cell_id.encode("utf-8")).hexdigest()[:24]
             evidence.setdefault(
@@ -194,7 +217,7 @@ class WorkbookBiProfileRepository:
             )
             for item in bi_profile.periods
         )
-        sheets = existing.sheets if existing and existing.sheets else tuple(
+        sheets = tuple(
             WorkbookSheetProfile(
                 sheet_name=sheet_name,
                 role=WorkbookSheetRole.UNKNOWN,
@@ -202,18 +225,13 @@ class WorkbookBiProfileRepository:
             )
             for sheet_name in dict.fromkeys(bi_profile.relevant_sheets)
         )
-        currency = existing.currency if existing and existing.currency else bi_profile.currency
+        currency = bi_profile.currency
         amount_scale = (
-            existing.amount_scale
-            if existing and existing.amount_scale
-            else (
-                WorkbookAmountScale(bi_profile.scale.value)
-                if bi_profile.scale is not None
-                else None
-            )
+            WorkbookAmountScale(bi_profile.scale.value)
+            if bi_profile.scale is not None
+            else None
         )
-        merged_periods = existing.periods if existing and existing.periods else periods
-        complete = bool(merged_periods and currency and amount_scale)
+        complete = bool(periods and currency and amount_scale)
         return WorkbookProfile(
             profile_version=self._profile_version,
             file_name=source.file_name,
@@ -222,7 +240,7 @@ class WorkbookBiProfileRepository:
             status="ready" if complete else "partial",
             currency=currency,
             amount_scale=amount_scale,
-            periods=merged_periods,
+            periods=periods,
             sheets=sheets,
             evidence=tuple(evidence.values()),
             diagnostics=() if complete else ("llm_profile_incomplete",),

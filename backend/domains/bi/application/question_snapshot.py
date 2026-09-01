@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, assert_never
 
-from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
+from backend.domains.bi.domain.catalog import (
+    CATALOG_VERSION,
+    METRIC_CATALOG,
+    SourceMetricDefinition,
+)
 from backend.domains.bi.domain.extraction_models import BiMetricExtractionResult
 from backend.domains.bi.domain.materialization_models import (
     BiDocumentProfile,
@@ -199,9 +203,10 @@ class BiQuestionSnapshotMaterializer:
                 question.company_id != base.company.company_id
                 or question.workbook_hash != base.source.workbook_hash
                 or question.index_id != base.source.index_id
+                or str(question.question_version) != CATALOG_VERSION
             ):
                 raise BiQuestionSnapshotDataError(
-                    "question lineage does not match current snapshot"
+                    "question lineage or catalog version does not match current snapshot"
                 )
 
     @staticmethod

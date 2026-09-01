@@ -549,11 +549,25 @@
 /* Shared product visual system alignment */
 .company-custom-logo-svg {
   flex-shrink: 0;
-  border-radius: 5px;
+  overflow: hidden;
+  border-radius: 25%;
+  filter: none;
+  transform-origin: center;
+  transition: transform var(--duration-standard) var(--ease-standard);
 }
 
 .company-custom-logo-svg text {
   font-family: var(--font-ui);
+}
+
+.company-cell-flex:hover .company-brand-mark,
+.league-mobile-company__identity:hover .company-brand-mark,
+.analysis-company-identity:hover .company-brand-mark {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-custom-logo-svg { transition: none; }
 }
 
 .league-top-filter-bar,

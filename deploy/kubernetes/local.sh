@@ -424,7 +424,7 @@ PY
 }
 
 apply_workload() {
-  local pg_url openai_key openai_base cluster_pg_url connection_hash previous_connection_hash scaledjob_existed max_jobs configured_max_jobs database_endpoint
+  local pg_url openai_key openai_base cluster_pg_url connection_hash worker_revision previous_connection_hash scaledjob_existed max_jobs configured_max_jobs database_endpoint
   pg_url="$(database_url)"
   openai_key="$(config_value OPENAI_API_KEY '')"
   openai_base="$(config_value OPENAI_BASE_URL https://api.openai.com/v1)"
@@ -435,6 +435,15 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode("utf-8")).hexdigest())
 PY
 )"
+  worker_revision="$(docker image inspect "${WORKER_IMAGE}" --format '{{.Id}}' 2>/dev/null | sed 's/^sha256://' || true)"
+  if [[ ! "${worker_revision}" =~ ^[a-f0-9]{64}$ ]]; then
+    worker_revision="$("${PROJECT_PYTHON}" - "${WORKER_IMAGE}" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode("utf-8")).hexdigest())
+PY
+)"
+  fi
   scaledjob_existed="false"
   previous_connection_hash=""
   if kubectl get scaledjob workflow-worker -n "${NAMESPACE}" >/dev/null 2>&1; then
@@ -469,6 +478,7 @@ PY
   "${PROJECT_PYTHON}" "${DEPLOY_DIR}/scripts/render.py" \
     --max-replicas "${max_jobs}" \
     --image "${WORKER_IMAGE}" \
+    --image-revision "${worker_revision}" \
     --connection-hash "${connection_hash}" \
     --cpu-request "$(config_value KUBERNETES_JOB_CPU_REQUEST 1000m)" \
     --memory-request "$(config_value KUBERNETES_JOB_MEMORY_REQUEST 2Gi)" \
