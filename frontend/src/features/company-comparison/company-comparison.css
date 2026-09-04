@@ -375,29 +375,18 @@
 
 .financial-tier-badge {
   --tier-accent: #64748b;
-  --tier-border: #cbd5e1;
-  --tier-surface: #f8fafc;
   display: inline-flex;
-  min-width: 2.15rem;
-  height: 1.65rem;
+  min-width: 0.75rem;
   align-items: center;
   justify-content: center;
-  gap: 0.24rem;
-  border: 1px solid var(--tier-border);
-  border-radius: 0.52rem;
-  background: var(--tier-surface);
   color: var(--tier-accent);
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--tier-accent) 16%, transparent);
 }
-.financial-tier-badge svg { width: 0.8rem; height: 0.8rem; stroke-width: 2; }
-.financial-tier-badge b { font-size: 0.65rem; font-weight: 900; line-height: 1; }
-.financial-tier-badge.is-compact { min-width: 1.85rem; height: 1.45rem; gap: 0.16rem; border-radius: 0.45rem; }
-.financial-tier-badge.is-compact svg { width: 0.7rem; height: 0.7rem; }
-.financial-tier-badge.is-compact b { font-size: 0.6rem; }
-.financial-tier-badge.tier-s { --tier-accent: #b91c1c; --tier-border: #fecaca; --tier-surface: #fff1f2; }
-.financial-tier-badge.tier-a { --tier-accent: #c2410c; --tier-border: #fed7aa; --tier-surface: #fff7ed; }
-.financial-tier-badge.tier-b { --tier-accent: #1d4ed8; --tier-border: #bfdbfe; --tier-surface: #eff6ff; }
-.financial-tier-badge.tier-c { --tier-accent: #475569; --tier-border: #cbd5e1; --tier-surface: #f8fafc; }
+.financial-tier-badge b { font-size: 0.72rem; font-weight: 900; line-height: 1; }
+.financial-tier-badge.is-compact b { font-size: 0.68rem; }
+.financial-tier-badge.tier-s { --tier-accent: #b91c1c; }
+.financial-tier-badge.tier-a { --tier-accent: #c2410c; }
+.financial-tier-badge.tier-b { --tier-accent: #1d4ed8; }
+.financial-tier-badge.tier-c { --tier-accent: #475569; }
 
 /* =========================================================================
    4. Right Side: Top-Performer Spotlight Cards & Metric Distribution
@@ -522,7 +511,6 @@
     font-size: 0.68rem;
     font-variant-numeric: tabular-nums;
   }
-  .league-mobile-company__summary .financial-tier-badge { min-width: 1.7rem; }
   .league-mobile-company__compare {
     display: inline-flex;
     min-height: 2.5rem;

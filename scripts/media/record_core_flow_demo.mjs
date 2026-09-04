@@ -101,8 +101,11 @@ await page.addInitScript(() => {
   }
 });
 
-await page.goto(`${BASE_URL}/chatbot`, { waitUntil: 'domcontentloaded' });
-await page.waitForTimeout(1600);
+// Start the loop on Data Sources. The recording ends on the completed chatbot
+// answer, so the GIF loop now transitions directly from that answer to the
+// first product workspace without flashing an empty/reset chatbot state.
+await page.goto(`${BASE_URL}/data-sources`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(350);
 
 const cdp = await context.newCDPSession(page);
 const frames = [];
@@ -166,12 +169,11 @@ async function clickNav(name, expectedPath, settleDelay = 450) {
   await pause(settleDelay);
 }
 
-// Establish the cursor and the opening chatbot scene.
+// Establish the cursor on the opening Data Sources scene.
 await page.mouse.move(previousPoint.x, previousPoint.y);
-await pause(800);
+await pause(350);
 
 // 1. Inspect indexed workbooks.
-await clickNav('데이터 소스', '/data-sources');
 const dataLoadingStart = (Date.now() - startedAt) / 1000;
 await page.locator('.ds-tab-content').waitFor({ state: 'visible', timeout: 30000 });
 await page.waitForFunction(
