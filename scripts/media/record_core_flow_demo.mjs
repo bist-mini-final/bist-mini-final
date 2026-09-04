@@ -125,7 +125,7 @@ cdp.on('Page.screencastFrame', async (event) => {
 
 await cdp.send('Page.startScreencast', {
   format: 'jpeg',
-  quality: 88,
+  quality: 94,
   maxWidth: 1920,
   maxHeight: 1080,
   everyNthFrame: 1,
@@ -304,6 +304,7 @@ fs.writeFileSync(
   JSON.stringify({
     width: 1920,
     height: 1080,
+    frame_sampling: 'nearest',
     started_at: new Date(startedAt).toISOString(),
     duration: (Date.now() - startedAt) / 1000,
     frames,
