@@ -1,7 +1,6 @@
 /* Scatter chart company markers */
 .benchmark-logo-marker {
   cursor: pointer;
-  filter: drop-shadow(0 1px 1.5px rgba(30, 64, 175, 0.12));
 }
 .benchmark-logo-marker-inner {
   display: flex;
@@ -9,8 +8,7 @@
   justify-content: center;
   width: 14px;
   height: 14px;
-  overflow: hidden;
-  border-radius: 4px;
+  overflow: visible;
 }
 .benchmark-logo-marker-label text {
   font-size: 7.5px;
@@ -169,13 +167,11 @@
   font-weight: 800;
   letter-spacing: 0.03em;
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
 }
 
 .benchmark-scatter-y-axis-labels span {
   white-space: nowrap;
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
 }
 
 .benchmark-scatter-chart .recharts-scatter-symbol { cursor: pointer; }

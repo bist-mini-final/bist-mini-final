@@ -1,4 +1,4 @@
-import type { CSSProperties, FC } from 'react';
+import type { FC } from 'react';
 import type { SimpleIcon } from 'simple-icons';
 import {
   si3m,
@@ -116,15 +116,9 @@ interface CompanyLogoBadgeProps {
   readonly className?: string;
 }
 
-interface BrandPalette {
-  readonly foreground: string;
-  readonly surface: string;
-  readonly border: string;
-  readonly accent: string;
-}
-
 export interface CompanyLogoDesign extends CompanyBrandMark {
   readonly sourceBrand: string;
+  readonly brandColor: string;
 }
 
 const BRAND_ICONS: readonly SimpleIcon[] = [
@@ -231,21 +225,6 @@ const BRAND_ICONS: readonly SimpleIcon[] = [
 ];
 
 const BRAND_ICON_BY_SLUG = new Map(BRAND_ICONS.map((icon) => [icon.slug, icon]));
-const BRAND_PALETTES: readonly BrandPalette[] = [
-  { foreground: '#b91c1c', surface: '#fff1f2', border: '#fecdd3', accent: '#ef4444' },
-  { foreground: '#1d4ed8', surface: '#eff6ff', border: '#bfdbfe', accent: '#60a5fa' },
-  { foreground: '#6d28d9', surface: '#f5f3ff', border: '#ddd6fe', accent: '#a78bfa' },
-  { foreground: '#0f766e', surface: '#f0fdfa', border: '#99f6e4', accent: '#2dd4bf' },
-  { foreground: '#c2410c', surface: '#fff7ed', border: '#fed7aa', accent: '#fb923c' },
-  { foreground: '#0369a1', surface: '#f0f9ff', border: '#bae6fd', accent: '#38bdf8' },
-  { foreground: '#a21caf', surface: '#fdf4ff', border: '#f5d0fe', accent: '#e879f9' },
-  { foreground: '#166534', surface: '#f0fdf4', border: '#bbf7d0', accent: '#4ade80' },
-  { foreground: '#9f1239', surface: '#fff1f2', border: '#fecdd3', accent: '#fb7185' },
-  { foreground: '#4338ca', surface: '#eef2ff', border: '#c7d2fe', accent: '#818cf8' },
-  { foreground: '#a16207', surface: '#fefce8', border: '#fef08a', accent: '#facc15' },
-  { foreground: '#334155', surface: '#f8fafc', border: '#cbd5e1', accent: '#94a3b8' },
-];
-const BRAND_ROTATIONS = [-12, -8, -4, 0, 4, 8, 12] as const;
 
 function hashString(value: string): number {
   let hash = 0x811c9dc5;
@@ -265,9 +244,10 @@ function fallbackBrandMark(companyId: string, companyName: string): CompanyBrand
   return {
     catalogVersion: COMPANY_BRAND_CATALOG_VERSION,
     sourceIcon: BRAND_ICONS[seed % BRAND_ICONS.length].slug,
-    colorIndex: (seed >>> 7) % BRAND_PALETTES.length,
-    rotationDegrees: BRAND_ROTATIONS[(seed >>> 15) % BRAND_ROTATIONS.length],
-    flipVertical: Boolean((seed >>> 22) & 1),
+    // Retained as neutral values for backward-compatible snapshot DTOs.
+    colorIndex: 0,
+    rotationDegrees: 0,
+    flipVertical: false,
   };
 }
 
@@ -284,13 +264,12 @@ export function companyLogoDesign(
   const icon = BRAND_ICON_BY_SLUG.get(resolved.sourceIcon) ?? BRAND_ICONS[0];
   return {
     ...resolved,
-    colorIndex: Math.abs(resolved.colorIndex) % BRAND_PALETTES.length,
-    rotationDegrees: Math.max(-12, Math.min(12, resolved.rotationDegrees)),
     sourceBrand: icon.title,
+    brandColor: `#${icon.hex}`,
   };
 }
 
-/** A stable augmented mark sourced from the bundled 100-brand SVG catalog. */
+/** A stable, unmodified mark sourced from the bundled 100-company SVG catalog. */
 export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
   companyId,
   companyName,
@@ -300,34 +279,21 @@ export const CompanyLogoBadge: FC<CompanyLogoBadgeProps> = ({
 }) => {
   const design = companyLogoDesign(companyId, companyName, brandMark);
   const icon = BRAND_ICON_BY_SLUG.get(design.sourceIcon) ?? BRAND_ICONS[0];
-  const palette = BRAND_PALETTES[design.colorIndex];
-  const iconTransform = `rotate(${design.rotationDegrees}deg) scaleY(${design.flipVertical ? -1 : 1})`;
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
+      viewBox="0 0 24 24"
       className={`company-custom-logo-svg company-brand-mark ${className}`.trim()}
       data-catalog-version={design.catalogVersion}
       data-source-icon={design.sourceIcon}
       data-source-brand={design.sourceBrand}
-      data-color-index={design.colorIndex}
-      data-rotation={design.rotationDegrees}
-      data-flip-vertical={design.flipVertical}
+      data-brand-color={design.brandColor}
       aria-hidden="true"
       focusable="false"
     >
-      <rect x="1" y="1" width="30" height="30" rx="8" fill={palette.surface} stroke={palette.border} />
-      <path d="M5 26.5h8" stroke={palette.accent} strokeWidth="1.5" strokeLinecap="round" opacity=".7" />
-      <g transform="translate(4 4)">
-        <path
-          d={icon.path}
-          fill={palette.foreground}
-          style={{ transform: iconTransform, transformOrigin: '12px 12px' } as CSSProperties}
-        />
-      </g>
+      <path d={icon.path} fill={design.brandColor} />
     </svg>
   );
 };

@@ -16,5 +16,6 @@ def test_brand_assignment_is_stable_and_constrained() -> None:
     assert assign_company_brand_mark("company-nexora", "a" * 64) == mark
     assert mark.catalog_version == BRAND_ICON_CATALOG_VERSION
     assert mark.source_icon in BRAND_ICON_SLUGS
-    assert 0 <= mark.color_index < 12
-    assert -12 <= mark.rotation_degrees <= 12
+    assert mark.color_index == 0
+    assert mark.rotation_degrees == 0
+    assert mark.flip_vertical is False

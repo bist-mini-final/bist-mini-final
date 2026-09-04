@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 BRAND_ICON_CATALOG_VERSION: Final = "simple-icons-v16-us-listed-1"
 BRAND_COLOR_COUNT: Final = 12
-BRAND_ROTATIONS: Final = (-12, -8, -4, 0, 4, 8, 12)
 
 # Public-company and public-company-owned brands distributed with Simple Icons.
 # The order is versioned because persisted snapshots reference icons by slug.
@@ -118,7 +117,7 @@ BRAND_ICON_SLUGS: Final = (
 
 
 class CompanyBrandMark(BaseModel):
-    """Persisted instructions for rendering one augmented source logo."""
+    """Persisted source-logo identity with legacy visual fields for API compatibility."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -142,14 +141,15 @@ def assign_company_brand_mark(
     company_id: str,
     workbook_hash: str,
 ) -> CompanyBrandMark:
-    """Assign a deterministic random-looking mark when a snapshot is built."""
+    """Assign a deterministic, unmodified company mark when a snapshot is built."""
 
     digest = sha256(f"{company_id.casefold()}\x1f{workbook_hash}".encode()).digest()
     return CompanyBrandMark(
         source_icon=BRAND_ICON_SLUGS[int.from_bytes(digest[:4]) % len(BRAND_ICON_SLUGS)],
-        color_index=digest[4] % BRAND_COLOR_COUNT,
-        rotation_degrees=BRAND_ROTATIONS[digest[5] % len(BRAND_ROTATIONS)],
-        flip_vertical=bool(digest[6] & 1),
+        # Keep legacy fields neutral until the snapshot contract is versioned.
+        color_index=0,
+        rotation_degrees=0,
+        flip_vertical=False,
     )
 
 
