@@ -18,6 +18,10 @@ from backend.domains.bi.domain.extraction_models import (
 from backend.platform.postgres.pool import get_pooled_raw_connection
 
 _PERIOD_DATE = re.compile(r"(20\d{2})-(\d{2})-(\d{2})")
+_ROW_HEADER = re.compile(
+    r"(?:^|\|)\s*Row Header:\s*(.*?)\s*\|\s*Column Header:",
+    re.IGNORECASE,
+)
 _NORMALIZED_TEXT = re.compile(r"[^0-9a-z\uac00-\ud7a3]+")
 _MISSING_VALUES = ("", "-", "?", "NA", "N/A", "NM", "#PEND", "NULL")
 
@@ -28,6 +32,75 @@ def _normalize(value: str) -> str:
 
 def _unique_normalized(values: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(normalized for value in values if (normalized := _normalize(value))))
+
+
+def _ordered_metric_aliases(definition: SourceMetricDefinition) -> tuple[str, ...]:
+    """Return aliases in business priority order, not just match order.
+
+    The catalog's canonical English label must win over broader aliases.  This
+    matters for workbooks that expose genuinely different rows such as
+    ``Total Revenue``, ``Revenue`` and ``As-Reported Total Revenue``.
+    """
+
+    return _unique_normalized(
+        (
+            definition.label_en,
+            *definition.row_header_hints,
+            *definition.aliases_en,
+            definition.label_ko,
+            *definition.aliases_ko,
+        )
+    )
+
+
+def _source_row_header(source_text: str) -> str:
+    match = _ROW_HEADER.search(source_text)
+    if match is None:
+        return ""
+    # Serialized hierarchy uses ``>``.  Rank the leaf metric, not its parents.
+    return match.group(1).rsplit(">", maxsplit=1)[-1].strip()
+
+
+def _metric_cell_rank(cell: BiContextCell, aliases: tuple[str, ...]) -> int:
+    row_header = _normalize(_source_row_header(cell.source_text))
+    if not row_header:
+        return len(aliases) * 2 + 1
+    try:
+        return aliases.index(row_header)
+    except ValueError:
+        pass
+
+    # Suffix matching supports prefixed vendor labels, but remains lower
+    # priority than every exact catalog alias (e.g. As-Reported Total Revenue).
+    suffix_positions = tuple(
+        index
+        for index, alias in enumerate(aliases)
+        if len(alias) >= 10 and row_header.endswith(alias)
+    )
+    if suffix_positions:
+        return len(aliases) + min(suffix_positions)
+    return len(aliases) * 2 + 1
+
+
+def _prioritize_metric_cells(
+    cells: tuple[BiContextCell, ...],
+    definition: SourceMetricDefinition,
+    *,
+    limit: int,
+) -> tuple[BiContextCell, ...]:
+    """Keep every candidate at the best available alias priority.
+
+    Keeping all best-priority cells preserves ambiguity detection when two
+    canonical sources disagree, while preventing lower-priority aliases from
+    creating a false conflict.
+    """
+
+    if not cells:
+        return ()
+    aliases = _ordered_metric_aliases(definition)
+    ranked = tuple((_metric_cell_rank(cell, aliases), cell) for cell in cells)
+    best_rank = min(rank for rank, _cell in ranked)
+    return tuple(cell for rank, cell in ranked if rank == best_rank)[:limit]
 
 
 def _period_terms(request: BiMetricExtractionRequest) -> tuple[tuple[str, ...], str]:
@@ -57,15 +130,7 @@ class PostgresBiMetricEvidenceRetriever:
         if not isinstance(definition, SourceMetricDefinition):
             return ()
 
-        aliases = _unique_normalized(
-            (
-                definition.label_en,
-                definition.label_ko,
-                *definition.row_header_hints,
-                *definition.aliases_en,
-                *definition.aliases_ko,
-            )
-        )
+        aliases = _ordered_metric_aliases(definition)
         suffix_aliases = tuple(alias for alias in aliases if len(alias) >= 10)
         excluded = _unique_normalized(definition.excluded_aliases)
         statement_hints = _unique_normalized(definition.statement_hints)
@@ -90,13 +155,17 @@ class PostgresBiMetricEvidenceRetriever:
                             "period_kind": period_kind,
                             "statement_hints": list(statement_hints),
                             "missing_values": list(_MISSING_VALUES),
-                            "limit": max(1, min(limit, 100)),
+                            # Fetch enough alternatives to apply catalog alias
+                            # priority after SQL matching.  The public context
+                            # limit is still enforced below.
+                            "limit": max(32, min(limit * 8, 100)),
                         },
                     )
                     rows = cursor.fetchall()
         except psycopg2.Error as error:
             raise RagPipelineContractError(code="metric_evidence_query_failed") from error
-        return tuple(BiContextCell.model_validate(dict(row)) for row in rows)
+        cells = tuple(BiContextCell.model_validate(dict(row)) for row in rows)
+        return _prioritize_metric_cells(cells, definition, limit=limit)
 
 
 _JSON_ARRAY = """
@@ -137,11 +206,22 @@ WITH scoped AS (
             SELECT 1 FROM jsonb_array_elements_text({_ROW_ARRAY}) AS row_token(token)
             WHERE {_NORMALIZE_TOKEN} = ANY(%(aliases)s)
         ) AS exact_metric_match,
+        (
+            SELECT MIN(array_position(%(aliases)s::text[], {_NORMALIZE_TOKEN}))
+            FROM jsonb_array_elements_text({_ROW_ARRAY}) AS row_token(token)
+            WHERE {_NORMALIZE_TOKEN} = ANY(%(aliases)s)
+        ) AS exact_metric_rank,
         EXISTS (
             SELECT 1 FROM jsonb_array_elements_text({_ROW_ARRAY}) AS row_token(token)
             CROSS JOIN unnest(%(suffix_aliases)s::text[]) AS wanted(alias)
             WHERE right({_NORMALIZE_TOKEN}, length(wanted.alias)) = wanted.alias
         ) AS suffix_metric_match,
+        (
+            SELECT MIN(array_position(%(suffix_aliases)s::text[], wanted.alias))
+            FROM jsonb_array_elements_text({_ROW_ARRAY}) AS row_token(token)
+            CROSS JOIN unnest(%(suffix_aliases)s::text[]) AS wanted(alias)
+            WHERE right({_NORMALIZE_TOKEN}, length(wanted.alias)) = wanted.alias
+        ) AS suffix_metric_rank,
         EXISTS (
             SELECT 1 FROM jsonb_array_elements_text({_ROW_ARRAY}) AS row_token(token)
             CROSS JOIN unnest(%(excluded)s::text[]) AS blocked(alias)
@@ -173,7 +253,9 @@ WITH scoped AS (
         MAX(row_index) AS row_index,
         MAX(col_index) AS col_index,
         BOOL_OR(exact_metric_match) AS exact_metric_match,
+        MIN(exact_metric_rank) AS exact_metric_rank,
         BOOL_OR(suffix_metric_match) AS suffix_metric_match,
+        MIN(suffix_metric_rank) AS suffix_metric_rank,
         BOOL_OR(excluded_metric_match) AS excluded_metric_match,
         BOOL_OR(period_match) AS period_match,
         BOOL_OR(ltm_match) AS ltm_match,
@@ -241,7 +323,10 @@ WITH scoped AS (
                     THEN jsonb_array_length(s.cmetadata->'column_header') ELSE 0 END DESC,
                 s.id
         ) AS evidence_rank,
-        CASE WHEN matches.exact_metric_match THEN 0 ELSE 1 END AS metric_rank,
+        CASE
+            WHEN matches.exact_metric_match THEN matches.exact_metric_rank
+            ELSE 1000 + matches.suffix_metric_rank
+        END AS metric_rank,
         matches.statement_rank
     FROM scoped s
     JOIN eligible_coordinates matches

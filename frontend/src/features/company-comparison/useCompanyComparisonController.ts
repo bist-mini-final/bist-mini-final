@@ -85,6 +85,7 @@ export function useCompanyComparisonController() {
     () => companies.map((company) => ({
       companyId: company.companyId,
       companyName: company.displayName,
+      brandMark: company.brandMark,
       growth: company.revenueCagr,
       margin: company.operatingMargin,
       tone: comparisonCompanies[0]?.companyId === company.companyId

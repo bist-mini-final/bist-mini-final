@@ -9,6 +9,7 @@ import {
   type RankingMetric,
 } from './metricRanking';
 import { CompanyLogoBadge } from './CompanyLogoBadge';
+import { FinancialTierBadge } from './FinancialTierBadge';
 
 const FACTOR_LABELS: Record<'Overall' | 'Revenue' | 'Profit' | 'Growth', string> = {
   Overall: '종합순위',
@@ -26,6 +27,7 @@ const FACTOR_METRICS: Record<keyof typeof FACTOR_LABELS, RankingMetric> = {
 
 interface ComparisonRankingToolbarProps {
   readonly rankingMetric: RankingMetric;
+  readonly displayDirection: DisplayDirection;
   readonly activeRankingLabel: string;
   readonly metricDirectionLabel: string;
   readonly onMetricChange: (metric: RankingMetric) => void;
@@ -35,12 +37,15 @@ interface ComparisonRankingToolbarProps {
 
 export function ComparisonRankingToolbar({
   rankingMetric,
+  displayDirection,
   activeRankingLabel,
   metricDirectionLabel,
   onMetricChange,
   onReset,
   onRefresh,
 }: ComparisonRankingToolbarProps) {
+  const isDefaultRanking = rankingMetric === 'composite' && displayDirection === 'best-first';
+
   return (
     <section className="league-top-filter-bar" aria-label="순위 정렬 제어">
       <div className="filter-section-block">
@@ -68,19 +73,21 @@ export function ComparisonRankingToolbar({
       <div className="filter-section-block">
         <span className="filter-section-label">실시간 정렬 기준</span>
         <div className="filter-pills-row">
-          <div className="sort-status-pill">
-            <ArrowUpDown size={11} />
-            <span>{activeRankingLabel} · {metricDirectionLabel}</span>
-            <button
-              type="button"
-              className="sort-clear-btn"
-              onClick={onReset}
-              aria-label="정렬 초기화"
-              title="정렬 초기화"
-            >
-              <X size={10} />
-            </button>
-          </div>
+          {!isDefaultRanking && (
+            <div className="sort-status-pill">
+              <ArrowUpDown size={11} />
+              <span>{activeRankingLabel} · {metricDirectionLabel}</span>
+              <button
+                type="button"
+                className="sort-clear-btn"
+                onClick={onReset}
+                aria-label="기본 정렬로 초기화"
+                title="종합점수 순위 · 높은 순으로 초기화"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          )}
           <Button type="button" onClick={onRefresh}>
             <RefreshCw size={14} /> 스냅샷 새로고침
           </Button>
@@ -199,7 +206,7 @@ export function CompanyRankingTable({
                   </td>
                   <td className="col-th-company">
                     <div className="company-cell-flex">
-                      <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={27} />
+                      <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} brandMark={company.brandMark} size={27} />
                       <AppLink
                         to={`/dashboard?companyId=${encodeURIComponent(company.companyId)}`}
                         className="company-name-text"
@@ -236,7 +243,7 @@ export function CompanyRankingTable({
                     </strong>
                   </td>
                   <td className={`col-th-operatingMargin ${rankingMetric === 'operatingMargin' ? 'is-ranked' : ''}`}>
-                    <strong className={company.operatingMargin < 0 ? 'metric-negative' : ''}>
+                    <strong>
                       {company.operatingMargin.toFixed(1)}%
                     </strong>
                   </td>
@@ -247,7 +254,7 @@ export function CompanyRankingTable({
                   </td>
                   <td className={`col-th-composite ${rankingMetric === 'composite' ? 'is-ranked' : ''}`}>
                     <div className="debt-grade-cell" title="성장성 35% + 수익성 35% + 안정성 30%">
-                      <span className={`tier-round-pill pill-${company.tier.toLowerCase()}`}>{company.tier}</span>
+                      <FinancialTierBadge tier={company.tier} compact />
                       <strong>{formatCompositeScore(company.compositeScore)}</strong>
                     </div>
                   </td>
@@ -274,11 +281,11 @@ export function CompanyRankingTable({
                   onClick={() => onFocusCompany(company.companyId)}
                   aria-pressed={isFocused}
                 >
-                  <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={32} />
+                  <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} brandMark={company.brandMark} size={32} />
                   <span className="league-mobile-company__name">{company.displayName}</span>
                 </button>
                 <span className="league-mobile-company__summary" title="종합 점수">
-                  <span className={`tier-round-pill pill-${company.tier.toLowerCase()}`}>{company.tier}</span>
+                  <FinancialTierBadge tier={company.tier} compact />
                   <strong>{formatCompositeScore(company.compositeScore)}</strong>
                 </span>
                 <label className="league-mobile-company__compare">

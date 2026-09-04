@@ -1,0 +1,16 @@
+.company-custom-logo-svg {
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 25%;
+  filter: drop-shadow(0 1px 1px rgb(15 23 42 / 10%));
+  transform-origin: center;
+  transition: transform var(--duration-standard) var(--ease-standard), filter var(--duration-standard) var(--ease-standard);
+}
+
+.company-brand-mark:hover {
+  filter: drop-shadow(0 2px 2px rgb(15 23 42 / 14%));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-custom-logo-svg { transition: none; }
+}

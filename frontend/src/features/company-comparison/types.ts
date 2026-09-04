@@ -1,3 +1,5 @@
+import type { CompanyBrandMark } from '../../shared/company-brand/contract';
+
 export type FinancialTier = 'S' | 'A' | 'B' | 'C';
 
 export interface ComparisonPeriod {
@@ -13,6 +15,7 @@ export interface ComparisonPeriod {
 export interface ComparisonCompany {
   readonly companyId: string;
   readonly displayName: string;
+  readonly brandMark?: CompanyBrandMark | null;
   readonly currency: string;
   readonly scale: 'ones' | 'thousands' | 'millions' | 'billions';
   readonly sourceSnapshotId: string;

@@ -1,4 +1,5 @@
 import { CompanyLogoBadge } from './CompanyLogoBadge';
+import { FinancialTierBadge } from './FinancialTierBadge';
 import { ComparisonTrendChart, FinancialTrendChart } from './CompanyComparisonCharts';
 import {
   formatAmount,
@@ -86,11 +87,12 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
             {comparisonCompanies.map((company, index) => (
               <div key={company.companyId} className={`analysis-company-identity is-${index === 0 ? 'a' : 'b'}`}>
                 <span className="analysis-compare-key">{index === 0 ? 'A' : 'B'}</span>
-                <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} size={31} />
+                <CompanyLogoBadge companyId={company.companyId} companyName={company.displayName} brandMark={company.brandMark} size={31} />
                 <div>
                   <strong title={company.displayName}>{company.displayName}</strong>
-                  <span>종합 {officialRankByCompanyId.get(company.companyId)}위 · {company.tier}등급 · {formatCompositeScore(company.compositeScore)}점</span>
+                  <span>종합 {officialRankByCompanyId.get(company.companyId)}위 · {formatCompositeScore(company.compositeScore)}점</span>
                 </div>
+                <FinancialTierBadge tier={company.tier} compact />
               </div>
             ))}
           </div>
@@ -195,14 +197,14 @@ export function CompanyAnalysisPanel({ comparison, assumptions }: CompanyAnalysi
         <>
           <div className="analysis-company-summary">
             <div className="analysis-company-identity">
-              <CompanyLogoBadge companyId={analysisCompany.companyId} companyName={analysisCompany.displayName} size={38} />
+              <CompanyLogoBadge companyId={analysisCompany.companyId} companyName={analysisCompany.displayName} brandMark={analysisCompany.brandMark} size={38} />
               <div>
                 <strong title={analysisCompany.displayName}>{analysisCompany.displayName}</strong>
                 <span>{companies.length}개 기업 중 종합 {officialRankByCompanyId.get(analysisCompany.companyId)}위</span>
               </div>
             </div>
             <div className="analysis-total-score">
-              <span className={`tier-round-pill pill-${analysisCompany.tier.toLowerCase()}`}>{analysisCompany.tier}</span>
+              <FinancialTierBadge tier={analysisCompany.tier} />
               <strong>{formatCompositeScore(analysisCompany.compositeScore)}</strong>
               <small>종합점수</small>
             </div>

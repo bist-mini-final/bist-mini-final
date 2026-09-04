@@ -45,6 +45,7 @@ from backend.domains.bi.domain.models import (
     UnavailableObservation,
     ValueKind,
 )
+from backend.shared.domain.company_brand import assign_company_brand_mark
 
 from .snapshot_projection import (
     BiSnapshotProjection,
@@ -225,6 +226,10 @@ class BiSnapshotBuilder:
             company=BiCompany(
                 company_id=projection.request.company_id,
                 display_name=projection.request.display_name,
+                brand_mark=assign_company_brand_mark(
+                    str(projection.request.company_id),
+                    projection.request.source.workbook_hash,
+                ),
             ),
             source=projection.request.source,
             snapshot=BiSnapshotMeta(

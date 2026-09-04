@@ -1,4 +1,5 @@
 import { CheckCircle2, CircleAlert, Clock3, DatabaseZap, FileSpreadsheet, RefreshCw, Trash2 } from 'lucide-react';
+import { CompanyLogoBadge } from '../../../shared/company-brand/CompanyLogoBadge';
 import { Button, StatusBadge } from '../../../shared/ui';
 import type { BiDashboardSnapshot } from '../types';
 
@@ -34,10 +35,18 @@ export function BiHeader({ dashboard, activeAction, onRefresh, onReset, onDelete
   return (
     <header className="bi-header">
       <div className="bi-header__title-group">
-        <h1 id="bi-page-title">
-          <span className="bi-header__company-name">{dashboard.company.displayName}</span>
-          <span className="bi-header__dashboard-label">Dashboard</span>
-        </h1>
+        <div className="bi-header__brand-identity">
+          <CompanyLogoBadge
+            companyId={dashboard.company.companyId}
+            companyName={dashboard.company.displayName}
+            brandMark={dashboard.company.brandMark}
+            size={52}
+          />
+          <h1 id="bi-page-title">
+            <span className="bi-header__company-name">{dashboard.company.displayName}</span>
+            <span className="bi-header__dashboard-label">Dashboard</span>
+          </h1>
+        </div>
       </div>
 
       <div className="bi-header__summary" aria-label="현재 대시보드 상태">

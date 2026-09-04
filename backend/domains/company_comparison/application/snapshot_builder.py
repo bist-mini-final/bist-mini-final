@@ -42,6 +42,7 @@ from backend.domains.company_comparison.domain.models import (
     FinancialTier,
 )
 from backend.domains.data_sources.domain.cell_values import extract_resolved_cell_value
+from backend.shared.domain.company_brand import CompanyBrandMark
 
 SCORING_VERSION: Final = "financial-league-v3"
 FORECAST_VERSION: Final = "historical-cagr-hold-v1"
@@ -71,6 +72,7 @@ class ObservedValue:
 class BaseFinancials:
     company_id: CompanyId
     display_name: str
+    brand_mark: CompanyBrandMark | None
     currency: str
     scale: AmountScale
     source_snapshot_id: str
@@ -245,6 +247,7 @@ def _extract_base(
         BaseFinancials(
             company_id=snapshot.company.company_id,
             display_name=snapshot.company.display_name,
+            brand_mark=snapshot.company.brand_mark,
             currency=revenue_series.currency,
             scale=revenue_series.scale,
             source_snapshot_id=str(snapshot.snapshot.snapshot_id),
@@ -388,6 +391,7 @@ class CompanyComparisonSnapshotBuilder:
             ComparisonCompany(
                 company_id=item["base"].company_id,
                 display_name=item["base"].display_name,
+                brand_mark=item["base"].brand_mark,
                 currency=item["base"].currency,
                 scale=item["base"].scale,
                 source_snapshot_id=item["base"].source_snapshot_id,

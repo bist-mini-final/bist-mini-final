@@ -12,8 +12,8 @@
   --bm-secondary-dark: #1d4ed8;
   --bm-secondary-light: #eff6ff;
   --bm-secondary-border: #bfdbfe;
-  --bm-up: #2563eb;
-  --bm-down: #dc2626;
+  --bm-up: #dc2626;
+  --bm-down: #2563eb;
   --bm-bg: transparent;
   --bm-card-bg: var(--surface);
   --bm-card-bg-elevated: var(--surface-subtle);
@@ -153,7 +153,6 @@
   background: var(--bm-secondary-light);
   border-color: var(--bm-secondary);
   color: var(--bm-secondary-dark);
-  box-shadow: inset 0 -2px 0 var(--bm-secondary);
 }
 
 /* Live sorting pill */
@@ -221,7 +220,6 @@
   overflow-x: auto;
   max-height: none;
   overflow-y: visible;
-  scrollbar-color: var(--bm-secondary) #e8eef8;
   scrollbar-width: thin;
 }
 
@@ -266,7 +264,6 @@
 .metric-rank-header.is-active {
   background: var(--bm-secondary-light);
   color: var(--bm-secondary-dark);
-  box-shadow: inset 0 -2px 0 var(--bm-secondary);
 }
 
 .league-pixel-table td {
@@ -373,9 +370,34 @@
   font-size: 9px;
   line-height: 1;
 }
-.metric-negative { color: #c2410c !important; }
 .debt-grade-cell { display: flex; align-items: center; gap: 7px; }
 .debt-grade-cell strong { min-width: 38px; font-size: 12px; }
+
+.financial-tier-badge {
+  --tier-accent: #64748b;
+  --tier-border: #cbd5e1;
+  --tier-surface: #f8fafc;
+  display: inline-flex;
+  min-width: 2.15rem;
+  height: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.24rem;
+  border: 1px solid var(--tier-border);
+  border-radius: 0.52rem;
+  background: var(--tier-surface);
+  color: var(--tier-accent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--tier-accent) 16%, transparent);
+}
+.financial-tier-badge svg { width: 0.8rem; height: 0.8rem; stroke-width: 2; }
+.financial-tier-badge b { font-size: 0.65rem; font-weight: 900; line-height: 1; }
+.financial-tier-badge.is-compact { min-width: 1.85rem; height: 1.45rem; gap: 0.16rem; border-radius: 0.45rem; }
+.financial-tier-badge.is-compact svg { width: 0.7rem; height: 0.7rem; }
+.financial-tier-badge.is-compact b { font-size: 0.6rem; }
+.financial-tier-badge.tier-s { --tier-accent: #b91c1c; --tier-border: #fecaca; --tier-surface: #fff1f2; }
+.financial-tier-badge.tier-a { --tier-accent: #c2410c; --tier-border: #fed7aa; --tier-surface: #fff7ed; }
+.financial-tier-badge.tier-b { --tier-accent: #1d4ed8; --tier-border: #bfdbfe; --tier-surface: #eff6ff; }
+.financial-tier-badge.tier-c { --tier-accent: #475569; --tier-border: #cbd5e1; --tier-surface: #f8fafc; }
 
 /* =========================================================================
    4. Right Side: Top-Performer Spotlight Cards & Metric Distribution
@@ -500,7 +522,7 @@
     font-size: 0.68rem;
     font-variant-numeric: tabular-nums;
   }
-  .league-mobile-company__summary .tier-round-pill { min-width: 1.35rem; padding: 0.12rem 0.3rem; }
+  .league-mobile-company__summary .financial-tier-badge { min-width: 1.7rem; }
   .league-mobile-company__compare {
     display: inline-flex;
     min-height: 2.5rem;
@@ -546,28 +568,11 @@
   .footer-left-links { align-items: flex-start; flex-direction: column; }
 }
 
-/* Shared product visual system alignment */
-.company-custom-logo-svg {
-  flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 25%;
-  filter: none;
-  transform-origin: center;
-  transition: transform var(--duration-standard) var(--ease-standard);
-}
-
-.company-custom-logo-svg text {
-  font-family: var(--font-ui);
-}
-
+/* Company-mark interactions within comparison surfaces. */
 .company-cell-flex:hover .company-brand-mark,
 .league-mobile-company__identity:hover .company-brand-mark,
 .analysis-company-identity:hover .company-brand-mark {
   transform: translateY(-1px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .company-custom-logo-svg { transition: none; }
 }
 
 .league-top-filter-bar,

@@ -144,22 +144,60 @@
   background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--surface) 92%, var(--bm-secondary-light)));
 }
 
+.benchmark-scatter-layout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 2.1rem minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.3rem;
+}
+
+.benchmark-scatter-y-axis-labels {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  padding: 0.45rem 0 1.85rem;
+  color: var(--text-muted);
+  font-size: 8px;
+  line-height: 1;
+}
+
+.benchmark-scatter-y-axis-labels strong {
+  align-self: center;
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.benchmark-scatter-y-axis-labels span {
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
 .benchmark-scatter-chart .recharts-scatter-symbol { cursor: pointer; }
 
 .quadrant-label {
   position: absolute;
   z-index: 2;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 2px 5px;
   color: var(--text-subtle);
   font-size: 8.5px;
   font-weight: 750;
   pointer-events: none;
-  opacity: 0.75;
+  opacity: 0.88;
 }
 
-.quadrant-label.is-top-left { top: 7px; left: 48px; }
-.quadrant-label.is-top-right { top: 7px; right: 12px; color: var(--bm-primary-dark); }
-.quadrant-label.is-bottom-left { bottom: 31px; left: 52px; }
-.quadrant-label.is-bottom-right { right: 18px; bottom: 31px; color: var(--bm-secondary-dark); }
+.quadrant-label.is-top-left { top: 9px; left: 48px; }
+.quadrant-label.is-top-right { top: 9px; right: 12px; color: var(--bm-primary-dark); }
+.quadrant-label.is-bottom-left { bottom: 48px; left: 52px; }
+.quadrant-label.is-bottom-right { right: 18px; bottom: 48px; color: var(--bm-secondary-dark); }
 
 .benchmark-scatter-axis-labels {
   display: grid;

@@ -1,3 +1,5 @@
+import type { CompanyBrandMark } from '../../shared/company-brand/contract';
+
 export const METRIC_IDS = [
   'revenue',
   'revenue_yoy_growth',
@@ -39,6 +41,7 @@ export type CardState = 'ready' | 'partial' | 'missing' | 'ambiguous' | 'invalid
 interface BiCompany {
   readonly companyId: string;
   readonly displayName: string;
+  readonly brandMark?: CompanyBrandMark | null;
 }
 
 export interface BiMaterializationSource {
