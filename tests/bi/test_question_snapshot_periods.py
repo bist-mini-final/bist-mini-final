@@ -165,6 +165,8 @@ def test_refresh_snapshot_keeps_only_current_dashboard_periods() -> None:
         )
         .model_copy(update={"periods": all_periods})
     )
+    assert base.company.brand_mark is not None
+    assert base.company.brand_mark.source_icon
     question = BiQuestionRecord(
         question_id=QuestionId("question-test"),
         materialization_job_id=REFRESH_JOB_ID,

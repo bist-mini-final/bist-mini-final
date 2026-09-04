@@ -6,6 +6,8 @@ from typing import Annotated, Final, Literal, NewType
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_core import PydanticCustomError
 
+from backend.shared.domain.company_brand import CompanyBrandMark
+
 IDENTIFIER_PATTERN: Final = r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
 WORKBOOK_HASH_PATTERN: Final = r"^[a-f0-9]{64}$"
 
@@ -106,6 +108,7 @@ class BiContractModel(BaseModel):
 class BiCompany(BiContractModel):
     company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
     display_name: str = Field(min_length=1, max_length=200)
+    brand_mark: CompanyBrandMark | None = None
 
 
 class BiMaterializationSource(BiContractModel):

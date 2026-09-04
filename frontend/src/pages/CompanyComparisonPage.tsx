@@ -69,6 +69,7 @@ export function CompanyComparisonPage() {
 
       <ComparisonRankingToolbar
         rankingMetric={rankingMetric}
+        displayDirection={displayDirection}
         activeRankingLabel={activeRankingLabel}
         metricDirectionLabel={metricDirectionLabel}
         onMetricChange={comparison.selectRankingMetric}

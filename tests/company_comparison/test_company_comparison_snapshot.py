@@ -37,6 +37,7 @@ from backend.domains.company_comparison.domain.errors import ComparisonDataError
 from backend.domains.company_comparison.domain.models import CompanyComparisonSnapshot
 from backend.domains.company_comparison.presentation.routes import create_company_comparison_router
 from backend.shared.application.snapshots import VersionedSnapshotRecord
+from backend.shared.domain.company_brand import assign_company_brand_mark
 
 
 def _snapshot(
@@ -145,7 +146,11 @@ def _snapshot(
     digest = ("a" if company_id.endswith("a") else "b") * 64
     return BiDashboardSnapshot(
         schema_version=1,
-        company=BiCompany(company_id=CompanyId(company_id), display_name=name),
+        company=BiCompany(
+            company_id=CompanyId(company_id),
+            display_name=name,
+            brand_mark=assign_company_brand_mark(company_id, digest),
+        ),
         source=BiMaterializationSource(
             file_name=f"{name}.xlsx",
             workbook_hash=digest,
@@ -184,6 +189,8 @@ def test_builder_uses_only_observed_financials_and_marks_forecasts() -> None:
     assert result.snapshot.status is SnapshotStatus.READY
     assert len(result.companies) == 2
     assert result.companies[0].display_name == "Alpha"
+    assert result.companies[0].brand_mark is not None
+    assert result.companies[0].brand_mark == assign_company_brand_mark("company-a", "a" * 64)
     assert result.companies[0].revenue_cagr == 10.0
     assert result.companies[1].net_debt == 0.0
     assert [period.year for period in result.companies[0].periods] == list(range(2022, 2029))

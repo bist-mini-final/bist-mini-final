@@ -201,8 +201,8 @@
   font-size: 8.5px;
   text-align: center;
 }
-.benchmark-compare-row > b.is-favorable { background: var(--bm-primary-light); color: var(--bm-primary-dark); }
-.benchmark-compare-row > b.is-unfavorable { background: #fef2f2; color: #dc2626; }
+.benchmark-compare-row > b.is-favorable { background: #fff1f2; color: #dc2626; }
+.benchmark-compare-row > b.is-unfavorable { background: #eff6ff; color: #2563eb; }
 .single-trend-row {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);
@@ -222,8 +222,8 @@
   font-weight: 700;
 }
 .single-trend-row > div > strong { color: #24372d; font-size: 10px; }
-.single-trend-row > div > small { color: var(--bm-primary); font-size: 8.5px; font-weight: 800; }
-.single-trend-row > div > small.is-down { color: #dc2626; }
+.single-trend-row > div > small { color: var(--bm-up); font-size: 8.5px; font-weight: 800; }
+.single-trend-row > div > small.is-down { color: var(--bm-down); }
 .analysis-trend-chart {
   width: 100%;
   height: 66px;
@@ -250,6 +250,7 @@
 .analysis-company-pair .analysis-company-identity.is-b { border-top: 2px solid var(--bm-secondary); }
 .analysis-company-pair .analysis-company-identity > div > strong { font-size: 10.5px; }
 .analysis-company-pair .analysis-company-identity > div > span { font-size: 8px; }
+.analysis-company-pair .financial-tier-badge { flex: none; margin-left: auto; }
 .analysis-compare-key {
   position: absolute;
   top: -7px;

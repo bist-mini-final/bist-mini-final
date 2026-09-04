@@ -5,6 +5,13 @@ function company(index: number) {
   return {
     company_id: `company-${index}`,
     display_name: `Company ${index}`,
+    brand_mark: {
+      catalog_version: 'simple-icons-v16-us-listed-1',
+      source_icon: 'apple',
+      color_index: index,
+      rotation_degrees: 4,
+      flip_vertical: false,
+    },
     currency: 'KRW',
     scale: 'millions',
     source_snapshot_id: `snapshot-${index}`,
@@ -83,6 +90,7 @@ describe('parseCompanyComparisonSnapshot', () => {
   it('maps the durable snapshot contract to frontend fields', () => {
     const result = parseCompanyComparisonSnapshot(payload());
     expect(result.companies).toHaveLength(2);
+    expect(result.companies[0].brandMark?.sourceIcon).toBe('apple');
     expect(result.companies[0].periods[4].periodType).toBe('forecast');
     expect(result.evidence[0].origin).toBe('bi_snapshot');
     expect(result.snapshot.sourceSnapshotIds).toHaveLength(2);

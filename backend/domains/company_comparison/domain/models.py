@@ -17,6 +17,7 @@ from backend.domains.bi.domain.models import (
     MetricId,
     SnapshotStatus,
 )
+from backend.shared.domain.company_brand import CompanyBrandMark
 
 
 class FinancialTier(StrEnum):
@@ -57,6 +58,7 @@ class ComparisonPeriod(BiContractModel):
 class ComparisonCompany(BiContractModel):
     company_id: CompanyId = Field(pattern=IDENTIFIER_PATTERN)
     display_name: str = Field(min_length=1, max_length=200)
+    brand_mark: CompanyBrandMark | None = None
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     scale: AmountScale
     source_snapshot_id: str = Field(pattern=IDENTIFIER_PATTERN)

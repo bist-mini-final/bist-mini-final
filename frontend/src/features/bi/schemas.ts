@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CompanyBrandMarkApiSchema } from '../../shared/company-brand/schema';
 import {
   METRIC_IDS,
   type BiCompanyListResponse,
@@ -149,6 +150,7 @@ const DashboardApiSchema = z.object({
   company: z.object({
     company_id: z.string().min(1),
     display_name: z.string().min(1),
+    brand_mark: CompanyBrandMarkApiSchema.nullable().optional(),
   }).strict(),
   source: MaterializationSourceApiSchema,
   snapshot: z.object({
@@ -184,6 +186,7 @@ const DashboardApiSchema = z.object({
   company: {
     companyId: value.company.company_id,
     displayName: value.company.display_name,
+    brandMark: value.company.brand_mark,
   },
   source: {
     fileName: value.source.file_name,

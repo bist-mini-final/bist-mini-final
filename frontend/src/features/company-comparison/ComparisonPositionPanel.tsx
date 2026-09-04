@@ -50,54 +50,61 @@ export function ComparisonPositionPanel({
             <span><i />기타</span>
           </div>
         </div>
-        <div
-          className="benchmark-scatter-chart"
-          role="img"
-          aria-label="기업별 매출 성장률과 영업이익률 산점도. 점을 선택하면 표에서 기업이 강조됩니다."
-        >
-          <span className="quadrant-label is-top-left">안정 수익형</span>
-          <span className="quadrant-label is-top-right">고성장·고수익</span>
-          <span className="quadrant-label is-bottom-left">관찰 필요</span>
-          <span className="quadrant-label is-bottom-right">성장 투자형</span>
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 22, right: 16, bottom: 6, left: -4 }}>
-              <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
-              <XAxis
-                type="number"
-                dataKey="growth"
-                name="매출 성장률"
-                unit="%"
-                tick={{ fill: 'var(--text-muted)', fontSize: 9 }}
-                tickLine={false}
-                axisLine={{ stroke: 'var(--border-strong)' }}
-                tickCount={5}
-                domain={['auto', 'auto']}
-              />
-              <YAxis
-                type="number"
-                dataKey="margin"
-                name="영업이익률"
-                unit="%"
-                width={42}
-                tick={{ fill: 'var(--text-muted)', fontSize: 9 }}
-                tickLine={false}
-                axisLine={{ stroke: 'var(--border-strong)' }}
-                tickCount={5}
-                domain={['auto', 'auto']}
-              />
-              <ReferenceLine x={averageCagr} stroke="var(--info-600, #2563eb)" strokeDasharray="4 3" />
-              <ReferenceLine y={averageMargin} stroke="var(--brand-600)" strokeDasharray="4 3" />
-              <Tooltip cursor={{ stroke: 'var(--text-muted)', strokeDasharray: '3 3' }} content={<BenchmarkScatterTooltip />} />
-              <Scatter
-                data={points}
-                shape={renderBenchmarkScatterMarker}
-                onClick={(point) => {
-                  const companyId = (point as { payload?: BenchmarkScatterPoint }).payload?.companyId;
-                  if (companyId) onSelectCompany(companyId);
-                }}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
+        <div className="benchmark-scatter-layout">
+          <div className="benchmark-scatter-y-axis-labels" aria-hidden="true">
+            <span>높은 수익성</span>
+            <strong>영업이익률</strong>
+            <span>낮은 수익성</span>
+          </div>
+          <div
+            className="benchmark-scatter-chart"
+            role="img"
+            aria-label="가로축은 매출 성장률, 세로축은 영업이익률인 기업 산점도. 위쪽일수록 수익성이 높으며 점을 선택하면 표에서 기업이 강조됩니다."
+          >
+            <span className="quadrant-label is-top-left">안정 수익형</span>
+            <span className="quadrant-label is-top-right">고성장·고수익</span>
+            <span className="quadrant-label is-bottom-left">관찰 필요</span>
+            <span className="quadrant-label is-bottom-right">성장 투자형</span>
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 30, right: 18, bottom: 12, left: -4 }}>
+                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  dataKey="growth"
+                  name="매출 성장률"
+                  unit="%"
+                  tick={{ fill: 'var(--text-muted)', fontSize: 9 }}
+                  tickLine={false}
+                  axisLine={{ stroke: 'var(--border-strong)' }}
+                  tickCount={5}
+                  domain={['auto', 'auto']}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="margin"
+                  name="영업이익률"
+                  unit="%"
+                  width={42}
+                  tick={{ fill: 'var(--text-muted)', fontSize: 9 }}
+                  tickLine={false}
+                  axisLine={{ stroke: 'var(--border-strong)' }}
+                  tickCount={5}
+                  domain={['auto', 'auto']}
+                />
+                <ReferenceLine x={averageCagr} stroke="var(--info-600, #2563eb)" strokeDasharray="4 3" />
+                <ReferenceLine y={averageMargin} stroke="var(--brand-600)" strokeDasharray="4 3" />
+                <Tooltip cursor={{ stroke: 'var(--text-muted)', strokeDasharray: '3 3' }} content={<BenchmarkScatterTooltip />} />
+                <Scatter
+                  data={points}
+                  shape={renderBenchmarkScatterMarker}
+                  onClick={(point) => {
+                    const companyId = (point as { payload?: BenchmarkScatterPoint }).payload?.companyId;
+                    if (companyId) onSelectCompany(companyId);
+                  }}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
         </div>
         <div className="benchmark-scatter-axis-labels" aria-hidden="true">
           <span>낮은 성장</span>

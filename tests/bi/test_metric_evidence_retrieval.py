@@ -1,6 +1,7 @@
 from backend.domains.bi.application.fast_rag_models import (
     FastRagPipelineSettings,
 )
+from backend.domains.bi.domain.catalog import METRIC_CATALOG, SourceMetricDefinition
 from backend.domains.bi.domain.extraction_models import (
     BiContextCell,
     BiMetricExtractionRequest,
@@ -15,7 +16,11 @@ from backend.domains.bi.domain.models import (
 from backend.domains.bi.infrastructure.integrations.fast_rag_adapter import (
     FastRagPipelineAdapter,
 )
-from backend.domains.bi.infrastructure.postgres.metric_evidence import _period_terms
+from backend.domains.bi.infrastructure.postgres.metric_evidence import (
+    _ordered_metric_aliases,
+    _period_terms,
+    _prioritize_metric_cells,
+)
 
 SOURCE = BiMaterializationSource(
     file_name="financials.xlsx",
@@ -99,3 +104,70 @@ def test_period_terms_distinguish_fy_and_ltm_for_the_same_end_date() -> None:
     assert "20251231" in ltm_terms
     assert "fy2025" in fy_terms
     assert "ltm2025" in ltm_terms
+
+
+def _revenue_cell(cell_id: str, row_header: str, value: str) -> BiContextCell:
+    return BiContextCell(
+        cell_id=cell_id,
+        sheet_name="Income_Statement",
+        cell_coord=cell_id,
+        source_text=(
+            "Company: IBM | Sheet: Income_Statement | "
+            f"Row Header: {row_header} | Column Header: 2024-12-31 | "
+            f"Cell Value: {value}"
+        ),
+    )
+
+
+def _revenue_definition() -> SourceMetricDefinition:
+    definition = METRIC_CATALOG[MetricId.REVENUE]
+    assert isinstance(definition, SourceMetricDefinition)
+    return definition
+
+
+def test_metric_alias_priority_prefers_canonical_label_over_broader_aliases() -> None:
+    definition = _revenue_definition()
+
+    selected = _prioritize_metric_cells(
+        (
+            _revenue_cell("O16", "Revenue", "62044"),
+            _revenue_cell("O122", "As-Reported Total Revenue", "62753"),
+            _revenue_cell("O23", "Total Revenue", "62753"),
+        ),
+        definition,
+        limit=8,
+    )
+
+    assert [cell.cell_id for cell in selected] == ["O23"]
+    assert _ordered_metric_aliases(definition)[0] == "totalrevenue"
+
+
+def test_metric_alias_priority_keeps_all_canonical_cells_for_conflict_validation() -> None:
+    definition = _revenue_definition()
+
+    selected = _prioritize_metric_cells(
+        (
+            _revenue_cell("O16", "Revenue", "62044"),
+            _revenue_cell("O23", "Total Revenue", "62753"),
+            _revenue_cell("H33", "Total Revenue", "62754"),
+        ),
+        definition,
+        limit=8,
+    )
+
+    assert [cell.cell_id for cell in selected] == ["O23", "H33"]
+
+
+def test_metric_alias_priority_falls_back_when_canonical_label_is_absent() -> None:
+    definition = _revenue_definition()
+
+    selected = _prioritize_metric_cells(
+        (
+            _revenue_cell("O122", "As-Reported Total Revenue", "62753"),
+            _revenue_cell("O16", "Revenue", "62044"),
+        ),
+        definition,
+        limit=8,
+    )
+
+    assert [cell.cell_id for cell in selected] == ["O16"]

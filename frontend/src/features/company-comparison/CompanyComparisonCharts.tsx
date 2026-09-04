@@ -9,12 +9,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { CompanyBrandMark } from '../../shared/company-brand/contract';
 import { CompanyLogoBadge } from './CompanyLogoBadge';
 import type { TrendPoint } from './analysis';
 
 export interface BenchmarkScatterPoint {
   readonly companyId: string;
   readonly companyName: string;
+  readonly brandMark?: CompanyBrandMark | null;
   readonly growth: number;
   readonly margin: number;
   readonly tone: 'selected' | 'compare-a' | 'compare-b' | 'default';
@@ -145,7 +147,7 @@ function BenchmarkScatterMarker({ cx = 0, cy = 0, payload }: BenchmarkScatterMar
       <circle cx={cx} cy={cy} r={10.5} fill="#ffffff" stroke={borderColor} strokeWidth={1.5} />
       <foreignObject x={cx - 7} y={cy - 7} width={14} height={14}>
         <div className="benchmark-logo-marker-inner">
-          <CompanyLogoBadge companyId={payload.companyId} companyName={payload.companyName} size={14} />
+          <CompanyLogoBadge companyId={payload.companyId} companyName={payload.companyName} brandMark={payload.brandMark} size={14} />
         </div>
       </foreignObject>
       <g className="benchmark-logo-marker-label">

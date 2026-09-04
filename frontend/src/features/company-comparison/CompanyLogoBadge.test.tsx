@@ -1,6 +1,10 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { CompanyLogoBadge, companyLogoDesign } from './CompanyLogoBadge';
+import {
+  COMPANY_BRAND_ICON_COUNT,
+  CompanyLogoBadge,
+  companyLogoDesign,
+} from './CompanyLogoBadge';
 
 describe('CompanyLogoBadge', () => {
   it('keeps one company mark stable while varying the generated brand identity', () => {
@@ -18,13 +22,14 @@ describe('CompanyLogoBadge', () => {
     const visualSignatures = new Set(
       companies.map(([id, name]) => {
         const design = companyLogoDesign(id, name);
-        return `${design.palette}:${design.family}:${design.variant}`;
+        return `${design.sourceIcon}:${design.colorIndex}:${design.rotationDegrees}:${design.flipVertical}`;
       }),
     );
     expect(visualSignatures.size).toBe(companies.length);
+    expect(COMPANY_BRAND_ICON_COUNT).toBe(100);
   });
 
-  it('renders reusable flat marks without gradient identifiers or crest metadata', () => {
+  it('renders reusable augmented source marks without gradient identifiers', () => {
     const { container } = render(
       <>
         <CompanyLogoBadge companyId="company-nexora" companyName="Nexora Labs" />
@@ -32,7 +37,27 @@ describe('CompanyLogoBadge', () => {
       </>,
     );
     expect(container.querySelectorAll('linearGradient')).toHaveLength(0);
-    expect(container.querySelectorAll('[data-logo-family]')).toHaveLength(2);
-    expect(container.querySelectorAll('[data-crest-sigil]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-source-icon]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-catalog-version="simple-icons-v16-us-listed-1"]')).toHaveLength(2);
+  });
+
+  it('honors the brand mark persisted in a BI snapshot', () => {
+    const { container } = render(
+      <CompanyLogoBadge
+        companyId="company-nexora"
+        companyName="Nexora Labs"
+        brandMark={{
+          catalogVersion: 'simple-icons-v16-us-listed-1',
+          sourceIcon: 'nvidia',
+          colorIndex: 4,
+          rotationDegrees: -8,
+          flipVertical: true,
+        }}
+      />,
+    );
+    const mark = container.querySelector('[data-source-icon="nvidia"]');
+    expect(mark).toHaveAttribute('data-color-index', '4');
+    expect(mark).toHaveAttribute('data-rotation', '-8');
+    expect(mark).toHaveAttribute('data-flip-vertical', 'true');
   });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CompanyBrandMarkApiSchema } from '../../shared/company-brand/schema';
 import type { CompanyComparisonSnapshot } from './types';
 
 const PeriodSchema = z.object({
@@ -14,6 +15,7 @@ const PeriodSchema = z.object({
 const CompanySchema = z.object({
   company_id: z.string().min(1),
   display_name: z.string().min(1),
+  brand_mark: CompanyBrandMarkApiSchema.nullable().optional(),
   currency: z.string().length(3),
   scale: z.enum(['ones', 'thousands', 'millions', 'billions']),
   source_snapshot_id: z.string().min(1),
@@ -107,6 +109,7 @@ export function parseCompanyComparisonSnapshot(value: unknown): CompanyCompariso
     companies: data.companies.map((company) => ({
       companyId: company.company_id,
       displayName: company.display_name,
+      brandMark: company.brand_mark,
       currency: company.currency,
       scale: company.scale,
       sourceSnapshotId: company.source_snapshot_id,
