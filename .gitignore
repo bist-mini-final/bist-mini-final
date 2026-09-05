@@ -76,6 +76,7 @@ data/chat_uploads/
 data/workflows/
 data/benchmark_sets/
 tmp/
+.tmp/
 
 # OS / editors
 .DS_Store
