@@ -18,6 +18,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=Path("docs/assets/excel-rag-core-user-flow.gif"))
     parser.add_argument("--fps", type=int, default=24)
     parser.add_argument("--colors", type=int, default=64)
+    parser.add_argument(
+        "--pace",
+        type=float,
+        default=1.0,
+        help="Multiply the composed timeline duration without changing source capture timing.",
+    )
+    parser.add_argument(
+        "--full-frames",
+        action="store_true",
+        help="Store complete GIF frames to avoid viewer-specific delta-frame artifacts.",
+    )
     return parser.parse_args()
 
 
@@ -219,10 +230,18 @@ def load_source_frame(
     frame_times: list[float],
     source_time: float,
     sampling: str,
+    width: int,
+    height: int,
 ) -> Image.Image:
     if sampling == "nearest":
-        return load_nearest_frame(frame_dir, frames, frame_times, source_time)
-    return load_blended_frame(frame_dir, frames, frame_times, source_time)
+        frame = load_nearest_frame(frame_dir, frames, frame_times, source_time)
+    else:
+        frame = load_blended_frame(frame_dir, frames, frame_times, source_time)
+    if frame.size != (width, height):
+        resized = frame.resize((width, height), Image.Resampling.LANCZOS)
+        frame.close()
+        return resized
+    return frame
 
 
 def build_palette(sample_frames: list[Image.Image], colors: int) -> Image.Image:
@@ -238,8 +257,13 @@ def build_palette(sample_frames: list[Image.Image], colors: int) -> Image.Image:
         # White canvas pixels dominate this product. Replicate real saturated
         # pixels so small rose, violet, blue, and amber module accents retain
         # dedicated entries in the shared GIF palette.
+        pixel_data = (
+            tile.get_flattened_data()
+            if hasattr(tile, "get_flattened_data")
+            else tile.getdata()
+        )
         accent_pixels.extend(
-            pixel for pixel in tile.get_flattened_data()
+            pixel for pixel in pixel_data
             if max(pixel) - min(pixel) >= 18 and min(pixel) < 242
         )
     if accent_pixels:
@@ -277,6 +301,8 @@ def main() -> None:
     ]
     source_anchors = sorted(set(source_anchors))
     output_anchors = build_time_map(source_anchors, fast_forward)
+    pace = max(0.1, float(args.pace))
+    output_anchors = [anchor * pace for anchor in output_anchors]
     output_duration = output_anchors[-1]
     output_count = max(2, math.ceil(output_duration * args.fps))
 
@@ -287,7 +313,9 @@ def main() -> None:
     for index in range(16):
         output_time = output_duration * index / 15
         source_time = interpolate(output_time, output_anchors, source_anchors)
-        frame = load_source_frame(frame_dir, frames, frame_times, source_time, frame_sampling)
+        frame = load_source_frame(
+            frame_dir, frames, frame_times, source_time, frame_sampling, width, height,
+        )
         camera = camera_state(output_time, actions, width, height, camera_mode)
         sample_frames.append(crop_camera(frame, *camera, width, height))
     palette = build_palette(sample_frames, args.colors)
@@ -298,7 +326,9 @@ def main() -> None:
     for index in range(output_count):
         output_time = index / args.fps
         source_time = interpolate(output_time, output_anchors, source_anchors)
-        source_frame = load_source_frame(frame_dir, frames, frame_times, source_time, frame_sampling)
+        source_frame = load_source_frame(
+            frame_dir, frames, frame_times, source_time, frame_sampling, width, height,
+        )
         camera = camera_state(output_time, actions, width, height, camera_mode)
         camera_frame = crop_camera(source_frame, *camera, width, height)
         source_frame.close()
@@ -324,8 +354,8 @@ def main() -> None:
         append_images=rendered[1:],
         duration=durations,
         loop=0,
-        optimize=True,
-        disposal=1,
+        optimize=not args.full_frames,
+        disposal=2 if args.full_frames else 1,
     )
     for frame in rendered:
         frame.close()
