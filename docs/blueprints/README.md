@@ -1,10 +1,12 @@
-# 청사진 해석 규칙과 목표 아키텍처
+# 청사진 해석 규칙과 설계 계약
 
 > **Contract State:** Target Architecture
 > **Current State Source:** [`CURRENT_IMPLEMENTATION_BASELINE.md`](../CURRENT_IMPLEMENTATION_BASELINE.md)
 > **Canonical Backend Structure:** [`BP-102`](01_system_blueprints/BP-102_backend_layered_architecture.md)
 
-이 디렉터리의 문서는 제품이 장기적으로 지켜야 할 책임, 의존 방향, 런타임 계약과 완료 조건을 정의하는 **To-Be 규격**이다. 2026-08-31 기준 현재 구현은 BP-101~701의 구조 목표에 도달했으며 모든 개별 BP의 `Structure State`는 `Complete`다. `Current References`는 현재 계약을 추적하는 구현 증거이고, 수치·검증 실행 결과는 `CURRENT_IMPLEMENTATION_BASELINE.md`에서만 관리한다.
+이 디렉터리의 문서는 구현 완료 후에도 유지할 책임, 의존 방향, 입출력·실행 계약을 정의한다. 프로젝트 완료 기준일은 2026-09-07이며 BP-101~701의 `Structure State`는 모두 `Complete`다. `Target Architecture`는 설계 계약의 성격을 나타내는 메타데이터이지 프로젝트가 미완료라는 의미가 아니다. `Current References`는 계약을 추적하는 구현 링크이며, 현재 수치와 검증 실행 결과는 [구현 기준선](../CURRENT_IMPLEMENTATION_BASELINE.md)에서 관리한다.
+
+전체 문서 탐색은 [문서 목차](../README.md), 결과와 한계는 [완료 요약](../PROJECT_SUMMARY.md)을 참고한다.
 
 ## 1. 문서 상태 해석
 
@@ -12,27 +14,27 @@
 
 | 상태 | 의미 |
 | :--- | :--- |
-| `Contract State` | 문서가 목표 계약인지 여부. 모든 BP 문서는 `Target Architecture`다. |
+| `Contract State` | 구현과 후속 변경에서 유지할 설계 계약. 모든 BP 문서는 `Target Architecture`다. |
 | `Capability State` | 사용자가 사용하는 기능과 런타임 계약의 가동 상태다. |
 | `Structure State` | 코드가 목표 소유 경계와 의존 규칙까지 이동했는지 나타낸다. |
-| `Target Ownership` | 최종적으로 책임을 소유해야 하는 패키지다. 존재하지 않는 목표 경로도 포함할 수 있다. |
-| `Current References` | 현재 동작을 추적하기 위한 구현 링크다. canonical target이 아니다. |
+| `Target Ownership` | 해당 책임을 소유하는 설계 경계다. 후속 구조 변경 시 계약과 구현을 함께 갱신한다. |
+| `Current References` | 현재 동작을 추적하기 위한 소스 링크다. 소유 경계의 정의는 `Target Ownership`을 함께 확인한다. |
 
 `Capability State: Operational`만으로 구조 완료를 판정하지 않는다. 현재 `Complete` 판정은 수평 호환 패키지 제거, vertical slice 소유권, composition 경계와 구조 계약 테스트가 함께 충족된 결과다. 이후 이 조건이 깨지면 해당 BP 상태를 같은 변경에서 즉시 낮춰야 한다.
 
 ### 1.1 현재 정합성 요약
 
-| 묶음 | 문서 | 2026-08-31 구현 증거 |
+| 묶음 | 문서 | 설계·구현 참조 |
 | :--- | :--- | :--- |
 | System | BP-101~104 | target backend allowlist, entrypoint/bootstrap 경계, durable lease, 6개 KEDA worker spec |
 | Data Engine | BP-201~203 | structured-cell v6, 외부 vision, shard artifact + Binary COPY + atomic publish |
 | Pipeline | BP-301~303 | workflow vertical slice, 17개 registry type, Dense+keyword+RRF+2D expansion |
 | Workspace | BP-401~405 | 5개 제품 workspace와 독립 BI/comparison snapshot, 근거 검증 UI |
-| Interface | BP-501~503 | OpenAPI 64 paths/74 operations, PostgreSQL source-of-truth SSE, Alembic 0005/22 tables |
+| Interface | BP-501~503 | REST·SSE·Alembic 계약. 현재 API 수와 DB revision은 구현 기준선 참조 |
 | Frontend | BP-601 | 7개 route, 공용 shell/UI/token/dialog, 모바일 상단 앱바+drawer, 시트별 다중 셀 근거 drag-pan modal |
 | Validation | BP-701 | architecture/OpenAPI/schema/K8s renderer/backend/frontend 회귀 gate |
 
-## 2. 목표 설계 원칙
+## 2. 유지할 설계 원칙
 
 1. **도메인 우선 modular monolith**: workflow, data sources, BI, company comparison, chatbot, benchmark, read-only operations를 독립 bounded context로 둔다.
 2. **안쪽으로 향하는 의존성**: `presentation → application → domain`, `infrastructure → application ports`만 허용한다.
@@ -45,7 +47,7 @@
 9. **영속 상태 우선**: PostgreSQL이 상태의 단일 진실 공급원이고 Redis는 상태 변경 신호에만 사용한다.
 10. **검증 가능한 완료**: 디렉터리 이름이 아니라 import graph, composition 위치, 계약 테스트와 삭제된 호환 경로로 완료를 판정한다.
 
-## 3. 목표 소유권 지도
+## 3. 책임 소유권 지도
 
 | 책임 | 최종 소유 위치 | 금지되는 대체 위치 |
 | :--- | :--- | :--- |

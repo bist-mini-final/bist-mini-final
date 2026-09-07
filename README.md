@@ -1,461 +1,232 @@
-# BIST Mini Final
+# Excel RAG LLM Agent
 
-재무 스프레드시트 구조 분석, 외부 vision 기반 테이블 감지, PostgreSQL/pgvector 하이브리드 검색(Dense + FTS + RRF), 셀 근거 기반 응답, BI 대시보드·기업 비교와 RAG 벤치마크를 제공하는 Excel RAG 플랫폼입니다.
+![Team ColdPlay · Excel RAG LLM Agent](docs/assets/readme-cover.svg)
 
-이 문서는 저장소를 처음 받은 개발자가 **로컬 웹 애플리케이션을 실행하고, 필요할 때 k3d/KEDA 워커까지 구성**할 수 있도록 현재 프로젝트 설정을 기준으로 작성되었습니다.
+<p align="center">
+  <strong>재무 엑셀, 자연어로 묻고 셀 근거로 답하다.</strong><br/>
+  Team ColdPlay · 4인 팀 프로젝트 · 2026.09.07 완료
+</p>
 
-## 1. 실행 환경
+<p align="center">
+  <a href="#주요-기능과-시연">서비스 시연</a> ·
+  <a href="#팀원-소개">팀원 소개</a> ·
+  <a href="#시스템-아키텍처">아키텍처</a> ·
+  <a href="docs/SETUP.md">실행 가이드</a> ·
+  <a href="docs/README.md">프로젝트 문서</a>
+</p>
 
-| 도구 | 지원/권장 버전 | 용도 |
-| --- | --- | --- |
-| Python | 3.11 이상, **3.12 권장** | FastAPI, 파이프라인, 워커 |
-| uv | 최신 안정 버전 | Python 가상환경 및 잠금 의존성 설치 |
-| Node.js | **22 LTS 권장** | React/Vite 프론트엔드 |
-| npm | Node.js에 포함 | 프론트엔드 의존성 및 스크립트 |
-| Docker | 24 이상 권장 | PostgreSQL/pgvector, 이미지 빌드 |
-| Git | 최신 안정 버전 | 소스 관리 |
+## 프로젝트 소개
 
-전체 비동기 실행 환경에는 `k3d`, `kubectl`, `helm`이 추가로 필요합니다. Windows에서는 WSL2 또는 Git Bash에서 `deploy/kubernetes/local.sh`를 실행할 수 있습니다. 스크립트는 Device Guard가 프로젝트 가상환경 실행을 막는 경우 uv 관리 Python으로 자동 우회합니다.
+**Excel RAG LLM Agent**는 복잡한 재무 엑셀을 구조적으로 분석하고, 자연어 질문에 재무 수치와 원본 셀 근거를 함께 제공하는 AI 에이전트 플랫폼입니다.
 
-> 로컬 pgvector 설정은 `shared_buffers=4GB`를 사용합니다. Docker Desktop에는 메모리를 8GB 이상 할당하는 것을 권장하며, 자원이 부족한 환경에서는 `deploy/compose/docker-compose.yml`의 PostgreSQL 메모리 설정을 낮춰야 합니다.
+S&P Capital IQ Pro 형식의 재무제표를 바탕으로 **데이터 적재 → 검색 → 답변 → 시각화 → 기업 비교**를 하나의 서비스로 연결했습니다. 분석 결과를 보는 사용자 화면과 RAG의 입력·출력·비용을 추적하는 개발자 도구를 함께 구현했습니다.
 
-설치 여부는 저장소를 구성하기 전에 확인합니다.
+| 최종 보고 정확도 | 재사용 기능 모듈 | 비동기 워커 | 개발 단계 |
+| :---: | :---: | :---: | :---: |
+| **81.45%** | **17개** | **6종** | **3단계 MVP** |
 
-```bash
-python --version
-uv --version
-node --version
-npm --version
-docker version
-```
+> 정확도는 최종 발표·보고 기준입니다. 평가 조건과 과거 자동채점 원본의 차이는 [평가 결과 안내](docs/PROJECT_SUMMARY.md#평가-결과를-읽는-방법)에 구분했습니다.
 
-## 2. 빠른 시작: 백엔드 + 프론트엔드
+### 개발 배경
 
-아래 구성은 개발 서버와 PostgreSQL을 실행합니다. 파일 업로드, BI 생성, 벤치마크처럼 큐에 등록되는 작업을 실제 처리하려면 [5. 비동기 워커 실행](#5-비동기-워커-실행)도 구성해야 합니다.
+재무 데이터를 분석할 때는 수치를 찾는 것만으로 충분하지 않습니다. **어느 기업의 어떤 기간·지표인지, 어디에서 가져온 값인지**까지 함께 확인할 수 있어야 합니다.
 
-### 2.1 환경 변수 파일 만들기
-
-저장소 루트에서 실행합니다.
-
-PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-macOS, Linux, WSL2:
-
-```bash
-cp .env.example .env
-```
-
-`.env`에서 데이터베이스 주소를 확인하고, OpenAI 기반 모듈을 사용한다면 API 키를 입력합니다.
-
-```dotenv
-OPENAI_API_KEY=sk-your-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-PGVECTOR_URL=postgresql://postgres:postgres@localhost:5432/rag_flow
-# Multi-Pod SSE relay is optional for a single local API process.
-REDIS_URL=
-```
-
-백엔드는 API 키 없이도 시작되지만 Query Decomposer, Luna 구조 감지, BI 질문 처리 등 OpenAI를 호출하는 기능은 실패합니다. `.env`와 `frontend/.env*`는 Git에서 제외되어 있으므로 실제 키를 커밋하지 마세요.
-
-### 2.2 PostgreSQL + pgvector 실행
-
-현재 Docker Compose 파일은 **데이터베이스만** 실행하며 외부 Docker 볼륨 `pgdata`를 사용합니다.
-
-```bash
-docker volume create pgdata
-docker compose -f deploy/compose/docker-compose.yml up -d
-docker compose -f deploy/compose/docker-compose.yml ps
-```
-
-`bist-pgvector`의 상태가 `healthy`인지 확인합니다. 외부 PostgreSQL을 사용한다면 이 단계는 건너뛰고 `.env`의 `PGVECTOR_URL` 또는 `DATABASE_URL`을 해당 접속 문자열로 설정합니다. 최초 실행과 배포 전에는 버전 마이그레이션을 적용합니다.
-
-```bash
-uv run alembic upgrade head
-```
-
-기존 설치도 `CREATE IF NOT EXISTS` 기반 기준선으로 현재 데이터를 유지한 채 채택됩니다. 애플리케이션의 시작 시 스키마 확인은 이전 배포와의 호환 안전망이며, 이후 스키마 변경은 `migrations/`의 새 Alembic revision으로 추가합니다.
-
-### 2.3 의존성 설치
-
-```bash
-uv sync --frozen
-npm --prefix frontend ci
-```
-
-`uv sync --frozen`은 루트의 `uv.lock`을 그대로 사용해 Python 개발 의존성까지 설치합니다.
-
-### 2.4 개발 서버 실행
-
-터미널 1 — FastAPI 백엔드:
-
-```bash
-uv run uvicorn backend.entrypoints.asgi:app --host 0.0.0.0 --port 8765 --reload
-```
-
-터미널 2 — React/Vite 프론트엔드:
-
-```bash
-npm --prefix frontend run dev
-```
-
-접속 주소:
-
-| 서비스 | 주소 |
+| 우리가 마주한 문제 | 해결 방향 |
 | --- | --- |
-| 웹 UI | <http://localhost:5173> |
-| Swagger UI (개발 전용) | <http://localhost:8765/docs> |
-| ReDoc (개발 전용) | <http://localhost:8765/redoc> |
-| OpenAPI JSON (개발 전용) | <http://localhost:8765/openapi.json> |
-| 상태 확인 | <http://localhost:8765/healthz> |
-| Liveness | <http://localhost:8765/livez> |
-| 준비 상태 | <http://localhost:8765/readyz> |
-| Kubernetes 작업 관제 | <http://localhost:5173/jobs> |
+| 파일마다 다른 표 배치와 다단 헤더로 수치의 의미가 유실됨 | VLM으로 표·헤더·데이터 영역을 구분하고 구조를 보존해 적재 |
+| 자연어 질문에 맞는 기업·지표·기간과 정확한 원본 셀을 찾기 어려움 | 질문 분해·범위 지정과 하이브리드 검색으로 근거 셀 탐색 |
+| 여러 시트·기업의 값을 다시 정리하고 비교해야 함 | 챗봇·자동 차트·BI 대시보드·기업 비교로 분석 결과 제공 |
 
-프론트엔드 개발 서버는 `/api`만 `http://localhost:8765`로 프록시합니다. API 명세는 프론트엔드와 외부 Ingress를 경유하지 않고 개발 환경의 백엔드 포트에서만 확인합니다. 정식 API 경로는 `/api/v1`이며 기존 `/api` 경로도 호환용으로 유지됩니다.
+## 팀원 소개
 
-### 2.5 기동 확인
+팀원별로 데이터·RAG·검색 최적화·오케스트레이션의 책임을 나누고, 공통 입출력 계약과 셀 근거를 기준으로 각 구현을 연결했습니다.
 
-PowerShell:
-
-```powershell
-Invoke-RestMethod http://localhost:8765/healthz
-Invoke-RestMethod http://localhost:8765/readyz
-```
-
-macOS, Linux, WSL2:
-
-```bash
-curl http://localhost:8765/healthz
-curl http://localhost:8765/readyz
-```
-
-`/healthz`는 프로세스 생존 여부, `/readyz`는 데이터베이스를 포함한 요청 처리 준비 상태를 확인합니다.
-
-## 3. 환경 변수
-
-### 애플리케이션 설정
-
-| 변수 | 기본값 | 설명 |
+| 팀원 | 역할 | 주요 담당 |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | 없음 | OpenAI 기반 모듈 사용 시 필요 |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 호환 API 주소 |
-| `DATABASE_URL` | 없음 | 설정하면 `PGVECTOR_URL`보다 우선하는 PostgreSQL 접속 문자열 |
-| `PGVECTOR_URL` | `postgresql://postgres:postgres@localhost:5432/rag_flow` | PostgreSQL/pgvector 및 큐 저장소 주소 |
-| `REDIS_URL` | 없음 | 설정 시 API Pod 간 SSE 상태 변경 알림용 Redis Pub/Sub 주소. 상태 원본은 계속 PostgreSQL이며 Redis 장애 시 0.5초 폴링으로 안전하게 대체 |
-| `APP_ENV` | `development` | `production` 또는 `prod`이면 API 명세 비공개가 기본값 |
-| `EXPOSE_API_DOCS` | 개발 `true`, 운영 `false` | Swagger, ReDoc, OpenAPI JSON 공개 여부. 운영 배포에서는 명시적으로 `false` 사용 |
-| `AUTH_ENABLED` | `false` | 서명 세션 인증과 API RBAC 활성화. 공유·운영 배포에서는 반드시 `true` |
-| `AUTH_USERS_JSON` | 없음 | `username`, PBKDF2 `password_hash`, `role`, `tenant_id`를 가진 사용자 배열. 평문 비밀번호를 저장하지 않음 |
-| `AUTH_SESSION_SECRET` | 없음 | 세션 서명용 32자 이상 비밀값. 운영 Secret에서 주입하고 정기 교체 |
-| `AUTH_SESSION_TTL_SECONDS` | `28800` | 로그인 세션 유효 시간(300~86400초) |
-| `AUTH_COOKIE_SECURE` | 운영 `true` | HTTPS에서만 세션 쿠키 전송. HTTP 전용 로컬 k3d는 `false` |
-| `USE_PGVECTOR` | `true` | `true`, `1`, `yes`일 때 pgvector 사용 |
-| `DB_POOL_MIN_SIZE` | `2` | 백엔드 프로세스의 최소 DB 연결 수 |
-| `DB_POOL_MAX_SIZE` | 템플릿 `10`, 미설정 시 `50` | 백엔드 프로세스의 최대 DB 연결 수 |
-| `KUBERNETES_WORKFLOW_QUEUE` | `workflow-core` | 기본 워크플로 큐 이름 |
-| `KUBERNETES_DATABASE_URL` | 없음 | Kubernetes 배포에만 사용할 PostgreSQL 접속 문자열. 지정하면 `DATABASE_URL`, `PGVECTOR_URL`보다 우선 |
-| `KUBERNETES_BACKEND_IMAGE` | `bist-backend:<git-sha>` | 배포할 API 이미지. 작업 트리가 더러우면 추적·신규 소스의 내용 지문을 포함한 `-dirty-<hash>`가 붙음 |
-| `KUBERNETES_WORKER_IMAGE` | `bist-workflow-worker:<git-sha>` | 배포할 KEDA 워커 이미지 |
-| `KUBERNETES_FRONTEND_IMAGE` | `bist-frontend:<git-sha>` | 배포할 UI 이미지 |
-| `K3D_IMPORT_IMAGES` | `true` | `true`면 로컬 빌드 이미지를 k3d에 import. 원격 레지스트리 배포 시 `false` |
-| `KUBERNETES_MAX_JOBS` | 자동 계산 | k3d/KEDA 최대 병렬 queue slot 수. 빈 값이면 Docker 자원과 parent/child Pod 쌍의 총 request로 계산 |
-| `KUBERNETES_CAPACITY_CPU_PER_SLOT` | `2` | 자동 계산에서 queue slot 하나(benchmark/ingestion parent와 workflow child)의 합산 CPU request |
-| `KUBERNETES_CAPACITY_MEMORY_GIB_PER_SLOT` | `4` | 자동 계산에서 queue slot 하나의 합산 메모리 request(GiB) |
-| `KUBERNETES_JOB_CPU_REQUEST` | `1000m` | 워커 CPU request |
-| `KUBERNETES_JOB_MEMORY_REQUEST` | `2Gi` | 워커 메모리 request |
-| `KUBERNETES_JOB_CPU_LIMIT` | `2` | 워커 CPU limit |
-| `KUBERNETES_JOB_MEMORY_LIMIT` | `3Gi` | 워커 메모리 limit |
-| `INGESTION_SHARDS_ENABLED` | `false` | 직접 실행 시 분산 Excel ingestion 사용 여부. Kubernetes ScaledJob 템플릿은 `true`를 주입 |
-| `INGESTION_SHARD_POLL_SECONDS` | `1` | 부모 ingestion 모듈의 child shard 상태 조회 간격 |
-| `INGESTION_SHARD_WAIT_TIMEOUT_SECONDS` | `21000` | embedding/COPY shard barrier 최대 대기 시간 |
-| `INGESTION_VECTOR_SHARD_SIZE` | `4096` | 한 vector COPY Job이 담당하는 문서 수 |
-| `BI_QUESTION_BATCH_SIZE` | `16` | BI 질문 워커가 한 번에 가져올 질문 수 |
-| `BI_QUESTION_MAX_WORKERS` | `4` | BI 질문 워커 내부 최대 병렬 스레드 수 |
-| `LOG_LEVEL` | `INFO` | 워커 로그 레벨 |
+| **김지환** | 팀장 · Orchestration | 모듈·DAG 실행 통합, 워커·상태 관리, Kubernetes·KEDA, 플레이그라운드 |
+| **전명준** | Data Foundation | 재무 데이터 분석·정규화, 가상 데이터·평가셋 제작, 기업 비교 |
+| **권혁준** | RAG Pipeline | 표 구조 인식, FRTR 셀 직렬화·검색 문서 설계, 재무 RAG |
+| **김정원** | Optimization | 서브쿼리, 검색 범위·순위 통합·문맥 확장, 재무 챗봇 |
 
-`KUBERNETES_JOB_NAME`은 Kubernetes가 워커 식별용으로 주입하는 값이고, `WORKFLOW_QUEUE`는 워크플로 워커 프로세스에서 기본 큐를 일시적으로 재정의할 때 사용합니다.
+## 주요 기능과 시연
 
-### Docker Compose 설정
+![Excel RAG 서비스 둘러보기](docs/assets/excel-rag-core-user-flow.gif)
 
-다음 값은 `deploy/compose/docker-compose.yml`의 PostgreSQL 컨테이너 설정에 사용됩니다.
+*저장소의 실제 프론트엔드 시연 GIF입니다. 아래 링크에서 기능별 전체 흐름을 확인할 수 있습니다.*
 
-| 변수 | 기본값 |
+### 01. 데이터 소스 · 엑셀을 검색 가능한 데이터로
+
+엑셀을 업로드하면 시트의 표 구조를 분석하고, 행·열 헤더를 포함한 셀 텍스트와 벡터를 생성합니다. 적재 상태와 구조 분석 결과를 화면에서 확인할 수 있습니다.
+
+**업로드 → 시트 미리보기 → VLM 구조 분석 → 셀 직렬화 → 벡터 적재**
+
+[데이터 적재 GIF 보기](docs/assets/excel-rag-data-ingestion.gif)
+
+### 02. 재무 챗봇 · 답변에서 원본 셀까지
+
+질문에 필요한 데이터를 검색해 답변하고, 사용한 셀 근거를 함께 제공합니다. 지원되는 재무 표 답변은 차트로 자동 시각화하여 수치와 추세를 함께 읽을 수 있습니다.
+
+**자연어 질문 → 재무 답변·표 → 자동 차트 → 원본 셀 확인**
+
+[챗봇 GIF 보기](docs/assets/excel-rag-chatbot-user-flow.gif)
+
+### 03. BI 대시보드 · 기업의 재무 상태를 한눈에
+
+기업별 재무 지표를 카드와 차트로 정리하고, 추세와 히트맵을 통해 데이터를 살펴봅니다. 지표에 연결된 근거를 확인하며 숫자의 출처를 검증할 수 있습니다.
+
+[BI 대시보드 GIF 보기](docs/assets/excel-rag-bi-dashboard-flow.gif)
+
+### 04. 기업 비교 · 같은 기준으로 기업을 비교
+
+검증된 BI 스냅샷을 바탕으로 기업의 재무 지표와 순위를 비교합니다. 기업을 선택해 차이를 확인하고, 비교에 사용된 실제 관측값을 따라갈 수 있습니다.
+
+[기업 비교 GIF 보기](docs/assets/excel-rag-company-comparison-flow.gif)
+
+### 05. 플레이그라운드 · 실행 과정을 투명하게
+
+기능 모듈을 연결해 워크플로를 구성하고 전체 파이프라인을 실행합니다. 모듈별 처리 상태, 입력·출력, 토큰과 호출 비용을 추적하며 RAG가 답변을 만드는 과정을 확인합니다.
+
+[플레이그라운드 GIF 보기](docs/assets/excel-rag-playground-workflow.gif)
+
+## 시스템 아키텍처
+
+웹 요청과 장시간 작업을 분리했습니다. FastAPI는 요청·조회·진행 상태 전달을 담당하고, 실제 파이프라인은 PostgreSQL 큐를 통해 워커가 처리합니다.
+
+```mermaid
+flowchart TB
+    USER["사용자 · 웹 브라우저"] --> INGRESS["Nginx Ingress · 단일 진입점"]
+
+    subgraph WEB["웹 서비스"]
+        UI["React · TypeScript<br/>챗봇 / BI / 기업 비교 / Playground"]
+        API["FastAPI<br/>요청 검증 · 작업 등록 · 상태 조회"]
+    end
+
+    INGRESS -->|"/"| UI
+    INGRESS -->|"/api"| API
+
+    subgraph RUNTIME["데이터·실행 기반"]
+        PG[("PostgreSQL + pgvector<br/>재무 데이터 · 벡터 · 작업 상태")]
+        REDIS[("Redis<br/>상태 변경 알림")]
+        KEDA["Kubernetes · KEDA"]
+        WORKER["6종 Worker<br/>DAG · 적재 · BI · 평가"]
+    end
+
+    API --> PG
+    REDIS -. "SSE 진행 상태" .-> API
+    PG -. "대기 작업 감지" .-> KEDA
+    KEDA --> WORKER
+    WORKER --> PG
+    WORKER -. "실행 알림" .-> REDIS
+    WORKER --> AI["OpenAI<br/>Vision · LLM · Embedding"]
+```
+
+브라우저는 동일한 진입점의 `/api`로 요청하며, Ingress가 백엔드에 전달합니다. 별도의 백엔드 포트 공개를 전제로 하지 않습니다.
+
+[상세 시스템 설계](docs/blueprints/01_system_blueprints/BP-101_system_architecture_blueprint.md) · [배포 구성](docs/blueprints/01_system_blueprints/BP-104_deployment_and_infra_topology.md)
+
+### 핵심 RAG 흐름
+
+```mermaid
+flowchart LR
+    Q["사용자 질문<br/>+ 데이터 범위"] --> D["질문 분해<br/>기업·지표·기간 지정"]
+    D --> V["Dense 검색"]
+    D --> K["키워드 검색"]
+    V --> R["RRF 순위 통합"]
+    K --> R
+    R --> C["행 문맥 확장"]
+    C --> A["답변 생성<br/>+ 셀 근거 검증"]
+```
+
+## 기술 스택
+
+| 영역 | 사용 기술 | 적용 목적 |
+| --- | --- | --- |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS | 재무 분석 웹 UI와 공통 디자인 |
+| **Visualization** | XYFlow, Recharts, Nivo | DAG 편집, 재무 차트, 히트맵 |
+| **Backend** | Python, FastAPI, Pydantic, SSE | API, 입출력 검증, 실시간 실행 상태 |
+| **AI · Data** | OpenAI, OpenPyXL, Pillow, NetworkX | 구조 분석·검색·답변, 시트 처리, DAG |
+| **Database** | PostgreSQL 16, pgvector, PostgreSQL FTS, Redis | 재무 데이터·벡터·큐 저장, 실행 알림 |
+| **Infrastructure** | Docker, Kubernetes, k3d, Helm, KEDA, Nginx | 컨테이너 배포와 작업량 기반 워커 확장 |
+| **Quality · Collaboration** | GitHub Actions, CodeRabbit, pytest, Ruff, Pyright, Vitest, ESLint | 자동 검사, 코드 리뷰, 타입·회귀 검증 |
+
+## 기술적 고민과 해결
+
+### 표의 구조를 잃지 않고 검색하려면?
+
+셀 값만 나열하면 행·열 헤더와 데이터의 관계가 사라집니다. VLM으로 구조를 먼저 인식한 뒤 **기업·시트·행 헤더·열 헤더·값을 일정한 포맷으로 직렬화**했습니다. 질문도 같은 재무 의미를 담도록 구성해 검색 표현을 맞췄습니다.
+
+[표 구조 분석](docs/blueprints/02_data_engine_blueprints/BP-202_luna_vlm_vision_detector.md) · [셀 표현 설계](docs/blueprints/02_data_engine_blueprints/BP-201_spreadsheet_coordinate_parser.md)
+
+### 의미가 비슷한 셀과 정확한 용어가 맞는 셀을 어떻게 함께 찾을까?
+
+자연어 의미 검색과 키워드 일치 검색을 병렬로 수행하고, 점수의 단위를 직접 비교하지 않는 **RRF 순위 통합**을 적용했습니다. 이후 같은 행과 설정된 인접 행의 실제 값 셀을 확장해 답변에 필요한 문맥을 보완했습니다.
+
+현재 코드의 키워드 검색은 PostgreSQL FTS(`ts_rank_cd`)입니다. BM25 실험과 최종 구현의 구분은 [검색 설계 문서](docs/blueprints/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md)에 기록했습니다.
+
+### 여러 팀원이 만든 기능을 어떻게 하나의 서비스로 연결할까?
+
+17개 기능 모듈에 공통 입력·설정·출력 계약을 적용하고, 이를 DAG로 조합했습니다. 비동기 작업은 워커 실행 규격과 PostgreSQL 상태 관리로 통일하고, KEDA가 작업량에 따라 필요한 워커를 실행하도록 구성했습니다.
+
+[모듈 표준화](docs/blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md) · [DAG 실행](docs/blueprints/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) · [동시 실행·복구](docs/blueprints/01_system_blueprints/BP-103_concurrency_and_locking_model.md)
+
+## 개발 과정
+
+프로젝트를 세 단계로 나누고, 각 단계에서 검증할 범위를 정한 뒤 다음 단계로 확장했습니다.
+
+| 단계 | 집중한 질문 | 주요 구현 |
+| --- | --- | --- |
+| **MVP 1 · 핵심 RAG** | 엑셀 구조를 보존하고 필요한 셀을 찾을 수 있는가? | 구조 분석, 셀 직렬화, 검색·근거 기반 답변 |
+| **MVP 2 · 통합 분석** | 데이터·분석·실행을 하나로 연결할 수 있는가? | 데이터 적재, 재무 BI, DAG·비동기 실행 |
+| **MVP 3 · 서비스화** | 사용자가 결과를 이해하고 실행을 추적할 수 있는가? | 챗봇·자동 차트, 기업 비교, 플레이그라운드·관제 |
+
+### 결과와 배운 점
+
+- **최종 보고 정확도 81.45%**: 답변 수치와 근거를 함께 평가하며 결과를 정리했습니다.
+- **데이터의 구조가 검색 품질의 출발점**: 모델 호출 이전에 기업·기간·헤더·단위를 보존하는 과정이 중요했습니다.
+- **공통 계약이 협업의 연결점**: 각 기능을 독립적으로 개발하더라도 입출력·오류·실행 상태를 맞춰야 제품으로 통합할 수 있었습니다.
+- **RAG 품질과 실행 안정성은 함께 다뤄야 하는 문제**: 검색 결과뿐 아니라 장시간 적재, 진행 상태, 비용과 복구 경로까지 설계했습니다.
+
+프로젝트의 지원 범위와 운영 한계는 [완료 요약](docs/PROJECT_SUMMARY.md)에 정리했습니다. 수식 재계산 엔진, 모든 엑셀 양식 지원이나 상용 운영 검증 완료를 주장하지 않습니다.
+
+## 협업 방식과 품질 관리
+
+**역할 분담 → 공통 계약 합의 → 기능 구현 → PR·자동 검사 → 통합 검증**의 흐름으로 개발했습니다.
+
+- **GitHub**: `dev`를 개발 통합 브랜치로 사용하고, 완료 소스는 `main`에 정리했습니다.
+- **GitHub Actions**: 백엔드 테스트·Ruff·Pyright·DB 마이그레이션·Kubernetes 렌더 검증과 프론트엔드 타입 검사·Vitest·빌드를 구성했습니다.
+- **CodeRabbit**: 한국어 자동 리뷰와 PR 대화를 활용했습니다.
+- **컨벤션**: PR 제목 자동 정리와 공통 모듈·도메인 책임 규칙을 적용했습니다.
+- **문서화**: 역할별 설계와 API·데이터·UI·검증 계약을 20개 청사진으로 정리했습니다.
+
+[협업·컨벤션 상세](docs/COLLABORATION.md) · [CI workflow](.github/workflows/ci.yml) · [CodeRabbit 설정](.coderabbit.yaml)
+
+## 실행 방법
+
+최종 소스는 `main` 브랜치입니다.
+
+```bash
+git clone https://github.com/bist-mini-final/bist-mini-final.git
+cd bist-mini-final
+```
+
+실행 환경은 Python·uv, Node.js·npm, PostgreSQL·pgvector가 필요합니다. 모델 기능에는 OpenAI API 키가, 큐에 등록된 작업 처리에는 워커가 필요합니다.
+
+| 실행 목적 | 안내 |
 | --- | --- |
-| `POSTGRES_DB` | `rag_flow` |
-| `POSTGRES_USER` | `postgres` |
-| `POSTGRES_PASSWORD` | `postgres` |
-| `PGVECTOR_PORT` | `5432` |
-
-기본 계정 정보는 로컬 개발용입니다. 공유 환경이나 운영 환경에서는 반드시 별도 비밀번호와 Secret 저장소를 사용하세요.
-
-## 4. 외부 데이터베이스 사용
-
-PostgreSQL 16과 pgvector 확장을 사용할 수 있는 관리형 DB(Supabase, Neon, RDS 등)도 연결할 수 있습니다.
-
-```dotenv
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require
-```
-
-- `DATABASE_URL`이 있으면 `PGVECTOR_URL`보다 우선합니다.
-- 접속 계정에는 확장 및 스키마를 준비할 권한이 필요합니다.
-- 특수문자가 포함된 사용자명과 비밀번호는 URL 인코딩해야 합니다.
-- `deploy/kubernetes/local.sh`는 `KUBERNETES_DATABASE_URL` → `DATABASE_URL` → `PGVECTOR_URL` 순으로 클러스터 DB를 선택합니다. 개발용 `.env`가 원격 DB를 가리키더라도, 로컬 k3d 실행에만 `KUBERNETES_DATABASE_URL`을 지정해 분리할 수 있습니다.
-- 원격 DB를 선택한 경우 스크립트는 마이그레이션이나 기존 로컬 PostgreSQL 컨테이너 중지 전에 인증 연결과 `SELECT 1`을 확인합니다. 검증에 실패하면 기존 로컬 DB와 클러스터를 유지한 채 중단합니다.
-
-## 5. 비동기 워커 실행
-
-이 프로젝트의 워크플로, BI, 벤치마크는 PostgreSQL 큐와 one-shot 워커를 사용합니다.
-
-```text
-React/Vite → FastAPI → PostgreSQL 큐 → KEDA ScaledJob → Worker Pod
-```
-
-### 5.1 전체 로컬 배치 환경: k3d + KEDA
-
-Docker가 실행 중인 macOS/Linux/WSL2에서 다음 명령을 사용합니다.
-
-```bash
-./deploy/kubernetes/local.sh all
-./deploy/kubernetes/local.sh status
-./deploy/kubernetes/local.sh credentials
-```
-
-첫 배포는 `bist-auth-env`에 PBKDF2 비밀번호 해시와 세션 서명 키를 생성하고,
-초기 관리자 자격 증명은 별도 `bist-auth-bootstrap` Secret에 보관합니다.
-`credentials` 명령으로 확인한 뒤 공유 환경에서는 bootstrap Secret을 삭제하고
-조직의 Secret 관리자와 계정 수명주기 정책으로 교체하세요. HTTP 로컬 배포 외에는
-`AUTH_COOKIE_SECURE=true`와 유효한 TLS 인증서가 필수입니다.
-
-`all`은 도구 확인, Python 동기화, DB 사전 검증·pgvector·Alembic 마이그레이션, k3d 클러스터 생성, KEDA/Metrics Server/NGINX Ingress 설치, API·워커·UI 이미지 빌드 및 import, Redis·전용 KEDA `TriggerAuthentication` Secret·6개 ScaledJob·Deployment·Ingress 배포를 순서대로 수행합니다. 로컬 기본 이미지는 `uv.lock`에 고정된 CPU 애플리케이션 의존성만 설치합니다.
-
-개발용 `.env`의 `DATABASE_URL`이 원격 DB를 가리킬 때 로컬 DB로 실행하려면 다음처럼 한 번만 재정의합니다.
-
-```bash
-KUBERNETES_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rag_flow \
-  ./deploy/kubernetes/local.sh all
-```
-
-단계별 명령:
-
-```bash
-./deploy/kubernetes/local.sh setup-tools  # 도구 및 Python 환경 준비
-./deploy/kubernetes/local.sh check        # 도구 확인
-./deploy/kubernetes/local.sh cluster      # DB, k3d, KEDA 준비
-./deploy/kubernetes/local.sh build        # API·워커·UI 이미지 빌드 및 k3d import
-./deploy/kubernetes/local.sh deploy       # DB migration, 워커, API/UI/Ingress 적용
-./deploy/kubernetes/local.sh recreate     # 8080/8443 포트 매핑을 포함해 k3d만 다시 생성
-./deploy/kubernetes/local.sh restart      # 중지된 클러스터 재시작
-./deploy/kubernetes/local.sh status       # 용량, Pod, Job, ScaledJob 확인
-./deploy/kubernetes/local.sh logs         # 워크플로 워커 로그 확인
-./deploy/kubernetes/local.sh logs-api     # API 로그 확인
-./deploy/kubernetes/local.sh logs-ingestion # embedding/vector shard 워커 로그 확인
-./deploy/kubernetes/local.sh down         # 클러스터 정지(데이터 유지)
-./deploy/kubernetes/local.sh destroy      # k3d 클러스터 삭제
-```
-
-`recreate`와 `destroy`는 k3d 클러스터만 삭제하며 외부 Docker 볼륨 `pgdata`는 삭제하지 않습니다. 새 클러스터는 `http://localhost:8080`을 Ingress에 연결하고 8443 포트도 예약합니다. 실제 HTTPS는 운영 도메인과 TLS Secret을 설정한 뒤 사용합니다. 이전 형식으로 생성한 클러스터는 안전을 위해 자동 삭제하지 않으므로, 포트가 없다면 `recreate`를 실행하거나 다음처럼 임시 접속합니다.
-
-```bash
-kubectl -n bist-batch port-forward service/frontend-ui 8080:80
-```
-
-Windows Git Bash에서는 MSYS가 k3d volume 인자의 컨테이너 경로를 Windows 경로로 바꾸지 않도록 `local.sh`가 `cygpath`와 `MSYS_NO_PATHCONV`를 적용합니다. 재생성·삭제 시에는 PostgreSQL 컨테이너를 기존 k3d 네트워크에서 먼저 분리해 stale network를 방지하고, 새 클러스터가 준비되면 자동으로 다시 연결합니다. DB 컨테이너와 데이터 volume은 삭제하지 않습니다. `bash`가 WSL relay를 가리키면서 `/bin/bash`를 찾지 못하는 PC에서는 `C:\Program Files\Git\bin\bash.exe deploy/kubernetes/local.sh ...`처럼 Git Bash 실행 파일을 명시합니다.
-
-### 공유기 외부 접속
-
-클러스터를 `recreate`한 뒤 공유기에서 TCP `외부 8080 → Kubernetes 호스트의 고정 LAN IP:8080`을 설정하면 `http://kosa165.iptime.org:8080`으로 Ingress에 접근할 수 있습니다. SPA와 `/api/*` 요청은 같은 Ingress를 통과하므로 프론트 개발 포트나 backend `8765`를 별도로 공개하지 않습니다. 현재 호스트 주소를 공유기의 DHCP 예약으로 고정하고 Windows 방화벽 인바운드 TCP 8080 허용, DDNS의 공인 IP 일치, 이중 NAT·CGNAT 여부도 함께 확인해야 합니다. 외부 포트 80을 내부 8080으로 전달하면 URL에서 `:8080`을 생략할 수 있습니다.
-
-관리자 PowerShell에서 Private 네트워크용 방화벽 규칙을 한 번 등록합니다.
-
-```powershell
-New-NetFirewallRule -DisplayName "Excel RAG k3d Ingress HTTP 8080" `
-  -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080 -Profile Private
-```
-
-검증은 먼저 호스트에서 `http://localhost:8080`, 같은 LAN의 다른 장치에서 `http://<고정-LAN-IP>:8080`, 마지막으로 Wi-Fi를 끈 휴대전화 데이터에서 `http://kosa165.iptime.org:8080` 순서로 수행합니다. 일부 공유기는 NAT loopback을 지원하지 않아 같은 LAN에서 DDNS 주소로 접속할 때만 timeout이 발생할 수 있습니다.
-
-일반 HTTP 원격 origin은 브라우저의 secure context가 아니므로 `crypto.randomUUID()`가 제공되지 않을 수 있습니다. 프론트의 client-side 식별자는 공통 UUID 유틸에서 `crypto.getRandomValues()` 기반 폴백을 사용합니다. 이는 브라우저 호환 조치일 뿐 전송 구간을 암호화하지 않으므로, 공개 서비스의 HTTPS 요구사항을 대체하지 않습니다.
-
-> **보안 경계:** 운영 API는 `APP_ENV=production`, `EXPOSE_API_DOCS=false`로 기동하며 Ingress/Nginx도 `/docs`, `/redoc`, `/openapi.json`과 내부 probe 경로를 외부에 라우팅하지 않습니다. 공유 k3d 배포는 PBKDF2 계정, 서명 HttpOnly 세션, viewer/operator/admin RBAC와 단일 tenant 경계를 자동 활성화합니다. API에는 보안 응답 헤더를, Ingress에는 연결·요청 속도 제한과 표준 `429` 응답을 적용합니다. Excel 업로드는 buffering 없이 application으로 전달되고 `.xlsx`/`.xlsm` Open XML 구조와 500 MiB 상한을 검증합니다. 8443은 예약 포트일 뿐 TLS 인증서가 자동 구성되는 것은 아닙니다. 인터넷 공개 전에는 유효 인증서, 외부 443 forwarding, `AUTH_COOKIE_SECURE=true`, HTTP→HTTPS redirect를 함께 구성하세요.
-
-원격 레지스트리로 배포할 때는 이미지를 별도로 `docker push`한 후, import를 끄고 불변 태그를 지정합니다.
-
-```bash
-K3D_IMPORT_IMAGES=false \
-KUBERNETES_BACKEND_IMAGE=registry.example.com/bist/backend:2026.08.27 \
-KUBERNETES_WORKER_IMAGE=registry.example.com/bist/worker:2026.08.27 \
-KUBERNETES_FRONTEND_IMAGE=registry.example.com/bist/frontend:2026.08.27 \
-  ./deploy/kubernetes/local.sh deploy
-```
-
-### 5.2 운영 배포: Helm Chart
-
-운영·스테이징은 [`deploy/helm/bist/`](deploy/helm/bist/) Chart를 기준으로 배포합니다. Secret은 Chart 값에 넣지 않고, 애플리케이션용 `bist-batch-env`와 KEDA PostgreSQL 트리거 전용 `bist-keda-postgresql`을 네임스페이스에 먼저 생성합니다. 운영용 RWX PVC도 `bist-data` 이름으로 사전에 준비해야 합니다.
-
-```bash
-kubectl create namespace bist-batch
-kubectl -n bist-batch create secret generic bist-batch-env \
-  --from-literal=PGVECTOR_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' \
-  --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY"
-kubectl -n bist-batch create secret generic bist-keda-postgresql \
-  --from-literal=PGVECTOR_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE'
-helm upgrade --install bist ./deploy/helm/bist \
-  --namespace bist-batch \
-  --values ./deploy/helm/bist/values.yaml
-```
-
-로컬 k3d 검증용 값은 `values-k3d.yaml`이며, 호스트 경로와 단일 replica를 사용하므로 운영에 사용하지 않습니다. Chart는 Redis, schema migration hook, API/UI deployment, 6개 KEDA ScaledJob 및 `TriggerAuthentication`을 함께 렌더링합니다. Excel ingestion은 부모 workflow 외에 `ingestion-embedding`(최대 4개)과 `ingestion-vector`(최대 2개) child Job을 사용합니다.
-
-### 5.3 워커를 로컬에서 한 번 실행하기
-
-Kubernetes 없이 큐 동작을 디버깅할 때 사용할 수 있습니다. 각 명령은 현재 큐에서 작업을 가져와 한 번 처리한 뒤 종료합니다.
-
-```bash
-# workflow-core 큐 1건
-uv run python -m backend.entrypoints.worker workflow
-
-# BI materialization 1건
-uv run python -m backend.entrypoints.worker bi-materialization
-
-# BI 질문 최대 1 batch
-uv run python -m backend.entrypoints.worker bi-question
-
-# benchmark 1건
-uv run python -m backend.entrypoints.worker benchmark
-
-# ingestion embedding/vector shard 각각 1건
-uv run python -m backend.entrypoints.worker ingestion-embedding
-uv run python -m backend.entrypoints.worker ingestion-vector
-```
-
-큐가 비어 있으면 정상적으로 메시지를 출력하고 종료합니다. 연속 처리가 필요하면 KEDA 구성을 사용하세요.
-
-## 6. 테스트와 품질 검증
-
-저장소 루트에서 실행합니다.
-
-```bash
-# Python
-uv run alembic upgrade head
-uv run pytest -q
-uv run ruff check .
-uv run pyright
-
-# Frontend
-npm --prefix frontend run check
-```
-
-프론트엔드 빌드 결과는 루트의 `dist/`에 생성됩니다.
-
-## 7. Docker 이미지 빌드
-
-세 Dockerfile 모두 저장소 루트를 build context로 사용합니다.
-
-```bash
-docker build -t bist-backend:local -f deploy/docker/Dockerfile.backend .
-docker build -t bist-workflow-worker:local -f deploy/docker/Dockerfile.worker .
-docker build -t bist-frontend:local -f deploy/docker/Dockerfile.frontend .
-```
-
-`deploy/compose/docker-compose.yml`은 전체 애플리케이션 Compose 구성이 아니라 pgvector 전용 구성입니다. 백엔드와 프론트엔드는 개발 명령 또는 각 Docker 이미지로 별도 실행합니다.
-
-## 8. 문제 해결
-
-### `uv` 명령을 찾을 수 없음
-
-uv 설치 후 터미널을 다시 열고 확인합니다.
-
-```bash
-uv --version
-```
-
-Windows에서 이미 `.venv`가 준비되어 있다면 임시로 다음과 같이 실행할 수 있습니다.
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn backend.entrypoints.asgi:app --host 0.0.0.0 --port 8765 --reload
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-### DB 연결 실패 또는 `/readyz` 실패
-
-```bash
-docker compose -f deploy/compose/docker-compose.yml ps
-docker logs bist-pgvector --tail 100
-```
-
-- `pgdata` 볼륨이 없으면 `docker volume create pgdata`를 실행합니다.
-- 5432 포트가 이미 사용 중이면 `PGVECTOR_PORT`와 애플리케이션 DB URL의 포트를 함께 변경합니다.
-- Docker 메모리가 부족하면 Docker Desktop 할당량을 높이거나 Compose의 PostgreSQL 메모리 설정을 낮춥니다.
-- 외부 DB 사용 시 방화벽, SSL 옵션, 사용자 권한을 확인합니다.
-
-### 작업이 `queued`에서 진행되지 않음
-
-API와 DB만 실행한 상태에서는 정상적인 현상입니다. `./deploy/kubernetes/local.sh status`로 KEDA 워커를 확인하거나 [로컬 one-shot 워커](#52-워커를-로컬에서-한-번-실행하기)를 실행합니다.
-
-### OpenAI 호출 오류
-
-- `.env`의 `OPENAI_API_KEY`와 `OPENAI_BASE_URL`을 확인합니다.
-- 호환 API를 사용할 경우 `/v1` 포함 여부와 지원 모델을 확인합니다.
-- 키를 로그, 이슈, 커밋에 남겼다면 즉시 폐기하고 재발급합니다.
-
-### 프론트엔드에서 API 호출 실패
-
-- 백엔드가 `localhost:8765`에서 실행 중인지 확인합니다.
-- 프론트엔드는 `npm --prefix frontend run dev`로 실행해야 Vite 프록시 설정을 사용합니다.
-- 직접 API를 호출할 때는 정식 경로 `/api/v1`을 사용합니다.
-
-## 9. 프로젝트 구조
-
-```text
-bist-mini-final/
-├── backend/
-│   ├── api/                  # router 결합, 미들웨어, 예외, OpenAPI/SPA/probe
-│   ├── bootstrap/            # application object graph와 HTTP/worker lifecycle
-│   ├── core/                 # 런타임 환경 설정만 보유
-│   ├── domains/              # 7개 bounded context vertical slice
-│   ├── entrypoints/          # ASGI·worker·관리 명령 process adapter
-│   ├── platform/             # PostgreSQL, pgvector, OpenAI, Redis, K8s adapter
-│   └── shared/               # 상태 stream, lease, embedding 등 공통 계약
-├── frontend/                 # React 18, TypeScript, Vite
-├── modules/                  # RAG 파이프라인 모듈 및 Pydantic 계약
-├── jobs/                     # canonical DAG/worker Job 선언과 K8s projection
-├── deploy/
-│   ├── compose/              # 로컬 pgvector
-│   ├── docker/               # backend, worker, frontend 이미지
-│   └── kubernetes/           # k3d/KEDA 스크립트와 매니페스트
-├── docs/
-│   ├── blueprints/           # 시스템·데이터·UI·검증 청사진
-│   └── CURRENT_IMPLEMENTATION_BASELINE.md
-├── tests/                    # Python 계약 및 통합 테스트
-├── .env.example              # 환경 변수 템플릿
-├── pyproject.toml            # Python 프로젝트와 도구 설정
-├── uv.lock                   # Python 잠금 파일
-└── README.md
-```
-
-## 10. 아키텍처 요약
-
-```text
-[Frontend: React/Vite]
-          │ HTTP / SSE
-          ▼
-[FastAPI Control Plane :8765]
-          │
-          ├── PostgreSQL + pgvector
-          │     ├── workflow queue / leases
-          │     ├── BI jobs / questions / answers
-          │     └── benchmark runs / results
-          │
-          └── KEDA PostgreSQL trigger
-                    ▼
-              [ScaledJob Workers]
-```
-
-- `modules/`가 파이프라인 모듈 계약의 단일 소스입니다.
-- FastAPI는 요청 검증, 큐 등록, 조회, SSE 관찰을 담당합니다.
-- KEDA는 PostgreSQL 큐 길이에 따라 one-shot 워커를 0개부터 확장합니다.
-- 상세 설계와 현재 검증 수치는 각각 [`docs/blueprints/`](docs/blueprints/)와 [`docs/CURRENT_IMPLEMENTATION_BASELINE.md`](docs/CURRENT_IMPLEMENTATION_BASELINE.md)를 참고하세요.
+| 로컬 백엔드·프론트엔드 개발 | [개발 서버 시작](docs/SETUP.md#2-빠른-시작-백엔드--프론트엔드) |
+| 전체 기능·비동기 워커 시연 | [k3d·KEDA 실행](docs/SETUP.md#51-전체-로컬-배치-환경-k3d--keda) |
+| 환경 변수·외부 DB·배포·문제 해결 | [설치·실행·배포 가이드](docs/SETUP.md) |
+
+## 프로젝트 문서
+
+| 문서 | 내용 |
+| --- | --- |
+| [전체 문서 목차](docs/README.md) | 프로젝트 문서와 20개 상세 설계 문서 탐색 |
+| [완료 요약](docs/PROJECT_SUMMARY.md) | MVP 결과, 평가 기준, 지원 범위와 한계 |
+| [협업·품질 관리](docs/COLLABORATION.md) | 개발 흐름, 자동 PR 검사, 테스트와 컨벤션 |
+| [현재 구현 기준선](docs/CURRENT_IMPLEMENTATION_BASELINE.md) | 모듈·API·DB·아키텍처와 검증 기록 |
+| [서버 실측 평가](server-evaluation-result/README.md) | 실행 조건과 원본을 보존한 평가 기록 |
+
+---
+
+<p align="center"><strong>Team ColdPlay</strong><br/>김지환 · 전명준 · 권혁준 · 김정원</p>

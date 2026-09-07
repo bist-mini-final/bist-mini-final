@@ -1,6 +1,6 @@
 # [BP-303] Dense + Sparse + RRF 융합 & 셀 확장 회로
 > **Document Code:** `BP-303` | **Contract State:** Target Architecture | **Capability State:** Operational | **Structure State:** Complete
-> **Target Ownership:** `modules/retrieval`, `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/postgres`, `backend/platform/pgvector`
+> **Target Ownership:** `modules/retrieval`, `backend/domains/data_sources/application`, `backend/domains/data_sources/infrastructure/pgvector`, `backend/platform/pgvector`
 > **Current References:** [`modules/retrieval/pgvector_retriever.py`](../../../modules/retrieval/pgvector_retriever.py), [`modules/retrieval/postgres_native_keyword_retriever.py`](../../../modules/retrieval/postgres_native_keyword_retriever.py), [`modules/retrieval/rrf_fusion.py`](../../../modules/retrieval/rrf_fusion.py), [`modules/retrieval/context_expander.py`](../../../modules/retrieval/context_expander.py), [`modules/reader/reader.py`](../../../modules/reader/reader.py), [`backend/shared/application/cell_evidence.py`](../../../backend/shared/application/cell_evidence.py)
 
 ---
@@ -9,7 +9,7 @@
 
 재무 엑셀 데이터는 "영업이익", "당기순손익"과 같은 **정확한 용어 일치(Exact Term Match)**와 "작년 장사해서 번 돈", "회사 부채 규모"와 같은 **자연어 의미론적 질의(Semantic Query)**를 동시에 처리해야 합니다.
 
-`bist-mini-final`은 pgvector Dense 벡터 검색과 PostgreSQL TSVector BM25 키워드 검색을 병렬 수행한 후 **RRF (Reciprocal Rank Fusion)**로 순위를 융합하고, 검색된 셀을 2D 테이블 문맥으로 확장합니다.
+`bist-mini-final`은 pgvector Dense 벡터 검색과 PostgreSQL FTS 키워드 검색을 병렬 수행한 후 **RRF (Reciprocal Rank Fusion)**로 순위를 융합하고, 검색된 셀을 행 단위 문맥으로 확장합니다. 현재 키워드 SQL은 `to_tsvector('simple', ...)`, `plainto_tsquery`와 `ts_rank_cd`를 사용합니다. BM25 실험과 현재 FTS 구현은 구분합니다. [실제 검색 SQL](../../../backend/domains/data_sources/infrastructure/pgvector/retrieval.py)
 
 ```mermaid
 flowchart TD
@@ -25,8 +25,8 @@ flowchart TD
     DENSE -->|Ranked Dense Candidates| RRF["3. RrfFusionModule<br>(Reciprocal Rank Fusion, k=60)"]
     SPARSE -->|Ranked Sparse Candidates| RRF
 
-    RRF -->|Top-K Fused Candidates| EXPAND["4. PgContextExpanderModule<br>(2D 그리드 셀 좌표 기반 Row/Table 확장)"]
-    EXPAND --> READER["ReaderModule (LLM 수식 검증 및 답변 생성)"]
+    RRF -->|Top-K Fused Candidates| EXPAND["4. PgContextExpanderModule<br>(같은 행·설정된 인접 행 확장)"]
+    EXPAND --> READER["ReaderModule (실제 값·셀 근거 기반 답변 생성)"]
 ```
 
 Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로 보입니다. `PgVectorDataScopeModule`은 DB에서 catalog만 읽는 Source 모듈이고, Decomposer는 한 번의 구조화 LLM 호출로 질문 분해와 data scope 결합을 함께 수행합니다. 출력의 모든 `index_id`는 catalog membership 검증을 통과해야 하며 회사명과 시트명은 실제 저장 표기로 정규화됩니다. 따라서 존재하지 않는 기업을 먼저 분해한 뒤 다른 collection으로 우회하는 경로는 허용하지 않습니다. Chatbot의 첨부+RAG 혼합 실행만 Query Context의 `external_context_sources`를 채울 수 있습니다. 이 경우 catalog 밖 기업은 attachment-owned 이름으로 기록하고 retrieval item을 만들지 않으며, catalog에 존재하는 기업의 route만 계속 실행합니다. 이 예외는 collection access를 넓히지 않고 첨부가 없는 실행에는 적용되지 않습니다. 서버가 정확히 하나의 catalog 기업으로 해석한 selection에서 모델이 반환한 ID가 전부 미등록이면 해당 기업의 scope로만 복구하고 `repaired_scope_count`를 남깁니다. 알려진 ID와 미등록 ID가 섞였거나 기업명이 catalog에 없거나 여러 기업으로 모호하면 계속 fail-closed 처리합니다. 반대로 모델이 catalog에 실제 존재하는 기업을 `unresolved_companies`에도 중복 표기한 false negative는 서버 catalog 해석을 우선합니다. 빈 item 응답이면서 실제 미등록 기업이 없는 경우에만 한 번 재분해하며 두 시도의 토큰·비용·지연과 `decomposition_attempts`를 합산합니다.
@@ -40,7 +40,7 @@ Decomposer의 두 입력 단자는 플레이그라운드에서도 독립 edge로
 ## 2. RRF (Reciprocal Rank Fusion) 수학적 공식
 
 $$
-\text{RRF Score}(d) = \sum_{m \in \{\text{Dense}, \text{BM25}\}} \frac{1}{k + r_m(d)}
+\text{RRF Score}(d) = \sum_{m \in \{\text{Dense}, \text{FTS}\}} \frac{1}{k + r_m(d)}
 $$
 
 - $d$: 평가 대상 엑셀 셀 청크 (Candidate Cell Chunk)
@@ -49,9 +49,12 @@ $$
 - $k$: 랭킹 스무딩 상수 (**기본값: $60$**)
 
 ### RRF 결합 효과 예시
-- **사례 1 (Dense 1위, Sparse 5위)**: $\frac{1}{60 + 1} + \frac{1}{60 + 5} = 0.01639 + 0.01538 = 0.03177$ -> **최상위 승격**
-- **사례 2 (Dense 단독 1위, Sparse 미검색)**: $\frac{1}{60 + 1} + 0 = 0.01639$
-- **사례 3 (양쪽 모두 1위)**: $\frac{1}{60+1} + \frac{1}{60+1} = 0.03278$ -> **절대적 1위 확정**
+
+- **사례 1 (Dense 1위, Sparse 5위)**: $\frac{1}{60 + 1} + \frac{1}{60 + 5} \approx 0.03178$ → **사례 2보다 높은 통합 점수**
+- **사례 2 (Dense 단독 1위, Sparse 미검색)**: $\frac{1}{60 + 1} + 0 \approx 0.01639$
+- **사례 3 (양쪽 모두 1위)**: $\frac{1}{60+1} + \frac{1}{60+1} \approx 0.03279$ → **이 두 채널 예시에서 가장 높은 점수**
+
+한 채널에 없는 후보의 해당 채널 기여도는 0입니다. 최종 순위는 동일한 채널 구성에서 모든 후보의 합산 점수를 비교해 결정하며, 단일 사례만으로 항상 1위가 된다고 일반화하지 않습니다.
 
 ---
 
@@ -61,7 +64,7 @@ $$
 
 ```mermaid
 graph TD
-    TARGET["Retrieved Top-K Cell: samsung:포괄손익계산서:C15 (영업이익: 6,567,200)"]
+    TARGET["Retrieved Top-K Cell: C15<br/>Company: 삼성전자 · Sheet: 포괄손익계산서(연결)"]
 
     subgraph ContextExpansion ["2D Grid Context Expansion Engine"]
         HDR["1. 상위 열 헤더 복원 (제 55기, 2023.12)"]
@@ -105,7 +108,7 @@ Company: 삼성전자 | Sheet: 포괄손익계산서(연결) | Row Header: 영�
 ## 5. 책임 분리와 구조 완료 조건
 
 - query normalization, candidate와 evidence DTO, 실제 값만 Reader로 전달하는 정책은 data sources application contract로 둡니다.
-- Dense/keyword SQL과 cell expansion mapping은 `data_sources/infrastructure/postgres`, 범용 vector connection·codec은 `platform/pgvector`가 소유합니다.
+- Dense/keyword SQL과 cell expansion mapping은 `data_sources/infrastructure/pgvector`, 범용 vector connection·codec은 `platform/pgvector`가 소유합니다.
 - retrieval module은 각 capability port를 호출하고 RRF처럼 순수한 결합 알고리즘은 module 내부에서 provider 독립적으로 유지합니다.
 - `Cell Value: ?` 후보는 retrieval recall에는 남기되 Reader input projection에서는 값 존재 여부를 공통 정책으로 강제합니다.
 - module의 legacy storage facade import는 제거됐고 Dense/keyword/context expansion은 data-source retrieval port를 통해 같은 sync/async 정규화 계약을 사용합니다.

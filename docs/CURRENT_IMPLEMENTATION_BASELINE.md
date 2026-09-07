@@ -1,10 +1,11 @@
 # 현재 구현 기준선
 
-> **기준일:** 2026-09-01
+> **문서 기준일:** 2026-09-07
+> **완료 소스 기준:** `main` · `7bc1461d8b43` (작성자 정리 후 동일 소스)
 > **제품 버전:** 0.1.0
 > **공개 API:** `/api/v1`
 
-이 문서는 As-Is 사실만 기록하는 현재 구현 기준선이다. 목표 구조, 허용 의존성과 완료 조건은 `docs/blueprints/README.md`와 개별 BP 문서를 따른다. 두 문서가 다를 때 현재 동작 확인에는 이 문서를, 변경 방향 판단에는 청사진을 사용한다.
+이 문서는 완료 시점의 구현 계약을 기록한다. 유지할 구조와 허용 의존성은 [청사진](blueprints/README.md), 설치·배포는 [실행 가이드](SETUP.md), 프로젝트 결과와 평가 해석은 [완료 요약](PROJECT_SUMMARY.md)을 따른다. 아래 과거 검증 실행일은 문서 정리일과 구분해 보존한다.
 
 ## 제품 경계
 
@@ -19,6 +20,7 @@
 
 - PostgreSQL 16과 pgvector가 영속 상태의 단일 진실 공급원이다.
 - Redis는 SSE 상태 변경 신호에만 사용한다.
+- 기본 Kubernetes Ingress는 단일 외부 진입점에서 `/`를 frontend-ui로, `/api`를 backend-api로 분기한다. frontend-ui에 직접 접속할 때는 Nginx가 `/api/`를 백엔드로 프록시한다. 백엔드 `8765`의 별도 외부 공개를 전제로 하지 않는다.
 - Kubernetes KEDA one-shot worker는 workflow, BI materialization, BI question, benchmark, ingestion embedding shard, ingestion vector shard의 6개 실행 사양을 가진다.
 - Excel ingestion은 embedding 최대 4개, vector COPY 최대 2개 child shard로 fan-out한다.
 - 벡터 적재는 float32 artifact와 PostgreSQL Binary COPY를 사용하며 발행 전 staging collection row count를 검증한다.
@@ -26,7 +28,7 @@
 ## RAG·분석 기준선
 
 - `ModuleRegistry`의 실행 가능 모듈은 17개다. 표준 RAG는 `Query Input`과 `PostgreSQL Data Scope`를 두 입력으로 받는 scope-aware Decomposer가 실제 collection별 `RetrievalPlanDTO`를 한 번에 만들며 별도 LLM Router나 Semantic Matcher를 사용하지 않는다.
-- 검색은 Dense pgvector, PostgreSQL keyword, RRF와 2D context expansion을 사용한다.
+- 검색은 Dense pgvector, PostgreSQL FTS(`ts_rank_cd`), RRF와 2D context expansion을 사용한다. 실험에서 다룬 BM25와 현재 PostgreSQL FTS 구현은 구분한다.
 - 셀 `cell_id`는 원본 Excel 좌표만 보존하고, collection/workbook·company·정확한 sheet 이름·좌표의 복합 키로 검색 후보와 근거를 식별한다. 시트 이름을 축약한 합성 ID는 생성하지 않는다.
 - `Cell Value: ?`는 검색 표현에는 유지하지만 Reader 입력에서는 실제 값이 있는 근거만 허용한다.
 - Reader는 strict `answer_markdown + evidence_ids` Pydantic 출력을 한 번 수행한다. 후보를 기간 기준으로 축소하거나 누락 근거를 자동 보강하지 않으며, 서버는 선택 ID를 전체 실제 값 후보와 run evidence에 대조해 `CellEvidenceDTO[]`로 만든다. 챗봇은 본문과 근거 JSONB를 독립 저장하고 frontend는 Markdown 좌표 문자열을 파싱하지 않고 구조화 `evidence[]`만 배지·원본 셀 검증 UI로 투영한다.
@@ -67,9 +69,9 @@
 - HTTP와 worker는 request/run/job/worker correlation context를 공유한다.
 - BP-101~701의 구조 상태는 모두 `Complete`이며 문서별 current reference가 존재하는 경로인지 정합성 검사한다.
 
-## 검증 기준선
+## 검증 기록
 
-2026-09-01 로컬 전체 검증 결과:
+2026-09-01에 보존된 전체 검증 결과(현재 문서 갱신일의 재실행 결과가 아님):
 
 - Backend: 379 passed, 2 skipped
 - Frontend: 181 passed
@@ -78,7 +80,14 @@
 - Kubernetes renderer: 6개 `ScaledJob`
 - 문서 정합성: BP 20개 모두 `Structure State: Complete`, 하드코딩된 로컬 절대 링크와 제외 기능 참조 0건
 
-테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다.
+테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다. 당시 근거는 [정적 검증 기록](../server-evaluation-result/02_static_tests/README.md), 현재 검사 구성은 [협업·품질 관리](COLLABORATION.md)를 참고한다. 최종 보고 정확도 81.45%는 [평가 해석 기준](PROJECT_SUMMARY.md#평가-결과를-읽는-방법)에 따라 과거 자동채점 원본과 구분한다.
+
+2026-09-07 문서 정리 시 추가 확인:
+
+- 구조 계약·지연 모듈 레지스트리 테스트: 44 passed.
+- 문서·OpenAPI 계약 테스트: 3 passed. DB·모델 호출 없이 격리한 application container에서 schema를 확인했으며 실제 DB 통합 검증은 아니다.
+- 생성된 schema와 registry에서 API 67개 path·77개 HTTP operation, 모듈 17개, 워커 사양 6개를 확인했다.
+- Markdown 29개 문서의 상대 링크·제목 바로가기 236개를 검사했다. 실제 서버 배포, 외부 모델 평가와 전체 테스트는 다시 실행하지 않았다.
 
 ## 구조 변경 원칙
 

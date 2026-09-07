@@ -1,37 +1,31 @@
-# 🏛️ bist-mini-final 엔지니어링 청사진 포털 (Engineering Blueprints Gateway)
-> **Project Version:** `0.1.0` | **Public API Version:** `2.4.0` | **Build Target:** Financial RAG, BI & Comparison Platform
-> **Master Portals:** [📐 청사진 해석 규칙과 목표 아키텍처](blueprints/README.md) | [📋 현재 구현 기준선 (Current Implementation Baseline)](CURRENT_IMPLEMENTATION_BASELINE.md)
+# 프로젝트 문서
 
----
+[프로젝트 소개](../README.md) · [설치·실행](SETUP.md) · [완료 요약](PROJECT_SUMMARY.md) · [협업·품질 관리](COLLABORATION.md)
 
-## 🧭 엔지니어링 문서 체계 및 청사진 구조
+기준일: **2026-09-07** · 최종 소스: **`main`**
 
-`bist-mini-final`의 기술 문서는 시스템 아키텍처, 17개 파이프라인 모듈 핀아웃, 5개 제품 워크스페이스와 Jobs/Settings, 데이터베이스 DDL 및 프론트엔드 배선도를 **[엔지니어링 청사진 규격서 (Blueprints)]** 체계로 관리합니다. 2026-08-31 기준 BP-101~701의 구조 상태는 모두 `Complete`이며 현재 수치와 검증 결과는 기준선 문서가 단일 출처입니다.
+## 목적에 따라 읽기
 
-> **문서 해석 기준:** [`blueprints/README.md`](blueprints/README.md)와 `BP-101~701`은 도달해야 할 To-Be 계약입니다. [`CURRENT_IMPLEMENTATION_BASELINE.md`](CURRENT_IMPLEMENTATION_BASELINE.md)는 현재 코드와 배포 상태만 기록합니다. 기능 가동 상태와 구조 migration 완료 상태를 혼동하지 않습니다.
+| 목적 | 문서 | 담고 있는 내용 |
+| --- | --- | --- |
+| 처음 실행하기 | [설치·실행·배포](SETUP.md) | 환경 변수, 로컬 서버, 워커, k3d·Helm, 문제 해결 |
+| 완성된 결과 확인 | [프로젝트 완료 요약](PROJECT_SUMMARY.md) | 3단계 MVP, 기능, 평가 기준, 지원 범위와 한계 |
+| 협업 방식 이해 | [협업·컨벤션·품질 관리](COLLABORATION.md) | PR, GitHub Actions, CodeRabbit, 코드 규칙, 테스트 |
+| 현재 코드 확인 | [구현 기준선](CURRENT_IMPLEMENTATION_BASELINE.md) | 제품 경계, 모듈·API·DB, 책임 구조, 검증 기록 |
+| 상세 구조 이해 | [청사진 해석 규칙](blueprints/README.md) | 유지할 설계 계약과 20개 BP의 읽는 방법 |
+| DB 변경 적용 | [마이그레이션 안내](../migrations/README.md) | Alembic 실행과 schema 변경 관리 |
+| 실험 근거 확인 | [서버 평가 기록](../server-evaluation-result/README.md) | 실행 조건을 보존한 자동평가·성능·보안 기록 |
 
-청사진의 `Target Ownership`은 최종 소유 경계이고, `Current References`는 migration 중인 현재 구현 추적 링크입니다. 현재 파일이 연결돼 있다는 이유만으로 해당 경로를 목표 구조로 간주하지 않습니다.
+## 문서 기준
 
-```mermaid
-flowchart TD
-    ROOT["docs/README.md (마스터 청사진 포털)"]
+- **현재 구현**은 기준선과 해당 소스 코드를 함께 확인합니다. API·DB 수치는 기준선에서 관리합니다.
+- **청사진**은 구현 완료 후에도 유지해야 할 책임·입출력·의존 규칙입니다. `Contract State: Target Architecture`는 미완료 표시가 아니며, 개별 BP의 `Structure State`는 모두 `Complete`입니다.
+- **평가 기록**의 날짜·브랜치·이미지·수치는 실행 당시 조건입니다. 최종 보고 수치와 과거 자동채점 기록은 [평가 해석 기준](PROJECT_SUMMARY.md#평가-결과를-읽는-방법)에 따라 구분합니다.
+- **시연 자료**는 [assets](assets/)의 GIF를 사용합니다. 발표·보고서 초안과 개인 임시 파일은 구현 계약의 기준으로 삼지 않습니다.
 
-    subgraph BlueprintTrack ["📐 blueprints/ (엔지니어링 상세 규격서 & 핀아웃)"]
-        B1["01_system_blueprints/ (BP-101~104: modular backend, durable job, 3-Level 락, K8s)"]
-        B2["02_data_engine_blueprints/ (BP-201~203: 2D 파서, 외부 Vision 구조 감지, Binary COPY)"]
-        B3["03_pipeline_module_blueprints/ (BP-301~303: DAG, 17개 모듈·BI 서비스, RRF 융합)"]
-        B4["04_workspace_blueprints/ (BP-401~405: 5대 워크스페이스 세부 명세)"]
-        B5["05_interface_blueprints/ (BP-501~503: REST API, SSE, PostgreSQL DDL)"]
-        B6["06_frontend_blueprints/ (BP-601: React 18 결선도·반응형 shell)"]
-        B7["07_validation_blueprints/ (BP-701: AST 계약 테스트 규격)"]
-    end
+## 상세 설계 문서
 
-    ROOT ==> BlueprintTrack
-```
-
----
-
-# 📐 엔지니어링 청사진 규격서 색인 (Blueprints Catalog)
+시스템 → 데이터 처리 → 파이프라인 → 제품 화면 → 인터페이스 → 프론트엔드 → 검증 순서로 구성했습니다. 특정 기능만 살펴볼 때는 해당 워크스페이스 문서에서 구현 링크를 따라가면 됩니다.
 
 | 도메인 | 청사진 번호 & 문서명 | 핵심 기술 스펙 및 내용 |
 | :--- | :--- | :--- |
@@ -44,7 +38,7 @@ flowchart TD
 | | [`BP-203`](blueprints/02_data_engine_blueprints/BP-203_binary_copy_vector_pipeline.md) | PostgreSQL Native `Binary COPY` 3072d 고속 벌크 주입 |
 | **03. Pipeline** | [`BP-301`](blueprints/03_pipeline_module_blueprints/BP-301_dag_execution_engine.md) | Kahn 위상정렬 DAG, durable queue 실행 및 FSM |
 | | [`BP-302`](blueprints/03_pipeline_module_blueprints/BP-302_module_pinout_catalog.md) | `ModuleRegistry` 기준 17개 원자적 파이프라인 모듈 계약 |
-| | [`BP-303`](blueprints/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | Dense(3072d) + Sparse(BM25) + RRF($k=60$) 융합 검색 |
+| | [`BP-303`](blueprints/03_pipeline_module_blueprints/BP-303_hybrid_retrieval_and_fusion.md) | Dense(3072d) + PostgreSQL FTS + RRF($k=60$) 융합 검색 |
 | **04. Workspaces** | [`BP-401`](blueprints/04_workspace_blueprints/BP-401_ws_pipeline_playground.md) | 모듈 카탈로그, DAG 실행 및 SSE 상태 스트림 |
 | | [`BP-402`](blueprints/04_workspace_blueprints/BP-402_ws_data_sources_management.md) | 스프레드시트 미리보기 및 영속 ingestion job 관리 |
 | | [`BP-403`](blueprints/04_workspace_blueprints/BP-403_ws_financial_bi_analytics.md) | 21개 근거 기반 BI 지표와 재무 분석 화면 |
