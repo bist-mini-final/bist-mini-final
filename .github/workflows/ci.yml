@@ -86,9 +86,11 @@ jobs:
 
       - name: Render Kubernetes ScaledJobs
         run: |
+          # Rendering-only fixture; deployments use the actual worker image revision.
           uv run python deploy/kubernetes/scripts/render.py \
             --max-replicas 4 \
             --connection-hash aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            --image-revision bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
             > /tmp/bist-scaledjobs.yaml
           uv run python -c "import pathlib,yaml; from jobs import ALL_JOBS; from jobs.kubernetes import kubernetes_worker_specs; docs=list(yaml.safe_load_all(pathlib.Path('/tmp/bist-scaledjobs.yaml').read_text())); expected=kubernetes_worker_specs(ALL_JOBS); assert len(docs)==len(expected) and all(item['kind']=='ScaledJob' for item in docs)"
 

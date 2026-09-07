@@ -245,7 +245,7 @@ describe('BiPage Component', () => {
     fireEvent.click(greenLabsOption);
 
     await waitFor(() => expect(fetchBiDashboard).toHaveBeenCalledWith('green-labs', expect.any(AbortSignal)));
-    expect(screen.getByRole('heading', { name: '그린랩스 Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '그린랩스 Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('그린랩스', { selector: '.bi-company-selector__current strong' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: '기업 선택' })).not.toBeInTheDocument();
     expect(localStorage.getItem('rag-flow:bi-selected-company:v1')).toBe('green-labs');
