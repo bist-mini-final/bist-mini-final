@@ -13,7 +13,7 @@ SOURCE_REVISION="${SOURCE_REVISION:-$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>
 SOURCE_DIRTY="false"
 mapfile -t UNTRACKED_SOURCE_FILES < <(
   git -C "${PROJECT_ROOT}" ls-files --others --exclude-standard \
-    | grep -Ev '^(server-evaluation-result|tmp)/' \
+    | grep -Ev '^(docs/evaluation|tmp)/' \
     || true
 )
 if ! git -C "${PROJECT_ROOT}" diff --quiet --ignore-submodules -- \
@@ -25,7 +25,7 @@ DEFAULT_IMAGE_TAG="${SOURCE_REVISION:0:12}"
 if [[ "${SOURCE_DIRTY}" == "true" ]]; then
   DIRTY_FINGERPRINT="$({
     git -C "${PROJECT_ROOT}" diff --binary HEAD -- . \
-      ':(exclude)server-evaluation-result/**' \
+      ':(exclude)docs/evaluation/**' \
       ':(exclude)tmp/**'
     for source_file in "${UNTRACKED_SOURCE_FILES[@]}"; do
       printf '%s\n' "${source_file}"

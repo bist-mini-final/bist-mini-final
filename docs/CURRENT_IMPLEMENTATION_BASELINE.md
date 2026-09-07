@@ -5,7 +5,7 @@
 > **제품 버전:** 0.1.0
 > **공개 API:** `/api/v1`
 
-이 문서는 완료 시점의 구현 계약을 기록한다. 유지할 구조와 허용 의존성은 [청사진](blueprints/README.md), 설치·배포는 [실행 가이드](SETUP.md), 프로젝트 결과와 평가 해석은 [완료 요약](PROJECT_SUMMARY.md)을 따른다. 아래 과거 검증 실행일은 문서 정리일과 구분해 보존한다.
+이 문서는 완료 시점의 구현 계약을 기록한다. 유지할 구조와 허용 의존성은 [청사진](blueprints/README.md), 설치·배포는 [실행 가이드](guides/SETUP.md), 프로젝트 결과와 평가 해석은 [완료 요약](PROJECT_SUMMARY.md)을 따른다. 아래 과거 검증 실행일은 문서 정리일과 구분해 보존한다.
 
 ## 제품 경계
 
@@ -80,7 +80,7 @@
 - Kubernetes renderer: 6개 `ScaledJob`
 - 문서 정합성: BP 20개 모두 `Structure State: Complete`, 하드코딩된 로컬 절대 링크와 제외 기능 참조 0건
 
-테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다. 당시 근거는 [정적 검증 기록](../server-evaluation-result/02_static_tests/README.md), 현재 검사 구성은 [협업·품질 관리](COLLABORATION.md)를 참고한다. 최종 보고 정확도 81.45%는 [평가 해석 기준](PROJECT_SUMMARY.md#평가-결과를-읽는-방법)에 따라 과거 자동채점 원본과 구분한다.
+테스트 수는 구현 변경에 따라 달라질 수 있으며 성공 여부와 계약 검증을 기준으로 관리한다. 당시 근거는 [정적 검증 기록](evaluation/02_static_tests/README.md), 현재 검사 구성은 [협업·품질 관리](guides/COLLABORATION.md)를 참고한다. 최종 보고 정확도 81.45%는 [평가 해석 기준](PROJECT_SUMMARY.md#평가-결과를-읽는-방법)에 따라 과거 자동채점 원본과 구분한다.
 
 2026-09-07 문서 정리 시 추가 확인:
 

@@ -1,8 +1,8 @@
 # 설치·실행·배포 가이드
 
-[프로젝트 소개](../README.md) · [문서 목차](README.md) · [협업·품질 관리](COLLABORATION.md)
+[프로젝트 소개](../../README.md) · [문서 목차](../README.md) · [협업·품질 관리](COLLABORATION.md)
 
-기준일: 2026-09-07. 모든 명령은 **저장소 루트**에서 실행합니다. 이 문서는 로컬 개발 서버, k3d/KEDA 워커, Helm 배포의 설정과 문제 해결 방법을 다룹니다. 프로젝트 결과와 운영 한계는 [완료 요약](PROJECT_SUMMARY.md)을 참고하세요.
+기준일: 2026-09-07. 모든 명령은 **저장소 루트**에서 실행합니다. 이 문서는 로컬 개발 서버, k3d/KEDA 워커, Helm 배포의 설정과 문제 해결 방법을 다룹니다. 프로젝트 결과와 운영 한계는 [완료 요약](../PROJECT_SUMMARY.md)을 참고하세요.
 
 ## 1. 실행 환경
 
@@ -294,7 +294,7 @@ KUBERNETES_FRONTEND_IMAGE='registry.example.com/bist/frontend:<release-tag>' \
 
 ### 5.2 운영 배포: Helm Chart
 
-운영·스테이징 배포 구성은 [`deploy/helm/bist/`](../deploy/helm/bist/) Chart를 기준으로 배포합니다. Secret은 Chart 값에 넣지 않고, 애플리케이션용 `bist-batch-env`와 KEDA PostgreSQL 트리거 전용 `bist-keda-postgresql`을 네임스페이스에 먼저 생성합니다. 인증용 `bist-auth-env` Secret에는 `AUTH_ENABLED=true`, PBKDF2 해시를 가진 `AUTH_USERS_JSON`, 32자 이상 `AUTH_SESSION_SECRET`, `AUTH_COOKIE_SECURE=true`가 필요합니다. 운영용 RWX PVC도 `bist-data` 이름으로 사전에 준비해야 합니다. 아래 명령만으로 인터넷 공개 준비가 완료되지는 않습니다. 이미지 태그, 도메인, `ingress.tls`, 인증 Secret은 배포 환경에 맞게 먼저 구성하세요.
+운영·스테이징 배포 구성은 [`deploy/helm/bist/`](../../deploy/helm/bist/) Chart를 기준으로 배포합니다. Secret은 Chart 값에 넣지 않고, 애플리케이션용 `bist-batch-env`와 KEDA PostgreSQL 트리거 전용 `bist-keda-postgresql`을 네임스페이스에 먼저 생성합니다. 인증용 `bist-auth-env` Secret에는 `AUTH_ENABLED=true`, PBKDF2 해시를 가진 `AUTH_USERS_JSON`, 32자 이상 `AUTH_SESSION_SECRET`, `AUTH_COOKIE_SECURE=true`가 필요합니다. 운영용 RWX PVC도 `bist-data` 이름으로 사전에 준비해야 합니다. 아래 명령만으로 인터넷 공개 준비가 완료되지는 않습니다. 이미지 태그, 도메인, `ingress.tls`, 인증 Secret은 배포 환경에 맞게 먼저 구성하세요.
 
 ```bash
 kubectl create namespace bist-batch

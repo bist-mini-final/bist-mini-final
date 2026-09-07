@@ -738,7 +738,7 @@ def test_local_images_are_revision_tagged_and_embed_oci_provenance() -> None:
 def test_docker_context_excludes_evaluation_evidence() -> None:
     dockerignore = (PROJECT_ROOT / ".dockerignore").read_text(encoding="utf-8")
 
-    assert "server-evaluation-result" in dockerignore.splitlines()
+    assert "docs" in dockerignore.splitlines()
 
 
 def test_schema_migration_image_is_rendered_before_immutable_job_creation() -> None:

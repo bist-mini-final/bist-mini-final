@@ -11,7 +11,7 @@
   <a href="#주요-기능과-시연">서비스 시연</a> ·
   <a href="#팀원-소개">팀원 소개</a> ·
   <a href="#시스템-아키텍처">아키텍처</a> ·
-  <a href="docs/SETUP.md">실행 가이드</a> ·
+  <a href="docs/guides/SETUP.md">실행 가이드</a> ·
   <a href="docs/README.md">프로젝트 문서</a>
 </p>
 
@@ -52,7 +52,7 @@ S&P Capital IQ Pro 형식의 재무제표를 바탕으로 **데이터 적재 →
 
 ![Excel RAG 서비스 둘러보기](docs/assets/excel-rag-core-user-flow.gif)
 
-*저장소의 실제 프론트엔드 시연 GIF입니다. 아래 링크에서 기능별 전체 흐름을 확인할 수 있습니다.*
+*실제 프론트엔드 시연입니다. 아래에서 기능별 GIF를 바로 확인할 수 있습니다.*
 
 ### 01. 데이터 소스 · 엑셀을 검색 가능한 데이터로
 
@@ -60,7 +60,7 @@ S&P Capital IQ Pro 형식의 재무제표를 바탕으로 **데이터 적재 →
 
 **업로드 → 시트 미리보기 → VLM 구조 분석 → 셀 직렬화 → 벡터 적재**
 
-[데이터 적재 GIF 보기](docs/assets/excel-rag-data-ingestion.gif)
+![데이터 소스 — 엑셀 업로드부터 구조 분석·벡터 적재까지](docs/assets/excel-rag-data-ingestion.gif)
 
 ### 02. 재무 챗봇 · 답변에서 원본 셀까지
 
@@ -68,25 +68,25 @@ S&P Capital IQ Pro 형식의 재무제표를 바탕으로 **데이터 적재 →
 
 **자연어 질문 → 재무 답변·표 → 자동 차트 → 원본 셀 확인**
 
-[챗봇 GIF 보기](docs/assets/excel-rag-chatbot-user-flow.gif)
+![재무 챗봇 — 자연어 질문, 표 답변, 자동 차트와 원본 셀 확인](docs/assets/excel-rag-chatbot-user-flow.gif)
 
 ### 03. BI 대시보드 · 기업의 재무 상태를 한눈에
 
 기업별 재무 지표를 카드와 차트로 정리하고, 추세와 히트맵을 통해 데이터를 살펴봅니다. 지표에 연결된 근거를 확인하며 숫자의 출처를 검증할 수 있습니다.
 
-[BI 대시보드 GIF 보기](docs/assets/excel-rag-bi-dashboard-flow.gif)
+![BI 대시보드 — 기업별 재무 카드, 추세와 히트맵](docs/assets/excel-rag-bi-dashboard-flow.gif)
 
 ### 04. 기업 비교 · 같은 기준으로 기업을 비교
 
 검증된 BI 스냅샷을 바탕으로 기업의 재무 지표와 순위를 비교합니다. 기업을 선택해 차이를 확인하고, 비교에 사용된 실제 관측값을 따라갈 수 있습니다.
 
-[기업 비교 GIF 보기](docs/assets/excel-rag-company-comparison-flow.gif)
+![기업 비교 — 기업 선택, 재무 지표와 순위 비교](docs/assets/excel-rag-company-comparison-flow.gif)
 
 ### 05. 플레이그라운드 · 실행 과정을 투명하게
 
 기능 모듈을 연결해 워크플로를 구성하고 전체 파이프라인을 실행합니다. 모듈별 처리 상태, 입력·출력, 토큰과 호출 비용을 추적하며 RAG가 답변을 만드는 과정을 확인합니다.
 
-[플레이그라운드 GIF 보기](docs/assets/excel-rag-playground-workflow.gif)
+![플레이그라운드 — 모듈 실행 상태, 입력·출력과 토큰·비용 추적](docs/assets/excel-rag-playground-workflow.gif)
 
 ## 시스템 아키텍처
 
@@ -198,7 +198,7 @@ flowchart LR
 - **컨벤션**: PR 제목 자동 정리와 공통 모듈·도메인 책임 규칙을 적용했습니다.
 - **문서화**: 역할별 설계와 API·데이터·UI·검증 계약을 20개 청사진으로 정리했습니다.
 
-[협업·컨벤션 상세](docs/COLLABORATION.md) · [CI workflow](.github/workflows/ci.yml) · [CodeRabbit 설정](.coderabbit.yaml)
+[협업·컨벤션 상세](docs/guides/COLLABORATION.md) · [CI workflow](.github/workflows/ci.yml) · [CodeRabbit 설정](.coderabbit.yaml)
 
 ## 실행 방법
 
@@ -213,19 +213,22 @@ cd bist-mini-final
 
 | 실행 목적 | 안내 |
 | --- | --- |
-| 로컬 백엔드·프론트엔드 개발 | [개발 서버 시작](docs/SETUP.md#2-빠른-시작-백엔드--프론트엔드) |
-| 전체 기능·비동기 워커 시연 | [k3d·KEDA 실행](docs/SETUP.md#51-전체-로컬-배치-환경-k3d--keda) |
-| 환경 변수·외부 DB·배포·문제 해결 | [설치·실행·배포 가이드](docs/SETUP.md) |
+| 로컬 백엔드·프론트엔드 개발 | [개발 서버 시작](docs/guides/SETUP.md#2-빠른-시작-백엔드--프론트엔드) |
+| 전체 기능·비동기 워커 시연 | [k3d·KEDA 실행](docs/guides/SETUP.md#51-전체-로컬-배치-환경-k3d--keda) |
+| 환경 변수·외부 DB·배포·문제 해결 | [설치·실행·배포 가이드](docs/guides/SETUP.md) |
 
 ## 프로젝트 문서
 
+문서는 [docs 통합 목차](docs/README.md)를 중심으로 관리합니다. 실행 코드와 설정은 각 소스 디렉터리에 두고, 설명·설계·평가 자료는 아래 문서 그룹에서 찾아볼 수 있습니다.
+
 | 문서 | 내용 |
 | --- | --- |
-| [전체 문서 목차](docs/README.md) | 프로젝트 문서와 20개 상세 설계 문서 탐색 |
 | [완료 요약](docs/PROJECT_SUMMARY.md) | MVP 결과, 평가 기준, 지원 범위와 한계 |
-| [협업·품질 관리](docs/COLLABORATION.md) | 개발 흐름, 자동 PR 검사, 테스트와 컨벤션 |
+| [개발·운영 가이드](docs/guides/README.md) | 설치·배포, 협업·컨벤션·품질 검사, DB 마이그레이션 |
 | [현재 구현 기준선](docs/CURRENT_IMPLEMENTATION_BASELINE.md) | 모듈·API·DB·아키텍처와 검증 기록 |
-| [서버 실측 평가](server-evaluation-result/README.md) | 실행 조건과 원본을 보존한 평가 기록 |
+| [상세 설계](docs/blueprints/README.md) | 시스템·데이터·파이프라인·API 등 20개 청사진 |
+| [서버 실측 평가](docs/evaluation/README.md) | 실행 조건과 원본을 보존한 평가 기록 |
+| [시연 자료](docs/assets/README.md) | 기능별 GIF와 README 커버 |
 
 ---
 

@@ -40,20 +40,20 @@ S&P Capital IQ Pro 형식의 재무 엑셀에서 기업·지표·기간·단위�
 
 수치를 인용할 때는 **평가셋·실행 시점·자동채점 또는 최종 판정 기준**을 함께 명시합니다. 최종 수치의 문항별 재현이 필요하면 별도 최종 판정표와 실행 원본의 매핑이 필요합니다. 과거 결과를 최신 수치에 맞춰 덮어쓰지 않습니다.
 
-근거: [서버 평가 기록 목차](../server-evaluation-result/README.md), [2차 직접 질의 자동평가 보고](../server-evaluation-result/05_benchmark_results/corrected-direct-rag-query-report.md).
+근거: [서버 평가 기록 목차](evaluation/README.md), [2차 직접 질의 자동평가 보고](evaluation/05_benchmark_results/corrected-direct-rag-query-report.md).
 
 ## 품질 검증과 협업
 
-GitHub Actions에 백엔드 테스트·정적 분석·DB 마이그레이션·Kubernetes 렌더 검증과 프론트엔드 타입 검사·테스트·빌드를 구성했습니다. CodeRabbit 자동 리뷰와 PR 제목 정리도 함께 사용했습니다. 구성된 검사와 실제 실행 결과는 구분하며, 검사 방법은 [협업·품질 관리](COLLABORATION.md)에 정리했습니다.
+GitHub Actions에 백엔드 테스트·정적 분석·DB 마이그레이션·Kubernetes 렌더 검증과 프론트엔드 타입 검사·테스트·빌드를 구성했습니다. CodeRabbit 자동 리뷰와 PR 제목 정리도 함께 사용했습니다. 구성된 검사와 실제 실행 결과는 구분하며, 검사 방법은 [협업·품질 관리](guides/COLLABORATION.md)에 정리했습니다.
 
-2026-09-01에 보존된 전체 검증 기록은 Backend 379 passed·2 skipped, Frontend 181 passed입니다. 이는 당시 스냅샷의 결과이며 현재 커밋에서 전체 검사를 다시 실행했다는 뜻이 아닙니다. [정적 검증 기록](../server-evaluation-result/02_static_tests/README.md)
+2026-09-01에 보존된 전체 검증 기록은 Backend 379 passed·2 skipped, Frontend 181 passed입니다. 이는 당시 스냅샷의 결과이며 현재 커밋에서 전체 검사를 다시 실행했다는 뜻이 아닙니다. [정적 검증 기록](evaluation/02_static_tests/README.md)
 
 ## 지원 범위와 남은 운영 과제
 
 - **데이터 품질**: 값 캐시, 통화·배율·기간 및 헤더가 불완전하면 답변 품질에 영향을 줍니다. 숫자만 보지 않고 근거 셀을 함께 확인해야 합니다.
 - **모델 의존성**: VLM·질문 분해·임베딩·답변 생성은 외부 모델 API를 사용하므로 호출 비용, 지연, 서비스 가용성과 데이터 전송 정책을 고려해야 합니다.
 - **배포 경계**: 로컬 시연 구성과 공개 운영 구성은 다릅니다. 공개 운영에는 TLS, 인증 Secret 관리, 백업·복원, 자원 산정이 필요합니다.
-- **검증 경계**: 다중 tenant 격리, 유효한 500 MiB 파일의 전체 적재, 워커 강제 종료를 포함한 모든 장애 상황을 검증 완료로 표기하지 않습니다. 실행별 검증 범위는 [서버 평가 요약](../server-evaluation-result/10_summary.md)에 보존했습니다.
+- **검증 경계**: 다중 tenant 격리, 유효한 500 MiB 파일의 전체 적재, 워커 강제 종료를 포함한 모든 장애 상황을 검증 완료로 표기하지 않습니다. 실행별 검증 범위는 [서버 평가 요약](evaluation/10_summary.md)에 보존했습니다.
 - **판단 책임**: 이 시스템은 재무 정보 조회·분석을 보조하며 회계 감사나 투자 판단의 정확성을 보장하지 않습니다.
 
 후속 작업은 이 완료 기록을 지우지 않고 새 이슈·PR에서 범위와 검증 기준을 명시해 진행합니다.

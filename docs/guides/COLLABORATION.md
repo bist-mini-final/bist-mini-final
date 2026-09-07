@@ -1,6 +1,6 @@
 # 협업·컨벤션·품질 관리
 
-[프로젝트 소개](../README.md) · [문서 목차](README.md) · [실행 가이드](SETUP.md)
+[프로젝트 소개](../../README.md) · [문서 목차](../README.md) · [실행 가이드](SETUP.md)
 
 이 문서는 프로젝트에서 사용한 협업 자동화와 코드 규칙을 저장소 설정에 근거해 정리합니다. GitHub의 브랜치 보호·필수 승인 설정은 이 파일만으로 활성화되지 않습니다.
 
@@ -44,7 +44,7 @@ PR 설명에는 다음을 포함합니다.
 | CodeRabbit | 한국어 리뷰, `chill` 프로필, 자동 리뷰와 대화 응답 | 자동 리뷰는 사람의 승인·검토를 대체하지 않음 |
 | PR 제목 정리 | `dev`·`main` 대상 비초안 PR의 제목을 모델로 정리 | API 키가 없거나 호출이 실패하면 건너뜀. 품질 통과 판정 기능이 아님 |
 
-구성 근거: [CI workflow](../.github/workflows/ci.yml), [CodeRabbit 설정](../.coderabbit.yaml), [PR 제목 workflow](../.github/workflows/auto_format_pr_title.yml), [제목 정리 스크립트](../.github/scripts/format_pr_title.py).
+구성 근거: [CI workflow](../../.github/workflows/ci.yml), [CodeRabbit 설정](../../.coderabbit.yaml), [PR 제목 workflow](../../.github/workflows/auto_format_pr_title.yml), [제목 정리 스크립트](../../.github/scripts/format_pr_title.py).
 
 ## 코드 컨벤션
 
@@ -56,7 +56,7 @@ PR 설명에는 다음을 포함합니다.
 - DB 변경은 새 Alembic revision으로 남기고 공개 API·SSE·셀 근거 계약의 변경 영향을 검증합니다.
 - Ruff·Pyright와 구조 계약 테스트를 기준으로 스타일, 타입, 의존 경계를 검사합니다.
 
-근거: [Python 설정](../pyproject.toml), [백엔드 책임 경계](blueprints/01_system_blueprints/BP-102_backend_layered_architecture.md), [구조 계약 테스트](../tests/modules/test_architecture_contracts.py), [마이그레이션 안내](../migrations/README.md).
+근거: [Python 설정](../../pyproject.toml), [백엔드 책임 경계](../blueprints/01_system_blueprints/BP-102_backend_layered_architecture.md), [구조 계약 테스트](../../tests/modules/test_architecture_contracts.py), [마이그레이션 안내](MIGRATIONS.md).
 
 ### 프론트엔드
 
@@ -64,7 +64,7 @@ PR 설명에는 다음을 포함합니다.
 - 라우트와 메뉴는 공통 route registry를 기준으로 연결합니다.
 - TypeScript 타입 검사, ESLint, Vitest와 production build를 함께 확인합니다.
 
-근거: [프론트엔드 스크립트](../frontend/package.json), [route registry](../frontend/src/app/routes.ts), [UI 설계](blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md).
+근거: [프론트엔드 스크립트](../../frontend/package.json), [route registry](../../frontend/src/app/routes.ts), [UI 설계](../blueprints/06_frontend_blueprints/BP-601_frontend_component_wiring.md).
 
 ## 로컬 검증
 
@@ -94,7 +94,7 @@ uv run pytest -q tests/modules/test_blueprint_consistency.py
 
 ## 문서와 검증 기록 관리
 
-- 현재 구현 사실은 [기준선](CURRENT_IMPLEMENTATION_BASELINE.md), 유지할 설계 계약은 [청사진](blueprints/README.md), 설치 명령은 [실행 가이드](SETUP.md)에 기록합니다.
+- 현재 구현 사실은 [기준선](../CURRENT_IMPLEMENTATION_BASELINE.md), 유지할 설계 계약은 [청사진](../blueprints/README.md), 설치 명령은 [실행 가이드](SETUP.md)에 기록합니다.
 - 평가 결과에는 데이터셋, 실행 시점, 코드·이미지와 채점 조건을 남깁니다. 과거 원본 수치를 최종 발표 수치로 덮어쓰지 않습니다.
 - `.env`, API 키, 인증 Secret, 실제 사용자 데이터와 내부 접속 정보는 PR·로그·시연 자료에 노출하지 않습니다.
 - 개인 임시 파일과 발표 초안은 코드 변경에 섞어 일괄 커밋하지 않습니다.

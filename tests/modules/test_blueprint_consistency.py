@@ -6,8 +6,6 @@ import re
 from pathlib import Path
 from urllib.parse import unquote
 
-from backend.entrypoints.asgi import app
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOCS_ROOT = PROJECT_ROOT / "docs"
 BLUEPRINT_ROOT = DOCS_ROOT / "blueprints"
@@ -21,9 +19,48 @@ def _blueprints() -> list[Path]:
 def _product_documentation() -> list[Path]:
     return [
         PROJECT_ROOT / "README.md",
-        PROJECT_ROOT / "migrations/README.md",
         *sorted(DOCS_ROOT.rglob("*.md")),
     ]
+
+
+def test_documentation_entrypoints_are_centralized_under_docs() -> None:
+    entries = (
+        "PROJECT_SUMMARY.md",
+        "CURRENT_IMPLEMENTATION_BASELINE.md",
+        "guides/README.md",
+        "guides/SETUP.md",
+        "guides/COLLABORATION.md",
+        "guides/MIGRATIONS.md",
+        "blueprints/README.md",
+        "evaluation/README.md",
+        "assets/README.md",
+    )
+    catalog = (DOCS_ROOT / "README.md").read_text(encoding="utf-8")
+    for entry in entries:
+        assert (DOCS_ROOT / entry).is_file()
+        assert f"]({entry})" in catalog
+
+    assert not (PROJECT_ROOT / "server-evaluation-result").exists()
+    assert not (PROJECT_ROOT / "migrations/README.md").exists()
+
+
+def test_root_readme_embeds_every_feature_demo() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    expected = {
+        "excel-rag-core-user-flow.gif",
+        "excel-rag-data-ingestion.gif",
+        "excel-rag-chatbot-user-flow.gif",
+        "excel-rag-bi-dashboard-flow.gif",
+        "excel-rag-company-comparison-flow.gif",
+        "excel-rag-playground-workflow.gif",
+    }
+    embedded = re.findall(r"!\[[^\]]*\]\(docs/assets/([^()]+\.gif)\)", readme)
+    assert set(embedded) == expected
+    assert len(embedded) == len(expected)
+    assert "GIF 보기]" not in readme
+    for name in embedded:
+        with (DOCS_ROOT / "assets" / name).open("rb") as image:
+            assert image.read(6) in (b"GIF87a", b"GIF89a")
 
 
 def test_blueprint_catalog_has_complete_and_consistent_metadata() -> None:
@@ -74,6 +111,8 @@ def test_documentation_uses_portable_valid_local_links() -> None:
 
 
 def test_rest_blueprint_matches_public_openapi_operations() -> None:
+    from backend.entrypoints.asgi import app
+
     blueprint = (
         BLUEPRINT_ROOT
         / "05_interface_blueprints/BP-501_rest_api_specification.md"
