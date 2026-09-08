@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="450" viewBox="0 0 1100 450" role="img" aria-labelledby="title desc">
+  <title id="title">Excel RAG 서비스의 요청과 실행 구조</title>
+  <desc id="desc">사용자 요청은 단일 Nginx Ingress에서 React 화면과 FastAPI API로 분기합니다. API는 PostgreSQL에 작업을 등록하고, KEDA가 대기 작업을 감지해 워커를 실행합니다. 워커는 OpenAI를 호출하고 DB에 결과를 저장합니다.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 7 3.5 0 7Z" fill="#5D86A7"/></marker>
+    <marker id="cyan" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 7 3.5 0 7Z" fill="#149AAB"/></marker>
+  </defs>
+  <rect x="1" y="1" width="1098" height="448" rx="8" fill="#F6F9FC" stroke="#DCE6EF"/>
+  <g font-family="Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif">
+    <text x="34" y="43" fill="#365F80" font-size="14" font-weight="700" letter-spacing="1.7">ONE ENTRY POINT. TWO EXECUTION LAYERS.</text>
+    <path d="M34 62H1066" stroke="#DCE6EF"/>
+    <text x="34" y="96" fill="#607D96" font-size="14" font-weight="700">WEB · 요청과 조회</text>
+    <text x="34" y="278" fill="#168B99" font-size="14" font-weight="700">WORKER · 장시간 작업</text>
+    <g fill="none" stroke="#5D86A7" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M196 156H247"/>
+      <path d="M425 144H453V116H482"/>
+      <path d="M425 168H453V210H482"/>
+      <path d="M654 210H713V171H768"/>
+    </g>
+    <g fill="none" stroke="#149AAB" stroke-width="2" marker-end="url(#cyan)">
+      <path d="M902 200V286H653V306" stroke-dasharray="5 5"/>
+      <path d="M548 334H491"/>
+      <path d="M287 334H234"/>
+      <path d="M390 309V268H829V200"/>
+    </g>
+    <rect x="34" y="125" width="162" height="62" rx="5" fill="#FFFFFF" stroke="#C9DAE7"/>
+    <rect x="248" y="119" width="177" height="74" rx="5" fill="#073B78"/>
+    <rect x="483" y="88" width="171" height="56" rx="5" fill="#FFFFFF" stroke="#C9DAE7"/>
+    <rect x="483" y="182" width="171" height="56" rx="5" fill="#FFFFFF" stroke="#C9DAE7"/>
+    <rect x="769" y="125" width="273" height="75" rx="5" fill="#EAF1F8" stroke="#B8CDDF"/>
+    <rect x="34" y="306" width="200" height="56" rx="5" fill="#FFFFFF" stroke="#C9DAE7"/>
+    <rect x="288" y="306" width="203" height="56" rx="5" fill="#DBF2F3" stroke="#9FD3D8"/>
+    <rect x="549" y="306" width="208" height="56" rx="5" fill="#FFFFFF" stroke="#9FD3D8"/>
+    <g fill="#153E5C" font-size="19" font-weight="700" text-anchor="middle">
+      <text x="115" y="164">사용자</text>
+      <text x="336.5" y="150" fill="#FFFFFF">Nginx Ingress</text>
+      <text x="336.5" y="175" fill="#BCE0ED" font-size="14" font-weight="500">단일 외부 진입점</text>
+      <text x="568.5" y="123">React · UI</text>
+      <text x="568.5" y="217">FastAPI · API</text>
+      <text x="905.5" y="154">PostgreSQL · pgvector</text>
+      <text x="905.5" y="181" fill="#536F87" font-size="15" font-weight="500">재무 데이터 · 벡터 · 작업 큐</text>
+      <text x="134" y="341">OpenAI</text>
+      <text x="389.5" y="341">6종 Worker</text>
+      <text x="653" y="341">Kubernetes · KEDA</text>
+    </g>
+    <g fill="#526F87" font-size="13">
+      <text x="461" y="105">/</text>
+      <text x="449" y="247">/api</text>
+      <text x="682" y="200">등록·조회</text>
+      <text x="474" y="286" fill="#168B99">결과 저장</text>
+      <text x="910" y="252" fill="#168B99">대기 작업 감지</text>
+      <text x="496" y="354" fill="#168B99">실행</text>
+    </g>
+    <path d="M34 391H1066" stroke="#DCE6EF"/>
+    <text x="34" y="423" fill="#59758D" font-size="15">진행 상태 전달</text>
+    <text x="190" y="423" fill="#365F80" font-size="15">Worker → Redis 알림 → API → SSE → 사용자</text>
+  </g>
+</svg>

@@ -1,8 +1,8 @@
 # 프로젝트 문서
 
-[프로젝트 소개](../README.md) · [설치·실행](guides/SETUP.md) · [완료 요약](PROJECT_SUMMARY.md) · [협업·품질 관리](guides/COLLABORATION.md)
+[프로젝트 소개](../README.md) · [전체 시연 영상](assets/demo/README.md) · [설치·실행](guides/SETUP.md) · [완료 요약](PROJECT_SUMMARY.md) · [협업·품질 관리](guides/COLLABORATION.md)
 
-기준일: **2026-09-07** · 최종 소스: **`main`**
+프로젝트 완료: **2026-09-07** · 문서·시연 갱신: **2026-09-08** · 최종 소스: **`main`**
 
 루트 README는 프로젝트 소개와 기능 시연을 담당하고, 사용·개발 가이드, 설계 문서, 평가 기록은 이 문서에서 찾아갑니다.
 
@@ -19,7 +19,9 @@ docs/
 │   └── MIGRATIONS.md
 ├── blueprints/                         시스템·데이터·API 등 20개 설계 문서
 ├── evaluation/                         서버 실측 보고·원본 데이터·화면 근거
-└── assets/                             기능 시연 GIF·README 커버
+└── assets/                             시연 자료·README 이미지
+    ├── demo/                           통합 시연 MP4·한글 자막·챕터 안내
+    └── previews/                       README용 경량 GIF (고해상도 원본 별도)
 ```
 
 [개발·운영 가이드](guides/README.md) · [설계 문서](blueprints/README.md) · [평가 기록](evaluation/README.md) · [시연 자료](assets/README.md)
@@ -30,6 +32,7 @@ docs/
 | --- | --- | --- |
 | 처음 실행하기 | [설치·실행·배포](guides/SETUP.md) | 환경 변수, 로컬 서버, 워커, k3d·Helm, 문제 해결 |
 | 완성된 결과 확인 | [프로젝트 완료 요약](PROJECT_SUMMARY.md) | 3단계 MVP, 기능, 평가 기준, 지원 범위와 한계 |
+| 전체 사용 흐름 보기 | [통합 시연 영상](assets/demo/README.md) | 적재·Luna 검사·RAG·챗봇·BI·기업 비교, 자막과 재현 범위 |
 | 협업 방식 이해 | [협업·컨벤션·품질 관리](guides/COLLABORATION.md) | PR, GitHub Actions, CodeRabbit, 코드 규칙, 테스트 |
 | 현재 코드 확인 | [구현 기준선](CURRENT_IMPLEMENTATION_BASELINE.md) | 제품 경계, 모듈·API·DB, 책임 구조, 검증 기록 |
 | 상세 구조 이해 | [청사진 해석 규칙](blueprints/README.md) | 유지할 설계 계약과 20개 BP의 읽는 방법 |
@@ -41,7 +44,7 @@ docs/
 - **현재 구현**은 기준선과 해당 소스 코드를 함께 확인합니다. API·DB 수치는 기준선에서 관리합니다.
 - **청사진**은 구현 완료 후에도 유지해야 할 책임·입출력·의존 규칙입니다. `Contract State: Target Architecture`는 미완료 표시가 아니며, 개별 BP의 `Structure State`는 모두 `Complete`입니다.
 - **평가 기록**의 날짜·브랜치·이미지·수치는 실행 당시 조건입니다. 최종 보고 수치와 과거 자동채점 기록은 [평가 해석 기준](PROJECT_SUMMARY.md#평가-결과를-읽는-방법)에 따라 구분합니다.
-- **시연 자료**는 [assets](assets/)의 GIF를 사용합니다. 발표·보고서 초안과 개인 임시 파일은 구현 계약의 기준으로 삼지 않습니다.
+- **시연 자료**는 [assets](assets/README.md)에서 관리합니다. MP4·자막·챕터 설명은 `assets/demo/`, README용 GIF는 `assets/previews/`, 기존 고해상도 GIF는 `assets/`에 둡니다. 재현 영상은 평가 실행의 증거와 구분합니다. 발표·보고서 초안과 개인 임시 파일은 구현 계약의 기준으로 삼지 않습니다.
 - **배치 원칙**: 새 가이드는 `guides/`, 설계 계약은 `blueprints/`, 평가 보고와 해당 원본은 `evaluation/`에 함께 둡니다. 실행 코드·DB revision·CI 설정은 원래 코드 디렉터리에 유지하고 문서에서 상대 링크로 연결합니다.
 
 ## 상세 설계 문서
