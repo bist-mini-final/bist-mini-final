@@ -2,13 +2,13 @@
 
 [프로젝트 소개·GIF 시연](../../README.md#주요-기능과-시연) · [문서 통합 목차](../README.md)
 
-실제 프론트엔드를 활용한 **통합 시연 영상·기능별 GIF·README 이미지**를 관리합니다. 루트 README에는 영상 미리보기와 기능 GIF를 직접 표시합니다.
+실제 프론트엔드를 활용한 **통합 시연 영상·기능별 GIF·README 이미지**를 관리합니다. 루트 README에서는 GitHub 내장 영상 플레이어와 기능 GIF를 바로 볼 수 있습니다.
 
 ## 통합 시연 영상
 
-[![자막 포함 통합 시연 영상](demo/poster.png)](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4)
+https://github.com/user-attachments/assets/6acd636c-8bf7-487a-8281-b722cd55a29d
 
-**[전체 영상 MP4](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4)** · [한글 자막 SRT](demo/coldplay-demo-ko.srt) · [챕터·재현 범위](demo/README.md)
+[원본 MP4 다운로드](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4) · [한글 자막 SRT](demo/coldplay-demo-ko.srt) · [챕터·재현 범위](demo/README.md)
 
 약 5분 30초 · 1080p · 30fps · 한글 자막 포함. 실제 프론트 코드와 저장된 실행 결과를 활용한 오프라인 재현으로, 실시간 성능 측정 영상이 아닙니다.
 

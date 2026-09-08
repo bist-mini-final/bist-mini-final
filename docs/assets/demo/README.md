@@ -2,9 +2,11 @@
 
 [프로젝트 소개](../../../README.md#통합-시연-영상) · [전체 시연 자료](../README.md) · [프로젝트 문서](../../README.md)
 
-[![통합 시연 미리보기](poster.png)](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4)
+https://github.com/user-attachments/assets/6acd636c-8bf7-487a-8281-b722cd55a29d
 
-**[전체 영상 MP4](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4)** · [한글 자막 SRT](coldplay-demo-ko.srt)
+[원본 MP4 다운로드](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4) · [한글 자막 SRT](coldplay-demo-ko.srt)
+
+위 플레이어에서 페이지를 떠나지 않고 재생하거나 전체 화면으로 볼 수 있습니다. GitHub 첨부용 영상은 10MB 한도에 맞춰 압축한 **1080p·30fps 재생본(약 8.9MB)**이며, 전체 시연 순서와 한글 자막은 동일합니다. 발표용 고화질 원본은 다운로드 링크로 제공합니다.
 
 | 항목 | 내용 |
 | --- | --- |
@@ -47,3 +49,7 @@
 MP4를 발표 기기에 미리 내려받으면 **API 키와 인터넷 없이 재생**할 수 있습니다. 자막이 영상에 포함되어 있으므로 SRT를 따로 불러올 필요가 없습니다. SRT는 자막 수정이나 다른 편집 도구에서 재사용할 때 사용합니다.
 
 전체 영상과 기능별 GIF 원본을 혼동하지 않도록 MP4·SRT·이 안내 문서는 `docs/assets/demo/`에서 함께 관리합니다.
+
+## README 영상 갱신
+
+GitHub 내장 플레이어에는 저장소의 Raw 다운로드 주소가 아니라 **GitHub에 첨부한 영상 주소**를 사용합니다. 영상을 교체할 때는 10MB 미만의 H.264 재생본을 GitHub 편집 화면에 첨부하고, 생성된 `https://github.com/user-attachments/assets/…` 주소를 루트 README·시연 자료 목차·이 문서에 함께 갱신합니다. 주소는 다른 텍스트나 링크 문법으로 감싸지 않고 독립된 문단에 둡니다.

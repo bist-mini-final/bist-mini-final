@@ -34,10 +34,10 @@ S&P Capital IQ Pro 형식의 재무제표를 구조적으로 적재하고, 검�
 
 **등록한 엑셀 한 파일이 검색과 기업 비교로 이어지는 과정**을 사용자 역할에 맞춰 보여줍니다.
 
-[![통합 시연 영상 — 재무 대시보드 미리보기, 클릭하면 MP4 열기](docs/assets/demo/poster.png)](https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4)
+https://github.com/user-attachments/assets/6acd636c-8bf7-487a-8281-b722cd55a29d
 
 <p align="center">
-  <a href="https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4"><strong>▶ 전체 시연 MP4</strong></a> &nbsp; · &nbsp;
+  <a href="https://github.com/bist-mini-final/bist-mini-final/raw/refs/heads/main/docs/assets/demo/coldplay-demo-ko.mp4">원본 MP4 다운로드</a> &nbsp; · &nbsp;
   <a href="docs/assets/demo/coldplay-demo-ko.srt">한글 자막 SRT</a> &nbsp; · &nbsp;
   <a href="docs/assets/demo/README.md">챕터·시연 안내</a><br/>
   <sub>05:30 · 1920 × 1080 · 30fps · 한글 자막 포함 · 음성 없음</sub>
@@ -145,7 +145,7 @@ Dense 검색과 PostgreSQL FTS의 순위를 RRF로 합치고, 행 문맥을 확�
     <td align="center" width="25%"><a href="https://github.com/pileuszu"><img src="https://avatars.githubusercontent.com/u/163377569?v=4&amp;s=160" width="88" height="88" alt="김지환 GitHub 프로필"/><br/><strong>김지환</strong><br/><sub>@pileuszu</sub></a></td>
     <td align="center" width="25%"><a href="https://github.com/baming320"><img src="https://avatars.githubusercontent.com/u/271436315?v=4&amp;s=160" width="88" height="88" alt="전명준 GitHub 프로필"/><br/><strong>전명준</strong><br/><sub>@baming320</sub></a></td>
     <td align="center" width="25%"><a href="https://github.com/Qui-0"><img src="https://avatars.githubusercontent.com/u/93606147?v=4&amp;s=160" width="88" height="88" alt="권혁준 GitHub 프로필"/><br/><strong>권혁준</strong><br/><sub>@Qui-0</sub></a></td>
-    <td align="center" width="25%"><a href="https://github.com/Garden-Kim"><img src="https://avatars.githubusercontent.com/u/39118437?v=4&amp;s=160" width="88" height="88" alt="김정원 GitHub 프로필"/><br/><strong>김정원</strong><br/><sub>@Garden-Kim</sub></a></td>
+    <td align="center" width="25%"><a href="https://github.com/garden-kim-git"><img src="https://avatars.githubusercontent.com/u/53960185?v=4&amp;s=160" width="88" height="88" alt="김정원 GitHub 프로필"/><br/><strong>김정원</strong><br/><sub>@garden-kim-git</sub></a></td>
   </tr>
   <tr>
     <td align="center"><strong>팀장 · 오케스트레이션</strong></td>
